@@ -674,6 +674,19 @@ enum PromoDiscountType {
   free_travel
 }
 
+// One band of a tiered promo. Embedded rather than a model: tiers are owned
+// entirely by their promo and are never queried on their own.
+type PromoTier {
+  // Inclusive floor for this band, against the pre-discount total.
+  minSpend        Float
+  // Exactly one is set, matching the parent promo's discountType. Same reason
+  // as the parent's columns: a misconfigured tier is visible in the data.
+  flatHourlyRate  Float?
+  percentDiscount Float?
+  fixedAmount     Float?
+  travelPercent   Float?
+}
+
 model Promo {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
   title           String
@@ -708,6 +721,43 @@ model Promo {
   // "newest createdAt wins", which could not be overridden. Existing promos
   // sit at 0, so the createdAt tie-break still decides them exactly as before.
   priority Int @default(0)
+
+  // Tiered thresholds. When non-empty the highest band the job reaches supplies
+  // the discount and the columns above are ignored; when the job reaches none,
+  // the promo does not apply at all rather than falling back to a smaller
+  // discount. Empty is the ordinary single-value promo.
+  //
+  // Bands are selected against the LOW end of the pre-discount total, so the
+  // customer is quoted the discount they are certain to get and a job that
+  // lands higher simply earns more at invoice time. Advertising the high band
+  // would promise a discount the job may not reach.
+  tiers PromoTier[]
+
+  // Eligibility limits. Null means no limit.
+  //
+  // maxRedemptions is approximate by design: two customers can pass the count
+  // check concurrently and both redeem. A distributed lock is not worth it for
+  // a one-operator business, so a promo can go one or two past its cap under
+  // concurrent load.
+  maxRedemptions   Int?
+  perCustomerLimit Int?
+  // Floor for the pre-discount total, read the same way a tier's is.
+  minSpend         Float?
+  // Only for someone with no prior completed booking.
+  newCustomersOnly Boolean @default(false)
+
+  // Recurring window. Inside [startAt, endAt], optionally restrict to these NZ
+  // weekdays (0 = Sunday) and this NZ time-of-day range. An empty list and null
+  // times mean the whole window, which is what every existing promo has.
+  //
+  // Both are matched against the APPOINTMENT, not against when the customer is
+  // browsing: a Tuesday promo exists to fill Tuesday slots, so booking on
+  // Monday for a Tuesday job earns it and booking on Tuesday for a Thursday job
+  // does not.
+  activeWeekdays   Int[]
+  // Minutes since NZ midnight, 0-1439. Both set or both null.
+  activeFromMinute Int?
+  activeToMinute   Int?
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

@@ -19,6 +19,7 @@ import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-pol
 import {
   getActivePromo,
   promoDisplayRate,
+  promoForAppointment,
   promoTravelFactor,
 } from "@/features/business/lib/promos";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
@@ -78,8 +79,12 @@ export default async function FaqPage(): Promise<React.ReactElement> {
     getActivePromo(),
   ]);
   // Quote the promo prices, or the FAQ contradicts the banner running above it.
-  const displayRate = promoDisplayRate(pricing.baseRate, promo);
-  const travelFactor = promoTravelFactor(promo);
+  // A promo restricted to certain days is deliberately not priced in: the FAQ
+  // has no appointment to check it against, so it would quote a discount the
+  // reader may not earn.
+  const pricedPromo = promoForAppointment(promo, null);
+  const displayRate = promoDisplayRate(pricing.baseRate, pricedPromo);
+  const travelFactor = promoTravelFactor(pricedPromo);
   const displayTravelRate = Math.round(pricing.travelRatePerHour * travelFactor * 100) / 100;
   const displayMinTravel = Math.round(policy.MIN_TRAVEL_CHARGE * travelFactor * 100) / 100;
   const rateDiscounted = displayRate !== pricing.baseRate;

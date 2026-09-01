@@ -1,6 +1,6 @@
 // src/app/api/business/job-context/route.ts
 /**
- * @description GET /api/business/job-context?date=YYYY-MM-DD[&code=CODE] -
+ * @description GET /api/business/job-context?date=YYYY-MM-DD[&code=CODE][&email=] -
  * admin-only. Given the date a job was actually done, returns whether it was an
  * NZ public holiday (with the live labour uplift) and which promo applied that
  * day, so the calculator prices a past job by what applied then, not today.
@@ -28,8 +28,9 @@ interface JobContextResponse {
 
 /**
  * Resolves the holiday + promo context for a job date.
- * @param request - Incoming request with a `date` query param (YYYY-MM-DD) and
- * an optional `code` for a job taken over the phone with a promo code.
+ * @param request - Incoming request with a `date` query param (YYYY-MM-DD), an
+ * optional `code` for a job taken over the phone, and an optional `email` so
+ * per-customer limits bind an operator-priced job too.
  * @returns JSON { holidayName, holidayUplift, promo }.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -50,11 +51,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // been running on the day the work happened, and the invoice must reflect the
   // day.
   const code = request.nextUrl.searchParams.get("code");
+  // Per-customer and new-customer limits need someone to judge. Without it an
+  // operator-priced job would quietly ignore a limit the public flow enforces.
+  const email = request.nextUrl.searchParams.get("email");
 
   const [settings, holiday, promo] = await Promise.all([
     getSettings(),
     lookupPublicHoliday(date).catch(() => null),
-    resolvePromo({ at: date, code }).catch(() => null),
+    resolvePromo({ at: date, code, email }).catch(() => null),
   ]);
 
   const body: JobContextResponse = {

@@ -10,11 +10,15 @@ import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { formatNZD } from "@/features/business/lib/business";
-import { pickWinningPromo } from "@/features/business/lib/promos";
+import {
+  describeRecurringWindow,
+  pickWinningPromo,
+  summariseForBanner,
+  type ActivePromo,
+} from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
-import type React from "react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 /** Shared classes for the promo form inputs. */
 const inputClass =
@@ -23,6 +27,46 @@ const inputClass =
 type PromoType = "flat" | "percent" | "fixed" | "travel";
 
 /** Form type > the column the API stores it under. */
+/**
+ * The stored columns for one amount of a given type.
+ *
+ * Shared by the promo's own value and every tier, so a band cannot be stored
+ * differently from the promo it belongs to - the travel inversion in particular
+ * is easy to apply once and forget the second time.
+ * @param type - The form's discount type.
+ * @param amount - The number the operator typed.
+ * @returns The four value columns, exactly one of them set.
+ */
+function discountColumns(
+  type: PromoType,
+  amount: number,
+): {
+  flatHourlyRate: number | null;
+  percentDiscount: number | null;
+  fixedAmount: number | null;
+  travelPercent: number | null;
+} {
+  return {
+    flatHourlyRate: type === "flat" ? amount : null,
+    percentDiscount: type === "percent" ? amount / 100 : null,
+    fixedAmount: type === "fixed" ? amount : null,
+    // The operator enters "% off travel"; the column stores the fraction still
+    // charged, so 100% off is 0.
+    travelPercent: type === "travel" ? 1 - amount / 100 : null,
+  };
+}
+
+/**
+ * The number to show in a tier's amount input, read the same way as the
+ * promo's own.
+ * @param tier - The stored tier.
+ * @param promo - Its parent, which decides how the value is read.
+ * @returns The operator-facing amount, or "" when the tier is blank.
+ */
+function tierAmountFor(tier: PromoRow["tiers"][number], promo: PromoRow): number | string {
+  return amountFor({ ...promo, ...tier });
+}
+
 const DISCOUNT_TYPE: Record<PromoType, "flat_hourly" | "percent" | "fixed_amount" | "free_travel"> =
   {
     flat: "flat_hourly",
@@ -89,7 +133,53 @@ interface FormState {
   kind: "automatic" | "code";
   /** The code, uppercase. Ignored when the kind is automatic. */
   code: string;
+  /** Total uses allowed across everyone. Blank for no cap. */
+  maxRedemptions: string;
+  /** Uses allowed per customer. Blank for no cap. */
+  perCustomerLimit: string;
+  newCustomersOnly: boolean;
+  /** NZ weekdays it applies on (0 = Sunday); empty means every day. */
+  activeWeekdays: number[];
+  /** NZ start time as "HH:mm", or "" for no time restriction. */
+  activeFrom: string;
+  /** NZ end time as "HH:mm", or "" for no time restriction. */
+  activeTo: string;
+  /** Floor for the pre-discount total. Blank for none. */
+  minSpend: string;
+  /**
+   * Spend bands, held as strings for the inputs. Empty is the ordinary
+   * single-value promo; the amount is read the same way the top-level one is,
+   * so a percent band is entered as "20" and stored as 0.2.
+   */
+  tiers: { minSpend: string; amount: string }[];
 }
+
+/**
+ * "HH:mm" > minutes past midnight, or null when blank or unparseable.
+ * @param value - Time-input value.
+ * @returns Minutes past midnight, or null.
+ */
+function toMinuteOfDay(value: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const minute = Number(match[1]) * 60 + Number(match[2]);
+  return minute >= 0 && minute <= 1439 ? minute : null;
+}
+
+/**
+ * Minutes past midnight > the "HH:mm" a time input expects.
+ * @param minute - Minutes past midnight, or null.
+ * @returns Time-input value, or "" when there is none.
+ */
+function fromMinuteOfDay(minute: number | null): string {
+  if (minute == null) return "";
+  const h = Math.floor(minute / 60);
+  const m = minute % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Weekday labels for the recurring-window picker, indexed 0 = Sunday. */
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /**
  * ISO timestamp > "YYYY-MM-DD" (local date parts) for <input type="date">.
@@ -143,6 +233,43 @@ function endIsoToInclusiveDate(iso: string): string {
 }
 
 /**
+ * Turns the form into the promo shape the customer-facing helpers read, so the
+ * preview below is produced by the same code that writes the real banner.
+ *
+ * Null until there is an amount to describe - a half-typed form would otherwise
+ * preview "Limited offer", which is the fallback for a misconfigured promo and
+ * would read as a warning.
+ * @param form - Current form state.
+ * @returns A promo to describe, or null when the form is not ready.
+ */
+function previewPromo(form: FormState): ActivePromo | null {
+  const amount = parseFloat(form.amount);
+  if (isNaN(amount) || amount <= 0) return null;
+  if (!form.endDate) return null;
+  return {
+    id: "preview",
+    title: form.title,
+    description: form.description || null,
+    startAt: startOfDayISO(form.startDate),
+    endAt: endOfDayISO(form.endDate),
+    kind: form.kind,
+    code: form.kind === "code" ? form.code : null,
+    discountType: DISCOUNT_TYPE[form.type],
+    ...discountColumns(form.type, amount),
+    minSpend: form.minSpend.trim() ? parseFloat(form.minSpend) : null,
+    tiers: form.tiers
+      .filter((t) => t.minSpend.trim() && t.amount.trim())
+      .map((t) => ({
+        minSpend: parseFloat(t.minSpend),
+        ...discountColumns(form.type, parseFloat(t.amount)),
+      })),
+    activeWeekdays: form.activeWeekdays,
+    activeFromMinute: toMinuteOfDay(form.activeFrom),
+    activeToMinute: toMinuteOfDay(form.activeTo),
+  };
+}
+
+/**
  * Empty form pre-populated with today + a week-out end.
  * @returns Default FormState.
  */
@@ -160,6 +287,14 @@ function emptyForm(): FormState {
     priority: "0",
     kind: "automatic",
     code: "",
+    maxRedemptions: "",
+    perCustomerLimit: "",
+    newCustomersOnly: false,
+    activeWeekdays: [],
+    activeFrom: "",
+    activeTo: "",
+    minSpend: "",
+    tiers: [],
   };
 }
 
@@ -218,7 +353,14 @@ function rangesOverlap(a: PromoRow, b: PromoRow): boolean {
   const aEnd = new Date(a.endAt).getTime();
   const bStart = new Date(b.startAt).getTime();
   const bEnd = new Date(b.endAt).getTime();
-  return aStart < bEnd && bStart < aEnd;
+  if (aStart >= bEnd || bStart >= aEnd) return false;
+  // Sharing a date range is not competing if they run on different days. A
+  // Tuesday promo and a Thursday one never meet, and warning about them would
+  // train the operator to ignore the warning that matters.
+  if (a.activeWeekdays.length > 0 && b.activeWeekdays.length > 0) {
+    return a.activeWeekdays.some((d) => b.activeWeekdays.includes(d));
+  }
+  return true;
 }
 
 /**
@@ -332,27 +474,108 @@ function describeDiscount(p: PromoRow): string {
   }
 }
 
-/** Props for {@link CodeChip}. */
-interface CodeChipProps {
-  /** The promo the chip describes. */
+/** Props for {@link PromoStatsBlock}. */
+interface PromoStatsBlockProps {
+  /** The promo being reported on. */
+  promo: PromoRow;
+  /** Its redemption totals, or undefined when it has none. */
+  stats: PromoStats | undefined;
+}
+
+/**
+ * Usage detail for one promo: how often it was redeemed, what it gave away, and
+ * how much of its cap is left.
+ *
+ * Deliberately answers only what the redemption rows can support. Whether the
+ * promo caused the bookings is not knowable from this data, and a number
+ * implying it were would be worse than no number.
+ * @param props - Component props.
+ * @param props.promo - The promo being reported on.
+ * @param props.stats - Its redemption totals.
+ * @returns The stats block.
+ */
+function PromoStatsBlock({ promo, stats }: PromoStatsBlockProps): React.ReactElement {
+  const used = stats?.redemptions ?? 0;
+  const rows: [string, string][] = [["Redemptions", String(used)]];
+
+  if (promo.maxRedemptions != null) {
+    const left = Math.max(0, promo.maxRedemptions - used);
+    rows.push([
+      "Cap",
+      `${used} of ${promo.maxRedemptions} used, ${left} left${left === 0 ? " - the promo will no longer apply" : ""}`,
+    ]);
+  }
+  if (promo.perCustomerLimit != null) {
+    rows.push(["Per customer", `${promo.perCustomerLimit} max`]);
+  }
+
+  // Unvalued rows are called out rather than counted as zero: a redemption
+  // recorded before the value was tracked is not a discount of nothing.
+  if (used > 0) {
+    const valued = used - (stats?.unvaluedRedemptions ?? 0);
+    rows.push([
+      "Discount given",
+      valued > 0
+        ? `${formatNZD(stats?.totalDiscount ?? 0)} across ${valued} of them`
+        : "not recorded on any of them",
+    ]);
+    if (stats?.lastRedeemedAt) {
+      rows.push(["Last used", formatDateShort(stats.lastRedeemedAt)]);
+    }
+  }
+
+  return (
+    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-lg bg-admin-bg px-3 py-2 text-xs">
+      {rows.map(([label, value]) => (
+        <React.Fragment key={label}>
+          <dt className="text-admin-faint">{label}</dt>
+          <dd className="text-admin-text">{value}</dd>
+        </React.Fragment>
+      ))}
+    </dl>
+  );
+}
+
+/** Props for {@link PromoChips}. */
+interface PromoChipsProps {
+  /** The promo the chips describe. */
   promo: PromoRow;
 }
 
 /**
- * Marks a promo as code-only, showing the code itself.
+ * Marks everything that narrows a promo below "applies to everyone, always".
  *
- * Without it a code promo reads as broken in the list: it says Active while the
- * banner stays silent and the pricing page quotes standard rates, which is
- * correct but looks like a bug.
+ * Without these a restricted promo reads as broken in the list: it says Active
+ * while the banner stays silent or the discount only lands on some jobs, which
+ * is correct but looks like a bug.
  * @param props - Component props.
- * @param props.promo - The promo the chip describes.
- * @returns The chip, or null for an automatic promo.
+ * @param props.promo - The promo the chips describe.
+ * @returns The chip row, or null when nothing narrows the promo.
  */
-function CodeChip({ promo }: CodeChipProps): React.ReactElement | null {
-  if (promo.kind !== "code" || !promo.code) return null;
+function PromoChips({ promo }: PromoChipsProps): React.ReactElement | null {
+  const chips: string[] = [];
+  if (promo.kind === "code" && promo.code) chips.push(`Code only: ${promo.code}`);
+  // Shared with the customer-facing banner so the operator reads the same
+  // wording the customer will.
+  const window = describeRecurringWindow(promo);
+  if (window) chips.push(window);
+  if (promo.tiers.length > 0) chips.push(`${promo.tiers.length} spend tiers`);
+  else if (promo.minSpend != null) chips.push(`Jobs over $${promo.minSpend}`);
+  if (promo.newCustomersOnly) chips.push("New customers only");
+  if (promo.maxRedemptions != null) chips.push(`${promo.maxRedemptions} uses total`);
+  if (promo.perCustomerLimit != null) chips.push(`${promo.perCustomerLimit} per customer`);
+  if (chips.length === 0) return null;
+
   return (
-    <span className="mt-1 inline-block rounded bg-admin-bg px-1.5 py-0.5 text-xs font-semibold tracking-wider text-admin-muted">
-      Code only: {promo.code}
+    <span className="mt-1 flex flex-wrap gap-1">
+      {chips.map((chip) => (
+        <span
+          key={chip}
+          className="rounded bg-admin-bg px-1.5 py-0.5 text-xs font-semibold text-admin-muted"
+        >
+          {chip}
+        </span>
+      ))}
     </span>
   );
 }
@@ -380,6 +603,21 @@ export function PromosView({ initial }: Props): React.ReactElement {
 
   const { ids: overlaps, winners: overlapWinners } = findOverlaps(promos);
   const [stats, setStats] = useState<Record<string, PromoStats>>({});
+  const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
+  // Ids whose stats block is open. Collapsed by default so the list stays
+  // scannable when most promos have nothing interesting to report.
+  const [openStats, setOpenStats] = useState<Set<string>>(new Set());
+
+  // Overlaps are computed across ALL promos, not the filtered view: a promo
+  // hidden by the filter still competes with a visible one, and warning only
+  // about what happens to be on screen would be worse than not warning.
+  const visiblePromos =
+    statusFilter === "all" ? promos : promos.filter((p) => getStatus(p) === statusFilter);
+  const statusCounts = promos.reduce<Record<string, number>>((acc, p) => {
+    const key = getStatus(p);
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
 
   useEffect(() => {
     fetch("/api/business/promos/stats")
@@ -390,6 +628,19 @@ export function PromosView({ initial }: Props): React.ReactElement {
       })
       .catch(() => toast("Couldn't load promo usage.", { tone: "error" }));
   }, [toast]);
+
+  /**
+   * Toggles a promo's stats block.
+   * @param id - Promo id.
+   */
+  function toggleStats(id: string): void {
+    setOpenStats((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   /** Resets the form back to its blank state and exits edit mode. */
   function resetForm(): void {
@@ -417,7 +668,43 @@ export function PromosView({ initial }: Props): React.ReactElement {
       priority: String(p.priority),
       kind: p.kind,
       code: p.code ?? "",
+      maxRedemptions: p.maxRedemptions != null ? String(p.maxRedemptions) : "",
+      perCustomerLimit: p.perCustomerLimit != null ? String(p.perCustomerLimit) : "",
+      newCustomersOnly: p.newCustomersOnly,
+      activeWeekdays: p.activeWeekdays,
+      activeFrom: fromMinuteOfDay(p.activeFromMinute),
+      activeTo: fromMinuteOfDay(p.activeToMinute),
+      minSpend: p.minSpend != null ? String(p.minSpend) : "",
+      tiers: [...p.tiers]
+        .sort((a, b) => a.minSpend - b.minSpend)
+        .map((t) => ({ minSpend: String(t.minSpend), amount: String(tierAmountFor(t, p)) })),
     });
+  }
+
+  /**
+   * Loads a promo into the form as a NEW one.
+   *
+   * Promos are nearly always a variation on the last, so the whole
+   * configuration is carried across - only the title is marked and the dates
+   * are pushed forward, since reusing a finished window would create a promo
+   * that is already expired.
+   * @param p - Promo to copy.
+   */
+  function startDuplicate(p: PromoRow): void {
+    startEdit(p);
+    setEditingId(null);
+    const today = new Date();
+    const weekOut = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+    setForm((f) => ({
+      ...f,
+      title: `${p.title} (copy)`,
+      startDate: toDateInput(today.toISOString()),
+      endDate: toDateInput(weekOut.toISOString()),
+      // A code is unique, so the copy cannot keep it - cleared rather than
+      // suffixed, so the operator has to choose one rather than ship "SPRING25-2".
+      code: "",
+    }));
+    setError(null);
   }
 
   /**
@@ -440,6 +727,16 @@ export function PromosView({ initial }: Props): React.ReactElement {
       setError("A code promo needs a code.");
       return;
     }
+    // Caught here as well as server-side so the operator is told before the
+    // round trip which half of the pair is missing.
+    if (Boolean(form.activeFrom) !== Boolean(form.activeTo)) {
+      setError("A time-of-day restriction needs both a start and an end.");
+      return;
+    }
+    if (form.tiers.some((t) => !t.minSpend.trim() || !t.amount.trim())) {
+      setError("Every tier needs both a spend threshold and an amount.");
+      return;
+    }
     const body = {
       title: form.title.trim(),
       description: form.description.trim() || null,
@@ -449,18 +746,28 @@ export function PromosView({ initial }: Props): React.ReactElement {
       // Send only the column that matches the selected type; the route
       // validates per type and rejects anything half-filled.
       discountType: DISCOUNT_TYPE[form.type],
-      flatHourlyRate: form.type === "flat" ? amount : null,
-      percentDiscount: form.type === "percent" ? amount / 100 : null,
-      fixedAmount: form.type === "fixed" ? amount : null,
-      // The operator enters "% off travel"; the column stores the fraction
-      // still charged, so 100% off is 0.
-      travelPercent: form.type === "travel" ? 1 - amount / 100 : null,
+      ...discountColumns(form.type, amount),
       isActive: form.isActive,
       priority: parseInt(form.priority, 10) || 0,
       kind: form.kind,
       // Always sent, including as null for automatic, so switching a promo back
       // to automatic clears the code it used to carry.
       code: form.kind === "code" ? form.code.trim() : null,
+      // Blank means no cap, which is null rather than 0 - the route rejects 0,
+      // since a limit of nothing reads as an off switch nobody looks for.
+      maxRedemptions: form.maxRedemptions.trim() ? parseInt(form.maxRedemptions, 10) : null,
+      perCustomerLimit: form.perCustomerLimit.trim() ? parseInt(form.perCustomerLimit, 10) : null,
+      newCustomersOnly: form.newCustomersOnly,
+      activeWeekdays: form.activeWeekdays,
+      activeFromMinute: toMinuteOfDay(form.activeFrom),
+      activeToMinute: toMinuteOfDay(form.activeTo),
+      minSpend: form.minSpend.trim() ? parseFloat(form.minSpend) : null,
+      // Bands carry the same kind of discount as their parent, built by the
+      // same converter.
+      tiers: form.tiers.map((t) => ({
+        minSpend: parseFloat(t.minSpend),
+        ...discountColumns(form.type, parseFloat(t.amount)),
+      })),
     };
 
     setBusy(true);
@@ -673,6 +980,210 @@ export function PromosView({ initial }: Props): React.ReactElement {
           </span>
         </label>
 
+        <fieldset className="flex flex-col gap-3 rounded-xl border border-admin-border p-4">
+          <legend className="px-1 text-xs font-medium text-admin-muted">
+            Spend thresholds (optional)
+          </legend>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-admin-muted">Minimum spend ($)</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.minSpend}
+              onChange={(e) => setForm((p) => ({ ...p, minSpend: e.target.value }))}
+              placeholder="No minimum"
+              className={cn(inputClass, "w-40")}
+            />
+          </label>
+
+          {form.tiers.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {form.tiers.map((tier, i) => (
+                <div key={i} className="flex flex-wrap items-end gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-admin-muted">Spend over ($)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={tier.minSpend}
+                      onChange={(e) =>
+                        setForm((p) => ({
+                          ...p,
+                          tiers: p.tiers.map((t, j) =>
+                            j === i ? { ...t, minSpend: e.target.value } : t,
+                          ),
+                        }))
+                      }
+                      className={cn(inputClass, "w-32")}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-admin-muted">
+                      {AMOUNT_LABEL[form.type]}
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step={form.type === "flat" || form.type === "fixed" ? "0.01" : "1"}
+                      value={tier.amount}
+                      onChange={(e) =>
+                        setForm((p) => ({
+                          ...p,
+                          tiers: p.tiers.map((t, j) =>
+                            j === i ? { ...t, amount: e.target.value } : t,
+                          ),
+                        }))
+                      }
+                      className={cn(inputClass, "w-32")}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm((p) => ({ ...p, tiers: p.tiers.filter((_, j) => j !== i) }))
+                    }
+                    className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() =>
+              setForm((p) => ({ ...p, tiers: [...p.tiers, { minSpend: "", amount: "" }] }))
+            }
+            className="self-start rounded-lg border border-admin-border bg-admin-surface px-3 py-1.5 text-xs font-medium text-admin-muted hover:bg-admin-bg"
+          >
+            Add a spend tier
+          </button>
+          <p className="text-xs text-admin-faint">
+            With no tiers the promo gives its single amount above. With tiers, the highest one the
+            job reaches supplies the discount and the amount above is ignored - a job that reaches
+            none gets nothing rather than a smaller discount. Thresholds are read against the low
+            end of the quote before any discount, so the customer is quoted what they are certain to
+            get and a job that lands higher earns more on the invoice.
+          </p>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3 rounded-xl border border-admin-border p-4">
+          <legend className="px-1 text-xs font-medium text-admin-muted">Who can use it</legend>
+          <div className="flex flex-wrap gap-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-admin-muted">Total uses</span>
+              <input
+                type="number"
+                min="1"
+                step={1}
+                value={form.maxRedemptions}
+                onChange={(e) => setForm((p) => ({ ...p, maxRedemptions: e.target.value }))}
+                placeholder="No limit"
+                className={cn(inputClass, "w-32")}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-admin-muted">Uses per customer</span>
+              <input
+                type="number"
+                min="1"
+                step={1}
+                value={form.perCustomerLimit}
+                onChange={(e) => setForm((p) => ({ ...p, perCustomerLimit: e.target.value }))}
+                placeholder="No limit"
+                className={cn(inputClass, "w-32")}
+              />
+            </label>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-admin-muted">
+            <input
+              type="checkbox"
+              checked={form.newCustomersOnly}
+              onChange={(e) => setForm((p) => ({ ...p, newCustomersOnly: e.target.checked }))}
+              className="h-4 w-4"
+            />
+            New customers only (nobody with a completed job on file)
+          </label>
+          <p className="text-xs text-admin-faint">
+            The total cap is approximate: two people can pass it at the same moment and both redeem.
+            Per-customer and new-customer rules need someone the site can identify, so an
+            unrecognised email is allowed through rather than refused.
+          </p>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3 rounded-xl border border-admin-border p-4">
+          <legend className="px-1 text-xs font-medium text-admin-muted">
+            When it applies (optional)
+          </legend>
+          <div className="flex flex-wrap gap-1.5">
+            {WEEKDAY_LABELS.map((label, day) => {
+              const picked = form.activeWeekdays.includes(day);
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={picked}
+                  onClick={() =>
+                    setForm((p) => ({
+                      ...p,
+                      activeWeekdays: picked
+                        ? p.activeWeekdays.filter((d) => d !== day)
+                        : [...p.activeWeekdays, day].sort((a, b) => a - b),
+                    }))
+                  }
+                  className={cn(
+                    "rounded-lg border px-3 py-1.5 text-sm font-medium",
+                    picked
+                      ? "border-admin-text bg-admin-text text-admin-surface"
+                      : "border-admin-border bg-admin-surface text-admin-muted hover:bg-admin-bg",
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap items-end gap-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-admin-muted">From</span>
+              <input
+                type="time"
+                value={form.activeFrom}
+                onChange={(e) => setForm((p) => ({ ...p, activeFrom: e.target.value }))}
+                className={cn(inputClass, "w-32")}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-admin-muted">To</span>
+              <input
+                type="time"
+                value={form.activeTo}
+                onChange={(e) => setForm((p) => ({ ...p, activeTo: e.target.value }))}
+                className={cn(inputClass, "w-32")}
+              />
+            </label>
+            {(form.activeFrom || form.activeTo) && (
+              <button
+                type="button"
+                onClick={() => setForm((p) => ({ ...p, activeFrom: "", activeTo: "" }))}
+                className="pb-2 text-xs font-medium text-admin-muted underline hover:text-admin-text"
+              >
+                Clear times
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-admin-faint">
+            Leave blank to run the whole window. These are matched against the appointment in NZ
+            time, not against when the customer is browsing, so a Tuesday offer is earned by booking
+            a Tuesday job on any day. The banner still advertises the promo throughout and names the
+            restriction.
+          </p>
+        </fieldset>
+
         <label className="flex items-center gap-2 text-sm text-admin-muted">
           <input
             type="checkbox"
@@ -688,6 +1199,29 @@ export function PromosView({ initial }: Props): React.ReactElement {
             {error}
           </p>
         )}
+
+        {/* Rendered by summariseForBanner, the same function the real banner
+            calls, so the preview cannot drift from what ships. Across four
+            discount types plus tiers, a spend floor and a weekday restriction,
+            the wording is no longer obvious from the fields above. */}
+        {(() => {
+          const preview = previewPromo(form);
+          if (!preview) return null;
+          return (
+            <div className="rounded-xl border border-admin-border bg-admin-bg px-4 py-3">
+              <p className="text-xs font-medium text-admin-muted">Customers will see</p>
+              <p className="mt-1 text-sm font-semibold text-admin-text">
+                ⚡ {summariseForBanner(preview)}
+              </p>
+              {form.kind === "code" && (
+                <p className="mt-1 text-xs text-admin-faint">
+                  Not on the banner - a code promo is only ever shown to someone who enters
+                  {form.code ? ` ${form.code}` : " the code"}.
+                </p>
+              )}
+            </div>
+          );
+        })()}
 
         <div className="flex gap-2">
           <AdminButton type="submit" busy={busy}>
@@ -705,9 +1239,36 @@ export function PromosView({ initial }: Props): React.ReactElement {
       {overlaps.size > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
           <strong>Heads up:</strong> {overlaps.size} active promos have overlapping date ranges.
-          Only one applies at a time - the highest priority wins, then the newer one. Customers will
-          see whichever was created most recently. Consider disabling or shortening one to avoid
-          surprise behaviour.
+          Only one applies at a time - the highest priority wins, then the newer one. Each row below
+          names which promo actually wins. Consider disabling or shortening one to avoid surprise
+          behaviour.
+        </div>
+      )}
+
+      {/* Status filter. Counts come from the full list, so a zero is visible
+          rather than the tab simply being absent. */}
+      {promos.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {(["all", "active", "upcoming", "expired", "disabled"] as const).map((key) => {
+            const count = key === "all" ? promos.length : (statusCounts[key] ?? 0);
+            const selected = statusFilter === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => setStatusFilter(key)}
+                className={cn(
+                  "rounded-lg border px-3 py-1.5 text-xs font-medium capitalize",
+                  selected
+                    ? "border-admin-text bg-admin-text text-admin-surface"
+                    : "border-admin-border bg-admin-surface text-admin-muted hover:bg-admin-bg",
+                )}
+              >
+                {key} ({count})
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -716,6 +1277,10 @@ export function PromosView({ initial }: Props): React.ReactElement {
         <p className="rounded-xl border border-admin-border bg-admin-surface p-6 text-sm text-admin-faint">
           No promos yet. Create one above to surface an offer in the site banner, pricing wizard,
           and admin calculator.
+        </p>
+      ) : visiblePromos.length === 0 ? (
+        <p className="rounded-xl border border-admin-border bg-admin-surface p-6 text-sm text-admin-faint">
+          No {statusFilter} promos. Pick another filter to see the rest.
         </p>
       ) : (
         <>
@@ -732,7 +1297,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
                 </tr>
               </thead>
               <tbody className="divide-y divide-admin-border">
-                {promos.map((p) => {
+                {visiblePromos.map((p) => {
                   const status = getStatus(p);
                   const overlapping = overlaps.has(p.id);
                   return (
@@ -742,8 +1307,16 @@ export function PromosView({ initial }: Props): React.ReactElement {
                         {p.description && (
                           <p className="text-xs text-admin-faint">{p.description}</p>
                         )}
-                        <CodeChip promo={p} />
-                        <p className="text-xs text-admin-muted">{usageNote(stats[p.id])}</p>
+                        <PromoChips promo={p} />
+                        <button
+                          type="button"
+                          onClick={() => toggleStats(p.id)}
+                          aria-expanded={openStats.has(p.id)}
+                          className="text-left text-xs text-admin-muted underline decoration-dotted hover:text-admin-text"
+                        >
+                          {usageNote(stats[p.id])}
+                        </button>
+                        {openStats.has(p.id) && <PromoStatsBlock promo={p} stats={stats[p.id]} />}
                         {overlapping && (
                           <p className="text-xs font-medium text-amber-700">
                             {overlapNote(p, overlapWinners, promos)}
@@ -773,6 +1346,12 @@ export function PromosView({ initial }: Props): React.ReactElement {
                             Edit
                           </button>
                           <button
+                            onClick={() => startDuplicate(p)}
+                            className="text-admin-muted hover:text-admin-text"
+                          >
+                            Duplicate
+                          </button>
+                          <button
                             onClick={() => setConfirmDelete(p)}
                             className="text-coquelicot-500 hover:text-coquelicot-400"
                           >
@@ -789,7 +1368,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
 
           {/* Mobile: stacked cards */}
           <div className="space-y-3 sm:hidden">
-            {promos.map((p) => {
+            {visiblePromos.map((p) => {
               const status = getStatus(p);
               const overlapping = overlaps.has(p.id);
               return (
@@ -806,8 +1385,16 @@ export function PromosView({ initial }: Props): React.ReactElement {
                       {p.description && (
                         <p className="mt-0.5 text-sm text-admin-muted">{p.description}</p>
                       )}
-                      <CodeChip promo={p} />
-                      <p className="mt-0.5 text-sm text-admin-muted">{usageNote(stats[p.id])}</p>
+                      <PromoChips promo={p} />
+                      <button
+                        type="button"
+                        onClick={() => toggleStats(p.id)}
+                        aria-expanded={openStats.has(p.id)}
+                        className="mt-0.5 text-left text-sm text-admin-muted underline decoration-dotted"
+                      >
+                        {usageNote(stats[p.id])}
+                      </button>
+                      {openStats.has(p.id) && <PromoStatsBlock promo={p} stats={stats[p.id]} />}
                       {overlapping && (
                         <p className="mt-0.5 text-sm font-medium text-amber-700">
                           {overlapNote(p, overlapWinners, promos)}
@@ -835,6 +1422,9 @@ export function PromosView({ initial }: Props): React.ReactElement {
                     </AdminButton>
                     <AdminButton variant="secondary" onClick={() => startEdit(p)}>
                       Edit
+                    </AdminButton>
+                    <AdminButton variant="secondary" onClick={() => startDuplicate(p)}>
+                      Duplicate
                     </AdminButton>
                     <AdminButton variant="danger" onClick={() => setConfirmDelete(p)}>
                       Delete

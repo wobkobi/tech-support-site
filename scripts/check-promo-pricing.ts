@@ -16,9 +16,12 @@ import {
   applyPromoToHourlyRate,
   applyPromoToQuote,
   describePromoDiscount,
+  promoForAppointment,
+  promoForSpend,
   promoModifierRate,
   promoRateBeforeAfter,
   promoTravelBeforeAfter,
+  summariseForBanner,
   type ActivePromo,
   type QuoteParts,
 } from "@/features/business/lib/promos";
@@ -63,6 +66,11 @@ function promo(type: ActivePromo["discountType"], value: number): ActivePromo {
     percentDiscount: type === "percent" ? value : null,
     fixedAmount: type === "fixed_amount" ? value : null,
     travelPercent: type === "free_travel" ? value : null,
+    minSpend: null,
+    tiers: [],
+    activeWeekdays: [],
+    activeFromMinute: null,
+    activeToMinute: null,
   };
 }
 
@@ -196,6 +204,181 @@ function main(): void {
     "free travel at 1 is rejected - it would discount nothing",
     validateDiscount({ discountType: "free_travel", travelPercent: 1 }),
     "travelPercent must be between 0 and 1 (0 = free travel)",
+  );
+
+  // ---- A restricted promo is advertised but not priced in ----
+  //
+  // Words and numbers part company: the banner names the restriction, while any
+  // surface without an appointment to check declines to discount. Quoting a
+  // Tuesday discount to someone who has not picked a day promises a price the
+  // invoice will not honour.
+
+  const tuesdayOnly: ActivePromo = { ...promo("percent", 0.2), activeWeekdays: [2] };
+
+  expectEqual(
+    "an unrestricted promo prices anywhere",
+    promoForAppointment(promo("percent", 0.2), null)?.id ?? null,
+    "p1",
+  );
+  expectEqual(
+    "a restricted one does not, with no appointment",
+    promoForAppointment(tuesdayOnly, null)?.id ?? null,
+    null,
+  );
+  expectEqual(
+    "it does on a matching appointment",
+    promoForAppointment(tuesdayOnly, new Date("2026-06-01T21:00:00Z"))?.id ?? null,
+    "p1",
+  );
+  expectEqual(
+    "and not on a different day",
+    promoForAppointment(tuesdayOnly, new Date("2026-06-02T21:00:00Z"))?.id ?? null,
+    null,
+  );
+  expectEqual("null in, null out", promoForAppointment(null, null), null);
+
+  // The banner is what adds the qualifier, so the phrase itself stays reusable.
+  expectEqual(
+    "the banner names the restriction",
+    summariseForBanner({
+      ...tuesdayOnly,
+      activeFromMinute: 9 * 60,
+      activeToMinute: 17 * 60,
+    }).endsWith(", Tuesdays 9am to 5pm only"),
+    true,
+  );
+
+  // ---- Spend thresholds and tiers ----
+  //
+  // Judged against the LOW end of the pre-discount total. A job quoted $90-$140
+  // sits below a $100 threshold at one end and above it at the other; the low
+  // end quotes the discount the customer is certain to get, and a job that
+  // lands higher earns more at invoice time.
+
+  /**
+   * Builds a percent promo with spend bands.
+   * @param bands - Pairs of [minSpend, percent off].
+   * @returns A tiered promo.
+   */
+  function tiered(bands: [number, number][]): ActivePromo {
+    return {
+      ...promo("percent", 0.1),
+      tiers: bands.map(([minSpend, pct]) => ({
+        minSpend,
+        flatHourlyRate: null,
+        percentDiscount: pct,
+        fixedAmount: null,
+        travelPercent: null,
+      })),
+    };
+  }
+
+  expectEqual(
+    "no threshold and no tiers applies as-is",
+    promoForSpend(promo("percent", 0.2), 50)?.percentDiscount ?? null,
+    0.2,
+  );
+  expectEqual(
+    "a job under minSpend earns nothing",
+    promoForSpend({ ...promo("percent", 0.2), minSpend: 100 }, 99),
+    null,
+  );
+  expectEqual(
+    "the threshold is inclusive",
+    promoForSpend({ ...promo("percent", 0.2), minSpend: 100 }, 100)?.percentDiscount ?? null,
+    0.2,
+  );
+
+  const BANDS = tiered([
+    [100, 0.1],
+    [200, 0.2],
+    [300, 0.3],
+  ]);
+
+  expectEqual("below every band the promo does not apply", promoForSpend(BANDS, 99), null);
+  expectEqual(
+    "the first band at its floor",
+    promoForSpend(BANDS, 100)?.percentDiscount ?? null,
+    0.1,
+  );
+  expectEqual(
+    "between bands takes the lower one",
+    promoForSpend(BANDS, 199)?.percentDiscount ?? null,
+    0.1,
+  );
+  expectEqual(
+    "the highest band the job reaches wins",
+    promoForSpend(BANDS, 250)?.percentDiscount ?? null,
+    0.2,
+  );
+  expectEqual(
+    "well past the top band still takes the top",
+    promoForSpend(BANDS, 5000)?.percentDiscount ?? null,
+    0.3,
+  );
+
+  // Resolution must not depend on how the bands happen to be stored.
+  expectEqual(
+    "stored out of order, same answer",
+    promoForSpend(
+      tiered([
+        [300, 0.3],
+        [100, 0.1],
+        [200, 0.2],
+      ]),
+      250,
+    )?.percentDiscount ?? null,
+    0.2,
+  );
+
+  // The band replaces the promo's own columns wholesale. Merging them would let
+  // a half-filled tier inherit the parent's value and discount by an amount
+  // that appears in neither.
+  expectEqual(
+    "a band's value replaces the promo's own",
+    promoForSpend(tiered([[100, 0.25]]), 150)?.percentDiscount ?? null,
+    0.25,
+  );
+
+  // Both gates apply: minSpend can rule a job out before any band is reached.
+  expectEqual(
+    "minSpend is checked before the bands",
+    promoForSpend({ ...tiered([[100, 0.1]]), minSpend: 200 }, 150),
+    null,
+  );
+
+  expectEqual("null in, null out", promoForSpend(null, 500), null);
+
+  // ---- What a tiered promo says it is ----
+  //
+  // Its own value columns are ignored by the engine, so quoting them would name
+  // a discount nobody can earn.
+
+  expectEqual(
+    "a tiered promo names its bands, not its own column",
+    describePromoDiscount(
+      tiered([
+        [200, 0.2],
+        [100, 0.1],
+      ]),
+    ),
+    "10% off over $100, 20% off over $200",
+  );
+
+  expectEqual(
+    "a spend floor is named, or the offer reads as unconditional",
+    summariseForBanner({ ...promo("percent", 0.2), minSpend: 100 }).startsWith(
+      "20% off on jobs over $100 until",
+    ),
+    true,
+  );
+
+  expectEqual(
+    "a tiered promo does not repeat the promo-wide floor",
+    summariseForBanner({ ...tiered([[100, 0.1]]), minSpend: 100 }).startsWith(
+      "10% off over $100 until",
+    ),
+    true,
   );
 
   // ---- Validation: kind and code have to agree ----
@@ -476,6 +659,58 @@ function main(): void {
   expectEqual(
     "travel is NOT discounted on a business visit",
     computeJobPromoDiscount(job(95, true), promo("free_travel", 0), 40, BIZ),
+    0,
+  );
+
+  // The invoice path narrows by spend through the same function as the public
+  // estimate, judged on the subtotal calcJobTotal has already computed.
+
+  const TIERED = {
+    ...promo("percent", 0.1),
+    tiers: [
+      {
+        minSpend: 100,
+        flatHourlyRate: null,
+        percentDiscount: 0.1,
+        fixedAmount: null,
+        travelPercent: null,
+      },
+      {
+        minSpend: 200,
+        flatHourlyRate: null,
+        percentDiscount: 0.2,
+        fixedAmount: null,
+        travelPercent: null,
+      },
+    ],
+  };
+
+  // job(65, false) is one hour of home labour at $65; the subtotal argument is
+  // what selects the band.
+  expectEqual(
+    "a job under every band earns nothing on the invoice either",
+    computeJobPromoDiscount(job(65, false), TIERED, 0, BIZ, 65),
+    0,
+  );
+  expectEqual(
+    "reaching the first band discounts at its rate",
+    computeJobPromoDiscount(job(65, false), TIERED, 0, BIZ, 150),
+    6.5,
+  );
+  expectEqual(
+    "reaching the second takes the higher one",
+    computeJobPromoDiscount(job(65, false), TIERED, 0, BIZ, 250),
+    13,
+  );
+  expectEqual(
+    "a spend floor blocks the invoice discount too",
+    computeJobPromoDiscount(
+      job(65, false),
+      { ...promo("percent", 0.15), minSpend: 100 },
+      0,
+      BIZ,
+      99,
+    ),
     0,
   );
 

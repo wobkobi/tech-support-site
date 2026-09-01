@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.24.1",
+  "version": "4.25.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -60,8 +60,8 @@
     "@vercel/speed-insights": "^2.0.0",
     "clsx": "^2.1.1",
     "date-holidays": "^3.36.0",
-    "googleapis": "^176.0.0",
-    "next": "^16.3.3",
+    "googleapis": "^178.0.0",
+    "next": "^16.3.4",
     "openai": "^7.8.0",
     "pdf-lib": "^1.17.1",
     "react": "^19.2.8",
@@ -73,9 +73,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "@next/bundle-analyzer": "^16.3.3",
+    "@next/bundle-analyzer": "^16.3.4",
     "@tailwindcss/postcss": "^4.3.3",
-    "@types/google.maps": "^3.66.0",
+    "@types/google.maps": "^3.66.1",
     "@types/jsdom": "^30.0.0",
     "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
@@ -85,9 +85,9 @@
     "dotenv": "^17.4.2",
     "dotenv-cli": "^11.0.0",
     "eslint": "9.39.5",
-    "eslint-config-next": "^16.3.3",
+    "eslint-config-next": "^16.3.4",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-jsdoc": "^64.3.2",
+    "eslint-plugin-jsdoc": "^64.3.3",
     "eslint-plugin-prettier": "^5.5.6",
     "eslint-plugin-tailwind-canonical-classes": "^1.4.1",
     "globals": "^17.11.0",
@@ -108,7 +108,7 @@
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.13",
     "typescript": "6.0.3",
-    "typescript-eslint": "^8.68.0"
+    "typescript-eslint": "^8.69.0"
   },
   "engines": {
     "node": "24.x",

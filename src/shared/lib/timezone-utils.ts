@@ -16,6 +16,32 @@ const nzDateKeyFormat = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
+// Weekday and time-of-day in NZ. Separate formatters rather than deriving both
+// from one, because a single formatter cannot yield a numeric weekday and
+// zero-padded 24-hour parts at once.
+const nzWeekdayFormat = new Intl.DateTimeFormat("en-NZ", {
+  timeZone: NZ_TZ,
+  weekday: "short",
+});
+const nzTimeFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: NZ_TZ,
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+// Intl gives a name, not an index, and the index is what a weekday filter
+// stores. 0 = Sunday, matching JS getDay() and the schema's activeWeekdays.
+const WEEKDAY_INDEX: Record<string, number> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+};
+
 // Same deal, with the time parts a datetime-local input needs.
 const nzInputFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: NZ_TZ,
@@ -26,6 +52,34 @@ const nzInputFormat = new Intl.DateTimeFormat("en-CA", {
   minute: "2-digit",
   hour12: false,
 });
+
+/**
+ * The NZ weekday an instant falls on.
+ *
+ * Read in NZ time, never UTC: a UTC weekday check puts the boundary at 11am or
+ * noon NZ depending on daylight saving, so a Tuesday-only rule would half-apply
+ * on Monday.
+ * @param date - The instant to read.
+ * @returns Weekday index, 0 = Sunday through 6 = Saturday.
+ */
+export function nzWeekday(date: Date): number {
+  // en-NZ short weekdays can arrive as "Tue" or "Tue." depending on the ICU
+  // build, so match on the first three letters rather than the whole string.
+  const name = nzWeekdayFormat.format(date).slice(0, 3);
+  return WEEKDAY_INDEX[name] ?? 0;
+}
+
+/**
+ * Minutes since NZ midnight for an instant, for a time-of-day comparison.
+ * @param date - The instant to read.
+ * @returns Minutes from 0 (midnight) to 1439 (23:59).
+ */
+export function nzMinuteOfDay(date: Date): number {
+  // "24" appears for midnight on some ICU builds; fold it back to 0 so the
+  // result never lands outside the day.
+  const [h, m] = nzTimeFormat.format(date).split(":").map(Number);
+  return (h % 24) * 60 + m;
+}
 
 /**
  * Formats an instant as its NZ (Pacific/Auckland) calendar date.

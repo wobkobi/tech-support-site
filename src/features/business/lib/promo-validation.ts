@@ -104,3 +104,133 @@ export function validateKind(values: PromoKindValues): string | null {
   }
   return code ? "an automatic promo cannot have a code" : null;
 }
+
+/** The eligibility limits a promo can carry, as they arrive from a request. */
+export interface PromoLimitValues {
+  maxRedemptions?: number | null;
+  perCustomerLimit?: number | null;
+}
+
+/**
+ * Checks the eligibility limits are whole positive counts.
+ *
+ * Rejected rather than coerced: a limit of 0 would disable the promo through a
+ * field nobody reads as an off switch, and a fractional one would compare
+ * unpredictably against a count.
+ * @param values - The promo's limit fields.
+ * @returns An error message, or null when the limits are well formed.
+ */
+export function validateLimits(values: PromoLimitValues): string | null {
+  for (const [name, value] of [
+    ["maxRedemptions", values.maxRedemptions],
+    ["perCustomerLimit", values.perCustomerLimit],
+  ] as const) {
+    if (value == null) continue;
+    if (!Number.isInteger(value) || value < 1) {
+      return `${name} must be a whole number of at least 1, or left empty for no limit`;
+    }
+  }
+  return null;
+}
+
+/** The recurring restriction as it arrives from a request. */
+export interface PromoWindowValues {
+  activeWeekdays?: number[] | null;
+  activeFromMinute?: number | null;
+  activeToMinute?: number | null;
+}
+
+/**
+ * Checks a promo's recurring restriction is one the resolver can act on.
+ *
+ * The two time bounds must both be set or both be absent. Half a range is
+ * enforced as no range at all, so accepting one would silently give the
+ * operator a wider promo than the form appeared to describe.
+ * @param values - The promo's weekday and time-of-day fields.
+ * @returns An error message, or null when the restriction is well formed.
+ */
+export function validateRecurringWindow(values: PromoWindowValues): string | null {
+  const days = values.activeWeekdays ?? [];
+  if (days.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) {
+    return "activeWeekdays must be whole numbers from 0 (Sunday) to 6 (Saturday)";
+  }
+  if (new Set(days).size !== days.length) {
+    return "activeWeekdays must not repeat a day";
+  }
+  if (days.length === 7) {
+    return "selecting every day is the same as no weekday restriction - leave them all unticked";
+  }
+
+  const from = values.activeFromMinute ?? null;
+  const to = values.activeToMinute ?? null;
+  if ((from == null) !== (to == null)) {
+    return "a time-of-day restriction needs both a start and an end";
+  }
+  if (from == null || to == null) return null;
+  for (const value of [from, to]) {
+    if (!Number.isInteger(value) || value < 0 || value > 1439) {
+      return "times must be whole minutes from 0 to 1439";
+    }
+  }
+  if (from === to) {
+    return "the start and end of a time restriction must differ";
+  }
+  return null;
+}
+
+/** One spend band as it arrives from a request. */
+export interface PromoTierInput {
+  minSpend?: number | null;
+  flatHourlyRate?: number | null;
+  percentDiscount?: number | null;
+  fixedAmount?: number | null;
+  travelPercent?: number | null;
+}
+
+/**
+ * Checks a promo's spend threshold and bands.
+ *
+ * Each band is put through {@link validateDiscount} against the parent's type,
+ * so a band cannot carry a different kind of discount from the promo it belongs
+ * to - a percent promo with a flat-rate band would price as neither.
+ *
+ * Floors must ascend with no repeats. Resolution takes the highest band reached
+ * and must never depend on stored order, so two bands at the same floor have no
+ * defined winner and are rejected rather than silently resolved.
+ * @param discountType - The parent promo's resolved discount type.
+ * @param minSpend - Floor for the whole promo, or null.
+ * @param tiers - The spend bands, possibly empty.
+ * @returns An error message, or null when the thresholds are well formed.
+ */
+export function validateTiers(
+  discountType: PromoDiscountType,
+  minSpend: number | null | undefined,
+  tiers: PromoTierInput[] | null | undefined,
+): string | null {
+  if (minSpend != null && (typeof minSpend !== "number" || minSpend <= 0)) {
+    return "minSpend must be a positive amount, or left empty";
+  }
+
+  const bands = tiers ?? [];
+  if (bands.length === 0) return null;
+
+  const floors: number[] = [];
+  for (const tier of bands) {
+    if (typeof tier.minSpend !== "number" || tier.minSpend <= 0) {
+      return "every tier needs a positive spend threshold";
+    }
+    floors.push(tier.minSpend);
+    const valueError = validateDiscount({ discountType, ...tier });
+    if (valueError) return `tier at $${tier.minSpend}: ${valueError}`;
+  }
+
+  if (new Set(floors).size !== floors.length) {
+    return "two tiers cannot share a spend threshold";
+  }
+  // The parent floor is the entry price, so a band below it could never be the
+  // one that applies and is a mistake rather than a narrower offer.
+  if (minSpend != null && floors.some((f) => f < minSpend)) {
+    return "a tier cannot sit below the promo's own minimum spend";
+  }
+  return null;
+}

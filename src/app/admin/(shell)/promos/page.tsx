@@ -38,6 +38,28 @@ export interface PromoRow {
   isActive: boolean;
   /** Higher wins when windows overlap. */
   priority: number;
+  /** Total uses allowed across everyone, or null for no cap. */
+  maxRedemptions: number | null;
+  /** Uses allowed per customer, or null for no cap. */
+  perCustomerLimit: number | null;
+  /** Restricted to someone with no prior completed booking. */
+  newCustomersOnly: boolean;
+  /** Floor for the pre-discount total, or null for none. */
+  minSpend: number | null;
+  /** Spend bands; when non-empty they supply the discount instead of the columns above. */
+  tiers: {
+    minSpend: number;
+    flatHourlyRate: number | null;
+    percentDiscount: number | null;
+    fixedAmount: number | null;
+    travelPercent: number | null;
+  }[];
+  /** NZ weekdays it applies on (0 = Sunday); empty means every day. */
+  activeWeekdays: number[];
+  /** Start of the NZ time-of-day restriction, in minutes past midnight. */
+  activeFromMinute: number | null;
+  /** End of the NZ time-of-day restriction, in minutes past midnight. */
+  activeToMinute: number | null;
   /** The overlap warning's tie-break must match the query's, so it needs this. */
   createdAt: string;
 }
@@ -65,6 +87,20 @@ export default async function AdminPromosPage(): Promise<React.ReactElement> {
     travelPercent: p.travelPercent,
     isActive: p.isActive,
     priority: p.priority,
+    maxRedemptions: p.maxRedemptions,
+    perCustomerLimit: p.perCustomerLimit,
+    newCustomersOnly: p.newCustomersOnly,
+    minSpend: p.minSpend,
+    tiers: p.tiers.map((t) => ({
+      minSpend: t.minSpend,
+      flatHourlyRate: t.flatHourlyRate,
+      percentDiscount: t.percentDiscount,
+      fixedAmount: t.fixedAmount,
+      travelPercent: t.travelPercent,
+    })),
+    activeWeekdays: p.activeWeekdays,
+    activeFromMinute: p.activeFromMinute,
+    activeToMinute: p.activeToMinute,
     createdAt: p.createdAt.toISOString(),
   }));
 

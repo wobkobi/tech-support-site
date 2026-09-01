@@ -11,6 +11,7 @@ import {
   GST_REGISTERED,
   MIN_BILLABLE_MINS,
 } from "@/features/business/lib/pricing-policy";
+import { promoForSpend, type PromoTierValues } from "@/features/business/lib/promo-tiers";
 import type {
   JobCalculation,
   LineItem,
@@ -738,6 +739,10 @@ export interface JobPromo {
   percentDiscount: number | null;
   fixedAmount?: number | null;
   travelPercent?: number | null;
+  /** Floor for the pre-discount subtotal, or null/absent for none. */
+  minSpend?: number | null;
+  /** Spend bands; when non-empty they supply the discount instead of the values above. */
+  tiers?: PromoTierValues[];
 }
 
 /** Live pricing values threaded into {@link calcJobTotal}; defaults are the code consts. */
@@ -771,17 +776,24 @@ export interface JobPricing {
  * Exported for check:promo-pricing - this decides real money on an invoice and
  * the business exclusion below has no other coverage.
  * @param job - Job calculation.
- * @param promo - Active promo or null.
+ * @param resolvedPromo - Active promo or null, before spend narrows it.
  * @param travelTotal - The job's travel charge, which a free-travel promo discounts.
  * @param businessModifierId - Modifier marking business labour, which promos skip.
+ * @param preDiscountSubtotal - The job's subtotal before any discount, which selects a tier.
  * @returns Discount in dollars.
  */
 export function computeJobPromoDiscount(
   job: JobCalculation,
-  promo: JobPromo | null,
+  resolvedPromo: JobPromo | null,
   travelTotal: number,
   businessModifierId?: string | null,
+  preDiscountSubtotal?: number,
 ): number {
+  // Narrowed to the band this job actually earns, through the same function the
+  // public estimate uses. Judged on the pre-discount subtotal the caller has
+  // already computed; without one there is nothing to judge, so an untiered
+  // promo passes through and a tiered one cannot apply.
+  const promo = promoForSpend(resolvedPromo, preDiscountSubtotal ?? 0);
   if (!promo) return 0;
 
   /**
@@ -915,6 +927,9 @@ export function calcJobTotal(
     promo,
     travelTotal,
     pricing.businessModifierId,
+    // The subtotal above is exactly the pre-discount total a spend threshold and
+    // a tier band are judged against.
+    subtotal,
   );
   // Fraction removed from an unsuccessful line: 1 - the charged share.
   const unsuccessfulCut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
