@@ -333,6 +333,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return null;
       }),
     ]);
+    // Only an untiered promo has terms that are fixed at booking time.
+    const snapshotPromo = activePromo && activePromo.tiers.length === 0 ? activePromo : null;
     const baseRow = rates.find((r) => r.ratePerHour !== null && r.isDefault) ?? null;
     const baseRateAtBooking = baseRow?.ratePerHour ?? null;
     // Travel rate is a pricing setting; snapshot it so later settings edits
@@ -398,8 +400,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           // Promo snapshot denormalised - survives Promo deletion before service.
           promoIdAtBooking: activePromo?.id ?? null,
           promoTitleAtBooking: activePromo?.title ?? null,
-          promoFlatHourlyRateAtBooking: activePromo?.flatHourlyRate ?? null,
-          promoPercentDiscountAtBooking: activePromo?.percentDiscount ?? null,
+          // Null for a tiered promo on purpose: the band is not decided until
+          // the job is priced, so these columns hold values the engine ignores.
+          // promoIdAtBooking is what carries the promo forward, and the
+          // calculator resolves the band against the real subtotal.
+          promoFlatHourlyRateAtBooking: snapshotPromo?.flatHourlyRate ?? null,
+          promoPercentDiscountAtBooking: snapshotPromo?.percentDiscount ?? null,
           publicHolidayName,
           // Snapshot of the public quote the customer saw before booking, plus
           // what they typed to get it and how the AI read it.
@@ -416,13 +422,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       console.log(`[booking/request] Created ${duration} booking: ${booking.id}`);
 
-      // Upsert contact record - best effort, never fail the booking on write error
+      // Upsert contact record - best effort, never fail the booking on write error.
+      // The id is kept beyond the try because the redemption below needs it: a
+      // redemption with no contact cannot be counted, and a per-customer promo
+      // limit would then never bind.
+      let redeemedByContactId: string | undefined;
       try {
         const { contact } = await findOrCreateContactByEmail(normalisedEmail, {
           name: cleanName,
           phone: phoneE164,
           address: canonicalAddress,
         });
+        redeemedByContactId = contact.id;
         // Best-effort sync to Google Contacts - never fail the booking if it errors.
         await syncContactToGoogle(contact.id);
       } catch (contactError) {
@@ -436,6 +447,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         await recordPromoRedemption({
           promoId: booking.promoIdAtBooking,
           bookingId: booking.id,
+          contactId: redeemedByContactId,
           // The realised discount is not known until the job is invoiced.
           discountValue: null,
         });
