@@ -16,6 +16,7 @@
     "check:promo-pricing": "tsx scripts/check-promo-pricing.ts",
     "check:promos": "tsx scripts/check-promo-selection.ts",
     "check:push": "tsx scripts/check-push-delivery.ts",
+    "check:task-window": "tsx scripts/check-task-window.ts",
     "db:push": "prisma db push",
     "dev": "next dev --turbopack",
     "eval:ai": "dotenv -e .env.local -- tsx scripts/eval-ai/index.ts",
@@ -31,7 +32,7 @@
     "typecheck": "tsc --noEmit"
   },
   "simple-git-hooks": {
-    "pre-commit": "if ! find node_modules/.npm-update-stamp -mmin -1440 2>/dev/null | grep -q .; then npm update --package-lock-only --allow-remote=all --no-audit --no-fund && touch node_modules/.npm-update-stamp; fi && npm install --package-lock-only --allow-remote=all --no-audit --no-fund && git add package-lock.json package.json && npx lint-staged && npm run typecheck && npm run check:addresses && npm run check:push && npm run check:promos && npm run check:promo-pricing && npm run check:emails-merge",
+    "pre-commit": "if ! find node_modules/.npm-update-stamp -mmin -1440 2>/dev/null | grep -q .; then npm update --package-lock-only --allow-remote=all --no-audit --no-fund && touch node_modules/.npm-update-stamp; fi && npm install --package-lock-only --allow-remote=all --no-audit --no-fund && git add package-lock.json package.json && npx lint-staged && npm run typecheck && npm run check:addresses && npm run check:push && npm run check:promos && npm run check:promo-pricing && npm run check:emails-merge && npm run check:task-window",
     "pre-push": "npm run lint && npm run build && npm run smoke -- --skip-build"
   },
   "lint-staged": {
