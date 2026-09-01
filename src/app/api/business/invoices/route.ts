@@ -18,6 +18,7 @@ import {
 } from "@/features/business/lib/invoice-numbering";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { settlePromoRedemption } from "@/features/business/lib/promo-redemption";
 import { parseAmount, parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -66,6 +67,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Optional promo snapshot from the calculator (persisted for history).
     promoTitle,
     promoDiscount,
+    promoId,
     // Optional unsuccessful-work flag + discount snapshot. Audit trail so
     // the admin dashboard can count how often the half-price clause fires.
     unsuccessful,
@@ -88,6 +90,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     contactId?: string | null;
     promoTitle?: string | null;
     promoDiscount?: number | null;
+    promoId?: string | null;
     unsuccessful?: boolean;
     unsuccessfulDiscount?: number | null;
     bookingId?: string | null;
@@ -223,6 +226,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   if (!invoice) {
     return errorResponse("Could not allocate a unique invoice number", 500);
+  }
+
+  // What the promo was actually worth, now that a real invoice says so. The
+  // booking-time redemption was recorded without a value, because the discount
+  // is not known until the work is priced; this settles that row rather than
+  // adding a second, so one job counts as one redemption against a cap.
+  //
+  // Quotes are excluded: a quote is not a use of the promo, and counting one
+  // would burn a redemption on work that may never happen.
+  if (!isQuote && promoId && discount > 0) {
+    await settlePromoRedemption({
+      promoId,
+      invoiceId: invoice.id,
+      bookingId: parseObjectId(bookingId),
+      contactId: parseObjectId(contactId),
+      discountValue: discount,
+    });
   }
 
   // Keep the Sheets counter in sync; the helper swallows + logs failures so the

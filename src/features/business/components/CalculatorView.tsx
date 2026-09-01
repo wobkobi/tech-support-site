@@ -1475,6 +1475,9 @@ export function CalculatorView({
           notes: notes || null,
           promoTitle: promoActive ? activePromo.title : null,
           promoDiscount: promoActive ? totals.promoDiscount : null,
+          // The id, not just the title: the redemption this settles is keyed by
+          // promo, and matching on a title would break the moment one is edited.
+          promoId: promoActive ? activePromo.id : null,
           // Send the flag alongside its discount: the server stores
           // `unsuccessful === true`, so omitting it records every calculator-raised
           // invoice as successful even when the half-price reduction was applied.
