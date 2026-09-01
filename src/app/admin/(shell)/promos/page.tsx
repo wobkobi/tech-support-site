@@ -44,6 +44,16 @@ export interface PromoRow {
   perCustomerLimit: number | null;
   /** Restricted to someone with no prior completed booking. */
   newCustomersOnly: boolean;
+  /** Floor for the pre-discount total, or null for none. */
+  minSpend: number | null;
+  /** Spend bands; when non-empty they supply the discount instead of the columns above. */
+  tiers: {
+    minSpend: number;
+    flatHourlyRate: number | null;
+    percentDiscount: number | null;
+    fixedAmount: number | null;
+    travelPercent: number | null;
+  }[];
   /** NZ weekdays it applies on (0 = Sunday); empty means every day. */
   activeWeekdays: number[];
   /** Start of the NZ time-of-day restriction, in minutes past midnight. */
@@ -80,6 +90,14 @@ export default async function AdminPromosPage(): Promise<React.ReactElement> {
     maxRedemptions: p.maxRedemptions,
     perCustomerLimit: p.perCustomerLimit,
     newCustomersOnly: p.newCustomersOnly,
+    minSpend: p.minSpend,
+    tiers: p.tiers.map((t) => ({
+      minSpend: t.minSpend,
+      flatHourlyRate: t.flatHourlyRate,
+      percentDiscount: t.percentDiscount,
+      fixedAmount: t.fixedAmount,
+      travelPercent: t.travelPercent,
+    })),
     activeWeekdays: p.activeWeekdays,
     activeFromMinute: p.activeFromMinute,
     activeToMinute: p.activeToMinute,

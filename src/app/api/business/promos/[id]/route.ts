@@ -7,11 +7,14 @@
  */
 
 import {
+  resolveDiscountType,
   validateDiscount,
   validateKind,
   validateLimits,
   validateRecurringWindow,
+  validateTiers,
   type PromoKind,
+  type PromoTierInput,
 } from "@/features/business/lib/promo-validation";
 import {
   ACTIVE_PROMO_TAG,
@@ -60,6 +63,8 @@ export async function PATCH(
     activeWeekdays: number[];
     activeFromMinute: number | null;
     activeToMinute: number | null;
+    minSpend: number | null;
+    tiers: PromoTierInput[];
   }>;
 
   if (body.priority !== undefined && !Number.isInteger(body.priority)) {
@@ -145,6 +150,16 @@ export async function PATCH(
   if (windowError) {
     return errorResponse(windowError, 400);
   }
+  // Judged against the merged discount type: switching a promo's type sends the
+  // new value column, and the bands have to match what it became.
+  const tierError = validateTiers(
+    resolveDiscountType(merged),
+    body.minSpend !== undefined ? body.minSpend : existing.minSpend,
+    body.tiers !== undefined ? body.tiers : existing.tiers,
+  );
+  if (tierError) {
+    return errorResponse(tierError, 400);
+  }
 
   const promo = await prisma.promo.update({
     where: { id },
@@ -170,6 +185,16 @@ export async function PATCH(
       ...(body.activeWeekdays !== undefined && { activeWeekdays: body.activeWeekdays }),
       ...(body.activeFromMinute !== undefined && { activeFromMinute: body.activeFromMinute }),
       ...(body.activeToMinute !== undefined && { activeToMinute: body.activeToMinute }),
+      ...(body.minSpend !== undefined && { minSpend: body.minSpend }),
+      ...(body.tiers !== undefined && {
+        tiers: body.tiers.map((t) => ({
+          minSpend: t.minSpend!,
+          flatHourlyRate: t.flatHourlyRate ?? null,
+          percentDiscount: t.percentDiscount ?? null,
+          fixedAmount: t.fixedAmount ?? null,
+          travelPercent: t.travelPercent ?? null,
+        })),
+      }),
     },
   });
   // Next 16's revalidateTag requires a second CacheLifeConfig arg.

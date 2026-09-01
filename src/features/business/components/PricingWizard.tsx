@@ -17,6 +17,7 @@ import {
   describePromoDiscount,
   describeRecurringWindow,
   promoForAppointment,
+  promoForSpend,
   summariseForBanner,
   type ActivePromo,
 } from "@/features/business/lib/promos";
@@ -94,19 +95,19 @@ interface QuoteSettings {
  * was already fetched. Re-running the whole flow would spend another AI call
  * and could return a different duration, which reads as the code having changed
  * the length of the job.
+ * A spend threshold or a tier band is judged here rather than by the caller,
+ * because the figure it needs - the undiscounted total - only exists inside
+ * this function.
  * @param inputs - The estimate inputs, independent of any promo.
  * @param settings - Live pricing settings.
- * @param promo - The promo to price against, or null.
- * @returns The range to display plus the effective hourly rate it used.
+ * @param resolvedPromo - The promo resolution returned, before spend is known.
+ * @returns The range, the effective hourly rate, and the promo the job earned.
  */
 function buildPriceRange(
   inputs: QuoteInputs,
   settings: QuoteSettings,
-  promo: ActivePromo | null,
-): { range: PriceRange; promoRate: number } {
-  const promoRate = applyPromoToHourlyRate(inputs.fullRate, promo);
-  const promoApplied = promoRate < inputs.fullRate;
-
+  resolvedPromo: ActivePromo | null,
+): { range: PriceRange; promoRate: number; promo: ActivePromo | null } {
   // Floor short jobs to the published billable minimum. The range width is
   // confidence-scaled (see priceRangeFor) - wider, with a lower low end, when
   // the description is vague.
@@ -152,6 +153,14 @@ function buildPriceRange(
     return { low, high, travel };
   };
 
+  // Priced undiscounted first, because that total is what a spend threshold and
+  // a tier band are judged against. It doubles as the crossed-out "before"
+  // figure below, so nothing is priced twice.
+  const undiscounted = buildVisitRange(inputs.fullRate);
+  const promo = promoForSpend(resolvedPromo, undiscounted.low + undiscounted.travel);
+  const promoRate = applyPromoToHourlyRate(inputs.fullRate, promo);
+  const promoApplied = promoRate < inputs.fullRate;
+
   // Quote-level promo types (fixed amount, free travel) act here, after the
   // band and travel are priced. The rate-based types already applied to
   // promoRate above and are a no-op at this stage.
@@ -174,7 +183,7 @@ function buildPriceRange(
     promoRange.low !== pricedRange.low ||
     promoRange.high !== pricedRange.high ||
     promoRange.travel !== pricedRange.travel;
-  const rawOriginal = anyDiscount ? buildVisitRange(inputs.fullRate) : null;
+  const rawOriginal = anyDiscount ? undiscounted : null;
   const original =
     rawOriginal &&
     (rawOriginal.low !== promoRange.low ||
@@ -251,7 +260,7 @@ function buildPriceRange(
       : {}),
   };
 
-  return { range, promoRate };
+  return { range, promoRate, promo };
 }
 
 interface Props {
@@ -450,7 +459,8 @@ export function PricingWizard({
     // to certain days cannot be checked and is deliberately not priced in. It is
     // still named below, under the estimate.
     const promo = promoForAppointment(codePromo ?? activePromo, null);
-    const { range, promoRate } = buildPriceRange(inputs, settings, promo);
+    const built = buildPriceRange(inputs, settings, promo);
+    const { range, promoRate } = built;
 
     setResult(range);
     setIsCalculating(false);
@@ -463,7 +473,7 @@ export function PricingWizard({
       window.gtag("event", "price_estimate");
     }
 
-    logEstimate(inputs, range, promoRate, promo);
+    logEstimate(inputs, range, promoRate, built.promo);
   }
 
   /**
@@ -529,7 +539,7 @@ export function PricingWizard({
     const effective = promoForAppointment(promo ?? activePromo, null);
     const built = buildPriceRange(quoteInputs, settings, effective);
     setResult(built.range);
-    logEstimate(quoteInputs, built.range, built.promoRate, effective);
+    logEstimate(quoteInputs, built.range, built.promoRate, built.promo);
   }
 
   /**
@@ -607,6 +617,30 @@ export function PricingWizard({
     const when = describeRecurringWindow(resolved);
     if (!when) return null;
     return `${describePromoDiscount(resolved)} is available ${when}. Pick one of those times when you book and it comes off this estimate.`;
+  })();
+
+  // The next spend threshold this estimate has not reached. Naming it is the
+  // whole point of a tiered offer - without it the customer cannot know that
+  // a slightly larger job earns more, which is exactly what the promo is for.
+  // Shown whether or not a lower band already applied.
+  const spendNudge = (() => {
+    const resolved = promoForAppointment(codePromo ?? activePromo, null);
+    if (!resolved || !result) return null;
+    // No promo applied means nothing was discounted, so the figures on screen
+    // are already the pre-discount ones; when one did, originalLow is.
+    const total = (result.originalLow ?? result.low) + (result.travelCharge ?? 0);
+    const next = [
+      ...resolved.tiers.map((t) => t.minSpend),
+      ...(resolved.minSpend != null ? [resolved.minSpend] : []),
+    ]
+      .filter((floor) => floor > total)
+      .sort((a, b) => a - b)[0];
+    if (next === undefined) return null;
+    const earned = promoForSpend(resolved, next);
+    if (!earned) return null;
+    // Tiers stripped so the phrase names the one band that threshold unlocks
+    // rather than listing every band again.
+    return `Jobs over $${next} get ${describePromoDiscount({ ...earned, tiers: [] })}.`;
   })();
 
   // An applied code travels to /booking so the customer does not re-enter it;
@@ -787,6 +821,12 @@ export function PricingWizard({
               </p>
             )}
           </div>
+
+          {spendNudge && (
+            <p className="mb-4 rounded-xl border border-mustard-400 bg-mustard-50 px-4 py-3 text-base font-medium text-russian-violet-900">
+              {spendNudge}
+            </p>
+          )}
 
           {restrictedOffer && (
             <p className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base font-medium text-amber-800">

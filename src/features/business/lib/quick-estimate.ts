@@ -13,6 +13,7 @@ import {
   applyPromoToQuote,
   normalisePromoCode,
   promoForAppointment,
+  promoForSpend,
   type ActivePromo,
 } from "@/features/business/lib/promos";
 import type { PublicRate } from "@/features/business/types/pricing";
@@ -144,7 +145,7 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
   // because that is the appointment it has to be checked against. Before then it
   // is advertised but not applied, so the estimate never promises a discount the
   // booking will not honour.
-  const promo = promoForAppointment(
+  const dateGated = promoForAppointment(
     resolved,
     input.departureTimeIso ? new Date(input.departureTimeIso) : null,
   );
@@ -184,20 +185,32 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     tasks = Array.isArray(ai.tasks) ? ai.tasks : [];
   }
 
-  const promoRate = applyPromoToHourlyRate(fullRate, promo);
   const effectiveMins = Math.max(minBillableMins, estimatedMins);
+  const rawTravel = calcTravelCharge(
+    travelMins,
+    travelMinsBack,
+    travelRatePerHour,
+    minTravelCharge,
+  );
+  // Priced undiscounted first: a spend threshold and a tier band are judged
+  // against that total, on its low end, so the customer is quoted the discount
+  // they are certain to get rather than one the job may not reach.
+  const undiscounted = priceRangeFor(
+    effectiveMins,
+    fullRate,
+    confidence,
+    estimatorRange,
+    lowEndFloorFactor,
+  );
+  const promo = promoForSpend(dateGated, undiscounted.low + rawTravel);
+
+  const promoRate = applyPromoToHourlyRate(fullRate, promo);
   const band = priceRangeFor(
     effectiveMins,
     promoRate,
     confidence,
     estimatorRange,
     lowEndFloorFactor,
-  );
-  const rawTravel = calcTravelCharge(
-    travelMins,
-    travelMinsBack,
-    travelRatePerHour,
-    minTravelCharge,
   );
   // Quote-level promo types act here, after the band and travel are priced.
   // The rate-based types already applied above and are a no-op at this stage.

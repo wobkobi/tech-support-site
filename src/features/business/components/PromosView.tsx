@@ -23,6 +23,46 @@ const inputClass =
 type PromoType = "flat" | "percent" | "fixed" | "travel";
 
 /** Form type > the column the API stores it under. */
+/**
+ * The stored columns for one amount of a given type.
+ *
+ * Shared by the promo's own value and every tier, so a band cannot be stored
+ * differently from the promo it belongs to - the travel inversion in particular
+ * is easy to apply once and forget the second time.
+ * @param type - The form's discount type.
+ * @param amount - The number the operator typed.
+ * @returns The four value columns, exactly one of them set.
+ */
+function discountColumns(
+  type: PromoType,
+  amount: number,
+): {
+  flatHourlyRate: number | null;
+  percentDiscount: number | null;
+  fixedAmount: number | null;
+  travelPercent: number | null;
+} {
+  return {
+    flatHourlyRate: type === "flat" ? amount : null,
+    percentDiscount: type === "percent" ? amount / 100 : null,
+    fixedAmount: type === "fixed" ? amount : null,
+    // The operator enters "% off travel"; the column stores the fraction still
+    // charged, so 100% off is 0.
+    travelPercent: type === "travel" ? 1 - amount / 100 : null,
+  };
+}
+
+/**
+ * The number to show in a tier's amount input, read the same way as the
+ * promo's own.
+ * @param tier - The stored tier.
+ * @param promo - Its parent, which decides how the value is read.
+ * @returns The operator-facing amount, or "" when the tier is blank.
+ */
+function tierAmountFor(tier: PromoRow["tiers"][number], promo: PromoRow): number | string {
+  return amountFor({ ...promo, ...tier });
+}
+
 const DISCOUNT_TYPE: Record<PromoType, "flat_hourly" | "percent" | "fixed_amount" | "free_travel"> =
   {
     flat: "flat_hourly",
@@ -100,6 +140,14 @@ interface FormState {
   activeFrom: string;
   /** NZ end time as "HH:mm", or "" for no time restriction. */
   activeTo: string;
+  /** Floor for the pre-discount total. Blank for none. */
+  minSpend: string;
+  /**
+   * Spend bands, held as strings for the inputs. Empty is the ordinary
+   * single-value promo; the amount is read the same way the top-level one is,
+   * so a percent band is entered as "20" and stored as 0.2.
+   */
+  tiers: { minSpend: string; amount: string }[];
 }
 
 /**
@@ -204,6 +252,8 @@ function emptyForm(): FormState {
     activeWeekdays: [],
     activeFrom: "",
     activeTo: "",
+    minSpend: "",
+    tiers: [],
   };
 }
 
@@ -406,6 +456,8 @@ function PromoChips({ promo }: PromoChipsProps): React.ReactElement | null {
   // wording the customer will.
   const window = describeRecurringWindow(promo);
   if (window) chips.push(window);
+  if (promo.tiers.length > 0) chips.push(`${promo.tiers.length} spend tiers`);
+  else if (promo.minSpend != null) chips.push(`Jobs over $${promo.minSpend}`);
   if (promo.newCustomersOnly) chips.push("New customers only");
   if (promo.maxRedemptions != null) chips.push(`${promo.maxRedemptions} uses total`);
   if (promo.perCustomerLimit != null) chips.push(`${promo.perCustomerLimit} per customer`);
@@ -491,6 +543,10 @@ export function PromosView({ initial }: Props): React.ReactElement {
       activeWeekdays: p.activeWeekdays,
       activeFrom: fromMinuteOfDay(p.activeFromMinute),
       activeTo: fromMinuteOfDay(p.activeToMinute),
+      minSpend: p.minSpend != null ? String(p.minSpend) : "",
+      tiers: [...p.tiers]
+        .sort((a, b) => a.minSpend - b.minSpend)
+        .map((t) => ({ minSpend: String(t.minSpend), amount: String(tierAmountFor(t, p)) })),
     });
   }
 
@@ -520,6 +576,10 @@ export function PromosView({ initial }: Props): React.ReactElement {
       setError("A time-of-day restriction needs both a start and an end.");
       return;
     }
+    if (form.tiers.some((t) => !t.minSpend.trim() || !t.amount.trim())) {
+      setError("Every tier needs both a spend threshold and an amount.");
+      return;
+    }
     const body = {
       title: form.title.trim(),
       description: form.description.trim() || null,
@@ -529,12 +589,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
       // Send only the column that matches the selected type; the route
       // validates per type and rejects anything half-filled.
       discountType: DISCOUNT_TYPE[form.type],
-      flatHourlyRate: form.type === "flat" ? amount : null,
-      percentDiscount: form.type === "percent" ? amount / 100 : null,
-      fixedAmount: form.type === "fixed" ? amount : null,
-      // The operator enters "% off travel"; the column stores the fraction
-      // still charged, so 100% off is 0.
-      travelPercent: form.type === "travel" ? 1 - amount / 100 : null,
+      ...discountColumns(form.type, amount),
       isActive: form.isActive,
       priority: parseInt(form.priority, 10) || 0,
       kind: form.kind,
@@ -549,6 +604,13 @@ export function PromosView({ initial }: Props): React.ReactElement {
       activeWeekdays: form.activeWeekdays,
       activeFromMinute: toMinuteOfDay(form.activeFrom),
       activeToMinute: toMinuteOfDay(form.activeTo),
+      minSpend: form.minSpend.trim() ? parseFloat(form.minSpend) : null,
+      // Bands carry the same kind of discount as their parent, built by the
+      // same converter.
+      tiers: form.tiers.map((t) => ({
+        minSpend: parseFloat(t.minSpend),
+        ...discountColumns(form.type, parseFloat(t.amount)),
+      })),
     };
 
     setBusy(true);
@@ -760,6 +822,97 @@ export function PromosView({ initial }: Props): React.ReactElement {
             Higher wins when two promos overlap. Ties go to the newer one.
           </span>
         </label>
+
+        <fieldset className="flex flex-col gap-3 rounded-xl border border-admin-border p-4">
+          <legend className="px-1 text-xs font-medium text-admin-muted">
+            Spend thresholds (optional)
+          </legend>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-admin-muted">Minimum spend ($)</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.minSpend}
+              onChange={(e) => setForm((p) => ({ ...p, minSpend: e.target.value }))}
+              placeholder="No minimum"
+              className={cn(inputClass, "w-40")}
+            />
+          </label>
+
+          {form.tiers.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {form.tiers.map((tier, i) => (
+                <div key={i} className="flex flex-wrap items-end gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-admin-muted">Spend over ($)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={tier.minSpend}
+                      onChange={(e) =>
+                        setForm((p) => ({
+                          ...p,
+                          tiers: p.tiers.map((t, j) =>
+                            j === i ? { ...t, minSpend: e.target.value } : t,
+                          ),
+                        }))
+                      }
+                      className={cn(inputClass, "w-32")}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-admin-muted">
+                      {AMOUNT_LABEL[form.type]}
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step={form.type === "flat" || form.type === "fixed" ? "0.01" : "1"}
+                      value={tier.amount}
+                      onChange={(e) =>
+                        setForm((p) => ({
+                          ...p,
+                          tiers: p.tiers.map((t, j) =>
+                            j === i ? { ...t, amount: e.target.value } : t,
+                          ),
+                        }))
+                      }
+                      className={cn(inputClass, "w-32")}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm((p) => ({ ...p, tiers: p.tiers.filter((_, j) => j !== i) }))
+                    }
+                    className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() =>
+              setForm((p) => ({ ...p, tiers: [...p.tiers, { minSpend: "", amount: "" }] }))
+            }
+            className="self-start rounded-lg border border-admin-border bg-admin-surface px-3 py-1.5 text-xs font-medium text-admin-muted hover:bg-admin-bg"
+          >
+            Add a spend tier
+          </button>
+          <p className="text-xs text-admin-faint">
+            With no tiers the promo gives its single amount above. With tiers, the highest one the
+            job reaches supplies the discount and the amount above is ignored - a job that reaches
+            none gets nothing rather than a smaller discount. Thresholds are read against the low
+            end of the quote before any discount, so the customer is quoted what they are certain to
+            get and a job that lands higher earns more on the invoice.
+          </p>
+        </fieldset>
 
         <fieldset className="flex flex-col gap-3 rounded-xl border border-admin-border p-4">
           <legend className="px-1 text-xs font-medium text-admin-muted">Who can use it</legend>

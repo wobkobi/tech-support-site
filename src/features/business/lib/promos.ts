@@ -3,6 +3,7 @@
  * @description Active-promo lookup + helpers. Cached 60s; admin writes revalidate.
  */
 
+import { promoForSpend, type PromoTierValues } from "@/features/business/lib/promo-tiers";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import { NZ_TZ, nzMinuteOfDay, nzWeekday } from "@/shared/lib/timezone-utils";
@@ -11,6 +12,10 @@ import { unstable_cache } from "next/cache";
 
 /** Cache tag invalidated by the promo CRUD routes. */
 export const ACTIVE_PROMO_TAG = "active-promo";
+
+// Re-exported from the pure tier module: every other promo helper lives here,
+// and splitting where they are imported from is how two of them drift.
+export { promoForSpend, type PromoTierValues };
 
 /** The fields promo selection needs. Real Promo rows satisfy this structurally. */
 export interface PromoCandidate {
@@ -62,6 +67,10 @@ export interface ActivePromo {
   percentDiscount: number | null;
   fixedAmount: number | null;
   travelPercent: number | null;
+  /** Floor for the pre-discount total, or null when there is none. */
+  minSpend: number | null;
+  /** Spend bands; when non-empty they supply the discount instead of the columns above. */
+  tiers: PromoTierValues[];
   /** NZ weekdays the promo is limited to (0 = Sunday); empty means every day. */
   activeWeekdays: number[];
   /** Start of the NZ time-of-day restriction, in minutes past midnight. */
@@ -150,6 +159,14 @@ function toActivePromo(row: Promo): ActivePromo {
     percentDiscount: row.percentDiscount,
     fixedAmount: row.fixedAmount,
     travelPercent: row.travelPercent,
+    minSpend: row.minSpend,
+    tiers: row.tiers.map((t) => ({
+      minSpend: t.minSpend,
+      flatHourlyRate: t.flatHourlyRate,
+      percentDiscount: t.percentDiscount,
+      fixedAmount: t.fixedAmount,
+      travelPercent: t.travelPercent,
+    })),
     activeWeekdays: row.activeWeekdays,
     activeFromMinute: row.activeFromMinute,
     activeToMinute: row.activeToMinute,
@@ -654,6 +671,18 @@ export function promoTravelBeforeAfter(
  * @returns The offer phrase.
  */
 export function describePromoDiscount(promo: ActivePromo): string {
+  // A tiered promo's own value columns are ignored by the engine, so quoting
+  // them here would name a discount nobody can earn. Describe the bands, low
+  // floor first, in the order a customer climbs them.
+  if (promo.tiers.length > 0) {
+    return [...promo.tiers]
+      .sort((a, b) => a.minSpend - b.minSpend)
+      .map(
+        (tier) =>
+          `${describePromoDiscount({ ...promo, ...tier, tiers: [] })} over $${tier.minSpend}`,
+      )
+      .join(", ");
+  }
   if (promo.discountType === "free_travel" && promo.travelPercent !== null) {
     // 0 means nothing is charged for the drive; anything else is a part-charge.
     return promo.travelPercent === 0
@@ -739,11 +768,18 @@ export function describeRecurringWindow(window: RecurringWindow): string | null 
 
 /**
  * Customer-facing one-line summary for banner + pricing hero.
+ *
+ * A spend floor is named here rather than left implicit: "20% off until 30 Sep"
+ * beside a $100 minimum reads as an unconditional offer.
  * @param promo - Active promo.
  * @returns Banner string.
  */
 export function summariseForBanner(promo: ActivePromo): string {
-  const base = `${describePromoDiscount(promo)} until ${formatPromoEnd(promo.endAt)}`;
+  // Only for an untiered promo: a tiered one already names a floor per band, and
+  // repeating the promo-wide one would read as a second, separate condition.
+  const floor =
+    promo.minSpend != null && promo.tiers.length === 0 ? ` on jobs over $${promo.minSpend}` : "";
+  const base = `${describePromoDiscount(promo)}${floor} until ${formatPromoEnd(promo.endAt)}`;
   const restriction = describeRecurringWindow(promo);
   return restriction ? `${base}, ${restriction} only` : base;
 }

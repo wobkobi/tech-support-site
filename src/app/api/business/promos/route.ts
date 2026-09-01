@@ -12,7 +12,9 @@ import {
   validateKind,
   validateLimits,
   validateRecurringWindow,
+  validateTiers,
   type PromoKind,
+  type PromoTierInput,
 } from "@/features/business/lib/promo-validation";
 import {
   ACTIVE_PROMO_TAG,
@@ -46,6 +48,8 @@ interface PromoBody {
   activeWeekdays?: number[];
   activeFromMinute?: number | null;
   activeToMinute?: number | null;
+  minSpend?: number | null;
+  tiers?: PromoTierInput[];
 }
 
 /**
@@ -76,6 +80,8 @@ function validatePromo(body: PromoBody): string | null {
   if (limitError) return limitError;
   const windowError = validateRecurringWindow(body);
   if (windowError) return windowError;
+  const tierError = validateTiers(resolveDiscountType(body), body.minSpend, body.tiers);
+  if (tierError) return tierError;
   // Reject rather than coerce: a fractional priority would order unpredictably
   // against the integer column and read as accepted.
   if (body.priority !== undefined && !Number.isInteger(body.priority)) {
@@ -135,6 +141,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       activeWeekdays: body.activeWeekdays ?? [],
       activeFromMinute: body.activeFromMinute ?? null,
       activeToMinute: body.activeToMinute ?? null,
+      minSpend: body.minSpend ?? null,
+      // Stored as given; resolution reduces rather than sorts, and validation
+      // has already rejected duplicate floors.
+      tiers: (body.tiers ?? []).map((t) => ({
+        minSpend: t.minSpend!,
+        flatHourlyRate: t.flatHourlyRate ?? null,
+        percentDiscount: t.percentDiscount ?? null,
+        fixedAmount: t.fixedAmount ?? null,
+        travelPercent: t.travelPercent ?? null,
+      })),
       isActive: body.isActive ?? true,
       priority: body.priority ?? 0,
     },
