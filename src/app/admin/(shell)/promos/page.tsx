@@ -38,6 +38,18 @@ export interface PromoRow {
   isActive: boolean;
   /** Higher wins when windows overlap. */
   priority: number;
+  /** Total uses allowed across everyone, or null for no cap. */
+  maxRedemptions: number | null;
+  /** Uses allowed per customer, or null for no cap. */
+  perCustomerLimit: number | null;
+  /** Restricted to someone with no prior completed booking. */
+  newCustomersOnly: boolean;
+  /** NZ weekdays it applies on (0 = Sunday); empty means every day. */
+  activeWeekdays: number[];
+  /** Start of the NZ time-of-day restriction, in minutes past midnight. */
+  activeFromMinute: number | null;
+  /** End of the NZ time-of-day restriction, in minutes past midnight. */
+  activeToMinute: number | null;
   /** The overlap warning's tie-break must match the query's, so it needs this. */
   createdAt: string;
 }
@@ -65,6 +77,12 @@ export default async function AdminPromosPage(): Promise<React.ReactElement> {
     travelPercent: p.travelPercent,
     isActive: p.isActive,
     priority: p.priority,
+    maxRedemptions: p.maxRedemptions,
+    perCustomerLimit: p.perCustomerLimit,
+    newCustomersOnly: p.newCustomersOnly,
+    activeWeekdays: p.activeWeekdays,
+    activeFromMinute: p.activeFromMinute,
+    activeToMinute: p.activeToMinute,
     createdAt: p.createdAt.toISOString(),
   }));
 

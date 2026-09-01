@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { formatNZD } from "@/features/business/lib/business";
-import { pickWinningPromo } from "@/features/business/lib/promos";
+import { describeRecurringWindow, pickWinningPromo } from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
@@ -89,7 +89,45 @@ interface FormState {
   kind: "automatic" | "code";
   /** The code, uppercase. Ignored when the kind is automatic. */
   code: string;
+  /** Total uses allowed across everyone. Blank for no cap. */
+  maxRedemptions: string;
+  /** Uses allowed per customer. Blank for no cap. */
+  perCustomerLimit: string;
+  newCustomersOnly: boolean;
+  /** NZ weekdays it applies on (0 = Sunday); empty means every day. */
+  activeWeekdays: number[];
+  /** NZ start time as "HH:mm", or "" for no time restriction. */
+  activeFrom: string;
+  /** NZ end time as "HH:mm", or "" for no time restriction. */
+  activeTo: string;
 }
+
+/**
+ * "HH:mm" > minutes past midnight, or null when blank or unparseable.
+ * @param value - Time-input value.
+ * @returns Minutes past midnight, or null.
+ */
+function toMinuteOfDay(value: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const minute = Number(match[1]) * 60 + Number(match[2]);
+  return minute >= 0 && minute <= 1439 ? minute : null;
+}
+
+/**
+ * Minutes past midnight > the "HH:mm" a time input expects.
+ * @param minute - Minutes past midnight, or null.
+ * @returns Time-input value, or "" when there is none.
+ */
+function fromMinuteOfDay(minute: number | null): string {
+  if (minute == null) return "";
+  const h = Math.floor(minute / 60);
+  const m = minute % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Weekday labels for the recurring-window picker, indexed 0 = Sunday. */
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /**
  * ISO timestamp > "YYYY-MM-DD" (local date parts) for <input type="date">.
@@ -160,6 +198,12 @@ function emptyForm(): FormState {
     priority: "0",
     kind: "automatic",
     code: "",
+    maxRedemptions: "",
+    perCustomerLimit: "",
+    newCustomersOnly: false,
+    activeWeekdays: [],
+    activeFrom: "",
+    activeTo: "",
   };
 }
 
@@ -218,7 +262,14 @@ function rangesOverlap(a: PromoRow, b: PromoRow): boolean {
   const aEnd = new Date(a.endAt).getTime();
   const bStart = new Date(b.startAt).getTime();
   const bEnd = new Date(b.endAt).getTime();
-  return aStart < bEnd && bStart < aEnd;
+  if (aStart >= bEnd || bStart >= aEnd) return false;
+  // Sharing a date range is not competing if they run on different days. A
+  // Tuesday promo and a Thursday one never meet, and warning about them would
+  // train the operator to ignore the warning that matters.
+  if (a.activeWeekdays.length > 0 && b.activeWeekdays.length > 0) {
+    return a.activeWeekdays.some((d) => b.activeWeekdays.includes(d));
+  }
+  return true;
 }
 
 /**
@@ -332,27 +383,44 @@ function describeDiscount(p: PromoRow): string {
   }
 }
 
-/** Props for {@link CodeChip}. */
-interface CodeChipProps {
-  /** The promo the chip describes. */
+/** Props for {@link PromoChips}. */
+interface PromoChipsProps {
+  /** The promo the chips describe. */
   promo: PromoRow;
 }
 
 /**
- * Marks a promo as code-only, showing the code itself.
+ * Marks everything that narrows a promo below "applies to everyone, always".
  *
- * Without it a code promo reads as broken in the list: it says Active while the
- * banner stays silent and the pricing page quotes standard rates, which is
- * correct but looks like a bug.
+ * Without these a restricted promo reads as broken in the list: it says Active
+ * while the banner stays silent or the discount only lands on some jobs, which
+ * is correct but looks like a bug.
  * @param props - Component props.
- * @param props.promo - The promo the chip describes.
- * @returns The chip, or null for an automatic promo.
+ * @param props.promo - The promo the chips describe.
+ * @returns The chip row, or null when nothing narrows the promo.
  */
-function CodeChip({ promo }: CodeChipProps): React.ReactElement | null {
-  if (promo.kind !== "code" || !promo.code) return null;
+function PromoChips({ promo }: PromoChipsProps): React.ReactElement | null {
+  const chips: string[] = [];
+  if (promo.kind === "code" && promo.code) chips.push(`Code only: ${promo.code}`);
+  // Shared with the customer-facing banner so the operator reads the same
+  // wording the customer will.
+  const window = describeRecurringWindow(promo);
+  if (window) chips.push(window);
+  if (promo.newCustomersOnly) chips.push("New customers only");
+  if (promo.maxRedemptions != null) chips.push(`${promo.maxRedemptions} uses total`);
+  if (promo.perCustomerLimit != null) chips.push(`${promo.perCustomerLimit} per customer`);
+  if (chips.length === 0) return null;
+
   return (
-    <span className="mt-1 inline-block rounded bg-admin-bg px-1.5 py-0.5 text-xs font-semibold tracking-wider text-admin-muted">
-      Code only: {promo.code}
+    <span className="mt-1 flex flex-wrap gap-1">
+      {chips.map((chip) => (
+        <span
+          key={chip}
+          className="rounded bg-admin-bg px-1.5 py-0.5 text-xs font-semibold text-admin-muted"
+        >
+          {chip}
+        </span>
+      ))}
     </span>
   );
 }
@@ -417,6 +485,12 @@ export function PromosView({ initial }: Props): React.ReactElement {
       priority: String(p.priority),
       kind: p.kind,
       code: p.code ?? "",
+      maxRedemptions: p.maxRedemptions != null ? String(p.maxRedemptions) : "",
+      perCustomerLimit: p.perCustomerLimit != null ? String(p.perCustomerLimit) : "",
+      newCustomersOnly: p.newCustomersOnly,
+      activeWeekdays: p.activeWeekdays,
+      activeFrom: fromMinuteOfDay(p.activeFromMinute),
+      activeTo: fromMinuteOfDay(p.activeToMinute),
     });
   }
 
@@ -440,6 +514,12 @@ export function PromosView({ initial }: Props): React.ReactElement {
       setError("A code promo needs a code.");
       return;
     }
+    // Caught here as well as server-side so the operator is told before the
+    // round trip which half of the pair is missing.
+    if (Boolean(form.activeFrom) !== Boolean(form.activeTo)) {
+      setError("A time-of-day restriction needs both a start and an end.");
+      return;
+    }
     const body = {
       title: form.title.trim(),
       description: form.description.trim() || null,
@@ -461,6 +541,14 @@ export function PromosView({ initial }: Props): React.ReactElement {
       // Always sent, including as null for automatic, so switching a promo back
       // to automatic clears the code it used to carry.
       code: form.kind === "code" ? form.code.trim() : null,
+      // Blank means no cap, which is null rather than 0 - the route rejects 0,
+      // since a limit of nothing reads as an off switch nobody looks for.
+      maxRedemptions: form.maxRedemptions.trim() ? parseInt(form.maxRedemptions, 10) : null,
+      perCustomerLimit: form.perCustomerLimit.trim() ? parseInt(form.perCustomerLimit, 10) : null,
+      newCustomersOnly: form.newCustomersOnly,
+      activeWeekdays: form.activeWeekdays,
+      activeFromMinute: toMinuteOfDay(form.activeFrom),
+      activeToMinute: toMinuteOfDay(form.activeTo),
     };
 
     setBusy(true);
@@ -673,6 +761,119 @@ export function PromosView({ initial }: Props): React.ReactElement {
           </span>
         </label>
 
+        <fieldset className="flex flex-col gap-3 rounded-xl border border-admin-border p-4">
+          <legend className="px-1 text-xs font-medium text-admin-muted">Who can use it</legend>
+          <div className="flex flex-wrap gap-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-admin-muted">Total uses</span>
+              <input
+                type="number"
+                min="1"
+                step={1}
+                value={form.maxRedemptions}
+                onChange={(e) => setForm((p) => ({ ...p, maxRedemptions: e.target.value }))}
+                placeholder="No limit"
+                className={cn(inputClass, "w-32")}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-admin-muted">Uses per customer</span>
+              <input
+                type="number"
+                min="1"
+                step={1}
+                value={form.perCustomerLimit}
+                onChange={(e) => setForm((p) => ({ ...p, perCustomerLimit: e.target.value }))}
+                placeholder="No limit"
+                className={cn(inputClass, "w-32")}
+              />
+            </label>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-admin-muted">
+            <input
+              type="checkbox"
+              checked={form.newCustomersOnly}
+              onChange={(e) => setForm((p) => ({ ...p, newCustomersOnly: e.target.checked }))}
+              className="h-4 w-4"
+            />
+            New customers only (nobody with a completed job on file)
+          </label>
+          <p className="text-xs text-admin-faint">
+            The total cap is approximate: two people can pass it at the same moment and both redeem.
+            Per-customer and new-customer rules need someone the site can identify, so an
+            unrecognised email is allowed through rather than refused.
+          </p>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3 rounded-xl border border-admin-border p-4">
+          <legend className="px-1 text-xs font-medium text-admin-muted">
+            When it applies (optional)
+          </legend>
+          <div className="flex flex-wrap gap-1.5">
+            {WEEKDAY_LABELS.map((label, day) => {
+              const picked = form.activeWeekdays.includes(day);
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={picked}
+                  onClick={() =>
+                    setForm((p) => ({
+                      ...p,
+                      activeWeekdays: picked
+                        ? p.activeWeekdays.filter((d) => d !== day)
+                        : [...p.activeWeekdays, day].sort((a, b) => a - b),
+                    }))
+                  }
+                  className={cn(
+                    "rounded-lg border px-3 py-1.5 text-sm font-medium",
+                    picked
+                      ? "border-admin-text bg-admin-text text-admin-surface"
+                      : "border-admin-border bg-admin-surface text-admin-muted hover:bg-admin-bg",
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap items-end gap-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-admin-muted">From</span>
+              <input
+                type="time"
+                value={form.activeFrom}
+                onChange={(e) => setForm((p) => ({ ...p, activeFrom: e.target.value }))}
+                className={cn(inputClass, "w-32")}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-admin-muted">To</span>
+              <input
+                type="time"
+                value={form.activeTo}
+                onChange={(e) => setForm((p) => ({ ...p, activeTo: e.target.value }))}
+                className={cn(inputClass, "w-32")}
+              />
+            </label>
+            {(form.activeFrom || form.activeTo) && (
+              <button
+                type="button"
+                onClick={() => setForm((p) => ({ ...p, activeFrom: "", activeTo: "" }))}
+                className="pb-2 text-xs font-medium text-admin-muted underline hover:text-admin-text"
+              >
+                Clear times
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-admin-faint">
+            Leave blank to run the whole window. These are matched against the appointment in NZ
+            time, not against when the customer is browsing, so a Tuesday offer is earned by booking
+            a Tuesday job on any day. The banner still advertises the promo throughout and names the
+            restriction.
+          </p>
+        </fieldset>
+
         <label className="flex items-center gap-2 text-sm text-admin-muted">
           <input
             type="checkbox"
@@ -742,7 +943,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
                         {p.description && (
                           <p className="text-xs text-admin-faint">{p.description}</p>
                         )}
-                        <CodeChip promo={p} />
+                        <PromoChips promo={p} />
                         <p className="text-xs text-admin-muted">{usageNote(stats[p.id])}</p>
                         {overlapping && (
                           <p className="text-xs font-medium text-amber-700">
@@ -806,7 +1007,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
                       {p.description && (
                         <p className="mt-0.5 text-sm text-admin-muted">{p.description}</p>
                       )}
-                      <CodeChip promo={p} />
+                      <PromoChips promo={p} />
                       <p className="mt-0.5 text-sm text-admin-muted">{usageNote(stats[p.id])}</p>
                       {overlapping && (
                         <p className="mt-0.5 text-sm font-medium text-amber-700">

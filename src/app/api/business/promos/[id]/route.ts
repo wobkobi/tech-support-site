@@ -9,6 +9,8 @@
 import {
   validateDiscount,
   validateKind,
+  validateLimits,
+  validateRecurringWindow,
   type PromoKind,
 } from "@/features/business/lib/promo-validation";
 import {
@@ -52,6 +54,12 @@ export async function PATCH(
     travelPercent: number | null;
     kind: PromoKind;
     code: string | null;
+    maxRedemptions: number | null;
+    perCustomerLimit: number | null;
+    newCustomersOnly: boolean;
+    activeWeekdays: number[];
+    activeFromMinute: number | null;
+    activeToMinute: number | null;
   }>;
 
   if (body.priority !== undefined && !Number.isInteger(body.priority)) {
@@ -115,6 +123,29 @@ export async function PATCH(
     return errorResponse("that code is already used by another promo", 409);
   }
 
+  // Merged like the rest: a sparse edit that moved only one end of the time
+  // range has to be judged against the end already stored.
+  const limitError = validateLimits({
+    maxRedemptions:
+      body.maxRedemptions !== undefined ? body.maxRedemptions : existing.maxRedemptions,
+    perCustomerLimit:
+      body.perCustomerLimit !== undefined ? body.perCustomerLimit : existing.perCustomerLimit,
+  });
+  if (limitError) {
+    return errorResponse(limitError, 400);
+  }
+  const windowError = validateRecurringWindow({
+    activeWeekdays:
+      body.activeWeekdays !== undefined ? body.activeWeekdays : existing.activeWeekdays,
+    activeFromMinute:
+      body.activeFromMinute !== undefined ? body.activeFromMinute : existing.activeFromMinute,
+    activeToMinute:
+      body.activeToMinute !== undefined ? body.activeToMinute : existing.activeToMinute,
+  });
+  if (windowError) {
+    return errorResponse(windowError, 400);
+  }
+
   const promo = await prisma.promo.update({
     where: { id },
     data: {
@@ -133,6 +164,12 @@ export async function PATCH(
       // Written whenever kind moves too: an automatic promo must not keep the
       // code it had as a code promo, or the list shows a code that does nothing.
       ...((body.code !== undefined || body.kind !== undefined) && { code }),
+      ...(body.maxRedemptions !== undefined && { maxRedemptions: body.maxRedemptions }),
+      ...(body.perCustomerLimit !== undefined && { perCustomerLimit: body.perCustomerLimit }),
+      ...(body.newCustomersOnly !== undefined && { newCustomersOnly: body.newCustomersOnly }),
+      ...(body.activeWeekdays !== undefined && { activeWeekdays: body.activeWeekdays }),
+      ...(body.activeFromMinute !== undefined && { activeFromMinute: body.activeFromMinute }),
+      ...(body.activeToMinute !== undefined && { activeToMinute: body.activeToMinute }),
     },
   });
   // Next 16's revalidateTag requires a second CacheLifeConfig arg.

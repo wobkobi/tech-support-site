@@ -320,12 +320,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // unrecognised code silently falls back to the automatic promo. Resolved
     // against startAt, not now, so a booking made today for a job next month is
     // priced by the promo that will be running on the day.
+    //
+    // The email goes with it so per-customer and new-customer limits bind a
+    // public booking, which has no Contact row yet.
     const [rates, activePromo] = await Promise.all([
       prisma.rateConfig.findMany().catch((err) => {
         console.warn("[booking/request] RateConfig snapshot fetch failed:", err);
         return [] as Awaited<ReturnType<typeof prisma.rateConfig.findMany>>;
       }),
-      resolvePromo({ at: startAt, code: promoCode }).catch((err) => {
+      resolvePromo({ at: startAt, code: promoCode, email }).catch((err) => {
         console.warn("[booking/request] promo resolution failed:", err);
         return null;
       }),

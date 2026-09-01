@@ -544,30 +544,41 @@ export function CalculatorView({
     let cancelled = false;
     const query = new URLSearchParams({ date: jobDate });
     if (promoCode) query.set("code", promoCode);
-    fetch(`/api/business/job-context?${query.toString()}`)
-      .then((r) => r.json())
-      .then(
-        (d: {
-          ok?: boolean;
-          holidayName?: string | null;
-          holidayUplift?: number;
-          promo?: ActivePromo | null;
-        }) => {
-          if (cancelled || !d?.ok) return;
-          setHoliday({
-            name: d.holidayName ?? null,
-            uplift: typeof d.holidayUplift === "number" ? d.holidayUplift : 0,
-          });
-          setActivePromo(d.promo ?? null);
-        },
-      )
-      .catch(() => {
-        /* leave the prior context in place */
-      });
+    // Sent so per-customer and new-customer limits bind an operator-priced job
+    // the same way they bind a public booking. Debounced below, since this is
+    // typed a character at a time.
+    if (clientEmail.trim()) query.set("email", clientEmail.trim());
+    /** Fetches the holiday + promo context for the current date, code and customer. */
+    const run = (): void => {
+      fetch(`/api/business/job-context?${query.toString()}`)
+        .then((r) => r.json())
+        .then(
+          (d: {
+            ok?: boolean;
+            holidayName?: string | null;
+            holidayUplift?: number;
+            promo?: ActivePromo | null;
+          }) => {
+            if (cancelled || !d?.ok) return;
+            setHoliday({
+              name: d.holidayName ?? null,
+              uplift: typeof d.holidayUplift === "number" ? d.holidayUplift : 0,
+            });
+            setActivePromo(d.promo ?? null);
+          },
+        )
+        .catch(() => {
+          /* leave the prior context in place */
+        });
+    };
+    // 400ms: long enough that typing an email is one request, short enough that
+    // the promo chip does not visibly lag a date change.
+    const timer = setTimeout(run, 400);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, [jobDate, promoCode]);
+  }, [jobDate, promoCode, clientEmail]);
 
   /**
    * Applies a picked Places suggestion: keep the full formatted address and

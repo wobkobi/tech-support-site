@@ -709,6 +709,30 @@ model Promo {
   // sit at 0, so the createdAt tie-break still decides them exactly as before.
   priority Int @default(0)
 
+  // Eligibility limits. Null means no limit.
+  //
+  // maxRedemptions is approximate by design: two customers can pass the count
+  // check concurrently and both redeem. A distributed lock is not worth it for
+  // a one-operator business, so a promo can go one or two past its cap under
+  // concurrent load.
+  maxRedemptions   Int?
+  perCustomerLimit Int?
+  // Only for someone with no prior completed booking.
+  newCustomersOnly Boolean @default(false)
+
+  // Recurring window. Inside [startAt, endAt], optionally restrict to these NZ
+  // weekdays (0 = Sunday) and this NZ time-of-day range. An empty list and null
+  // times mean the whole window, which is what every existing promo has.
+  //
+  // Both are matched against the APPOINTMENT, not against when the customer is
+  // browsing: a Tuesday promo exists to fill Tuesday slots, so booking on
+  // Monday for a Tuesday job earns it and booking on Tuesday for a Thursday job
+  // does not.
+  activeWeekdays   Int[]
+  // Minutes since NZ midnight, 0-1439. Both set or both null.
+  activeFromMinute Int?
+  activeToMinute   Int?
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

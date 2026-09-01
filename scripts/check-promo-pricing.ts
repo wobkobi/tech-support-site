@@ -63,6 +63,9 @@ function promo(type: ActivePromo["discountType"], value: number): ActivePromo {
     percentDiscount: type === "percent" ? value : null,
     fixedAmount: type === "fixed_amount" ? value : null,
     travelPercent: type === "free_travel" ? value : null,
+    activeWeekdays: [],
+    activeFromMinute: null,
+    activeToMinute: null,
   };
 }
 

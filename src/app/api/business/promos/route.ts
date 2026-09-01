@@ -10,6 +10,8 @@ import {
   resolveDiscountType,
   validateDiscount,
   validateKind,
+  validateLimits,
+  validateRecurringWindow,
   type PromoKind,
 } from "@/features/business/lib/promo-validation";
 import {
@@ -38,6 +40,12 @@ interface PromoBody {
   travelPercent?: number | null;
   kind?: PromoKind;
   code?: string | null;
+  maxRedemptions?: number | null;
+  perCustomerLimit?: number | null;
+  newCustomersOnly?: boolean;
+  activeWeekdays?: number[];
+  activeFromMinute?: number | null;
+  activeToMinute?: number | null;
 }
 
 /**
@@ -64,6 +72,10 @@ function validatePromo(body: PromoBody): string | null {
   if (discountError) return discountError;
   const kindError = validateKind({ kind: body.kind, code: normalisePromoCode(body.code) });
   if (kindError) return kindError;
+  const limitError = validateLimits(body);
+  if (limitError) return limitError;
+  const windowError = validateRecurringWindow(body);
+  if (windowError) return windowError;
   // Reject rather than coerce: a fractional priority would order unpredictably
   // against the integer column and read as accepted.
   if (body.priority !== undefined && !Number.isInteger(body.priority)) {
@@ -117,6 +129,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       travelPercent: body.travelPercent ?? null,
       kind: body.kind ?? "automatic",
       code,
+      maxRedemptions: body.maxRedemptions ?? null,
+      perCustomerLimit: body.perCustomerLimit ?? null,
+      newCustomersOnly: body.newCustomersOnly ?? false,
+      activeWeekdays: body.activeWeekdays ?? [],
+      activeFromMinute: body.activeFromMinute ?? null,
+      activeToMinute: body.activeToMinute ?? null,
       isActive: body.isActive ?? true,
       priority: body.priority ?? 0,
     },
