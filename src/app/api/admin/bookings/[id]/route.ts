@@ -148,14 +148,21 @@ export async function PATCH(
 
   const now = new Date();
 
-  // Lock past events: state changes and time edits both feed billing, so a booking that
-  // ended more than the configured window ago can't be rewritten by accident.
-  // Metadata-only edits (name/email/phone/notes/address) are still allowed.
-  const isStateChange = body.status !== undefined || body.markNoShow === true;
+  // Lock past events: the state changes that move money, and time edits, can't be
+  // rewritten once a booking is well past. Metadata-only edits
+  // (name/email/phone/notes/address) are still allowed.
+  //
+  // Completing is deliberately exempt. It is the expected terminal state and
+  // costs nothing - it sets the status and releases the slot, while cancelling
+  // computes a fee and a no-show drafts an invoice. Locking it meant a job that
+  // ran on a Friday could never be closed out on the Monday, which is not a
+  // safety property, just an unfinishable booking.
+  const isMoneyStateChange =
+    (body.status !== undefined && body.status !== "completed") || body.markNoShow === true;
   const isTimeChange = body.startAt !== undefined || body.endAt !== undefined;
   const { scheduling } = await getSettings();
   if (
-    (isStateChange || isTimeChange) &&
+    (isMoneyStateChange || isTimeChange) &&
     isPastEditWindow(booking.endAt.getTime(), now.getTime(), scheduling.pastEditLockHours)
   ) {
     return errorResponse(
