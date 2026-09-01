@@ -21,6 +21,7 @@ import {
 import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import {
   describePromoDiscount,
+  describeRecurringWindow,
   getActivePromo,
   promoDisplayRate,
   promoForAppointment,
@@ -103,6 +104,9 @@ export default async function PricingPage(): Promise<React.ReactElement> {
   // an appointment yet. Quoting a Tuesday discount to someone who has not
   // chosen a day promises a price the invoice will not honour.
   const pricedPromo = promoForAppointment(promo, null);
+  // Named wherever the promo is announced, since the figures on this page stay
+  // undiscounted for it.
+  const promoRestriction = promo ? describeRecurringWindow(promo) : null;
   // Crossed-out pairs for the promo block. Null when the promo does not touch
   // that figure, so nothing is struck out to show the same number back.
   const ratePair = pricedPromo ? promoRateBeforeAfter(baseRate, pricedPromo) : null;
@@ -193,6 +197,15 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                   <p className="mt-1 text-base font-semibold sm:text-lg">
                     {describePromoDiscount(promo)}
                   </p>
+                  {/* Without this a restricted promo reads as a discount that
+                      applies now, beside a headline rate that has not moved.
+                      The rates above are deliberately undiscounted, because no
+                      appointment exists here to check the restriction against. */}
+                  {promoRestriction && (
+                    <p className="mt-1 text-base font-semibold sm:text-lg">
+                      {promoRestriction} only
+                    </p>
+                  )}
                   <p className="mt-1 text-base text-russian-violet-900 sm:text-lg">
                     Until {formatDateShort(promo.endAt)}.
                   </p>
@@ -385,13 +398,17 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                           <strong>{mod.label}</strong> ({mod.deltaDescription} ={" "}
                           <PromoPrice
                             discounted={
-                              promoModifierRate(baseRate, mod.effectiveRate, mod.kind, promo) !==
-                              mod.effectiveRate
+                              promoModifierRate(
+                                baseRate,
+                                mod.effectiveRate,
+                                mod.kind,
+                                pricedPromo,
+                              ) !== mod.effectiveRate
                             }
                             className="font-bold"
                           >
                             {formatMoneyCompact(
-                              promoModifierRate(baseRate, mod.effectiveRate, mod.kind, promo),
+                              promoModifierRate(baseRate, mod.effectiveRate, mod.kind, pricedPromo),
                             )}
                             /hr
                           </PromoPrice>
