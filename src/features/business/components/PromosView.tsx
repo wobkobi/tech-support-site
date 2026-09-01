@@ -85,6 +85,10 @@ interface FormState {
   isActive: boolean;
   /** Higher wins when windows overlap. Held as a string for the input. */
   priority: string;
+  /** Automatic promos apply to everyone; a code promo only to whoever enters it. */
+  kind: "automatic" | "code";
+  /** The code, uppercase. Ignored when the kind is automatic. */
+  code: string;
 }
 
 /**
@@ -154,6 +158,8 @@ function emptyForm(): FormState {
     amount: "",
     isActive: true,
     priority: "0",
+    kind: "automatic",
+    code: "",
   };
 }
 
@@ -217,6 +223,10 @@ function rangesOverlap(a: PromoRow, b: PromoRow): boolean {
 
 /**
  * IDs of active promos whose ranges overlap each other.
+ *
+ * Compared within a kind only. A code promo and an automatic one can share a
+ * window without competing - a valid code always wins, and only for whoever
+ * entered it - so pairing them would raise a warning about nothing.
  * @param promos - All promos.
  * @returns Set of overlapping IDs.
  */
@@ -226,6 +236,7 @@ function findOverlaps(promos: PromoRow[]): { ids: Set<string>; winners: Map<stri
   const active = promos.filter((p) => p.isActive);
   for (let i = 0; i < active.length; i++) {
     for (let j = i + 1; j < active.length; j++) {
+      if (active[i].kind !== active[j].kind) continue;
       if (!rangesOverlap(active[i], active[j])) continue;
       ids.add(active[i].id);
       ids.add(active[j].id);
@@ -321,6 +332,31 @@ function describeDiscount(p: PromoRow): string {
   }
 }
 
+/** Props for {@link CodeChip}. */
+interface CodeChipProps {
+  /** The promo the chip describes. */
+  promo: PromoRow;
+}
+
+/**
+ * Marks a promo as code-only, showing the code itself.
+ *
+ * Without it a code promo reads as broken in the list: it says Active while the
+ * banner stays silent and the pricing page quotes standard rates, which is
+ * correct but looks like a bug.
+ * @param props - Component props.
+ * @param props.promo - The promo the chip describes.
+ * @returns The chip, or null for an automatic promo.
+ */
+function CodeChip({ promo }: CodeChipProps): React.ReactElement | null {
+  if (promo.kind !== "code" || !promo.code) return null;
+  return (
+    <span className="mt-1 inline-block rounded bg-admin-bg px-1.5 py-0.5 text-xs font-semibold tracking-wider text-admin-muted">
+      Code only: {promo.code}
+    </span>
+  );
+}
+
 interface Props {
   /** Initial server-fetched promo list. */
   initial: PromoRow[];
@@ -379,6 +415,8 @@ export function PromosView({ initial }: Props): React.ReactElement {
       amount: String(amountFor(p)),
       isActive: p.isActive,
       priority: String(p.priority),
+      kind: p.kind,
+      code: p.code ?? "",
     });
   }
 
@@ -398,6 +436,10 @@ export function PromosView({ initial }: Props): React.ReactElement {
       setError("Start date must be on or before the end date.");
       return;
     }
+    if (form.kind === "code" && !form.code.trim()) {
+      setError("A code promo needs a code.");
+      return;
+    }
     const body = {
       title: form.title.trim(),
       description: form.description.trim() || null,
@@ -415,6 +457,10 @@ export function PromosView({ initial }: Props): React.ReactElement {
       travelPercent: form.type === "travel" ? 1 - amount / 100 : null,
       isActive: form.isActive,
       priority: parseInt(form.priority, 10) || 0,
+      kind: form.kind,
+      // Always sent, including as null for automatic, so switching a promo back
+      // to automatic clears the code it used to carry.
+      code: form.kind === "code" ? form.code.trim() : null,
     };
 
     setBusy(true);
@@ -569,6 +615,50 @@ export function PromosView({ initial }: Props): React.ReactElement {
           </label>
         </div>
 
+        <div className="flex flex-wrap items-start gap-4">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-admin-muted">Who gets it</span>
+            <select
+              value={form.kind}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, kind: e.target.value as "automatic" | "code" }))
+              }
+              className={cn(inputClass, "w-56")}
+            >
+              <option value="automatic">Everyone (automatic)</option>
+              <option value="code">Only with a code</option>
+            </select>
+            <span className="text-xs text-admin-faint">
+              {form.kind === "code"
+                ? "Never shown on the banner or the pricing page - only someone with the code gets it."
+                : "Applies to every visitor and shows on the site-wide banner."}
+            </span>
+          </label>
+
+          {form.kind === "code" && (
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-admin-muted">Code</span>
+              <input
+                type="text"
+                required
+                value={form.code}
+                // Uppercased as it is typed, because that is how it is stored
+                // and compared - what the operator sees is what a customer
+                // has to enter.
+                onChange={(e) => setForm((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
+                placeholder="SPRING25"
+                maxLength={32}
+                autoComplete="off"
+                spellCheck={false}
+                className={cn(inputClass, "w-48 tracking-wider uppercase")}
+              />
+              <span className="text-xs text-admin-faint">
+                Letters, numbers and dashes. 3 to 32 characters.
+              </span>
+            </label>
+          )}
+        </div>
+
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-admin-muted">Priority</span>
           <input
@@ -652,6 +742,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
                         {p.description && (
                           <p className="text-xs text-admin-faint">{p.description}</p>
                         )}
+                        <CodeChip promo={p} />
                         <p className="text-xs text-admin-muted">{usageNote(stats[p.id])}</p>
                         {overlapping && (
                           <p className="text-xs font-medium text-amber-700">
@@ -715,6 +806,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
                       {p.description && (
                         <p className="mt-0.5 text-sm text-admin-muted">{p.description}</p>
                       )}
+                      <CodeChip promo={p} />
                       <p className="mt-0.5 text-sm text-admin-muted">{usageNote(stats[p.id])}</p>
                       {overlapping && (
                         <p className="mt-0.5 text-sm font-medium text-amber-700">

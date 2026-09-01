@@ -179,6 +179,8 @@ interface CalculatorDraft {
   aiInput: string;
   /** Date the job was done (YYYY-MM-DD); drives the holiday + promo lookup. */
   jobDate: string;
+  /** Applied promo code, uppercase, or "" for none. */
+  promoCode: string;
   timeRanges: ParsedRange[];
   /** Out-of-session minutes added to the slot sum (0 = none). */
   followUpMins: number;
@@ -518,6 +520,11 @@ export function CalculatorView({
   // promo for the selected job date (refined by the job-context effect below).
   const [activePromo, setActivePromo] = useState<ActivePromo | null>(initialPromo);
   const [skipPromo, setSkipPromo] = useState(false);
+  // Two fields, not one: the box the operator types in, and the code actually
+  // applied. Only the applied one is in the lookup's deps, so the job is not
+  // repriced on every keystroke.
+  const [promoCodeInput, setPromoCodeInput] = useState("");
+  const [promoCode, setPromoCode] = useState("");
 
   // Job date drives the holiday + promo lookup so a past job is priced by what
   // applied THEN, not today. Persisted in the draft; defaults to today (NZ).
@@ -535,7 +542,9 @@ export function CalculatorView({
   useEffect(() => {
     if (!jobDate) return;
     let cancelled = false;
-    fetch(`/api/business/job-context?date=${encodeURIComponent(jobDate)}`)
+    const query = new URLSearchParams({ date: jobDate });
+    if (promoCode) query.set("code", promoCode);
+    fetch(`/api/business/job-context?${query.toString()}`)
       .then((r) => r.json())
       .then(
         (d: {
@@ -558,7 +567,7 @@ export function CalculatorView({
     return () => {
       cancelled = true;
     };
-  }, [jobDate]);
+  }, [jobDate, promoCode]);
 
   /**
    * Applies a picked Places suggestion: keep the full formatted address and
@@ -586,6 +595,8 @@ export function CalculatorView({
       setDraftRestoredAt(draft.savedAt ?? null);
       setAiInput(draft.aiInput ?? "");
       setJobDate(draft.jobDate ?? todayISO());
+      setPromoCode(draft.promoCode ?? "");
+      setPromoCodeInput(draft.promoCode ?? "");
       setTimeRanges(draft.timeRanges ?? [{ startTime: "", endTime: "" }]);
       setFollowUpMins(draft.followUpMins ?? 0);
       setTravelEntries(draft.travelEntries ?? []);
@@ -638,6 +649,7 @@ export function CalculatorView({
       saveDraft({
         aiInput,
         jobDate,
+        promoCode,
         timeRanges,
         followUpMins,
         travelEntries,
@@ -657,6 +669,7 @@ export function CalculatorView({
   }, [
     aiInput,
     jobDate,
+    promoCode,
     timeRanges,
     followUpMins,
     travelEntries,
@@ -1139,7 +1152,8 @@ export function CalculatorView({
   /**
    * Resets every form field - persisted and session-only - back to a blank
    * calculator and drops the saved draft. Single source of truth for "start
-   * fresh": also rewinds the job date to today, un-skips the promo, resets the
+   * fresh": also rewinds the job date to today, un-skips the promo, drops any
+   * promo code, resets the
    * cancel-policy inputs, and clears any error banners. When billing a
    * calendar event, navigates off `?eventId=` so the keyed view remounts
    * without the prefill.
@@ -1148,6 +1162,8 @@ export function CalculatorView({
     const now = nowTime();
     setJobDate(todayISO());
     setSkipPromo(false);
+    setPromoCode("");
+    setPromoCodeInput("");
     setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
     setFollowUpMins(0);
     setTravelEntries([]);
@@ -1934,26 +1950,72 @@ export function CalculatorView({
         )}
       </div>
 
-      {/* Promo chip with per-job skip toggle. */}
-      {activePromo && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-amber-800">
-            <span aria-hidden="true">⚡</span>
-            <span className="font-semibold">Promo: {activePromo.title}</span>
-            <span className="text-xs text-amber-700">({summariseForBanner(activePromo)})</span>
-            {skipPromo && <span className="text-xs italic">- skipped for this job</span>}
+      {/* Promo chip with per-job skip toggle, plus code entry for a job taken
+          over the phone. The code box renders whether or not a promo resolved -
+          without one there would be nowhere to type a code when no automatic
+          promo is running, which is exactly when a code matters. */}
+      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+        {activePromo && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm text-amber-800">
+              <span aria-hidden="true">⚡</span>
+              <span className="font-semibold">Promo: {activePromo.title}</span>
+              <span className="text-xs text-amber-700">({summariseForBanner(activePromo)})</span>
+              {activePromo.code && (
+                <span className="rounded bg-amber-200 px-1.5 py-0.5 text-xs font-semibold tracking-wider">
+                  {activePromo.code}
+                </span>
+              )}
+              {skipPromo && <span className="text-xs italic">- skipped for this job</span>}
+            </div>
+            <label className="flex items-center gap-2 text-xs text-amber-800">
+              <input
+                type="checkbox"
+                checked={skipPromo}
+                onChange={(e) => setSkipPromo(e.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+              Skip promo for this job
+            </label>
           </div>
-          <label className="flex items-center gap-2 text-xs text-amber-800">
-            <input
-              type="checkbox"
-              checked={skipPromo}
-              onChange={(e) => setSkipPromo(e.target.checked)}
-              className="h-3.5 w-3.5"
-            />
-            Skip promo for this job
+        )}
+        <div className="flex flex-wrap items-center gap-2 text-sm text-amber-800">
+          <label htmlFor="calc-promo-code" className="font-medium">
+            Promo code
           </label>
+          <input
+            id="calc-promo-code"
+            value={promoCodeInput}
+            onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                setPromoCode(promoCodeInput.trim());
+              }
+            }}
+            placeholder="None"
+            maxLength={32}
+            autoComplete="off"
+            spellCheck={false}
+            className="w-40 rounded-lg border border-amber-300 bg-white px-2 py-1 tracking-wider uppercase"
+          />
+          <button
+            type="button"
+            onClick={() => setPromoCode(promoCodeInput.trim())}
+            disabled={promoCodeInput.trim() === promoCode}
+            className="rounded-lg border border-amber-300 bg-white px-3 py-1 font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+          >
+            Apply
+          </button>
+          {/* The verdict comes from the job-date lookup, not a live check: a
+              code can be valid today and not on the day the job was done. */}
+          {promoCode !== "" && activePromo?.code !== promoCode && (
+            <span className="font-medium text-red-700">
+              Not valid on {jobDate} - pricing uses whatever promo applied that day.
+            </span>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Form toolbar. The full clear lives here rather than under the save
           buttons: it is the "start over" action, reached mid-form far more

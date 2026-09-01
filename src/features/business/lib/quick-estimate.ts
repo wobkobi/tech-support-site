@@ -11,6 +11,7 @@ import { calcTravelCharge, FALLBACK_BASE_RATE } from "@/features/business/lib/pr
 import {
   applyPromoToHourlyRate,
   applyPromoToQuote,
+  normalisePromoCode,
   type ActivePromo,
 } from "@/features/business/lib/promos";
 import type { PublicRate } from "@/features/business/types/pricing";
@@ -35,6 +36,11 @@ export interface QuickEstimateInput {
   departureTimeIso?: string;
   /** End of the visit; the return leg is quoted from here. */
   returnDepartureTimeIso?: string;
+  /**
+   * A promo code the customer entered. A valid one beats the automatic promo;
+   * an invalid one is ignored and the automatic promo still applies.
+   */
+  promoCode?: string | null;
 }
 
 /** Result of a one-shot estimate. `estimateId` is null when logging failed. */
@@ -79,9 +85,19 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
           .replace(/,?\s*New Zealand$/i, "")
           .trim();
 
-  const [ratesRes, promoRes, travelRes, estimateRes] = await Promise.allSettled([
+  const code = normalisePromoCode(input.promoCode);
+
+  const [ratesRes, promoRes, codeRes, travelRes, estimateRes] = await Promise.allSettled([
     fetch("/api/pricing/rates").then((r) => r.json() as Promise<{ rates?: PublicRate[] }>),
     fetch("/api/promos/active").then((r) => r.json() as Promise<{ promo?: ActivePromo | null }>),
+    // Both promos are asked for at once, so an entered code costs no latency.
+    code
+      ? fetch("/api/promos/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code }),
+        }).then((r) => r.json() as Promise<{ valid?: boolean; promo?: ActivePromo | null }>)
+      : Promise.resolve({ valid: false, promo: null }),
     dest
       ? fetch("/api/pricing/travel-time", {
           method: "POST",
@@ -114,8 +130,15 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
   ]);
 
   const rates: PublicRate[] = ratesRes.status === "fulfilled" ? (ratesRes.value.rates ?? []) : [];
-  const promo: ActivePromo | null =
+  const autoPromo: ActivePromo | null =
     promoRes.status === "fulfilled" ? (promoRes.value.promo ?? null) : null;
+  const codePromo: ActivePromo | null =
+    codeRes.status === "fulfilled" && codeRes.value.valid ? (codeRes.value.promo ?? null) : null;
+  // Same precedence as resolvePromo on the server: a valid code wins, an
+  // invalid one falls through rather than blocking the automatic promo. This is
+  // the displayed figure only - /api/booking/request re-resolves the code
+  // itself and prices from that, so a fabricated code buys nothing.
+  const promo: ActivePromo | null = codePromo ?? autoPromo;
   // Both legs quoted at "now"-ish traffic (no job time exists here; the
   // server defaults the return to +60 min, matching the fallback duration).
   const travelMins =

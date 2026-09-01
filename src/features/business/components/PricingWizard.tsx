@@ -8,6 +8,7 @@
 
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { BOOKING_FIELD_LIMITS } from "@/features/booking/lib/booking";
+import { PromoCodeField } from "@/features/business/components/PromoCodeField";
 import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
 import { calcTravelCharge, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
 import {
@@ -49,6 +50,205 @@ function formatDuration(mins: number): string {
   const m = mins % 60;
   const hourStr = `${h} hour${h === 1 ? "" : "s"}`;
   return m === 0 ? `About ${hourStr}` : `About ${hourStr} ${m} min`;
+}
+
+/** The promo-independent half of a quote, kept so a code can reprice without re-asking the AI. */
+interface QuoteInputs {
+  /** Undiscounted $/hr for the chosen meeting mode. */
+  fullRate: number;
+  /** AI-estimated labour minutes. */
+  estimatedMins: number;
+  /** AI confidence, which sets the band width. */
+  confidence: EstimateConfidence;
+  /** AI task breakdown, possibly empty. */
+  tasks: { label: string; mins: number }[];
+  /** The AI's plain-English reasoning, logged with the estimate. */
+  explanation: string;
+  /** Outbound drive minutes; 0 for remote. */
+  travelMins: number;
+  /** Return drive minutes; 0 for remote. */
+  travelMinsBack: number;
+  /** Geocoded destination, or "" for remote. Logged with the estimate. */
+  dest: string;
+  /** Meeting mode the customer picked. */
+  meeting: MeetingMode;
+}
+
+/** The live pricing settings a quote is built against. */
+interface QuoteSettings {
+  minBillableMins: number;
+  minTravelCharge: number;
+  travelRatePerHour: number;
+  estimatorRange: EstimatorRange;
+  lowEndFloorFactor: number;
+}
+
+/**
+ * Builds the displayed price range from a fixed set of estimate inputs and one
+ * promo.
+ *
+ * Split out of the estimate flow so applying a promo code reprices from what
+ * was already fetched. Re-running the whole flow would spend another AI call
+ * and could return a different duration, which reads as the code having changed
+ * the length of the job.
+ * @param inputs - The estimate inputs, independent of any promo.
+ * @param settings - Live pricing settings.
+ * @param promo - The promo to price against, or null.
+ * @returns The range to display plus the effective hourly rate it used.
+ */
+function buildPriceRange(
+  inputs: QuoteInputs,
+  settings: QuoteSettings,
+  promo: ActivePromo | null,
+): { range: PriceRange; promoRate: number } {
+  const promoRate = applyPromoToHourlyRate(inputs.fullRate, promo);
+  const promoApplied = promoRate < inputs.fullRate;
+
+  // Floor short jobs to the published billable minimum. The range width is
+  // confidence-scaled (see priceRangeFor) - wider, with a lower low end, when
+  // the description is vague.
+  const effectiveMins = Math.max(settings.minBillableMins, inputs.estimatedMins);
+
+  /**
+   * Confidence-scaled price band for one slice, via the shared helper so the
+   * pricing page and the inline booking estimate use identical math.
+   * @param mins - Minutes for this slice.
+   * @param rate - Effective $/hr.
+   * @returns Whole-dollar low/high range.
+   */
+  const rangeFor = (mins: number, rate: number): { low: number; high: number } =>
+    priceRangeFor(
+      mins,
+      rate,
+      inputs.confidence,
+      settings.estimatorRange,
+      settings.lowEndFloorFactor,
+    );
+
+  // Travel uses the dedicated Travel rate (never promo-discounted, never
+  // labour-rate). Routes through calcTravelCharge so the floor + leg
+  // summing match the calculator and invoice exactly.
+  const travel = calcTravelCharge(
+    inputs.travelMins,
+    inputs.travelMinsBack,
+    settings.travelRatePerHour,
+    settings.minTravelCharge,
+  );
+
+  /**
+   * Labour-only band (floor applied), with the drive-time charge alongside it
+   * for the separate travel line - not folded into low/high.
+   * @param rate - Effective $/hr for labour.
+   * @returns Labour low/high plus the (rate-invariant) drive-time charge.
+   */
+  const buildVisitRange = (rate: number): { low: number; high: number; travel: number } => {
+    const { low, high } = rangeFor(effectiveMins, rate);
+    // Labour-only band; travel is surfaced on its own line (matching the
+    // booking form) rather than folded into the headline. The logged total
+    // below stays all-in so the booking snapshot is unchanged.
+    return { low, high, travel };
+  };
+
+  // Quote-level promo types (fixed amount, free travel) act here, after the
+  // band and travel are priced. The rate-based types already applied to
+  // promoRate above and are a no-op at this stage.
+  const pricedRange = buildVisitRange(promoRate);
+  const discounted = applyPromoToQuote(
+    { labourLow: pricedRange.low, labourHigh: pricedRange.high, travel: pricedRange.travel },
+    promo,
+  );
+  const promoRange = {
+    low: discounted.labourLow,
+    high: discounted.labourHigh,
+    travel: discounted.travel,
+  };
+  // The crossed-out "before" figure is deliberately undiscounted at both
+  // stages. A quote-level promo moves travel without touching the band, so
+  // the comparison has to include travel or a free-travel offer would show
+  // no saving at all.
+  const anyDiscount =
+    promoApplied ||
+    promoRange.low !== pricedRange.low ||
+    promoRange.high !== pricedRange.high ||
+    promoRange.travel !== pricedRange.travel;
+  const rawOriginal = anyDiscount ? buildVisitRange(inputs.fullRate) : null;
+  const original =
+    rawOriginal &&
+    (rawOriginal.low !== promoRange.low ||
+      rawOriginal.high !== promoRange.high ||
+      rawOriginal.travel !== promoRange.travel)
+      ? rawOriginal
+      : null;
+
+  // Allocate the visit range proportionally to each task's share of total mins. A
+  // per-line rangeFor would re-apply the $20 minimum spread and inflate past the visit
+  // total; the proportional split keeps the sum honest, with drift snapping to the
+  // largest line.
+  const taskLines = (() => {
+    const visitJob = rangeFor(effectiveMins, promoRate);
+    if (inputs.tasks.length <= 1) {
+      // Use the AI's own label ("Wi-Fi troubleshooting") rather than a generic
+      // one - the multi-task branch below already does. "Tech support" stays
+      // as the fallback for a parse that returned no tasks at all.
+      return [
+        {
+          label: inputs.tasks[0]?.label || "Tech support",
+          low: visitJob.low,
+          high: visitJob.high,
+          note: null,
+        },
+      ];
+    }
+    const totalTaskMins = inputs.tasks.reduce((s, t) => s + t.mins, 0) || 1;
+    const lines = inputs.tasks.map((t) => ({
+      label: t.label,
+      low: Math.round((t.mins * visitJob.low) / totalTaskMins / 5) * 5,
+      high: Math.round((t.mins * visitJob.high) / totalTaskMins / 5) * 5,
+      note: null as string | null,
+    }));
+    const lowDrift = visitJob.low - lines.reduce((s, l) => s + l.low, 0);
+    const highDrift = visitJob.high - lines.reduce((s, l) => s + l.high, 0);
+    if (lowDrift !== 0 || highDrift !== 0) {
+      const largestIdx = lines.reduce((maxI, l, i, arr) => (l.high > arr[maxI].high ? i : maxI), 0);
+      lines[largestIdx] = {
+        ...lines[largestIdx],
+        low: Math.max(0, lines[largestIdx].low + lowDrift),
+        high: Math.max(0, lines[largestIdx].high + highDrift),
+      };
+    }
+    return lines;
+  })();
+
+  // Assemble the final price range
+  const range: PriceRange = {
+    low: promoRange.low,
+    high: promoRange.high,
+    breakdown: [
+      ...taskLines,
+      ...(promoRange.travel > 0
+        ? [
+            {
+              label: "Drive time",
+              low: promoRange.travel,
+              high: promoRange.travel,
+              note: null,
+            },
+          ]
+        : []),
+    ],
+    includesTravel: promoRange.travel > 0,
+    travelCharge: promoRange.travel,
+    includesAfterHours: false,
+    ...(original
+      ? {
+          originalLow: original.low,
+          originalHigh: original.high,
+          promoLabel: promo ? summariseForBanner(promo) : undefined,
+        }
+      : {}),
+  };
+
+  return { range, promoRate };
 }
 
 interface Props {
@@ -100,6 +300,19 @@ export function PricingWizard({
   // Id of the logged estimate, carried to /booking so the booking snapshots
   // which quote the customer actually saw.
   const [estimateId, setEstimateId] = useState<string | null>(null);
+  // The estimate behind the current quote, kept so applying a promo code
+  // reprices it instead of asking the AI again.
+  const [quoteInputs, setQuoteInputs] = useState<QuoteInputs | null>(null);
+  const [promoCode, setPromoCode] = useState("");
+  const [codePromo, setCodePromo] = useState<ActivePromo | null>(null);
+
+  const settings: QuoteSettings = {
+    minBillableMins,
+    minTravelCharge,
+    travelRatePerHour,
+    estimatorRange,
+    lowEndFloorFactor,
+  };
 
   useEffect(() => {
     // Rates + active promo in parallel; promo may be null.
@@ -213,148 +426,25 @@ export function PricingWizard({
       tasks = Array.isArray(ai.tasks) ? ai.tasks : [];
     }
 
-    const promoRate = applyPromoToHourlyRate(fullRate, activePromo);
-    const promoApplied = promoRate < fullRate;
-
     setAiExplanation(explanation);
     setAiEstimatedMins(estimatedMins);
     setAiConfidence(confidence);
 
-    // Floor short jobs to the published billable minimum. The range width is
-    // confidence-scaled (see priceRangeFor) - wider, with a lower low end, when
-    // the description is vague.
-    const effectiveMins = Math.max(minBillableMins, estimatedMins);
-
-    /**
-     * Confidence-scaled price band for one slice, via the shared helper so the
-     * pricing page and the inline booking estimate use identical math.
-     * @param mins - Minutes for this slice.
-     * @param rate - Effective $/hr.
-     * @returns Whole-dollar low/high range.
-     */
-    const rangeFor = (mins: number, rate: number): { low: number; high: number } =>
-      priceRangeFor(mins, rate, confidence, estimatorRange, lowEndFloorFactor);
-
-    // Travel uses the dedicated Travel rate (never promo-discounted, never
-    // labour-rate). Routes through calcTravelCharge so the floor + leg
-    // summing match the calculator and invoice exactly.
-    const travel = calcTravelCharge(travelMins, travelMinsBack, travelRatePerHour, minTravelCharge);
-
-    /**
-     * Labour-only band (floor applied), with the drive-time charge alongside it
-     * for the separate travel line - not folded into low/high.
-     * @param rate - Effective $/hr for labour.
-     * @returns Labour low/high plus the (rate-invariant) drive-time charge.
-     */
-    const buildVisitRange = (rate: number): { low: number; high: number; travel: number } => {
-      const { low, high } = rangeFor(effectiveMins, rate);
-      // Labour-only band; travel is surfaced on its own line (matching the
-      // booking form) rather than folded into the headline. The logged total
-      // below stays all-in so the booking snapshot is unchanged.
-      return { low, high, travel };
+    const inputs: QuoteInputs = {
+      fullRate,
+      estimatedMins,
+      confidence,
+      tasks,
+      explanation,
+      travelMins,
+      travelMinsBack,
+      dest,
+      meeting,
     };
-
-    // Quote-level promo types (fixed amount, free travel) act here, after the
-    // band and travel are priced. The rate-based types already applied to
-    // promoRate above and are a no-op at this stage.
-    const pricedRange = buildVisitRange(promoRate);
-    const discounted = applyPromoToQuote(
-      { labourLow: pricedRange.low, labourHigh: pricedRange.high, travel: pricedRange.travel },
-      activePromo,
-    );
-    const promoRange = {
-      low: discounted.labourLow,
-      high: discounted.labourHigh,
-      travel: discounted.travel,
-    };
-    // The crossed-out "before" figure is deliberately undiscounted at both
-    // stages. A quote-level promo moves travel without touching the band, so
-    // the comparison has to include travel or a free-travel offer would show
-    // no saving at all.
-    const anyDiscount =
-      promoApplied ||
-      promoRange.low !== pricedRange.low ||
-      promoRange.high !== pricedRange.high ||
-      promoRange.travel !== pricedRange.travel;
-    const rawOriginal = anyDiscount ? buildVisitRange(fullRate) : null;
-    const original =
-      rawOriginal &&
-      (rawOriginal.low !== promoRange.low ||
-        rawOriginal.high !== promoRange.high ||
-        rawOriginal.travel !== promoRange.travel)
-        ? rawOriginal
-        : null;
-
-    // Allocate the visit range proportionally to each task's share of total mins. A
-    // per-line rangeFor would re-apply the $20 minimum spread and inflate past the visit
-    // total; the proportional split keeps the sum honest, with drift snapping to the
-    // largest line.
-    const taskLines = (() => {
-      const visitJob = rangeFor(effectiveMins, promoRate);
-      if (tasks.length <= 1) {
-        // Use the AI's own label ("Wi-Fi troubleshooting") rather than a generic
-        // one - the multi-task branch below already does. "Tech support" stays
-        // as the fallback for a parse that returned no tasks at all.
-        return [
-          {
-            label: tasks[0]?.label || "Tech support",
-            low: visitJob.low,
-            high: visitJob.high,
-            note: null,
-          },
-        ];
-      }
-      const totalTaskMins = tasks.reduce((s, t) => s + t.mins, 0) || 1;
-      const lines = tasks.map((t) => ({
-        label: t.label,
-        low: Math.round((t.mins * visitJob.low) / totalTaskMins / 5) * 5,
-        high: Math.round((t.mins * visitJob.high) / totalTaskMins / 5) * 5,
-        note: null as string | null,
-      }));
-      const lowDrift = visitJob.low - lines.reduce((s, l) => s + l.low, 0);
-      const highDrift = visitJob.high - lines.reduce((s, l) => s + l.high, 0);
-      if (lowDrift !== 0 || highDrift !== 0) {
-        const largestIdx = lines.reduce(
-          (maxI, l, i, arr) => (l.high > arr[maxI].high ? i : maxI),
-          0,
-        );
-        lines[largestIdx] = {
-          ...lines[largestIdx],
-          low: Math.max(0, lines[largestIdx].low + lowDrift),
-          high: Math.max(0, lines[largestIdx].high + highDrift),
-        };
-      }
-      return lines;
-    })();
-
-    // Assemble the final price range
-    const range: PriceRange = {
-      low: promoRange.low,
-      high: promoRange.high,
-      breakdown: [
-        ...taskLines,
-        ...(promoRange.travel > 0
-          ? [
-              {
-                label: "Drive time",
-                low: promoRange.travel,
-                high: promoRange.travel,
-                note: null,
-              },
-            ]
-          : []),
-      ],
-      includesTravel: promoRange.travel > 0,
-      travelCharge: promoRange.travel,
-      includesAfterHours: false,
-      ...(original
-        ? {
-            originalLow: original.low,
-            originalHigh: original.high,
-            promoLabel: activePromo ? summariseForBanner(activePromo) : undefined,
-          }
-        : {}),
-    };
+    // Held so applying a promo code later reprices from the same estimate.
+    setQuoteInputs(inputs);
+    const promo = codePromo ?? activePromo;
+    const { range, promoRate } = buildPriceRange(inputs, settings, promo);
 
     setResult(range);
     setIsCalculating(false);
@@ -367,29 +457,44 @@ export function PricingWizard({
       window.gtag("event", "price_estimate");
     }
 
-    // Audit log: fire-and-forget so failures don't break the UX. Captures
-    // the raw text, AI interpretation, meeting mode the customer picked, and
-    // the exact range shown so disputes can be reconstructed.
+    logEstimate(inputs, range, promoRate, promo);
+  }
+
+  /**
+   * Records the quote the customer actually saw and keeps its id for the
+   * booking link. Fire-and-forget: a failed log must not break the quote.
+   * @param inputs - The estimate behind the quote.
+   * @param range - The range as displayed.
+   * @param promoRate - Effective $/hr the range was built at.
+   * @param promo - The promo in force, or null.
+   */
+  function logEstimate(
+    inputs: QuoteInputs,
+    range: PriceRange,
+    promoRate: number,
+    promo: ActivePromo | null,
+  ): void {
+    const travel = range.travelCharge ?? 0;
     fetch("/api/pricing/log-estimate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         description: issueDescription,
-        aiEstimatedMins: estimatedMins,
-        aiExplanation: explanation,
-        aiTasks: tasks,
-        address: dest || null,
-        travelMins,
-        travelMinsBack,
-        meetingType: meeting === "on-site" ? "in_person" : "remote",
+        aiEstimatedMins: inputs.estimatedMins,
+        aiExplanation: inputs.explanation,
+        aiTasks: inputs.tasks,
+        address: inputs.dest || null,
+        travelMins: inputs.travelMins,
+        travelMinsBack: inputs.travelMinsBack,
+        meetingType: inputs.meeting === "on-site" ? "in_person" : "remote",
         hourlyRate: promoRate,
         // Logged total stays all-in (labour + travel) so the booking snapshot
         // and legacy consumers keep the full price; the headline shows labour only.
-        priceLow: promoRange.low + promoRange.travel,
-        priceHigh: promoRange.high + promoRange.travel,
-        travelCharge: promoRange.travel,
-        promoTitle: activePromo?.title ?? null,
-        promoLabel: activePromo ? summariseForBanner(activePromo) : null,
+        priceLow: range.low + travel,
+        priceHigh: range.high + travel,
+        travelCharge: travel,
+        promoTitle: promo?.title ?? null,
+        promoLabel: promo ? summariseForBanner(promo) : null,
       }),
     })
       .then((r) => r.json())
@@ -399,6 +504,26 @@ export function PricingWizard({
       .catch(() => {
         // Logging is best-effort; ignore network/server errors.
       });
+  }
+
+  /**
+   * Reprices the quote on screen after a promo code is applied or cleared.
+   *
+   * Rebuilt from the stored estimate rather than re-run: another AI call could
+   * return a different duration, which would read as the code having changed
+   * how long the job takes. Re-logged because the customer is now looking at a
+   * different quote, and the booking snapshots whichever one they saw.
+   * @param promo - The promo the code unlocked, or null when it was cleared or rejected.
+   */
+  function repriceForCode(promo: ActivePromo | null): void {
+    setCodePromo(promo);
+    if (!quoteInputs) return;
+    // A rejected code leaves the automatic promo in place - it never costs the
+    // customer a discount they already had.
+    const effective = promo ?? activePromo;
+    const built = buildPriceRange(quoteInputs, settings, effective);
+    setResult(built.range);
+    logEstimate(quoteInputs, built.range, built.promoRate, effective);
   }
 
   /**
@@ -435,6 +560,9 @@ export function PricingWizard({
   function reset(): void {
     setStep("issue");
     setIssueDescription("");
+    setQuoteInputs(null);
+    setPromoCode("");
+    setCodePromo(null);
     // Null, not "on-site" - the meeting step must always be an explicit pick.
     setMeeting(null);
     setAddress("");
@@ -463,6 +591,16 @@ export function PricingWizard({
   if (loading) {
     return <div className="py-8 text-center text-sm text-slate-400">Loading calculator...</div>;
   }
+
+  // An applied code travels to /booking so the customer does not re-enter it;
+  // the booking route re-resolves it there rather than trusting the link.
+  const bookingHref = (() => {
+    const params = new URLSearchParams();
+    if (estimateId) params.set("estimate", estimateId);
+    if (codePromo?.code) params.set("promo", codePromo.code);
+    const query = params.toString();
+    return query ? `/booking?${query}` : "/booking";
+  })();
 
   return (
     <div>
@@ -633,6 +771,13 @@ export function PricingWizard({
             )}
           </div>
 
+          <PromoCodeField
+            value={promoCode}
+            onChange={setPromoCode}
+            onApplied={repriceForCode}
+            className="mb-4 max-w-sm"
+          />
+
           {aiExplanation && <p className="mb-4 text-base text-slate-600">{aiExplanation}</p>}
 
           {result.breakdown.length > 0 && (
@@ -662,7 +807,7 @@ export function PricingWizard({
 
           <div className="flex flex-wrap gap-3">
             <Link
-              href={estimateId ? `/booking?estimate=${estimateId}` : "/booking"}
+              href={bookingHref}
               className="rounded-xl bg-russian-violet px-5 py-2.5 text-base font-semibold text-white select-none hover:bg-russian-violet/90"
             >
               Book now

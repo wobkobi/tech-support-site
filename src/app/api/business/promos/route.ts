@@ -2,12 +2,21 @@
 /**
  * @description Admin promo collection endpoint. GET lists every promo newest
  * start first; POST validates a {@link PromoBody} via {@link validatePromo}
- * (XOR of flatHourlyRate/percentDiscount, startAt before endAt), creates the
- * promo, and revalidates the active-promo cache tag.
+ * (per-type discount fields, kind/code pairing, startAt before endAt), creates
+ * the promo, and revalidates the active-promo cache tag.
  */
 
-import { resolveDiscountType, validateDiscount } from "@/features/business/lib/promo-validation";
-import { ACTIVE_PROMO_TAG } from "@/features/business/lib/promos";
+import {
+  resolveDiscountType,
+  validateDiscount,
+  validateKind,
+  type PromoKind,
+} from "@/features/business/lib/promo-validation";
+import {
+  ACTIVE_PROMO_TAG,
+  isPromoCodeTaken,
+  normalisePromoCode,
+} from "@/features/business/lib/promos";
 import { parseDate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -27,10 +36,13 @@ interface PromoBody {
   discountType?: "flat_hourly" | "percent" | "fixed_amount" | "free_travel";
   fixedAmount?: number | null;
   travelPercent?: number | null;
+  kind?: PromoKind;
+  code?: string | null;
 }
 
 /**
- * Validates a {@link PromoBody}. Enforces XOR of pricing fields + start < end.
+ * Validates a {@link PromoBody}. Enforces the per-type discount fields, the
+ * kind/code pairing, and start < end.
  * @param body - Parsed request body.
  * @returns Error message or null when valid.
  */
@@ -50,6 +62,8 @@ function validatePromo(body: PromoBody): string | null {
   // is how editing a fixed-amount promo came to be rejected outright.
   const discountError = validateDiscount(body);
   if (discountError) return discountError;
+  const kindError = validateKind({ kind: body.kind, code: normalisePromoCode(body.code) });
+  if (kindError) return kindError;
   // Reject rather than coerce: a fractional priority would order unpredictably
   // against the integer column and read as accepted.
   if (body.priority !== undefined && !Number.isInteger(body.priority)) {
@@ -84,6 +98,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const err = validatePromo(body);
   if (err) return errorResponse(err, 400);
 
+  // Stored uppercase so a customer's lowercase typing still matches.
+  const code = normalisePromoCode(body.code);
+  if (await isPromoCodeTaken(code)) {
+    return errorResponse("that code is already used by another promo", 409);
+  }
+
   const promo = await prisma.promo.create({
     data: {
       title: body.title!,
@@ -95,6 +115,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       percentDiscount: body.percentDiscount ?? null,
       fixedAmount: body.fixedAmount ?? null,
       travelPercent: body.travelPercent ?? null,
+      kind: body.kind ?? "automatic",
+      code,
       isActive: body.isActive ?? true,
       priority: body.priority ?? 0,
     },

@@ -6,8 +6,16 @@
  * return 404 when the promo does not exist.
  */
 
-import { validateDiscount } from "@/features/business/lib/promo-validation";
-import { ACTIVE_PROMO_TAG } from "@/features/business/lib/promos";
+import {
+  validateDiscount,
+  validateKind,
+  type PromoKind,
+} from "@/features/business/lib/promo-validation";
+import {
+  ACTIVE_PROMO_TAG,
+  isPromoCodeTaken,
+  normalisePromoCode,
+} from "@/features/business/lib/promos";
 import { parseDate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -42,6 +50,8 @@ export async function PATCH(
     discountType: "flat_hourly" | "percent" | "fixed_amount" | "free_travel";
     fixedAmount: number | null;
     travelPercent: number | null;
+    kind: PromoKind;
+    code: string | null;
   }>;
 
   if (body.priority !== undefined && !Number.isInteger(body.priority)) {
@@ -83,6 +93,28 @@ export async function PATCH(
     return errorResponse(discountError, 400);
   }
 
+  // Merged for the same reason as the discount: switching a promo to automatic
+  // sends kind without a code, and judging the patch alone would keep the old
+  // code on an automatic promo.
+  const kind = body.kind ?? existing.kind;
+  // Switching to automatic drops whatever code the promo had, rather than
+  // failing validation on a leftover the caller never meant to keep.
+  const code =
+    kind === "automatic"
+      ? null
+      : body.code !== undefined
+        ? normalisePromoCode(body.code)
+        : existing.code;
+  const kindError = validateKind({ kind, code });
+  if (kindError) {
+    return errorResponse(kindError, 400);
+  }
+  // Excluding this promo matters: without it, saving one without touching its
+  // code conflicts with itself.
+  if (await isPromoCodeTaken(code, id)) {
+    return errorResponse("that code is already used by another promo", 409);
+  }
+
   const promo = await prisma.promo.update({
     where: { id },
     data: {
@@ -97,6 +129,10 @@ export async function PATCH(
       ...(body.discountType !== undefined && { discountType: body.discountType }),
       ...(body.fixedAmount !== undefined && { fixedAmount: body.fixedAmount }),
       ...(body.travelPercent !== undefined && { travelPercent: body.travelPercent }),
+      ...(body.kind !== undefined && { kind }),
+      // Written whenever kind moves too: an automatic promo must not keep the
+      // code it had as a code promo, or the list shows a code that does nothing.
+      ...((body.code !== undefined || body.kind !== undefined) && { code }),
     },
   });
   // Next 16's revalidateTag requires a second CacheLifeConfig arg.

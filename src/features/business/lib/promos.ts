@@ -5,6 +5,7 @@
 
 import { prisma } from "@/shared/lib/prisma";
 import { NZ_TZ } from "@/shared/lib/timezone-utils";
+import type { Promo } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 
 /** Cache tag invalidated by the promo CRUD routes. */
@@ -40,6 +41,9 @@ export function pickWinningPromo<T extends PromoCandidate>(candidates: T[]): T |
 /** Which stage of the quote a promo acts on. */
 export type PromoDiscountType = "flat_hourly" | "percent" | "fixed_amount" | "free_travel";
 
+/** How a customer comes by a promo. Mirrors the `PromoKind` enum in the schema. */
+export type PromoKind = "automatic" | "code";
+
 /** Plain-data promo shape exposed across the app. */
 export interface ActivePromo {
   id: string;
@@ -47,6 +51,10 @@ export interface ActivePromo {
   description: string | null;
   startAt: string;
   endAt: string;
+  /** Automatic promos apply to everyone; a code promo only to whoever enters it. */
+  kind: PromoKind;
+  /** Uppercase code for a code promo, null for an automatic one. */
+  code: string | null;
   /** Null on rows written before the column existed; treated as a rate promo. */
   discountType: PromoDiscountType | null;
   flatHourlyRate: number | null;
@@ -110,10 +118,42 @@ export function applyPromoToQuote(parts: QuoteParts, promo: ActivePromo | null):
   return parts;
 }
 
+/** Ordering for every promo lookup: highest priority wins, then newest. */
+const PROMO_ORDER = [{ priority: "desc" as const }, { createdAt: "desc" as const }];
+
 /**
- * Returns the currently-active promo or null. Highest priority wins on overlap,
- * then newest.
- * @returns Active promo or null.
+ * Maps a database row to the plain shape the rest of the app passes around.
+ *
+ * One copy on purpose: three lookups return this shape, and a new column added
+ * to two of them is exactly the drift that broke promo editing in Phase 2.
+ * @param row - The promo row as stored.
+ * @returns The promo in its cross-app shape.
+ */
+function toActivePromo(row: Promo): ActivePromo {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    startAt: row.startAt.toISOString(),
+    endAt: row.endAt.toISOString(),
+    kind: row.kind,
+    code: row.code,
+    discountType: row.discountType,
+    flatHourlyRate: row.flatHourlyRate,
+    percentDiscount: row.percentDiscount,
+    fixedAmount: row.fixedAmount,
+    travelPercent: row.travelPercent,
+  };
+}
+
+/**
+ * Returns the currently-active automatic promo or null. Highest priority wins
+ * on overlap, then newest.
+ *
+ * Automatic only, and deliberately so: every caller is a display surface, and
+ * a code promo advertised on the banner or the pricing page would be offered to
+ * people who never entered the code. Widening this filter re-opens that.
+ * @returns Active automatic promo or null.
  */
 export const getActivePromo = unstable_cache(
   async (): Promise<ActivePromo | null> => {
@@ -121,56 +161,104 @@ export const getActivePromo = unstable_cache(
     const row = await prisma.promo.findFirst({
       where: {
         isActive: true,
+        kind: "automatic",
         startAt: { lte: now },
         endAt: { gt: now },
       },
-      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+      orderBy: PROMO_ORDER,
     });
-    if (!row) return null;
-    return {
-      id: row.id,
-      title: row.title,
-      description: row.description,
-      startAt: row.startAt.toISOString(),
-      endAt: row.endAt.toISOString(),
-      discountType: row.discountType,
-      flatHourlyRate: row.flatHourlyRate,
-      percentDiscount: row.percentDiscount,
-      fixedAmount: row.fixedAmount,
-      travelPercent: row.travelPercent,
-    };
+    return row ? toActivePromo(row) : null;
   },
   ["active-promo"],
   { tags: [ACTIVE_PROMO_TAG], revalidate: 60 },
 );
 
+/** What a promo resolution depends on beyond the moment. */
+export interface PromoContext {
+  /** The job date to price against. Defaults to now. */
+  at?: Date;
+  /** A code the customer entered, if any. */
+  code?: string | null;
+}
+
 /**
- * Resolves the promo that was in force on a given date (highest priority wins
- * on overlap, then newest). Used by the admin calculator to price a past job
- * with the promo that was live when the work actually happened, not today's.
- * @param date - The job date to resolve against.
- * @returns Resolved promo or null.
+ * Uppercases and trims a customer-entered code, or returns null when there was
+ * not one. Stored codes are uppercase, so comparing anything else silently
+ * fails to match and a real code is reported as invalid.
+ * @param raw - The code as typed.
+ * @returns The comparable code, or null.
  */
-export async function resolvePromoForDate(date: Date): Promise<ActivePromo | null> {
-  const row = await prisma.promo
+export function normalisePromoCode(raw: string | null | undefined): string | null {
+  const trimmed = raw?.trim().toUpperCase();
+  return trimmed ? trimmed : null;
+}
+
+/**
+ * The promo that applies to one request.
+ *
+ * Not cached, unlike {@link getActivePromo}: the answer depends on the code
+ * entered, so two visitors at the same instant can be entitled to different
+ * promos.
+ *
+ * A valid code wins outright - someone who went to the trouble of entering one
+ * must never lose to a background automatic promo. An invalid or expired code
+ * falls through to the automatic promo rather than blocking it; the caller
+ * reports the code as invalid separately.
+ * @param context - The job date and any entered code.
+ * @returns The promo that applies, or null.
+ */
+export async function resolvePromo(context: PromoContext): Promise<ActivePromo | null> {
+  const at = context.at ?? new Date();
+  const code = normalisePromoCode(context.code);
+
+  if (code) {
+    const hit = await prisma.promo
+      .findFirst({
+        where: {
+          isActive: true,
+          kind: "code",
+          code,
+          startAt: { lte: at },
+          endAt: { gt: at },
+        },
+        orderBy: PROMO_ORDER,
+      })
+      .catch(() => null);
+    if (hit) return toActivePromo(hit);
+  }
+
+  const auto = await prisma.promo
     .findFirst({
-      where: { isActive: true, startAt: { lte: date }, endAt: { gt: date } },
-      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+      where: {
+        isActive: true,
+        kind: "automatic",
+        startAt: { lte: at },
+        endAt: { gt: at },
+      },
+      orderBy: PROMO_ORDER,
     })
     .catch(() => null);
-  if (!row) return null;
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    startAt: row.startAt.toISOString(),
-    endAt: row.endAt.toISOString(),
-    discountType: row.discountType,
-    flatHourlyRate: row.flatHourlyRate,
-    percentDiscount: row.percentDiscount,
-    fixedAmount: row.fixedAmount,
-    travelPercent: row.travelPercent,
-  };
+  return auto ? toActivePromo(auto) : null;
+}
+
+/**
+ * Whether another promo already holds a code.
+ *
+ * Uniqueness is enforced here rather than by a database constraint: MongoDB's
+ * unique index counts a second null as a duplicate, and every automatic promo
+ * has a null code, so creating a second automatic promo would be rejected
+ * outright. Both promo routes call this so the rule cannot drift between them.
+ * @param code - The normalised code being claimed, or null when there is none.
+ * @param excludeId - Promo being edited, so it does not conflict with itself.
+ * @returns True when the code is already taken.
+ */
+export async function isPromoCodeTaken(code: string | null, excludeId?: string): Promise<boolean> {
+  if (!code) return false;
+  const clash = await prisma.promo.findFirst({
+    where: { code, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    select: { id: true },
+  });
+  return clash !== null;
 }
 
 /**

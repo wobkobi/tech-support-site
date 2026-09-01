@@ -1,9 +1,14 @@
 // scripts/check-promo-selection.ts
-// Which promo wins when several windows overlap. Pure ordering logic, no
-// database: the window filter itself is Prisma's job.
+// Which promo wins when several windows overlap, and how a customer-entered
+// code is normalised before it is compared. Pure logic, no database: the window
+// filter itself is Prisma's job.
 // Run with: npm run check:promos
 
-import { pickWinningPromo, type PromoCandidate } from "@/features/business/lib/promos";
+import {
+  normalisePromoCode,
+  pickWinningPromo,
+  type PromoCandidate,
+} from "@/features/business/lib/promos";
 
 let failures = 0;
 
@@ -80,6 +85,17 @@ function main(): void {
     ])?.id ?? null,
     "old-important",
   );
+
+  // ---- Code normalisation ----
+  //
+  // Stored codes are uppercase, so comparing anything else silently fails to
+  // match and the customer is told a real code is invalid.
+
+  expectWinner("trims and uppercases", normalisePromoCode("  spring25 "), "SPRING25");
+  expectWinner("blank becomes null", normalisePromoCode("   "), null);
+  expectWinner("undefined becomes null", normalisePromoCode(undefined), null);
+  expectWinner("null stays null", normalisePromoCode(null), null);
+  expectWinner("already uppercase is unchanged", normalisePromoCode("SPRING25"), "SPRING25");
 
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);

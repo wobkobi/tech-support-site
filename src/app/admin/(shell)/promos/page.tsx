@@ -26,6 +26,10 @@ export interface PromoRow {
   startAt: string;
   endAt: string;
   discountType: "flat_hourly" | "percent" | "fixed_amount" | "free_travel" | null;
+  /** Automatic promos apply to everyone; a code promo only to whoever enters it. */
+  kind: "automatic" | "code";
+  /** Uppercase code for a code promo, null for an automatic one. */
+  code: string | null;
   flatHourlyRate: number | null;
   percentDiscount: number | null;
   fixedAmount: number | null;
@@ -53,6 +57,8 @@ export default async function AdminPromosPage(): Promise<React.ReactElement> {
     startAt: p.startAt.toISOString(),
     endAt: p.endAt.toISOString(),
     discountType: p.discountType,
+    kind: p.kind,
+    code: p.code,
     flatHourlyRate: p.flatHourlyRate,
     percentDiscount: p.percentDiscount,
     fixedAmount: p.fixedAmount,
@@ -66,7 +72,7 @@ export default async function AdminPromosPage(): Promise<React.ReactElement> {
     <>
       <PageHeader
         title="Promos"
-        description="Time-limited offers. Each active promo applies automatically to the public pricing wizard, the admin calculator, and the site-wide banner. Only one is active at a time; if date ranges overlap, the most recently created wins."
+        description="Time-limited offers. An automatic promo applies to every visitor and shows on the site-wide banner; a code promo applies only to someone who enters its code, and is never advertised. Only one applies at a time - a valid code beats an automatic promo, and where windows overlap the highest priority wins, then the most recently created."
       />
       <PromosView initial={initial} />
     </>

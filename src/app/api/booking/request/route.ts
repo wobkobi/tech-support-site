@@ -19,7 +19,7 @@ import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.s
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { recordPromoRedemption } from "@/features/business/lib/promo-redemption";
-import { getActivePromo } from "@/features/business/lib/promos";
+import { resolvePromo } from "@/features/business/lib/promos";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import { parseObjectId } from "@/features/business/lib/validation";
 import {
@@ -76,6 +76,11 @@ interface BookingRequestPayload {
   idempotencyKey?: string;
   /** Id of the PriceEstimateLog the customer saw before booking, if any. */
   estimateId?: string;
+  /**
+   * Promo code the customer entered, if any. Never trusted: the route
+   * re-resolves it and prices from the result.
+   */
+  promoCode?: string;
 }
 
 /**
@@ -104,6 +109,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       website,
       idempotencyKey,
       estimateId,
+      promoCode,
     } = body;
 
     if (idempotencyKey) {
@@ -308,13 +314,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Snapshot rates + active promo + one-way travel so the quoted price survives later
     // rate edits and promo expiry. Read by the late-cancellation invoice helper.
     // Best-effort: failures degrade to null rather than blocking the booking.
+    //
+    // The submitted code is re-resolved here rather than believed. A client can
+    // post any string; resolvePromo decides what it actually unlocks, and an
+    // unrecognised code silently falls back to the automatic promo. Resolved
+    // against startAt, not now, so a booking made today for a job next month is
+    // priced by the promo that will be running on the day.
     const [rates, activePromo] = await Promise.all([
       prisma.rateConfig.findMany().catch((err) => {
         console.warn("[booking/request] RateConfig snapshot fetch failed:", err);
         return [] as Awaited<ReturnType<typeof prisma.rateConfig.findMany>>;
       }),
-      getActivePromo().catch((err) => {
-        console.warn("[booking/request] active promo fetch failed:", err);
+      resolvePromo({ at: startAt, code: promoCode }).catch((err) => {
+        console.warn("[booking/request] promo resolution failed:", err);
         return null;
       }),
     ]);

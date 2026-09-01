@@ -11,7 +11,7 @@
 // Run with: npm run check:promo-pricing
 
 import { computeJobPromoDiscount, formatMoneyCompact } from "@/features/business/lib/business";
-import { validateDiscount } from "@/features/business/lib/promo-validation";
+import { validateDiscount, validateKind } from "@/features/business/lib/promo-validation";
 import {
   applyPromoToHourlyRate,
   applyPromoToQuote,
@@ -56,6 +56,8 @@ function promo(type: ActivePromo["discountType"], value: number): ActivePromo {
     description: null,
     startAt: "2026-01-01T00:00:00.000Z",
     endAt: "2026-12-31T00:00:00.000Z",
+    kind: "automatic",
+    code: null,
     discountType: type,
     flatHourlyRate: type === "flat_hourly" ? value : null,
     percentDiscount: type === "percent" ? value : null,
@@ -195,6 +197,52 @@ function main(): void {
     validateDiscount({ discountType: "free_travel", travelPercent: 1 }),
     "travelPercent must be between 0 and 1 (0 = free travel)",
   );
+
+  // ---- Validation: kind and code have to agree ----
+  //
+  // A code promo saved without a code could never be claimed by anyone, and an
+  // automatic promo carrying one would read as code-only in the admin list
+  // while quietly applying to every visitor.
+
+  expectEqual("an automatic promo needs no code", validateKind({ kind: "automatic" }), null);
+
+  expectEqual(
+    "an automatic promo may not carry one",
+    validateKind({ kind: "automatic", code: "SPRING25" }),
+    "an automatic promo cannot have a code",
+  );
+
+  expectEqual(
+    "a code promo with a code is valid",
+    validateKind({ kind: "code", code: "SPRING25" }),
+    null,
+  );
+
+  expectEqual(
+    "a code promo without one is rejected",
+    validateKind({ kind: "code", code: null }),
+    "a code promo needs a code",
+  );
+
+  // Lowercase never reaches here - the routes normalise first - so the pattern
+  // judges the stored form, and a space would make the code unspeakable over
+  // the phone.
+  expectEqual(
+    "a code with a space is rejected",
+    validateKind({ kind: "code", code: "SPRING 25" }),
+    "code must be 3-32 characters, letters, numbers and dashes only",
+  );
+
+  expectEqual(
+    "a two-character code is too short to be worth guessing at",
+    validateKind({ kind: "code", code: "AB" }),
+    "code must be 3-32 characters, letters, numbers and dashes only",
+  );
+
+  expectEqual("dashes are allowed", validateKind({ kind: "code", code: "WINTER-25" }), null);
+
+  // Missing kind means automatic, matching the column default.
+  expectEqual("no kind at all reads as automatic", validateKind({}), null);
 
   expectEqual(
     "fixed amount without a value is rejected",

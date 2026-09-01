@@ -17,6 +17,8 @@ import {
   type StartMinute,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
+import { PromoCodeField } from "@/features/business/components/PromoCodeField";
+import { normalisePromoCode } from "@/features/business/lib/promos";
 import { fetchQuickEstimate } from "@/features/business/lib/quick-estimate";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { Button } from "@/shared/components/Button";
@@ -156,10 +158,16 @@ export default function BookingForm({
   // Estimate id sent with the booking so it can snapshot which public quote the
   // customer saw - seeded from the /pricing wizard's "Book now" link
   // (?estimate=<id>, 24-hex) and replaced if they run the inline estimate below.
-  const estimateParam = useSearchParams().get("estimate");
+  const searchParams = useSearchParams();
+  const estimateParam = searchParams.get("estimate");
   const [estimateId, setEstimateId] = useState<string | undefined>(
     parseObjectId(estimateParam) ?? undefined,
   );
+  // Carried over from the wizard's "Book now" link (?promo=CODE) so a code the
+  // customer already entered on /pricing does not have to be typed again. It is
+  // re-resolved server-side at submit, never trusted from here.
+  const promoParam = normalisePromoCode(searchParams.get("promo"));
+  const [promoCode, setPromoCode] = useState(promoParam ?? "");
   // Inline "get a rough estimate" state (new bookings only).
   const [estimating, setEstimating] = useState(false);
   const [quote, setQuote] = useState<{
@@ -299,6 +307,7 @@ export default function BookingForm({
         lowEndFloorFactor,
         departureTimeIso: slotStart?.toISOString(),
         returnDepartureTimeIso: slotEnd?.toISOString(),
+        promoCode,
       });
       setQuote({
         low: res.low,
@@ -800,6 +809,7 @@ export default function BookingForm({
             website,
             idempotencyKey,
             estimateId,
+            promoCode: promoCode.trim() || undefined,
           };
 
       const res = await fetch(endpoint, {
@@ -1654,6 +1664,24 @@ export default function BookingForm({
             )}
             {quoteError && <p className="text-sm text-coquelicot-400">{quoteError}</p>}
           </div>
+        )}
+
+        {/* Outside the estimate block on purpose: a code changes what the job
+            is invoiced at, so it must be enterable whether or not the customer
+            asked for a ballpark first. Hidden when editing, where the promo was
+            already snapshotted onto the booking. */}
+        {!isEditMode && (
+          <PromoCodeField
+            value={promoCode}
+            onChange={setPromoCode}
+            onApplied={() => {
+              // Refresh only a quote already on screen. Applying a code should
+              // not spend an AI estimate the customer never asked for.
+              if (quote) void runInlineEstimate();
+            }}
+            applyOnMount={promoParam !== null}
+            className="max-w-sm"
+          />
         )}
       </fieldset>
 
