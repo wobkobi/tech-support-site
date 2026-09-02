@@ -844,7 +844,12 @@ export function computeJobPromoDiscount(
     // Business labour is out of scope for a promo. Checked per task rather than
     // per job so a mixed job discounts only its home-rate lines.
     .filter((t) => !isBusinessTask(t));
-  const labourSubtotal = hourlyTasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
+  // Round each line before summing, as jobToLineItems and calcJobTotal do. A raw sum
+  // discounts a base the invoice never prints, landing the promo a cent off its lines.
+  const labourSubtotal = hourlyTasks.reduce(
+    (s, t) => s + Math.round(t.qty * t.unitPrice * 100) / 100,
+    0,
+  );
   if (labourSubtotal <= 0) return 0;
 
   if (promo.flatHourlyRate !== null) {
@@ -960,10 +965,12 @@ export function calcJobTotal(
     // here so a task can't be discounted twice.
     unsuccessfulDiscount = Math.round(hourlyTasksTotal * unsuccessfulCut * 100) / 100;
   } else {
-    // Per-task flags discount only the flagged hourly lines.
+    // Per-task flags discount only the flagged hourly lines. Rounded per line like the
+    // whole-job branch above, so flagging every task gives the same discount as the
+    // whole-job flag rather than drifting a cent off it.
     const flaggedTasksTotal = job.tasks
       .filter((t) => t.unsuccessful && isHourlyTask(t))
-      .reduce((s, t) => s + t.qty * t.unitPrice, 0);
+      .reduce((s, t) => s + Math.round(t.qty * t.unitPrice * 100) / 100, 0);
     unsuccessfulDiscount = Math.round(flaggedTasksTotal * unsuccessfulCut * 100) / 100;
   }
   // GST applies to the discounted amount, per IRD price-reduction treatment. Clamped at 0
