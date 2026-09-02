@@ -248,6 +248,8 @@ export interface EventPrefillSlot {
   calendarEventId: string;
   /** Matching Booking row id, or null for a bare calendar entry. */
   bookingId: string | null;
+  /** NZ-local yyyy-mm-dd. Separates a merged job's days so their windows cannot merge. */
+  date: string;
   /** NZ-local HH:MM event start (actual on-site start). */
   startTime: string;
   /** NZ-local HH:MM event end (actual on-site end). */

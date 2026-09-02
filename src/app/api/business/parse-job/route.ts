@@ -6,13 +6,17 @@
  * rebalances task quantities. May return clarification questions instead.
  */
 
-import { composeDescription, effectiveHourlyRate } from "@/features/business/lib/business";
+import {
+  composeDescription,
+  effectiveHourlyRate,
+  isChannelModifier,
+} from "@/features/business/lib/business";
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import {
   buildParseJobContext,
   buildParseJobPrompt,
 } from "@/features/business/lib/prompts/parse-job";
-import { extractRanges } from "@/features/business/lib/time-parse";
+import { extractRangeStats } from "@/features/business/lib/time-parse";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import type {
   ParseJobQuestion,
@@ -208,8 +212,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Live ceiling on one job's billable time; clamps the model's minutes below.
     const maxJobMins = settings.pricing.maxJobMins;
 
-    // Parse the stated time ranges once - reused below to attach parsed.ranges.
-    const extractedRanges = extractRanges(input);
+    // Parse the stated time ranges once - reused below to attach parsed.ranges and to
+    // warn when overlapping ranges cost the job billable minutes.
+    const rangeStats = extractRangeStats(input);
+    const extractedRanges = rangeStats.ranges;
     const precomputed =
       extractedRanges.length > 0
         ? extractedRanges.reduce((sum, r) => sum + r.durationMins, 0)
@@ -371,12 +377,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return rate;
           })
           .filter((r): r is RateConfig => r !== null && r.hourlyDelta !== null);
-        // Delivery channels (At home / Remote / Phone) are mutually exclusive; the prompt
-        // says so, but enforce it so a model stacking them can't compound the discounts.
-        // Highest effective rate wins, ties keep the first. Matches DEFAULT label names,
-        // so a renamed channel bypasses this guard.
-        const CHANNEL_LABELS = new Set(["at home", "remote", "phone"]);
-        const channels = modifierRates.filter((r) => CHANNEL_LABELS.has(r.label.toLowerCase()));
+        // Delivery channels are mutually exclusive; the prompt says so, but enforce it so
+        // a model stacking them can't compound the discounts. Highest effective rate
+        // wins, ties keep the first. Shares isChannelModifier with the calculator chips,
+        // so the AI output and a hand-edited task obey one rule.
+        const channels = modifierRates.filter(isChannelModifier);
         const keptChannel = channels.reduce<RateConfig | null>(
           (best, r) => (best === null || (r.hourlyDelta ?? 0) > (best.hourlyDelta ?? 0) ? r : best),
           null,
@@ -384,7 +389,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const modifierIds = [
           ...new Set(
             modifierRates
-              .filter((r) => !CHANNEL_LABELS.has(r.label.toLowerCase()) || r.id === keptChannel?.id)
+              .filter((r) => !isChannelModifier(r) || r.id === keptChannel?.id)
               .map((r) => r.id),
           ),
         ];
@@ -459,6 +464,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       parsed.ranges = [];
     }
 
+    // An overlap silently shrinks the billable window, and the reconciliation check below
+    // cannot catch it - tasks are sized against the already-merged total, so both sides
+    // agree on the smaller number. On a multi-day job the cause is usually a missing date
+    // header, which only the operator can confirm.
+    if (rangeStats.discardedMins > 0) {
+      parsed.warnings = [
+        ...(parsed.warnings ?? []),
+        `Overlapping time ranges: ${rangeStats.statedMins} min stated but ${rangeStats.billableMins} min billed (${rangeStats.discardedMins} min dropped as double-counted). If those ranges were on different days, put a date or weekday line above each day.`,
+      ];
+    }
+
     // Sanitise the model's out-of-session minutes (work explicitly stated to
     // have happened outside the session ranges, e.g. a call after the visit).
     const outOfSessionMins =
@@ -475,7 +491,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (parsed.startTime && parsed.endTime && typeof parsed.durationMins === "number") {
       const [sh, sm] = parsed.startTime.split(":").map(Number);
       const [eh, em] = parsed.endTime.split(":").map(Number);
-      const wallMin = eh * 60 + em - (sh * 60 + sm);
+      // A single clock span cannot bound a multi-day job - two 9-5 days would cap at 8h,
+      // halving the bill. With operator-stated ranges each day contributes its own span;
+      // the plain subtraction is only the fallback for a window the model supplied itself.
+      const wallMin =
+        rangeStats.ranges.length > 0 ? rangeStats.spanMins : eh * 60 + em - (sh * 60 + sm);
       const ceiling = wallMin + outOfSessionMins;
       if (wallMin > 0 && parsed.durationMins > ceiling) {
         parsed.warnings = [

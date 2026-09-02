@@ -592,6 +592,27 @@ export function composeDescription(
 }
 
 /**
+ * Delivery-channel modifier labels, lower-cased. A task has exactly one channel
+ * - the work happened at the client's place, at the operator's, over a screen
+ * share, or on a call - so these never stack, and picking one replaces any
+ * other. Matched on the DEFAULT label names, so a renamed channel row drops out
+ * of the group and stacks again.
+ */
+export const CHANNEL_MODIFIER_LABELS = new Set(["at home", "remote", "phone"]);
+
+/**
+ * Tests whether a rate row is a delivery channel rather than a freely stacking
+ * modifier. Shared by the calculator's chips and the parse-job route so the UI
+ * and the AI output enforce the same exclusivity.
+ * @param rate - Rate row to test, or anything carrying its label.
+ * @param rate.label - Label to match, compared trimmed and case-insensitively.
+ * @returns True for a delivery channel (At home / Remote / Phone).
+ */
+export function isChannelModifier(rate: { label: string }): boolean {
+  return CHANNEL_MODIFIER_LABELS.has(rate.label.trim().toLowerCase());
+}
+
+/**
  * Computes the effective hourly rate for a task by composing the base rate
  * with its modifiers. Sums `hourlyDelta` first, then multiplies by any
  * `percentDelta` (e.g. Public Holiday +25%) so the uplift acts on the

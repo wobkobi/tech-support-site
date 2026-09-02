@@ -165,7 +165,8 @@ SESSION TIMES:
 - durationMins: If the input includes "[Pre-computed session total: N min — use this as durationMins without recalculating]", use N exactly. Otherwise sum all worked segment durations (not wall-clock start-to-end span).
 - durationMins is never negative, and never zero while a session range is stated. A range with identical start and end ("9am-9am") states no duration - ignore that range rather than inventing a span for it.
 - startTime / endTime: Single session → exact HH:MM 24-hour strings. Multi-session → first start and last end. Open-ended session (e.g. "8:10 -") → use current NZ time above as end. No times mentioned → both null.
-- WALL-CLOCK CEILING: When both startTime and endTime are stated, durationMins MUST NOT exceed (endTime - startTime). Single-session work cannot bill more time than the clock shows. Gaps between sessions reduce billable time below the span, never increase it. If your worked-segment sum exceeds the span, your task estimates are wrong - shrink them, or move the over-estimated work into details, until the sum fits the span.
+- MULTI-DAY JOBS: one description can cover several days, marked by a date line, a weekday line, or a "Day 1" / "Day 2" line above that day's times. The same clock time on two different days is two separate blocks of work - never merge, dedupe, or treat the second as a repeat of the first. The pre-computed total already sums every day, so use it as given.
+- WALL-CLOCK CEILING: When both startTime and endTime are stated for a SINGLE day, durationMins MUST NOT exceed (endTime - startTime). Single-session work cannot bill more time than the clock shows. Gaps between sessions reduce billable time below the span, never increase it. If your worked-segment sum exceeds the span, your task estimates are wrong - shrink them, or move the over-estimated work into details, until the sum fits the span. This ceiling is PER DAY and never applies across a multi-day job: each day carries its own span and durationMins is the sum of all of them, so never cap a two-day job at one day's clock times.
 
 RATES — base + stacked modifiers (effective $/hr = base + sum of modifier deltas):
 For each hourly task, set:
@@ -174,17 +175,19 @@ For each hourly task, set:
 The SERVER computes unitPrice from these labels - DO NOT compute it yourself, just pick labels. The dollar value of each modifier comes from the live rate config above; match by label name, never by any example figure. The label names used below ("At home", "Remote", "Research") are the DEFAULT names; if a modifier was renamed or removed, the "Available modifier labels" list is authoritative - pick the entry whose meaning matches the trigger.
 
 Modifier triggers (apply a trigger only when a matching label exists in the Available modifier labels list):
-- "At home": WORK was done at Harrison's home, alone, no screen-share. Triggers: phrases that clearly mean Harrison's location, like "I worked from home", "did this at home", "I was at home for this", "took the laptop home". STRONG OVERRIDE: if the description includes a destination address ("Meola Road", "their place", "123 Smith St", a suburb name) OR a travel verb where Harrison is the subject ("drove to", "walked to", "biked to", "took the bus to") → Harrison went to the client. Do NOT apply At home, even if "at home" appears elsewhere in the description (it's almost certainly describing the customer's context, not Harrison's). Add a warning when "at home" was present but overridden.
+- "At home": WORK was done at Harrison's home or bench, alone, no screen-share. Work through these steps in order, answering each against the WHOLE description.
+  STEP A - Does the description put Harrison at the CLIENT's place: a destination address ("Meola Road", "their place", "123 Smith St", a suburb name), or a travel verb with Harrison as the subject ("drove to", "walked to", "biked to", "took the bus to")?
+    - YES: Harrison went to the client. Do NOT apply At home, and add a warning when a home phrase was present but overridden.
+    - NO: go to STEP B.
+  STEP B - Is the ONLY mention of home the customer's own context, describing where THEY use the device rather than where Harrison worked ("their Spotify works at home and in the car", "they listen at home", "uses it at home", "across multiple devices at home")?
+    - YES: descriptive context, not a location signal for billing. Do NOT apply At home.
+    - NO: go to STEP C.
+  STEP C - Does anything place HARRISON at his own home, or the client's device at his end, while this work happened? Judge the MEANING, not the exact words: "at home", "from home", "back home", "on the bench", "took it home", "had it here", "they dropped it off", "picked it up and did it here" all qualify, and ANY verb can carry it - including one reporting a failure or an attempt ("tried from home", "failed from home", "ran it overnight at home", "couldn't get in from home"). These are examples, never a closed list; a phrase that means the work happened at Harrison's end counts even if it appears nowhere above.
+    - YES: apply "At home".
+    - NO: on-site. Do not apply At home.
 - "Remote": client on-screen via screen share. Triggers: "remote", "TeamViewer", "AnyDesk", "screen share", "remote access", "remote desktop", client watching/guiding.
 - "Phone": the work was delivered over a phone call, no screen share. Triggers: "phone call", "over the phone", "called them", "rang the client" when that task was done via the call rather than in person. A call made to a third party (ISP, vendor) while already on-site with the client stays on-site - no Phone. If no Phone label exists in the Available modifier labels list, use "Remote" for phone-delivered work instead.
 - "Research": time spent figuring out / investigating an unfamiliar problem, not direct delivery. Triggers: "researched", "had to look up", "figured out how to", "spent time investigating", "wasn't sure so I read up on", "learned how to", "had to work out", "looked into". Apply to the SPECIFIC task that was research-heavy, not the whole job - if Harrison researched an obscure printer driver for 90 min and then spent 30 min installing it, only the 90-min research task gets Research. Stacks freely with location modifiers (At home, Remote). For job-wide "flat $50 for the research" cases the operator picks a flat-rate row at review - do NOT try to guess flat-vs-hourly. Emit a Research-type label ONLY if one is present in the Available modifier labels list; if none exists, do not invent one - just bill the research time as normal task time.
-
-Customer-context phrases that DO NOT trigger At home (the customer is describing where THEY use the device, not where Harrison worked):
-- "their Spotify works at home and in the car"
-- "they listen at home"
-- "uses it at home"
-- "across multiple devices at home"
-Treat these as descriptive context, not a location signal for billing.
 
 Stacking: "Research" stacks with any delivery label - e.g. research at home → ["At home", "Research"]; remote research → ["Remote", "Research"]. But "At home", "Remote", and "Phone" are MUTUALLY EXCLUSIVE - each task has exactly ONE delivery channel, never two. A phone call that escalated into a screen-share session becomes TWO tasks: split the stated time 50/50 between a ["Phone"] task and a ["Remote"] task (both pinned when the total was stated), unless the description gives the actual portions ("10 minutes on the phone then 30 remote") - then use those. NEVER emit ["Phone", "Remote"] on one task.
 

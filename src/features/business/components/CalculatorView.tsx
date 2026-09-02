@@ -30,6 +30,7 @@ import {
   enforceMinBillable,
   explicitRoundingAllowanceMins,
   hourlyTaskMinutes,
+  isChannelModifier,
   jobToLineItems,
   timeDiffMins,
   todayISO,
@@ -980,13 +981,23 @@ export function CalculatorView({
       // booked job, prepend the booking's window as a digit-led "HH:MM-HH:MM" line so the
       // parser bills the real session length instead of falling back to the minimum -
       // only when the description states no times of its own, so operator times win. A
-      // merged job gets one line per event; extractRanges sums them server-side excluding
-      // the gaps, so tasks are sized to time worked rather than wall-clock span.
-      const eventWindow =
-        eventPrefill?.slots
-          .filter((slot) => slot.startTime && slot.endTime)
-          .map((slot) => `${slot.startTime}-${slot.endTime}`)
-          .join("\n") || null;
+      // merged job gets one line per event under a date line per day; extractRanges sums
+      // them server-side excluding the gaps, so tasks are sized to time worked rather
+      // than wall-clock span.
+      // Slots arrive date-ordered; a date line goes in whenever the day changes so the
+      // parser buckets each day on its own. Without it a second day's window sitting
+      // inside the first day's hours merges away and those minutes never bill.
+      const windowLines: string[] = [];
+      let lastSlotDate: string | null = null;
+      for (const slot of eventPrefill?.slots ?? []) {
+        if (!slot.startTime || !slot.endTime) continue;
+        if (slot.date !== lastSlotDate) {
+          windowLines.push(slot.date);
+          lastSlotDate = slot.date;
+        }
+        windowLines.push(`${slot.startTime}-${slot.endTime}`);
+      }
+      const eventWindow = windowLines.length > 0 ? windowLines.join("\n") : null;
       // The operator's own ranges win, but only actual RANGES count. Testing for any time
       // at all let an incidental mention ("drove to PB Tech @ 10:30 am") pass as a stated
       // session, dropping the booked window and leaving nothing to bill. extractRanges is
@@ -1763,9 +1774,18 @@ export function CalculatorView({
     setTasks((prev) => {
       const arr = [...prev];
       const current = arr[idx].modifierIds ?? [];
-      const next = current.includes(modifierId)
-        ? current.filter((m) => m !== modifierId)
-        : [...current, modifierId];
+      const picked = rates.find((r) => r.id === modifierId);
+      let next: string[];
+      if (current.includes(modifierId)) {
+        next = current.filter((m) => m !== modifierId);
+      } else if (picked && isChannelModifier(picked)) {
+        // One task, one delivery channel: picking a second SWAPS rather than stacking,
+        // which would compound both discounts into a rate the invoice never charges.
+        const channelIds = new Set(rates.filter(isChannelModifier).map((r) => r.id));
+        next = [...current.filter((m) => !channelIds.has(m)), modifierId];
+      } else {
+        next = [...current, modifierId];
+      }
       const newPrice = effectiveHourlyRate(rates, arr[idx].baseRateId, next);
       arr[idx] = {
         ...arr[idx],
