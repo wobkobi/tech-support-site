@@ -6,6 +6,7 @@
 
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";
+import { isPrintRoute } from "@/shared/lib/print-routes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type React from "react";
@@ -42,11 +43,14 @@ function setNavOffset(px: number): void {
  */
 export function PromoBannerClient({ promo }: Props): React.ReactElement {
   const pathname = usePathname();
+  // Print artwork carries no chrome at all - a banner here would be printed
+  // onto the poster or business card.
   // Admin pages have their own chrome - no public promo banner over the top.
   // Business too, not just admin: promos are a home-rate offer, and the phrase
   // is unscoped ("15% off"), so on the business page it would promise a
   // discount the invoice does not honour.
   const hidden =
+    isPrintRoute(pathname) ||
     pathname === "/admin" ||
     pathname.startsWith("/admin/") ||
     pathname === "/business" ||
