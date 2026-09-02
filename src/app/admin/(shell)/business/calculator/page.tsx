@@ -177,6 +177,7 @@ async function buildEventPrefill(eventIds: string[]): Promise<EventPrefill | nul
   const slots: EventPrefillSlot[] = resolved.map((e) => ({
     calendarEventId: e.id,
     bookingId: e.booking?.id ?? null,
+    date: formatNz(e.start, { year: "numeric", month: "2-digit", day: "2-digit" }),
     startTime: formatNz(e.start, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }),
     endTime: formatNz(e.end, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }),
     summary: e.summary ?? "(no title)",
