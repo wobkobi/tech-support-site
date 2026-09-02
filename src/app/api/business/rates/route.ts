@@ -17,7 +17,7 @@ import type { Settings } from "@/shared/lib/settings/types";
 import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
-// Seed shape: one base hourly rate (Standard), $/hr modifiers (At home -$10, Remote -$10)
+// Seed shape: one base hourly rate (Standard), $/hr modifiers (At home -$15, Remote -$10)
 // and a percentage one (Public Holiday +25%). No separate Complex tier - everything bills
 // at Standard plus modifiers. The travel $/hr is a pricing setting, not a rate row.
 const DEFAULTS = [
@@ -46,7 +46,7 @@ const DEFAULTS = [
     label: "At home",
     ratePerHour: null,
     flatRate: null,
-    hourlyDelta: -10,
+    hourlyDelta: -15,
     percentDelta: null,
     unit: "modifier",
     isDefault: false,
