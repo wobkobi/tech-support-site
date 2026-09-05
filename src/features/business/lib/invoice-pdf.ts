@@ -50,7 +50,7 @@ interface LogoPath {
 }
 
 /**
- * Converts a CSS hex colour (e.g. "#0B093D") into pdf-lib's rgb() colour.
+ * Converts a CSS hex colour (e.g. "#0c0a3e") into pdf-lib's rgb() colour.
  * @param hex - Hex colour with leading #.
  * @returns pdf-lib RGB colour.
  */
@@ -532,7 +532,7 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
   }
   if (invoice.unsuccessfulDiscount && invoice.unsuccessfulDiscount > 0) {
     drawRow(
-      "Unsuccessful-visit discount (half off labour)",
+      "Unsuccessful-visit discount (labour only)",
       `-${formatNZD(invoice.unsuccessfulDiscount)}`,
       { isPromo: true },
     );
