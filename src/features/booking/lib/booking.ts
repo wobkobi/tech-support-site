@@ -136,7 +136,8 @@ export function splitUnitFromAddress(addr: string): { unit: string; rest: string
   const trimmed = addr.replace(/\s+/g, " ").trim();
   const m = trimmed.match(/^(\d{1,4}[A-Za-z]?)\/(.+)$/);
   if (!m) return { unit: "", rest: trimmed };
-  return { unit: m[1], rest: m[2].trim() };
+  const [, unit = "", rest = ""] = m;
+  return { unit, rest: rest.trim() };
 }
 
 /**
@@ -168,7 +169,7 @@ export function unitMatchesStreetNumber(unit: string, rest: string): boolean {
   const u = unit.trim();
   if (!u) return false;
   const m = rest.trim().match(/^(\d{1,4}[A-Za-z]?)\b/);
-  return !!m && m[1].toLowerCase() === u.toLowerCase();
+  return !!m && (m[1] ?? "").toLowerCase() === u.toLowerCase();
 }
 
 /**
@@ -460,7 +461,7 @@ export function buildAvailableDays(
   // Derive today's NZ calendar date independently of server timezone.
   // en-CA locale reliably produces YYYY-MM-DD on all Node.js platforms.
   const todayNZStr = now.toLocaleDateString("en-CA", { timeZone: config.timeZone });
-  const [startY, startM, startD] = todayNZStr.split("-").map(Number);
+  const [startY = NaN, startM = NaN, startD = NaN] = todayNZStr.split("-").map(Number);
 
   for (let i = 0; days.length < config.maxAdvanceDays && i <= config.maxAdvanceDays; i++) {
     // UTC noon for day i - using noon avoids any DST-induced date-boundary shift
@@ -498,7 +499,7 @@ export function buildAvailableDays(
     const timeWindows: TimeWindow[] = [];
 
     // Extract year/month/day from dateKey for reliable timezone calculations
-    const [year, month, day] = dateKey.split("-").map(Number);
+    const [year = NaN, month = NaN, day = NaN] = dateKey.split("-").map(Number);
 
     // Get dynamic UTC offset once per day (handles NZDT/NZST)
     const utcOffset = getPacificAucklandOffset(year, month, day);
@@ -656,7 +657,7 @@ export function validateBookingRequest(
   now: Date,
   config: AvailabilityConfig,
 ): { valid: true } | { valid: false; error: string } {
-  const [year, month, day] = dateKey.split("-").map(Number);
+  const [year = NaN, month = NaN, day = NaN] = dateKey.split("-").map(Number);
   if (!year || !month || !day) {
     return { valid: false, error: "Invalid date format" };
   }
@@ -666,7 +667,7 @@ export function validateBookingRequest(
   const selectedDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 
   const todayNZStr = now.toLocaleDateString("en-CA", { timeZone: config.timeZone });
-  const [ty, tm, td] = todayNZStr.split("-").map(Number);
+  const [ty = NaN, tm = NaN, td = NaN] = todayNZStr.split("-").map(Number);
   const today = new Date(Date.UTC(ty, tm - 1, td, 12, 0, 0));
 
   if (selectedDate < today) {

@@ -428,7 +428,10 @@ export default function AddressAutocomplete({
       }
       if (e.key === "Enter" && activeIndex >= 0) {
         e.preventDefault();
-        void selectSuggestion(suggestions[activeIndex]);
+        // activeIndex is only bounded below, so a list that shrank between the
+        // keypress and this read leaves it past the end.
+        const picked = suggestions[activeIndex];
+        if (picked) void selectSuggestion(picked);
         return;
       }
       if (e.key === "Escape") {

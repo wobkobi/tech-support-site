@@ -33,7 +33,7 @@ export function isPastEditWindow(
  * @returns The day's end (next NZ midnight) as epoch ms.
  */
 export function nzDayEndMs(dateKey: string): number {
-  const [y, m, d] = dateKey.split("-").map(Number);
+  const [y = NaN, m = NaN, d = NaN] = dateKey.split("-").map(Number);
   const offset = getPacificAucklandOffset(y, m, d);
   // Next NZ midnight = UTC (d+1) 00:00 shifted back by the NZ offset.
   return Date.UTC(y, m - 1, d + 1, -offset, 0, 0);

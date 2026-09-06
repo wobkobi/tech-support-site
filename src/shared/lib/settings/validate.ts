@@ -399,7 +399,7 @@ function validateIdentity(i: IdentitySettings): FieldError[] {
   // which no test would catch, so reject it at the point it is typed.
   const unknownPlaceholders = [...i.emailSignature.matchAll(/\{(\w+)\}/g)]
     .map((m) => m[1])
-    .filter((key) => !SIGNATURE_PLACEHOLDERS.includes(key));
+    .filter((key): key is string => key !== undefined && !SIGNATURE_PLACEHOLDERS.includes(key));
   if (unknownPlaceholders.length > 0)
     errors.push({
       field: "emailSignature",

@@ -266,7 +266,7 @@ export default function BookingForm({
     if (!selectedDay || !selectedTime) return null;
     const window = selectedDay.timeWindows.find((w) => w.value === selectedTime);
     if (!window) return null;
-    const [y, m, d] = selectedDay.dateKey.split("-").map(Number);
+    const [y = NaN, m = NaN, d = NaN] = selectedDay.dateKey.split("-").map(Number);
     const offset = getPacificAucklandOffset(y, m, d);
     return new Date(Date.UTC(y, m - 1, d, window.startHour - offset, selectedMinute, 0, 0));
   }

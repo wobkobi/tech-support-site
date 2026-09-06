@@ -77,7 +77,7 @@ export function nzWeekday(date: Date): number {
 export function nzMinuteOfDay(date: Date): number {
   // "24" appears for midnight on some ICU builds; fold it back to 0 so the
   // result never lands outside the day.
-  const [h, m] = nzTimeFormat.format(date).split(":").map(Number);
+  const [h = NaN, m = NaN] = nzTimeFormat.format(date).split(":").map(Number);
   return (h % 24) * 60 + m;
 }
 
@@ -106,7 +106,7 @@ export function nzTodayKey(): string {
  * @returns Tuple of [year, month (1-12), day].
  */
 export function nzDateParts(date: Date): [number, number, number] {
-  const [y, m, d] = nzDateKey(date).split("-").map(Number);
+  const [y = NaN, m = NaN, d = NaN] = nzDateKey(date).split("-").map(Number);
   return [y, m, d];
 }
 
@@ -150,8 +150,13 @@ export function toNzInputValue(input: Date | string): string {
  */
 export function fromNzInputValue(local: string): Date {
   const [datePart, timePart] = local.split("T");
-  const [y, m, d] = datePart.split("-").map(Number);
-  const [hh, mm] = timePart.split(":").map(Number);
+  // Without both halves the old code threw an unnamed TypeError on .split of
+  // undefined; say which value was wrong instead.
+  if (datePart === undefined || timePart === undefined) {
+    throw new Error(`fromNzInputValue expects "YYYY-MM-DDTHH:MM", received "${local}"`);
+  }
+  const [y = NaN, m = NaN, d = NaN] = datePart.split("-").map(Number);
+  const [hh = NaN, mm = NaN] = timePart.split(":").map(Number);
   const offset = getPacificAucklandOffset(y, m, d);
   return new Date(Date.UTC(y, m - 1, d, hh - offset, mm, 0));
 }
@@ -206,7 +211,7 @@ export function nzWallClockUtc(
  * @returns The shifted YYYY-MM-DD key.
  */
 export function addDaysToDateKey(dateKey: string, n: number): string {
-  const [y, m, d] = dateKey.split("-").map(Number);
+  const [y = NaN, m = NaN, d = NaN] = dateKey.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + n, 12, 0, 0)).toISOString().slice(0, 10);
 }
 
