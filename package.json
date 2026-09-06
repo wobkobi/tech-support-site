@@ -1,10 +1,10 @@
 {
   "name": "tech-support-site",
-  "version": "4.26.5",
+  "version": "4.26.6",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "next build --turbopack",
+    "build": "next build",
     "build:ads": "tsx scripts/build-ads.ts",
     "build:all": "npm run build:icons && npm run build",
     "build:icons": "tsx scripts/build-icons/index.ts",
@@ -18,7 +18,7 @@
     "check:push": "tsx scripts/check-push-delivery.ts",
     "check:task-window": "tsx scripts/check-task-window.ts",
     "db:push": "prisma db push",
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "eval:ai": "dotenv -e .env.local -- tsx scripts/eval-ai/index.ts",
     "format": "prettier --write \"**/*.{js,ts,jsx,tsx,mjs,css,html,md,json,yml,yaml}\"",
     "postinstall": "prisma generate",
