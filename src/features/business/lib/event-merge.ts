@@ -134,6 +134,7 @@ export function findMergeSuggestions(
   if (gapLimitMins <= 0 || anchors.length === 0) return [];
   const anchorIds = new Set(anchors.map((a) => a.id));
   const earliest = [...anchors].sort((a, b) => a.start.localeCompare(b.start))[0];
+  if (!earliest) return [];
   const day = nzDayKey(earliest.start);
   // Match against ANY anchor: a merged run can span two calendar titles for
   // the same customer, and either one is evidence for the next hop.

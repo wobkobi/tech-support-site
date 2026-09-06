@@ -56,7 +56,9 @@ function parseDateCell(raw: unknown): Date | null {
   if (!s) return null;
   const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (dmy) {
-    const d = new Date(`${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`);
+    const d = new Date(
+      `${dmy[3]}-${(dmy[2] ?? "").padStart(2, "0")}-${(dmy[1] ?? "").padStart(2, "0")}`,
+    );
     return isNaN(d.getTime()) ? null : d;
   }
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) {

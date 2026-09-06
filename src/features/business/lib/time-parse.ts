@@ -99,7 +99,7 @@ function normaliseTimeLine(line: string): string {
  */
 function inferBareMeridiem(fragment: string): Meridiem {
   if (isCompact(fragment)) return null;
-  const h = parseInt(fragment.includes(":") ? fragment.split(":")[0] : fragment, 10);
+  const h = parseInt(fragment.includes(":") ? (fragment.split(":")[0] ?? "") : fragment, 10);
   if (Number.isNaN(h) || h < 1 || h > 12) return null;
   return h <= 6 || h === 12 ? "pm" : "am";
 }
@@ -116,7 +116,7 @@ function parseTimeMins(fragment: string, meridiem: Meridiem): number | null {
   let h: number;
   let m: number;
   if (fragment.includes(":")) {
-    const [hStr, mStr] = fragment.split(":");
+    const [hStr = "", mStr = ""] = fragment.split(":");
     h = parseInt(hStr, 10);
     m = parseInt(mStr, 10);
   } else if (isCompact(fragment)) {
@@ -168,7 +168,7 @@ export function extractRangeStats(input: string): RangeStats {
     if (DAY_HEADER_RE.test(line)) day += 1;
     if (!/^\d/.test(line) && !WEEKDAY_LEAD_RE.test(line)) continue;
     for (const match of line.matchAll(TIME_RANGE_RE)) {
-      const [, startRaw, startMerRaw, sep, endRaw, endMerRaw] = match;
+      const [, startRaw = "", startMerRaw, sep = "", endRaw = "", endMerRaw] = match;
       // Bare-space compact pairs are phone numbers or IDs, never a range.
       if (!/[-–—]|to/.test(sep) && (isCompact(startRaw) || isCompact(endRaw))) continue;
       // A dashed date reads as a range at face value: "2026-08-25" pairs 2026 with 08 as

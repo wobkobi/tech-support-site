@@ -49,7 +49,7 @@ export async function getNextInvoiceNumber(): Promise<NextInvoiceNumber> {
     // Trailing "-NNNN" is the sequence; the year segment can't leak in (\d+
     // stops at the hyphen). Missing/legacy > 0 so the sheet counter wins.
     const dbMatch = last?.number.match(/-(\d+)$/);
-    const dbNext = (dbMatch ? parseInt(dbMatch[1], 10) : 0) + 1;
+    const dbNext = (dbMatch ? parseInt(dbMatch[1] ?? "", 10) : 0) + 1;
     const nextNumber = Math.max(data.nextNumber, dbNext);
     const number =
       nextNumber === data.nextNumber
@@ -86,7 +86,7 @@ export async function getNextQuoteNumber(): Promise<NextInvoiceNumber> {
     select: { number: true },
   });
   const dbMatch = last?.number.match(/-(\d+)$/);
-  const dbNext = (dbMatch ? parseInt(dbMatch[1], 10) : 0) + 1;
+  const dbNext = (dbMatch ? parseInt(dbMatch[1] ?? "", 10) : 0) + 1;
   try {
     const data = await getQuoteCounter();
     const nextNumber = Math.max(data.nextNumber, dbNext);

@@ -187,7 +187,7 @@ export function nextInvoiceNumber(
   // instead of silently restarting the sequence at 0001.
   const match = lastNumber.match(/-(\d{4,})$/);
   if (!match) return `${prefix}-${yearCode}-0001`;
-  const next = parseInt(match[1], 10) + 1;
+  const next = parseInt(match[1] ?? "", 10) + 1;
   return `${prefix}-${yearCode}-${String(next).padStart(4, "0")}`;
 }
 
@@ -218,8 +218,8 @@ export function billableMins(mins: number, incrementMins: number = BILLING_INCRE
  */
 export function timeDiffMins(start: string, end: string): number {
   if (!start || !end) return 0;
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
+  const [sh = NaN, sm = NaN] = start.split(":").map(Number);
+  const [eh = NaN, em = NaN] = end.split(":").map(Number);
   if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return 0;
   const diff = eh * 60 + em - (sh * 60 + sm);
   if (diff > 0) return diff;
@@ -468,8 +468,9 @@ export function collapseToWindow(
       for (let i = 1; i < floating.length; i++) {
         if (floating[i].qty > floating[biggestIdx].qty) biggestIdx = i;
       }
-      const adjustedMin = Math.max(timing.minTaskMins, floating[biggestIdx].qty * 60 + error);
-      floating[biggestIdx] = derive(floating[biggestIdx], adjustedMin);
+      const winner = floating[biggestIdx];
+      const adjustedMin = Math.max(timing.minTaskMins, winner.qty * 60 + error);
+      floating[biggestIdx] = derive(winner, adjustedMin);
     }
   }
 
@@ -663,6 +664,7 @@ export function enforceMinBillable(
   const floating = hourly.filter((t) => !t.isExplicit && !t.isShort);
   const pool = floating.length > 0 ? floating : hourly;
   let biggest = pool[0];
+  if (!biggest) return tasks;
   for (const t of pool) if (t.qty > biggest.qty) biggest = t;
   const bumped = withMinutes(biggest, biggest.qty * 60 + (minBillableMins - totalMin));
   return tasks.map((t) => (t === biggest ? bumped : t));

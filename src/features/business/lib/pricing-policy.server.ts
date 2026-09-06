@@ -246,7 +246,7 @@ function matchInHolidayList(
  * @returns `{ name, region }` or null.
  */
 function holidayFromPackage(key: string): { name: string; region: string } | null {
-  const [year] = key.split("-");
+  const [year = ""] = key.split("-");
   const yearInt = parseInt(year, 10);
   return (
     matchInHolidayList(hdNz.getHolidays(yearInt), key, NZ_REGION) ??
