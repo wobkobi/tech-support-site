@@ -390,10 +390,10 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
     const headerWidth = ctx.bold.widthOfTextAtSize(h, HEADER_SIZE);
     let x: number;
     if (i === 0) {
-      x = cols[i] + 4;
+      x = cols[i]! + 4;
     } else {
-      const colLeft = cols[i];
-      const colRight = i + 1 < cols.length ? cols[i + 1] : MARGIN + CONTENT_W;
+      const colLeft = cols[i]!;
+      const colRight = i + 1 < cols.length ? cols[i + 1]! : MARGIN + CONTENT_W;
       x = (colLeft + colRight) / 2 - headerWidth / 2;
     }
     ctx.page.drawText(h, { x, y: y - ROW_H + 9, size: HEADER_SIZE, font: ctx.bold, color: DARK });

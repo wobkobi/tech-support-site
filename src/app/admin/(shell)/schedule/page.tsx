@@ -243,7 +243,7 @@ export default async function AdminSchedulePage({
       ? day
       : bufferedDayKeys.includes(todayKey)
         ? todayKey
-        : dayKeysInWeek[0];
+        : dayKeysInWeek[0]!;
 
   return (
     <>

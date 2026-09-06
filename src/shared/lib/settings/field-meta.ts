@@ -59,7 +59,7 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
 };
 
 /** Field metadata for the availability group's scalar fields, keyed by dotted path. */
-export const AVAILABILITY_FIELD_META: Record<string, FieldMeta> = {
+export const AVAILABILITY_FIELD_META = {
   acceptingBookings: {
     title: "Accepting online bookings",
     description:
@@ -122,10 +122,10 @@ export const AVAILABILITY_FIELD_META: Record<string, FieldMeta> = {
     description:
       "Protect early slots once the night-before arrives (e.g. from Friday evening, block Sat/Sun before noon). Slots stay bookable if reserved earlier in the week.",
   },
-};
+} satisfies Record<string, FieldMeta>;
 
 /** Field metadata for the comms group, keyed by field name. */
-export const COMMS_FIELD_META: Record<string, FieldMeta> = {
+export const COMMS_FIELD_META = {
   notifyConfirmation: {
     title: "Booking confirmation email",
     description: "Send the customer a confirmation email when they book.",
@@ -193,10 +193,10 @@ export const COMMS_FIELD_META: Record<string, FieldMeta> = {
       "When a payment is recorded with a date earlier than the last reminder, offer to email the client an apology for chasing a bill they had already paid.",
     off: "When off, the payment dialog never offers the apology.",
   },
-};
+} satisfies Record<string, FieldMeta>;
 
 /** Field metadata for the reviews group, keyed by field name. */
-export const REVIEWS_FIELD_META: Record<string, FieldMeta> = {
+export const REVIEWS_FIELD_META = {
   homepageFeaturedCount: {
     title: "Featured reviews on homepage",
     description: "How many approved reviews show on the home page.",
@@ -212,10 +212,10 @@ export const REVIEWS_FIELD_META: Record<string, FieldMeta> = {
     description: "Minimum days before the same customer is asked for a review again.",
     unit: "days",
   },
-};
+} satisfies Record<string, FieldMeta>;
 
 /** Field metadata for the business identity group, keyed by dotted path. */
-export const IDENTITY_FIELD_META: Record<string, FieldMeta> = {
+export const IDENTITY_FIELD_META = {
   name: { title: "Operator name", description: "Your name, shown in emails and on invoices." },
   company: {
     title: "Business name",
@@ -301,10 +301,10 @@ export const IDENTITY_FIELD_META: Record<string, FieldMeta> = {
       "{website} and {location} to pull the details above in, so changing one there updates every " +
       "email. Wrap text in **stars** for bold, and leave a row blank for a gap.",
   },
-};
+} satisfies Record<string, FieldMeta>;
 
 /** Field metadata for the tax-planner group, keyed by dotted path. */
-export const TAX_FIELD_META: Record<string, FieldMeta> = {
+export const TAX_FIELD_META = {
   incomeTax: {
     title: "Income-tax reserve rate",
     description:
@@ -321,10 +321,10 @@ export const TAX_FIELD_META: Record<string, FieldMeta> = {
     description: "Voluntary KiwiSaver contribution as a percent of profit.",
     unit: "%",
   },
-};
+} satisfies Record<string, FieldMeta>;
 
 /** Field metadata for the advanced scheduling group, keyed by dotted path. */
-export const SCHEDULING_FIELD_META: Record<string, FieldMeta> = {
+export const SCHEDULING_FIELD_META = {
   travelRoundBufferMin: {
     title: "Travel rounding buffer",
     description:
@@ -366,10 +366,10 @@ export const SCHEDULING_FIELD_META: Record<string, FieldMeta> = {
       "When a customer hasn't picked a slot yet, drive time is quoted against this hour of the day (a realistic-traffic proxy rather than whenever they opened the page).",
     unit: "hour 0-23",
   },
-};
+} satisfies Record<string, FieldMeta>;
 
 /** Field metadata for the pricing group, keyed by dotted path. */
-export const PRICING_FIELD_META: Record<string, FieldMeta> = {
+export const PRICING_FIELD_META = {
   gstRegistered: {
     title: "GST registered",
     description:
@@ -508,10 +508,10 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
     unit: "times",
     off: "Leave blank for no limit.",
   },
-};
+} satisfies Record<string, FieldMeta>;
 
 /** Metadata for the estimator group's editable fields (benchmark list + range widths). */
-export const ESTIMATOR_FIELD_META: Record<string, FieldMeta> = {
+export const ESTIMATOR_FIELD_META = {
   benchmarks: {
     title: "Task-duration benchmarks",
     description:
@@ -578,7 +578,7 @@ export const ESTIMATOR_FIELD_META: Record<string, FieldMeta> = {
       "The advertised low price never drops below this share of straight-time cost (75 = 75%), so a vague job still quotes a fair minimum.",
     unit: "%",
   },
-};
+} satisfies Record<string, FieldMeta>;
 
 /** Per-group field metadata, keyed by group - powers the settings search. */
 export const FIELD_META_BY_GROUP: Record<SettingsGroup, Record<string, FieldMeta>> = {

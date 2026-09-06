@@ -43,21 +43,21 @@ function editDistance(a: string, b: string): number {
   // no index here can miss. The assertions carry that invariant to the compiler
   // and erase at runtime, leaving the inner loop free of extra checks.
   const dp: number[][] = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 0; i <= m; i++) dp[i]![0] = i;
+  for (let j = 0; j <= n; j++) dp[0]![j] = j;
 
   for (let i = 1; i <= m; i++) {
-    const row = dp[i];
-    const prevRow = dp[i - 1];
+    const row = dp[i]!;
+    const prevRow = dp[i - 1]!;
     for (let j = 1; j <= n; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      row[j] = Math.min(prevRow[j] + 1, row[j - 1] + 1, prevRow[j - 1] + cost);
+      row[j] = Math.min(prevRow[j]! + 1, row[j - 1]! + 1, prevRow[j - 1]! + cost);
       if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
-        row[j] = Math.min(row[j], dp[i - 2][j - 2] + 1);
+        row[j] = Math.min(row[j]!, dp[i - 2]![j - 2]! + 1);
       }
     }
   }
-  return dp[m][n];
+  return dp[m]![n]!;
 }
 
 /**

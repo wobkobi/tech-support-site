@@ -29,8 +29,8 @@ interface SlotIssue {
 function slotIssue(range: ParsedRange): SlotIssue | null {
   const { startTime, endTime } = range;
   if (!startTime || !endTime) return null;
-  const [sh, sm] = startTime.split(":").map(Number);
-  const [eh, em] = endTime.split(":").map(Number);
+  const [sh = NaN, sm = NaN] = startTime.split(":").map(Number);
+  const [eh = NaN, em = NaN] = endTime.split(":").map(Number);
   if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return null;
   const raw = eh * 60 + em - (sh * 60 + sm);
   if (raw === 0) return { tone: "warn", text: "Start and end are the same" };

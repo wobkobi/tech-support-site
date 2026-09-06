@@ -468,7 +468,7 @@ export function buildAvailableDays(
     // when extracting UTC date components. JavaScript's Date constructor handles
     // month/day overflow automatically (e.g. day 32 wraps to the next month).
     const dayUTC = new Date(Date.UTC(startY, startM - 1, startD + i, 12, 0, 0));
-    const dateKey = dayUTC.toISOString().split("T")[0];
+    const dateKey = dayUTC.toISOString().split("T")[0]!;
     const dayOfWeek = dayUTC.getUTCDay();
 
     const isToday = i === 0;

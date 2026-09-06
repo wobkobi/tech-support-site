@@ -13,6 +13,6 @@
 export function splitName(fullName: string): { givenName: string; familyName: string } {
   const parts = (fullName ?? "").trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return { givenName: "", familyName: "" };
-  if (parts.length === 1) return { givenName: parts[0], familyName: "" };
-  return { givenName: parts.slice(0, -1).join(" "), familyName: parts[parts.length - 1] };
+  if (parts.length === 1) return { givenName: parts[0]!, familyName: "" };
+  return { givenName: parts.slice(0, -1).join(" "), familyName: parts[parts.length - 1]! };
 }

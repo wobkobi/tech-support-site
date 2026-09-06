@@ -120,14 +120,14 @@ export async function DELETE(
       // Keep the first (or only) surviving segment on the original event...
       await patchBlockedDayRange({
         eventId,
-        startDateKey: segments[0].startDateKey,
-        endDateKey: segments[0].endDateKey,
+        startDateKey: segments[0]!.startDateKey,
+        endDateKey: segments[0]!.endDateKey,
       });
       // ...and, for a middle-day unblock, spin the after-portion into a new block.
       if (segments.length === 2) {
         await insertBlockedDayRange({
-          startDateKey: segments[1].startDateKey,
-          endDateKey: segments[1].endDateKey,
+          startDateKey: segments[1]!.startDateKey,
+          endDateKey: segments[1]!.endDateKey,
           summary: range.summary,
         });
         action = "split";

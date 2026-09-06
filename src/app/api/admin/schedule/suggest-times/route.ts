@@ -98,7 +98,7 @@ function spreadEvenly<T>(items: T[], n: number): T[] {
   if (items.length <= n) return items;
   const picks: T[] = [];
   for (let i = 0; i < n; i++) {
-    picks.push(items[Math.round((i * (items.length - 1)) / (n - 1))]);
+    picks.push(items[Math.round((i * (items.length - 1)) / (n - 1))]!);
   }
   return picks;
 }

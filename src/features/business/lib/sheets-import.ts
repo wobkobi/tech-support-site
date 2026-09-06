@@ -292,7 +292,7 @@ async function importFromSheet(
 
   // Reconcile Cashbook income rows
   for (let i = 0; i < cashRows.length; i++) {
-    const row = cashRows[i];
+    const row = cashRows[i]!;
     const date = parseDate(row[0] ?? "");
     if (!date) {
       incomeSkipped++;
@@ -424,7 +424,7 @@ async function importFromSheet(
 
   // Reconcile Expenses rows
   for (let i = 0; i < expRows.length; i++) {
-    const row = expRows[i];
+    const row = expRows[i]!;
     const date = parseDate(row[0] ?? "");
     if (!date) {
       expensesSkipped++;

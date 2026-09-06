@@ -88,12 +88,12 @@ function fixWordCase(word: string): string {
   if (word.length < 2 || word === word.toUpperCase()) return word;
   let artifact = false;
   for (let i = 1; i < word.length - 1; i++) {
-    if (/[A-Z]/.test(word[i]) && /[A-Z]/.test(word[i - 1]) && /[a-z]/.test(word[i + 1])) {
+    if (/[A-Z]/.test(word[i]!) && /[A-Z]/.test(word[i - 1]!) && /[a-z]/.test(word[i + 1]!)) {
       artifact = true;
       break;
     }
   }
-  return artifact ? word[0].toUpperCase() + word.slice(1).toLowerCase() : word;
+  return artifact ? word[0]!.toUpperCase() + word.slice(1).toLowerCase() : word;
 }
 
 /**
@@ -387,7 +387,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const candidates = extractCandidates(file.name);
       if (candidates.length === 0) continue;
 
-      const dedupeKey = candidates[0];
+      const dedupeKey = candidates[0]!;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
 
@@ -438,7 +438,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
 
       // Create a new invoice from the parsed PDF
-      const number = candidates[0];
+      const number = candidates[0]!;
       const { data: parsed } = await downloadAndParse(file.fileId);
       const issueDate = parsed?.issueDate ?? estimateIssueDate(number);
       const dueDate = parsed?.dueDate ?? new Date(issueDate.getTime() + 14 * 24 * 60 * 60 * 1000);

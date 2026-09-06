@@ -380,7 +380,7 @@ export function collapseToWindow(
       floatingUp.length > 0 ? grown.filter((t) => !t.isShort && !t.isExplicit) : grown;
     const error = windowMin - sumTaskMinutes(grown);
     if (error !== 0 && adjustable.length > 0) {
-      let biggest = adjustable[0];
+      let biggest = adjustable[0]!;
       for (const t of adjustable) if (taskMinutes(t) > taskMinutes(biggest)) biggest = t;
       grown[grown.indexOf(biggest)] = derive(
         biggest,
@@ -454,7 +454,7 @@ export function collapseToWindow(
       break;
     }
     scaled.sort((a, b) => a.scaledMin - b.scaledMin);
-    const removed = scaled[0].task;
+    const removed = scaled[0]!.task;
     floating = floating.filter((t) => t !== removed);
     dropped++;
   }
@@ -466,9 +466,9 @@ export function collapseToWindow(
     if (error !== 0 && floating.length > 0) {
       let biggestIdx = 0;
       for (let i = 1; i < floating.length; i++) {
-        if (floating[i].qty > floating[biggestIdx].qty) biggestIdx = i;
+        if (floating[i]!.qty > floating[biggestIdx]!.qty) biggestIdx = i;
       }
-      const winner = floating[biggestIdx];
+      const winner = floating[biggestIdx]!;
       const adjustedMin = Math.max(timing.minTaskMins, winner.qty * 60 + error);
       floating[biggestIdx] = derive(winner, adjustedMin);
     }

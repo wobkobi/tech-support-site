@@ -339,7 +339,7 @@ function statusTone(status: Status): StatusTone {
  * @returns Capitalised label.
  */
 function statusLabel(status: Status): string {
-  return status[0].toUpperCase() + status.slice(1);
+  return status[0]!.toUpperCase() + status.slice(1);
 }
 
 /**
@@ -378,28 +378,30 @@ function findOverlaps(promos: PromoRow[]): { ids: Set<string>; winners: Map<stri
   const active = promos.filter((p) => p.isActive);
   for (let i = 0; i < active.length; i++) {
     for (let j = i + 1; j < active.length; j++) {
-      if (active[i].kind !== active[j].kind) continue;
-      if (!rangesOverlap(active[i], active[j])) continue;
-      ids.add(active[i].id);
-      ids.add(active[j].id);
+      const a = active[i]!;
+      const b = active[j]!;
+      if (a.kind !== b.kind) continue;
+      if (!rangesOverlap(a, b)) continue;
+      ids.add(a.id);
+      ids.add(b.id);
       // Resolved through the shared selector, and on createdAt rather than
       // startAt, so the warning can never name a different winner than the
       // query that actually picks the promo.
       const winner = pickWinningPromo([
         {
-          id: active[i].id,
-          priority: active[i].priority,
-          createdAt: new Date(active[i].createdAt),
+          id: a.id,
+          priority: a.priority,
+          createdAt: new Date(a.createdAt),
         },
         {
-          id: active[j].id,
-          priority: active[j].priority,
-          createdAt: new Date(active[j].createdAt),
+          id: b.id,
+          priority: b.priority,
+          createdAt: new Date(b.createdAt),
         },
       ]);
       if (winner) {
-        winners.set(active[i].id, winner.id);
-        winners.set(active[j].id, winner.id);
+        winners.set(a.id, winner.id);
+        winners.set(b.id, winner.id);
       }
     }
   }

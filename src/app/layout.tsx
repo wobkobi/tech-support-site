@@ -149,8 +149,8 @@ export default async function RootLayout({
     .map((d) => ({
       "@type": "OpeningHoursSpecification",
       dayOfWeek: dayNames[d],
-      opens: `${String(published?.open ?? availability.schedule[d].open).padStart(2, "0")}:00`,
-      closes: `${String(published?.close ?? availability.schedule[d].close).padStart(2, "0")}:00`,
+      opens: `${String(published?.open ?? availability.schedule[d]!.open).padStart(2, "0")}:00`,
+      closes: `${String(published?.close ?? availability.schedule[d]!.close).padStart(2, "0")}:00`,
     }));
   // Fall back to the default suburb list when the stored list is empty - an
   // identity row seeded before servedSuburbs existed stores [], which would

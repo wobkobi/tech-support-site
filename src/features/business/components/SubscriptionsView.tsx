@@ -123,7 +123,7 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
       gstRate: String(sub.gstRate),
       method: sub.method,
       frequency: sub.frequency,
-      nextDue: sub.nextDue.split("T")[0],
+      nextDue: sub.nextDue.split("T")[0] ?? "",
       notes: sub.notes ?? "",
     });
     setShowForm(true);

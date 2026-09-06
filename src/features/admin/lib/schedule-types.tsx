@@ -79,7 +79,7 @@ export function optimisticBusyEvent(dayKey: string): WeekEvent {
  * @returns Monday-of-week NZ date key.
  */
 export function mondayOf(dayKey: string): string {
-  const [y, m, d] = dayKey.split("-").map(Number);
+  const [y = NaN, m = NaN, d = NaN] = dayKey.split("-").map(Number);
   const utc = new Date(Date.UTC(y, m - 1, d));
   const back = (utc.getUTCDay() + 6) % 7;
   const monday = new Date(Date.UTC(y, m - 1, d - back));

@@ -62,7 +62,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
   const setDay = (index: number, patch: Partial<DayWindow>): void =>
     setDraft((p) => ({
       ...p,
-      schedule: { ...p.schedule, [index]: { ...p.schedule[index], ...patch } },
+      schedule: { ...p.schedule, [index]: { ...p.schedule[index]!, ...patch } },
     }));
 
   /**
@@ -121,9 +121,9 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
    */
   const toggleProtectedDay = (index: number, dayIndex: number): void =>
     setGuard(index, {
-      protectedDays: draft.morningGuards[index].protectedDays.includes(dayIndex)
-        ? draft.morningGuards[index].protectedDays.filter((d) => d !== dayIndex)
-        : [...draft.morningGuards[index].protectedDays, dayIndex].sort((a, b) => a - b),
+      protectedDays: draft.morningGuards[index]!.protectedDays.includes(dayIndex)
+        ? draft.morningGuards[index]!.protectedDays.filter((d) => d !== dayIndex)
+        : [...draft.morningGuards[index]!.protectedDays, dayIndex].sort((a, b) => a - b),
     });
 
   return (
@@ -162,7 +162,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       </p>
       <div className="mt-3 space-y-2">
         {DAY_ORDER.map(({ index, name }) => {
-          const d = draft.schedule[index];
+          const d = draft.schedule[index]!;
           return (
             <div key={index} className="rounded-lg border border-admin-border p-3">
               <div className="flex flex-wrap items-center gap-3">

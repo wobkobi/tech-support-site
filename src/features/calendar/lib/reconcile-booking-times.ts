@@ -203,7 +203,7 @@ export async function reconcileBookingTimes(options: {
     );
 
     for (const [index, booking] of batch.entries()) {
-      const lookup = lookups[index];
+      const lookup = lookups[index]!;
 
       // Event deleted in Calendar: flag the orphaned row so the email crons
       // leave it alone, and leave its times as they are - there is nothing

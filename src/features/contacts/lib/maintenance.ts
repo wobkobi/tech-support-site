@@ -216,6 +216,7 @@ export async function mergeDuplicateGoogleContacts(): Promise<number> {
     if (rows.length < 2) continue;
     // Oldest first (orderBy above): the original row is the keeper.
     const [keeper, ...dupes] = rows;
+    if (!keeper) continue;
     for (const dup of dupes) {
       if (await foldContactInto(keeper, dup)) merged++;
     }
@@ -253,6 +254,7 @@ export async function mergeDuplicateEmailContacts(): Promise<number> {
     if (rows.length < 2) continue;
     // Oldest first (orderBy above): the original row is the keeper.
     const [keeper, ...dupes] = rows;
+    if (!keeper) continue;
     for (const dup of dupes) {
       if (await foldContactInto(keeper, dup)) merged++;
     }

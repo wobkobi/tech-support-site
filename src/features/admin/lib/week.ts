@@ -14,7 +14,7 @@ import { nzDateParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
  */
 export function resolveWeekStart(weekStartParam: string | undefined, now: Date): Date {
   if (weekStartParam && /^\d{4}-\d{2}-\d{2}$/.test(weekStartParam)) {
-    const [y, m, d] = weekStartParam.split("-").map(Number);
+    const [y = NaN, m = NaN, d = NaN] = weekStartParam.split("-").map(Number);
     return nzMidnightUtc(y, m, d);
   }
 

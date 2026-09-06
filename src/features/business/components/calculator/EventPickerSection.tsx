@@ -52,7 +52,7 @@ const EVENT_STAMP = new Intl.DateTimeFormat("en-NZ", {
  * @returns Minutes since midnight, or null.
  */
 function minutesOfDay(hhmm: string): number | null {
-  const [h, m] = hhmm.split(":").map(Number);
+  const [h = NaN, m = NaN] = hhmm.split(":").map(Number);
   return Number.isNaN(h) || Number.isNaN(m) ? null : h * 60 + m;
 }
 
@@ -71,8 +71,8 @@ function gapMinutesBetween(ranges: ParsedRange[]): number {
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
   let total = 0;
   for (let i = 1; i < complete.length; i++) {
-    const prevEnd = minutesOfDay(complete[i - 1].endTime);
-    const nextStart = minutesOfDay(complete[i].startTime);
+    const prevEnd = minutesOfDay(complete[i - 1]!.endTime);
+    const nextStart = minutesOfDay(complete[i]!.startTime);
     if (prevEnd === null || nextStart === null) continue;
     total += Math.max(0, nextStart - prevEnd);
   }
@@ -89,7 +89,7 @@ function gapMinutesBetween(ranges: ParsedRange[]): number {
  * @returns One anchor per billed slot, in slot order.
  */
 function buildAnchors(prefill: EventPrefill, known: RecentEvent[]): MergeCandidateEvent[] {
-  const [y, m, d] = prefill.jobDate.split("-").map(Number);
+  const [y = NaN, m = NaN, d = NaN] = prefill.jobDate.split("-").map(Number);
   const offsetHours =
     Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)
       ? null

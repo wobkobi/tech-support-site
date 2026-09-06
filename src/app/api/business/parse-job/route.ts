@@ -656,7 +656,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             shares.reduce((max, cur) => (cur.mins > max.mins ? cur : max)).mins += leftover;
           }
           for (const { i, mins } of shares) {
-            parsed.tasks[i] = { ...parsed.tasks[i], minutes: mins, qty: mins / 60 };
+            parsed.tasks[i] = { ...parsed.tasks[i]!, minutes: mins, qty: mins / 60 };
           }
           parsed.warnings = [
             ...(parsed.warnings ?? []),

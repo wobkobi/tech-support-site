@@ -148,7 +148,7 @@ export function DayAgendaView({
   const LONG_PRESS_MS = 500;
   const LONG_PRESS_MOVE_THRESHOLD = 10;
 
-  const [yy, mm, dd] = selectedDayKey.split("-").map(Number);
+  const [yy = NaN, mm = NaN, dd = NaN] = selectedDayKey.split("-").map(Number);
   const offset = getPacificAucklandOffset(yy, mm, dd);
 
   const { dayLabel, yearLabel, prevDayKey, nextDayKey } = useMemo(() => {
@@ -196,7 +196,7 @@ export function DayAgendaView({
       | { type: "now"; atMs: number };
     const items: AgendaItem[] = [];
     for (let i = 0; i < timed.length; i++) {
-      const cur = timed[i];
+      const cur = timed[i]!;
       items.push({ type: "event", ev: cur });
       const next = timed[i + 1];
       if (!next) continue;
@@ -246,7 +246,7 @@ export function DayAgendaView({
     const mondayKey = mondayOf(selectedDayKey);
     return Array.from({ length: 7 }, (_, i) => {
       const dayKey = addDaysToDateKey(mondayKey, i);
-      const [y, m, d] = dayKey.split("-").map(Number);
+      const [y = NaN, m = NaN, d = NaN] = dayKey.split("-").map(Number);
       const ofs = getPacificAucklandOffset(y, m, d);
       const noon = new Date(Date.UTC(y, m - 1, d, 12 - ofs, 0, 0));
       const weekday = new Intl.DateTimeFormat("en-NZ", {

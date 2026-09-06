@@ -147,7 +147,7 @@ function renderEmphasisedHtml(text: string): string {
     .split(/(\*\*[^*]+\*\*)/g)
     .map((part) => {
       const m = part.match(/^\*\*([^*]+)\*\*$/);
-      return m ? `<strong>${escapeHtml(m[1])}</strong>` : escapeHtml(part);
+      return m ? `<strong>${escapeHtml(m[1] ?? "")}</strong>` : escapeHtml(part);
     })
     .join("");
 }
@@ -619,7 +619,7 @@ export async function sendCustomerBookingConfirmation(
 
   // Derive display fields
   const kind = options?.kind ?? "new";
-  const firstName = booking.name.split(" ")[0];
+  const firstName = booking.name.split(" ")[0] ?? "";
   const safeFirstName = escapeHtml(firstName);
   const start = formatDateTimeLong(booking.startAt);
   const previous = options?.previousStartAt ? formatDateTimeLong(options.previousStartAt) : null;
@@ -727,7 +727,7 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
   }
 
   // Derive display fields
-  const firstName = booking.name.split(" ")[0];
+  const firstName = booking.name.split(" ")[0] ?? "";
   const safeFirstName = escapeHtml(firstName);
   const start = formatDateTimeLong(booking.startAt);
   const cancelUrl = `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`;
@@ -903,7 +903,7 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
 
   const identity = await getIdentity();
   const reviewUrl = `${siteUrl}/review?token=${encodeURIComponent(booking.reviewToken)}`;
-  const firstName = booking.name.split(" ")[0];
+  const firstName = booking.name.split(" ")[0] ?? "";
   const safeFirstName = escapeHtml(firstName);
 
   const html = renderNotificationEmail(`
@@ -953,7 +953,7 @@ export async function buildPastClientReviewEmailHtml(
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName},</h2>
-    <p style="margin:0 0 12px;color:#444;line-height:1.6">It's ${escapeHtml(identity.name.split(" ")[0])} from ${escapeHtml(brandName(identity))} - thanks again for letting me help you out!</p>
+    <p style="margin:0 0 12px;color:#444;line-height:1.6">It's ${escapeHtml(identity.name.split(" ")[0] ?? "")} from ${escapeHtml(brandName(identity))} - thanks again for letting me help you out!</p>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, a quick review would mean a lot - it really helps other people find reliable local tech support.</p>
     <p style="margin:0 0 24px;color:#444;line-height:1.6">No pressure at all, but if you're happy to, I'd really appreciate it.</p>
     <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Leave a review</a>
@@ -985,7 +985,7 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
   }
 
   const reviewUrl = `${siteUrl}/review?token=${encodeURIComponent(booking.reviewToken)}`;
-  const firstName = booking.name.split(" ")[0];
+  const firstName = booking.name.split(" ")[0] ?? "";
   const identity = await getIdentity();
   const html = await buildPastClientReviewEmailHtml(firstName, reviewUrl);
 
@@ -1594,7 +1594,7 @@ export async function sendBusinessEnquiryAck(enquiry: BusinessEnquiryData): Prom
     return;
   }
 
-  const firstName = enquiry.name.split(" ")[0];
+  const firstName = enquiry.name.split(" ")[0] ?? "";
   const safeFirstName = escapeHtml(firstName);
   // Personal enquiries thank the person directly rather than a company.
   const aboutTarget = enquiry.company ? ` for ${escapeHtml(enquiry.company)}` : "";
