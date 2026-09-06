@@ -125,6 +125,43 @@ interface SyncState {
   seenSyncIds: Set<string>;
 }
 
+/** Setting key holding the Drive modifiedTime of each workbook at its last clean import. */
+const WORKBOOK_MTIMES_KEY = "sheets:workbook-mtimes";
+
+/**
+ * Reads the per-workbook modifiedTime marks from the last clean import.
+ *
+ * A missing or unparseable row means "import everything", which is the safe
+ * direction: a wasted full scan costs time, a wrongly-skipped workbook loses
+ * ledger rows.
+ * @returns Map of Drive file id to the modifiedTime seen when it was imported.
+ */
+async function readWorkbookMtimes(): Promise<Record<string, string>> {
+  try {
+    const row = await prisma.setting.findUnique({ where: { key: WORKBOOK_MTIMES_KEY } });
+    if (!row) return {};
+    const parsed: unknown = JSON.parse(row.value);
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, string>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Records the modifiedTime of every workbook imported or skipped this run.
+ * @param mtimes - Drive file id to modifiedTime for this run's workbooks.
+ */
+async function writeWorkbookMtimes(mtimes: Record<string, string>): Promise<void> {
+  const value = JSON.stringify(mtimes);
+  await prisma.setting.upsert({
+    where: { key: WORKBOOK_MTIMES_KEY },
+    create: { key: WORKBOOK_MTIMES_KEY, value },
+    update: { value },
+  });
+}
+
 /**
  * Dedup key matching the pre-Sync-ID import behaviour.
  * @param date - Entry date.
@@ -682,21 +719,44 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
     const warnings: string[] = [];
     let result: ImportResult;
     let allSheetsClean = true;
+    // A scan that skipped workbooks cannot tell a deleted row from an archived
+    // one, which is what the orphan report below turns on.
+    let excludedCount = 0;
+    let skippedCount = 0;
 
     if (folderId) {
+      const allSheets = await listSpreadsheetsInFolder(folderId);
       // Retired workbooks prefixed "old" stay in the folder for reference but
       // must not sync - they duplicate the replacement workbook's transactions,
       // so importing both double-counts the ledger.
-      const sheetsToImport = (await listSpreadsheetsInFolder(folderId)).filter((s) => {
+      const sheetsToImport = allSheets.filter((s) => {
         const fileName = s.name.split(" / ").pop() ?? s.name;
         return !fileName.toLowerCase().startsWith("old");
       });
+      excludedCount = allSheets.length - sheetsToImport.length;
+
+      // A workbook Drive says is untouched since the last clean import holds
+      // exactly the rows already in the DB, so re-reading every row of every
+      // financial year each hour is wasted work that grows as years accumulate.
+      const lastSeen = dryRun ? {} : await readWorkbookMtimes();
+      const seenNow: Record<string, string> = {};
+
       const aggregate = { ...zero, errors: [] as string[] };
       const perSheet: PerSheetCounts[] = [];
 
       for (const sheet of sheetsToImport) {
+        if (
+          !dryRun &&
+          sheet.modifiedTime !== null &&
+          lastSeen[sheet.fileId] === sheet.modifiedTime
+        ) {
+          skippedCount++;
+          seenNow[sheet.fileId] = sheet.modifiedTime;
+          continue;
+        }
         try {
           const counts = await importFromSheet(sheet.fileId, dryRun, state);
+          if (sheet.modifiedTime !== null) seenNow[sheet.fileId] = sheet.modifiedTime;
           aggregate.incomeImported += counts.incomeImported;
           aggregate.incomeUpdated += counts.incomeUpdated;
           aggregate.incomeSkipped += counts.incomeSkipped;
@@ -713,6 +773,7 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
         }
       }
 
+      if (!dryRun) await writeWorkbookMtimes(seenNow);
       result = { ok: true, source: "folder", perSheet, ...aggregate };
     } else {
       const counts = await importFromSheet(getSheetId(), dryRun, state);
@@ -724,9 +785,25 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
 
       // Log-only: a linked entry whose Sync ID appeared in no scanned sheet had its row
       // deleted sheet-side. Sheet-wins says delete it too, but auto-deleting off a partial
-      // scan is destructive, so leave the call to the operator. Skipped when a sheet
-      // failed to load, or when only one workbook was scanned (other FYs missed).
-      if (folderId && allSheetsClean) {
+      // scan is destructive, so leave the call to the operator.
+      //
+      // "Partial" includes the workbooks this run chose not to read: retired "old"
+      // workbooks are always excluded, and unchanged ones are skipped. Rows that live in
+      // those are absent from seenSyncIds through no fault of the sheet, so listing them
+      // as deleted invites the operator to delete archived ledger rows. Only a run that
+      // read every workbook in the folder can tell the difference.
+      const scanWasComplete = allSheetsClean && excludedCount === 0 && skippedCount === 0;
+      const unmatched = [...state.incomeByKey.keys(), ...state.expenseByKey.keys()].filter(
+        (key) => !state.seenSyncIds.has(key),
+      ).length;
+
+      if (folderId && !scanWasComplete && unmatched > 0) {
+        warnings.push(
+          `${unmatched} linked row(s) were not seen in this scan, but it did not read every workbook (${excludedCount} retired, ${skippedCount} unchanged since last import). They may be archived rather than deleted - not listing them.`,
+        );
+      }
+
+      if (folderId && scanWasComplete) {
         for (const [key, entry] of state.incomeByKey) {
           if (!state.seenSyncIds.has(key)) {
             warnings.push(
