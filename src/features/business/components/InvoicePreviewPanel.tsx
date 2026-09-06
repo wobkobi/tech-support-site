@@ -200,7 +200,7 @@ function InvoicePreviewPanelImpl({
           )}
           {showUnsuccessfulLine && (
             <div className="flex justify-between gap-3 text-amber-700">
-              <span>Unsuccessful-visit discount (half off labour)</span>
+              <span>Unsuccessful-visit discount (labour only)</span>
               <span className="whitespace-nowrap">-{formatNZD(unsuccessfulDiscount)}</span>
             </div>
           )}

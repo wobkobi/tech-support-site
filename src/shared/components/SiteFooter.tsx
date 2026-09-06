@@ -2,17 +2,16 @@
 // src/shared/components/SiteFooter.tsx
 /**
  * @description Site-wide footer with quick links, the privacy policy link, and
- * copyright. Hidden on the admin area and the print-only poster, matching the
+ * copyright. Hidden on the admin area and the print artwork routes, matching the
  * NavBar's hidden paths. A direct child of <body>, so it is the page's single
  * contentinfo landmark (the homepage's contact bar lives inside <main>).
  */
 
+import { isPrintRoute } from "@/shared/lib/print-routes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type React from "react";
 
-/** Exact paths that hide the footer (print-only poster). */
-const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
 /** Path prefixes that hide the footer (admin has its own chrome). */
 const HIDDEN_PREFIXES: ReadonlyArray<string> = ["/admin"];
 
@@ -34,7 +33,7 @@ const LINKS: ReadonlyArray<{ label: string; href: string }> = [
  */
 export function SiteFooter(): React.ReactElement | null {
   const pathname = usePathname();
-  if (HIDDEN_PATHS.includes(pathname)) return null;
+  if (isPrintRoute(pathname)) return null;
   if (HIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
 
   const year = new Date().getFullYear();

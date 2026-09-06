@@ -85,3 +85,6 @@ To the Point - Template.xlsx
 # operator's own global config instead.
 /AGENTS.md
 /CLAUDE.md
+
+.vercel
+.env*

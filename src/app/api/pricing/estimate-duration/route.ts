@@ -10,6 +10,7 @@
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { errorResponse } from "@/shared/lib/api-response";
+import { openAiRateLimitResponse } from "@/shared/lib/openai-rate-limit";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings, SETTINGS_TAG } from "@/shared/lib/settings/get-settings";
 import type { Benchmark } from "@/shared/lib/settings/types";
@@ -288,10 +289,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Upstream OpenAI 429s are transient: mark them retryable so callers can
     // back off and retry instead of reading a rate limit as an estimate failure.
     if (err instanceof OpenAI.RateLimitError) {
-      return NextResponse.json(
-        { ok: false, error: "AI rate limited - try again shortly", retryable: true },
-        { status: 429 },
-      );
+      return openAiRateLimitResponse(err);
     }
     return errorResponse("Could not estimate duration", 422);
   }

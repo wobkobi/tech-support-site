@@ -59,7 +59,7 @@ export interface Invoice {
   promoTitle?: string | null;
   /** Dollar discount applied to the labour subtotal at creation time. */
   promoDiscount?: number | null;
-  /** Operator ticked the unsuccessful-work checkbox: half off labour (parts + travel unaffected). */
+  /** Operator ticked the unsuccessful-work checkbox: labour discounted by the unsuccessful-work factor (parts + travel unaffected). */
   unsuccessful?: boolean;
   /** Computed labour-half discount, persisted for audit + PDF rendering. */
   unsuccessfulDiscount?: number | null;
@@ -157,7 +157,7 @@ export interface TaskLine {
   isShort?: boolean;
   /** AI-flagged task with an operator-stated explicit duration. Pinned at the parser-emitted qty by the rebalance helper, so only floating tasks absorb any window mismatch. */
   isExplicit?: boolean;
-  /** Operator-set: this task wasn't finished, so calcJobTotal halves its line per the unsuccessful-work policy. Ignored on flat-rate rows and when the whole-job `unsuccessful` flag is set (which already covers it). */
+  /** Operator-set: this task wasn't finished, so calcJobTotal discounts its line per the unsuccessful-work policy. Ignored on flat-rate rows and when the whole-job `unsuccessful` flag is set (which already covers it). */
   unsuccessful?: boolean;
 }
 
@@ -199,7 +199,7 @@ export interface JobCalculation {
   travelEntries: TravelEntry[];
   notes: string;
   /**
-   * Operator-set flag: when true, calcJobTotal halves the labour portion
+   * Operator-set flag: when true, calcJobTotal discounts the labour portion
    * (time charge + hourly tasks) per the published unsuccessful-work
    * policy. Travel and parts are not discounted. Auditable on the saved
    * invoice via Invoice.unsuccessful + Invoice.unsuccessfulDiscount.
@@ -322,7 +322,7 @@ interface ParsedTaskLine {
   isShort?: boolean;
   /** True when the AI pinned this task to an operator-stated explicit duration. Pinned tasks are skipped by the post-parse safety-net rebalance. */
   isExplicit?: boolean;
-  /** True when the AI read the task's problem as not resolved ("couldn't fix it"); the calculator halves that line's labour per the unsuccessful-work policy. */
+  /** True when the AI read the task's problem as not resolved ("couldn't fix it"); the calculator discounts that line's labour per the unsuccessful-work policy. */
   unsuccessful?: boolean;
 }
 

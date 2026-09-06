@@ -7,6 +7,7 @@
 
 import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
+import { isPrintRoute } from "@/shared/lib/print-routes";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -19,7 +20,6 @@ interface NavItem {
   activePrefix: string;
 }
 
-const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
 /** Path prefixes that hide the public nav entirely (e.g. admin has its own sidebar). */
 const HIDDEN_PREFIXES: ReadonlyArray<string> = ["/admin"];
 const NAV_ITEMS: ReadonlyArray<NavItem> = [
@@ -402,7 +402,7 @@ export function NavBar(): React.ReactElement | null {
     };
   }, [isHoveringTop]);
 
-  if (HIDDEN_PATHS.includes(pathname)) {
+  if (isPrintRoute(pathname)) {
     return null;
   }
   if (HIDDEN_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {

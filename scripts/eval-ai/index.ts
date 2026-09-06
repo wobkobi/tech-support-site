@@ -19,6 +19,11 @@ import {
 } from "./assert";
 import type { LiveContext } from "./context";
 
+// One errored case must not discard the run's completed paid calls: record
+// it and carry on. Three consecutive errors mean the upstream API is down
+// (dead key, exhausted quota) - abort then, keeping everything collected.
+const MAX_CONSECUTIVE_ERRORS = 3;
+
 /** One assertion check with expected/actual values, hardcoded - no network. */
 interface SelfCase {
   name: string;
@@ -198,10 +203,6 @@ async function collectRaw(
     process.stdout.write(`\r\x1b[2K  [${done}/${total}] ${id}`);
   };
 
-  // One errored case must not discard the run's completed paid calls: record
-  // it and carry on. Three consecutive errors mean the upstream API is down
-  // (dead key, exhausted quota) - abort then, keeping everything collected.
-  const MAX_CONSECUTIVE_ERRORS = 3;
   let consecutiveErrors = 0;
   let aborted = false;
 
@@ -582,8 +583,30 @@ function printReport(checks: CheckResult[]): void {
       `\n${completed.length}/${raw.length} cases completed, ~${calls} paid calls. Artifact: ${artifact}`,
     );
     if (aborted) {
+      // Name what actually failed. Guessing "rate limited or out of quota" sent
+      // an operator hunting through OpenAI billing when the real causes were a
+      // stale dev server and another project holding port 3000.
+      const errors = raw.map((r) => r.error ?? "").filter(Boolean);
+      /**
+       * Whether any recorded case error mentions a given marker.
+       * @param needle - Substring identifying one failure mode.
+       * @returns True when at least one errored case reported it.
+       */
+      const has = (needle: string): boolean => errors.some((e) => e.includes(needle));
+      const cause = has("Could not reach the dev server")
+        ? "the dev server stopped answering - check it is still up (a corrupted .next needs `rm -rf .next` and a restart)"
+        : has("HTTP 404")
+          ? "the route was not found - port 3000 may be serving a different project"
+          : has("HTTP 401")
+            ? "the admin secret was rejected - ADMIN_SECRET must match the running server"
+            : has("HTTP 500")
+              ? "the route threw - the real stack trace is in the dev server terminal"
+              : has("HTTP 429")
+                ? "the OpenAI rate limit outlasted every backoff retry - check tokens-per-minute on the account"
+                : "see the per-case errors above";
       console.log(
-        `\n\x1b[33m⚠ run aborted early after repeated consecutive case errors (${raw.filter((r) => r.error).length} errored total) - upstream API likely rate-limited or out of quota. Completed cases are reported above and saved in the artifact.\x1b[0m`,
+        `
+[33m⚠ run aborted early after ${MAX_CONSECUTIVE_ERRORS} consecutive case errors (${errors.length} errored total) - ${cause}. Completed cases are reported above and saved in the artifact.[0m`,
       );
     }
     if (reproFailed.length > 0) {

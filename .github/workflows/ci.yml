@@ -2,13 +2,21 @@ name: CI
 
 permissions:
   contents: read
-  pull-requests: write
 
 on:
   pull_request:
     branches: [main, dev]
+  # Only main, so a branch with an open pull request is not checked twice: the
+  # pull_request event already covers every push to that branch.
   push:
-    branches: [main, dev]
+    branches: [main]
+
+# Supersede a run when its ref is pushed again. Grouping by ref keeps branches
+# from cancelling each other, and a cancelled run reports "cancelled" rather
+# than "success", so the auto-merge workflow ignores it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -36,8 +44,10 @@ jobs:
       - name: Run linter
         run: npm run lint
 
+      # Dependabot pull requests are built too. The build reads no secrets, and
+      # auto-merge queues patch and minor bumps, so this is the signal that a
+      # bump still compiles.
       - name: Build application
-        if: github.actor != 'dependabot[bot]'
         run: npm run build
 
   type-check:
@@ -63,4 +73,4 @@ jobs:
         run: npx prisma generate
 
       - name: TypeScript type check
-        run: npx tsc --noEmit
+        run: npm run typecheck

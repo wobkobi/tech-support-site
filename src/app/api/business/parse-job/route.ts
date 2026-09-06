@@ -25,6 +25,7 @@ import type {
 } from "@/features/business/types/business";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { openAiRateLimitResponse } from "@/shared/lib/openai-rate-limit";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NZ_TZ, getPacificAucklandOffset, nzDateParts } from "@/shared/lib/timezone-utils";
@@ -247,6 +248,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ],
     });
 
+    // Prompt-cache visibility. The system prompt is ~13.9k static tokens sent on
+    // every call, so whether it is served from cache is the difference between
+    // roughly $3 and $1.40 a hundred calls. cached_tokens is the only ground
+    // truth for that - it does NOT reduce tokens-per-minute usage, which is
+    // billed on the full prompt either way.
+    const usage = completion.usage;
+    console.log(
+      `[parse-job] prompt ${usage?.prompt_tokens ?? "?"} tokens, ${
+        usage?.prompt_tokens_details?.cached_tokens ?? 0
+      } cached, completion ${usage?.completion_tokens ?? "?"}`,
+    );
+
     const text = completion.choices[0]?.message?.content ?? "";
     const parsed = JSON.parse(text) as ParseJobResponse & { clarify?: ParseJobQuestion[] };
 
@@ -336,6 +349,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // warning so a genuinely new tag is a visible operator decision and a
       // drifted synonym gets corrected before it splits the price history.
       const newTags = new Set<string>();
+      const strippedSpeedHints = new Set<string>();
       parsed.tasks = parsed.tasks.map((task) => {
         const t = task as typeof task & {
           action?: string | null;
@@ -353,17 +367,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (action && !knownActions.has(action.toLowerCase())) newTags.add(action);
         const snap = findTemplateByTags(device, action, templates);
         // Billing signals must not print on the invoice line. The prompt forbids them, but
-        // the model still echoes speed hints ("quick") back out of inputs like "(quick)" -
-        // strip them deterministically and tidy the separators; an emptied details is null.
+        // the model still echoes speed hints back out of inputs like "(quick)" as their own
+        // details item. Only a comma item that is ENTIRELY a speed hint is dropped: matching
+        // the word anywhere would eat product names the operator really typed - "Quick Assist"
+        // is Microsoft's remote-support tool, "Quick Look" is a macOS feature. An emptied
+        // details is null. Every drop is reported as a warning rather than rewritten silently,
+        // so a recurring one here means the prompt rule has stopped binding.
         const rawDetails = t.details?.trim() ? t.details.trim() : null;
-        const details = rawDetails
-          ? rawDetails
-              .replace(/\b(?:quick(?:ly)?|briefly)\b/gi, "")
-              .replace(/\s{2,}/g, " ")
-              .replace(/\s*,\s*,+/g, ",")
-              .replace(/^[\s,;-]+|[\s,;-]+$/g, "")
-              .trim() || null
-          : null;
+        let details: string | null = null;
+        if (rawDetails) {
+          const kept: string[] = [];
+          for (const part of rawDetails.split(",")) {
+            const item = part.trim();
+            if (!item) continue;
+            if (/^(?:quick(?:ly)?|briefly)$/i.test(item)) {
+              strippedSpeedHints.add(item.toLowerCase());
+              continue;
+            }
+            kept.push(item);
+          }
+          details = kept.join(", ") || null;
+        }
 
         const baseRate =
           findRateByLabel(t.baseRateLabel) ??
@@ -426,6 +450,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           `Dropped unrecognised modifier label(s): ${[...unresolvedModifierLabels].join(
             ", ",
           )}. None match a current rate - check the modifier labels in Settings > Pricing.`,
+        ];
+      }
+      if (strippedSpeedHints.size > 0) {
+        parsed.warnings = [
+          ...(parsed.warnings ?? []),
+          `Removed speed hint(s) from the invoice wording: ${[...strippedSpeedHints].join(
+            ", ",
+          )}. These set how long the task is billed for; they are not part of what the customer is told was done.`,
         ];
       }
       if (newTags.size > 0) {
@@ -657,10 +689,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Upstream OpenAI 429s are transient: mark them retryable so callers can
     // back off and retry instead of reading a rate limit as a parse failure.
     if (err instanceof OpenAI.RateLimitError) {
-      return NextResponse.json(
-        { ok: false, error: "AI rate limited - try again shortly", retryable: true },
-        { status: 429 },
-      );
+      return openAiRateLimitResponse(err);
     }
     return errorResponse("Could not parse job description", 422);
   }

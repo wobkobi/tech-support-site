@@ -93,13 +93,23 @@ async function postJson<T>(url: string, body: unknown, adminSecret: string): Pro
     const json = (await res.json().catch(() => null)) as {
       ok?: boolean;
       retryable?: boolean;
+      retryAfterMs?: number;
     } | null;
-    // Upstream OpenAI rate limit: hold off and retry, doubling the wait after
-    // each subsequent failure (5s > 10s > 20s > 40s > 80s).
+    // Upstream OpenAI rate limit: hold off and retry. The route passes OpenAI's
+    // own reset time through as retryAfterMs - prefer it, since the limit that
+    // bites here is tokens-per-minute and only OpenAI knows when that window
+    // reopens. Doubling from 5s is the fallback when no hint came back, and it
+    // burns its early retries failing again against a window measured in minutes.
     if (res.status === 429 && json?.retryable === true && attempt < RATE_LIMIT_RETRIES) {
-      const delayMs = RATE_LIMIT_BASE_DELAY_MS * 2 ** attempt;
+      const hinted =
+        typeof json.retryAfterMs === "number" && json.retryAfterMs > 0 ? json.retryAfterMs : null;
+      // A second past the stated reset, so a clock skew of a few ms does not
+      // spend a whole retry landing back in the same closed window.
+      const delayMs = hinted !== null ? hinted + 1_000 : RATE_LIMIT_BASE_DELAY_MS * 2 ** attempt;
       console.log(
-        `    AI rate limited - waiting ${delayMs / 1000}s (retry ${attempt + 1}/${RATE_LIMIT_RETRIES})`,
+        `    AI rate limited - waiting ${Math.round(delayMs / 1000)}s${
+          hinted !== null ? " (OpenAI's stated reset)" : ""
+        } (retry ${attempt + 1}/${RATE_LIMIT_RETRIES})`,
       );
       await new Promise((resolve) => setTimeout(resolve, delayMs));
       continue;

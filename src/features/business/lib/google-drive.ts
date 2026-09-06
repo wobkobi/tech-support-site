@@ -185,14 +185,17 @@ export async function searchAllInvoicePdfs(): Promise<
  * any subfolders so per-year subfolder structures (e.g. `Business/2025-26/...`)
  * are walked end-to-end. Sheet display names are prefixed with the folder
  * breadcrumb so they're identifiable in the per-sheet import breakdown.
+ * `modifiedTime` lets a caller skip a workbook it has already imported: the
+ * hourly ledger sync reads every row of every workbook otherwise, and that cost
+ * grows with each financial year added to the folder.
  * @param folderId - The Drive folder ID to scan.
- * @returns Array of `{ name, fileId }` for every spreadsheet found, sorted by name.
+ * @returns Array of `{ name, fileId, modifiedTime }` for every spreadsheet found, sorted by name.
  */
 export async function listSpreadsheetsInFolder(
   folderId: string,
-): Promise<{ name: string; fileId: string }[]> {
+): Promise<{ name: string; fileId: string; modifiedTime: string | null }[]> {
   const drive = getDriveClient();
-  const results: { name: string; fileId: string }[] = [];
+  const results: { name: string; fileId: string; modifiedTime: string | null }[] = [];
 
   /**
    * Recursive walker.
@@ -204,7 +207,7 @@ export async function listSpreadsheetsInFolder(
     do {
       const res = await drive.files.list({
         q: `'${currentFolderId}' in parents and trashed=false and (mimeType='application/vnd.google-apps.spreadsheet' or mimeType='application/vnd.google-apps.folder')`,
-        fields: "nextPageToken, files(id,name,mimeType)",
+        fields: "nextPageToken, files(id,name,mimeType,modifiedTime)",
         pageSize: 100,
         ...(pageToken ? { pageToken } : {}),
       });
@@ -213,7 +216,7 @@ export async function listSpreadsheetsInFolder(
         if (f.mimeType === "application/vnd.google-apps.spreadsheet") {
           const displayName =
             breadcrumbs.length > 0 ? `${breadcrumbs.join(" / ")} / ${f.name}` : f.name;
-          results.push({ name: displayName, fileId: f.id });
+          results.push({ name: displayName, fileId: f.id, modifiedTime: f.modifiedTime ?? null });
         } else if (f.mimeType === "application/vnd.google-apps.folder") {
           await walk(f.id, [...breadcrumbs, f.name]);
         }
