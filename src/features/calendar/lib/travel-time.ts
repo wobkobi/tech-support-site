@@ -3,6 +3,8 @@
  * @description Calculates public-transport travel time using the Google Maps Distance Matrix API.
  */
 
+import { prisma } from "@/shared/lib/prisma";
+
 /**
  * Transit schedule data is only reliable within this many days from now.
  * Departures further out are proxied to the nearest matching day-of-week.
@@ -46,6 +48,81 @@ function toReliableDeparture(departureTime: Date, now: Date): Date {
 
 /** Valid Google Distance Matrix travel modes. */
 export type TransportMode = "transit" | "driving" | "walking" | "bicycling";
+
+/** Setting key holding origin|destination|mode pairs Distance Matrix cannot route. */
+const UNROUTABLE_KEY = "travel:unroutable";
+
+/** How long a "no route" verdict stands before the pair is tried again. */
+const UNROUTABLE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Per-process copy of the unroutable set, loaded once and written through.
+ * The calendar refresh recomputes every future event twice an hour, so without
+ * this an address Google cannot route is re-queried indefinitely - 4 failing
+ * legs cost ~192 wasted Distance Matrix calls a day.
+ */
+let unroutable: Record<string, string> | null = null;
+
+/**
+ * Identity of a route lookup, independent of when it was asked.
+ * @param origin - Start address.
+ * @param destination - End address.
+ * @param mode - Transport mode.
+ * @returns Stable key for the pair.
+ */
+function routeKey(origin: string, destination: string, mode: TransportMode): string {
+  return `${origin.trim().toLowerCase()}|${destination.trim().toLowerCase()}|${mode}`;
+}
+
+/**
+ * Whether this pair failed to route recently enough to skip retrying.
+ * @param key - Route key from {@link routeKey}.
+ * @returns True when a fresh "no route" verdict stands.
+ */
+async function isKnownUnroutable(key: string): Promise<boolean> {
+  if (unroutable === null) {
+    try {
+      const row = await prisma.setting.findUnique({ where: { key: UNROUTABLE_KEY } });
+      const parsed: unknown = row ? JSON.parse(row.value) : {};
+      unroutable =
+        parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+          ? (parsed as Record<string, string>)
+          : {};
+    } catch {
+      // Never let a cache read stop a real lookup.
+      unroutable = {};
+    }
+  }
+  const at = unroutable[key];
+  return at !== undefined && Date.now() - new Date(at).getTime() < UNROUTABLE_TTL_MS;
+}
+
+/**
+ * Records that Distance Matrix cannot route this pair, dropping stale entries
+ * so an address the operator has since corrected is retried.
+ * @param key - Route key from {@link routeKey}.
+ */
+async function rememberUnroutable(key: string): Promise<void> {
+  const now = Date.now();
+  const next: Record<string, string> = {
+    ...(unroutable ?? {}),
+    [key]: new Date(now).toISOString(),
+  };
+  for (const [k, at] of Object.entries(next)) {
+    if (now - new Date(at).getTime() >= UNROUTABLE_TTL_MS) delete next[k];
+  }
+  unroutable = next;
+  try {
+    const value = JSON.stringify(next);
+    await prisma.setting.upsert({
+      where: { key: UNROUTABLE_KEY },
+      create: { key: UNROUTABLE_KEY, value },
+      update: { value },
+    });
+  } catch {
+    // In-process copy still spares the retries for this instance's lifetime.
+  }
+}
 
 /**
  * Travel time between two addresses, in minutes (ceiling). Driving lookups use
@@ -99,6 +176,9 @@ export async function calculateTravelMinutes(
     timeParam: "arrival_time" | "departure_time",
     epochSeconds: number,
   ): Promise<number | null> {
+    const key0 = routeKey(origin, destination, mode);
+    if (await isKnownUnroutable(key0)) return null;
+
     const url = new URL("https://maps.googleapis.com/maps/api/distancematrix/json");
     url.searchParams.set("origins", origin);
     url.searchParams.set("destinations", destination);
@@ -140,7 +220,14 @@ export async function calculateTravelMinutes(
 
       const element = data.rows[0]?.elements[0];
       if (!element || element.status !== "OK") {
-        console.warn(`[travel-time] Element status: ${element?.status ?? "missing"}`);
+        const status = element?.status ?? "missing";
+        // ZERO_RESULTS and NOT_FOUND are properties of the addresses, not of this
+        // moment, so retrying them on a 30-minute cycle never succeeds. Anything
+        // else (a transient element error) stays retryable.
+        console.warn(`[travel-time] Element status: ${status} for "${origin}" > "${destination}"`);
+        if (status === "ZERO_RESULTS" || status === "NOT_FOUND") {
+          await rememberUnroutable(key0);
+        }
         return null;
       }
 
