@@ -147,7 +147,7 @@ export function TasksSection({
                       const next = v.trim() || null;
                       onTasksChange((prev) => {
                         const arr = [...prev];
-                        const updated = { ...arr[idx], device: next };
+                        const updated = { ...arr[idx]!, device: next };
                         const composedDesc = composeDescription(
                           next,
                           updated.action ?? null,
@@ -182,7 +182,7 @@ export function TasksSection({
                       const next = v.trim() || null;
                       onTasksChange((prev) => {
                         const arr = [...prev];
-                        const updated = { ...arr[idx], action: next };
+                        const updated = { ...arr[idx]!, action: next };
                         const composedDesc = composeDescription(
                           updated.device ?? null,
                           next,
@@ -218,7 +218,7 @@ export function TasksSection({
                       const raw = e.target.value;
                       onTasksChange((prev) => {
                         const arr = [...prev];
-                        const updated = { ...arr[idx], details: raw === "" ? null : raw };
+                        const updated = { ...arr[idx]!, details: raw === "" ? null : raw };
                         const composedDesc = composeDescription(
                           updated.device ?? null,
                           updated.action ?? null,

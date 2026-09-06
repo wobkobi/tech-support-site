@@ -52,10 +52,10 @@ function inferFrequency(dates: Date[]): string {
   const sorted = [...dates].sort((a, b) => a.getTime() - b.getTime());
   const gaps: number[] = [];
   for (let i = 1; i < sorted.length; i++) {
-    gaps.push((sorted[i].getTime() - sorted[i - 1].getTime()) / 86_400_000);
+    gaps.push((sorted[i]!.getTime() - sorted[i - 1]!.getTime()) / 86_400_000);
   }
   gaps.sort((a, b) => a - b);
-  const median = gaps[Math.floor(gaps.length / 2)];
+  const median = gaps[Math.floor(gaps.length / 2)]!;
   return CADENCES.reduce((best, c) =>
     Math.abs(c.days - median) < Math.abs(best.days - median) ? c : best,
   ).frequency;
@@ -93,7 +93,7 @@ export function MigrateToSubscriptionDialog({
   // the gaps when the expense recurs, else defaults to monthly.
   const latestDate = matchList.reduce(
     (latest, m) => (new Date(m.date) > new Date(latest) ? m.date : latest),
-    matchList[0].date,
+    matchList[0]!.date,
   );
   const initialFrequency = recurring
     ? inferFrequency(matchList.map((m) => new Date(m.date)))

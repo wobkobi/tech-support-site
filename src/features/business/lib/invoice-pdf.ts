@@ -94,15 +94,16 @@ function parseWordmarkPaths(): LogoPath[] {
   const groupRe = /<g\s+transform="translate\(0\s+(-?\d+(?:\.\d+)?)\)">([\s\S]*?)<\/g>/g;
   const groupRanges: Array<{ start: number; end: number; ty: number }> = [];
   for (const m of svgText.matchAll(groupRe)) {
-    const start = (m.index ?? 0) + m[0].indexOf(m[2]);
-    groupRanges.push({ start, end: start + m[2].length, ty: parseFloat(m[1]) });
+    const body = m[2] ?? "";
+    const start = (m.index ?? 0) + m[0].indexOf(body);
+    groupRanges.push({ start, end: start + body.length, ty: parseFloat(m[1] ?? "") });
   }
   const pathRe = /<path[^>]*\sfill="(#[0-9A-Fa-f]+)"[^>]*\sd="([^"]+)"[^>]*\/>/g;
   const paths: LogoPath[] = [];
   for (const m of svgText.matchAll(pathRe)) {
     const idx = m.index ?? 0;
     const insideGroup = groupRanges.find((g) => idx >= g.start && idx < g.end);
-    paths.push({ fill: m[1], d: m[2], ty: insideGroup?.ty ?? 0 });
+    paths.push({ fill: m[1] ?? "", d: m[2] ?? "", ty: insideGroup?.ty ?? 0 });
   }
   return paths;
 }
@@ -389,10 +390,10 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
     const headerWidth = ctx.bold.widthOfTextAtSize(h, HEADER_SIZE);
     let x: number;
     if (i === 0) {
-      x = cols[i] + 4;
+      x = cols[i]! + 4;
     } else {
-      const colLeft = cols[i];
-      const colRight = i + 1 < cols.length ? cols[i + 1] : MARGIN + CONTENT_W;
+      const colLeft = cols[i]!;
+      const colRight = i + 1 < cols.length ? cols[i + 1]! : MARGIN + CONTENT_W;
       x = (colLeft + colRight) / 2 - headerWidth / 2;
     }
     ctx.page.drawText(h, { x, y: y - ROW_H + 9, size: HEADER_SIZE, font: ctx.bold, color: DARK });
@@ -770,6 +771,6 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
  */
 export function extractYearCode(invoiceNumber: string): string {
   const m = invoiceNumber.match(/^[A-Z]+-(\d{4,6})-/);
-  if (m) return m[1];
+  if (m?.[1]) return m[1];
   return nzFinancialYearCode();
 }

@@ -40,7 +40,7 @@ export function ReviewScrollHandler(): null {
         window.scrollTo({ top: 0, behavior: "instant" });
         return;
       }
-      const id = matches[matches.length - 1];
+      const id = matches[matches.length - 1]!;
 
       if (matches.length > 1 || rawHash !== `#${id}`) {
         history.replaceState(null, "", `${window.location.pathname}#${id}`);

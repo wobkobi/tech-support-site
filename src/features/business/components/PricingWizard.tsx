@@ -221,11 +221,15 @@ function buildPriceRange(
     const lowDrift = visitJob.low - lines.reduce((s, l) => s + l.low, 0);
     const highDrift = visitJob.high - lines.reduce((s, l) => s + l.high, 0);
     if (lowDrift !== 0 || highDrift !== 0) {
-      const largestIdx = lines.reduce((maxI, l, i, arr) => (l.high > arr[maxI].high ? i : maxI), 0);
+      const largestIdx = lines.reduce(
+        (maxI, l, i, arr) => (l.high > arr[maxI]!.high ? i : maxI),
+        0,
+      );
+      const widest = lines[largestIdx]!;
       lines[largestIdx] = {
-        ...lines[largestIdx],
-        low: Math.max(0, lines[largestIdx].low + lowDrift),
-        high: Math.max(0, lines[largestIdx].high + highDrift),
+        ...widest,
+        low: Math.max(0, widest.low + lowDrift),
+        high: Math.max(0, widest.high + highDrift),
       };
     }
     return lines;

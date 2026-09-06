@@ -20,7 +20,7 @@ import type {
   TravelEntry,
 } from "@/features/business/types/business";
 import { formatDateSlash } from "@/shared/lib/date-format";
-import { nzTodayKey } from "@/shared/lib/timezone-utils";
+import { nzTodayKey, timeParts } from "@/shared/lib/timezone-utils";
 
 /**
  * Minimum travel cost (NZD) below which a calculated travel charge is
@@ -187,7 +187,7 @@ export function nextInvoiceNumber(
   // instead of silently restarting the sequence at 0001.
   const match = lastNumber.match(/-(\d{4,})$/);
   if (!match) return `${prefix}-${yearCode}-0001`;
-  const next = parseInt(match[1], 10) + 1;
+  const next = parseInt(match[1] ?? "", 10) + 1;
   return `${prefix}-${yearCode}-${String(next).padStart(4, "0")}`;
 }
 
@@ -218,8 +218,8 @@ export function billableMins(mins: number, incrementMins: number = BILLING_INCRE
  */
 export function timeDiffMins(start: string, end: string): number {
   if (!start || !end) return 0;
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
+  const [sh, sm] = timeParts(start);
+  const [eh, em] = timeParts(end);
   if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return 0;
   const diff = eh * 60 + em - (sh * 60 + sm);
   if (diff > 0) return diff;
@@ -380,7 +380,7 @@ export function collapseToWindow(
       floatingUp.length > 0 ? grown.filter((t) => !t.isShort && !t.isExplicit) : grown;
     const error = windowMin - sumTaskMinutes(grown);
     if (error !== 0 && adjustable.length > 0) {
-      let biggest = adjustable[0];
+      let biggest = adjustable[0]!;
       for (const t of adjustable) if (taskMinutes(t) > taskMinutes(biggest)) biggest = t;
       grown[grown.indexOf(biggest)] = derive(
         biggest,
@@ -454,7 +454,7 @@ export function collapseToWindow(
       break;
     }
     scaled.sort((a, b) => a.scaledMin - b.scaledMin);
-    const removed = scaled[0].task;
+    const removed = scaled[0]!.task;
     floating = floating.filter((t) => t !== removed);
     dropped++;
   }
@@ -466,10 +466,11 @@ export function collapseToWindow(
     if (error !== 0 && floating.length > 0) {
       let biggestIdx = 0;
       for (let i = 1; i < floating.length; i++) {
-        if (floating[i].qty > floating[biggestIdx].qty) biggestIdx = i;
+        if (floating[i]!.qty > floating[biggestIdx]!.qty) biggestIdx = i;
       }
-      const adjustedMin = Math.max(timing.minTaskMins, floating[biggestIdx].qty * 60 + error);
-      floating[biggestIdx] = derive(floating[biggestIdx], adjustedMin);
+      const winner = floating[biggestIdx]!;
+      const adjustedMin = Math.max(timing.minTaskMins, winner.qty * 60 + error);
+      floating[biggestIdx] = derive(winner, adjustedMin);
     }
   }
 
@@ -663,6 +664,7 @@ export function enforceMinBillable(
   const floating = hourly.filter((t) => !t.isExplicit && !t.isShort);
   const pool = floating.length > 0 ? floating : hourly;
   let biggest = pool[0];
+  if (!biggest) return tasks;
   for (const t of pool) if (t.qty > biggest.qty) biggest = t;
   const bumped = withMinutes(biggest, biggest.qty * 60 + (minBillableMins - totalMin));
   return tasks.map((t) => (t === biggest ? bumped : t));

@@ -28,7 +28,13 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { openAiRateLimitResponse } from "@/shared/lib/openai-rate-limit";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
-import { NZ_TZ, getPacificAucklandOffset, nzDateParts } from "@/shared/lib/timezone-utils";
+import {
+  NZ_TZ,
+  dateKeyParts,
+  getPacificAucklandOffset,
+  nzDateParts,
+  timeParts,
+} from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -47,14 +53,14 @@ export const maxDuration = 60;
  */
 function nzTimeToDate(hhmm: string | null | undefined, anchorDate?: string): Date | undefined {
   if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return undefined;
-  const [h, m] = hhmm.split(":").map(Number);
+  const [h, m] = timeParts(hhmm);
   if (h > 23 || m > 59) return undefined;
   const [y, mo, d] = nzDateParts(new Date());
   // Weekday of a Y-M-D is timezone-independent when computed in UTC.
   const todayDow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
   let daysAhead = 0;
   if (anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate)) {
-    const [ay, am, ad] = anchorDate.split("-").map(Number);
+    const [ay, am, ad] = dateKeyParts(anchorDate);
     const targetDow = new Date(Date.UTC(ay, am - 1, ad)).getUTCDay();
     daysAhead = (targetDow - todayDow + 7) % 7;
   }
@@ -521,8 +527,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // estimates ("9-9:30" but emits 50 min). Cap to the stated span plus out-of-session
     // minutes - gaps only reduce billable time, but work after the session adds on top.
     if (parsed.startTime && parsed.endTime && typeof parsed.durationMins === "number") {
-      const [sh, sm] = parsed.startTime.split(":").map(Number);
-      const [eh, em] = parsed.endTime.split(":").map(Number);
+      const [sh, sm] = timeParts(parsed.startTime);
+      const [eh, em] = timeParts(parsed.endTime);
       // A single clock span cannot bound a multi-day job - two 9-5 days would cap at 8h,
       // halving the bill. With operator-stated ranges each day contributes its own span;
       // the plain subtraction is only the fallback for a window the model supplied itself.
@@ -656,7 +662,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             shares.reduce((max, cur) => (cur.mins > max.mins ? cur : max)).mins += leftover;
           }
           for (const { i, mins } of shares) {
-            parsed.tasks[i] = { ...parsed.tasks[i], minutes: mins, qty: mins / 60 };
+            parsed.tasks[i] = { ...parsed.tasks[i]!, minutes: mins, qty: mins / 60 };
           }
           parsed.warnings = [
             ...(parsed.warnings ?? []),

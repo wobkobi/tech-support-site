@@ -62,7 +62,7 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
                 onChange={(e) =>
                   onPartsChange((p) => {
                     const n = [...p];
-                    n[idx] = { ...n[idx], description: e.target.value };
+                    n[idx] = { ...n[idx]!, description: e.target.value };
                     return n;
                   })
                 }
@@ -85,14 +85,14 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
                   e.preventDefault();
                   onPartsChange((p) => {
                     const n = [...p];
-                    n[idx] = { ...n[idx], cost: value };
+                    n[idx] = { ...n[idx]!, cost: value };
                     return n;
                   });
                 }}
                 onChange={(e) =>
                   onPartsChange((p) => {
                     const n = [...p];
-                    n[idx] = { ...n[idx], cost: parseFloat(e.target.value) || 0 };
+                    n[idx] = { ...n[idx]!, cost: parseFloat(e.target.value) || 0 };
                     return n;
                   })
                 }

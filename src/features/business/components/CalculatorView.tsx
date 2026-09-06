@@ -64,7 +64,12 @@ import type {
 import { cn } from "@/shared/lib/cn";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
-import { getPacificAucklandOffset, nzDateParts } from "@/shared/lib/timezone-utils";
+import {
+  dateKeyParts,
+  getPacificAucklandOffset,
+  nzDateParts,
+  timeParts,
+} from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -94,7 +99,7 @@ function nowTime(): string {
  * @returns A new time string one hour later, in HH:MM format.
  */
 function addHour(t: string): string {
-  const [h, m] = t.split(":").map(Number);
+  const [h, m] = timeParts(t);
   return `${String((h + 1) % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
@@ -105,7 +110,7 @@ function addHour(t: string): string {
  * @returns The shifted time string in HH:MM format.
  */
 function addMinsToTime(t: string, mins: number): string {
-  const [h, m] = t.split(":").map(Number);
+  const [h, m] = timeParts(t);
   const total = Math.max(0, Math.min(24 * 60 - 1, h * 60 + m + Math.round(mins)));
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
@@ -121,14 +126,14 @@ function addMinsToTime(t: string, mins: number): string {
  */
 function jobStartIsoFromTime(hhmm: string, anchorDate?: string): string | null {
   if (!/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
-  const [h, m] = hhmm.split(":").map(Number);
+  const [h, m] = timeParts(hhmm);
   if (h < 0 || h > 23 || m < 0 || m > 59) return null;
   const [y, mo, d] = nzDateParts(new Date());
   // Weekday of a Y-M-D is timezone-independent when computed in UTC.
   const todayDow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
   let daysAhead = 0;
   if (anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate)) {
-    const [ay, am, ad] = anchorDate.split("-").map(Number);
+    const [ay, am, ad] = dateKeyParts(anchorDate);
     const targetDow = new Date(Date.UTC(ay, am - 1, ad)).getUTCDay();
     daysAhead = (targetDow - todayDow + 7) % 7;
   }
@@ -481,7 +486,7 @@ export function CalculatorView({
     }
     const query =
       eventIds.length === 1
-        ? `eventId=${encodeURIComponent(eventIds[0])}`
+        ? `eventId=${encodeURIComponent(eventIds[0]!)}`
         : `eventIds=${encodeURIComponent(eventIds.join(","))}`;
     router.push(`/admin/business/calculator?${query}`);
   }
@@ -1045,7 +1050,9 @@ export function CalculatorView({
   function updateTask(idx: number, field: keyof TaskLine, val: string | number | null): void {
     setTasks((prev) => {
       const t = [...prev];
-      const item = { ...t[idx], [field]: val };
+      const existing = t[idx];
+      if (!existing) return prev;
+      const item = { ...existing, [field]: val };
       // Minutes are the billed unit on hourly rows, so a hand-edited qty must rewrite them
       // or the stale value keeps winning downstream. The row edits hrs + mins, so the
       // incoming qty is already whole minutes: snap it, and carry qty unrounded.
@@ -1773,7 +1780,9 @@ export function CalculatorView({
   function toggleTaskModifier(idx: number, modifierId: string): void {
     setTasks((prev) => {
       const arr = [...prev];
-      const current = arr[idx].modifierIds ?? [];
+      const target = arr[idx];
+      if (!target) return prev;
+      const current = target.modifierIds ?? [];
       const picked = rates.find((r) => r.id === modifierId);
       let next: string[];
       if (current.includes(modifierId)) {
@@ -1786,12 +1795,12 @@ export function CalculatorView({
       } else {
         next = [...current, modifierId];
       }
-      const newPrice = effectiveHourlyRate(rates, arr[idx].baseRateId, next);
+      const newPrice = effectiveHourlyRate(rates, target.baseRateId, next);
       arr[idx] = {
-        ...arr[idx],
+        ...target,
         modifierIds: next,
         unitPrice: newPrice,
-        lineTotal: Math.round(arr[idx].qty * newPrice * 100) / 100,
+        lineTotal: Math.round(target.qty * newPrice * 100) / 100,
       };
       return arr;
     });
@@ -1805,12 +1814,14 @@ export function CalculatorView({
   function setTaskBase(idx: number, baseId: string | null): void {
     setTasks((prev) => {
       const arr = [...prev];
-      const newPrice = effectiveHourlyRate(rates, baseId, arr[idx].modifierIds);
+      const target = arr[idx];
+      if (!target) return prev;
+      const newPrice = effectiveHourlyRate(rates, baseId, target.modifierIds);
       arr[idx] = {
-        ...arr[idx],
+        ...target,
         baseRateId: baseId,
         unitPrice: newPrice,
-        lineTotal: Math.round(arr[idx].qty * newPrice * 100) / 100,
+        lineTotal: Math.round(target.qty * newPrice * 100) / 100,
       };
       return arr;
     });

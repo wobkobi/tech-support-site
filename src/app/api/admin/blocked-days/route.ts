@@ -17,7 +17,12 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
-import { addDaysToDateKey, getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import {
+  addDaysToDateKey,
+  dateKeyParts,
+  getPacificAucklandOffset,
+  nzMidnightUtc,
+} from "@/shared/lib/timezone-utils";
 import { revalidateTag } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -59,9 +64,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const [y, m, d] = dateKey.split("-").map(Number);
+  const [y, m, d] = dateKeyParts(dateKey);
   const offset = getPacificAucklandOffset(y, m, d);
-  const dayStart = new Date(Date.UTC(y, m - 1, d, -offset, 0, 0));
+  const dayStart = nzMidnightUtc(y, m, d);
+  // The end boundary keeps day d's offset on purpose: it is "24 hours of NZ
+  // day d", not "NZ midnight of day d+1", which differ across a DST change.
   const dayEnd = new Date(Date.UTC(y, m - 1, d + 1, -offset, 0, 0));
 
   const conflicting = await prisma.booking.findFirst({

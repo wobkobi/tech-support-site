@@ -756,7 +756,7 @@ export function describeRecurringWindow(window: RecurringWindow): string | null 
       const names = days.map((d) => WEEKDAY_NAMES[d] ?? "");
       dayPart =
         names.length === 1
-          ? names[0]
+          ? (names[0] ?? "")
           : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
     }
   }

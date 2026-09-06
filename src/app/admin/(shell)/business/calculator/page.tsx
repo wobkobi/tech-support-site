@@ -166,8 +166,8 @@ async function buildEventPrefill(eventIds: string[]): Promise<EventPrefill | nul
     .sort((a, b) => a.start.localeCompare(b.start));
   if (resolved.length === 0) return null;
 
-  const first = resolved[0];
-  const last = resolved[resolved.length - 1];
+  const first = resolved[0]!;
+  const last = resolved[resolved.length - 1]!;
   // Client identity comes from the earliest event that actually has a booking:
   // a merged run can start with a bare calendar entry and still be the same
   // customer's job.

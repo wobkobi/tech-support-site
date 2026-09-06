@@ -31,7 +31,7 @@ function normaliseTag(raw: unknown): string | null {
     .map((w) => {
       if (w.length === 0) return w;
       if (/^[a-z]+[A-Z]/.test(w)) return w;
-      return w[0].toUpperCase() + w.slice(1).toLowerCase();
+      return w[0]!.toUpperCase() + w.slice(1).toLowerCase();
     })
     .join(" ");
 }

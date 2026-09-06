@@ -23,7 +23,10 @@ export function parseOpenAiDuration(value: string): number | null {
   const perUnit: Record<string, number> = { ms: 1, s: 1000, m: 60_000, h: 3_600_000 };
   let total = 0;
   let matched = false;
-  for (const [, amount, unit] of parts) {
+  for (const match of parts) {
+    const amount = match[1];
+    const unit = match[2];
+    if (amount === undefined || unit === undefined) continue;
     total += Number(amount) * (perUnit[unit.toLowerCase()] ?? 0);
     matched = true;
   }

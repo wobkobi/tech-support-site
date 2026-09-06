@@ -39,7 +39,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
-import { nzWallClockUtc } from "@/shared/lib/timezone-utils";
+import { dateKeyParts, nzWallClockUtc } from "@/shared/lib/timezone-utils";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -199,7 +199,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const cleanDurationLabel = `${duration === "short" ? "Standard" : "Extended"} ${durationMinutes} min`;
 
     // Calculate start/end times
-    const [year, month, day] = dateKey.split("-").map(Number);
+    const [year, month, day] = dateKeyParts(dateKey);
     const startAt = nzWallClockUtc(year, month, day, startHour, startMinute);
     const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
 

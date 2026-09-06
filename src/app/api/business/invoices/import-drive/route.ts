@@ -28,10 +28,10 @@ const INVOICE_FILE_RE = /^Invoice\s+([A-Z]+-[\d-]+\d)\.pdf$/i;
 function extractCandidates(filename: string): string[] {
   const m = filename.match(INVOICE_FILE_RE);
   if (!m) return [];
-  const raw = m[1];
+  const raw = m[1] ?? "";
   const candidates = [raw];
   const yearMatch = raw.match(/^([A-Z]+-)(\d{6})(-.+)$/i);
-  if (yearMatch) candidates.push(`${yearMatch[1]}${yearMatch[2].slice(-4)}${yearMatch[3]}`);
+  if (yearMatch) candidates.push(`${yearMatch[1]}${(yearMatch[2] ?? "").slice(-4)}${yearMatch[3]}`);
   return candidates;
 }
 
@@ -88,12 +88,12 @@ function fixWordCase(word: string): string {
   if (word.length < 2 || word === word.toUpperCase()) return word;
   let artifact = false;
   for (let i = 1; i < word.length - 1; i++) {
-    if (/[A-Z]/.test(word[i]) && /[A-Z]/.test(word[i - 1]) && /[a-z]/.test(word[i + 1])) {
+    if (/[A-Z]/.test(word[i]!) && /[A-Z]/.test(word[i - 1]!) && /[a-z]/.test(word[i + 1]!)) {
       artifact = true;
       break;
     }
   }
-  return artifact ? word[0].toUpperCase() + word.slice(1).toLowerCase() : word;
+  return artifact ? word[0]!.toUpperCase() + word.slice(1).toLowerCase() : word;
 }
 
 /**
@@ -107,7 +107,7 @@ function extractTextOps(content: string): string[] {
   const tjRe = /\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*Tj/g;
   let m: RegExpExecArray | null;
   while ((m = tjRe.exec(content)) !== null) {
-    const raw = m[1].replace(
+    const raw = (m[1] ?? "").replace(
       /\\([()\\nrtf])/g,
       (_, c: string) => ({ n: "\n", r: "\r", t: "\t", f: "\f" })[c] ?? c,
     );
@@ -116,7 +116,7 @@ function extractTextOps(content: string): string[] {
   // [(text) kern ...] TJ
   const tjArrRe = /\[([^\]]*)\]\s*TJ/g;
   while ((m = tjArrRe.exec(content)) !== null) {
-    const parts = (m[1].match(/\(([^)]*)\)/g) ?? []).map((p) => p.slice(1, -1));
+    const parts = ((m[1] ?? "").match(/\(([^)]*)\)/g) ?? []).map((p) => p.slice(1, -1));
     if (parts.length) out.push(decodePdfString(parts.join("")));
   }
   return out;
@@ -135,7 +135,7 @@ function extractPdfText(buffer: Buffer): string {
   const streamRe = /stream\r?\n([\s\S]+?)\nendstream/g;
   let m: RegExpExecArray | null;
   while ((m = streamRe.exec(str)) !== null) {
-    const raw = m[1];
+    const raw = m[1] ?? "";
     const rawOps = extractTextOps(raw);
     if (rawOps.length > 0) {
       texts.push(...rawOps);
@@ -169,7 +169,7 @@ interface ParsedInvoiceData {
  */
 function parseAmount(text: string, pattern: RegExp): number {
   const m = text.match(pattern);
-  return m ? parseFloat(m[1].replace(",", "")) : 0;
+  return m ? parseFloat((m[1] ?? "").replace(",", "")) : 0;
 }
 
 /**
@@ -193,7 +193,7 @@ function parseLegacyInvoiceText(text: string): ParsedInvoiceData {
   const searchArea = fromIdx > 0 ? text.slice(0, fromIdx) : text;
   const emailMatch = searchArea.match(/\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/);
   if (emailMatch) {
-    const e = emailMatch[1];
+    const e = emailMatch[1] ?? "";
     if (!e.includes("tothepoint.co.nz") && e !== "client@example.com") clientEmail = e;
   }
 
@@ -266,7 +266,7 @@ function parseLegacyInvoiceText(text: string): ParsedInvoiceData {
       /bill\s+to\s+(.+?)(?=\s+(?:due\s+)?date\b|\s+email\b|\s+phone\b|\s+from\b)/i,
     );
     if (m) {
-      const name = m[1].trim().replace(/\s+/g, " ");
+      const name = (m[1] ?? "").trim().replace(/\s+/g, " ");
       if (
         !isRef(name) &&
         !isPlaceholder(name) &&
@@ -331,14 +331,14 @@ function parseLegacyInvoiceText(text: string): ParsedInvoiceData {
   let issueDate: Date | null = null;
   const issueDateMatch = text.match(/Invoice\s*#?\s+\S+\s+Date\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
   if (issueDateMatch) {
-    const [, d, mo, y] = issueDateMatch;
+    const [, d = "", mo = "", y = ""] = issueDateMatch;
     issueDate = new Date(`${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`);
   }
 
   let dueDate: Date | null = null;
   const dueDateMatch = text.match(/Due\s+Date\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
   if (dueDateMatch) {
-    const [, d, mo, y] = dueDateMatch;
+    const [, d = "", mo = "", y = ""] = dueDateMatch;
     dueDate = new Date(`${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`);
   }
 
@@ -387,7 +387,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const candidates = extractCandidates(file.name);
       if (candidates.length === 0) continue;
 
-      const dedupeKey = candidates[0];
+      const dedupeKey = candidates[0]!;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
 
@@ -438,7 +438,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
 
       // Create a new invoice from the parsed PDF
-      const number = candidates[0];
+      const number = candidates[0]!;
       const { data: parsed } = await downloadAndParse(file.fileId);
       const issueDate = parsed?.issueDate ?? estimateIssueDate(number);
       const dueDate = parsed?.dueDate ?? new Date(issueDate.getTime() + 14 * 24 * 60 * 60 * 1000);

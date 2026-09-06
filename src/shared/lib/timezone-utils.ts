@@ -77,7 +77,7 @@ export function nzWeekday(date: Date): number {
 export function nzMinuteOfDay(date: Date): number {
   // "24" appears for midnight on some ICU builds; fold it back to 0 so the
   // result never lands outside the day.
-  const [h, m] = nzTimeFormat.format(date).split(":").map(Number);
+  const [h = NaN, m = NaN] = nzTimeFormat.format(date).split(":").map(Number);
   return (h % 24) * 60 + m;
 }
 
@@ -101,12 +101,42 @@ export function nzTodayKey(): string {
 }
 
 /**
+ * Splits a YYYY-MM-DD key into its numeric parts.
+ *
+ * Returns a fixed tuple so callers destructure three numbers rather than three
+ * possibly-missing ones. A malformed key yields NaN parts, which is what the
+ * arithmetic downstream already produced from a short split - callers that care
+ * test with Number.isNaN, and the rest fall through to an Invalid Date exactly
+ * as before.
+ * @param key - Date key, e.g. "2026-09-07".
+ * @returns Tuple of [year, month (1-12), day].
+ */
+export function dateKeyParts(key: string): [number, number, number] {
+  const [y = NaN, m = NaN, d = NaN] = key.split("-").map(Number);
+  return [y, m, d];
+}
+
+/**
+ * Splits an HH:MM time into its numeric parts.
+ *
+ * Fixed tuple for the same reason as {@link dateKeyParts}: a caller gets two
+ * numbers, and a fragment with no colon yields NaN rather than undefined, so a
+ * Number.isNaN guard actually catches it.
+ * @param hhmm - Time string, e.g. "09:30".
+ * @returns Tuple of [hours, minutes].
+ */
+export function timeParts(hhmm: string): [number, number] {
+  const [h = NaN, m = NaN] = hhmm.split(":").map(Number);
+  return [h, m];
+}
+
+/**
  * Splits an instant into its NZ calendar year, month and day.
  * @param date - The instant to read.
  * @returns Tuple of [year, month (1-12), day].
  */
 export function nzDateParts(date: Date): [number, number, number] {
-  const [y, m, d] = nzDateKey(date).split("-").map(Number);
+  const [y = NaN, m = NaN, d = NaN] = nzDateKey(date).split("-").map(Number);
   return [y, m, d];
 }
 
@@ -150,8 +180,13 @@ export function toNzInputValue(input: Date | string): string {
  */
 export function fromNzInputValue(local: string): Date {
   const [datePart, timePart] = local.split("T");
-  const [y, m, d] = datePart.split("-").map(Number);
-  const [hh, mm] = timePart.split(":").map(Number);
+  // Without both halves the old code threw an unnamed TypeError on .split of
+  // undefined; say which value was wrong instead.
+  if (datePart === undefined || timePart === undefined) {
+    throw new Error(`fromNzInputValue expects "YYYY-MM-DDTHH:MM", received "${local}"`);
+  }
+  const [y = NaN, m = NaN, d = NaN] = datePart.split("-").map(Number);
+  const [hh = NaN, mm = NaN] = timePart.split(":").map(Number);
   const offset = getPacificAucklandOffset(y, m, d);
   return new Date(Date.UTC(y, m - 1, d, hh - offset, mm, 0));
 }
@@ -206,7 +241,7 @@ export function nzWallClockUtc(
  * @returns The shifted YYYY-MM-DD key.
  */
 export function addDaysToDateKey(dateKey: string, n: number): string {
-  const [y, m, d] = dateKey.split("-").map(Number);
+  const [y = NaN, m = NaN, d = NaN] = dateKey.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + n, 12, 0, 0)).toISOString().slice(0, 10);
 }
 

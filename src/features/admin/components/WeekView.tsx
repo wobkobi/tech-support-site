@@ -22,7 +22,13 @@ import {
 } from "@/features/admin/lib/schedule-types";
 import { cn } from "@/shared/lib/cn";
 import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
-import { NZ_TZ, getPacificAucklandOffset, nzDateKey } from "@/shared/lib/timezone-utils";
+import {
+  NZ_TZ,
+  dateKeyParts,
+  nzDateKey,
+  nzMidnightUtc,
+  nzWallClockUtc,
+} from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -115,9 +121,8 @@ export function WeekView({
     }
     // Convert the NZ Monday key to a UTC ISO that represents NZ midnight
     // (same shape as initialWeekStartIso so the days memo math stays consistent).
-    const [y, m, d] = weekStartKey.split("-").map(Number);
-    const offset = getPacificAucklandOffset(y, m, d);
-    const iso = new Date(Date.UTC(y, m - 1, d, -offset, 0, 0)).toISOString();
+    const [y, m, d] = dateKeyParts(weekStartKey);
+    const iso = nzMidnightUtc(y, m, d).toISOString();
     setWeekStartIso(iso);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -214,7 +219,7 @@ export function WeekView({
       let j = i;
       while (j + 1 < days.length && blocked[j + 1]) j++;
       raw.push({
-        key: `busy-${days[i].key}`,
+        key: `busy-${days[i]!.key}`,
         title: "Busy",
         kind: "booking",
         startCol: i + 2,
@@ -226,7 +231,7 @@ export function WeekView({
     // Other all-day events (e.g. car): one bar per event's contiguous run.
     const idxByEvent = new Map<string, { event: WeekEvent; indices: number[] }>();
     for (let i = 0; i < days.length; i++) {
-      for (const ev of days[i].allDayEvents) {
+      for (const ev of days[i]!.allDayEvents) {
         if (ev.kind === "booking") continue;
         const entry = idxByEvent.get(ev.id);
         if (entry) entry.indices.push(i);
@@ -234,8 +239,8 @@ export function WeekView({
       }
     }
     for (const { event, indices } of idxByEvent.values()) {
-      let runStart = indices[0];
-      let prev = indices[0];
+      let runStart = indices[0]!;
+      let prev = indices[0]!;
       /** Pushes the current contiguous run [runStart..prev] as one bar. */
       const flush = (): void => {
         raw.push({
@@ -248,11 +253,11 @@ export function WeekView({
       };
       for (let k = 1; k < indices.length; k++) {
         if (indices[k] === prev + 1) {
-          prev = indices[k];
+          prev = indices[k]!;
         } else {
           flush();
-          runStart = indices[k];
-          prev = indices[k];
+          runStart = indices[k]!;
+          prev = indices[k]!;
         }
       }
       flush();
@@ -283,9 +288,8 @@ export function WeekView({
     const rounded = Math.round(minuteOfDay / 15) * 15;
     const hour = DAY_START_HOUR + Math.floor(rounded / 60);
     const minute = rounded % 60;
-    const [y2, m, d] = dayKey.split("-").map(Number);
-    const offset = getPacificAucklandOffset(y2, m, d);
-    const startAt = new Date(Date.UTC(y2, m - 1, d, hour - offset, minute, 0));
+    const [y2, m, d] = dateKeyParts(dayKey);
+    const startAt = nzWallClockUtc(y2, m, d, hour, minute);
     setModalStartAt(startAt.toISOString());
   }
 

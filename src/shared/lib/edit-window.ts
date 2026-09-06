@@ -6,7 +6,7 @@
  * and mirrored client-side to disable the controls.
  */
 
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { dateKeyParts, getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
 /** Fallback hours after an event/day ends before it locks (live: scheduling.pastEditLockHours). */
 const MAX_PAST_EDIT_HOURS = 18;
@@ -33,7 +33,7 @@ export function isPastEditWindow(
  * @returns The day's end (next NZ midnight) as epoch ms.
  */
 export function nzDayEndMs(dateKey: string): number {
-  const [y, m, d] = dateKey.split("-").map(Number);
+  const [y, m, d] = dateKeyParts(dateKey);
   const offset = getPacificAucklandOffset(y, m, d);
   // Next NZ midnight = UTC (d+1) 00:00 shifted back by the NZ offset.
   return Date.UTC(y, m - 1, d + 1, -offset, 0, 0);

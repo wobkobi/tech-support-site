@@ -3,7 +3,7 @@
  * @description Week-range helpers for the admin schedule view.
  */
 
-import { nzDateParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
+import { dateKeyParts, nzDateParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
 
 /**
  * Parses a YYYY-MM-DD week-start string into a UTC Date representing NZ midnight,
@@ -14,7 +14,7 @@ import { nzDateParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
  */
 export function resolveWeekStart(weekStartParam: string | undefined, now: Date): Date {
   if (weekStartParam && /^\d{4}-\d{2}-\d{2}$/.test(weekStartParam)) {
-    const [y, m, d] = weekStartParam.split("-").map(Number);
+    const [y, m, d] = dateKeyParts(weekStartParam);
     return nzMidnightUtc(y, m, d);
   }
 
