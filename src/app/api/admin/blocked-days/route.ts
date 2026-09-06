@@ -59,7 +59,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const [y, m, d] = dateKey.split("-").map(Number);
+  const [y = NaN, m = NaN, d = NaN] = dateKey.split("-").map(Number);
   const offset = getPacificAucklandOffset(y, m, d);
   const dayStart = new Date(Date.UTC(y, m - 1, d, -offset, 0, 0));
   const dayEnd = new Date(Date.UTC(y, m - 1, d + 1, -offset, 0, 0));

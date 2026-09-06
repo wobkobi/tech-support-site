@@ -27,11 +27,11 @@ const INVOICE_FILE_RE = /^Invoice\s+([A-Z]+-[\d-]+\d)\.pdf$/i;
 function extractCandidates(filename: string): string[] {
   const m = filename.match(INVOICE_FILE_RE);
   if (!m) return [];
-  const raw = m[1]; // e.g. "TTP-202627-0006" or "TTP-0001"
+  const raw = m[1] ?? ""; // e.g. "TTP-202627-0006" or "TTP-0001"
   const candidates = [raw];
   // Normalise 6-digit year like "202627" > 4-digit "2627"
   const yearMatch = raw.match(/^([A-Z]+-)(\d{6})(-.+)$/i);
-  if (yearMatch) candidates.push(`${yearMatch[1]}${yearMatch[2].slice(-4)}${yearMatch[3]}`);
+  if (yearMatch) candidates.push(`${yearMatch[1]}${(yearMatch[2] ?? "").slice(-4)}${yearMatch[3]}`);
   return candidates;
 }
 

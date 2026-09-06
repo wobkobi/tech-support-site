@@ -299,7 +299,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (day.dateKey > effectiveToKey) break; // ordered days: nothing later qualifies
     if (!day.hasAnySlots) continue;
 
-    const [y, m, d] = day.dateKey.split("-").map(Number);
+    const [y = NaN, m = NaN, d = NaN] = day.dateKey.split("-").map(Number);
 
     // One candidate per hour: the EARLIEST free start in the hour, so a clean :00
     // is preferred and :15/:30 only surface when :00 is taken - never a run of

@@ -199,7 +199,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const cleanDurationLabel = `${duration === "short" ? "Standard" : "Extended"} ${durationMinutes} min`;
 
     // Calculate start/end times
-    const [year, month, day] = dateKey.split("-").map(Number);
+    const [year = NaN, month = NaN, day = NaN] = dateKey.split("-").map(Number);
     const startAt = nzWallClockUtc(year, month, day, startHour, startMinute);
     const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
 

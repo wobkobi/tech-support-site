@@ -120,12 +120,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // the "* " primary marker, alternates get a blank label.
     const emailCells: string[] = [];
     for (let i = 0; i < maxEmails; i++) {
-      const value = emails[i] ?? "";
+      const value = emails?.[i] ?? "";
       emailCells.push(csvCell(value && i === 0 ? "* " : ""), csvCell(value));
     }
     const phoneCells: string[] = [];
     for (let i = 0; i < maxPhones; i++) {
-      phoneCells.push(csvCell(""), csvCell(phones[i] ?? ""));
+      phoneCells.push(csvCell(""), csvCell(phones?.[i] ?? ""));
     }
 
     return [

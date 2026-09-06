@@ -122,9 +122,10 @@ function rebalanceTasks(tasks: EstimateTask[], target: number, increment: number
   const diff = target - scaledSum;
   if (diff !== 0) {
     const largestIdx = scaled.reduce((maxI, t, i, arr) => (t.mins > arr[maxI].mins ? i : maxI), 0);
+    const largest = scaled[largestIdx];
     scaled[largestIdx] = {
-      ...scaled[largestIdx],
-      mins: Math.max(0, scaled[largestIdx].mins + diff),
+      ...largest,
+      mins: Math.max(0, largest.mins + diff),
     };
   }
   return scaled;
