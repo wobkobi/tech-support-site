@@ -25,8 +25,10 @@ import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
 import {
   NZ_TZ,
   addDaysToDateKey,
+  dateKeyParts,
   getPacificAucklandOffset,
   nzDateKey,
+  nzWallClockUtc,
 } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -148,11 +150,11 @@ export function DayAgendaView({
   const LONG_PRESS_MS = 500;
   const LONG_PRESS_MOVE_THRESHOLD = 10;
 
-  const [yy = NaN, mm = NaN, dd = NaN] = selectedDayKey.split("-").map(Number);
+  const [yy, mm, dd] = dateKeyParts(selectedDayKey);
   const offset = getPacificAucklandOffset(yy, mm, dd);
 
   const { dayLabel, yearLabel, prevDayKey, nextDayKey } = useMemo(() => {
-    const noonUtc = new Date(Date.UTC(yy, mm - 1, dd, 12 - offset, 0, 0));
+    const noonUtc = nzWallClockUtc(yy, mm, dd, 12);
     const dayFmt = new Intl.DateTimeFormat("en-NZ", {
       timeZone: NZ_TZ,
       weekday: "long",
@@ -166,7 +168,7 @@ export function DayAgendaView({
       prevDayKey: addDaysToDateKey(selectedDayKey, -1),
       nextDayKey: addDaysToDateKey(selectedDayKey, 1),
     };
-  }, [yy, mm, dd, offset, selectedDayKey]);
+  }, [yy, mm, dd, selectedDayKey]);
 
   // Filter the week down to the selected day. All-day events are start-inclusive /
   // end-exclusive so multi-day Busy blocks show on every overlapping day key; timed events
@@ -246,9 +248,8 @@ export function DayAgendaView({
     const mondayKey = mondayOf(selectedDayKey);
     return Array.from({ length: 7 }, (_, i) => {
       const dayKey = addDaysToDateKey(mondayKey, i);
-      const [y = NaN, m = NaN, d = NaN] = dayKey.split("-").map(Number);
-      const ofs = getPacificAucklandOffset(y, m, d);
-      const noon = new Date(Date.UTC(y, m - 1, d, 12 - ofs, 0, 0));
+      const [y, m, d] = dateKeyParts(dayKey);
+      const noon = nzWallClockUtc(y, m, d, 12);
       const weekday = new Intl.DateTimeFormat("en-NZ", {
         timeZone: NZ_TZ,
         weekday: "narrow",

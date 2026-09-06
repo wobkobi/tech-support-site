@@ -20,7 +20,7 @@ import type {
   TravelEntry,
 } from "@/features/business/types/business";
 import { formatDateSlash } from "@/shared/lib/date-format";
-import { nzTodayKey } from "@/shared/lib/timezone-utils";
+import { nzTodayKey, timeParts } from "@/shared/lib/timezone-utils";
 
 /**
  * Minimum travel cost (NZD) below which a calculated travel charge is
@@ -218,8 +218,8 @@ export function billableMins(mins: number, incrementMins: number = BILLING_INCRE
  */
 export function timeDiffMins(start: string, end: string): number {
   if (!start || !end) return 0;
-  const [sh = NaN, sm = NaN] = start.split(":").map(Number);
-  const [eh = NaN, em = NaN] = end.split(":").map(Number);
+  const [sh, sm] = timeParts(start);
+  const [eh, em] = timeParts(end);
   if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return 0;
   const diff = eh * 60 + em - (sh * 60 + sm);
   if (diff > 0) return diff;

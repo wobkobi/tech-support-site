@@ -64,7 +64,12 @@ import type {
 import { cn } from "@/shared/lib/cn";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
-import { getPacificAucklandOffset, nzDateParts } from "@/shared/lib/timezone-utils";
+import {
+  dateKeyParts,
+  getPacificAucklandOffset,
+  nzDateParts,
+  timeParts,
+} from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -94,7 +99,7 @@ function nowTime(): string {
  * @returns A new time string one hour later, in HH:MM format.
  */
 function addHour(t: string): string {
-  const [h = NaN, m = NaN] = t.split(":").map(Number);
+  const [h, m] = timeParts(t);
   return `${String((h + 1) % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
@@ -105,7 +110,7 @@ function addHour(t: string): string {
  * @returns The shifted time string in HH:MM format.
  */
 function addMinsToTime(t: string, mins: number): string {
-  const [h = NaN, m = NaN] = t.split(":").map(Number);
+  const [h, m] = timeParts(t);
   const total = Math.max(0, Math.min(24 * 60 - 1, h * 60 + m + Math.round(mins)));
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
@@ -121,14 +126,14 @@ function addMinsToTime(t: string, mins: number): string {
  */
 function jobStartIsoFromTime(hhmm: string, anchorDate?: string): string | null {
   if (!/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
-  const [h = NaN, m = NaN] = hhmm.split(":").map(Number);
+  const [h, m] = timeParts(hhmm);
   if (h < 0 || h > 23 || m < 0 || m > 59) return null;
   const [y, mo, d] = nzDateParts(new Date());
   // Weekday of a Y-M-D is timezone-independent when computed in UTC.
   const todayDow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
   let daysAhead = 0;
   if (anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate)) {
-    const [ay = NaN, am = NaN, ad = NaN] = anchorDate.split("-").map(Number);
+    const [ay, am, ad] = dateKeyParts(anchorDate);
     const targetDow = new Date(Date.UTC(ay, am - 1, ad)).getUTCDay();
     daysAhead = (targetDow - todayDow + 7) % 7;
   }

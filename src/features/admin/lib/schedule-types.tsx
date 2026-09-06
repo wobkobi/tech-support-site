@@ -5,7 +5,7 @@
  */
 
 import { cn } from "@/shared/lib/cn";
-import { NZ_TZ } from "@/shared/lib/timezone-utils";
+import { NZ_TZ, dateKeyParts } from "@/shared/lib/timezone-utils";
 import type React from "react";
 
 export type WeekViewKind = "booking" | "car" | "personal" | "travel";
@@ -79,7 +79,7 @@ export function optimisticBusyEvent(dayKey: string): WeekEvent {
  * @returns Monday-of-week NZ date key.
  */
 export function mondayOf(dayKey: string): string {
-  const [y = NaN, m = NaN, d = NaN] = dayKey.split("-").map(Number);
+  const [y, m, d] = dateKeyParts(dayKey);
   const utc = new Date(Date.UTC(y, m - 1, d));
   const back = (utc.getUTCDay() + 6) % 7;
   const monday = new Date(Date.UTC(y, m - 1, d - back));

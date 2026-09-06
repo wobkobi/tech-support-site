@@ -30,7 +30,7 @@ import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { isPlausibleName, normaliseName } from "@/shared/lib/normalise-name";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import type { EstimatorRange } from "@/shared/lib/settings/types";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { dateKeyParts, nzWallClockUtc } from "@/shared/lib/timezone-utils";
 import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
@@ -266,9 +266,8 @@ export default function BookingForm({
     if (!selectedDay || !selectedTime) return null;
     const window = selectedDay.timeWindows.find((w) => w.value === selectedTime);
     if (!window) return null;
-    const [y = NaN, m = NaN, d = NaN] = selectedDay.dateKey.split("-").map(Number);
-    const offset = getPacificAucklandOffset(y, m, d);
-    return new Date(Date.UTC(y, m - 1, d, window.startHour - offset, selectedMinute, 0, 0));
+    const [y, m, d] = dateKeyParts(selectedDay.dateKey);
+    return nzWallClockUtc(y, m, d, window.startHour, selectedMinute);
   }
 
   /**

@@ -101,6 +101,36 @@ export function nzTodayKey(): string {
 }
 
 /**
+ * Splits a YYYY-MM-DD key into its numeric parts.
+ *
+ * Returns a fixed tuple so callers destructure three numbers rather than three
+ * possibly-missing ones. A malformed key yields NaN parts, which is what the
+ * arithmetic downstream already produced from a short split - callers that care
+ * test with Number.isNaN, and the rest fall through to an Invalid Date exactly
+ * as before.
+ * @param key - Date key, e.g. "2026-09-07".
+ * @returns Tuple of [year, month (1-12), day].
+ */
+export function dateKeyParts(key: string): [number, number, number] {
+  const [y = NaN, m = NaN, d = NaN] = key.split("-").map(Number);
+  return [y, m, d];
+}
+
+/**
+ * Splits an HH:MM time into its numeric parts.
+ *
+ * Fixed tuple for the same reason as {@link dateKeyParts}: a caller gets two
+ * numbers, and a fragment with no colon yields NaN rather than undefined, so a
+ * Number.isNaN guard actually catches it.
+ * @param hhmm - Time string, e.g. "09:30".
+ * @returns Tuple of [hours, minutes].
+ */
+export function timeParts(hhmm: string): [number, number] {
+  const [h = NaN, m = NaN] = hhmm.split(":").map(Number);
+  return [h, m];
+}
+
+/**
  * Splits an instant into its NZ calendar year, month and day.
  * @param date - The instant to read.
  * @returns Tuple of [year, month (1-12), day].

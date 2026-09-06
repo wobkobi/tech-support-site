@@ -13,6 +13,7 @@
 
 import { getSheetsClient } from "@/features/business/lib/google-sheets";
 import { DEFAULT_TAX_RATES, type TaxRates } from "@/features/business/lib/tax-planner";
+import { parseSheetDate } from "@/shared/lib/date-format";
 import type { TaxSettings } from "@/shared/lib/settings/types";
 
 /** Combined planner configuration for one workbook. */
@@ -52,21 +53,10 @@ function num(raw: unknown): number | null {
  * @returns Parsed Date or null.
  */
 function parseDateCell(raw: unknown): Date | null {
+  // A cell can arrive as a number (a bare year, or a serial), so coerce first;
+  // the parsing itself is shared with the ledger importer.
   const s = typeof raw === "string" ? raw.trim() : typeof raw === "number" ? String(raw) : "";
-  if (!s) return null;
-  const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (dmy) {
-    const d = new Date(
-      `${dmy[3]}-${(dmy[2] ?? "").padStart(2, "0")}-${(dmy[1] ?? "").padStart(2, "0")}`,
-    );
-    return isNaN(d.getTime()) ? null : d;
-  }
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-    const d = new Date(s);
-    return isNaN(d.getTime()) ? null : d;
-  }
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
+  return s ? parseSheetDate(s) : null;
 }
 
 /**

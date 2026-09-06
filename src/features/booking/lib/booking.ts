@@ -4,7 +4,12 @@
  */
 
 import type { AvailabilitySettings, MorningGuard } from "@/shared/lib/settings/types";
-import { NZ_TZ, getPacificAucklandOffset, nzWallClockUtc } from "@/shared/lib/timezone-utils";
+import {
+  NZ_TZ,
+  dateKeyParts,
+  getPacificAucklandOffset,
+  nzWallClockUtc,
+} from "@/shared/lib/timezone-utils";
 
 /**
  * Splits a notes blob into the free text someone actually typed and the trailing
@@ -461,7 +466,7 @@ export function buildAvailableDays(
   // Derive today's NZ calendar date independently of server timezone.
   // en-CA locale reliably produces YYYY-MM-DD on all Node.js platforms.
   const todayNZStr = now.toLocaleDateString("en-CA", { timeZone: config.timeZone });
-  const [startY = NaN, startM = NaN, startD = NaN] = todayNZStr.split("-").map(Number);
+  const [startY, startM, startD] = dateKeyParts(todayNZStr);
 
   for (let i = 0; days.length < config.maxAdvanceDays && i <= config.maxAdvanceDays; i++) {
     // UTC noon for day i - using noon avoids any DST-induced date-boundary shift
@@ -499,7 +504,7 @@ export function buildAvailableDays(
     const timeWindows: TimeWindow[] = [];
 
     // Extract year/month/day from dateKey for reliable timezone calculations
-    const [year = NaN, month = NaN, day = NaN] = dateKey.split("-").map(Number);
+    const [year, month, day] = dateKeyParts(dateKey);
 
     // Get dynamic UTC offset once per day (handles NZDT/NZST)
     const utcOffset = getPacificAucklandOffset(year, month, day);
@@ -657,7 +662,7 @@ export function validateBookingRequest(
   now: Date,
   config: AvailabilityConfig,
 ): { valid: true } | { valid: false; error: string } {
-  const [year = NaN, month = NaN, day = NaN] = dateKey.split("-").map(Number);
+  const [year, month, day] = dateKeyParts(dateKey);
   if (!year || !month || !day) {
     return { valid: false, error: "Invalid date format" };
   }
@@ -667,7 +672,7 @@ export function validateBookingRequest(
   const selectedDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 
   const todayNZStr = now.toLocaleDateString("en-CA", { timeZone: config.timeZone });
-  const [ty = NaN, tm = NaN, td = NaN] = todayNZStr.split("-").map(Number);
+  const [ty, tm, td] = dateKeyParts(todayNZStr);
   const today = new Date(Date.UTC(ty, tm - 1, td, 12, 0, 0));
 
   if (selectedDate < today) {

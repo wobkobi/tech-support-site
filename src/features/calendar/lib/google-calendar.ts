@@ -7,7 +7,7 @@ import { google, type calendar_v3 } from "googleapis";
 import { unstable_cache } from "next/cache";
 
 import { requireEnv } from "@/shared/lib/env";
-import { nzMidnightUtc } from "@/shared/lib/timezone-utils";
+import { dateKeyParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
 
 /**
  * Cache tag invalidated by routes that mutate bookings or blocked days so the
@@ -300,7 +300,7 @@ export async function createBlockedDayEvent(params: {
   summary?: string;
 }): Promise<{ eventId: string }> {
   // All-day events use YYYY-MM-DD strings and an exclusive end date (next day).
-  const [y = NaN, m = NaN, d = NaN] = params.dateKey.split("-").map(Number);
+  const [y, m, d] = dateKeyParts(params.dateKey);
   const endDateKey = new Date(Date.UTC(y, m - 1, d + 1, 12, 0, 0)).toISOString().slice(0, 10);
   return insertBlockedDayRange({
     startDateKey: params.dateKey,
@@ -516,8 +516,8 @@ export async function fetchAllCalendarEventsDetailed(
             // Convert NZ calendar midnight > UTC so slot checking works correctly.
             const startDateStr = event.start.date;
             const endDateStr = event.end.date;
-            const [sYear = NaN, sMonth = NaN, sDay = NaN] = startDateStr.split("-").map(Number);
-            const [eYear = NaN, eMonth = NaN, eDay = NaN] = endDateStr.split("-").map(Number);
+            const [sYear, sMonth, sDay] = dateKeyParts(startDateStr);
+            const [eYear, eMonth, eDay] = dateKeyParts(endDateStr);
             // Each boundary resolves its own offset: an all-day block spanning a
             // DST change has a different offset at its end than at its start.
             const startAt = nzMidnightUtc(sYear, sMonth, sDay);

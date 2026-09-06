@@ -79,3 +79,22 @@ export function formatDateSlash(input: Date | string, opts: { utc?: boolean } = 
   const month = String(get.month).padStart(2, "0");
   return `${day}/${month}/${get.year}`;
 }
+
+/**
+ * Parses a spreadsheet date cell into a Date.
+ *
+ * Sheets carry NZ day-first slashes ("7/9/2026" is 7 September), which the
+ * Date constructor reads month-first, so those are rewritten to ISO before
+ * parsing. Anything else is handed to the constructor as-is.
+ * @param raw - Cell text.
+ * @returns The parsed date, or null when it is not a date at all.
+ */
+export function parseSheetDate(raw: string): Date | null {
+  const t = raw.trim();
+  const dmy = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const value = dmy
+    ? `${dmy[3]}-${(dmy[2] ?? "").padStart(2, "0")}-${(dmy[1] ?? "").padStart(2, "0")}`
+    : t;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}

@@ -22,7 +22,13 @@ import {
 } from "@/features/admin/lib/schedule-types";
 import { cn } from "@/shared/lib/cn";
 import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
-import { NZ_TZ, getPacificAucklandOffset, nzDateKey } from "@/shared/lib/timezone-utils";
+import {
+  NZ_TZ,
+  dateKeyParts,
+  nzDateKey,
+  nzMidnightUtc,
+  nzWallClockUtc,
+} from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -115,9 +121,8 @@ export function WeekView({
     }
     // Convert the NZ Monday key to a UTC ISO that represents NZ midnight
     // (same shape as initialWeekStartIso so the days memo math stays consistent).
-    const [y = NaN, m = NaN, d = NaN] = weekStartKey.split("-").map(Number);
-    const offset = getPacificAucklandOffset(y, m, d);
-    const iso = new Date(Date.UTC(y, m - 1, d, -offset, 0, 0)).toISOString();
+    const [y, m, d] = dateKeyParts(weekStartKey);
+    const iso = nzMidnightUtc(y, m, d).toISOString();
     setWeekStartIso(iso);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -283,9 +288,8 @@ export function WeekView({
     const rounded = Math.round(minuteOfDay / 15) * 15;
     const hour = DAY_START_HOUR + Math.floor(rounded / 60);
     const minute = rounded % 60;
-    const [y2 = NaN, m = NaN, d = NaN] = dayKey.split("-").map(Number);
-    const offset = getPacificAucklandOffset(y2, m, d);
-    const startAt = new Date(Date.UTC(y2, m - 1, d, hour - offset, minute, 0));
+    const [y2, m, d] = dateKeyParts(dayKey);
+    const startAt = nzWallClockUtc(y2, m, d, hour, minute);
     setModalStartAt(startAt.toISOString());
   }
 

@@ -14,7 +14,12 @@ import {
 } from "@/features/business/lib/event-merge";
 import type { EventPrefill, ParsedRange } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
-import { NZ_TZ, getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import {
+  NZ_TZ,
+  dateKeyParts,
+  getPacificAucklandOffset,
+  timeParts,
+} from "@/shared/lib/timezone-utils";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -52,7 +57,7 @@ const EVENT_STAMP = new Intl.DateTimeFormat("en-NZ", {
  * @returns Minutes since midnight, or null.
  */
 function minutesOfDay(hhmm: string): number | null {
-  const [h = NaN, m = NaN] = hhmm.split(":").map(Number);
+  const [h, m] = timeParts(hhmm);
   return Number.isNaN(h) || Number.isNaN(m) ? null : h * 60 + m;
 }
 
@@ -89,7 +94,7 @@ function gapMinutesBetween(ranges: ParsedRange[]): number {
  * @returns One anchor per billed slot, in slot order.
  */
 function buildAnchors(prefill: EventPrefill, known: RecentEvent[]): MergeCandidateEvent[] {
-  const [y = NaN, m = NaN, d = NaN] = prefill.jobDate.split("-").map(Number);
+  const [y, m, d] = dateKeyParts(prefill.jobDate);
   const offsetHours =
     Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)
       ? null

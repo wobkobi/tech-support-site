@@ -15,6 +15,7 @@ import {
   resolveSheetIdForDate,
 } from "@/features/business/lib/sheets-sync";
 import { parseObjectId } from "@/features/business/lib/validation";
+import { parseSheetDate } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
 import { acquireRunLock, releaseRunLock } from "@/shared/lib/run-lock";
 import type { ExpenseEntry, IncomeEntry } from "@prisma/client";
@@ -34,22 +35,6 @@ const SELF_HEAL_MAX_AGE_MS = 24 * 60 * 60_000;
  * @param raw - Raw cell value from the sheet.
  * @returns Parsed Date, or null if not a valid date.
  */
-function parseDate(raw: string): Date | null {
-  const t = raw.trim();
-  const dmy = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (dmy) {
-    const d = new Date(
-      `${dmy[3]}-${(dmy[2] ?? "").padStart(2, "0")}-${(dmy[1] ?? "").padStart(2, "0")}`,
-    );
-    return isNaN(d.getTime()) ? null : d;
-  }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) {
-    const d = new Date(t);
-    return isNaN(d.getTime()) ? null : d;
-  }
-  const d = new Date(t);
-  return isNaN(d.getTime()) ? null : d;
-}
 
 /**
  * Strips currency symbols and commas, returning a float or null.
@@ -293,7 +278,7 @@ async function importFromSheet(
   // Reconcile Cashbook income rows
   for (let i = 0; i < cashRows.length; i++) {
     const row = cashRows[i]!;
-    const date = parseDate(row[0] ?? "");
+    const date = parseSheetDate(row[0] ?? "");
     if (!date) {
       incomeSkipped++;
       continue;
@@ -425,7 +410,7 @@ async function importFromSheet(
   // Reconcile Expenses rows
   for (let i = 0; i < expRows.length; i++) {
     const row = expRows[i]!;
-    const date = parseDate(row[0] ?? "");
+    const date = parseSheetDate(row[0] ?? "");
     if (!date) {
       expensesSkipped++;
       continue;

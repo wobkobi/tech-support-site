@@ -14,7 +14,7 @@ import { calculateTravelMinutes } from "@/features/calendar/lib/travel-time";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
-import { addDaysToDateKey, nzWallClockUtc } from "@/shared/lib/timezone-utils";
+import { addDaysToDateKey, dateKeyParts, nzWallClockUtc } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
 // A slow Google/DB round-trip must not 504 on the default timeout.
@@ -299,7 +299,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (day.dateKey > effectiveToKey) break; // ordered days: nothing later qualifies
     if (!day.hasAnySlots) continue;
 
-    const [y = NaN, m = NaN, d = NaN] = day.dateKey.split("-").map(Number);
+    const [y, m, d] = dateKeyParts(day.dateKey);
 
     // One candidate per hour: the EARLIEST free start in the hour, so a clean :00
     // is preferred and :15/:30 only surface when :00 is taken - never a run of
