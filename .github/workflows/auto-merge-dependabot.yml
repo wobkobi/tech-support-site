@@ -14,30 +14,81 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Merge Dependabot PRs
+      - name: Queue Dependabot PRs for auto-merge
         uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
             const headSha = context.payload.workflow_run.head_sha;
+            const defaultBranch = context.payload.repository.default_branch;
 
-            const { data: prs } = await github.rest.pulls.list({ owner, repo, state: 'open' });
+            /**
+             * Leading major/minor of a semver string.
+             * @param {string} v - Version as Dependabot writes it, with or without a leading "v".
+             * @returns {{major: number, minor: number} | null} Parsed parts, or null when unparseable.
+             */
+            const parse = (v) => {
+              const m = /^v?(\d+)\.(\d+)/.exec(v.trim());
+              return m ? { major: Number(m[1]), minor: Number(m[2]) } : null;
+            };
+
+            /**
+             * Whether a Dependabot title describes a bump that can break the build.
+             * Pre-1.0 packages have no major to bump, so a minor is the breaking
+             * step there and 0.4.x -> 0.5.x counts.
+             * @param {string} title - Pull request title.
+             * @returns {boolean | null} True when breaking, null when no single from/to pair is stated.
+             */
+            const isBreaking = (title) => {
+              const m = /\bfrom (\S+) to (\S+)/.exec(title);
+              if (!m) return null;
+              const from = parse(m[1]);
+              const to = parse(m[2]);
+              if (!from || !to) return null;
+              if (from.major !== to.major) return true;
+              return from.major === 0 && from.minor !== to.minor;
+            };
+
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
 
             for (const pr of prs) {
               if (pr.user?.login !== 'dependabot[bot]') continue;
               if (pr.draft) continue;
               if (pr.head.sha !== headSha) continue;
+              if (pr.base.ref !== defaultBranch) continue;
 
-              await github.rest.pulls.createReview({
-                owner, repo, pull_number: pr.number, event: 'APPROVE',
-              });
+              // Majors are held back for a person to judge. Several have been
+              // blocked here for reasons CI cannot see: Prisma 7 dropped MongoDB
+              // support, and ESLint 10 conflicts with the eslint-plugin-react peer
+              // that eslint-config-next pins. A green CI run does not mean a major
+              // is safe to take. Grouped updates state no single version pair, so
+              // they are held back too rather than guessed at.
+              const breaking = isBreaking(pr.title);
+              if (breaking === null) {
+                core.info(`#${pr.number} left for review: no single version bump in "${pr.title}"`);
+                continue;
+              }
+              if (breaking) {
+                core.info(`#${pr.number} left for review: breaking bump - "${pr.title}"`);
+                continue;
+              }
 
-              // Queue the squash merge instead of merging immediately. GitHub
-              // runs it once every required check passes (CodeQL / Vercel /
-              // type-check), so this no longer races the still-pending Vercel
-              // deployment - an immediate merge here returns 405 "Required
-              // status check Vercel is pending" and fails the job.
+              // Queue the squash merge instead of merging immediately. GitHub runs
+              // it once every required check passes (CodeQL / Vercel / type-check),
+              // so this does not race the still-pending Vercel deployment - an
+              // immediate merge here returns 405 "Required status check Vercel is
+              // pending" and fails the job.
+              //
+              // No review is submitted: main requires zero approving reviews, and
+              // GITHUB_TOKEN may only approve when the repo enables "Allow GitHub
+              // Actions to create and approve pull requests", so an unguarded
+              // approve call fails the whole job with a 422.
               try {
                 await github.graphql(
                   `mutation($id: ID!) {
@@ -47,7 +98,28 @@ jobs:
                   }`,
                   { id: pr.node_id },
                 );
+                core.info(`Auto-merge queued for #${pr.number}`);
               } catch (e) {
-                core.warning(`Could not enable auto-merge for #${pr.number}: ${e.message}`);
+                const message = String(e?.message ?? e);
+                // "Clean status" means nothing is left to wait for, so GitHub
+                // refuses to queue. Without this fallback the PR would sit open
+                // forever behind a warning nobody reads.
+                if (/clean status/i.test(message)) {
+                  try {
+                    await github.rest.pulls.merge({
+                      owner,
+                      repo,
+                      pull_number: pr.number,
+                      merge_method: 'squash',
+                    });
+                    core.info(`Merged #${pr.number} directly - no checks left to wait for`);
+                  } catch (mergeError) {
+                    core.warning(`Could not merge #${pr.number}: ${mergeError.message}`);
+                  }
+                } else {
+                  // Most often "Allow auto-merge" is off in repo settings, which
+                  // makes every run a silent no-op until someone reads this line.
+                  core.warning(`Could not enable auto-merge for #${pr.number}: ${message}`);
+                }
               }
             }
