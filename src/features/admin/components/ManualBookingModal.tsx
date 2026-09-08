@@ -7,6 +7,7 @@
  */
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
@@ -389,15 +390,11 @@ export function ManualBookingModal({
           />
         </Field>
 
-        <label className="flex items-center gap-2 text-sm text-admin-text">
-          <input
-            type="checkbox"
-            checked={sendConfirmation}
-            onChange={(e) => setSendConfirmation(e.target.checked)}
-            className="h-4 w-4 rounded border-admin-border-strong"
-          />
-          Send confirmation email to customer
-        </label>
+        <AdminCheckbox
+          checked={sendConfirmation}
+          onChange={setSendConfirmation}
+          label="Send confirmation email to customer"
+        />
 
         {error && (
           <p

@@ -11,7 +11,7 @@
 import { buildAvailableDays, hourLabel } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
 import type { AvailabilitySettings } from "@/shared/lib/settings/types";
-import { NZ_TZ } from "@/shared/lib/timezone-utils";
+import { NZ_TZ, type Weekday } from "@/shared/lib/timezone-utils";
 import type React from "react";
 import { useMemo } from "react";
 
@@ -19,7 +19,7 @@ import { useMemo } from "react";
 const TIME_ZONE = NZ_TZ;
 
 /** Weekday order shown in the grid (Mon-Sun) with their getUTCDay() index. */
-const DAY_ORDER: { index: number; name: string }[] = [
+const DAY_ORDER: { index: Weekday; name: string }[] = [
   { index: 1, name: "Mon" },
   { index: 2, name: "Tue" },
   { index: 3, name: "Wed" },
@@ -74,7 +74,7 @@ export function AvailabilityPreview({ config }: Props): React.ReactElement {
       <div className="mt-3 grid grid-cols-7 gap-1">
         {DAY_ORDER.map(({ index, name }) => {
           const d = config.schedule[index];
-          const open = d?.enabled === true;
+          const open = d.enabled;
           return (
             <div
               key={index}

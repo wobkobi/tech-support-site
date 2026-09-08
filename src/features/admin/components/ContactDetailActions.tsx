@@ -8,6 +8,7 @@
  */
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
@@ -84,6 +85,9 @@ export function ContactDetailActions({
   const { toast } = useToast();
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Ticked by default: deleting a contact here normally means dropping the person
+  // altogether, and leaving the Google entry would let the sync pull them back.
+  const [deleteGoogle, setDeleteGoogle] = useState(true);
   const [busy, setBusy] = useState<null | "save" | "sync" | "delete">(null);
 
   const [form, setForm] = useState({
@@ -165,7 +169,10 @@ export function ContactDetailActions({
   async function remove(): Promise<void> {
     setBusy("delete");
     try {
-      const res = await fetch(`/api/admin/contacts/${id}`, { method: "DELETE" });
+      const res = await fetch(
+        `/api/admin/contacts/${id}${deleteGoogle ? "" : "?deleteGoogle=false"}`,
+        { method: "DELETE" },
+      );
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Request failed");
       toast("Contact deleted.", { tone: "success" });
@@ -187,7 +194,13 @@ export function ContactDetailActions({
       <AdminButton variant="secondary" href={`/admin/reviews?contactId=${id}`}>
         Send review link
       </AdminButton>
-      <AdminButton variant="danger" onClick={() => setConfirmDelete(true)}>
+      <AdminButton
+        variant="danger"
+        onClick={() => {
+          setDeleteGoogle(true);
+          setConfirmDelete(true);
+        }}
+      >
         Delete
       </AdminButton>
 
@@ -327,7 +340,22 @@ export function ContactDetailActions({
       <ConfirmDialog
         open={confirmDelete}
         title="Delete this contact?"
-        body="It's removed from the list and unlinked from its reviews. Bookings and invoices are kept."
+        body={
+          <div className="flex flex-col gap-2">
+            <p>
+              It&apos;s removed from the list and unlinked from its reviews. Bookings and invoices
+              are kept.
+            </p>
+            {googleContactId && (
+              <AdminCheckbox
+                checked={deleteGoogle}
+                onChange={setDeleteGoogle}
+                disabled={busy === "delete"}
+                label="Also delete the linked Google contact"
+              />
+            )}
+          </div>
+        }
         confirmLabel="Delete"
         tone="danger"
         busy={busy === "delete"}

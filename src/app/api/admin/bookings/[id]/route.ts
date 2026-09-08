@@ -56,10 +56,28 @@ interface PatchPayload {
   cancelMode?: "operator" | "on-behalf";
   /** No-show: always charges callout + travel via the draft-invoice flow. */
   markNoShow?: boolean;
+  /**
+   * Completing only. False opts out of the review-request email; the send is
+   * skipped but reviewSentAt is still claimed, so the cron can't send it later.
+   * Defaults to true when absent.
+   */
+  sendReview?: boolean;
+  /**
+   * Charging paths only. False records the fee on the booking but skips drafting
+   * the cancellation invoice, for a no-show the operator isn't chasing.
+   * Defaults to true when absent.
+   */
+  draftInvoice?: boolean;
   /** New start (ISO) for a time edit. Must be sent together with `endAt`. */
   startAt?: string;
   /** New end (ISO) for a time edit. Must be sent together with `startAt`. */
   endAt?: string;
+  /**
+   * Time edits only. False mutes a reschedule: the move still happens and is
+   * recorded, but neither party is emailed and the Google invite goes out
+   * silently. Defaults to true when absent.
+   */
+  notifyCustomer?: boolean;
   /** Save a future time change that overlaps something else anyway. */
   force?: boolean;
 }
@@ -196,6 +214,8 @@ export async function PATCH(
   // Time edit. Runs before the status branches so that cancelling in the same
   // request still wins the activeSlotKey - a cancelled booking must release its
   // slot, not move it.
+  // `notify` here is "the customer hears about it" - a reschedule the operator
+  // muted carries the same false as a silent past-time correction.
   let timeChange: { startAt: Date; endAt: Date; notify: boolean } | null = null;
   if (isTimeChange) {
     if (body.startAt === undefined || body.endAt === undefined) {
@@ -221,9 +241,12 @@ export async function PATCH(
     // the customer may not know about yet, so it notifies.
     const alreadyRun =
       booking.startAt.getTime() <= now.getTime() && startAt.getTime() <= now.getTime();
-    const notify = !alreadyRun && booking.status !== "cancelled";
+    const isReschedule = !alreadyRun && booking.status !== "cancelled";
+    // Muting is about who hears, not what happened: the conflict check, the
+    // sequence bump and the travel re-snapshot below all still run.
+    const notify = isReschedule && body.notifyCustomer !== false;
 
-    if (notify && !body.force) {
+    if (isReschedule && !body.force) {
       const conflict = await findScheduleConflict(id, booking.calendarEventId, startAt, endAt);
       if (conflict) {
         return errorResponse(`That overlaps ${conflict}.`, 409);
@@ -244,7 +267,7 @@ export async function PATCH(
       data.emailReminderSentAt = null;
     }
 
-    if (notify) {
+    if (isReschedule) {
       // The replacement invite only supersedes the old one when its SEQUENCE
       // rises, and the ICS sequence is built from rescheduleCount.
       data.rescheduleCount = { increment: 1 };
@@ -375,7 +398,9 @@ export async function PATCH(
           meetingType: updated.meetingType,
           rescheduleCount: updated.rescheduleCount,
         },
-        { kind: "rescheduled", previousStartAt: booking.startAt },
+        // Operator-driven move, so it waits for the quiet window; a customer
+        // rescheduling themselves gets theirs straight away.
+        { kind: "rescheduled", previousStartAt: booking.startAt, quietHours: true },
       ),
       sendOwnerBookingNotification(
         {
@@ -394,11 +419,14 @@ export async function PATCH(
     ]);
   }
 
-  // Same cancellation draft applies to on-behalf and no-show paths.
+  // Same cancellation draft applies to on-behalf and no-show paths. Opting out
+  // skips only the invoice - the fee assessment stays on the booking, so a job
+  // recorded as chargeable can still be billed later from the invoices tab.
   if (
     updated.lateCancellation &&
     updated.cancelledBy === "customer" &&
-    booking.status !== "cancelled"
+    booking.status !== "cancelled" &&
+    body.draftInvoice !== false
   ) {
     // Awaited, not detached: Vercel freezes the instance once the response is sent, and
     // the no-show path skips the awaits further down that would otherwise give a `void`
@@ -415,6 +443,11 @@ export async function PATCH(
   // Atomic claim: updateMany returns count=0 if the send-review-emails cron got there
   // first, so the two can never double-send. `isSet: false` also covers Mongo docs
   // written before reviewSentAt existed, which have no such key at all.
+  //
+  // The claim runs even when the operator opts out, matching how the cron marks
+  // its own suppressed bookings: leaving reviewSentAt unset would just hand the
+  // booking back to the cron, which would send the email that was declined.
+  // Sending it later is still one click away on the booking detail page.
   let reviewSent = false;
   if (
     body.status === "completed" &&
@@ -430,7 +463,7 @@ export async function PATCH(
       data: { reviewSentAt: new Date() },
     });
 
-    if (claim.count > 0) {
+    if (claim.count > 0 && body.sendReview !== false) {
       // Claim won - sendCustomerReviewRequest never throws (catches its own
       // errors and logs), so the PATCH response stays successful even if
       // Resend has a hiccup. Trade-off: a single failed send won't auto-retry.

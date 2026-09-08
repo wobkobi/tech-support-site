@@ -45,20 +45,29 @@ export interface UseBookingActions {
     body: Record<string, unknown>,
     successMsg?: string,
   ) => Promise<BookingActionResult>;
-  /** Marks the booking completed; toast reflects whether a review email was sent. */
-  completeBooking: (id: string) => Promise<BookingActionResult>;
+  /**
+   * Marks the booking completed; toast reflects whether a review email was sent.
+   * `sendReview` false (default true) opts out of that email.
+   */
+  completeBooking: (id: string, sendReview?: boolean) => Promise<BookingActionResult>;
   /** Cancels the booking; operator = no fee, on-behalf = customer fee rules. */
   cancelBooking: (id: string, mode: CancelMode) => Promise<BookingActionResult>;
-  /** Flags a no-show; drafts the late-cancellation invoice (callout + travel). */
-  markNoShow: (id: string) => Promise<BookingActionResult>;
+  /**
+   * Flags a no-show; drafts the late-cancellation invoice (callout + travel).
+   * `draftInvoice` false (default true) records the fee without raising one.
+   */
+  markNoShow: (id: string, draftInvoice?: boolean) => Promise<BookingActionResult>;
   /** Permanently deletes the booking and its calendar event. */
   deleteBooking: (id: string) => Promise<BookingActionResult>;
   /** Sends (or re-sends) the review-request email; `alreadySent` tunes the toast. */
   resendReview: (id: string, alreadySent?: boolean) => Promise<BookingActionResult>;
-  /** Moves a booking's start/end; `force` saves through an overlap warning. */
+  /**
+   * Moves a booking's start/end; `force` saves through an overlap warning and
+   * `notifyCustomer` false mutes the reschedule emails.
+   */
   updateBookingTimes: (
     id: string,
-    times: { startAt: string; endAt: string; force?: boolean },
+    times: { startAt: string; endAt: string; force?: boolean; notifyCustomer?: boolean },
   ) => Promise<BookingTimesResult>;
 }
 
@@ -87,13 +96,18 @@ export function useBookingActions(): UseBookingActions {
   );
 
   const completeBooking = useCallback<UseBookingActions["completeBooking"]>(
-    async (id) => {
+    async (id, sendReview = true) => {
       // No successMsg here: the toast depends on the review-send outcome.
-      const result = await patchBooking(id, { status: "completed" });
+      const result = await patchBooking(id, { status: "completed", sendReview });
       if (result.ok) {
-        toast(result.reviewSent ? "Marked completed - review email sent." : "Marked completed.", {
-          tone: "success",
-        });
+        // Three outcomes: sent, skipped on purpose, or nothing to send because
+        // one had already gone out.
+        const message = result.reviewSent
+          ? "Marked completed - review email sent."
+          : sendReview
+            ? "Marked completed."
+            : "Marked completed - review email skipped.";
+        toast(message, { tone: "success" });
       }
       return result;
     },
@@ -113,7 +127,14 @@ export function useBookingActions(): UseBookingActions {
   );
 
   const markNoShow = useCallback<UseBookingActions["markNoShow"]>(
-    (id) => patchBooking(id, { markNoShow: true }, "Marked no-show - draft invoice created."),
+    (id, draftInvoice = true) =>
+      patchBooking(
+        id,
+        { markNoShow: true, draftInvoice },
+        draftInvoice
+          ? "Marked no-show - draft invoice created."
+          : "Marked no-show - no invoice drafted.",
+      ),
     [patchBooking],
   );
 

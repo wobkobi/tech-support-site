@@ -8,6 +8,7 @@
  * {@link useBookingActions} hook, with toasts from the global admin toaster.
  */
 
+import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import type {
   BookingStatus,
@@ -21,12 +22,16 @@ import { useEffect, useRef, useState } from "react";
 
 /** Which mutation a pending confirmation will run once accepted. */
 type PendingTarget =
-  { kind: "cancel"; mode: "operator" | "on-behalf" } | { kind: "no-show" } | { kind: "delete" };
+  | { kind: "complete" }
+  | { kind: "cancel"; mode: "operator" | "on-behalf" }
+  | { kind: "no-show" }
+  | { kind: "delete" };
 
 /** A mutation awaiting confirmation, with the dialog copy to show for it. */
 interface PendingAction {
   title: string;
-  body: string;
+  /** Omitted by the dialogs that render a checkbox body from live state instead. */
+  body?: string;
   confirmLabel: string;
   tone: "default" | "danger";
   target: PendingTarget;
@@ -69,6 +74,10 @@ export function EventActionSheet({
   // calling an impure function during render.
   const [renderedAt] = useState(() => Date.now());
   const [pending, setPending] = useState<PendingAction | null>(null);
+  // Both ticked by default: sending the review request is the normal way to
+  // finish a job, and a no-show is normally chased for the call-out fee.
+  const [sendReview, setSendReview] = useState(true);
+  const [draftInvoice, setDraftInvoice] = useState(true);
 
   // Keep the latest onClose without re-running the dialog effect (parent passes
   // a fresh closure each render). Updated in an effect so the ref is never
@@ -130,9 +139,15 @@ export function EventActionSheet({
     }
   }
 
-  /** Marks the booking as completed and triggers the review email. */
+  /** Confirms completing the booking, with the review email as an opt-out. */
   function handleComplete(): void {
-    void act(() => actions.completeBooking(booking.id));
+    setSendReview(true);
+    setPending({
+      title: "Mark this booking completed?",
+      confirmLabel: "Mark completed",
+      tone: "default",
+      target: { kind: "complete" },
+    });
   }
 
   /**
@@ -153,11 +168,11 @@ export function EventActionSheet({
     });
   }
 
-  /** Flags the booking as a no-show; drafts the late-cancellation invoice. */
+  /** Confirms the no-show, with the draft invoice as an opt-out. */
   function handleNoShow(): void {
+    setDraftInvoice(true);
     setPending({
       title: "Mark as no-show?",
-      body: "A draft invoice will be created for the call-out fee plus round-trip travel.",
       confirmLabel: "Mark no-show",
       tone: "danger",
       target: { kind: "no-show" },
@@ -179,6 +194,31 @@ export function EventActionSheet({
       target: { kind: "delete" },
     });
   }
+
+  // Rendered from live state rather than stored on `pending`, so a stored
+  // element can't freeze the tick. The sheet has no reviewSentAt to go on, so
+  // the box always shows; a booking already emailed just ignores it server-side.
+  const confirmBody =
+    pending?.target.kind === "complete" ? (
+      <AdminCheckbox
+        checked={sendReview}
+        onChange={setSendReview}
+        disabled={busy}
+        label="Send the review-request email"
+      />
+    ) : pending?.target.kind === "no-show" ? (
+      <div className="flex flex-col gap-2">
+        <p>The call-out fee plus round-trip travel is charged for a no-show.</p>
+        <AdminCheckbox
+          checked={draftInvoice}
+          onChange={setDraftInvoice}
+          disabled={busy}
+          label="Draft the invoice for it"
+        />
+      </div>
+    ) : (
+      pending?.body
+    );
 
   return (
     <div
@@ -312,7 +352,7 @@ export function EventActionSheet({
         <ConfirmDialog
           open={pending !== null}
           title={pending?.title ?? ""}
-          body={pending?.body}
+          body={confirmBody}
           confirmLabel={pending?.confirmLabel}
           tone={pending?.tone}
           busy={busy}
@@ -321,8 +361,11 @@ export function EventActionSheet({
             setPending(null);
             if (!target) return;
             void act(() => {
+              if (target.kind === "complete") {
+                return actions.completeBooking(booking.id, sendReview);
+              }
               if (target.kind === "cancel") return actions.cancelBooking(booking.id, target.mode);
-              if (target.kind === "no-show") return actions.markNoShow(booking.id);
+              if (target.kind === "no-show") return actions.markNoShow(booking.id, draftInvoice);
               return actions.deleteBooking(booking.id);
             });
           }}

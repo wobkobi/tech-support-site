@@ -193,6 +193,22 @@ export const COMMS_FIELD_META = {
       "When a payment is recorded with a date earlier than the last reminder, offer to email the client an apology for chasing a bill they had already paid.",
     off: "When off, the payment dialog never offers the apology.",
   },
+  quietHoursEnabled: {
+    title: "Quiet hours",
+    description:
+      "Hold customer emails triggered inside the window until it closes, so a job finished late at night doesn't land in an inbox at 11pm. Anything the customer asked for themselves (manage-booking links, enquiry replies) still goes out at once.",
+    off: "When off, every email sends the moment it is triggered.",
+  },
+  quietHoursStart: {
+    title: "Quiet from",
+    description: "NZ hour the window opens - emails triggered after this wait.",
+    unit: "o'clock",
+  },
+  quietHoursEnd: {
+    title: "Quiet until",
+    description: "NZ hour the window closes - held emails go out then.",
+    unit: "o'clock",
+  },
 } satisfies Record<string, FieldMeta>;
 
 /** Field metadata for the reviews group, keyed by field name. */

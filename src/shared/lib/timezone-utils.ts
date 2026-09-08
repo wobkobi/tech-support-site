@@ -130,6 +130,39 @@ export function timeParts(hhmm: string): [number, number] {
   return [h, m];
 }
 
+/** A weekday index as `getUTCDay()` numbers them: 0 = Sunday .. 6 = Saturday. */
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+/**
+ * Every weekday in `getUTCDay()` order. Iterate this rather than counting to 6,
+ * so a {@link Weekday}-keyed map indexes without widening back to `number`.
+ */
+export const WEEKDAYS: readonly Weekday[] = [0, 1, 2, 3, 4, 5, 6];
+
+/** Weekday names in `getUTCDay()` order, for labels and schema.org output. */
+export const DAY_NAMES: Record<Weekday, string> = {
+  0: "Sunday",
+  1: "Monday",
+  2: "Tuesday",
+  3: "Wednesday",
+  4: "Thursday",
+  5: "Friday",
+  6: "Saturday",
+};
+
+/**
+ * Reads an instant's UTC weekday as a {@link Weekday}.
+ *
+ * `getUTCDay()` is specified to return 0-6, but TypeScript types it `number`,
+ * so indexing a seven-key map with it fails. The assertion is sound and belongs
+ * here once rather than at each call site.
+ * @param date - The instant to read.
+ * @returns The weekday, 0 = Sunday .. 6 = Saturday.
+ */
+export function weekdayOf(date: Date): Weekday {
+  return date.getUTCDay() as Weekday;
+}
+
 /**
  * Splits an instant into its NZ calendar year, month and day.
  * @param date - The instant to read.

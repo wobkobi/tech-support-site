@@ -11,6 +11,7 @@
  */
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import { useRouter } from "next/navigation";
@@ -40,16 +41,16 @@ type ConfirmKind =
 /** Copy + tone for each confirm dialog. */
 const CONFIRM_COPY: Record<
   ConfirmKind,
-  { title: string; body: string; confirmLabel: string; tone?: "danger" }
+  { title: string; body?: string; confirmLabel: string; tone?: "danger" }
 > = {
+  // No body: the complete dialog renders the review-email checkbox instead.
   complete: {
     title: "Mark this booking completed?",
-    body: "This also sends the review-request email if one hasn't gone out yet.",
     confirmLabel: "Mark completed",
   },
+  // No body: the no-show dialog renders the draft-invoice checkbox instead.
   noshow: {
     title: "Mark as no-show?",
-    body: "A draft invoice will be created for the call-out fee plus round-trip travel.",
     confirmLabel: "Mark no-show",
     tone: "danger",
   },
@@ -100,6 +101,10 @@ export function BookingActions({
   const actions = useBookingActions();
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
+  // Both ticked by default: sending the review request is the normal way to
+  // finish a job, and a no-show is normally chased for the call-out fee.
+  const [sendReview, setSendReview] = useState(true);
+  const [draftInvoice, setDraftInvoice] = useState(true);
   // Stable "now" so the past-booking check doesn't trip react-hooks/purity.
   const [renderedAt] = useState(() => Date.now());
 
@@ -119,9 +124,9 @@ export function BookingActions({
     const result = await (async () => {
       switch (kind) {
         case "complete":
-          return actions.completeBooking(id);
+          return actions.completeBooking(id, sendReview);
         case "noshow":
-          return actions.markNoShow(id);
+          return actions.markNoShow(id, draftInvoice);
         case "cancel-operator":
           return actions.cancelBooking(id, "operator");
         case "cancel-onbehalf":
@@ -144,16 +149,61 @@ export function BookingActions({
 
   const copy = confirm ? CONFIRM_COPY[confirm] : null;
 
+  // Completing offers the review email as an opt-out, unless one already went
+  // out - then there is nothing to decide and the dialog just says so.
+  const completeBody = reviewAlreadySent ? (
+    "The review-request email has already gone out, so this only changes the status."
+  ) : (
+    <AdminCheckbox
+      checked={sendReview}
+      onChange={setSendReview}
+      disabled={busy}
+      label="Send the review-request email"
+    />
+  );
+
+  // The fee is recorded on the booking either way; the box only decides whether
+  // the invoice for it is drafted now.
+  const noShowBody = (
+    <div className="flex flex-col gap-2">
+      <p>The call-out fee plus round-trip travel is charged for a no-show.</p>
+      <AdminCheckbox
+        checked={draftInvoice}
+        onChange={setDraftInvoice}
+        disabled={busy}
+        label="Draft the invoice for it"
+      />
+    </div>
+  );
+
+  /** Body for the open dialog: the two with a checkbox, else their copy. */
+  const body =
+    confirm === "complete" ? completeBody : confirm === "noshow" ? noShowBody : copy?.body;
+
   return (
     <>
       <div className="flex flex-col gap-2">
         {isConfirmed && (
-          <AdminButton variant="secondary" onClick={() => setConfirm("complete")} disabled={busy}>
+          <AdminButton
+            variant="secondary"
+            onClick={() => {
+              setSendReview(true);
+              setConfirm("complete");
+            }}
+            disabled={busy}
+          >
             Mark completed
           </AdminButton>
         )}
         {isConfirmed && isPast && (
-          <AdminButton variant="secondary" onClick={() => setConfirm("noshow")} disabled={busy}>
+          <AdminButton
+            variant="secondary"
+            onClick={() => {
+              setDraftInvoice(true);
+              setConfirm("noshow");
+            }}
+            disabled={busy}
+          >
             Mark no-show
           </AdminButton>
         )}
@@ -199,7 +249,7 @@ export function BookingActions({
       <ConfirmDialog
         open={confirm !== null}
         title={copy?.title ?? ""}
-        body={copy?.body}
+        body={body}
         confirmLabel={copy?.confirmLabel ?? "Confirm"}
         tone={copy?.tone}
         busy={busy}

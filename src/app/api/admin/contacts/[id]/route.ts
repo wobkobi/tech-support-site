@@ -186,7 +186,9 @@ export async function PATCH(
  * Soft-deletes a contact by stamping `deletedAt`. Soft (not hard) delete because
  * backfillContacts would otherwise re-create the contact from its still-present
  * booking on the next admin page load; the stamped row suppresses that. Removes
- * the linked Google contact best-effort. Requires X-Admin-Secret header.
+ * the linked Google contact best-effort, unless `?deleteGoogle=false` asks to
+ * leave it - dropping the local row is not always meant to wipe the phone entry.
+ * Requires X-Admin-Secret header.
  * @param request - Incoming request.
  * @param params - Route parameters containing the contact ID.
  * @param params.params - Promise resolving to the dynamic route params object.
@@ -221,7 +223,10 @@ export async function DELETE(
     prisma.contact.update({ where: { id }, data: { deletedAt: new Date() } }),
   ]);
 
-  if (contact.googleContactId) {
+  // Kept out of the transaction above deliberately: Google is best-effort and
+  // must never roll back the local delete.
+  const deleteGoogle = request.nextUrl.searchParams.get("deleteGoogle") !== "false";
+  if (contact.googleContactId && deleteGoogle) {
     await deleteContactFromGoogle(contact.googleContactId);
   }
 

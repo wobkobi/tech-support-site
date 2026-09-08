@@ -9,6 +9,7 @@ import {
   dateKeyParts,
   getPacificAucklandOffset,
   nzWallClockUtc,
+  weekdayOf,
 } from "@/shared/lib/timezone-utils";
 
 /**
@@ -474,7 +475,7 @@ export function buildAvailableDays(
     // month/day overflow automatically (e.g. day 32 wraps to the next month).
     const dayUTC = new Date(Date.UTC(startY, startM - 1, startD + i, 12, 0, 0));
     const dateKey = dayUTC.toISOString().split("T")[0]!;
-    const dayOfWeek = dayUTC.getUTCDay();
+    const dayOfWeek = weekdayOf(dayUTC);
 
     const isToday = i === 0;
     const isTomorrow = i === 1;
@@ -523,7 +524,7 @@ export function buildAvailableDays(
       dayBookings.reduce((sum, b) => sum + (b.endAt.getTime() - b.startAt.getTime()) / 60000, 0) >=
         config.maxBillableHoursPerDay * 60;
 
-    if (window?.enabled === true && !jobsCapHit && !hoursCapHit) {
+    if (window.enabled && !jobsCapHit && !hoursCapHit) {
       const closeMins = window.close * 60;
       const breakStartMins = window.break ? window.break.start * 60 : null;
       const breakEndMins = window.break ? window.break.end * 60 : null;
@@ -687,8 +688,8 @@ export function validateBookingRequest(
     };
   }
 
-  const window = config.schedule[selectedDate.getUTCDay()];
-  if (!window?.enabled) {
+  const window = config.schedule[weekdayOf(selectedDate)];
+  if (!window.enabled) {
     return { valid: false, error: "That day isn't available for bookings" };
   }
 
@@ -741,7 +742,7 @@ export function validateBookingRequest(
       year,
       month,
       day,
-      selectedDate.getUTCDay(),
+      weekdayOf(selectedDate),
       startHour,
       now,
       config.morningGuards,

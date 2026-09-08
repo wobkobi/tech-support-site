@@ -268,8 +268,6 @@ export const ADDITIONAL_ASSETS: AdditionalAsset[] = [
   },
   // Invoice/document header
   { name: "document-header-800x270", width: 800, height: 270, type: "logo-only", format: "png" },
-  // Business card back (print-ready)
-  { name: "card-back-1050x600", width: 1050, height: 600, type: "logo-on-bg", format: "jpg" },
   // QR code landing background
   {
     name: "qr-landing-bg-1080x1920",

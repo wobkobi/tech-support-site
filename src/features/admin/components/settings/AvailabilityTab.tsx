@@ -23,6 +23,7 @@ import { hourLabel } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
 import { AVAILABILITY_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { AvailabilitySettings, DayWindow, MorningGuard } from "@/shared/lib/settings/types";
+import type { Weekday } from "@/shared/lib/timezone-utils";
 import type React from "react";
 
 interface Props {
@@ -31,7 +32,7 @@ interface Props {
 }
 
 /** Weekday order shown in the editor (Mon-Sun) with their `getUTCDay()` index. */
-const DAY_ORDER: { index: number; name: string }[] = [
+const DAY_ORDER: { index: Weekday; name: string }[] = [
   { index: 1, name: "Monday" },
   { index: 2, name: "Tuesday" },
   { index: 3, name: "Wednesday" },
@@ -59,10 +60,10 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
    * @param patch - Partial day-window fields to merge.
    * @returns void
    */
-  const setDay = (index: number, patch: Partial<DayWindow>): void =>
+  const setDay = (index: Weekday, patch: Partial<DayWindow>): void =>
     setDraft((p) => ({
       ...p,
-      schedule: { ...p.schedule, [index]: { ...p.schedule[index]!, ...patch } },
+      schedule: { ...p.schedule, [index]: { ...p.schedule[index], ...patch } },
     }));
 
   /**
@@ -162,7 +163,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       </p>
       <div className="mt-3 space-y-2">
         {DAY_ORDER.map(({ index, name }) => {
-          const d = draft.schedule[index]!;
+          const d = draft.schedule[index];
           return (
             <div key={index} className="rounded-lg border border-admin-border p-3">
               <div className="flex flex-wrap items-center gap-3">
