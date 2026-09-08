@@ -7,7 +7,9 @@
  * disable-semantics table in the settings plan.
  */
 
-/** One weekday's bookable window. `getUTCDay()` indexing: 0 = Sunday .. 6 = Saturday. */
+import type { Weekday } from "@/shared/lib/timezone-utils";
+
+/** One weekday's bookable window. See {@link Weekday} for the key numbering. */
 export interface DayWindow {
   /** When false the whole day is unavailable (no slots offered). */
   enabled: boolean;
@@ -19,8 +21,15 @@ export interface DayWindow {
   break: { start: number; end: number } | null;
 }
 
-/** Seven-day availability map keyed by `getUTCDay()` (0 = Sunday .. 6 = Saturday). */
-export type WeeklySchedule = Record<number, DayWindow>;
+/**
+ * Seven-day availability map keyed by {@link Weekday} (0 = Sunday .. 6 = Saturday).
+ *
+ * Every day is present: `defaults.ts` seeds all seven and the DB override merges
+ * onto that base, so a stored partial can add a day's fields but never remove
+ * one. Reads therefore need no presence check - except in `checkGuardrails`,
+ * which also runs against a half-edited admin draft.
+ */
+export type WeeklySchedule = Record<Weekday, DayWindow>;
 
 /**
  * A "protect a morning once the night-before arrives" rule. Once `now` passes

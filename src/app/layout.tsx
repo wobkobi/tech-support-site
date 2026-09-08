@@ -12,6 +12,7 @@ import { SiteFooter } from "@/shared/components/SiteFooter";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
+import { DAY_NAMES, type Weekday } from "@/shared/lib/timezone-utils";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
@@ -139,18 +140,19 @@ export default async function RootLayout({
   ]);
   // schema.org telephone, derived from the editable tel: link (strip the scheme).
   const telephone = identity.phoneTel.replace(/^tel:/, "");
-  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   // Which days appear still tracks the real schedule; only the times are
   // overridable, so the advertised listing can be narrower than the hours the
   // booking form offers (evening slots stay bookable, just not advertised).
+  // Listed Monday-first, which is how the hours read to a customer.
   const published = identity.publishedHours;
-  const openingHoursSpecification = [1, 2, 3, 4, 5, 6, 0]
-    .filter((d) => availability.schedule[d]?.enabled)
+  const advertisedOrder: readonly Weekday[] = [1, 2, 3, 4, 5, 6, 0];
+  const openingHoursSpecification = advertisedOrder
+    .filter((d) => availability.schedule[d].enabled)
     .map((d) => ({
       "@type": "OpeningHoursSpecification",
-      dayOfWeek: dayNames[d],
-      opens: `${String(published?.open ?? availability.schedule[d]!.open).padStart(2, "0")}:00`,
-      closes: `${String(published?.close ?? availability.schedule[d]!.close).padStart(2, "0")}:00`,
+      dayOfWeek: DAY_NAMES[d],
+      opens: `${String(published?.open ?? availability.schedule[d].open).padStart(2, "0")}:00`,
+      closes: `${String(published?.close ?? availability.schedule[d].close).padStart(2, "0")}:00`,
     }));
   // Fall back to the default suburb list when the stored list is empty - an
   // identity row seeded before servedSuburbs existed stores [], which would

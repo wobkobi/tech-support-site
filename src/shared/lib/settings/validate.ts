@@ -21,6 +21,7 @@ import type {
   SettingsGroup,
   TaxSettings,
 } from "@/shared/lib/settings/types";
+import { DAY_NAMES, WEEKDAYS } from "@/shared/lib/timezone-utils";
 
 /** A single rejected field plus the reason, surfaced inline by the form. */
 export interface FieldError {
@@ -117,7 +118,9 @@ function validateAvailability(a: AvailabilitySettings): FieldError[] {
     });
   }
 
-  for (let day = 0; day <= 6; day++) {
+  // Raw input: a submitted schedule really can be missing a day, so this read
+  // stays optional even though the resolved type promises all seven.
+  for (const day of WEEKDAYS) {
     const d = a.schedule?.[day];
     if (!d) {
       errors.push({ field: `schedule.${day}`, message: "Missing day window." });
@@ -497,10 +500,13 @@ export function checkGuardrails(s: Settings): GuardrailIssue[] {
   const issues: GuardrailIssue[] = [];
   const { availability: a, pricing: p, identity, comms } = s;
   const shortestJob = Math.min(a.durations.short, a.durations.long);
-  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  // The schedule reads below stay defensive even though WeeklySchedule promises
+  // all seven days: useSettingsForm runs this against the live admin draft on
+  // every keystroke, with no shape validation ahead of it.
 
   // Each enabled day's largest contiguous window must fit the shortest job + buffer.
-  for (let day = 0; day <= 6; day++) {
+  for (const day of WEEKDAYS) {
     const d = a.schedule[day];
     if (!d?.enabled) continue;
     const segments = d.break ? [d.break.start - d.open, d.close - d.break.end] : [d.close - d.open];
@@ -508,7 +514,7 @@ export function checkGuardrails(s: Settings): GuardrailIssue[] {
     if (largestMins < shortestJob + a.bookingBufferAfterMin) {
       issues.push({
         level: "block",
-        message: `${dayNames[day]}'s open hours are shorter than the shortest job (${shortestJob} min) plus its after-buffer, so nobody could book ${dayNames[day]}.`,
+        message: `${DAY_NAMES[day]}'s open hours are shorter than the shortest job (${shortestJob} min) plus its after-buffer, so nobody could book ${DAY_NAMES[day]}.`,
       });
     }
   }
@@ -517,9 +523,9 @@ export function checkGuardrails(s: Settings): GuardrailIssue[] {
   // (that is the point of the override), but advertising a time no day can
   // actually take sends customers to a booking form with no such slot.
   if (identity.publishedHours) {
-    const open = [0, 1, 2, 3, 4, 5, 6]
-      .map((day) => a.schedule[day])
-      .filter((d): d is NonNullable<typeof d> => Boolean(d?.enabled));
+    const open = WEEKDAYS.map((day) => a.schedule[day]).filter((d): d is NonNullable<typeof d> =>
+      Boolean(d?.enabled),
+    );
     if (open.length > 0) {
       const earliestOpen = Math.min(...open.map((d) => d.open));
       const latestClose = Math.max(...open.map((d) => d.close));
@@ -560,7 +566,7 @@ export function checkGuardrails(s: Settings): GuardrailIssue[] {
 
   // Longest duration that fits nowhere is silently unbookable.
   const longest = Math.max(a.durations.short, a.durations.long);
-  const fitsAnywhere = [0, 1, 2, 3, 4, 5, 6].some((day) => {
+  const fitsAnywhere = WEEKDAYS.some((day) => {
     const d = a.schedule[day];
     if (!d?.enabled) return false;
     const segments = d.break ? [d.break.start - d.open, d.close - d.break.end] : [d.close - d.open];

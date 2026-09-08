@@ -35,7 +35,7 @@ STRUCTURE — every task object represents ONE device + ONE action (+ optional d
 - ONE action per task. Distinct actions on the SAME OR DIFFERENT devices are separate tasks (e.g. "set up phone AND configure email AND transfer photos" = 3 tasks). NEVER use "and" inside an action string.
 - EXCEPTION — same-device sequential phases of one continuous session: when one device gets phases that read as parts of a single hand-over (Setup → showing the client how to use it, Configuration → quick orientation, Repair → verification with the client), DO NOT split. Use ONE task with the primary action and put the secondary phase in details. Example: "Streaming account setup with shared plan + showed how to use Spotify properly" → ONE task {device: "Streaming account", action: "Setup", details: "Spotify, shared plan & training"}. Splitting trivial trailing training/orientation into its own task creates noisy line items.
 - EXCEPTION — causally-linked work is ONE task. When the description uses "because of" / "due to" / "caused by" / "from" (as cause) / "the root cause was" to link a fix to its underlying cause, treat the FIX as the task and put the cause in details. Diagnosing the cause is PART of fixing it, not a separate billable action. Example: "fixed account sign-in into Windows and Edge not syncing because of a Microsoft 365 business account config issue" → ONE task {device: "Laptop", action: "Account sign-in repair", details: "Windows, Edge, sync issue caused by M365 business config"}. The M365 config is NOT a separate "Configuration" task — it's the diagnosed cause. If the user also stated a duration like "took 10 mins", that duration belongs to the whole causally-linked task. SCOPE LIMIT: this exception covers ONE specific fix + ONE root cause. A multi-step job with distinct services (diagnosis, network setup, account configuration, security fix) must stay as separate tasks even if they all relate to a single theme like "email not working" — do NOT collapse the whole job into one task.
-- EXCEPTION — general app tuition named in ONE breath is ONE task. When a SINGLE item in the description teaches/explains several apps or programs together (not fixing a physical device), emit ONE task {device: "Software", action: "Training", details: "<app list>"} rather than splitting per app or using "Other". The apps stay in details even if one (e.g. iCloud) would map to its own device when it were the actual subject of the work. Example: "explained and guided how to use ChatGPT, Excel, iCloud, Finder and more" is one item, so one task.
+- EXCEPTION — general app tuition named in ONE breath is ONE task. When a SINGLE item in the description teaches/explains several apps or programs together (not fixing a physical device), emit ONE task {device: "Software", action: "Training", details: "<app list>"} rather than splitting per app or using "Other". The apps stay in details even if one (e.g. iCloud) would map to its own device when it were the actual subject of the work.
   SCOPE LIMIT — this exception covers APPS AND PROGRAMS only. The device tag follows what the explanation was ABOUT, never whether the work was hands-on: teaching or advising on a physical thing takes that thing's device tag from the "Current device tags" list, exactly as repairing it would. Explaining how to wipe and dispose of a hard drive is storage training, not software training. Reach for the software tag only when the subject genuinely is apps or programs.
   SCOPE LIMIT — this exception NEVER merges items the operator listed separately. The operator's own line breaks and separate clauses are the task boundary: each listed item is its own task even when several are training on the same platform. "macOS Pages help" on one line and "Helping explain tech with macOS" on the next are TWO training tasks, not one merged "Pages, macOS" line - they were written apart, so they bill apart. Merge only WITHIN a single listed item.
 - ONE device per task. If the same action applies to two devices, that's two tasks (e.g. "set up new phone and laptop" → task A device "Phone" action "Setup", task B device "Laptop" action "Setup").
@@ -270,11 +270,21 @@ OTHER RULES:
 - Ignore dates and client names.
 
 CLARIFICATION MODE:
-Before returning the full result, check if you are genuinely blocked on any of the following. If so, return a clarify object instead of the full result - but ONLY when you truly cannot make a reasonable inference.
-- Location/rate: you have no clues at all about whether the job was on-site, at home, or remote (no suburb, no address, no "at home", no "remote" anywhere)
-- Duration: no times mentioned, no duration stated, no pre-computed annotation present
-- Tasks: the description is too vague to identify any specific service (e.g. "did some stuff", "helped with computer")
-Ask at most 3 questions. Do NOT ask if you can reasonably infer the answer.
+The default is to answer. Asking is the exception, and each trigger below is a literal test - run the test, do not substitute a judgement call about whether more detail would be nice to have. A trigger fires ONLY when every clause under it is true.
+- Location/rate. Fires when ALL are true:
+  - no suburb, address or place name anywhere
+  - no "at home" / "my place" / "here" / "came to me"
+  - no "remote" / "phone" / "online" / "TeamViewer" / "AnyDesk"
+  - no travel, drive, distance or parking mentioned
+  Any ONE of those present means it does NOT fire - infer the location from it.
+- Duration. Fires when ALL are true:
+  - no pre-computed annotation
+  - no start/end times and no time range
+  - no stated duration ("2 hours", "45 min")
+  - no phrase that implies one ("all morning", "an hour or so", "quick job")
+  Any ONE present means it does NOT fire - infer the duration from it.
+- Tasks. Fires when the description names no concrete device, app, service or action: "did some stuff", "helped with computer", "sorted his laptop" fire. "fixed virus on laptop", "set up printer", "Windows reinstall" do NOT fire.
+Ask one question per fired trigger, at most 3. If no trigger fires, return the full result - never return clarify alongside a result you could have produced.
 
 Clarify response shape (use instead of the normal shape when blocked):
 {

@@ -10,7 +10,7 @@
  * with the current values until the one-shot seed hands them to the DB.
  */
 
-import type { Settings, WeeklySchedule } from "@/shared/lib/settings/types";
+import type { DayWindow, Settings, WeeklySchedule } from "@/shared/lib/settings/types";
 
 /** Bank-account placeholder shown when neither the DB nor the env var is set. */
 const BANK_ACCOUNT_PLACEHOLDER = "[BANK ACCOUNT NOT SET - configure in admin settings]";
@@ -21,11 +21,18 @@ const BANK_ACCOUNT_PLACEHOLDER = "[BANK ACCOUNT NOT SET - configure in admin set
  * @returns A seven-day schedule with every day enabled.
  */
 function defaultSchedule(): WeeklySchedule {
-  const schedule: WeeklySchedule = {};
-  for (let day = 0; day <= 6; day++) {
-    schedule[day] = { enabled: true, open: 10, close: 20, break: null };
-  }
-  return schedule;
+  const day: DayWindow = { enabled: true, open: 10, close: 20, break: null };
+  // Spread per day rather than reusing `day`: a shared reference would let an
+  // edit to one weekday silently move the others.
+  return {
+    0: { ...day },
+    1: { ...day },
+    2: { ...day },
+    3: { ...day },
+    4: { ...day },
+    5: { ...day },
+    6: { ...day },
+  };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
