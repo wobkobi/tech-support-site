@@ -77,6 +77,9 @@ interface ContactCardProps {
   isReviewsExpanded: boolean;
   isConfirmingDelete: boolean;
   isDeleting: boolean;
+  /** Whether confirming will also delete the linked Google contact. */
+  deleteGoogle: boolean;
+  onDeleteGoogleChange: (value: boolean) => void;
   mergeRole: MergeRole;
   onStartEdit: () => void;
   onRequestSync: () => void;
@@ -196,6 +199,8 @@ const CONTACT_EDIT_FIELDS: ReadonlyArray<ContactEditField> = [
  * @param props.isReviewsExpanded - True when the linked-reviews panel is open.
  * @param props.isConfirmingDelete - True when the delete confirmation panel is open.
  * @param props.isDeleting - True while this contact is mid-delete.
+ * @param props.deleteGoogle - Whether the linked Google contact goes too.
+ * @param props.onDeleteGoogleChange - Toggles that choice.
  * @param props.mergeRole - This card's role in an in-progress merge (idle/source/target).
  * @param props.onStartEdit - Opens the edit form for this contact.
  * @param props.onRequestSync - Opens the sync-to-Google confirmation.
@@ -218,6 +223,8 @@ function ContactCard({
   isReviewsExpanded,
   isConfirmingDelete,
   isDeleting,
+  deleteGoogle,
+  onDeleteGoogleChange,
   mergeRole,
   onStartEdit,
   onRequestSync,
@@ -367,6 +374,18 @@ function ContactCard({
         <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-coquelicot-800 bg-coquelicot-50 px-3 py-2 text-xs">
           <span className="font-medium text-coquelicot-300">Delete {c.name}?</span>
           <span className="text-slate-500">Linked reviews are kept.</span>
+          {c.googleContactId && (
+            <label className="flex items-center gap-1.5 text-slate-600">
+              <input
+                type="checkbox"
+                checked={deleteGoogle}
+                onChange={(e) => onDeleteGoogleChange(e.target.checked)}
+                disabled={isDeleting}
+                className="h-3.5 w-3.5 rounded border-slate-300"
+              />
+              Google contact too
+            </label>
+          )}
           <button
             onClick={onConfirmDelete}
             disabled={isDeleting}
@@ -500,6 +519,9 @@ export function ContactAdminList({
   const [noPhone, setNoPhone] = useState(false);
   const [sort, setSort] = useState<"name" | "newest" | "oldest">("name");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  // Ticked by default: deleting a contact normally means dropping the person
+  // altogether, and leaving the Google entry would let the sync pull them back.
+  const [deleteGoogle, setDeleteGoogle] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   // Contact currently selected to merge away; while set, every other card offers
   // to become the survivor. Null when no merge is in progress.
@@ -727,13 +749,26 @@ export function ContactAdminList({
   }
 
   /**
+   * Opens the delete confirmation for a contact. Resets the Google choice with
+   * each open, so an earlier untick can't silently carry over to the next one.
+   * @param id - Contact ID being confirmed for deletion.
+   */
+  function requestDelete(id: string): void {
+    setDeleteGoogle(true);
+    setDeleteConfirmId(id);
+  }
+
+  /**
    * Soft-deletes a contact via the admin API and drops it from the list.
    * @param id - Contact ID to delete.
    */
   async function deleteContact(id: string): Promise<void> {
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/admin/contacts/${id}`, { method: "DELETE" });
+      const res = await fetch(
+        `/api/admin/contacts/${id}${deleteGoogle ? "" : "?deleteGoogle=false"}`,
+        { method: "DELETE" },
+      );
       const data = (await res.json()) as { ok: boolean; error?: string };
       if (data.ok) {
         setContacts((prev) => prev.filter((c) => c.id !== id));
@@ -848,6 +883,8 @@ export function ContactAdminList({
       isConfirmingSync: confirmSyncId === c.id,
       isReviewsExpanded: expandedReviewsId === c.id,
       isConfirmingDelete: deleteConfirmId === c.id,
+      deleteGoogle,
+      onDeleteGoogleChange: setDeleteGoogle,
       isDeleting: deletingId === c.id,
       mergeRole: mergeSourceId === null ? "idle" : mergeSourceId === c.id ? "source" : "target",
       onStartEdit: startEdit.bind(null, c),
@@ -855,7 +892,7 @@ export function ContactAdminList({
       onConfirmSync: handleConfirmSyncToGoogle.bind(null, c.id),
       onCancelSync: handleCancelSyncToGoogle,
       onToggleReviews: toggleReviews.bind(null, c.id),
-      onRequestDelete: setDeleteConfirmId.bind(null, c.id),
+      onRequestDelete: requestDelete.bind(null, c.id),
       onConfirmDelete: handleDeleteContact.bind(null, c.id),
       onCancelDelete: setDeleteConfirmId.bind(null, null),
       onStartMerge: setMergeSourceId.bind(null, c.id),

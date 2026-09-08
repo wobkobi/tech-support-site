@@ -1,11 +1,12 @@
 "use client";
 // src/features/admin/components/DashboardQuickActions.tsx
 /**
- * @description Quick-action panels shown on the admin dashboard:
- * send a review link to a past client, or mark a completed event and send its review.
+ * @description Quick-action panels shown on the admin dashboard: send a review
+ * link to a past client, or clear the past-confirmed bookings. Completing offers
+ * both doors - with the review email or without - so neither needs a dialog.
  */
 
-import { useToast } from "@/features/admin/components/ui/Toast";
+import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import {
   SendReviewLinkForm,
   type ContactSuggestion,
@@ -54,67 +55,54 @@ export function DashboardQuickActions({
   contactSuggestions,
 }: DashboardQuickActionsProps): React.ReactElement {
   const router = useRouter();
-  const { toast } = useToast();
+  const actions = useBookingActions();
   const [bookings, setBookings] = useState<PastBookingRow[]>(initial);
   const [completing, setCompleting] = useState<string | null>(null);
   const [done, setDone] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   /**
-   * Marks a booking completed. The PATCH endpoint automatically sends the
-   * review request email if one has not already been sent (atomically guarded
-   * against the cron, so no double-send risk).
+   * Marks a booking completed. Sending the review request is the caller's call:
+   * the row offers a button either way, which is why this list has no confirm
+   * dialog. The send itself is atomically guarded against the cron, so a
+   * completed booking can never be emailed twice.
    * @param id - Booking ID to complete.
+   * @param sendReview - Whether to send the review-request email with it.
    */
-  async function completeAndSend(id: string): Promise<void> {
+  async function complete(id: string, sendReview: boolean): Promise<void> {
     setCompleting(id);
     setErrors((prev) => ({ ...prev, [id]: "" }));
-    try {
-      const patchRes = await fetch(`/api/admin/bookings/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "completed" }),
-      });
-      const patchData = (await patchRes.json().catch(() => ({}))) as {
-        error?: string;
-        reviewSent?: boolean;
-      };
-      if (!patchRes.ok) {
-        throw new Error(patchData.error ?? "Failed to mark completed.");
-      }
-
-      setDone((prev) => new Set(prev).add(id));
-      toast(patchData.reviewSent ? "Marked completed - review email sent." : "Marked completed.", {
-        tone: "success",
-      });
-      // Re-render the server components so the dashboard stat cards (Confirmed
-      // bookings, Pending reviews) reflect the completion.
-      router.refresh();
-      // Remove from list after a short delay so the user sees the success state
-      setTimeout(() => {
-        setBookings((prev) => prev.filter((b) => b.id !== id));
-        setDone((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-      }, 1800);
-    } catch (err) {
-      setErrors((prev) => ({
-        ...prev,
-        [id]: err instanceof Error ? err.message : "Something went wrong.",
-      }));
-    } finally {
-      setCompleting(null);
+    // Toasts (success and failure alike) come from the shared hook; the inline
+    // message is what keeps a failed row explaining itself after one fades.
+    const result = await actions.completeBooking(id, sendReview);
+    setCompleting(null);
+    if (!result.ok) {
+      setErrors((prev) => ({ ...prev, [id]: result.error ?? "Something went wrong." }));
+      return;
     }
+
+    setDone((prev) => new Set(prev).add(id));
+    // Re-render the server components so the dashboard stat cards (Confirmed
+    // bookings, Pending reviews) reflect the completion.
+    router.refresh();
+    // Remove from list after a short delay so the user sees the success state
+    setTimeout(() => {
+      setBookings((prev) => prev.filter((b) => b.id !== id));
+      setDone((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 1800);
   }
 
   /**
-   * Wraps completeAndSend to return void for use as an event handler.
+   * Wraps complete to return void for use as an event handler.
    * @param id - Booking ID.
+   * @param sendReview - Whether to send the review-request email.
    */
-  function handleComplete(id: string): void {
-    void completeAndSend(id);
+  function handleComplete(id: string, sendReview: boolean): void {
+    void complete(id, sendReview);
   }
 
   return (
@@ -137,7 +125,7 @@ export function DashboardQuickActions({
             )}
           </h2>
           <p className="mt-0.5 text-xs text-slate-400">
-            Past confirmed bookings - mark complete and send review
+            Past confirmed bookings - complete them, with or without the review email
           </p>
         </div>
 
@@ -165,18 +153,31 @@ export function DashboardQuickActions({
                       <FaCheck className="h-3 w-3" aria-hidden />
                     </span>
                   ) : (
-                    <button
-                      type="button"
-                      disabled={isRunning}
-                      onClick={() => handleComplete(b.id)}
-                      className="shrink-0 rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50"
-                    >
-                      {isRunning
-                        ? "Working…"
-                        : b.email
-                          ? "Complete + send review"
-                          : "Mark complete"}
-                    </button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={isRunning}
+                        onClick={() => handleComplete(b.id, b.email !== null)}
+                        className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50"
+                      >
+                        {isRunning
+                          ? "Working…"
+                          : b.email
+                            ? "Complete + send review"
+                            : "Mark complete"}
+                      </button>
+                      {/* Only worth offering where there is an email to withhold. */}
+                      {b.email && (
+                        <button
+                          type="button"
+                          disabled={isRunning}
+                          onClick={() => handleComplete(b.id, false)}
+                          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          Complete only
+                        </button>
+                      )}
+                    </div>
                   )}
                 </li>
               );

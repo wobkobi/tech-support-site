@@ -4,14 +4,15 @@
  * @description Editable start/finish times on the booking detail page. One
  * control, two meanings: moving a job that has already run to another past time
  * is the operator recording what actually happened, and stays silent; anything
- * else is a reschedule, so the customer is emailed. The banner above the inputs
- * says which a save will do, and follows the times as they're typed. Overlaps
+ * else is a reschedule, which emails the customer unless that box is unticked.
+ * Which of the two a save will do follows the times as they're typed. Overlaps
  * on the reschedule path come back as a 409 and are re-offered through a
  * {@link ConfirmDialog} rather than blocked. Between them these are why the
  * Google event no longer has to be corrected by hand.
  */
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import { formatMins } from "@/features/business/lib/business";
@@ -69,6 +70,10 @@ export function BookingTimesCard({
     start: toNzInputValue(startAt),
     end: toNzInputValue(endAt),
   });
+  // Ticked by default: a customer whose booking moved normally needs telling.
+  // Only offered on the reschedule branch - the past-correction branch is silent
+  // whatever this says.
+  const [notifyCustomer, setNotifyCustomer] = useState(true);
   // Stable "now" so the branch copy doesn't trip react-hooks/purity. The lock
   // is read here rather than on the server for the same reason - it's only the
   // edit affordance, and the PATCH route re-checks it before writing anyway.
@@ -89,6 +94,7 @@ export function BookingTimesCard({
    */
   function cancel(): void {
     setForm({ start: toNzInputValue(startAt), end: toNzInputValue(endAt) });
+    setNotifyCustomer(true);
     setEditing(false);
   }
 
@@ -104,6 +110,7 @@ export function BookingTimesCard({
     const result = await updateBookingTimes(id, {
       startAt: fromNzInputValue(form.start).toISOString(),
       endAt: fromNzInputValue(form.end).toISOString(),
+      notifyCustomer,
       ...(force ? { force: true } : {}),
     });
     setSaving(false);
@@ -155,11 +162,18 @@ export function BookingTimesCard({
     <>
       <div className="flex flex-col gap-3">
         <h2 className="text-base font-bold text-admin-text">Edit times</h2>
-        <p className="text-xs text-admin-muted">
-          {willNotify
-            ? "This moves the booking and emails the customer the new time."
-            : "This records what actually happened. No email is sent."}
-        </p>
+        {willNotify ? (
+          <AdminCheckbox
+            checked={notifyCustomer}
+            onChange={setNotifyCustomer}
+            disabled={saving}
+            label="Email the customer the new time"
+          />
+        ) : (
+          <p className="text-xs text-admin-muted">
+            This records what actually happened. No email is sent.
+          </p>
+        )}
         <label className="flex flex-col gap-1">
           <span className={LABEL_CLS}>Start</span>
           <input
