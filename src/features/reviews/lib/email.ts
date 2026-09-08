@@ -1,6 +1,9 @@
 // src/features/reviews/lib/email.ts
 /**
- * @description Shared Resend utility for sending transactional emails.
+ * @description Shared Resend utility for sending transactional emails. Every
+ * send goes out through one of two doors: {@link sendNow} for owner mail and the
+ * replies a customer is waiting on, {@link sendOutreach} for everything we
+ * initiate, which Resend holds until the quiet-hours window closes.
  */
 
 import { buildAppointmentDescription, parseBookingNotes } from "@/features/booking/lib/booking";
@@ -15,6 +18,7 @@ import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort, formatDateTimeLong } from "@/shared/lib/date-format";
+import { nextSendTime } from "@/shared/lib/quiet-hours";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import { Resend } from "resend";
@@ -269,6 +273,52 @@ function getResend(): Resend {
   return _resend;
 }
 
+/** A Resend send payload, taken from the client so it can never drift from it. */
+type MailPayload = Parameters<Resend["emails"]["send"]>[0];
+/** What Resend answers a send with - `{ data, error }`, never a throw. */
+type MailResult = Awaited<ReturnType<Resend["emails"]["send"]>>;
+
+/**
+ * Sends immediately. For mail to the operator, and for the replies a customer is
+ * sitting waiting on - their own booking confirmation, manage-booking links, an
+ * enquiry acknowledgement. Holding those would read as the site being broken.
+ * @param payload - The Resend send payload.
+ * @returns Resend's send response.
+ */
+function sendNow(payload: MailPayload): Promise<MailResult> {
+  return getResend().emails.send(payload);
+}
+
+/**
+ * Sends outreach - mail the customer did not just ask for. Inside the quiet-hours
+ * window the send is handed to Resend with a `scheduledAt` for the moment the
+ * window closes, so a job finished at 11pm doesn't buzz a phone at 11pm.
+ *
+ * Resend does the waiting, so there is no queue here to drain or retry, and the
+ * call resolves now either way: the caller's "sent" stamp still lands at click
+ * time, which is what stops the crons sending a second copy.
+ * @param payload - The Resend send payload.
+ * @returns Resend's send response.
+ */
+async function sendOutreach(payload: MailPayload): Promise<MailResult> {
+  let holdUntil: Date | null = null;
+  try {
+    const { comms } = await getSettings();
+    holdUntil = nextSendTime({
+      enabled: comms.quietHoursEnabled,
+      startHour: comms.quietHoursStart,
+      endHour: comms.quietHoursEnd,
+    });
+  } catch (err) {
+    // Settings unreadable (no request context, DB blip). Send now rather than
+    // lose the mail - being early is a smaller fault than being missing.
+    console.warn("[email] Couldn't read quiet hours, sending immediately:", err);
+  }
+  if (!holdUntil) return sendNow(payload);
+  console.log(`[email] Quiet hours - holding until ${holdUntil.toISOString()}`);
+  return getResend().emails.send({ ...payload, scheduledAt: holdUntil.toISOString() });
+}
+
 /**
  * Names the given email env vars that are unset or blank, so a "not configured"
  * skip log says exactly which var to fix. The email layer deliberately skips
@@ -342,7 +392,7 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
 `);
 
   try {
-    await getResend().emails.send({
+    await sendNow({
       from,
       replyTo: adminEmail,
       to: adminEmail,
@@ -523,7 +573,7 @@ export async function sendOwnerBookingNotification(
 
   // Send via Resend
   try {
-    await getResend().emails.send({
+    await sendNow({
       from,
       // Reply goes to the customer who booked, not back to the owner inbox.
       replyTo: booking.email,
@@ -581,7 +631,7 @@ export async function sendOwnerBookingCancellation(
 `);
 
   try {
-    await getResend().emails.send({
+    await sendNow({
       from,
       // Reply goes to the customer who cancelled, not back to the owner inbox.
       replyTo: booking.email,
@@ -602,11 +652,15 @@ export async function sendOwnerBookingCancellation(
  * @param options - Optional flags.
  * @param options.kind - "new" (default) for a fresh booking; "rescheduled" for an edit.
  * @param options.previousStartAt - Original start time, shown crossed-out when rescheduled.
+ * @param options.quietHours - Hold this one for the quiet window. Set by the
+ * operator-driven move; a customer who just booked or rescheduled themselves is
+ * waiting on the confirmation, so those stay immediate.
  */
 export async function sendCustomerBookingConfirmation(
   booking: BookingNotificationData,
-  options?: { kind?: "new" | "rescheduled"; previousStartAt?: Date },
+  options?: { kind?: "new" | "rescheduled"; previousStartAt?: Date; quietHours?: boolean },
 ): Promise<void> {
+  const send = options?.quietHours ? sendOutreach : sendNow;
   const from = process.env.EMAIL_FROM;
   const siteUrl = getSiteUrl();
 
@@ -695,7 +749,7 @@ ${await buildEmailSignature(siteUrl)}
 
   // Send via Resend
   try {
-    await getResend().emails.send({
+    await send({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
@@ -785,7 +839,7 @@ ${await buildEmailSignature(siteUrl)}
 
   // Send via Resend
   try {
-    await getResend().emails.send({
+    await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
@@ -854,7 +908,7 @@ ${await buildEmailSignature(siteUrl)}
 `);
 
   try {
-    await getResend().emails.send({
+    await sendNow({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to,
@@ -918,7 +972,7 @@ ${await buildEmailSignature(siteUrl)}
 `);
 
   try {
-    await getResend().emails.send({
+    await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
@@ -990,7 +1044,7 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
   const html = await buildPastClientReviewEmailHtml(firstName, reviewUrl);
 
   try {
-    await getResend().emails.send({
+    await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
@@ -1167,7 +1221,7 @@ export async function sendInvoiceEmail({
     customBody,
   });
   try {
-    await getResend().emails.send({
+    await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: invoice.clientEmail,
@@ -1258,7 +1312,7 @@ export async function sendInvoiceReminderEmail({
 `);
 
   try {
-    await getResend().emails.send({
+    await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: invoice.clientEmail,
@@ -1345,7 +1399,7 @@ export async function sendPaymentApologyEmail({
     // Resend SDK v3+ returns { data, error } instead of throwing on API-level
     // failures, so check error explicitly - a rejected send must leave
     // apologySentAt unstamped rather than reporting success.
-    const result = await getResend().emails.send({
+    const result = await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: invoice.clientEmail,
@@ -1462,7 +1516,7 @@ export async function sendVoidNotification({
     // Resend SDK v3+ returns { data, error } instead of throwing on API-level
     // failures (invalid sender, rate limit, etc.). Check error explicitly so a
     // rejected call isn't silently reported as "Client notified".
-    const result = await getResend().emails.send({
+    const result = await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: invoice.clientEmail,
@@ -1561,7 +1615,7 @@ export async function sendBusinessEnquiryNotification(enquiry: BusinessEnquiryDa
 `);
 
   try {
-    await getResend().emails.send({
+    await sendNow({
       from,
       // Reply goes straight back to the enquirer, not the owner inbox.
       replyTo: enquiry.email,
@@ -1615,7 +1669,7 @@ export async function sendBusinessEnquiryAck(enquiry: BusinessEnquiryData): Prom
 `);
 
   try {
-    await getResend().emails.send({
+    await sendNow({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: enquiry.email,

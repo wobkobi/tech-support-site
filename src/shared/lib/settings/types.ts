@@ -282,6 +282,15 @@ export interface CommsSettings {
   invoiceReminderMaxCount: number;
   /** Master switch for the apology sent when a reminder chased an already-paid invoice. */
   invoiceApologyEnabled: boolean;
+  /**
+   * Hold customer-facing email overnight rather than sending it the moment it is
+   * triggered. Resend does the waiting, so the action itself still completes now.
+   */
+  quietHoursEnabled: boolean;
+  /** NZ hour the quiet window opens (0-23). */
+  quietHoursStart: number;
+  /** NZ hour it closes again next morning (0-23). */
+  quietHoursEnd: number;
 }
 
 export interface SchedulingSettings {

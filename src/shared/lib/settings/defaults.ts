@@ -220,6 +220,9 @@ export const DEFAULT_SETTINGS: Settings = {
     invoiceReminderSecondDays: 10,
     invoiceReminderMaxCount: 2,
     invoiceApologyEnabled: true,
+    quietHoursEnabled: true,
+    quietHoursStart: 21,
+    quietHoursEnd: 7,
   },
 
   // Source: calendar-cache.ts travel-block heuristics + edit-window.ts + travel-time route.

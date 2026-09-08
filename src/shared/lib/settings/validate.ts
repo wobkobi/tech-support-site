@@ -344,6 +344,16 @@ function validateComms(c: CommsSettings): FieldError[] {
     errors.push({ field: "invoiceReminderMaxCount", message: "Must be 0-10 reminders." });
   if (typeof c.invoiceApologyEnabled !== "boolean")
     errors.push({ field: "invoiceApologyEnabled", message: "Must be on or off." });
+  if (typeof c.quietHoursEnabled !== "boolean")
+    errors.push({ field: "quietHoursEnabled", message: "Must be on or off." });
+  if (!inRange(c.quietHoursStart, 0, 23))
+    errors.push({ field: "quietHoursStart", message: "Must be an hour from 0-23." });
+  if (!inRange(c.quietHoursEnd, 0, 23))
+    errors.push({ field: "quietHoursEnd", message: "Must be an hour from 0-23." });
+  // Equal hours would read as "quiet all day" but mean "never quiet", so it is
+  // rejected rather than silently doing nothing.
+  if (c.quietHoursEnabled && c.quietHoursStart === c.quietHoursEnd)
+    errors.push({ field: "quietHoursEnd", message: "Pick a different hour from the start." });
   return errors;
 }
 

@@ -398,7 +398,9 @@ export async function PATCH(
           meetingType: updated.meetingType,
           rescheduleCount: updated.rescheduleCount,
         },
-        { kind: "rescheduled", previousStartAt: booking.startAt },
+        // Operator-driven move, so it waits for the quiet window; a customer
+        // rescheduling themselves gets theirs straight away.
+        { kind: "rescheduled", previousStartAt: booking.startAt, quietHours: true },
       ),
       sendOwnerBookingNotification(
         {

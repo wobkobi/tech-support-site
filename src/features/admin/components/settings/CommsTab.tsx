@@ -155,6 +155,39 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
       </div>
 
       <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+        Quiet hours
+      </h3>
+      <div className="mt-2 divide-y divide-admin-border">
+        <ToggleField
+          id="quietHoursEnabled"
+          meta={m.quietHoursEnabled}
+          value={draft.quietHoursEnabled}
+          customised={draft.quietHoursEnabled !== defaults.quietHoursEnabled}
+          onChange={(v) => set({ quietHoursEnabled: v })}
+        />
+        <NumberField
+          id="quietHoursStart"
+          meta={m.quietHoursStart}
+          value={draft.quietHoursStart}
+          min={0}
+          max={23}
+          error={fieldErrors.quietHoursStart}
+          customised={draft.quietHoursStart !== defaults.quietHoursStart}
+          onChange={(v) => set({ quietHoursStart: v ?? 0 })}
+        />
+        <NumberField
+          id="quietHoursEnd"
+          meta={m.quietHoursEnd}
+          value={draft.quietHoursEnd}
+          min={0}
+          max={23}
+          error={fieldErrors.quietHoursEnd}
+          customised={draft.quietHoursEnd !== defaults.quietHoursEnd}
+          onChange={(v) => set({ quietHoursEnd: v ?? 0 })}
+        />
+      </div>
+
+      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Overdue invoice reminders
       </h3>
       <div className="mt-2 divide-y divide-admin-border">
