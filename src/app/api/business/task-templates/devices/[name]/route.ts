@@ -16,7 +16,7 @@
  * canonical spelling - do NOT clear it and expect it to come back.
  */
 
-import { renameTaxonomyTag } from "@/features/business/lib/task-taxonomy";
+import { renameTaxonomyTag } from "@/features/business/lib/task-taxonomy.server";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -48,9 +48,9 @@ export async function PATCH(
 
   if (!from) return errorResponse("name is required", 400);
   if (!to) return errorResponse("to is required", 400);
-  if (from.toLowerCase() === to.toLowerCase() && from === to) {
-    return errorResponse("to must differ from the current name", 400);
-  }
+  // A case-only rename is allowed - it is the fix for a tag stored under two
+  // spellings - so only an exact repeat is rejected.
+  if (from === to) return errorResponse("to must differ from the current name", 400);
 
   const result = await renameTaxonomyTag("device", from, to);
   return NextResponse.json({ ok: true, ...result });

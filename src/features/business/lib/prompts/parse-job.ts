@@ -4,6 +4,7 @@
  * is the static, cache-friendly system prompt (rules, structure, output schema);
  * {@link buildParseJobContext} appends live per-call data to the user message.
  */
+import { collectTaxonomyTags } from "@/features/business/lib/task-taxonomy";
 import type { RateConfig, TaskTemplate } from "@/features/business/types/business";
 
 /**
@@ -40,7 +41,7 @@ STRUCTURE — every task object represents ONE device + ONE action (+ optional d
   SCOPE LIMIT — this exception NEVER merges items the operator listed separately. The operator's own line breaks and separate clauses are the task boundary: each listed item is its own task even when several are training on the same platform. "macOS Pages help" on one line and "Helping explain tech with macOS" on the next are TWO training tasks, not one merged "Pages, macOS" line - they were written apart, so they bill apart. Merge only WITHIN a single listed item.
 - ONE device per task. If the same action applies to two devices, that's two tasks (e.g. "set up new phone and laptop" → task A device "Phone" action "Setup", task B device "Laptop" action "Setup").
 - Use generic device names — never brand names; the specific product the customer used goes in details, not the device tag. Match each product to the closest device in the vocabulary below (e.g. "iPhone" → "Phone", "Dropbox" → "Cloud service").
-- Use SPECIFIC action names when context calls for it — single concept per action, but encode meaningful detail in the verb-phrase rather than defaulting to a bare generic. Prefer "Corruption repair", "Windows repair", "Battery replacement", "Account recovery", "Password reset" over plain "Repair" / "Recovery" when the job description tells you what was actually fixed/recovered. Stay short (1-3 words) and never use "and".
+- Use SPECIFIC action names when context calls for it — single concept per action, but encode meaningful detail in the verb-phrase rather than defaulting to a bare generic. Prefer "Corruption repair", "Windows repair", "Battery replacement", "Account recovery" over plain "Repair" / "Recovery" when the job description tells you what was actually fixed/recovered. Stay short (1-3 words) and never use "and".
 - PRESERVE compound qualifiers from the source ("Bluetooth/radio", "Wi-Fi + ethernet", "front + rear cam") by pushing them into details ("Bluetooth & radio") under the generic action ("Setup"). Do NOT bake them into the action tag - compound actions splinter the taxonomy. NEVER silently drop one half because it's shorter.
 
 TAG SELECTION — the "Current device tags" / "Current action tags" lists in the user message are the authoritative vocabulary. Pick from them VERBATIM (exact casing) whenever an entry fits the work; coin a new tag ONLY when nothing in the lists applies, keeping it a short generic noun (devices) or 1-3 word verb-phrase (actions). Never coin a synonym or spelling variant of a listed tag - a new tag splits the operator's price history.
@@ -67,8 +68,9 @@ DEVICE semantic guide (what each common tag means; the live list above is author
 - Peripherals are NEVER device tags: a microphone, webcam, mouse, keyboard, speaker, or headset belongs to the machine it plugs into. Tag the HOST device and name the peripheral in details. When the host is named, use it. When it is NOT named, infer it from the rest of the job's context (a session full of Outlook/Ethernet work implies the client's computer - pick "Laptop" or "Desktop / PC" only when the description hints at which; a session about a phone implies "Phone"); with no usable context at all, fall back to "Other". NEVER present an inferred host as more specific than the evidence supports, and do not coin peripheral names as new device tags.
 
 ACTION semantic guide (typical shapes; the "Current action tags" list is authoritative when it has a fitting entry):
-- Bare verbs: "Setup", "Configuration", "Repair", "Troubleshooting", "Cleanup", "Recovery", "Migration", "Training", "Maintenance", "Diagnosis".
-- Specific verb-phrases: "Corruption repair", "Windows repair", "Operating system reinstall", "Battery replacement", "Screen replacement", "Password reset", "Account recovery", "Data transfer", "Photo transfer", "Firmware update", "Driver update", "Virus removal", "Privacy & security".
+- Bare verbs: "Setup", "Configuration", "Repair", "Troubleshooting", "Cleanup", "Recovery", "Migration", "Training", "Maintenance".
+- "Setup" vs "Configuration" - the pair most often confused, and both are live tags. Decide on whether it was already working FOR THIS CUSTOMER before the visit: it was > "Configuration" (changing settings on something in service - reconnecting, re-pointing, adjusting, tuning). It was not > "Setup" (bringing it into service the first time - a new device out of the box, a new account, a first install). Never pick between them on how much work it took.
+- Specific verb-phrases: "Corruption repair", "Windows repair", "Battery replacement", "Screen replacement", "Account recovery", "Data transfer", "Photo transfer", "Firmware update", "Driver update", "Virus removal", "Privacy & security".
 - SPECIFICITY GATE for transfers/migrations: only narrow to a payload-specific variant ("Photo transfer", "Single file transfer") when the source NAMES what moved (photos, files, contacts, a count). For a bare unqualified "transfer" with no stated payload, use "Data transfer", or "Migration" when it reads as moving a whole device's content to a new one (e.g. "new phone setup and transfer"). NEVER assume "photos" just because the device is a phone.
 - Phrasing → action: "explained" / "guided" / "showed how to use" / "walkthrough" / "went through" → "Training" (don't invent "Explanation" / "Tuition" variants).
 
@@ -89,7 +91,7 @@ REUSE — if a previously-used template in the user-message templates list has t
 
 EXAMPLES — multi-task splitting + specific actions + details:
 - Input: "set up new phone and transfer photos to laptop, also reset the email password"
-  Tasks: [{device: "Phone", action: "Setup"}, {device: "Phone", action: "Photo transfer", details: "to laptop"}, {device: "Email account", action: "Password reset"}]
+  Tasks: [{device: "Phone", action: "Setup"}, {device: "Phone", action: "Photo transfer", details: "to laptop"}, {device: "Email account", action: "Account recovery"}]
 - Input: "iPhone setup and iCloud configuration, then laptop config for that"  (brand in details for both)
   Tasks: [{device: "Phone", action: "Setup", details: "iPhone"}, {device: "Cloud service", action: "Configuration", details: "iCloud"}, {device: "Laptop", action: "Configuration", details: "iCloud sync"}]
 - Input: "fixed and repaired corrupted USB drives and fixed Windows since it was causing it"
@@ -105,7 +107,7 @@ EXAMPLES — multi-task splitting + specific actions + details:
 - Input: "Apple App Store iCloud account fix"  (the Apple account/login itself - App Store sign-in + iCloud login - NOT file storage; do NOT tag Cloud service)
   Tasks: [{device: "Software", action: "Account recovery", details: "iCloud, App Store"}]
 - Input: "email not working - diagnosed delivery issues, fixed DNS/routing records across multiple providers, reconfigured Outlook POP3/SMTP for multiple accounts, fixed Gmail rejecting outbound mail due to missing SPF/DKIM"  (4 distinct services - do NOT collapse; Network for DNS work; DNS/POP3/SMTP are fine in output details; SPF/DKIM/MX appear in the input but stay out of output details per JARGON BAN; domain names and registrar names are forbidden; use positive outcome language not failure phrases)
-  Tasks: [{device: "Email account", action: "Diagnosis", details: "not sending, not receiving"}, {device: "Network", action: "Configuration", details: "DNS, multiple providers"}, {device: "Email account", action: "Configuration", details: "Outlook, POP3/SMTP, multiple accounts"}, {device: "Email account", action: "Privacy & security", details: "Gmail, outbound mail"}]
+  Tasks: [{device: "Email account", action: "Troubleshooting", details: "not sending, not receiving"}, {device: "Network", action: "Configuration", details: "DNS, multiple providers"}, {device: "Email account", action: "Configuration", details: "Outlook, POP3/SMTP, multiple accounts"}, {device: "Email account", action: "Privacy & security", details: "Gmail, outbound mail"}]
 
 BILLING — single source of truth for time distribution. Run the algorithm step by step.
 Let step = the billing increment from the BILLING context line expressed in hours (5 min > step = 0.0833h; 10 min > 0.1667h; 15 min > 0.25h), minBill = the minimum billable time from that line, and quickTask = the quick-task time from that line. EVERY task qty must be a whole multiple of step. Some examples below show 0.25h figures because they are worked at a 15-min step for legibility - NEVER hardcode 0.25h; always read step from the context and round on it.
@@ -358,15 +360,14 @@ export function buildParseJobContext(
   identity?: { company: string; name: string; location: string },
   billing?: { minBillableMins: number; incrementMins: number; shortTaskMins: number },
 ): string {
-  // Distinct live tag vocabulary, derived from the same template rows the
-  // taxonomy endpoint reads. Sent as flat lists so TAG SELECTION can demand
-  // verbatim reuse without the model re-deriving the sets from the pairs.
-  const deviceTags = Array.from(
-    new Set(templates.map((t) => t.device).filter((v): v is string => !!v)),
-  ).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
-  const actionTags = Array.from(
-    new Set(templates.map((t) => t.action).filter((v): v is string => !!v)),
-  ).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+  // Live tag vocabulary, collapsed the same way the taxonomy endpoint collapses
+  // it: one entry per case-insensitive tag. Offering both "PC" and "Pc" under a
+  // "reuse verbatim" instruction is what splits the taxonomy in the first place -
+  // the model picks either, and the next row is written with whichever it picked.
+  // Sent as flat lists so TAG SELECTION can demand verbatim reuse without the
+  // model re-deriving the sets from the pairs.
+  const deviceTags = collectTaxonomyTags(templates, "device").map((tag) => tag.name);
+  const actionTags = collectTaxonomyTags(templates, "action").map((tag) => tag.name);
   const taxonomyBlock =
     deviceTags.length > 0 || actionTags.length > 0
       ? `Current device tags (authoritative - reuse verbatim when one fits):\n${JSON.stringify(

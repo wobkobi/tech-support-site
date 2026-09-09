@@ -9,6 +9,7 @@
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
 import { Combobox } from "@/features/business/components/Combobox";
 import { composeDescription, formatNZD } from "@/features/business/lib/business";
+import { collectTaxonomyTags } from "@/features/business/lib/task-taxonomy";
 import type { RateConfig, TaskLine, TaskTemplate } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -33,19 +34,16 @@ interface Props {
 }
 
 /**
- * Sorted, deduplicated suggestions for a Combobox axis (device or action),
- * extracted from the current template snapshot.
+ * Sorted suggestions for a Combobox axis (device or action), extracted from the
+ * current template snapshot. One entry per case-insensitive tag: offering both
+ * "PC" and "Pc" would let the operator pick either and keep the split alive,
+ * and the two are one tag to every consumer downstream.
  * @param templates - All saved templates.
  * @param key - Which axis to extract.
- * @returns Sorted unique tag values.
+ * @returns Sorted canonical tag values.
  */
 function tagSuggestions(templates: TaskTemplate[], key: "device" | "action"): string[] {
-  const set = new Set<string>();
-  for (const t of templates) {
-    const v = t[key];
-    if (typeof v === "string" && v.trim().length > 0) set.add(v.trim());
-  }
-  return Array.from(set).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+  return collectTaxonomyTags(templates, key).map((tag) => tag.name);
 }
 
 /**

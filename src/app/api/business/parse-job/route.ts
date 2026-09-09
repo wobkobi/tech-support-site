@@ -16,6 +16,7 @@ import {
   buildParseJobContext,
   buildParseJobPrompt,
 } from "@/features/business/lib/prompts/parse-job";
+import { canonicalTagMap, canonicaliseTag } from "@/features/business/lib/task-taxonomy";
 import { extractRangeStats } from "@/features/business/lib/time-parse";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import type {
@@ -72,24 +73,6 @@ function nzTimeToDate(hhmm: string | null | undefined, anchorDate?: string): Dat
     utc = new Date(utc.getTime() + (daysAhead === 0 && !anchorDate ? 1 : 7) * 24 * 60 * 60 * 1000);
   }
   return utc;
-}
-
-/**
- * Canonicalises one AI-emitted tag: case-variants of a known tag snap to the
- * stored casing so near-duplicates can't split the taxonomy or the price
- * memory. Unknown tags pass through trimmed - the vocabulary stays open, and
- * the caller warns the operator so a new tag is a visible decision, not drift.
- * @param tag - Device or action tag from the AI.
- * @param known - Lowercased tag > stored casing, built from the templates.
- * @returns Canonical tag, or null when the input was empty.
- */
-function canonicaliseTag(
-  tag: string | null | undefined,
-  known: Map<string, string>,
-): string | null {
-  const trimmed = tag?.trim();
-  if (!trimmed) return null;
-  return known.get(trimmed.toLowerCase()) ?? trimmed;
 }
 
 /**
@@ -339,18 +322,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // since-renamed modifier, or a hallucinated label). Collected so the
       // operator gets a warning instead of the modifier silently vanishing.
       const unresolvedModifierLabels = new Set<string>();
-      // Known-tag maps (lowercased > stored casing) for canonicaliseTag, so
-      // emitted case-variants land on the taxonomy's existing spelling.
-      const knownDevices = new Map(
-        templates.flatMap((t): [string, string][] =>
-          t.device ? [[t.device.toLowerCase(), t.device]] : [],
-        ),
-      );
-      const knownActions = new Map(
-        templates.flatMap((t): [string, string][] =>
-          t.action ? [[t.action.toLowerCase(), t.action]] : [],
-        ),
-      );
+      // Known-tag maps (lowercased > canonical casing) for canonicaliseTag, so
+      // emitted case-variants land on the taxonomy's existing spelling. Where the
+      // stored rows disagree the busiest casing wins, so a stray "Pc" on one row
+      // can't pull every later parse off the "PC" the rest of the table uses.
+      const knownDevices = canonicalTagMap(templates, "device");
+      const knownActions = canonicalTagMap(templates, "action");
       // Tags the model coined that aren't in the taxonomy. Surfaced as a
       // warning so a genuinely new tag is a visible operator decision and a
       // drifted synonym gets corrected before it splits the price history.

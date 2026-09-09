@@ -1090,9 +1090,18 @@ export function CalculatorView({
   async function saveTaskTemplates(taskList: TaskLine[]): Promise<void> {
     // Only save tasks that have BOTH device + action populated. Description-only
     // rows (e.g. flat-rate travel lines) skip templating.
-    const custom = taskList.filter((t) => t.rateConfigId == null && t.device && t.action);
+    const tagged = taskList.filter((t) => t.rateConfigId == null && t.device && t.action);
+    // One request per distinct tag pair. The endpoint upserts by looking the row
+    // up and then creating it, so two line items sharing a pair would both miss
+    // the lookup in this parallel batch and insert a duplicate template - which
+    // is how a second "Software repair" row appeared at a different price. The
+    // last occurrence wins, matching the sequential upsert's final state.
+    const byPair = new Map<string, TaskLine>();
+    for (const t of tagged) {
+      byPair.set(`${t.device?.toLowerCase()}|${t.action?.toLowerCase()}`, t);
+    }
     await Promise.all(
-      custom.map((t) =>
+      [...byPair.values()].map((t) =>
         fetch("/api/business/task-templates", {
           method: "POST",
           headers: { "content-type": "application/json" },
