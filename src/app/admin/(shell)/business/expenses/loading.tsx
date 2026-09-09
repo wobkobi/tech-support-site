@@ -1,6 +1,4 @@
 // src/app/admin/(shell)/business/expenses/loading.tsx
-/**
- * @description Expenses list-view loading skeleton (shared admin list shape).
- */
+// Expenses list-view loading skeleton (shared admin list shape).
 
 export { AdminListSkeleton as default } from "@/features/admin/components/AdminListSkeleton";

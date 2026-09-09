@@ -1,9 +1,7 @@
 "use client";
 // src/features/reviews/components/ReviewsList.tsx
-/**
- * @description Public reviews grid. Reveals a batch at a time rather than
- * rendering every approved review at once, with each review's date and name.
- */
+// Public reviews grid. Reveals a batch at a time rather than rendering every approved
+// review at once, with each review's date and name.
 
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import { splitReviewsIntoColumns } from "@/features/reviews/lib/gridColumns";

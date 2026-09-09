@@ -1,7 +1,5 @@
 // src/app/api/admin/bookings/[id]/route.ts
-/**
- * @description Admin API for editing and cancelling bookings by ID.
- */
+// Admin API for editing and cancelling bookings by ID.
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import { combineUnitAndAddress } from "@/features/booking/lib/booking";

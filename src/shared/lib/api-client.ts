@@ -1,10 +1,8 @@
 // src/shared/lib/api-client.ts
-/**
- * @description Client-side wrapper for the site's own JSON API. Collapses the
- * `res.ok` / `body.ok` / `body.error` branching every call site was repeating,
- * and mirrors the `{ ok, ... }` contract that `api-response.ts` writes on the
- * server so a caller branches once instead of guessing which layer failed.
- */
+// Client-side wrapper for the site's own JSON API. Collapses the `res.ok` / `body.ok` /
+// `body.error` branching every call site was repeating, and mirrors the `{ ok, ... }`
+// contract that `api-response.ts` writes on the server so a caller branches once instead
+// of guessing which layer failed.
 
 /** Outcome of an {@link apiFetch} call. */
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; status: number };

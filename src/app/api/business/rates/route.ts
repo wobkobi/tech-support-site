@@ -1,11 +1,8 @@
 // src/app/api/business/rates/route.ts
-/**
- * @description Admin rate-config collection endpoint. GET returns every rate,
- * seeding any missing DEFAULTS and running passive migrations (drop Student /
- * Complex, retire the Travel row into the pricing settings, backfill
- * updatedAt). POST creates a rate (clearing other defaults when isDefault is
- * set); DELETE wipes all rows and reseeds the DEFAULTS.
- */
+// Admin rate-config collection endpoint. GET returns every rate, seeding any missing
+// DEFAULTS and running passive migrations (drop Student / Complex, retire the Travel row
+// into the pricing settings, backfill updatedAt). POST creates a rate (clearing other
+// defaults when isDefault is set); DELETE wipes all rows and reseeds the DEFAULTS.
 
 import { RATE_CONFIG_TAG } from "@/features/business/lib/pricing-policy.server";
 import { errorResponse } from "@/shared/lib/api-response";

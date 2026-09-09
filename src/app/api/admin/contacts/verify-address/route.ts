@@ -1,10 +1,8 @@
 // src/app/api/admin/contacts/verify-address/route.ts
-/**
- * @description Admin-side address verification for the contact address review
- * queue. Same geocoding as the public /api/booking/verify-address, but behind
- * admin auth instead of that route's 10-per-minute public rate limit, which an
- * operator working through a long queue would otherwise hit.
- */
+// Admin-side address verification for the contact address review queue. Same geocoding as
+// the public /api/booking/verify-address, but behind admin auth instead of that route's
+// 10-per-minute public rate limit, which an operator working through a long queue would
+// otherwise hit.
 
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

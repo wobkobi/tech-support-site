@@ -1,12 +1,9 @@
 "use client";
 // src/features/admin/components/ContactAddressReviewList.tsx
-/**
- * @description Review queue for imported contact addresses the geocoder could
- * not confidently resolve. Each card offers the Auckland candidates as
- * one-click picks plus a free-text box checked through
- * /api/admin/contacts/verify-address, and saves through PATCH
- * /api/admin/contacts/[id]. A saved or dismissed row drops out of the list.
- */
+// Review queue for imported contact addresses the geocoder could not confidently resolve.
+// Each card offers the Auckland candidates as one-click picks plus a free-text box
+// checked through /api/admin/contacts/verify-address, and saves through PATCH
+// /api/admin/contacts/[id]. A saved or dismissed row drops out of the list.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";

@@ -1,10 +1,8 @@
 // src/app/api/cron/refresh-calendar-cache/route.ts
-/**
- * @description Cron endpoint to refresh cached calendar events.
- * Called externally via cron-job.org every 30 minutes. The cache backs
- * booking-page availability; the admin schedule reads Google live through
- * getCachedScheduleEvents, so it stays current regardless of this cadence.
- */
+// Cron endpoint to refresh cached calendar events. Called externally via cron-job.org
+// every 30 minutes. The cache backs booking-page availability; the admin schedule reads
+// Google live through getCachedScheduleEvents, so it stays current regardless of this
+// cadence.
 
 import { refreshCalendarCache } from "@/features/calendar/lib/calendar-cache";
 import { errorResponse } from "@/shared/lib/api-response";

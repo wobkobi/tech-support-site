@@ -1,16 +1,13 @@
 // src/features/business/lib/pricing-policy.ts
-/**
- * @description Single source of truth for every billable rule customers and
- * operators see: travel-charge math, cancellation windows, minimum billable
- * time, GST mode, plus the copy shared by the pricing page, booking
- * confirmation emails, and the FAQ.
- *
- * The constants here are the DEFAULTS. The live, settings-backed values are
- * resolved by `getPolicy()` in `pricing-policy.server.ts`; server consumers
- * read `(await getPolicy()).X` and client consumers receive resolved values as
- * props. The copy generators take their figures as arguments so the rendered
- * text always matches the live policy. Keep this module client-safe (no Prisma).
- */
+// Single source of truth for every billable rule customers and operators see:
+// travel-charge math, cancellation windows, minimum billable time, GST mode, plus the
+// copy shared by the pricing page, booking confirmation emails, and the FAQ.
+//
+// The constants here are the DEFAULTS. The live, settings-backed values are resolved by
+// `getPolicy()` in `pricing-policy.server.ts`; server consumers read
+// `(await getPolicy()).X` and client consumers receive resolved values as props. The copy
+// generators take their figures as arguments so the rendered text always matches the live
+// policy. Keep this module client-safe (no Prisma).
 
 import {
   MIN_TRAVEL_CHARGE,

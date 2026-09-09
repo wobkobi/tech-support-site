@@ -1,11 +1,10 @@
 // src/app/admin/(shell)/business/invoices/[id]/page.tsx
-/**
- * @description Detail page for a single saved invoice. Two-column on lg+: the A4
- * preview (mirrors the generated PDF) on the left, a context rail (timeline,
- * payment, linked records) on the right. Data loads in two batches so the preview
- * paints from batch 1 while the rail streams via Suspense from batch 2; both are
- * Server-Timing instrumented to catch this page's historically slow loads.
- */
+// Detail page for a single saved invoice. Two-column on lg+: the A4 preview (mirrors the
+// generated PDF) on the left, a context rail (timeline, payment, linked records) on the
+// right. Data loads in two batches so the preview paints from batch 1 while the rail
+// streams via Suspense from batch 2; both are Server-Timing instrumented to catch this
+// page's historically slow loads.
+
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";

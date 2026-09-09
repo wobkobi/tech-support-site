@@ -1,15 +1,12 @@
 // src/app/api/business/task-templates/taxonomy/route.ts
-/**
- * @description Admin task-template taxonomy endpoint. GET returns the device and
- * action tags in use across all templates - one entry per case-insensitive tag,
- * sorted alphabetically - to power the manage-tags modal.
- *
- * Casing does not make a second tag: everything downstream matches tags
- * case-insensitively, so listing "PC" and "Pc" as two rows would offer two
- * handles on one tag and let a Clear aimed at either take both. Rival casings
- * ride along in `variants` so a split spelling stays visible and the operator
- * can rename it away.
- */
+// Admin task-template taxonomy endpoint. GET returns the device and action tags in use
+// across all templates - one entry per case-insensitive tag, sorted alphabetically - to
+// power the manage-tags modal.
+//
+// Casing does not make a second tag: everything downstream matches tags
+// case-insensitively, so listing "PC" and "Pc" as two rows would offer two handles on one
+// tag and let a Clear aimed at either take both. Rival casings ride along in `variants`
+// so a split spelling stays visible and the operator can rename it away.
 
 import { collectTaxonomyTags } from "@/features/business/lib/task-taxonomy";
 import { errorResponse } from "@/shared/lib/api-response";

@@ -1,10 +1,9 @@
 // src/app/admin/(shell)/schedule/page.tsx
-/**
- * @description Admin schedule page. Resolves the requested week from `?day=` or
- * `?weekStart=`, prefetches a {@link BUFFER_WEEKS}-week buffer of calendar and
- * travel events so day/week stepping stays client-side, and renders the desktop
- * {@link WeekView} grid and mobile {@link DayAgendaView}.
- */
+// Admin schedule page. Resolves the requested week from `?day=` or `?weekStart=`,
+// prefetches a BUFFER_WEEKS-week buffer of calendar and travel events so day/week
+// stepping stays client-side, and renders the desktop WeekView grid and mobile
+// DayAgendaView.
+
 import { DayAgendaView } from "@/features/admin/components/DayAgendaView";
 import { ScheduleAutoRefresh } from "@/features/admin/components/ScheduleAutoRefresh";
 import { ScheduleFindTimes } from "@/features/admin/components/ScheduleFindTimes";

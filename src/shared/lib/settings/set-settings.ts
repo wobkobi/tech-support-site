@@ -1,10 +1,8 @@
 // src/shared/lib/settings/set-settings.ts
-/**
- * @description Server-only writer for a single settings group. Upserts the
- * `settings:<group>` row, records an append-only `SettingAudit` entry for the
- * change, then busts the `settings` cache tag so the change is live
- * immediately. Callers (the admin API route) validate the payload first.
- */
+// Server-only writer for a single settings group. Upserts the `settings:<group>` row,
+// records an append-only `SettingAudit` entry for the change, then busts the `settings`
+// cache tag so the change is live immediately. Callers (the admin API route) validate the
+// payload first.
 
 import { prisma } from "@/shared/lib/prisma";
 import { SETTINGS_KEY_PREFIX, SETTINGS_TAG } from "@/shared/lib/settings/get-settings";

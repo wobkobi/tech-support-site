@@ -1,11 +1,10 @@
 // src/app/admin/(shell)/contacts/page.tsx
-/**
- * @description Admin contacts hub. Surfaces booking-sourced field conflicts
- * via {@link enrichContactsFromBookings}, counts pending Google-sync
- * conflicts, loads all contacts plus their linked reviews, and renders the
- * {@link ContactsAdminView} list. The heavier dedup/merge/backfill passes run
- * on the sync-contacts cron and the standalone admin routes, not per page load.
- */
+// Admin contacts hub. Surfaces booking-sourced field conflicts via
+// enrichContactsFromBookings, counts pending Google-sync conflicts, loads all contacts
+// plus their linked reviews, and renders the ContactsAdminView list. The heavier
+// dedup/merge/backfill passes run on the sync-contacts cron and the standalone admin
+// routes, not per page load.
+
 import { ContactsAdminView } from "@/features/admin/components/ContactsAdminView";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";

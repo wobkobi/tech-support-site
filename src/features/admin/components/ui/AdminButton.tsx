@@ -1,11 +1,8 @@
 // src/features/admin/components/ui/AdminButton.tsx
-/**
- * @description Compact back-office button. Cloned (not extended) from the shared
- * public Button - the public primary is coquelicot h-12 for the marketing site,
- * whereas admin wants russian-violet h-8/h-9 controls. Polymorphic: renders a
- * Next.js Link when `href` is set, otherwise a native button. A `busy` button
- * shows a spinner and is disabled.
- */
+// Compact back-office button. Cloned (not extended) from the shared public Button - the
+// public primary is coquelicot h-12 for the marketing site, whereas admin wants
+// russian-violet h-8/h-9 controls. Polymorphic: renders a Next.js Link when `href` is
+// set, otherwise a native button. A `busy` button shows a spinner and is disabled.
 
 "use client";
 

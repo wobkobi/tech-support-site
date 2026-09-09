@@ -1,12 +1,10 @@
 "use client";
 // src/features/business/components/InvoicesListView.tsx
-/**
- * @description Lists every invoice with client-side search, status/date
- * filtering, sortable columns, and clickable summary cards. Status is shown as a
- * derived badge (SENT-past-due surfaces as OVERDUE) - there is no inline status
- * dropdown; a payment is recorded through {@link PaymentDialog} (POST /pay), and
- * voiding lives on the invoice detail page so a client notification can be sent.
- */
+// Lists every invoice with client-side search, status/date filtering, sortable columns,
+// and clickable summary cards. Status is shown as a derived badge (SENT-past-due surfaces
+// as OVERDUE) - there is no inline status dropdown; a payment is recorded through
+// PaymentDialog (POST /pay), and voiding lives on the invoice detail page so a client
+// notification can be sent.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";

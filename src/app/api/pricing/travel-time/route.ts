@@ -1,11 +1,8 @@
 // src/app/api/pricing/travel-time/route.ts
-/**
- * @description Public, rate-limited travel-time endpoint. POST looks up both
- * drive legs via {@link lookupDriveRoundTrip}, each traffic-aware at its own
- * departure. Returns zero durations for no match, 503 on misconfig, 502 on
- * upstream errors. Each request costs two Google Distance Matrix elements;
- * the 5/min rate limit keeps that within quota.
- */
+// Public, rate-limited travel-time endpoint. POST looks up both drive legs via
+// lookupDriveRoundTrip, each traffic-aware at its own departure. Returns zero durations
+// for no match, 503 on misconfig, 502 on upstream errors. Each request costs two Google
+// Distance Matrix elements; the 5/min rate limit keeps that within quota.
 
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";

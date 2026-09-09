@@ -1,7 +1,5 @@
 // src/features/admin/lib/week.ts
-/**
- * @description Week-range helpers for the admin schedule view.
- */
+// Week-range helpers for the admin schedule view.
 
 import { dateKeyParts, nzDateParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
 

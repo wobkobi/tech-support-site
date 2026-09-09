@@ -1,11 +1,8 @@
 // src/features/business/lib/invoice-numbering.ts
-/**
- * @description Shared invoice-numbering helper. Both the admin invoice
- * create flow and the auto-drafted late-cancellation invoice flow have to
- * agree on the next number so they never collide on the unique
- * `Invoice.number` index. Sheets is the source of truth when reachable;
- * Prisma is the fallback when it's not.
- */
+// Shared invoice-numbering helper. Both the admin invoice create flow and the
+// auto-drafted late-cancellation invoice flow have to agree on the next number so they
+// never collide on the unique `Invoice.number` index. Sheets is the source of truth when
+// reachable; Prisma is the fallback when it's not.
 
 import { nextInvoiceNumber } from "@/features/business/lib/business";
 import { nzFinancialYearCode } from "@/features/business/lib/financial-year";

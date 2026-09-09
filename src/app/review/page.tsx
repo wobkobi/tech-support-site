@@ -1,7 +1,5 @@
 // src/app/review/page.tsx
-/**
- * @description Protected review page - requires token OR allows public reviews.
- */
+// Protected review page - requires token OR allows public reviews.
 
 import ReviewFormProtected from "@/features/reviews/components/ReviewForm";
 import { Button } from "@/shared/components/Button";

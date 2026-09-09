@@ -1,7 +1,5 @@
 // src/app/sitemap.ts
-/**
- * @description Dynamic sitemap for search engines. Lists all crawlable public routes.
- */
+// Dynamic sitemap for search engines. Lists all crawlable public routes.
 
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { MetadataRoute } from "next";

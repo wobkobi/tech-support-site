@@ -1,7 +1,5 @@
 // src/features/booking/components/BookingForm.tsx
-/**
- * @description Booking form with duration selection (1hr vs 2hr jobs).
- */
+// Booking form with duration selection (1hr vs 2hr jobs).
 
 "use client";
 

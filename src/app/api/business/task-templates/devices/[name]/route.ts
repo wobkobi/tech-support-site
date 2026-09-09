@@ -1,20 +1,18 @@
 // src/app/api/business/task-templates/devices/[name]/route.ts
-/**
- * @description Admin endpoint to retire a task-template device tag. DELETE
- * clears the device (sets it to null, case-insensitive match) on every matching
- * TaskTemplate and returns the count of rows updated.
- *
- * Clearing a device is effectively PERMANENT - nothing re-tags the rows later.
- * parse-job may only reuse device tags from the live vocabulary, and that
- * vocabulary is built from this very field, so a retired tag is never offered to
- * the model again; `findTemplateByTags` also needs BOTH device and action, so a
- * null-device row can never match. The rows survive but go inert, and the work
- * they described gets tagged as something else (or an invented tag) from then on.
- *
- * Retire a tag only when that work is genuinely gone. To fix a drifted or
- * misspelt tag ("Desktop / Pc" vs "Desktop / PC"), re-tag the rows to the
- * canonical spelling - do NOT clear it and expect it to come back.
- */
+// Admin endpoint to retire a task-template device tag. DELETE clears the device (sets it
+// to null, case-insensitive match) on every matching TaskTemplate and returns the count
+// of rows updated.
+//
+// Clearing a device is effectively PERMANENT - nothing re-tags the rows later. parse-job
+// may only reuse device tags from the live vocabulary, and that vocabulary is built from
+// this very field, so a retired tag is never offered to the model again;
+// `findTemplateByTags` also needs BOTH device and action, so a null-device row can never
+// match. The rows survive but go inert, and the work they described gets tagged as
+// something else (or an invented tag) from then on.
+//
+// Retire a tag only when that work is genuinely gone. To fix a drifted or misspelt tag
+// ("Desktop / Pc" vs "Desktop / PC"), re-tag the rows to the canonical spelling - do NOT
+// clear it and expect it to come back.
 
 import { renameTaxonomyTag } from "@/features/business/lib/task-taxonomy.server";
 import { errorResponse } from "@/shared/lib/api-response";

@@ -1,11 +1,9 @@
 "use client";
 // src/features/admin/components/settings/SettingsSaveBar.tsx
-/**
- * @description Shared save/reset bar for every settings tab: "Save changes",
- * "Reset to defaults", and the dirty / saved indicators. High-impact
- * confirmations live on the individual controls that cause them, so a
- * cancelled confirm leaves the switch where it was rather than after a save.
- */
+// Shared save/reset bar for every settings tab: "Save changes", "Reset to defaults", and
+// the dirty / saved indicators. High-impact confirmations live on the individual controls
+// that cause them, so a cancelled confirm leaves the switch where it was rather than
+// after a save.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import type React from "react";

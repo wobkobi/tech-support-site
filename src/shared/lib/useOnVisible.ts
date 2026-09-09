@@ -1,8 +1,6 @@
 // src/shared/lib/useOnVisible.ts
-/**
- * @description Hook that latches true once an element first becomes visible or
- * focused, used to defer loading heavy third-party scripts.
- */
+// Hook that latches true once an element first becomes visible or focused, used to defer
+// loading heavy third-party scripts.
 
 import { useEffect, useState } from "react";
 

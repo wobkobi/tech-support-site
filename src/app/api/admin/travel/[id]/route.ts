@@ -1,10 +1,8 @@
 // src/app/api/admin/travel/[id]/route.ts
-/**
- * @description Admin endpoint to update a TravelBlock's transport mode, custom
- * origin, or custom travel-back destination. A travel-affecting change reprices
- * the block's two legs immediately - the 15-min cron only maintains upcoming
- * events, so a past job would otherwise sit blank after the change.
- */
+// Admin endpoint to update a TravelBlock's transport mode, custom origin, or custom
+// travel-back destination. A travel-affecting change reprices the block's two legs
+// immediately - the 15-min cron only maintains upcoming events, so a past job would
+// otherwise sit blank after the change.
 
 import {
   recomputeTravelBlock,

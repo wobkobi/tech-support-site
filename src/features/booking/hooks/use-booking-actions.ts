@@ -1,14 +1,12 @@
 "use client";
 // src/features/booking/hooks/use-booking-actions.ts
-/**
- * @description Shared booking mutation wrappers around the admin bookings API -
- * PATCH edits, mark-completed, cancel (operator / on-behalf), no-show, delete,
- * resend-review, and time edits - each bundled with success/error toasts. The bookings list,
- * the booking detail page, and the schedule's EventActionSheet all mutate
- * bookings through this hook so the endpoints, wording, and error handling live
- * in one place. Every wrapper resolves to a {@link BookingActionResult}; the
- * caller owns busy state and any optimistic update or router refresh.
- */
+// Shared booking mutation wrappers around the admin bookings API - PATCH edits,
+// mark-completed, cancel (operator / on-behalf), no-show, delete, resend-review, and time
+// edits - each bundled with success/error toasts. The bookings list, the booking detail
+// page, and the schedule's EventActionSheet all mutate bookings through this hook so the
+// endpoints, wording, and error handling live in one place. Every wrapper resolves to a
+// BookingActionResult; the caller owns busy state and any optimistic update or router
+// refresh.
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { apiFetch } from "@/shared/lib/api-client";

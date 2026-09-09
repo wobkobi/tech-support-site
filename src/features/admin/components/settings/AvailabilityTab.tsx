@@ -1,12 +1,10 @@
 "use client";
 // src/features/admin/components/settings/AvailabilityTab.tsx
-/**
- * @description Editor for the availability group: the master accepting-bookings
- * switch + paused message, the per-weekday hours (with optional midday break and
- * day-off), the booking-window rules, job durations, and daily caps. Saves
- * through the shared settings form hook; guardrails (e.g. a day too short for a
- * job) come back from the API and surface inline.
- */
+// Editor for the availability group: the master accepting-bookings switch + paused
+// message, the per-weekday hours (with optional midday break and day-off), the
+// booking-window rules, job durations, and daily caps. Saves through the shared settings
+// form hook; guardrails (e.g. a day too short for a job) come back from the API and
+// surface inline.
 
 import { AvailabilityPreview } from "@/features/admin/components/settings/AvailabilityPreview";
 import {

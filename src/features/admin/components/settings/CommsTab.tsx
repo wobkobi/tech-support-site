@@ -1,10 +1,7 @@
 "use client";
 // src/features/admin/components/settings/CommsTab.tsx
-/**
- * @description Editor for the comms & automation group: which emails send
- * (confirmation, reminder, review request) and their timings. Saves through
- * the shared settings form hook.
- */
+// Editor for the comms & automation group: which emails send (confirmation, reminder,
+// review request) and their timings. Saves through the shared settings form hook.
 
 import {
   NumberField,

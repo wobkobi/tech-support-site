@@ -1,7 +1,5 @@
 // scripts/build-icons/helpers.ts
-/**
- * @description Helper functions for image manipulation during icon generation.
- */
+// Helper functions for image manipulation during icon generation.
 
 import fs from "node:fs/promises";
 import { PALETTE } from "./config.js";

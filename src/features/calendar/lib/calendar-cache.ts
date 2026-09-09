@@ -1,7 +1,5 @@
 // src/features/calendar/lib/calendar-cache.ts
-/**
- * @description Background task to fetch and cache Google Calendar events.
- */
+// Background task to fetch and cache Google Calendar events.
 
 import {
   fetchAllCalendarEventsDetailed,

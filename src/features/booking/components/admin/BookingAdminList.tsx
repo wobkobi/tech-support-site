@@ -1,13 +1,10 @@
 "use client";
 // src/features/booking/components/admin/BookingAdminList.tsx
-/**
- * @description Admin bookings list: summary StatCards, status pills, free-text
- * search (name / email / phone), a start-date range filter, and sortable columns.
- * Editing and the full action set (cancel, no-show, delete) live on the booking
- * detail page now; the list keeps only the two common quick actions - mark
- * completed and send / resend review - each behind a {@link ConfirmDialog} and
- * routed through {@link useBookingActions}. Each row links to its detail page.
- */
+// Admin bookings list: summary StatCards, status pills, free-text search (name / email /
+// phone), a start-date range filter, and sortable columns. Editing and the full action
+// set (cancel, no-show, delete) live on the booking detail page now; the list keeps only
+// the two common quick actions - mark completed and send / resend review - each behind a
+// ConfirmDialog and routed through useBookingActions. Each row links to its detail page.
 
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";

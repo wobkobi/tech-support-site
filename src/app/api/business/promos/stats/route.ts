@@ -1,10 +1,8 @@
 // src/app/api/business/promos/stats/route.ts
-/**
- * @description Per-promo redemption counts for the admin promos page. Rows
- * created by the backfill carry no discount value, so they are counted
- * separately rather than folded into the total as zeroes - otherwise a promo
- * whose value was never recorded reads as one that saved nobody anything.
- */
+// Per-promo redemption counts for the admin promos page. Rows created by the backfill
+// carry no discount value, so they are counted separately rather than folded into the
+// total as zeroes - otherwise a promo whose value was never recorded reads as one that
+// saved nobody anything.
 
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

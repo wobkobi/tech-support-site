@@ -1,14 +1,12 @@
 // src/shared/lib/settings/defaults.ts
-/**
- * @description Canonical default for every settings group, transcribed from the
- * constants that lived in code before the settings panel. `get-settings.ts`
- * merges DB overrides on top of these, so an empty/missing/unreachable Setting
- * row always falls back to today's behaviour. Kept dependency-free (no Prisma,
- * no next/cache) so the seed script and client code can both import it.
- *
- * Identity secrets default from the existing env vars so the panel self-seeds
- * with the current values until the one-shot seed hands them to the DB.
- */
+// Canonical default for every settings group, transcribed from the constants that lived
+// in code before the settings panel. `get-settings.ts` merges DB overrides on top of
+// these, so an empty/missing/unreachable Setting row always falls back to today's
+// behaviour. Kept dependency-free (no Prisma, no next/cache) so the seed script and
+// client code can both import it.
+//
+// Identity secrets default from the existing env vars so the panel self-seeds with the
+// current values until the one-shot seed hands them to the DB.
 
 import type { DayWindow, Settings, WeeklySchedule } from "@/shared/lib/settings/types";
 

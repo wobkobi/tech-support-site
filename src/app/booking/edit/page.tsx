@@ -1,7 +1,5 @@
 // src/app/booking/edit/page.tsx
-/**
- * @description Edit an existing booking using the cancel token.
- */
+// Edit an existing booking using the cancel token.
 
 import BookingForm, {
   type BookingFormInitialValues,

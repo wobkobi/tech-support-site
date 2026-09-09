@@ -1,14 +1,12 @@
 "use client";
 // src/features/booking/components/admin/BookingInfoCard.tsx
-/**
- * @description Editable customer/booking info card on the booking detail page:
- * name, email, phone, address, and notes. View mode shows the values; Edit mode
- * swaps in inputs (address uses the Places autocomplete) and saves via the sparse
- * admin bookings PATCH, then refreshes the page. Only the free text is shown and
- * edited - the notes blob's metadata block is machine-written mirror, surfaced on
- * this page as chips - but the address is still written back into its "Address:"
- * line, the convention the PATCH route and contact backfill both read.
- */
+// Editable customer/booking info card on the booking detail page:
+// name, email, phone, address, and notes. View mode shows the values; Edit mode
+// swaps in inputs (address uses the Places autocomplete) and saves via the sparse
+// admin bookings PATCH, then refreshes the page. Only the free text is shown and
+// edited - the notes blob's metadata block is machine-written mirror, surfaced on
+// this page as chips - but the address is still written back into its "Address:"
+// line, the convention the PATCH route and contact backfill both read.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";

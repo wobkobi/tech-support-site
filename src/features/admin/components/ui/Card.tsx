@@ -1,9 +1,7 @@
 // src/features/admin/components/ui/Card.tsx
-/**
- * @description Canonical admin surface. Replaces the copy-pasted
- * `rounded-xl border ... bg-white shadow-sm` class strings with a tokenised
- * {@link Card} plus an optional {@link CardHeader}. Server-safe.
- */
+// Canonical admin surface. Replaces the copy-pasted
+// `rounded-xl border ... bg-white shadow-sm` class strings with a tokenised Card plus an
+// optional CardHeader. Server-safe.
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";

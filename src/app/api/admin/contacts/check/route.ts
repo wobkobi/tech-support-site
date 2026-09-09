@@ -1,9 +1,7 @@
 // src/app/api/admin/contacts/check/route.ts
-/**
- * @description Lightweight contact lookup by email. The post-save "Add to
- * contacts?" popup uses `exists` to decide whether to prompt; the calculator
- * uses `contactId` to link an invoice to a customer who is already on file.
- */
+// Lightweight contact lookup by email. The post-save "Add to contacts?" popup uses
+// `exists` to decide whether to prompt; the calculator uses `contactId` to link an
+// invoice to a customer who is already on file.
 
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

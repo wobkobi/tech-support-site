@@ -1,7 +1,5 @@
 // src/app/api/admin/reviews/route.ts
-/**
- * @description Admin API for manually creating reviews (for past clients).
- */
+// Admin API for manually creating reviews (for past clients).
 
 import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
 import { reviewTextError } from "@/features/reviews/lib/validation";

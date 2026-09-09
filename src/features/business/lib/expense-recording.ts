@@ -1,11 +1,8 @@
 // src/features/business/lib/expense-recording.ts
-/**
- * @description Shared expense-entry writer, the counterpart to
- * `income-recording.ts`: creates the ExpenseEntry, mirrors it to the per-FY
- * Expenses sheet keyed by the entry's own id (a deterministic Sync ID, so a
- * retried append reuses the row instead of doubling it), and persists the
- * returned sheetRowKey.
- */
+// Shared expense-entry writer, the counterpart to `income-recording.ts`: creates the
+// ExpenseEntry, mirrors it to the per-FY Expenses sheet keyed by the entry's own id (a
+// deterministic Sync ID, so a retried append reuses the row instead of doubling it), and
+// persists the returned sheetRowKey.
 
 import { splitGstInclusive } from "@/features/business/lib/business";
 import {

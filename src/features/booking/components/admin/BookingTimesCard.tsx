@@ -1,15 +1,12 @@
 "use client";
 // src/features/booking/components/admin/BookingTimesCard.tsx
-/**
- * @description Editable start/finish times on the booking detail page. One
- * control, two meanings: moving a job that has already run to another past time
- * is the operator recording what actually happened, and stays silent; anything
- * else is a reschedule, which emails the customer unless that box is unticked.
- * Which of the two a save will do follows the times as they're typed. Overlaps
- * on the reschedule path come back as a 409 and are re-offered through a
- * {@link ConfirmDialog} rather than blocked. Between them these are why the
- * Google event no longer has to be corrected by hand.
- */
+// Editable start/finish times on the booking detail page. One control, two meanings:
+// moving a job that has already run to another past time is the operator recording what
+// actually happened, and stays silent; anything else is a reschedule, which emails the
+// customer unless that box is unticked. Which of the two a save will do follows the times
+// as they're typed. Overlaps on the reschedule path come back as a 409 and are re-offered
+// through a ConfirmDialog rather than blocked. Between them these are why the Google
+// event no longer has to be corrected by hand.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";

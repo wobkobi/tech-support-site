@@ -1,7 +1,5 @@
 // src/app/contact/page.tsx
-/**
- * @description Contact page: how to get in touch.
- */
+// Contact page: how to get in touch.
 
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { Button } from "@/shared/components/Button";

@@ -1,12 +1,9 @@
 // scripts/export-card-screenshot.ts
-/**
- * @description Exports the /card page as print-ready business card PDFs (90x55mm,
- * the standard NZ size) by screenshotting each face via Puppeteer and embedding
- * the result into a pdf-lib document. Capture, PDF assembly and crop marks come
- * from scripts/lib/print-export.ts, shared with the poster exporter; this file
- * owns the card's dimensions and CLI.
- * Run with: npm run build:card [-- --local] [--side=front|back] [--variant=digital|print]
- */
+// Exports the /card page as print-ready business card PDFs (90x55mm, the standard NZ
+// size) by screenshotting each face via Puppeteer and embedding the result into a pdf-lib
+// document. Capture, PDF assembly and crop marks come from scripts/lib/print-export.ts,
+// shared with the poster exporter; this file owns the card's dimensions and CLI.
+// Run with: npm run build:card [-- --local] [--side=front|back] [--variant=digital|print]
 
 import { logSummary, renderVariants, type PageConfig } from "./lib/print-export.js";
 

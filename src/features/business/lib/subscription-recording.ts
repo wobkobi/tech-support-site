@@ -1,9 +1,7 @@
 // src/features/business/lib/subscription-recording.ts
-/**
- * @description Shared subscription-payment writer used by both the cron sweep
- * and the admin "Record payment" button, so the two cannot disagree about which
- * day a payment lands on or whether a double-fire is safe.
- */
+// Shared subscription-payment writer used by both the cron sweep and the admin "Record
+// payment" button, so the two cannot disagree about which day a payment lands on or
+// whether a double-fire is safe.
 
 import { advanceNextDue } from "@/features/business/lib/business";
 import { recordExpense } from "@/features/business/lib/expense-recording";

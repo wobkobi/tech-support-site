@@ -1,15 +1,13 @@
 // src/app/admin/(shell)/layout.tsx
-/**
- * @description Admin shell layout - renders the sidebar, the padded content
- * column, and the toast provider once for every page in the (shell) group. The
- * route group is transparent in the URL, so paths stay `/admin/...` unchanged.
- * The chrome that used to live in AdminPageLayout per-page now lives here.
- *
- * Auth stays PER-PAGE (`await requireAdminAuth(...)` as the first line of each
- * page), NOT in this layout: layouts do not re-run on client-side navigation
- * between sibling pages, so a layout-level gate would be a hole. The
- * request-level gate is `src/proxy.ts`; the per-page checks are defence-in-depth.
- */
+// Admin shell layout - renders the sidebar, the padded content column, and the toast
+// provider once for every page in the (shell) group. The route group is transparent in
+// the URL, so paths stay `/admin/...` unchanged. The chrome that used to live in
+// AdminPageLayout per-page now lives here.
+//
+// Auth stays PER-PAGE (`await requireAdminAuth(...)` as the first line of each page), NOT
+// in this layout: layouts do not re-run on client-side navigation between sibling pages,
+// so a layout-level gate would be a hole. The request-level gate is `src/proxy.ts`; the
+// per-page checks are defence-in-depth.
 
 import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
 import { AdminToastProvider } from "@/features/admin/components/ui/Toast";

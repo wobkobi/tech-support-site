@@ -1,9 +1,6 @@
 // src/app/booking/cancel/page.tsx
-/**
- * @description Booking cancel page. Confirmation gate with a three-state
- * fee banner so the customer sees the cancellation cost before they fire
- * the cancel.
- */
+// Booking cancel page. Confirmation gate with a three-state fee banner so the customer
+// sees the cancellation cost before they fire the cancel.
 
 "use client";
 

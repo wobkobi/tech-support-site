@@ -1,8 +1,6 @@
 // src/app/faq/loading.tsx
-/**
- * @description Streaming skeleton for the FAQ page: a heading card plus the
- * two-column stack of collapsed accordion rows and a next-steps card.
- */
+// Streaming skeleton for the FAQ page: a heading card plus the two-column stack of
+// collapsed accordion rows and a next-steps card.
 
 import { CARD, SOFT_CARD } from "@/shared/components/PageLayout";
 import { PageLoadingShell } from "@/shared/components/PageLoadingShell";

@@ -1,10 +1,7 @@
 "use client";
 // src/features/admin/components/WeekView.tsx
-/**
- * @description Admin week-grid view. Renders booking, work, personal, and travel
- * events for the requested week and opens a manual-booking modal when an empty
- * slot is clicked.
- */
+// Admin week-grid view. Renders booking, work, personal, and travel events for the
+// requested week and opens a manual-booking modal when an empty slot is clicked.
 
 import { BlockDayButton } from "@/features/admin/components/BlockDayButton";
 import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";

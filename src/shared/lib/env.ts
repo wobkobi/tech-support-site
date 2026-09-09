@@ -1,10 +1,8 @@
 // src/shared/lib/env.ts
-/**
- * @description Required environment variable access plus a startup validation
- * pass. Most secrets are read lazily and degrade gracefully, so only the
- * handful the server cannot run without are fatal; the rest warn so a
- * misconfigured deploy is visible without taking the site down.
- */
+// Required environment variable access plus a startup validation pass. Most secrets are
+// read lazily and degrade gracefully, so only the handful the server cannot run without
+// are fatal; the rest warn so a misconfigured deploy is visible without taking the site
+// down.
 
 /**
  * Secrets the server cannot function without. Missing one in production fails

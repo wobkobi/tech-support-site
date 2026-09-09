@@ -1,10 +1,8 @@
 // src/features/admin/components/ui/StatusPill.tsx
-/**
- * @description Tone-mapped status badge for admin lists and detail views,
- * replacing the ad-hoc per-view pill colour maps with one vocabulary:
- * DRAFT = neutral, SENT = info, PAID = success, OVERDUE = critical,
- * VOIDED = violet. Server-safe (no client hooks).
- */
+// Tone-mapped status badge for admin lists and detail views,
+// replacing the ad-hoc per-view pill colour maps with one vocabulary:
+// DRAFT = neutral, SENT = info, PAID = success, OVERDUE = critical,
+// VOIDED = violet. Server-safe (no client hooks).
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";

@@ -1,9 +1,7 @@
 // src/app/admin/(shell)/business/invoices/[id]/loading.tsx
-/**
- * @description Loading skeleton for a single invoice: the actions bar plus the
- * invoice document card (wordmark + INVOICE block, parties, line items, totals)
- * in the same max-w-3xl column the page uses.
- */
+// Loading skeleton for a single invoice: the actions bar plus the invoice document card
+// (wordmark + INVOICE block, parties, line items, totals) in the same max-w-3xl column
+// the page uses.
 
 import { Bone } from "@/shared/components/Skeleton";
 import type React from "react";

@@ -1,7 +1,5 @@
 // src/features/calendar/lib/travel-time.ts
-/**
- * @description Calculates public-transport travel time using the Google Maps Distance Matrix API.
- */
+// Calculates public-transport travel time using the Google Maps Distance Matrix API.
 
 import { prisma } from "@/shared/lib/prisma";
 

@@ -1,10 +1,8 @@
 // src/features/business/lib/cancellation-invoice.ts
-/**
- * @description Builds + writes the DRAFT invoice that covers a late
- * cancellation or no-show. Shared by /api/booking/cancel (customer) and
- * /api/admin/bookings/[id] (operator). Fire-and-forget callable; failures
- * log but never throw so the cancel action that triggered this stays clean.
- */
+// Builds + writes the DRAFT invoice that covers a late cancellation or no-show. Shared by
+// /api/booking/cancel (customer) and /api/admin/bookings/[id] (operator). Fire-and-forget
+// callable; failures log but never throw so the cancel action that triggered this stays
+// clean.
 
 import { calcInvoiceTotals } from "@/features/business/lib/business";
 import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";

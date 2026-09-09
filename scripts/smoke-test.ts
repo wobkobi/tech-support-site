@@ -1,27 +1,24 @@
 // scripts/smoke-test.ts
-/**
- * @description Optionally builds the Next.js app, starts it, then visits every
- * public page with Puppeteer to collect console errors and navigation timing.
- *
- * Usage:
- *   npx tsx scripts/smoke-test.ts              # build > start > test
- *   npx tsx scripts/smoke-test.ts --skip-build # start > test (reuse existing .next)
- *   npx tsx scripts/smoke-test.ts --port=3001
- *   npx tsx scripts/smoke-test.ts --url=https://deploy.example.com  # test a deployed
- *                                              # URL (no local build/server)
- *
- * Remote (--url) auth: reads ADMIN_SECRET (must match the DEPLOYED environment's
- * value) for admin pages and VERCEL_AUTOMATION_BYPASS_SECRET for the Deployment
- * Protection wall. Both are sent ONLY to the deployment origin via request
- * interception, never to third-party hosts (maps, fonts, the Meta pixel). The
- * bypass is additionally primed as a session cookie before any page is measured
- * (see primeBypassCookie), since headers alone leave redirected sub-resources
- * looping through SSO.
- *
- * Exit codes:
- *   0  all pages loaded without errors
- *   1  one or more pages had console errors or failed to load
- */
+// Optionally builds the Next.js app, starts it, then visits every public page with
+// Puppeteer to collect console errors and navigation timing.
+//
+// Usage:
+//   npx tsx scripts/smoke-test.ts              # build > start > test
+//   npx tsx scripts/smoke-test.ts --skip-build # start > test (reuse existing .next)
+//   npx tsx scripts/smoke-test.ts --port=3001
+//   npx tsx scripts/smoke-test.ts --url=https://deploy.example.com  # test a deployed
+//                                              # URL (no local build/server)
+//
+// Remote (--url) auth: reads ADMIN_SECRET (must match the DEPLOYED environment's value)
+// for admin pages and VERCEL_AUTOMATION_BYPASS_SECRET for the Deployment Protection wall.
+// Both are sent ONLY to the deployment origin via request interception, never to
+// third-party hosts (maps, fonts, the Meta pixel). The bypass is additionally primed as a
+// session cookie before any page is measured (see primeBypassCookie), since headers alone
+// leave redirected sub-resources looping through SSO.
+//
+// Exit codes:
+//   0  all pages loaded without errors
+//   1  one or more pages had console errors or failed to load
 
 import { execSync, spawn, type ChildProcess } from "child_process";
 import fs from "fs";

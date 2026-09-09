@@ -1,7 +1,5 @@
 // src/app/booking/success/page.tsx
-/**
- * @description Booking request success page.
- */
+// Booking request success page.
 
 import {
   buildAppointmentDescription,

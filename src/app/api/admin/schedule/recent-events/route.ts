@@ -1,11 +1,8 @@
 // src/app/api/admin/schedule/recent-events/route.ts
-/**
- * @description Admin endpoint listing recent booking-calendar events for the
- * calculator's "Bill a calendar event" picker. GET returns the last two weeks
- * up to now (future bookings are excluded - a job isn't billable until it has
- * started), newest first, so the operator can jump straight to billing a
- * just-finished job with its corrected times.
- */
+// Admin endpoint listing recent booking-calendar events for the calculator's "Bill a
+// calendar event" picker. GET returns the last two weeks up to now (future bookings are
+// excluded - a job isn't billable until it has started), newest first, so the operator
+// can jump straight to billing a just-finished job with its corrected times.
 
 import {
   getBookingCalendarId,

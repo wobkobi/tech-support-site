@@ -1,7 +1,5 @@
 // src/app/api/admin/push/devices/route.ts
-/**
- * @description Lists registered push devices for the notifications admin page.
- */
+// Lists registered push devices for the notifications admin page.
 
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

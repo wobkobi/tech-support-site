@@ -1,11 +1,9 @@
 "use client";
 // src/features/admin/components/settings/PricingTab.tsx
-/**
- * @description Editor for the pricing & cancellation group. Renders each field
- * from {@link PRICING_FIELD_META}, tracks dirty state via {@link useSettingsForm}, and saves
- * to the admin settings route - surfacing inline field errors, guardrail blocks,
- * and warnings (with a "save anyway" confirm).
- */
+// Editor for the pricing & cancellation group. Renders each field from
+// PRICING_FIELD_META, tracks dirty state via useSettingsForm, and saves to the admin
+// settings route - surfacing inline field errors, guardrail blocks, and warnings (with a
+// "save anyway" confirm).
 
 import { PricingPreview } from "@/features/admin/components/settings/PricingPreview";
 import {

@@ -1,8 +1,6 @@
 // src/app/api/admin/push/unsubscribe/route.ts
-/**
- * @description Removes a registered push device. Deleting an endpoint that is
- * already gone is treated as success so the UI stays idempotent.
- */
+// Removes a registered push device. Deleting an endpoint that is already gone is treated
+// as success so the UI stays idempotent.
 
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

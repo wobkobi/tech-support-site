@@ -1,9 +1,7 @@
 "use client";
 // src/app/booking/success/BookingConversion.tsx
-/**
- * @description Reports a completed booking to GA4, Google Ads and the Meta
- * Pixel on the success page, at most once per booking per browser.
- */
+// Reports a completed booking to GA4, Google Ads and the Meta Pixel on the success page,
+// at most once per booking per browser.
 
 import { useEffect } from "react";
 

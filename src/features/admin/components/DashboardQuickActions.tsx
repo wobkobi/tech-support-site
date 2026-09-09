@@ -1,10 +1,8 @@
 "use client";
 // src/features/admin/components/DashboardQuickActions.tsx
-/**
- * @description Quick-action panels shown on the admin dashboard: send a review
- * link to a past client, or clear the past-confirmed bookings. Completing offers
- * both doors - with the review email or without - so neither needs a dialog.
- */
+// Quick-action panels shown on the admin dashboard: send a review link to a past client,
+// or clear the past-confirmed bookings. Completing offers both doors - with the review
+// email or without - so neither needs a dialog.
 
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import {

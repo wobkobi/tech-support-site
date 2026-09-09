@@ -1,5 +1,6 @@
-// src/features/booking/lib/ics.ts - minimal dependency-free RFC 5545 builder
-// (TEXT escaping, CRLF folding, UTC stamps, stable UID).
+// src/features/booking/lib/ics.ts
+// Minimal dependency-free RFC 5545 builder (TEXT escaping, CRLF folding, UTC stamps,
+// stable UID).
 
 /** A single calendar event to serialise. */
 export interface IcsEvent {

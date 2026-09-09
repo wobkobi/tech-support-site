@@ -1,9 +1,7 @@
 "use client";
 // src/features/reviews/components/admin/ReviewApprovalList.tsx
-/**
- * @description Interactive client component for approving, revoking, and deleting
- * reviews, with search, filter chips (status / verified / unlinked), and sort.
- */
+// Interactive client component for approving, revoking, and deleting reviews, with
+// search, filter chips (status / verified / unlinked), and sort.
 
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";

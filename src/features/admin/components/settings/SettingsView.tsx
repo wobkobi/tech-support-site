@@ -1,10 +1,8 @@
 "use client";
 // src/features/admin/components/settings/SettingsView.tsx
-/**
- * @description Tabbed shell for the admin settings panel. Renders the group tab
- * bar and the active tab's editor. Tabs are added group by group; ones not yet
- * built show a placeholder noting they're still managed in code.
- */
+// Tabbed shell for the admin settings panel. Renders the group tab bar and the active
+// tab's editor. Tabs are added group by group; ones not yet built show a placeholder
+// noting they're still managed in code.
 
 import { SettingsSearch } from "@/features/admin/components/settings/SettingsSearch";
 import { SettingsAllContext } from "@/features/admin/components/settings/useSettingsForm";

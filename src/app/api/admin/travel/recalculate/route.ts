@@ -1,8 +1,6 @@
 // src/app/api/admin/travel/recalculate/route.ts
-/**
- * @description Admin endpoint to force-recalculate all travel blocks.
- * Clears stored TravelBlock records so the next cache refresh recomputes fresh travel times.
- */
+// Admin endpoint to force-recalculate all travel blocks. Clears stored TravelBlock
+// records so the next cache refresh recomputes fresh travel times.
 
 import { refreshCalendarCache } from "@/features/calendar/lib/calendar-cache";
 import { errorResponse } from "@/shared/lib/api-response";

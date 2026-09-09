@@ -1,10 +1,7 @@
 // src/app/api/enquiry/business/route.ts
-/**
- * @description Public business enquiry endpoint. Validates the form payload,
- * then emails the operator a notification and the enquirer an acknowledgement.
- * Email-only - no DB record is written. Deliberately outside /api/business/*,
- * which is the admin-guarded namespace.
- */
+// Public business enquiry endpoint. Validates the form payload, then emails the operator
+// a notification and the enquirer an acknowledgement. Email-only - no DB record is
+// written. Deliberately outside /api/business/*, which is the admin-guarded namespace.
 
 import { validateEmail } from "@/features/booking/lib/booking";
 import {

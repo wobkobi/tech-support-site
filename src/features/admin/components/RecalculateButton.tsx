@@ -1,9 +1,8 @@
 "use client";
 // src/features/admin/components/RecalculateButton.tsx
-/**
- * @description Client button that POSTs to the travel recalculation API, then
- * shows the cached-event count or an error and refreshes the route.
- */
+// Client button that POSTs to the travel recalculation API, then shows the cached-event
+// count or an error and refreshes the route.
+
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";

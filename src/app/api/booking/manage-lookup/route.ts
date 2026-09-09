@@ -1,10 +1,7 @@
 // src/app/api/booking/manage-lookup/route.ts
-/**
- * @description Find-my-booking: emails someone the change/cancel links for
- * their upcoming appointments. The response is deliberately identical whether
- * or not the address matched, so this can't be used to test which email
- * addresses have booked.
- */
+// Find-my-booking: emails someone the change/cancel links for their upcoming
+// appointments. The response is deliberately identical whether or not the address
+// matched, so this can't be used to test which email addresses have booked.
 
 import { sendBookingManageLinksEmail } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";

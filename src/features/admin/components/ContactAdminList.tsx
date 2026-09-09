@@ -1,11 +1,9 @@
 "use client";
 // src/features/admin/components/ContactAdminList.tsx
-/**
- * @description Admin component listing contacts saved from booking submissions,
- * with inline editing and Google Places autocomplete for the address field.
- * Contacts are split into two sections: unsynced (needs attention) and synced
- * (already linked to Google Contacts, shown in a collapsible drawer).
- */
+// Admin component listing contacts saved from booking submissions, with inline editing
+// and Google Places autocomplete for the address field. Contacts are split into two
+// sections: unsynced (needs attention) and synced (already linked to Google Contacts,
+// shown in a collapsible drawer).
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";

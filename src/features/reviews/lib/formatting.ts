@@ -1,7 +1,5 @@
 // src/features/reviews/lib/formatting.ts
-/**
- * @description Shared formatting utilities for review display.
- */
+// Shared formatting utilities for review display.
 
 /**
  * Formats a reviewer's display name exactly as stored.

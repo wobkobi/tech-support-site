@@ -1,7 +1,5 @@
 // src/app/api/admin/contacts/[id]/route.ts
-/**
- * @description Admin API route for updating individual contacts.
- */
+// Admin API route for updating individual contacts.
 
 import {
   deleteContactFromGoogle,

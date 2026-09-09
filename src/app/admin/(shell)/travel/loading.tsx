@@ -1,10 +1,7 @@
 // src/app/admin/(shell)/travel/loading.tsx
-/**
- * @description Travel-blocks loading skeleton. Matches the real page shape -
- * heading + description with the Recalculate action, then the block list in a
- * card - rather than the generic list skeleton's filter-chip row (this page has
- * no filters).
- */
+// Travel-blocks loading skeleton. Matches the real page shape - heading + description
+// with the Recalculate action, then the block list in a card - rather than the generic
+// list skeleton's filter-chip row (this page has no filters).
 
 import { Bone } from "@/shared/components/Skeleton";
 import type React from "react";

@@ -1,13 +1,12 @@
 // src/app/admin/(shell)/bookings/[id]/page.tsx
-/**
- * @description Detail page for a single booking - the Booking model is the app's
- * richest row (price/promo/rate snapshots, travel mins, cancellation metadata,
- * reminder/review stamps) and this surfaces it. Two-column on lg+: the editable
- * customer + times cards and the price snapshot on the left, a context rail
- * (actions, timeline, linked records) on the right. Batch 1 loads the booking;
- * batch 2 runs the linked-record lookups (contact / invoices / review) and the
- * settings read in parallel. Both are Server-Timing instrumented.
- */
+// Detail page for a single booking - the Booking model is the app's richest row
+// (price/promo/rate snapshots, travel mins, cancellation metadata, reminder/review
+// stamps) and this surfaces it. Two-column on lg+: the editable customer + times cards
+// and the price snapshot on the left, a context rail (actions, timeline, linked records)
+// on the right. Batch 1 loads the booking; batch 2 runs the linked-record lookups
+// (contact / invoices / review) and the settings read in parallel. Both are Server-Timing
+// instrumented.
+
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";

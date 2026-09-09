@@ -1,13 +1,10 @@
 // src/features/business/lib/travel-distance.ts
-/**
- * @description Round-trip driving distance + duration lookup against the
- * Google Distance Matrix API: base address > destination at the departure
- * time, destination > base address at the return time, both traffic-aware.
- * Used by /api/pricing/travel-time (public estimator + calculator), the
- * parse-job route, the booking snapshot, and the late-cancel invoice. Never
- * throws - returns a discriminated status so the caller can decide whether
- * to skip the travel charge or surface an error.
- */
+// Round-trip driving distance + duration lookup against the Google Distance Matrix API:
+// base address > destination at the departure time, destination > base address at the
+// return time, both traffic-aware. Used by /api/pricing/travel-time (public estimator +
+// calculator), the parse-job route, the booking snapshot, and the late-cancel invoice.
+// Never throws - returns a discriminated status so the caller can decide whether to skip
+// the travel charge or surface an error.
 
 import { getIdentity } from "@/shared/lib/business-identity.server";
 

@@ -1,8 +1,6 @@
 "use client";
 // src/features/reviews/components/admin/SendReviewLinkForm.tsx
-/**
- * @description Form for sending a review link to a past client via email or SMS.
- */
+// Form for sending a review link to a past client via email or SMS.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Modal } from "@/features/admin/components/ui/Modal";

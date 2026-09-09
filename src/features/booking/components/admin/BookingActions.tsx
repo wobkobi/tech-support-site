@@ -1,14 +1,11 @@
 "use client";
 // src/features/booking/components/admin/BookingActions.tsx
-/**
- * @description Lifecycle actions for the booking detail page: mark completed,
- * cancel (my call / for customer), mark no-show (past bookings only), send /
- * resend the review email, reschedule (magic link), and delete (test bookings
- * only). Every mutating action routes through {@link useBookingActions} and is
- * gated by a {@link ConfirmDialog}; on success the page refreshes so the info,
- * timeline, and linked-records cards reflect the new state. Delete redirects back
- * to the bookings list.
- */
+// Lifecycle actions for the booking detail page: mark completed, cancel (my call / for
+// customer), mark no-show (past bookings only), send / resend the review email,
+// reschedule (magic link), and delete (test bookings only). Every mutating action routes
+// through useBookingActions and is gated by a ConfirmDialog; on success the page
+// refreshes so the info, timeline, and linked-records cards reflect the new state. Delete
+// redirects back to the bookings list.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";

@@ -1,8 +1,6 @@
 // src/app/booking/error.tsx
-/**
- * @description Booking-segment error boundary. Reassures the customer their
- * booking wasn't lost and offers a retry.
- */
+// Booking-segment error boundary. Reassures the customer their booking wasn't lost and
+// offers a retry.
 
 "use client";
 

@@ -1,8 +1,6 @@
 // src/app/booking/loading.tsx
-/**
- * @description Skeleton shown during navigation to /booking (and inherited by
- * /booking/edit, which reuses the same form).
- */
+// Skeleton shown during navigation to /booking (and inherited by /booking/edit, which
+// reuses the same form).
 
 import { CARD } from "@/shared/components/PageLayout";
 import { PageLoadingShell } from "@/shared/components/PageLoadingShell";

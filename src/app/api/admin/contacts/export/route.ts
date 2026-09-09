@@ -1,8 +1,6 @@
 // src/app/api/admin/contacts/export/route.ts
-/**
- * @description Exports all contacts as a Google Contacts-compatible CSV file.
- * Column layout matches the format produced by Google Contacts own export tool.
- */
+// Exports all contacts as a Google Contacts-compatible CSV file. Column layout matches
+// the format produced by Google Contacts own export tool.
 
 import { splitName } from "@/features/contacts/lib/split-name";
 import { errorResponse } from "@/shared/lib/api-response";

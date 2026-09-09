@@ -1,8 +1,6 @@
 // src/features/admin/lib/schedule-types.tsx
-/**
- * @description Shared types, styles, and formatters used by both the desktop
- * week grid and the mobile day-agenda view.
- */
+// Shared types, styles, and formatters used by both the desktop week grid and the mobile
+// day-agenda view.
 
 import { cn } from "@/shared/lib/cn";
 import { NZ_TZ, dateKeyParts } from "@/shared/lib/timezone-utils";

@@ -1,12 +1,9 @@
 "use client";
 // src/features/admin/components/EventActionSheet.tsx
-/**
- * @description Bottom-sheet of quick mutations for a booking event, opened by
- * a long-press on a booking card in DayAgendaView: view details, complete,
- * cancel, no-show, reschedule, bill in calculator, resend review email, delete
- * (test bookings only). Mutations route through the shared
- * {@link useBookingActions} hook, with toasts from the global admin toaster.
- */
+// Bottom-sheet of quick mutations for a booking event, opened by a long-press on a
+// booking card in DayAgendaView: view details, complete, cancel, no-show, reschedule,
+// bill in calculator, resend review email, delete (test bookings only). Mutations route
+// through the shared useBookingActions hook, with toasts from the global admin toaster.
 
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";

@@ -1,8 +1,6 @@
 // src/app/poster/page.tsx
-/**
- * @description Poster page - A5 at 300 DPI (1748x2480px).
- * Pass ?mode=print to add a 3mm bleed on all edges (viewport 1818x2550px).
- */
+// Poster page - A5 at 300 DPI (1748x2480px). Pass ?mode=print to add a 3mm bleed on all
+// edges (viewport 1818x2550px).
 
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";

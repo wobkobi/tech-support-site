@@ -1,8 +1,6 @@
 // scripts/build-icons/generators.ts
-/**
- * @file generators.ts
- * @description Generator functions for favicons, social images, additional assets, QR codes, and manifests.
- */
+// Generator functions for favicons, social images, additional assets, QR codes, and
+// manifests.
 
 import { JSDOM } from "jsdom";
 import fs from "node:fs/promises";

@@ -1,8 +1,6 @@
 // src/app/admin/(shell)/business/income/page.tsx
-/**
- * @description Admin income page. Renders {@link IncomeView} for recording and
- * viewing income entries.
- */
+// Admin income page. Renders IncomeView for recording and viewing income entries.
+
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { IncomeView } from "@/features/business/components/IncomeView";
 import { requireAdminAuth } from "@/shared/lib/auth";

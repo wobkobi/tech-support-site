@@ -1,7 +1,5 @@
 // src/features/calendar/lib/google-calendar.ts
-/**
- * @description Google Calendar API integration - multi-calendar without list permission.
- */
+// Google Calendar API integration - multi-calendar without list permission.
 
 import { google, type calendar_v3 } from "googleapis";
 import { unstable_cache } from "next/cache";

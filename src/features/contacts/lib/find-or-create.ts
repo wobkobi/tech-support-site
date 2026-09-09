@@ -1,13 +1,11 @@
 // src/features/contacts/lib/find-or-create.ts
-/**
- * @description Shared find-or-create helpers for Contact records. Centralises
- * the pattern used by booking, review-request and admin flows that need to
- * land a Contact row when one doesn't already exist for an email or phone.
- *
- * Email is not `@unique` in the schema (see model Contact in schema.prisma)
- * so prisma.contact.upsert cannot be used directly - the find + conditional
- * create pattern below is the canonical replacement.
- */
+// Shared find-or-create helpers for Contact records. Centralises the pattern used by
+// booking, review-request and admin flows that need to land a Contact row when one
+// doesn't already exist for an email or phone.
+//
+// Email is not `@unique` in the schema (see model Contact in schema.prisma) so
+// prisma.contact.upsert cannot be used directly - the find + conditional create pattern
+// below is the canonical replacement.
 
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { normaliseContactPhone } from "@/shared/lib/normalise-phone";

@@ -1,10 +1,7 @@
 // src/features/booking/lib/existing-bookings.server.ts
-/**
- * @description Loads the bookings that can block a slot, in the shape the slot
- * engine expects. The public booking flow, the edit flow and the edit page all
- * need the same query, and a select that drifts here would silently let a
- * double-booking through.
- */
+// Loads the bookings that can block a slot, in the shape the slot engine expects. The
+// public booking flow, the edit flow and the edit page all need the same query, and a
+// select that drifts here would silently let a double-booking through.
 
 import type { ExistingBooking } from "@/features/booking/lib/booking";
 import { prisma } from "@/shared/lib/prisma";

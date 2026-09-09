@@ -1,7 +1,5 @@
 // src/app/error.tsx
-/**
- * @description Themed error boundary. Matches site styling.
- */
+// Themed error boundary. Matches site styling.
 
 "use client";
 

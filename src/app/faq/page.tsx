@@ -1,11 +1,9 @@
 // src/app/faq/page.tsx
-/**
- * @description FAQ page: common questions about services, pricing, and ways of working.
- * Server-rendered with live rates from the RateConfig table so the headline
- * prices stay in sync with whatever the operator has set, and cancellation /
- * unsuccessful-work / GST copy comes from pricing-policy.ts so this page
- * never drifts from the /pricing accordion + booking emails.
- */
+// FAQ page: common questions about services, pricing, and ways of working.
+// Server-rendered with live rates from the RateConfig table so the headline prices stay
+// in sync with whatever the operator has set, and cancellation / unsuccessful-work / GST
+// copy comes from pricing-policy.ts so this page never drifts from the /pricing accordion
+// + booking emails.
 
 import { formatMoneyCompact } from "@/features/business/lib/business";
 import {

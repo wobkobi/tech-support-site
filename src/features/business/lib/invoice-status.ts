@@ -1,16 +1,14 @@
 // src/features/business/lib/invoice-status.ts
-/**
- * @description Single source of truth for the derived OVERDUE state of an
- * invoice. An invoice is overdue when it is SENT and its due date is before the
- * start of today. The PDF watermark, the list badges, and the reminder cron all
- * read from here so the definition can't drift.
- *
- * Timezone note: today is computed in the runtime's local zone. On Vercel that
- * is UTC, whereas a browser renders in NZ - so "overdue" can flip up to ~13h
- * earlier server-side than a NZ operator would reckon. This divergence is
- * accepted (it matches the existing PDF watermark behaviour) rather than pulling
- * a timezone dependency into this pure, isomorphic helper.
- */
+// Single source of truth for the derived OVERDUE state of an invoice. An invoice is
+// overdue when it is SENT and its due date is before the start of today. The PDF
+// watermark, the list badges, and the reminder cron all read from here so the definition
+// can't drift.
+//
+// Timezone note: today is computed in the runtime's local zone. On Vercel that is UTC,
+// whereas a browser renders in NZ - so "overdue" can flip up to ~13h earlier server-side
+// than a NZ operator would reckon. This divergence is accepted (it matches the existing
+// PDF watermark behaviour) rather than pulling a timezone dependency into this pure,
+// isomorphic helper.
 
 import type { InvoiceStatus } from "@/features/business/types/business";
 

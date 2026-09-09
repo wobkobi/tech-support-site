@@ -1,7 +1,5 @@
 // src/app/api/booking/days/route.ts
-/**
- * @description API route to get available booking days (blocks calendar events and DB bookings).
- */
+// API route to get available booking days (blocks calendar events and DB bookings).
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import { BOOKING_CONFIG, buildAvailableDays } from "@/features/booking/lib/booking";

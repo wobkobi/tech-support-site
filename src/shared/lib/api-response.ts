@@ -1,9 +1,7 @@
 // src/shared/lib/api-response.ts
-/**
- * @description Shared JSON response helpers so every API route returns a
- * consistent `{ ok, ... }` shape, letting clients branch on `ok` instead of
- * guessing between `{ error }` and `{ ok: false, error }`.
- */
+// Shared JSON response helpers so every API route returns a consistent `{ ok, ... }`
+// shape, letting clients branch on `ok` instead of guessing between `{ error }` and
+// `{ ok: false, error }`.
 
 import { NextResponse } from "next/server";
 

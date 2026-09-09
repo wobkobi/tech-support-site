@@ -1,9 +1,7 @@
 "use client";
 // src/features/admin/components/TravelBlockAdminList.tsx
-/**
- * @description Read-only admin view of travel time blocks computed for calendar events,
- * with per-event transport mode selector and custom origin override.
- */
+// Read-only admin view of travel time blocks computed for calendar events, with per-event
+// transport mode selector and custom origin override.
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { cn } from "@/shared/lib/cn";

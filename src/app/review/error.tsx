@@ -1,7 +1,5 @@
 // src/app/review/error.tsx
-/**
- * @description Review-segment error boundary. Offers a retry on the review form.
- */
+// Review-segment error boundary. Offers a retry on the review form.
 
 "use client";
 

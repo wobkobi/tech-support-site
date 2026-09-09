@@ -1,10 +1,8 @@
 // src/app/api/booking/cancel/route.ts
-/**
- * @description Cancel a booking by cancel token. GET returns startAt +
- * status so the cancel page can render the fee banner before firing. POST
- * cancels, stamps cancellation flags from the server clock, and auto-drafts
- * a DRAFT invoice when the cancel lands inside the fee window.
- */
+// Cancel a booking by cancel token. GET returns startAt + status so the cancel page can
+// render the fee banner before firing. POST cancels, stamps cancellation flags from the
+// server clock, and auto-drafts a DRAFT invoice when the cancel lands inside the fee
+// window.
 
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 import { assessCancellation } from "@/features/business/lib/pricing-policy";

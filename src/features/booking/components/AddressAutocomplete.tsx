@@ -1,8 +1,8 @@
-// src/features/booking/components/AddressAutocomplete.tsx - Places
-// AutocompleteSuggestion input with a component-owned combobox dropdown.
-// One session token per lookup (concluded by fetchFields, discarded on
-// abandonment, never reused). Any failure falls back to a plain input +
-// warning; typing retries, and recovery fires onRecovered.
+// src/features/booking/components/AddressAutocomplete.tsx
+// Places AutocompleteSuggestion input with a component-owned combobox dropdown. One
+// session token per lookup (concluded by fetchFields, discarded on abandonment, never
+// reused). Any failure falls back to a plain input + warning; typing retries, and
+// recovery fires onRecovered.
 
 "use client";
 

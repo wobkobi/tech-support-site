@@ -1,10 +1,8 @@
 // src/features/reviews/lib/email.ts
-/**
- * @description Shared Resend utility for sending transactional emails. Every
- * send goes out through one of two doors: {@link sendNow} for owner mail and the
- * replies a customer is waiting on, {@link sendOutreach} for everything we
- * initiate, which Resend holds until the quiet-hours window closes.
- */
+// Shared Resend utility for sending transactional emails. Every send goes out through one
+// of two doors: sendNow for owner mail and the replies a customer is waiting on,
+// sendOutreach for everything we initiate, which Resend holds until the quiet-hours
+// window closes.
 
 import { buildAppointmentDescription, parseBookingNotes } from "@/features/booking/lib/booking";
 import { buildIcs } from "@/features/booking/lib/ics";

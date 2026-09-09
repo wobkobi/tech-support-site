@@ -1,10 +1,8 @@
 // src/app/api/business/invoices/[id]/convert/route.ts
-/**
- * @description Converts an accepted quote into a real invoice: allocates the
- * next TTP number (quote counter untouched), clears the quote flag, restamps
- * issue/due dates from today, and re-syncs the PDF to Drive under the new
- * number. The row keeps its id, so links and history carry over.
- */
+// Converts an accepted quote into a real invoice: allocates the next TTP number (quote
+// counter untouched), clears the quote flag, restamps issue/due dates from today, and
+// re-syncs the PDF to Drive under the new number. The row keeps its id, so links and
+// history carry over.
 
 import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";
 import {

@@ -1,7 +1,5 @@
 // src/shared/components/PageLayout.tsx
-/**
- * @description Reusable layout components with frosted glass effect.
- */
+// Reusable layout components with frosted glass effect.
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";

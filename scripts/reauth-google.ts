@@ -1,10 +1,9 @@
 #!/usr/bin/env -S npx tsx
-/**
- * @description Re-authorise Google OAuth for both dev and prod redirect URIs.
- * Generates two refresh tokens and writes them to google-tokens.txt.
- *
- * Run:  npx tsx scripts/reauth-google.ts
- */
+// scripts/reauth-google.ts
+// Re-authorise Google OAuth for both dev and prod redirect URIs. Generates two refresh
+// tokens and writes them to google-tokens.txt.
+//
+// Run:  npx tsx scripts/reauth-google.ts
 
 import * as dotenv from "dotenv";
 import * as fs from "fs";

@@ -1,10 +1,9 @@
 // src/app/admin/(shell)/business/invoices/[id]/edit/page.tsx
-/**
- * @description DRAFT-only invoice edit page. Loads the invoice; a non-DRAFT
- * status redirects to the detail page (SENT/PAID are audit-locked - void and
- * reissue). Loads live identity + pricing policy in parallel so the form's totals
- * and preview match what the server will recompute on save.
- */
+// DRAFT-only invoice edit page. Loads the invoice; a non-DRAFT status redirects to the
+// detail page (SENT/PAID are audit-locked - void and reissue). Loads live identity +
+// pricing policy in parallel so the form's totals and preview match what the server will
+// recompute on save.
+
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { EditInvoiceView } from "@/features/business/components/invoice/EditInvoiceView";
 import type { InvoiceFormData } from "@/features/business/components/invoice/InvoiceForm";

@@ -1,12 +1,10 @@
 "use client";
 // src/features/business/components/ExpensesView.tsx
-/**
- * @description Records, edits, and lists expense entries against
- * /api/business/expenses. The add form doubles as the edit form and previews the
- * GST split. The list has search, FY + method + category filters, a
- * missing-receipt toggle, sortable columns, filter-aware summary cards with a
- * per-category breakdown drill-in, and a "Migrate to subscription" row action.
- */
+// Records, edits, and lists expense entries against /api/business/expenses. The add form
+// doubles as the edit form and previews the GST split. The list has search, FY + method +
+// category filters, a missing-receipt toggle, sortable columns, filter-aware summary
+// cards with a per-category breakdown drill-in, and a "Migrate to subscription" row
+// action.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";

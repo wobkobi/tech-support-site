@@ -1,14 +1,12 @@
 "use client";
 // src/features/admin/components/ScheduleFindTimes.tsx
-/**
- * @description Inline "next open times" bar for the admin schedule. Shows a few
- * genuinely-bookable start times (one per hour, spread across days) for a short or
- * long job so the operator can read them out on the phone; tapping a time opens the
- * manual-booking form prefilled. Entering the customer's address - typed or picked
- * from a contact - gates the times by the real drive to/from the surrounding jobs.
- * Data comes from /api/admin/schedule/suggest-times, which reuses the public
- * availability engine so slots match what customers can actually book.
- */
+// Inline "next open times" bar for the admin schedule. Shows a few genuinely-bookable
+// start times (one per hour, spread across days) for a short or long job so the operator
+// can read them out on the phone; tapping a time opens the manual-booking form prefilled.
+// Entering the customer's address - typed or picked from a contact - gates the times by
+// the real drive to/from the surrounding jobs. Data comes from
+// /api/admin/schedule/suggest-times, which reuses the public availability engine so slots
+// match what customers can actually book.
 
 import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
 import { cn } from "@/shared/lib/cn";

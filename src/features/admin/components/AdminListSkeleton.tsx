@@ -1,13 +1,10 @@
 // src/features/admin/components/AdminListSkeleton.tsx
-/**
- * @description Loading skeleton for the admin data-table views (Bookings,
- * Income, Expenses, Invoices, Contacts, Promos): heading + filter chips + the
- * card-on-mobile / table-on-desktop card list. Travel and Price-estimates have
- * their own skeletons - neither has a filter row.
- * The data-table route loading.tsx files re-export this as their default.
- * Renders content bones only - the (shell) layout supplies the sidebar +
- * padding, so no skeleton frame is needed here.
- */
+// Loading skeleton for the admin data-table views (Bookings, Income, Expenses, Invoices,
+// Contacts, Promos): heading + filter chips + the card-on-mobile / table-on-desktop card
+// list. Travel and Price-estimates have their own skeletons - neither has a filter row.
+// The data-table route loading.tsx files re-export this as their default. Renders content
+// bones only - the (shell) layout supplies the sidebar + padding, so no skeleton frame is
+// needed here.
 
 import { Bone } from "@/shared/components/Skeleton";
 import type React from "react";

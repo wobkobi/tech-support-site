@@ -1,7 +1,5 @@
 // src/shared/lib/timezone-utils.ts
-/**
- * @description Timezone utility functions for Pacific/Auckland timezone calculations.
- */
+// Timezone utility functions for Pacific/Auckland timezone calculations.
 
 /** The one NZ timezone name. Exported so nothing has to hardcode the literal. */
 export const NZ_TZ = "Pacific/Auckland";

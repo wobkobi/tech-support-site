@@ -1,11 +1,9 @@
 // src/app/api/admin/contacts/check-addresses/route.ts
-/**
- * @description Admin sweep that re-geocodes every stored contact address and
- * flags the ones that don't resolve to a single confident Auckland match. The
- * import path only geocodes addresses that changed, so rows that were already
- * wrong never get re-checked - this is how they surface. On demand rather than
- * on the cron: it costs one Geocoding call per contact.
- */
+// Admin sweep that re-geocodes every stored contact address and
+// flags the ones that don't resolve to a single confident Auckland match. The
+// import path only geocodes addresses that changed, so rows that were already
+// wrong never get re-checked - this is how they surface. On demand rather than
+// on the cron: it costs one Geocoding call per contact.
 
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

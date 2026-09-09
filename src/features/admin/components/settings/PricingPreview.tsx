@@ -1,11 +1,8 @@
 "use client";
 // src/features/admin/components/settings/PricingPreview.tsx
-/**
- * @description Live worked-example for the pricing tab - renders the draft
- * cancellation policy, billing rounding, surcharge, and GST status as the
- * plain-English lines a customer or invoice would reflect, so the abstract
- * numbers have a concrete meaning before saving.
- */
+// Live worked-example for the pricing tab - renders the draft cancellation policy,
+// billing rounding, surcharge, and GST status as the plain-English lines a customer or
+// invoice would reflect, so the abstract numbers have a concrete meaning before saving.
 
 import type { PricingSettings } from "@/shared/lib/settings/types";
 import type React from "react";

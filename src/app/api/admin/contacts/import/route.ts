@@ -1,7 +1,5 @@
 // src/app/api/admin/contacts/import/route.ts
-/**
- * @description Admin API route to import contacts from Google Contacts.
- */
+// Admin API route to import contacts from Google Contacts.
 
 import { importFromGoogleContacts } from "@/features/contacts/lib/google-contacts";
 import { normaliseSoftDeleteField } from "@/features/contacts/lib/maintenance";

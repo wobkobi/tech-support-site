@@ -1,9 +1,6 @@
 "use client";
 // src/shared/components/GoogleTag.tsx
-/**
- * @description Loads gtag.js for GA4 + Google Ads and reports tel: and
- * mailto: link taps.
- */
+// Loads gtag.js for GA4 + Google Ads and reports tel: and mailto: link taps.
 
 import { usePathname } from "next/navigation";
 import Script from "next/script";

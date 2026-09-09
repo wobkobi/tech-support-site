@@ -1,7 +1,5 @@
 // src/app/not-found.tsx
-/**
- * @description Themed 404 page. Matches site styling.
- */
+// Themed 404 page. Matches site styling.
 
 "use client";
 

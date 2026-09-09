@@ -1,10 +1,8 @@
 // src/app/api/admin/reviews/match-contacts/route.ts
-/**
- * @description Admin trigger to link reviews to contacts by email, phone, or token.
- * Delegates to the shared contacts maintenance module so this route and the
- * sync-contacts cron use identical matching (including the ambiguous-phone
- * guard that skips numbers shared by more than one contact).
- */
+// Admin trigger to link reviews to contacts by email, phone, or token. Delegates to the
+// shared contacts maintenance module so this route and the sync-contacts cron use
+// identical matching (including the ambiguous-phone guard that skips numbers shared by
+// more than one contact).
 
 import { matchReviewsToContacts } from "@/features/contacts/lib/maintenance";
 import { errorResponse } from "@/shared/lib/api-response";

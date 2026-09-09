@@ -1,12 +1,9 @@
 // src/app/api/business/invoices/route.ts
-/**
- * @description Admin invoices collection endpoint. GET lists every invoice
- * (newest issue date first). POST creates one: validates line items, allocates
- * the next TTP-YYYY-XXXX number (or Q-YYYY-XXXX from the quote counter when
- * `isQuote`), computes totals via {@link calcInvoiceTotals} (promo +
- * unsuccessful-work discounts reduce the taxable amount), writes back the
- * matching Sheets counter, then renders the PDF and uploads it to Drive.
- */
+// Admin invoices collection endpoint. GET lists every invoice (newest issue date first).
+// POST creates one: validates line items, allocates the next TTP-YYYY-XXXX number (or
+// Q-YYYY-XXXX from the quote counter when `isQuote`), computes totals via
+// calcInvoiceTotals (promo + unsuccessful-work discounts reduce the taxable amount),
+// writes back the matching Sheets counter, then renders the PDF and uploads it to Drive.
 
 import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
 import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";

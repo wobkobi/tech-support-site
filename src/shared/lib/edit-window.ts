@@ -1,10 +1,8 @@
 // src/shared/lib/edit-window.ts
-/**
- * @description Editing window for past schedule items: an event or blocked day
- * is locked once it ended more than MAX_PAST_EDIT_HOURS ago, so stale history
- * can't be mutated by accident. Enforced server-side in the mutation routes
- * and mirrored client-side to disable the controls.
- */
+// Editing window for past schedule items: an event or blocked day is locked once it ended
+// more than MAX_PAST_EDIT_HOURS ago, so stale history can't be mutated by accident.
+// Enforced server-side in the mutation routes and mirrored client-side to disable the
+// controls.
 
 import { dateKeyParts, getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 

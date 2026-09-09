@@ -1,18 +1,14 @@
 // src/app/card/page.tsx
-/**
- * @description Business card artwork - 90x55mm at 300 DPI (1063x650px), the
- * standard NZ card size. Pass ?side=back for the contact face (default is the
- * brand face), and ?mode=print to add a 3mm bleed on all edges (viewport
- * 1134x721px). Contact details come from the live identity settings so the card
- * cannot drift from the site, invoices and emails.
- *
- * Deliberately plain: a flat white ground, no backdrop photo and no frosted
- * panel. At 90mm the site's blurred backdrop reads as muddy tone rather than
- * imagery, and white keeps the small type crisp on uncoated stock. Grouping is
- * done with spacing rather than rules - the wordmark already carries a vertical
- * coquelicot rule, and a second one anywhere on the card reads as a stray piece
- * of the logo.
- */
+// Business card artwork - 90x55mm at 300 DPI (1063x650px), the standard NZ card size.
+// Pass ?side=back for the contact face (default is the brand face), and ?mode=print to
+// add a 3mm bleed on all edges (viewport 1134x721px). Contact details come from the live
+// identity settings so the card cannot drift from the site, invoices and emails.
+//
+// Deliberately plain: a flat white ground, no backdrop photo and no frosted panel. At
+// 90mm the site's blurred backdrop reads as muddy tone rather than imagery, and white
+// keeps the small type crisp on uncoated stock. Grouping is done with spacing rather than
+// rules - the wordmark already carries a vertical coquelicot rule, and a second one
+// anywhere on the card reads as a stray piece of the logo.
 
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { IdentitySettings } from "@/shared/lib/settings/types";

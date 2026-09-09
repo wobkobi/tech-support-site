@@ -1,12 +1,10 @@
 "use client";
 // src/features/business/components/IncomeView.tsx
-/**
- * @description Records, edits, and lists income entries against
- * /api/business/income. The add form doubles as the edit form. The list has
- * search, date-range + financial-year + method filters, sortable columns, and
- * filter-aware summary cards; rows created from an invoice link back to it. The
- * tax reserve lives on the business overview (single source), not here.
- */
+// Records, edits, and lists income entries against /api/business/income. The add form
+// doubles as the edit form. The list has search, date-range + financial-year + method
+// filters, sortable columns, and filter-aware summary cards; rows created from an invoice
+// link back to it. The tax reserve lives on the business overview (single source), not
+// here.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";

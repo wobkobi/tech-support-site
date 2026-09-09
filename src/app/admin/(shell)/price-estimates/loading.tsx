@@ -1,9 +1,7 @@
 // src/app/admin/(shell)/price-estimates/loading.tsx
-/**
- * @description Price-estimates loading skeleton. Matches the real page shape -
- * heading + a three-up stat row + the estimate-log list - rather than the
- * generic list skeleton's filter-chip row (this page has stat cards, not chips).
- */
+// Price-estimates loading skeleton. Matches the real page shape - heading + a three-up
+// stat row + the estimate-log list - rather than the generic list skeleton's filter-chip
+// row (this page has stat cards, not chips).
 
 import { Bone } from "@/shared/components/Skeleton";
 import type React from "react";

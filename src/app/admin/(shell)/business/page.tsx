@@ -1,10 +1,9 @@
 // src/app/admin/(shell)/business/page.tsx
-/**
- * @description Business dashboard. Resolves the displayed scope from the `?fy=`
- * param (all-time or a financial year via {@link resolveScope}), aggregates
- * income, expenses, and invoices into {@link BusinessDashboardCards}, and shows
- * the tax planner with a cached snapshot plus a Sheets import action.
- */
+// Business dashboard. Resolves the displayed scope from the `?fy=` param (all-time or a
+// financial year via resolveScope), aggregates income, expenses, and invoices into
+// BusinessDashboardCards, and shows the tax planner with a cached snapshot plus a Sheets
+// import action.
+
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import {

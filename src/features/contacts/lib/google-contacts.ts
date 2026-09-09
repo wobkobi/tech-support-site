@@ -1,11 +1,9 @@
 // src/features/contacts/lib/google-contacts.ts
-/**
- * @description Google People API bidirectional sync. Phones merge as a union
- * (never overwrite). Single-value fields (name, email, address) are latest-wins
- * via `lastSyncedAt` + `lastGoogleEtag`; if both sides changed and differ, a
- * `ContactConflict` is recorded and the admin resolves it. First-time sync
- * (lastSyncedAt null) lets Google win for any field it has populated.
- */
+// Google People API bidirectional sync. Phones merge as a union (never overwrite).
+// Single-value fields (name, email, address) are latest-wins via `lastSyncedAt` +
+// `lastGoogleEtag`; if both sides changed and differ, a `ContactConflict` is recorded and
+// the admin resolves it. First-time sync (lastSyncedAt null) lets Google win for any
+// field it has populated.
 
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { mergeEmails } from "@/features/contacts/lib/merge-emails";

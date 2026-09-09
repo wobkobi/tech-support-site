@@ -1,7 +1,5 @@
 // src/features/reviews/components/Reviews.tsx
-/**
- * @description Reviews module with responsive rows (1-3 items) or marquee scroll (4+ items).
- */
+// Reviews module with responsive rows (1-3 items) or marquee scroll (4+ items).
 
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";

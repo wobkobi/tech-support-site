@@ -1,11 +1,9 @@
 // src/app/api/business/invoices/[id]/route.ts
-/**
- * @description Admin endpoint for a single invoice. GET returns it. PATCH applies
- * a status-only change, a contactId backfill, or a full field update, enforcing transition rules
- * via {@link validateTransition} (VOIDED is terminal) and recomputing totals on
- * line-item changes. DELETE removes DRAFT invoices only; SENT/PAID/VOIDED are
- * audit-protected. Field-changing paths re-sync the PDF to Drive.
- */
+// Admin endpoint for a single invoice. GET returns it. PATCH applies a status-only
+// change, a contactId backfill, or a full field update, enforcing transition rules via
+// validateTransition (VOIDED is terminal) and recomputing totals on line-item changes.
+// DELETE removes DRAFT invoices only; SENT/PAID/VOIDED are audit-protected.
+// Field-changing paths re-sync the PDF to Drive.
 
 import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
 import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";

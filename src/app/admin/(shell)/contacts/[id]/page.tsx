@@ -1,10 +1,9 @@
 // src/app/admin/(shell)/contacts/[id]/page.tsx
-/**
- * @description Customer-360 contact detail. Loads everything the contact touches
- * through the shared {@link loadContact360} matcher - bookings, invoices, income,
- * reviews - summarises it as StatCards, and merges the lot into one interaction
- * timeline. The right rail carries the contact fields and sync/review-link state.
- */
+// Customer-360 contact detail. Loads everything the contact touches through the shared
+// loadContact360 matcher - bookings, invoices, income, reviews - summarises it as
+// StatCards, and merges the lot into one interaction timeline. The right rail carries the
+// contact fields and sync/review-link state.
+
 import { ContactDetailActions } from "@/features/admin/components/ContactDetailActions";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";

@@ -1,7 +1,5 @@
 // src/app/api/admin/contacts/conflicts/route.ts
-/**
- * @description Admin endpoint listing pending Google Contacts sync conflicts.
- */
+// Admin endpoint listing pending Google Contacts sync conflicts.
 
 import { UNRESOLVED_CONFLICT_FILTER } from "@/features/contacts/lib/contact-conflicts";
 import { errorResponse } from "@/shared/lib/api-response";

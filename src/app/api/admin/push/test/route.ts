@@ -1,9 +1,7 @@
 // src/app/api/admin/push/test/route.ts
-/**
- * @description Sends a test notification to every registered device. iOS drops
- * push subscriptions with no client-side event, so this is the only way to
- * confirm a device still actually receives anything.
- */
+// Sends a test notification to every registered device. iOS drops push subscriptions with
+// no client-side event, so this is the only way to confirm a device still actually
+// receives anything.
 
 import { sendOwnerPush } from "@/features/notifications/lib/push";
 import { errorResponse } from "@/shared/lib/api-response";

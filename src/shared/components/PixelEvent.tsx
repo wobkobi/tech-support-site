@@ -1,11 +1,9 @@
 "use client";
 // src/shared/components/PixelEvent.tsx
-/**
- * @description Fires a single Meta Pixel standard event once on mount, for
- * server-rendered pages that want a per-page signal (e.g. ViewContent on the
- * pricing/services pages, InitiateCheckout on the booking page). No-ops until
- * the pixel is configured. Renders no markup.
- */
+// Fires a single Meta Pixel standard event once on mount, for server-rendered pages that
+// want a per-page signal (e.g. ViewContent on the pricing/services pages,
+// InitiateCheckout on the booking page). No-ops until the pixel is configured. Renders no
+// markup.
 
 import { useEffect } from "react";
 

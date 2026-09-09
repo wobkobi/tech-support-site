@@ -1,12 +1,10 @@
 "use client";
 // src/features/business/components/calculator/EventPickerSection.tsx
-/**
- * @description "Bill a calendar event" card. On a blank calculator it lists
- * recent booking-calendar events to jump into; once one is loaded it becomes
- * the billing banner and offers the day's neighbouring events as a merge, via
- * {@link findMergeSuggestions}. Merging keeps one time slot per event, so the
- * gaps between them are never billed.
- */
+// "Bill a calendar event" card. On a blank calculator it lists recent booking-calendar
+// events to jump into; once one is loaded it becomes the billing banner and offers the
+// day's neighbouring events as a merge, via findMergeSuggestions. Merging keeps one time
+// slot per event, so the gaps between them are never billed.
+
 import { minsToHoursLabel } from "@/features/business/lib/business";
 import {
   findMergeSuggestions,

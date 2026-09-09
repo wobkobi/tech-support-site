@@ -1,8 +1,6 @@
 "use client";
 // src/features/reviews/components/admin/CopyLinkButton.tsx
-/**
- * @description Button that copies a review link to the clipboard.
- */
+// Button that copies a review link to the clipboard.
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";

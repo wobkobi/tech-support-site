@@ -1,9 +1,7 @@
 // src/app/pricing/page.tsx
-/**
- * @description Pricing page. Rates come from RateConfig (shared with the
- * calculator and wizard); accordion copy comes from pricing-policy.ts so the
- * page, booking emails, and FAQ stay aligned.
- */
+// Pricing page. Rates come from RateConfig (shared with the calculator and wizard);
+// accordion copy comes from pricing-policy.ts so the page, booking emails, and FAQ stay
+// aligned.
 
 import { GetEstimateButton } from "@/features/business/components/GetEstimateButton";
 import { PricingWizard } from "@/features/business/components/PricingWizard";

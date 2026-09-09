@@ -1,9 +1,8 @@
 // src/app/admin/(shell)/notifications/page.tsx
-/**
- * @description Admin notifications page. Push state (permission, subscription,
- * whether the app is installed) lives entirely in the browser, so this is a
- * thin auth gate around {@link NotificationsView}.
- */
+// Admin notifications page. Push state (permission, subscription, whether the app is
+// installed) lives entirely in the browser, so this is a thin auth gate around
+// NotificationsView.
+
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { NotificationsView } from "@/features/notifications/components/NotificationsView";
 import { requireAdminAuth } from "@/shared/lib/auth";

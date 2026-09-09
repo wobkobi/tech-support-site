@@ -1,9 +1,7 @@
 // src/app/pricing/loading.tsx
-/**
- * @description Streaming skeleton for the pricing page: heading card, a rate
- * card, the "no surprises" + accordion details card, and the closing
- * next-steps and estimate cards. Shown while the live pricing policy loads.
- */
+// Streaming skeleton for the pricing page: heading card, a rate card, the "no surprises"
+// + accordion details card, and the closing next-steps and estimate cards. Shown while
+// the live pricing policy loads.
 
 import { CARD } from "@/shared/components/PageLayout";
 import { PageLoadingShell } from "@/shared/components/PageLoadingShell";

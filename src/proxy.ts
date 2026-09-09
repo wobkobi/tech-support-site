@@ -1,11 +1,8 @@
 // src/proxy.ts
-/**
- * @description Edge chokepoint for admin/business routes (Next.js 16 proxy,
- * formerly `middleware.ts`). Accepts EITHER a signed session cookie (browser
- * path, set on /admin/login) OR the `x-admin-secret` header (scripts + cron).
- * Per-route checks via `isAdminRequest` / `requireAdminAuth` still run as
- * belt-and-braces.
- */
+// Edge chokepoint for admin/business routes (Next.js 16 proxy, formerly `middleware.ts`).
+// Accepts EITHER a signed session cookie (browser path, set on /admin/login) OR the
+// `x-admin-secret` header (scripts + cron). Per-route checks via `isAdminRequest` /
+// `requireAdminAuth` still run as belt-and-braces.
 
 import { ADMIN_SESSION_COOKIE, verifySessionCookieValue } from "@/shared/lib/admin-session";
 import { NextRequest, NextResponse } from "next/server";

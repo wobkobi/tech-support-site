@@ -1,10 +1,7 @@
 // src/features/admin/components/ui/PageHeader.tsx
-/**
- * @description Standard admin page header: optional breadcrumbs, a title, an
- * optional description, and a right-aligned actions slot. Replaces the
- * copy-pasted `<h1 class="mb-6 text-2xl font-extrabold text-russian-violet">`.
- * Server-safe.
- */
+// Standard admin page header: optional breadcrumbs, a title, an optional description, and
+// a right-aligned actions slot. Replaces the copy-pasted
+// `<h1 class="mb-6 text-2xl font-extrabold text-russian-violet">`. Server-safe.
 
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";

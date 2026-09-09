@@ -1,11 +1,9 @@
 "use client";
 // src/features/admin/components/ContactDetailActions.tsx
-/**
- * @description Header actions for the customer-360 detail page: edit the core
- * fields, sync to Google, send a review link, and soft-delete. Edits and the
- * sync PATCH/POST the same routes the contacts list uses; a delete routes back
- * to the list, since the contact no longer exists to show.
- */
+// Header actions for the customer-360 detail page: edit the core fields, sync to Google,
+// send a review link, and soft-delete. Edits and the sync PATCH/POST the same routes the
+// contacts list uses; a delete routes back to the list, since the contact no longer
+// exists to show.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";

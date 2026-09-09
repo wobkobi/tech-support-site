@@ -1,7 +1,5 @@
 // src/features/reviews/components/admin/review-types.ts
-/**
- * @description Shared types and utility functions for review moderation.
- */
+// Shared types and utility functions for review moderation.
 
 /**
  * A single review entry from the database.

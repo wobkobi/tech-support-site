@@ -1,14 +1,11 @@
 // src/features/business/lib/tax-planner.ts
-/**
- * @description NZ sole-trader tax planner calculations - mirrors the user's
- * `Tax Planner` spreadsheet so the dashboard reserve numbers reconcile with
- * what's in the per-FY workbook.
- *
- * Rates and weekly transfer amounts are now sourced from each FY workbook's
- * SETTINGS tab (see `readPlannerConfig` in tax-settings.ts). The defaults
- * below are only used when the sheet is unavailable - they should match
- * whatever the active workbook has so the dashboard stays consistent.
- */
+// NZ sole-trader tax planner calculations - mirrors the user's `Tax Planner` spreadsheet
+// so the dashboard reserve numbers reconcile with what's in the per-FY workbook.
+//
+// Rates and weekly transfer amounts are now sourced from each FY workbook's SETTINGS tab
+// (see `readPlannerConfig` in tax-settings.ts). The defaults below are only used when the
+// sheet is unavailable - they should match whatever the active workbook has so the
+// dashboard stays consistent.
 
 /**
  * Rates used by the planner. The first three come from `SETTINGS!B13:B15`

@@ -1,10 +1,8 @@
 // src/features/contacts/lib/contact-conflicts.ts
-/**
- * @description Helpers for recording and resolving sync conflicts between the
- * site DB and Google Contacts. A conflict is created when a single-value field
- * (name, email, address) has different values on each side AND both sides
- * have changed since the last successful sync, so auto-resolution isn't safe.
- */
+// Helpers for recording and resolving sync conflicts between the site DB and Google
+// Contacts. A conflict is created when a single-value field (name, email, address) has
+// different values on each side AND both sides have changed since the last successful
+// sync, so auto-resolution isn't safe.
 
 import { prisma } from "@/shared/lib/prisma";
 import type { ContactField } from "@prisma/client";

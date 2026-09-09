@@ -1,10 +1,7 @@
 // src/app/api/business/promos/route.ts
-/**
- * @description Admin promo collection endpoint. GET lists every promo newest
- * start first; POST validates a {@link PromoBody} via {@link validatePromo}
- * (per-type discount fields, kind/code pairing, startAt before endAt), creates
- * the promo, and revalidates the active-promo cache tag.
- */
+// Admin promo collection endpoint. GET lists every promo newest start first; POST
+// validates a PromoBody via validatePromo (per-type discount fields, kind/code pairing,
+// startAt before endAt), creates the promo, and revalidates the active-promo cache tag.
 
 import {
   resolveDiscountType,

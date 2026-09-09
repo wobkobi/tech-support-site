@@ -1,11 +1,9 @@
 "use client";
 // src/features/admin/components/settings/EstimatorPreview.tsx
-/**
- * @description Live worked example for the estimator settings: a sample job run
- * through the shared {@link priceRangeFor} at each confidence level, so the
- * range factors + low-end floor read as real dollars while the operator edits.
- * Mirrors the Availability/Pricing preview affordances.
- */
+// Live worked example for the estimator settings: a sample job run through the shared
+// priceRangeFor at each confidence level, so the range factors + low-end floor read as
+// real dollars while the operator edits. Mirrors the Availability/Pricing preview
+// affordances.
 
 import { priceRangeFor } from "@/features/business/lib/estimate-range";
 import type { EstimateConfidence, EstimatorSettings } from "@/shared/lib/settings/types";

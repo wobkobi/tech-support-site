@@ -1,7 +1,5 @@
 // src/app/about/page.tsx
-/**
- * @description About page: background, approach, and who the service helps.
- */
+// About page: background, approach, and who the service helps.
 
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";

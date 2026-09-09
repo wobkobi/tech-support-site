@@ -1,9 +1,7 @@
 // src/app/api/business/invoices/[id]/preview-void-email/route.ts
-/**
- * @description Admin endpoint that renders the void-notification email for review
- * without sending it. POST builds the subject + HTML body for the void notice,
- * applying optional operator overrides (greetingName, customBody).
- */
+// Admin endpoint that renders the void-notification email for review without sending it.
+// POST builds the subject + HTML body for the void notice, applying optional operator
+// overrides (greetingName, customBody).
 
 import { parseInvoiceEmailOverrides } from "@/features/business/lib/invoice-email-request";
 import { buildVoidEmail } from "@/features/reviews/lib/email";

@@ -1,20 +1,17 @@
 "use client";
 // src/features/business/components/TaxonomyManageModal.tsx
-/**
- * @description Lightweight modal for the Calculator that lists every distinct
- * device + category currently in use and lets the operator RENAME a tag (the
- * safe fix for a drifted or misspelt one - every task using it follows, and
- * colliding rows merge) or CLEAR it.
- *
- * Casing is presentation only - every consumer matches tags case-insensitively -
- * so a tag appears here ONCE however its rows are spelt, with the rival casings
- * named on the row. Splitting them into two rows would hand the operator two
- * handles on one tag, and clearing either would take both.
- *
- * Clearing is permanent. The AI may only reuse tags from the live vocabulary,
- * and that vocabulary is built from these tags, so a cleared tag is never
- * offered back to the model and its rows go inert.
- */
+// Lightweight modal for the Calculator that lists every distinct device + category
+// currently in use and lets the operator RENAME a tag (the safe fix for a drifted or
+// misspelt one - every task using it follows, and colliding rows merge) or CLEAR it.
+//
+// Casing is presentation only - every consumer matches tags case-insensitively - so a tag
+// appears here ONCE however its rows are spelt, with the rival casings named on the row.
+// Splitting them into two rows would hand the operator two handles on one tag, and
+// clearing either would take both.
+//
+// Clearing is permanent. The AI may only reuse tags from the live vocabulary, and that
+// vocabulary is built from these tags, so a cleared tag is never offered back to the
+// model and its rows go inert.
 
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
