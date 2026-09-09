@@ -4,6 +4,7 @@
  * is the static, cache-friendly system prompt (rules, structure, output schema);
  * {@link buildParseJobContext} appends live per-call data to the user message.
  */
+import { collectTaxonomyTags } from "@/features/business/lib/task-taxonomy";
 import type { RateConfig, TaskTemplate } from "@/features/business/types/business";
 
 /**
@@ -358,15 +359,14 @@ export function buildParseJobContext(
   identity?: { company: string; name: string; location: string },
   billing?: { minBillableMins: number; incrementMins: number; shortTaskMins: number },
 ): string {
-  // Distinct live tag vocabulary, derived from the same template rows the
-  // taxonomy endpoint reads. Sent as flat lists so TAG SELECTION can demand
-  // verbatim reuse without the model re-deriving the sets from the pairs.
-  const deviceTags = Array.from(
-    new Set(templates.map((t) => t.device).filter((v): v is string => !!v)),
-  ).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
-  const actionTags = Array.from(
-    new Set(templates.map((t) => t.action).filter((v): v is string => !!v)),
-  ).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+  // Live tag vocabulary, collapsed the same way the taxonomy endpoint collapses
+  // it: one entry per case-insensitive tag. Offering both "PC" and "Pc" under a
+  // "reuse verbatim" instruction is what splits the taxonomy in the first place -
+  // the model picks either, and the next row is written with whichever it picked.
+  // Sent as flat lists so TAG SELECTION can demand verbatim reuse without the
+  // model re-deriving the sets from the pairs.
+  const deviceTags = collectTaxonomyTags(templates, "device").map((tag) => tag.name);
+  const actionTags = collectTaxonomyTags(templates, "action").map((tag) => tag.name);
   const taxonomyBlock =
     deviceTags.length > 0 || actionTags.length > 0
       ? `Current device tags (authoritative - reuse verbatim when one fits):\n${JSON.stringify(

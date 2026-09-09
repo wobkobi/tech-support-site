@@ -6,23 +6,27 @@
  * safe fix for a drifted or misspelt one - every task using it follows, and
  * colliding rows merge) or CLEAR it.
  *
+ * Casing is presentation only - every consumer matches tags case-insensitively -
+ * so a tag appears here ONCE however its rows are spelt, with the rival casings
+ * named on the row. Splitting them into two rows would hand the operator two
+ * handles on one tag, and clearing either would take both.
+ *
  * Clearing is permanent. The AI may only reuse tags from the live vocabulary,
  * and that vocabulary is built from these tags, so a cleared tag is never
- * offered back to the model and its rows go inert. The copy below says so
- * plainly - it previously promised the next parse would retag them, which is
- * not something the system can do.
+ * offered back to the model and its rows go inert.
  */
 
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import type { TaxonomyTag } from "@/features/business/lib/task-taxonomy";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useEffect, useState } from "react";
 
 interface TaxonomyResponse {
   ok: boolean;
-  devices?: string[];
-  actions?: string[];
+  devices?: TaxonomyTag[];
+  actions?: TaxonomyTag[];
   error?: string;
 }
 
@@ -59,8 +63,8 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
   const headers: Record<string, string> = {};
   const { toast } = useToast();
 
-  const [devices, setDevices] = useState<string[]>([]);
-  const [actions, setActions] = useState<string[]>([]);
+  const [devices, setDevices] = useState<TaxonomyTag[]>([]);
+  const [actions, setActions] = useState<TaxonomyTag[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -80,7 +84,7 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
    */
   async function fetchTaxonomy(
     signal?: AbortSignal,
-  ): Promise<{ devices: string[]; actions: string[] } | null> {
+  ): Promise<{ devices: TaxonomyTag[]; actions: TaxonomyTag[] } | null> {
     const res = await fetch("/api/business/task-templates/taxonomy", { headers, signal });
     if (signal?.aborted) return null;
     const data = (await res.json()) as TaxonomyResponse;
@@ -240,7 +244,7 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
  * (Firefox suppresses native confirm dialogs once the user opts out).
  * @param props - Component props.
  * @param props.title - Section heading (e.g. "Devices").
- * @param props.tags - Tag values to render.
+ * @param props.tags - Tags to render, one per case-insensitive value.
  * @param props.busyKey - Currently-busy `kind:name` key.
  * @param props.pendingKey - `kind:name` staged for clear confirmation.
  * @param props.renamingKey - `kind:name` currently being renamed.
@@ -272,7 +276,7 @@ function TagSection({
   onCancelClear,
 }: {
   title: string;
-  tags: string[];
+  tags: TaxonomyTag[];
   busyKey: string | null;
   pendingKey: string | null;
   renamingKey: string | null;
@@ -296,13 +300,14 @@ function TagSection({
       ) : (
         <ul className="flex flex-col gap-1">
           {tags.map((tag) => {
-            const rowKey = `${kind}:${tag}`;
+            const name = tag.name;
+            const rowKey = `${kind}:${name}`;
             const isBusy = busyKey === rowKey;
             const isPending = pendingKey === rowKey;
             const isRenaming = renamingKey === rowKey;
             return (
               <li
-                key={tag}
+                key={name}
                 className={cn(
                   "flex items-center justify-between gap-3 rounded-lg border px-3 py-2",
                   isPending
@@ -319,17 +324,17 @@ function TagSection({
                       value={renameValue}
                       onChange={(e) => onRenameValue(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") onSubmitRename(tag);
+                        if (e.key === "Enter") onSubmitRename(name);
                         if (e.key === "Escape") onCancelRename();
                       }}
-                      aria-label={`Rename ${tag}`}
+                      aria-label={`Rename ${name}`}
                       className="min-w-0 flex-1 rounded border border-admin-border-strong px-2 py-1 text-sm text-admin-text"
                     />
                     <div className="flex shrink-0 items-center gap-2">
                       <button
                         type="button"
                         disabled={isBusy}
-                        onClick={() => onSubmitRename(tag)}
+                        onClick={() => onSubmitRename(name)}
                         className="rounded bg-russian-violet px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
                       >
                         {isBusy ? "Saving..." : "Save"}
@@ -345,13 +350,20 @@ function TagSection({
                   </>
                 ) : (
                   <>
-                    <span className="truncate text-sm text-admin-text">{tag}</span>
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate text-sm text-admin-text">{name}</span>
+                      {tag.variants.length > 0 && (
+                        <span className="truncate text-xs text-admin-muted">
+                          Also spelt {tag.variants.join(", ")} - rename to settle on one.
+                        </span>
+                      )}
+                    </span>
                     {isPending ? (
                       <div className="flex shrink-0 items-center gap-2">
                         <span className="text-xs text-red-700">Clear for good?</span>
                         <button
                           type="button"
-                          onClick={() => onConfirmClear(tag)}
+                          onClick={() => onConfirmClear(name)}
                           className="rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700"
                         >
                           Yes, clear
@@ -369,7 +381,7 @@ function TagSection({
                         <button
                           type="button"
                           disabled={isBusy}
-                          onClick={() => onRequestRename(tag)}
+                          onClick={() => onRequestRename(name)}
                           className="rounded text-xs font-semibold text-admin-muted hover:text-russian-violet disabled:opacity-50"
                         >
                           Rename
@@ -377,7 +389,7 @@ function TagSection({
                         <button
                           type="button"
                           disabled={isBusy}
-                          onClick={() => onRequestClear(tag)}
+                          onClick={() => onRequestClear(name)}
                           className="rounded text-xs font-semibold text-red-500 hover:text-red-700 disabled:opacity-50"
                         >
                           {isBusy ? "Clearing..." : "Clear"}
