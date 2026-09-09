@@ -1,7 +1,5 @@
 // src/features/booking/lib/booking.ts
-/**
- * @description Booking system with duration selection (1hr quick jobs vs 2hr standard jobs).
- */
+// Booking system with duration selection (1hr quick jobs vs 2hr standard jobs).
 
 import type { AvailabilitySettings, MorningGuard } from "@/shared/lib/settings/types";
 import {

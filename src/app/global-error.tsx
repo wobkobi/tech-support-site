@@ -1,7 +1,5 @@
 // src/app/global-error.tsx
-/**
- * @description Global error boundary. Must render <html> and <body>.
- */
+// Global error boundary. Must render <html> and <body>.
 
 "use client";
 

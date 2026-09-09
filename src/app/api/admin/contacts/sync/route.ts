@@ -1,9 +1,7 @@
 // src/app/api/admin/contacts/sync/route.ts
-/**
- * @description Admin API route for the manual full two-way Google Contacts sync.
- * Shares {@link runContactsSync} with the cron; the button force-pushes every
- * contact (full mode) rather than just the changed ones.
- */
+// Admin API route for the manual full two-way Google Contacts sync. Shares
+// runContactsSync with the cron; the button force-pushes every contact (full mode) rather
+// than just the changed ones.
 
 import { CONTACTS_SYNC_LOCK_KEY, runContactsSync } from "@/features/contacts/lib/contacts-sync";
 import { errorResponse } from "@/shared/lib/api-response";

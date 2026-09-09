@@ -1,9 +1,7 @@
 // src/app/business/page.tsx
-/**
- * @description Business page: ad-hoc IT support and monthly retainers for
- * Auckland small businesses. Reads the live business rate from the rate
- * config; retainer tiers are page copy (nothing downstream derives from them).
- */
+// Business page: ad-hoc IT support and monthly retainers for Auckland small businesses.
+// Reads the live business rate from the rate config; retainer tiers are page copy
+// (nothing downstream derives from them).
 
 import { BusinessEnquiryForm } from "@/features/business/components/BusinessEnquiryForm";
 import { formatMoneyCompact } from "@/features/business/lib/business";

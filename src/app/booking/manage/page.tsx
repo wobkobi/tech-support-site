@@ -1,9 +1,7 @@
 // src/app/booking/manage/page.tsx
-/**
- * @description Find-my-booking page. Customers who have lost the confirmation
- * email can have their change / cancel links re-sent to the address they booked
- * with, without needing the token.
- */
+// Find-my-booking page. Customers who have lost the confirmation email can have their
+// change / cancel links re-sent to the address they booked with, without needing the
+// token.
 
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { getIdentity } from "@/shared/lib/business-identity.server";

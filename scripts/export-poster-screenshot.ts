@@ -1,11 +1,9 @@
 // scripts/export-poster-screenshot.ts
-/**
- * @description Exports the /poster page as a print-ready A5 PDF by screenshotting
- * it via Puppeteer and embedding the result into a pdf-lib document. The capture,
- * PDF assembly and crop marks live in scripts/lib/print-export.ts, shared with the
- * business card exporter; this file owns the poster's page sizes and CLI.
- * Run with: npx tsx scripts/export-poster-screenshot.ts [--url=<url>] [--variant=<v>] [--output-dir=<dir>] [--format=a5|a4]
- */
+// Exports the /poster page as a print-ready A5 PDF by screenshotting it via Puppeteer and
+// embedding the result into a pdf-lib document. The capture, PDF assembly and crop marks
+// live in scripts/lib/print-export.ts, shared with the business card exporter; this file
+// owns the poster's page sizes and CLI.
+// Run with: npx tsx scripts/export-poster-screenshot.ts [--url=<url>] [--variant=<v>] [--output-dir=<dir>] [--format=a5|a4]
 
 import { logSummary, renderVariants, type PageConfig } from "./lib/print-export.js";
 

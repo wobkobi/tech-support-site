@@ -1,7 +1,5 @@
 // src/shared/lib/date-format.ts
-/**
- * @description Canonical NZ date/time formatters (Pacific/Auckland for clocked outputs).
- */
+// Canonical NZ date/time formatters (Pacific/Auckland for clocked outputs).
 
 import { NZ_TZ } from "@/shared/lib/timezone-utils";
 

@@ -1,21 +1,18 @@
 "use client";
 // src/features/admin/components/ScheduleAutoRefresh.tsx
-/**
- * @description Keeps the admin schedule current without a manual reload, so
- * externally-made calendar changes (a new booking landing, or a block made
- * directly in Google Calendar) surface on their own. Each tick asks
- * `/api/admin/schedule/version` for a fingerprint of the rendered window and
- * only calls router.refresh() when it differs from the token the page was built
- * with; refreshing unconditionally would re-run a full server render of the
- * seven-week grid every tick. Polling pauses while the tab is hidden and checks
- * once on re-show so a backgrounded tab catches up. Rendered once by the
- * schedule page; router.refresh() preserves client state (open modals, form
- * input) so a refresh is non-disruptive.
- *
- * Travel-bar minutes are not part of the fingerprint: they are recomputed by the
- * travel cron and can lag a cycle behind their event either way, so they ride
- * along on the next calendar-driven refresh.
- */
+// Keeps the admin schedule current without a manual reload, so externally-made calendar
+// changes (a new booking landing, or a block made directly in Google Calendar) surface on
+// their own. Each tick asks `/api/admin/schedule/version` for a fingerprint of the
+// rendered window and only calls router.refresh() when it differs from the token the page
+// was built with; refreshing unconditionally would re-run a full server render of the
+// seven-week grid every tick. Polling pauses while the tab is hidden and checks once on
+// re-show so a backgrounded tab catches up. Rendered once by the schedule page;
+// router.refresh() preserves client state (open modals, form input) so a refresh is
+// non-disruptive.
+//
+// Travel-bar minutes are not part of the fingerprint: they are recomputed by the travel
+// cron and can lag a cycle behind their event either way, so they ride along on the next
+// calendar-driven refresh.
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";

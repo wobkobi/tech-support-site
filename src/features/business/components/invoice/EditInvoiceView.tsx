@@ -1,12 +1,9 @@
 "use client";
 // src/features/business/components/invoice/EditInvoiceView.tsx
-/**
- * @description DRAFT-invoice editor: {@link InvoiceForm} on the left, a live
- * {@link InvoicePreviewPanel} (real invoice number, sticky on lg+) on the right.
- * Submitting PATCHes the full-update branch of /api/business/invoices/[id] (which
- * re-validates line items, recomputes totals with the preserved discounts, and
- * re-syncs the Drive PDF), then routes back to the detail page.
- */
+// DRAFT-invoice editor: InvoiceForm on the left, a live InvoicePreviewPanel (real invoice
+// number, sticky on lg+) on the right. Submitting PATCHes the full-update branch of
+// /api/business/invoices/[id] (which re-validates line items, recomputes totals with the
+// preserved discounts, and re-syncs the Drive PDF), then routes back to the detail page.
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import {

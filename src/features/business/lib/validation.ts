@@ -1,8 +1,7 @@
-/**
- * @description Shared input parsers for business write routes.
- * Reject non-finite, out-of-range, or otherwise nonsensical numeric values
- * before they reach Prisma so accounting reports stay coherent.
- */
+// src/features/business/lib/validation.ts
+// Shared input parsers for business write routes. Reject non-finite, out-of-range, or
+// otherwise nonsensical numeric values before they reach Prisma so accounting reports
+// stay coherent.
 
 const MAX_AMOUNT = 1_000_000_000;
 

@@ -1,10 +1,7 @@
 // src/app/api/business/invoices/[id]/pdf/route.ts
-/**
- * @description Admin endpoint that downloads the PDF for a saved invoice. GET
- * re-generates the bytes with the same renderer used for Drive uploads and email
- * attachments and returns them as an attachment, so the operator's copy matches
- * what the customer receives.
- */
+// Admin endpoint that downloads the PDF for a saved invoice. GET re-generates the bytes
+// with the same renderer used for Drive uploads and email attachments and returns them as
+// an attachment, so the operator's copy matches what the customer receives.
 
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import { errorResponse } from "@/shared/lib/api-response";

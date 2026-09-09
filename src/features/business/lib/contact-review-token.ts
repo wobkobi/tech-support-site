@@ -1,7 +1,5 @@
 // src/features/business/lib/contact-review-token.ts
-/**
- * @description Lazy generator for the per-contact review token used in invoice emails.
- */
+// Lazy generator for the per-contact review token used in invoice emails.
 
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";

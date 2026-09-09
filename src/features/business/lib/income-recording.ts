@@ -1,11 +1,8 @@
 // src/features/business/lib/income-recording.ts
-/**
- * @description Shared income-entry writer: creates the IncomeEntry, mirrors it
- * to the per-FY Cashbook sheet keyed by the entry's own id (a deterministic
- * Sync ID, so a retried append reuses the row instead of doubling it), and
- * persists the returned sheetRowKey. Extracted from POST /api/business/income so
- * the invoice /pay route reuses exactly the same write path.
- */
+// Shared income-entry writer: creates the IncomeEntry, mirrors it to the per-FY Cashbook
+// sheet keyed by the entry's own id (a deterministic Sync ID, so a retried append reuses
+// the row instead of doubling it), and persists the returned sheetRowKey. Extracted from
+// POST /api/business/income so the invoice /pay route reuses exactly the same write path.
 
 import {
   appendRowWithSyncId,

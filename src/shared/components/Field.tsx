@@ -1,10 +1,8 @@
 // src/shared/components/Field.tsx
-/**
- * @description Shared labelled form-field wrapper for admin/business forms. The
- * label is associated with its input via `htmlFor`, and a consistent
- * required/optional marker (red `*` or muted "(optional)") signals which fields
- * are mandatory the same way the public booking/review forms do.
- */
+// Shared labelled form-field wrapper for admin/business forms. The label is associated
+// with its input via `htmlFor`, and a consistent required/optional marker (red `*` or
+// muted "(optional)") signals which fields are mandatory the same way the public
+// booking/review forms do.
 
 import type React from "react";
 

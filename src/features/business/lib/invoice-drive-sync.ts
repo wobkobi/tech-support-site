@@ -1,11 +1,9 @@
 // src/features/business/lib/invoice-drive-sync.ts
-/**
- * @description Shared "sync the invoice PDF to Google Drive" helper, previously
- * copy-pasted across five call sites (PATCH, void, send-email, create,
- * cancellation). Re-uploads the PDF (replacing the Drive file in place when
- * driveFileId is set, else creating a fresh one) and persists any new ids.
- * Failures are logged, never thrown - Drive is a non-critical archive sync.
- */
+// Shared "sync the invoice PDF to Google Drive" helper, previously copy-pasted across
+// five call sites (PATCH, void, send-email, create, cancellation). Re-uploads the PDF
+// (replacing the Drive file in place when driveFileId is set, else creating a fresh one)
+// and persists any new ids. Failures are logged, never thrown - Drive is a non-critical
+// archive sync.
 
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import {

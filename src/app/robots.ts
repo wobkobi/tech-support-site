@@ -1,7 +1,5 @@
 // src/app/robots.ts
-/**
- * @description robots.txt generator. Allows public routes, blocks the API only.
- */
+// robots.txt generator. Allows public routes, blocks the API only.
 
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { MetadataRoute } from "next";

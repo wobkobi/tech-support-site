@@ -1,11 +1,8 @@
 // src/app/api/business/expenses/[id]/route.ts
-/**
- * @description Admin endpoint for a single expense entry. PUT updates the entry
- * (recomputing the GST split server-side) and writes the change through to its
- * Expenses sheet row (by Sync ID); DELETE removes the entry and its sheet row.
- * Sheet failures are logged and swallowed so DB changes are never blocked -
- * the sync cron reconciles any drift.
- */
+// Admin endpoint for a single expense entry. PUT updates the entry (recomputing the GST
+// split server-side) and writes the change through to its Expenses sheet row (by Sync
+// ID); DELETE removes the entry and its sheet row. Sheet failures are logged and
+// swallowed so DB changes are never blocked - the sync cron reconciles any drift.
 
 import { splitGstInclusive } from "@/features/business/lib/business";
 import { GST_RATE } from "@/features/business/lib/pricing-policy";

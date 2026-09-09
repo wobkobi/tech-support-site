@@ -1,7 +1,5 @@
 // src/app/reviews/page.tsx
-/**
- * @description Public reviews page showing all approved client reviews.
- */
+// Public reviews page showing all approved client reviews.
 
 import { ReviewScrollHandler } from "@/features/reviews/components/ReviewScrollHandler";
 import { ReviewsList, type PublicReview } from "@/features/reviews/components/ReviewsList";

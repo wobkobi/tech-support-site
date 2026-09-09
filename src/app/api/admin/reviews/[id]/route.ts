@@ -1,8 +1,6 @@
 // src/app/api/admin/reviews/[id]/route.ts
-/**
- * @description Admin API for approving, revoking, and deleting reviews.
- * Protected by ADMIN_SECRET via constant-time comparison.
- */
+// Admin API for approving, revoking, and deleting reviews. Protected by ADMIN_SECRET via
+// constant-time comparison.
 
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";

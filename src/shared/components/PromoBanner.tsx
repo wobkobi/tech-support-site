@@ -1,7 +1,5 @@
 // src/shared/components/PromoBanner.tsx
-/**
- * @description Server wrapper - fetches the active promo, hands it to the client banner.
- */
+// Server wrapper - fetches the active promo, hands it to the client banner.
 
 import { getActivePromo } from "@/features/business/lib/promos";
 import { PromoBannerClient } from "@/shared/components/PromoBannerClient";

@@ -1,15 +1,12 @@
 "use client";
 // src/app/admin/(shell)/business/invoices/[id]/InvoiceActions.tsx
-/**
- * @description Action buttons + modals for the invoice detail page: save PDF,
- * open Drive PDF, record payment (via {@link PaymentDialog}), send-to-client,
- * void, and delete-draft. The send flow opens a preview modal with an editable
- * email body/greeting plus an optional review link based on eligibility; the
- * void flow previews the notification and warns when linked income entries would
- * be left behind. Housed beside the page so it ships in the PageHeader actions
- * slot. Built on the shared admin primitives (Modal / ConfirmDialog / AdminButton
- * / Toast).
- */
+// Action buttons + modals for the invoice detail page: save PDF, open Drive PDF, record
+// payment (via PaymentDialog), send-to-client, void, and delete-draft. The send flow
+// opens a preview modal with an editable email body/greeting plus an optional review link
+// based on eligibility; the void flow previews the notification and warns when linked
+// income entries would be left behind. Housed beside the page so it ships in the
+// PageHeader actions slot. Built on the shared admin primitives (Modal / ConfirmDialog /
+// AdminButton / Toast).
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";

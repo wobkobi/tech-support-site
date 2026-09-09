@@ -1,7 +1,5 @@
 // src/app/api/admin/bookings/[id]/resend-review/route.ts
-/**
- * @description Admin API to manually (re)send a review request email for a booking.
- */
+// Admin API to manually (re)send a review request email for a booking.
 
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";

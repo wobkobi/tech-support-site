@@ -1,10 +1,9 @@
 // src/app/admin/(shell)/contacts/conflicts/page.tsx
-/**
- * @description Lists unresolved Google Contacts sync conflicts (fields that
- * changed on both the site DB and Google since the last sync). Joins each
- * conflict to its contact, maps to {@link ConflictRow}s, and renders
- * {@link ContactConflictsView} so the operator can pick the winning value.
- */
+// Lists unresolved Google Contacts sync conflicts (fields that changed on both the site
+// DB and Google since the last sync). Joins each conflict to its contact, maps to
+// ConflictRows, and renders ContactConflictsView so the operator can pick the winning
+// value.
+
 import {
   ContactAddressReviewList,
   type AddressReviewRow,

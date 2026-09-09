@@ -1,10 +1,8 @@
 // src/app/api/business/job-context/route.ts
-/**
- * @description GET /api/business/job-context?date=YYYY-MM-DD[&code=CODE][&email=] -
- * admin-only. Given the date a job was actually done, returns whether it was an
- * NZ public holiday (with the live labour uplift) and which promo applied that
- * day, so the calculator prices a past job by what applied then, not today.
- */
+// GET /api/business/job-context?date=YYYY-MM-DD[&code=CODE][&email=] - admin-only. Given
+// the date a job was actually done, returns whether it was an NZ public holiday (with the
+// live labour uplift) and which promo applied that day, so the calculator prices a past
+// job by what applied then, not today.
 
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { resolvePromo, type ActivePromo } from "@/features/business/lib/promos";

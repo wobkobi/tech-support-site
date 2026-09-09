@@ -1,11 +1,9 @@
 // src/app/api/cron/send-review-emails/route.ts
-/**
- * @description Cron job that sends review request emails once a booking has been
- * finished for the configured delay. Called externally via cron-job.org hourly.
- * The query is unbounded catch-up work ("ended long enough ago and not yet
- * emailed"), so the cadence only shifts when a mail goes out, never whether it
- * does - safe to slow further if function CPU ever needs trimming again.
- */
+// Cron job that sends review request emails once a booking has been finished for the
+// configured delay. Called externally via cron-job.org hourly. The query is unbounded
+// catch-up work ("ended long enough ago and not yet emailed"), so the cadence only shifts
+// when a mail goes out, never whether it does - safe to slow further if function CPU ever
+// needs trimming again.
 
 import { CALENDAR_EVENT_PRESENT_FILTER } from "@/features/booking/lib/booking";
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";

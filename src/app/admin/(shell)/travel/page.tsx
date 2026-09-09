@@ -1,10 +1,8 @@
 // src/app/admin/(shell)/travel/page.tsx
-/**
- * @description Admin travel blocks page. Loads computed travel blocks, looks up
- * cache expiry for their synthetic before/after events, maps them to
- * {@link TravelBlockRow}s, and renders {@link TravelBlockAdminList} alongside a
- * {@link RecalculateButton}.
- */
+// Admin travel blocks page. Loads computed travel blocks, looks up cache expiry for their
+// synthetic before/after events, maps them to TravelBlockRows, and renders
+// TravelBlockAdminList alongside a RecalculateButton.
+
 import { RecalculateButton } from "@/features/admin/components/RecalculateButton";
 import {
   TravelBlockAdminList,

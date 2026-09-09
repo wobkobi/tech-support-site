@@ -1,11 +1,9 @@
 "use client";
 // src/features/business/components/invoice/LineItemsEditor.tsx
-/**
- * @description Editable list of invoice line items: description, qty, unit price,
- * with `lineTotal` auto-derived (qty x unitPrice, rounded to cents) as the
- * operator types. Add/remove rows. Purely controlled - the parent owns the array
- * and validates it (mirroring isValidLineItem) before persisting.
- */
+// Editable list of invoice line items: description, qty, unit price, with `lineTotal`
+// auto-derived (qty x unitPrice, rounded to cents) as the operator types. Add/remove
+// rows. Purely controlled - the parent owns the array and validates it (mirroring
+// isValidLineItem) before persisting.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { formatNZD } from "@/features/business/lib/business";

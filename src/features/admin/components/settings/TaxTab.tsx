@@ -1,11 +1,8 @@
 "use client";
 // src/features/admin/components/settings/TaxTab.tsx
-/**
- * @description Editor for the tax-planner group: the income-tax / ACC /
- * KiwiSaver reserve rates (stored as fractions). These feed the dashboard tax
- * planner and the per-FY tax reserve; a per-FY workbook rate, when present,
- * still takes precedence over these.
- */
+// Editor for the tax-planner group: the income-tax / ACC / KiwiSaver reserve rates
+// (stored as fractions). These feed the dashboard tax planner and the per-FY tax reserve;
+// a per-FY workbook rate, when present, still takes precedence over these.
 
 import { NumberField, SettingsTabBody } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";

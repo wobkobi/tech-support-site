@@ -1,12 +1,9 @@
 "use client";
 // src/features/business/components/ExpensesPageView.tsx
-/**
- * @description Thin client wrapper pairing {@link ExpensesView} with
- * {@link SubscriptionsView} on the expenses page. They are sibling components
- * with separate self-loaded state, so a migrate in the expenses view can't
- * directly refresh the subscriptions list - this wrapper bumps a `reloadKey`
- * the subscriptions view watches, so a migrated subscription appears at once.
- */
+// Thin client wrapper pairing ExpensesView with SubscriptionsView on the expenses page.
+// They are sibling components with separate self-loaded state, so a migrate in the
+// expenses view can't directly refresh the subscriptions list - this wrapper bumps a
+// `reloadKey` the subscriptions view watches, so a migrated subscription appears at once.
 
 import { ExpensesView } from "@/features/business/components/ExpensesView";
 import { SubscriptionsView } from "@/features/business/components/SubscriptionsView";

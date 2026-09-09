@@ -1,10 +1,8 @@
 // src/app/api/admin/settings/[group]/history/route.ts
-/**
- * @description Admin read of the change history for one settings group. Returns
- * the most recent `SettingAudit` rows (newest first) with the set of top-level
- * keys that changed in each, plus the raw post-change value so the panel can
- * load a prior version back into the editor for review + re-save.
- */
+// Admin read of the change history for one settings group. Returns the most recent
+// `SettingAudit` rows (newest first) with the set of top-level keys that changed in each,
+// plus the raw post-change value so the panel can load a prior version back into the
+// editor for review + re-save.
 
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

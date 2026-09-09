@@ -1,5 +1,6 @@
-// src/shared/lib/google-maps-loader.ts - loads the Maps JS API once
-// (loading=async) and resolves the Places library via importLibrary.
+// src/shared/lib/google-maps-loader.ts
+// Loads the Maps JS API once (loading=async) and resolves the Places library via
+// importLibrary.
 
 /** Global callback name the Maps bootstrap invokes when the API is ready. */
 const READY_CALLBACK = "__gmapsLoaderReady";

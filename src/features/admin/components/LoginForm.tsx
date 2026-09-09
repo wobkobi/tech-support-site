@@ -1,11 +1,8 @@
 "use client";
 // src/features/admin/components/LoginForm.tsx
-/**
- * @description Client-side form for the admin login page. POSTs the secret
- * to /api/admin/login and navigates back to the requested `next` path on
- * success. Generic error on failure so a wrong password can't be
- * distinguished from a rate-limited one (defence-in-depth).
- */
+// Client-side form for the admin login page. POSTs the secret to /api/admin/login and
+// navigates back to the requested `next` path on success. Generic error on failure so a
+// wrong password can't be distinguished from a rate-limited one (defence-in-depth).
 
 import { useRouter } from "next/navigation";
 import type React from "react";

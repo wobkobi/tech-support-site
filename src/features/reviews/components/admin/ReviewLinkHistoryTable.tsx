@@ -1,10 +1,7 @@
 "use client";
 // src/features/reviews/components/admin/ReviewLinkHistoryTable.tsx
-/**
- * @description Table of review link history with inline editing of a contact's
- * email/phone, and revoke for links not yet used. Legacy entries (customerRef or
- * reviewId only) are read-only.
- */
+// Table of review link history with inline editing of a contact's email/phone, and revoke
+// for links not yet used. Legacy entries (customerRef or reviewId only) are read-only.
 
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";

@@ -1,12 +1,9 @@
 "use client";
 // src/features/business/components/AddToContactsModal.tsx
-/**
- * @description Post-action prompt asking the operator whether to save the
- * current client to the DB Contact table (and Google Contacts via the
- * fire-and-forget sync). Triggered after an invoice save succeeds or when
- * the calculator hands off to the invoice builder, but only when the email
- * doesn't already exist in the DB.
- */
+// Post-action prompt asking the operator whether to save the current client to the DB
+// Contact table (and Google Contacts via the fire-and-forget sync). Triggered after an
+// invoice save succeeds or when the calculator hands off to the invoice builder, but only
+// when the email doesn't already exist in the DB.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Modal } from "@/features/admin/components/ui/Modal";

@@ -1,7 +1,5 @@
 // src/app/api/booking/contact-lookup/route.ts
-/**
- * @description Looks up a contact by email so the booking form can pre-fill name/phone/address.
- */
+// Looks up a contact by email so the booking form can pre-fill name/phone/address.
 
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";

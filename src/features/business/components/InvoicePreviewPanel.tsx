@@ -1,10 +1,8 @@
 "use client";
 // src/features/business/components/InvoicePreviewPanel.tsx
-/**
- * @description Live A4-styled invoice preview. The layout must stay in sync with
- * the generated PDF so the operator sees the same invoice the customer receives.
- * Pure presentational; memoised.
- */
+// Live A4-styled invoice preview. The layout must stay in sync with the generated PDF so
+// the operator sees the same invoice the customer receives. Pure presentational;
+// memoised.
 
 import { calcInvoiceTotals, formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
 import type { LineItem } from "@/features/business/types/business";

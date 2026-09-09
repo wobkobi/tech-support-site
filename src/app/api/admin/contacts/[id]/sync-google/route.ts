@@ -1,7 +1,5 @@
 // src/app/api/admin/contacts/[id]/sync-google/route.ts
-/**
- * @description Admin API to sync a single contact to Google Contacts.
- */
+// Admin API to sync a single contact to Google Contacts.
 
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { errorResponse } from "@/shared/lib/api-response";

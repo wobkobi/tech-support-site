@@ -1,8 +1,6 @@
 // src/app/api/admin/contacts/resolve-conflict/route.ts
-/**
- * @description Resolves a contact conflict by applying a chosen value to both
- * the contact and the source record (Booking or Review).
- */
+// Resolves a contact conflict by applying a chosen value to both the contact and the
+// source record (Booking or Review).
 
 import { splitName } from "@/features/contacts/lib/split-name";
 import { errorResponse } from "@/shared/lib/api-response";

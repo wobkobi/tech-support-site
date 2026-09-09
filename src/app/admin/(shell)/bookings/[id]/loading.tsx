@@ -1,8 +1,7 @@
 // src/app/admin/(shell)/bookings/[id]/loading.tsx
-/**
- * @description Booking detail loading skeleton - a two-column shell matching the
- * detail page so the list skeleton from the parent segment doesn't flash here.
- */
+// Booking detail loading skeleton - a two-column shell matching the detail page so the
+// list skeleton from the parent segment doesn't flash here.
+
 import type React from "react";
 
 /**

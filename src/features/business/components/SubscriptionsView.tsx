@@ -1,9 +1,7 @@
 "use client";
 // src/features/business/components/SubscriptionsView.tsx
-/**
- * @description Records and lists recurring subscription expenses (description,
- * supplier, amount, GST, frequency, next due) and flags overdue ones.
- */
+// Records and lists recurring subscription expenses (description, supplier, amount, GST,
+// frequency, next due) and flags overdue ones.
 
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";

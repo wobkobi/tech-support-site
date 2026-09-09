@@ -1,13 +1,11 @@
 // src/shared/lib/settings/get-settings.ts
-/**
- * @description Server-only accessor that resolves the full, typed settings:
- * code defaults with DB overrides merged on top, with the booking window
- * (maxAdvanceDays) defensively clamped so a hand-edited bad row can't push it
- * out of range on the public booking/pricing pages. Cached
- * via {@link unstable_cache} with a tag: hot reads hit the data cache, and
- * `saveSettingsGroup` busts the tag so edits go live immediately. The 60s
- * revalidate is only a cross-instance safety net.
- */
+// Server-only accessor that resolves the full, typed settings:
+// code defaults with DB overrides merged on top, with the booking window
+// (maxAdvanceDays) defensively clamped so a hand-edited bad row can't push it
+// out of range on the public booking/pricing pages. Cached
+// via unstable_cache with a tag: hot reads hit the data cache, and
+// `saveSettingsGroup` busts the tag so edits go live immediately. The 60s
+// revalidate is only a cross-instance safety net.
 
 import { prisma } from "@/shared/lib/prisma";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";

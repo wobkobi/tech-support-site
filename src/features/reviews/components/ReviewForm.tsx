@@ -1,7 +1,5 @@
 // src/features/reviews/components/ReviewForm.tsx
-/**
- * @description Review form that supports verified reviews via booking tokens.
- */
+// Review form that supports verified reviews via booking tokens.
 
 "use client";
 

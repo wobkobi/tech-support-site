@@ -1,10 +1,8 @@
 "use client";
 // src/features/business/components/PromoCodeField.tsx
-/**
- * @description Promo code entry, shared by the pricing wizard, the booking form
- * and the calculator. One control rather than three, because the surfaces have
- * to agree on what "applied" means and on the wording of a rejection.
- */
+// Promo code entry, shared by the pricing wizard, the booking form and the calculator.
+// One control rather than three, because the surfaces have to agree on what "applied"
+// means and on the wording of a rejection.
 
 import type { ActivePromo } from "@/features/business/lib/promos";
 import { normalisePromoCode } from "@/features/business/lib/promos";

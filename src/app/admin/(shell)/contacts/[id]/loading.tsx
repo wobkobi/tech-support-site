@@ -1,8 +1,6 @@
 // src/app/admin/(shell)/contacts/[id]/loading.tsx
-/**
- * @description Loading skeleton for the customer-360 contact detail: header,
- * four stat cards, and the timeline + rail two-column, matching the real page.
- */
+// Loading skeleton for the customer-360 contact detail: header, four stat cards, and the
+// timeline + rail two-column, matching the real page.
 
 import { Bone } from "@/shared/components/Skeleton";
 import type React from "react";

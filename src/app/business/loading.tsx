@@ -1,9 +1,6 @@
 // src/app/business/loading.tsx
-/**
- * @description Streaming skeleton for the business page: centred hero with CTA
- * buttons, service grid, rates list, retainer tier cards, how-it-works row,
- * FAQ block and the enquiry card.
- */
+// Streaming skeleton for the business page: centred hero with CTA buttons, service grid,
+// rates list, retainer tier cards, how-it-works row, FAQ block and the enquiry card.
 
 import { CARD } from "@/shared/components/PageLayout";
 import { PageLoadingShell } from "@/shared/components/PageLoadingShell";

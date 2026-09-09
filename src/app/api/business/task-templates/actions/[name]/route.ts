@@ -1,18 +1,15 @@
 // src/app/api/business/task-templates/actions/[name]/route.ts
-/**
- * @description Admin endpoint to rename or retire a task-template action tag.
- * PATCH renames it across every row (merging collisions) and is the safe way to
- * fix a drifted or misspelt tag. DELETE clears the action (sets it to null,
- * case-insensitive match) on every matching TaskTemplate.
- *
- * Clearing an action is effectively PERMANENT - nothing re-tags the rows later.
- * parse-job may only reuse tags from the live vocabulary, and that vocabulary is
- * built from this very field, so a retired tag is never offered to the model
- * again; `findTemplateByTags` also needs BOTH device and action, so a
- * null-action row can never match. The rows survive but go inert. Retire a tag
- * only when that work is genuinely gone - otherwise PATCH it to the canonical
- * spelling.
- */
+// Admin endpoint to rename or retire a task-template action tag. PATCH renames it across
+// every row (merging collisions) and is the safe way to fix a drifted or misspelt tag.
+// DELETE clears the action (sets it to null, case-insensitive match) on every matching
+// TaskTemplate.
+//
+// Clearing an action is effectively PERMANENT - nothing re-tags the rows later. parse-job
+// may only reuse tags from the live vocabulary, and that vocabulary is built from this
+// very field, so a retired tag is never offered to the model again; `findTemplateByTags`
+// also needs BOTH device and action, so a null-action row can never match. The rows
+// survive but go inert. Retire a tag only when that work is genuinely gone - otherwise
+// PATCH it to the canonical spelling.
 
 import { renameTaxonomyTag } from "@/features/business/lib/task-taxonomy.server";
 import { errorResponse } from "@/shared/lib/api-response";

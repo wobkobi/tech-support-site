@@ -1,8 +1,6 @@
 "use client";
 // src/features/business/components/PromosView.tsx
-/**
- * @description Admin promo CRUD - form-on-top + table-below + overlap warning.
- */
+// Admin promo CRUD - form-on-top + table-below + overlap warning.
 
 import type { PromoRow } from "@/app/admin/(shell)/promos/page";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";

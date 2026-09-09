@@ -1,9 +1,7 @@
 // src/app/admin/login/loading.tsx
-/**
- * @description Streaming skeleton for the admin sign-in page. Overrides the
- * admin sidebar skeleton with the centred login card (slate theme), so the
- * login route doesn't flash the operator-panel layout.
- */
+// Streaming skeleton for the admin sign-in page. Overrides the admin sidebar skeleton
+// with the centred login card (slate theme), so the login route doesn't flash the
+// operator-panel layout.
 
 import { Bone } from "@/shared/components/Skeleton";
 import type React from "react";

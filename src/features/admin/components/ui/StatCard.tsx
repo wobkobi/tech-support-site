@@ -1,11 +1,9 @@
 // src/features/admin/components/ui/StatCard.tsx
-/**
- * @description Summary stat card used by every upgraded admin list (invoices,
- * ledger, bookings, reviews). Renders a plain surface, a link when `href` is
- * given (navigates), or a button when `onClick` is given (applies a filter).
- * Server-safe without `onClick` (the link and plain forms render anywhere).
- * Follows the dashboard stat-card pattern (bold value + muted label + optional sub).
- */
+// Summary stat card used by every upgraded admin list (invoices, ledger, bookings,
+// reviews). Renders a plain surface, a link when `href` is given (navigates), or a button
+// when `onClick` is given (applies a filter). Server-safe without `onClick` (the link and
+// plain forms render anywhere). Follows the dashboard stat-card pattern (bold value +
+// muted label + optional sub).
 
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";

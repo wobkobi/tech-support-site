@@ -1,15 +1,12 @@
 "use client";
 // src/features/business/components/MigrateToSubscriptionDialog.tsx
-/**
- * @description Turns a repeat expense into a recurring subscription. Prefilled
- * from the expense (supplier, description, category, amount, GST, method, notes).
- * When the same supplier+description recurs across several expenses, the caller
- * passes the whole matching set - the dialog treats them as one subscription,
- * guesses the frequency from the gaps between their dates, and defaults next-due
- * off the most recent one. POSTs the existing subscriptions API - no API change.
- * Sheets-safe: the expense entries and their sheet rows are left untouched; the
- * new subscription is site-only.
- */
+// Turns a repeat expense into a recurring subscription. Prefilled from the expense
+// (supplier, description, category, amount, GST, method, notes). When the same
+// supplier+description recurs across several expenses, the caller passes the whole
+// matching set - the dialog treats them as one subscription, guesses the frequency from
+// the gaps between their dates, and defaults next-due off the most recent one. POSTs the
+// existing subscriptions API - no API change. Sheets-safe: the expense entries and their
+// sheet rows are left untouched; the new subscription is site-only.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";

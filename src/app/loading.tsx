@@ -1,10 +1,7 @@
 // src/app/loading.tsx
-/**
- * @description Streaming skeleton for the home page: hero, trust cards,
- * support grid, about/approach pair and flyer card. Matches the real page
- * layout so the swap causes no layout shift once the approved-reviews query
- * resolves.
- */
+// Streaming skeleton for the home page: hero, trust cards, support grid, about/approach
+// pair and flyer card. Matches the real page layout so the swap causes no layout shift
+// once the approved-reviews query resolves.
 
 import { CARD } from "@/shared/components/PageLayout";
 import { PageLoadingShell } from "@/shared/components/PageLoadingShell";

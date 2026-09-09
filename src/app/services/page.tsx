@@ -1,7 +1,5 @@
 // src/app/services/page.tsx
-/**
- * @description Services page: full list of service categories.
- */
+// Services page: full list of service categories.
 
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";

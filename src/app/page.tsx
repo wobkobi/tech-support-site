@@ -1,7 +1,5 @@
 // src/app/page.tsx
-/**
- * @description Main landing page for tech support company.
- */
+// Main landing page for tech support company.
 
 import Reviews, { type ReviewItem } from "@/features/reviews/components/Reviews";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";

@@ -1,17 +1,14 @@
 // scripts/build-ads.ts
-/**
- * @description Generates Meta (Facebook/Instagram) ad creatives by rendering
- * branded HTML with Puppeteer and screenshotting it at the exact ad sizes
- * (1:1 Feed, 4:5 Feed, 9:16 Stories/Reels, 1.91:1 right column). Follows Meta's
- * image-ad guidance: ONE message per image - a 3-layer stack of brand logo, one
- * big outcome headline, and one short support line (no benefits list, no fake
- * buttons; the feed chrome + Meta's own CTA button carry name/URL/CTA). The
- * frosted card mirrors the website's FrostedSection. The 9:16 keeps its content
- * in the vertical safe zone (Meta overlays UI top/bottom). Edit AD_COPY /
- * AD_SPECS / STYLES below and re-run. Output lands in ad-creatives/ (not served
- * or committed).
- * Run with: npm run build:ads
- */
+// Generates Meta (Facebook/Instagram) ad creatives by rendering branded HTML with
+// Puppeteer and screenshotting it at the exact ad sizes (1:1 Feed, 4:5 Feed, 9:16
+// Stories/Reels, 1.91:1 right column). Follows Meta's image-ad guidance: ONE message per
+// image - a 3-layer stack of brand logo, one big outcome headline, and one short support
+// line (no benefits list, no fake buttons; the feed chrome + Meta's own CTA button carry
+// name/URL/CTA). The frosted card mirrors the website's FrostedSection. The 9:16 keeps
+// its content in the vertical safe zone (Meta overlays UI top/bottom). Edit AD_COPY /
+// AD_SPECS / STYLES below and re-run. Output lands in ad-creatives/ (not served or
+// committed).
+// Run with: npm run build:ads
 
 import fs from "node:fs";
 import path from "node:path";

@@ -1,10 +1,8 @@
 "use client";
 // src/app/booking/manage/ManageLookupForm.tsx
-/**
- * @description Email box for the find-my-booking page. Posts to
- * /api/booking/manage-lookup, which replies identically whether or not the
- * address matched - so this form must not imply a match either way.
- */
+// Email box for the find-my-booking page. Posts to /api/booking/manage-lookup, which
+// replies identically whether or not the address matched - so this form must not imply a
+// match either way.
 
 import { Button } from "@/shared/components/Button";
 import type React from "react";

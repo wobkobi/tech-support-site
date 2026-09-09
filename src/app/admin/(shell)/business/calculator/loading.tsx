@@ -1,9 +1,7 @@
 // src/app/admin/(shell)/business/calculator/loading.tsx
-/**
- * @description Loading skeleton for the job calculator: heading plus the
- * two-column layout - stacked input cards (time, tasks, parts, travel) on the
- * left and the totals / invoice-preview panel on the right.
- */
+// Loading skeleton for the job calculator: heading plus the two-column layout - stacked
+// input cards (time, tasks, parts, travel) on the left and the totals / invoice-preview
+// panel on the right.
 
 import { Bone } from "@/shared/components/Skeleton";
 import type React from "react";

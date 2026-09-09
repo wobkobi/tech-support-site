@@ -1,11 +1,9 @@
 "use client";
 // src/features/admin/components/settings/EstimatorTab.tsx
-/**
- * @description Editor for the price-estimator group - the task-duration benchmark
- * list the public estimator uses. Tracks dirty state via {@link useSettingsForm} and
- * saves to the admin settings route, surfacing inline row errors, guardrail
- * blocks, and warnings (with a "save anyway" confirm).
- */
+// Editor for the price-estimator group - the task-duration benchmark list the public
+// estimator uses. Tracks dirty state via useSettingsForm and saves to the admin settings
+// route, surfacing inline row errors, guardrail blocks, and warnings (with a "save
+// anyway" confirm).
 
 import { BenchmarkListField } from "@/features/admin/components/settings/BenchmarkListField";
 import { EstimatorPreview } from "@/features/admin/components/settings/EstimatorPreview";

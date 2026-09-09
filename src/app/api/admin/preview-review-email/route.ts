@@ -1,7 +1,5 @@
 // src/app/api/admin/preview-review-email/route.ts
-/**
- * @description Admin endpoint that returns the rendered HTML preview for a past-client review email.
- */
+// Admin endpoint that returns the rendered HTML preview for a past-client review email.
 
 import { buildPastClientReviewEmailHtml } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";

@@ -1,8 +1,6 @@
 "use client";
 // src/features/reviews/components/admin/ReviewCard.tsx
-/**
- * @description Single review card with approve/revoke/delete actions.
- */
+// Single review card with approve/revoke/delete actions.
 
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";

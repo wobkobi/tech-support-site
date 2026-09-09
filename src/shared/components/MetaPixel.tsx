@@ -1,9 +1,7 @@
 "use client";
 // src/shared/components/MetaPixel.tsx
-/**
- * @description Loads the Meta Pixel (fbevents.js), tracks PageView on load and
- * client-side route changes, and reports tel:/mailto: link taps as Contact events.
- */
+// Loads the Meta Pixel (fbevents.js), tracks PageView on load and client-side route
+// changes, and reports tel:/mailto: link taps as Contact events.
 
 import { usePathname } from "next/navigation";
 import Script from "next/script";

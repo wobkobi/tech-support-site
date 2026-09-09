@@ -1,11 +1,9 @@
 "use client";
 // src/features/admin/components/settings/useSettingsForm.ts
-/**
- * @description Shared client state for one settings tab: holds the draft, tracks
- * dirty state, and saves to `/api/admin/settings/[group]`, mapping the route's
- * responses (400 field errors, 409 warnings, 422 blocks) into UI state. Reused
- * by every settings tab so the save/validation flow stays consistent.
- */
+// Shared client state for one settings tab: holds the draft, tracks dirty state, and
+// saves to `/api/admin/settings/[group]`, mapping the route's responses (400 field
+// errors, 409 warnings, 422 blocks) into UI state. Reused by every settings tab so the
+// save/validation flow stays consistent.
 
 import type { Settings, SettingsGroup } from "@/shared/lib/settings/types";
 import { checkGuardrails, type FieldError } from "@/shared/lib/settings/validate";

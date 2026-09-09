@@ -1,8 +1,6 @@
 // src/app/api/promos/active/route.ts
-/**
- * @description Public active-promo endpoint. GET returns the currently active
- * promo via {@link getActivePromo}, or null when none applies.
- */
+// Public active-promo endpoint. GET returns the currently active promo via
+// getActivePromo, or null when none applies.
 
 import { getActivePromo } from "@/features/business/lib/promos";
 import { NextResponse } from "next/server";

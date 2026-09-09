@@ -1,9 +1,6 @@
 // src/app/admin/(shell)/contacts/conflicts/loading.tsx
-/**
- * @description Loading skeleton for the contact-conflicts page: heading + intro
- * and a list of conflict cards (field label + the two candidate values to pick
- * between).
- */
+// Loading skeleton for the contact-conflicts page: heading + intro and a list of conflict
+// cards (field label + the two candidate values to pick between).
 
 import { Bone } from "@/shared/components/Skeleton";
 import type React from "react";

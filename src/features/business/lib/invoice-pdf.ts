@@ -1,9 +1,8 @@
 // src/features/business/lib/invoice-pdf.ts
-/**
- * @description Generates the A4 invoice PDF with pdf-lib. Colours mirror the web
- * Tailwind palette so the PDF reads as the same document as the on-screen
- * InvoicePreviewPanel; keep the two layouts in sync.
- */
+// Generates the A4 invoice PDF with pdf-lib. Colours mirror the web Tailwind palette so
+// the PDF reads as the same document as the on-screen InvoicePreviewPanel; keep the two
+// layouts in sync.
+
 import { formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
 import { nzFinancialYearCode } from "@/features/business/lib/financial-year";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";

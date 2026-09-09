@@ -1,12 +1,10 @@
 // src/shared/lib/rate-limit.ts
-/**
- * @description In-memory fixed-window rate limiter for public POST routes.
- *
- * Vercel serverless instances each hold their own bucket map, so the effective
- * global limit per IP is roughly N_instances times the per-instance limit. For
- * a low-traffic site this is acceptable; swap for an Upstash/Redis-backed
- * limiter if/when stricter global enforcement becomes necessary.
- */
+// In-memory fixed-window rate limiter for public POST routes.
+//
+// Vercel serverless instances each hold their own bucket map, so the effective global
+// limit per IP is roughly N_instances times the per-instance limit. For a low-traffic
+// site this is acceptable; swap for an Upstash/Redis-backed limiter if/when stricter
+// global enforcement becomes necessary.
 
 import { NextRequest, NextResponse } from "next/server";
 

@@ -1,7 +1,5 @@
 // src/shared/lib/normalise-phone.ts
-/**
- * @description Shared phone number normalisation and validation utilities.
- */
+// Shared phone number normalisation and validation utilities.
 
 /**
  * Strip all non-digit characters except a leading '+'.

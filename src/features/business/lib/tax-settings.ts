@@ -1,15 +1,10 @@
 // src/features/business/lib/tax-settings.ts
-/**
- * @description Reads the planner configuration cells from a per-FY workbook's
- * SETTINGS tab. The rate cells are at fixed positions; the auto-transfer start
- * date is found by scanning column A for its label so the operator can drop it
- * anywhere they like.
- *
- *   B13 - Tax Reserve Rate (income tax %)
- *   B14 - ACC Rate
- *   B15 - KiwiSaver Rate
- *   B(?) - Auto-transfer start date (located by label match in column A)
- */
+// Reads the planner configuration cells from a per-FY workbook's SETTINGS tab. The rate
+// cells are at fixed positions; the auto-transfer start date is found by scanning column
+// A for its label so the operator can drop it anywhere they like.
+//
+// B13 - Tax Reserve Rate (income tax %) B14 - ACC Rate B15 - KiwiSaver Rate B(?) -
+// Auto-transfer start date (located by label match in column A)
 
 import { getSheetsClient } from "@/features/business/lib/google-sheets";
 import { DEFAULT_TAX_RATES, type TaxRates } from "@/features/business/lib/tax-planner";

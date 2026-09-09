@@ -1,10 +1,8 @@
 // src/app/api/business/income/[id]/route.ts
-/**
- * @description Admin endpoint for a single income entry. PUT updates the entry
- * and writes the change through to its Cashbook sheet row (by Sync ID); DELETE
- * removes the entry and its sheet row. Sheet failures are logged and swallowed
- * so DB changes are never blocked - the sync cron reconciles any drift.
- */
+// Admin endpoint for a single income entry. PUT updates the entry and writes the change
+// through to its Cashbook sheet row (by Sync ID); DELETE removes the entry and its sheet
+// row. Sheet failures are logged and swallowed so DB changes are never blocked - the sync
+// cron reconciles any drift.
 
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import {

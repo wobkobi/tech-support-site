@@ -1,13 +1,11 @@
 "use client";
 // src/features/notifications/components/NotificationsView.tsx
-/**
- * @description Per-device push notification setup. Resolves the browser into
- * one of five states and shows only the controls that can actually work there.
- *
- * iOS is the reason this is stateful rather than a single button: Apple only
- * allows push for home-screen web apps, and a declined permission prompt can
- * only be undone in iOS Settings, never re-prompted from the page.
- */
+// Per-device push notification setup. Resolves the browser into one of five states and
+// shows only the controls that can actually work there.
+//
+// iOS is the reason this is stateful rather than a single button: Apple only allows push
+// for home-screen web apps, and a declined permission prompt can only be undone in iOS
+// Settings, never re-prompted from the page.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { useToast } from "@/features/admin/components/ui/Toast";

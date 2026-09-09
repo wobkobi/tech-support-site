@@ -1,8 +1,6 @@
 // src/app/admin/(shell)/settings/loading.tsx
-/**
- * @description Loading skeleton for the settings panel: heading + intro, the
- * horizontal tab strip and a form card of labelled field rows with a save bar.
- */
+// Loading skeleton for the settings panel: heading + intro, the horizontal tab strip and
+// a form card of labelled field rows with a save bar.
 
 import { Bone } from "@/shared/components/Skeleton";
 import type React from "react";

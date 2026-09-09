@@ -1,8 +1,6 @@
 // src/app/admin/(shell)/business/loading.tsx
-/**
- * @description Loading skeleton for the business dashboard: FY scope tabs, the
- * overview stat cards, the tax-planner panel and the action-link row.
- */
+// Loading skeleton for the business dashboard: FY scope tabs, the overview stat cards,
+// the tax-planner panel and the action-link row.
 
 import { Bone } from "@/shared/components/Skeleton";
 import type React from "react";

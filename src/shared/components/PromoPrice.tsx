@@ -1,8 +1,6 @@
 // src/shared/components/PromoPrice.tsx
-/**
- * @description Marks a price that a promo has changed, so a discounted figure
- * is visibly not the standard one wherever it appears in prose.
- */
+// Marks a price that a promo has changed, so a discounted figure is visibly not the
+// standard one wherever it appears in prose.
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";

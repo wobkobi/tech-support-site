@@ -1,11 +1,9 @@
 "use client";
 // src/features/business/components/calculator/JobDetailsSection.tsx
-/**
- * @description Time card. Multiple Start/End slots sum into the billable
- * window, with {@link slotIssue} flagging zero-length or cross-midnight slots.
- * A follow-up minutes field adds work done outside the slots (a call after the
- * visit, a remote fix later) on top of the slot sum.
- */
+// Time card. Multiple Start/End slots sum into the billable window, with slotIssue
+// flagging zero-length or cross-midnight slots. A follow-up minutes field adds work done
+// outside the slots (a call after the visit, a remote fix later) on top of the slot sum.
+
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
 import { minsToHoursLabel, timeDiffMins } from "@/features/business/lib/business";
 import type { ParsedRange } from "@/features/business/types/business";

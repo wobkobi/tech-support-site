@@ -1,10 +1,8 @@
 // src/features/business/lib/sheets-sync.ts
-/**
- * @description Site > Google Sheet write-back primitives. Hidden Sync ID at
- * column Z carries a UUID so appends, in-place updates, deletes, and the
- * import's reconciliation can all locate rows. Cell builders keep the
- * Cashbook/Expenses column order in one place. Failures are non-fatal.
- */
+// Site > Google Sheet write-back primitives. Hidden Sync ID at column Z carries a UUID so
+// appends, in-place updates, deletes, and the import's reconciliation can all locate
+// rows. Cell builders keep the Cashbook/Expenses column order in one place. Failures are
+// non-fatal.
 
 import { getFinancialYear } from "@/features/business/lib/financial-year";
 import { getDriveClient } from "@/features/business/lib/google-drive";

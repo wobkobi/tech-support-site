@@ -1,8 +1,6 @@
 // src/app/admin/error.tsx
-/**
- * @description Admin-segment error boundary. Operator-facing, so it keeps the
- * technical details block for debugging.
- */
+// Admin-segment error boundary. Operator-facing, so it keeps the technical details block
+// for debugging.
 
 "use client";
 

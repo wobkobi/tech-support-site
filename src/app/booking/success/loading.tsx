@@ -1,10 +1,7 @@
 // src/app/booking/success/loading.tsx
-/**
- * @description Streaming skeleton for the booking success page. Matches the
- * page's own frosted container (not PageShell) so it doesn't inherit the
- * booking-form skeleton: a centred confirmation card, a "what's next" card and
- * the cancellation-policy card.
- */
+// Streaming skeleton for the booking success page. Matches the page's own frosted
+// container (not PageShell) so it doesn't inherit the booking-form skeleton: a centred
+// confirmation card, a "what's next" card and the cancellation-policy card.
 
 import { Bone } from "@/shared/components/Skeleton";
 import { cn } from "@/shared/lib/cn";

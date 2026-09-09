@@ -1,10 +1,9 @@
 // src/app/admin/(shell)/price-estimates/page.tsx
-/**
- * @description Audit page for the public price estimator. Lists the last 500
- * estimate logs (raw description, AI interpretation, per-task split, and the
- * range shown to the user) with today/week/month counts. Dev/test rows are
- * hidden unless `?showDev=1` is set; entries are purged after 30 days.
- */
+// Audit page for the public price estimator. Lists the last 500 estimate logs (raw
+// description, AI interpretation, per-task split, and the range shown to the user) with
+// today/week/month counts. Dev/test rows are hidden unless `?showDev=1` is set; entries
+// are purged after 30 days.
+
 import { Card } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";

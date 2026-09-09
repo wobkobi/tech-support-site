@@ -1,11 +1,8 @@
 // src/app/api/admin/contacts/conflicts/[id]/route.ts
-/**
- * @description Admin endpoint to resolve a ContactConflict by picking a
- * winner (site / google / custom). Writes the chosen value to the site
- * Contact row, marks the conflict resolved, and triggers a fresh sync to
- * push the chosen value to Google (which lets the cross-stamping in
- * lastSyncedAt + lastGoogleEtag catch up).
- */
+// Admin endpoint to resolve a ContactConflict by picking a winner (site / google /
+// custom). Writes the chosen value to the site Contact row, marks the conflict resolved,
+// and triggers a fresh sync to push the chosen value to Google (which lets the
+// cross-stamping in lastSyncedAt + lastGoogleEtag catch up).
 
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { errorResponse } from "@/shared/lib/api-response";

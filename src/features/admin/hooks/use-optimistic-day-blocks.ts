@@ -1,11 +1,8 @@
 "use client";
 // src/features/admin/hooks/use-optimistic-day-blocks.ts
-/**
- * @description Optimistic block/unblock state for the schedule views. Google
- * lags a write and the 30s cache can serve a stale read, so a plain refetch
- * shows the old state; this holds an override per day to bridge the gap and
- * coalesces the refetches that follow.
- */
+// Optimistic block/unblock state for the schedule views. Google lags a write and the 30s
+// cache can serve a stale read, so a plain refetch shows the old state; this holds an
+// override per day to bridge the gap and coalesces the refetches that follow.
 
 import type { WeekEvent } from "@/features/admin/lib/schedule-types";
 import { useRouter } from "next/navigation";

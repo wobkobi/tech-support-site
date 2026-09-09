@@ -1,9 +1,6 @@
 // src/app/api/admin/push/subscribe/route.ts
-/**
- * @description Registers the calling browser for operator push notifications.
- * Upserts on endpoint so re-subscribing the same browser refreshes its keys
- * instead of adding a duplicate row.
- */
+// Registers the calling browser for operator push notifications. Upserts on endpoint so
+// re-subscribing the same browser refreshes its keys instead of adding a duplicate row.
 
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

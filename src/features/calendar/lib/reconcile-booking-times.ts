@@ -1,24 +1,21 @@
 // src/features/calendar/lib/reconcile-booking-times.ts
-/**
- * @description Pulls booking times back from Google Calendar.
- *
- * The operator corrects event times in Calendar - usually on a phone, after the
- * job - and the billing path already reads those live. The Booking row doesn't
- * follow, so reminder timing, review timing and the cancellation-fee windows go
- * on working off a stale start. This walks the bookings that own an event,
- * compares the row against the live event, and reports or applies the
- * difference. The calendar wins: it is where the correction was made.
- *
- * It also carries the other half of that drift: an event deleted in Calendar
- * because the job was called off, on a row nobody cancelled. Those get
- * calendarEventMissingAt stamped so the reminder and review crons stop emailing
- * about a job that isn't happening.
- *
- * Correcting a time is not enough on its own. emailReminderSentAt and
- * reviewSentAt are one-way stamps, so a row moved to a new date still carries
- * the marks of emails sent against the old one, and both crons skip it forever.
- * A correction clears the stamps its move invalidated.
- */
+// Pulls booking times back from Google Calendar.
+//
+// The operator corrects event times in Calendar - usually on a phone, after the job - and
+// the billing path already reads those live. The Booking row doesn't follow, so reminder
+// timing, review timing and the cancellation-fee windows go on working off a stale start.
+// This walks the bookings that own an event, compares the row against the live event, and
+// reports or applies the difference. The calendar wins: it is where the correction was
+// made.
+//
+// It also carries the other half of that drift: an event deleted in Calendar because the
+// job was called off, on a row nobody cancelled. Those get calendarEventMissingAt stamped
+// so the reminder and review crons stop emailing about a job that isn't happening.
+//
+// Correcting a time is not enough on its own. emailReminderSentAt and reviewSentAt are
+// one-way stamps, so a row moved to a new date still carries the marks of emails sent
+// against the old one, and both crons skip it forever. A correction clears the stamps its
+// move invalidated.
 
 import { lookupBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { prisma } from "@/shared/lib/prisma";

@@ -1,11 +1,9 @@
 // src/app/admin/(shell)/reviews/page.tsx
-/**
- * @description Admin reviews page. Loads reviews plus booking and contact
- * review-link sends (soft-capped at 1000 each), joins them into a unified link
- * history, summarises the pipeline as StatCards, and renders the
- * {@link ReviewApprovalList}, {@link SendReviewLinkForm}, and
- * {@link ReviewLinkHistoryTable}.
- */
+// Admin reviews page. Loads reviews plus booking and contact review-link sends
+// (soft-capped at 1000 each), joins them into a unified link history, summarises the
+// pipeline as StatCards, and renders the ReviewApprovalList, SendReviewLinkForm, and
+// ReviewLinkHistoryTable.
+
 import { Card } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";

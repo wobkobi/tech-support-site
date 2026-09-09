@@ -1,7 +1,6 @@
 // src/app/api/reviews/[id]/route.ts
-/**
- * @description PATCH /api/reviews/[id] - Allows a customer to edit their review (with valid customerRef), resets status to pending.
- */
+// PATCH /api/reviews/[id] - Allows a customer to edit their review (with valid
+// customerRef), resets status to pending.
 
 import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
 import { reviewTextError } from "@/features/reviews/lib/validation";

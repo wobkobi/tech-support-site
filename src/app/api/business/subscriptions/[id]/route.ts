@@ -1,9 +1,6 @@
 // src/app/api/business/subscriptions/[id]/route.ts
-/**
- * @description Admin single-subscription endpoint. PATCH validates frequency,
- * amount, and GST rate when present and applies a sparse update; DELETE removes
- * the subscription.
- */
+// Admin single-subscription endpoint. PATCH validates frequency, amount, and GST rate
+// when present and applies a sparse update; DELETE removes the subscription.
 
 import { VALID_FREQUENCIES } from "@/features/business/lib/constants";
 import { parseAmount, parseDate, parseRate } from "@/features/business/lib/validation";

@@ -1,10 +1,8 @@
 // src/app/api/business/task-templates/route.ts
-/**
- * @description Admin task-template endpoint. GET lists all templates ordered by
- * usage; POST upserts a template by description (auto-composing the description
- * from normalised device + action when supplied), incrementing usageCount and
- * refreshing defaultPrice on existing rows.
- */
+// Admin task-template endpoint. GET lists all templates ordered by
+// usage; POST upserts a template by description (auto-composing the description
+// from normalised device + action when supplied), incrementing usageCount and
+// refreshing defaultPrice on existing rows.
 
 import { composeDescription } from "@/features/business/lib/business";
 import { canonicalTagMap, canonicaliseTag } from "@/features/business/lib/task-taxonomy";

@@ -1,10 +1,8 @@
 // src/app/api/admin/settings/[group]/route.ts
-/**
- * @description Admin read/write for one settings group. GET returns the resolved
- * group (defaults + DB override); PUT validates the payload, runs cross-setting
- * guardrails on the full proposed settings, then persists. Guardrail BLOCKs
- * always reject; WARNs reject unless the client confirms.
- */
+// Admin read/write for one settings group. GET returns the resolved group (defaults + DB
+// override); PUT validates the payload, runs cross-setting guardrails on the full
+// proposed settings, then persists. Guardrail BLOCKs always reject; WARNs reject unless
+// the client confirms.
 
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

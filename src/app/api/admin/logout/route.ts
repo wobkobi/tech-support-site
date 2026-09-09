@@ -1,8 +1,6 @@
 // src/app/api/admin/logout/route.ts
-/**
- * @description Admin logout endpoint. Clears the session cookie. No auth
- * required to log out - hitting this endpoint without a session is a no-op.
- */
+// Admin logout endpoint. Clears the session cookie. No auth required to log out - hitting
+// this endpoint without a session is a no-op.
 
 import { ADMIN_SESSION_COOKIE } from "@/shared/lib/admin-session";
 import { NextResponse } from "next/server";

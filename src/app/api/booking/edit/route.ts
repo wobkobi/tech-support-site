@@ -1,7 +1,5 @@
 // src/app/api/booking/edit/route.ts
-/**
- * @description API route to edit an existing booking by cancel token.
- */
+// API route to edit an existing booking by cancel token.
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {

@@ -1,11 +1,8 @@
 // src/app/booking/page.tsx
-/**
- * @description Booking page with duration-aware slot availability.
- *   The static shell (heading, sidebar, skeleton) renders immediately while
- *   the slot data is streamed in via a Suspense boundary, so TTFB stays
- *   constant even when the calendar cache is cold and slot data has to come
- *   from the live Google Calendar API.
- */
+// Booking page with duration-aware slot availability. The static shell (heading, sidebar,
+// skeleton) renders immediately while the slot data is streamed in via a Suspense
+// boundary, so TTFB stays constant even when the calendar cache is cold and slot data has
+// to come from the live Google Calendar API.
 
 import BookingForm from "@/features/booking/components/BookingForm";
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";

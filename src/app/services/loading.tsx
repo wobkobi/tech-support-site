@@ -1,9 +1,7 @@
 // src/app/services/loading.tsx
-/**
- * @description Streaming skeleton for the services page: heading card, the
- * "What I help with" card with its service-area grid, the home/business pair
- * and the closing CTA. Shown while the live pricing lookup runs.
- */
+// Streaming skeleton for the services page: heading card, the "What I help with" card
+// with its service-area grid, the home/business pair and the closing CTA. Shown while the
+// live pricing lookup runs.
 
 import { CARD } from "@/shared/components/PageLayout";
 import { PageLoadingShell } from "@/shared/components/PageLoadingShell";

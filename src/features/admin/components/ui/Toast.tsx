@@ -1,10 +1,7 @@
 // src/features/admin/components/ui/Toast.tsx
-/**
- * @description Global admin toast system. {@link AdminToastProvider} mounts a
- * bottom-right stack (mounted once by the admin layout); {@link useToast}
- * returns a `toast(message, opts)` function. Toasts auto-dismiss (4s default,
- * 6s for warning/error) and the region is `aria-live="polite"`.
- */
+// Global admin toast system. AdminToastProvider mounts a bottom-right stack (mounted once
+// by the admin layout); useToast returns a `toast(message, opts)` function. Toasts
+// auto-dismiss (4s default, 6s for warning/error) and the region is `aria-live="polite"`.
 
 "use client";
 

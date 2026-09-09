@@ -1,9 +1,6 @@
 // src/shared/components/Skeleton.tsx
-/**
- * @description Shared loading-skeleton primitive ("bone") used by route-level
- * loading.tsx files so every page streams a placeholder in the same visual
- * language instead of a blank frame.
- */
+// Shared loading-skeleton primitive ("bone") used by route-level loading.tsx files so
+// every page streams a placeholder in the same visual language instead of a blank frame.
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";

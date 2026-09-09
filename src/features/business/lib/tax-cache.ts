@@ -1,7 +1,5 @@
 // src/features/business/lib/tax-cache.ts
-/**
- * @description Per-scope cache of tax-planner inputs in the Setting table.
- */
+// Per-scope cache of tax-planner inputs in the Setting table.
 
 import type { TaxRates } from "@/features/business/lib/tax-planner";
 import { prisma } from "@/shared/lib/prisma";

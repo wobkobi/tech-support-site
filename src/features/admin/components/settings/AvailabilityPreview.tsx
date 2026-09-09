@@ -1,12 +1,10 @@
 "use client";
 // src/features/admin/components/settings/AvailabilityPreview.tsx
-/**
- * @description Live preview for the availability tab. Shows the weekly pattern
- * the draft produces (open hours / break / day-off per weekday) and, by running
- * the same buildAvailableDays engine the booking page uses, the next day a
- * customer could actually book - so booking-window rules (notice, same-day
- * cutoff, caps) are reflected, not just the raw hours.
- */
+// Live preview for the availability tab. Shows the weekly pattern the draft produces
+// (open hours / break / day-off per weekday) and, by running the same buildAvailableDays
+// engine the booking page uses, the next day a customer could actually book - so
+// booking-window rules (notice, same-day cutoff, caps) are reflected, not just the raw
+// hours.
 
 import { buildAvailableDays, hourLabel } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";

@@ -1,8 +1,6 @@
 // src/app/api/business/task-templates/[id]/route.ts
-/**
- * @description Admin single task-template endpoint. DELETE removes a saved task
- * template by ID and returns 404 when it does not exist.
- */
+// Admin single task-template endpoint. DELETE removes a saved task template by ID and
+// returns 404 when it does not exist.
 
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

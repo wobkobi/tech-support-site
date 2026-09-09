@@ -1,10 +1,8 @@
 "use client";
 // src/shared/components/PhoneInput.tsx
-/**
- * @description Shared NZ phone input. On blur, formats the value with
- * formatNZPhone and runs validatePhone so every form on the site behaves
- * identically. Per-form wording can be customised via errorMessages.
- */
+// Shared NZ phone input. On blur, formats the value with formatNZPhone and runs
+// validatePhone so every form on the site behaves identically. Per-form wording can be
+// customised via errorMessages.
 
 import { cn } from "@/shared/lib/cn";
 import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";

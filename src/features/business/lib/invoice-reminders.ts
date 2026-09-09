@@ -1,6 +1,6 @@
-// src/features/business/lib/invoice-reminders.ts - overdue-reminder
-// send-and-stamp shared by the daily cron and the manual action, plus the
-// apology for a reminder that chased an already-paid invoice.
+// src/features/business/lib/invoice-reminders.ts
+// Overdue-reminder send-and-stamp shared by the daily cron and the manual action, plus
+// the apology for a reminder that chased an already-paid invoice.
 
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import { sendInvoiceReminderEmail, sendPaymentApologyEmail } from "@/features/reviews/lib/email";

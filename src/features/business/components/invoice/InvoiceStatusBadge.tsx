@@ -1,9 +1,7 @@
 // src/features/business/components/invoice/InvoiceStatusBadge.tsx
-/**
- * @description Renders an invoice's DISPLAY status (a SENT invoice past due
- * surfaces as OVERDUE) as a tone-mapped {@link StatusPill}. Shared by the
- * invoices list and the detail page so the badge can't drift. Server-safe.
- */
+// Renders an invoice's DISPLAY status (a SENT invoice past due surfaces as OVERDUE) as a
+// tone-mapped StatusPill. Shared by the invoices list and the detail page so the badge
+// can't drift. Server-safe.
 
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import {

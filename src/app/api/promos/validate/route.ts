@@ -1,9 +1,7 @@
 // src/app/api/promos/validate/route.ts
-/**
- * @description Checks a customer-entered promo code. Public, because the
- * booking form and the pricing wizard both need it before anyone has
- * identified themselves - which is also why it is rate limited.
- */
+// Checks a customer-entered promo code. Public, because the booking form and the pricing
+// wizard both need it before anyone has identified themselves - which is also why it is
+// rate limited.
 
 import {
   describePromoDiscount,

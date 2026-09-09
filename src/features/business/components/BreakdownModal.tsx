@@ -1,9 +1,7 @@
 "use client";
 // src/features/business/components/BreakdownModal.tsx
-/**
- * @description Modal that explains how a dashboard total was computed - either by
- * listing the entries that summed to it, or by showing the calculation steps.
- */
+// Modal that explains how a dashboard total was computed - either by listing the entries
+// that summed to it, or by showing the calculation steps.
 
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { formatNZD } from "@/features/business/lib/business";

@@ -1,13 +1,10 @@
 // src/app/admin/layout.tsx
-/**
- * @description Admin route segment layout. Sets `Referrer-Policy: no-referrer`
- * so per-record customer tokens embedded in admin-rendered links
- * (`cancelToken`, `reviewToken`) don't leak via the Referer header when the
- * operator clicks through to external services - Google Drive PDFs, Maps
- * links inside expanded booking cards, the "Back to site" link, etc. Pure
- * metadata wrapper; doesn't render a sidebar or shell - those live in
- * AdminPageLayout per-page.
- */
+// Admin route segment layout. Sets `Referrer-Policy: no-referrer` so per-record customer
+// tokens embedded in admin-rendered links (`cancelToken`, `reviewToken`) don't leak via
+// the Referer header when the operator clicks through to external services - Google Drive
+// PDFs, Maps links inside expanded booking cards, the "Back to site" link, etc. Pure
+// metadata wrapper; doesn't render a sidebar or shell - those live in AdminPageLayout
+// per-page.
 
 import type { Metadata } from "next";
 import type React from "react";

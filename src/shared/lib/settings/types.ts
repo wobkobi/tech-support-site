@@ -1,11 +1,8 @@
 // src/shared/lib/settings/types.ts
-/**
- * @description Shape of the admin-editable settings, one interface per group.
- * Every value here was a hardcoded constant before the settings panel; the
- * matching defaults live in `defaults.ts` and DB overrides merge on top in
- * `get-settings.ts`. Optional rules use `null`/`0` to mean "off" - see the
- * disable-semantics table in the settings plan.
- */
+// Shape of the admin-editable settings, one interface per group. Every value here was a
+// hardcoded constant before the settings panel; the matching defaults live in
+// `defaults.ts` and DB overrides merge on top in `get-settings.ts`. Optional rules use
+// `null`/`0` to mean "off" - see the disable-semantics table in the settings plan.
 
 import type { Weekday } from "@/shared/lib/timezone-utils";
 

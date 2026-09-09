@@ -1,10 +1,7 @@
 // src/app/admin/(shell)/loading.tsx
-/**
- * @description Loading skeleton for the /admin dashboard (this segment's index
- * page): today snapshot bar, quick-action row, stat-card grid and the 2x2
- * data-panel grid. Child routes define their own loading.tsx, so this covers
- * only the dashboard index.
- */
+// Loading skeleton for the /admin dashboard (this segment's index page): today snapshot
+// bar, quick-action row, stat-card grid and the 2x2 data-panel grid. Child routes define
+// their own loading.tsx, so this covers only the dashboard index.
 
 import { Bone } from "@/shared/components/Skeleton";
 import type React from "react";

@@ -1,11 +1,8 @@
 "use client";
 // src/features/admin/components/settings/SettingsFooter.tsx
-/**
- * @description Guardrail banners plus the save/reset bar, composed into the one
- * footer every settings tab ends with. Reads straight off the form api so a tab
- * cannot render the save bar while forgetting the banners that explain why a
- * save was refused.
- */
+// Guardrail banners plus the save/reset bar, composed into the one footer every settings
+// tab ends with. Reads straight off the form api so a tab cannot render the save bar
+// while forgetting the banners that explain why a save was refused.
 
 import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import type { SettingsFormApi } from "@/features/admin/components/settings/useSettingsForm";

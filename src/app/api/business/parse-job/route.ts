@@ -1,10 +1,8 @@
 // src/app/api/business/parse-job/route.ts
-/**
- * @description Admin endpoint that turns a plain-English job description into
- * a structured quote: prompts the model, resolves task templates and rates,
- * attaches round-trip travel, caps durationMins to the wall-clock span, and
- * rebalances task quantities. May return clarification questions instead.
- */
+// Admin endpoint that turns a plain-English job description into a structured quote:
+// prompts the model, resolves task templates and rates, attaches round-trip travel, caps
+// durationMins to the wall-clock span, and rebalances task quantities. May return
+// clarification questions instead.
 
 import {
   composeDescription,

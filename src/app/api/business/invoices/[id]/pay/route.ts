@@ -1,12 +1,9 @@
 // src/app/api/business/invoices/[id]/pay/route.ts
-/**
- * @description Records a payment against an invoice: atomically claims the PAID
- * stamp (idempotent under double-clicks / retries), creates or updates the
- * linked income-ledger entry, re-syncs the PAID-watermarked PDF to Drive, and
- * apologises when an overdue reminder had chased a payment that already landed.
- * The DB stamp is authoritative; the income, Drive and apology steps are
- * best-effort and never roll back the payment.
- */
+// Records a payment against an invoice: atomically claims the PAID stamp (idempotent
+// under double-clicks / retries), creates or updates the linked income-ledger entry,
+// re-syncs the PAID-watermarked PDF to Drive, and apologises when an overdue reminder had
+// chased a payment that already landed. The DB stamp is authoritative; the income, Drive
+// and apology steps are best-effort and never roll back the payment.
 
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import { recordIncome } from "@/features/business/lib/income-recording";

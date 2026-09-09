@@ -1,9 +1,7 @@
 // src/shared/lib/auth.ts
-/**
- * @description Shared authentication utilities for admin routes and pages.
- * Browser sessions go through a signed cookie (see `admin-session.ts`);
- * scripts + cron still pass the header so curl / cron-job.org keep working.
- */
+// Shared authentication utilities for admin routes and pages. Browser sessions go through
+// a signed cookie (see `admin-session.ts`); scripts + cron still pass the header so curl
+// / cron-job.org keep working.
 
 import { ADMIN_SESSION_COOKIE, verifySessionCookieValue } from "@/shared/lib/admin-session";
 import { getClientIp } from "@/shared/lib/rate-limit";

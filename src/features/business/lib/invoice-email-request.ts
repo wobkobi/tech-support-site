@@ -1,10 +1,7 @@
 // src/features/business/lib/invoice-email-request.ts
-/**
- * @description Shared request-side helpers for the four invoice email routes
- * (preview / send / void / void-preview): operator override parsing, the
- * invoice > email payload projection, and the review-link inclusion rule that
- * preview and send had drifted apart on.
- */
+// Shared request-side helpers for the four invoice email routes (preview / send / void /
+// void-preview): operator override parsing, the invoice > email payload projection, and
+// the review-link inclusion rule that preview and send had drifted apart on.
 
 import type { InvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
 import type { Invoice } from "@prisma/client";

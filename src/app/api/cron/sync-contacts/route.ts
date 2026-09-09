@@ -1,10 +1,8 @@
 // src/app/api/cron/sync-contacts/route.ts
-/**
- * @description Cron endpoint (Bearer-authorised) that runs the incremental two-way
- * Google Contacts sync via {@link runContactsSync}: local dedup/merge first, then
- * push the changed contacts, then pull Google's changes back. Designed to run every
- * few hours via cron-job.org and returns 503 when the sync throws.
- */
+// Cron endpoint (Bearer-authorised) that runs the incremental two-way Google Contacts
+// sync via runContactsSync: local dedup/merge first, then push the changed contacts, then
+// pull Google's changes back. Designed to run every few hours via cron-job.org and
+// returns 503 when the sync throws.
 
 import { runContactsSync } from "@/features/contacts/lib/contacts-sync";
 import { errorResponse } from "@/shared/lib/api-response";

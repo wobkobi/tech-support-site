@@ -1,7 +1,5 @@
 // src/app/api/admin/contacts/route.ts
-/**
- * @description Admin API for listing and creating contacts.
- */
+// Admin API for listing and creating contacts.
 
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";

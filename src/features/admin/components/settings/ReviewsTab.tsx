@@ -1,10 +1,8 @@
 "use client";
 // src/features/admin/components/settings/ReviewsTab.tsx
-/**
- * @description Editor for the reviews & reputation group: how many reviews
- * feature on the home page, whether verified reviews auto-approve, and the
- * review-request cooldown. Saves through the shared settings form hook.
- */
+// Editor for the reviews & reputation group: how many reviews feature on the home page,
+// whether verified reviews auto-approve, and the review-request cooldown. Saves through
+// the shared settings form hook.
 
 import {
   NumberField,

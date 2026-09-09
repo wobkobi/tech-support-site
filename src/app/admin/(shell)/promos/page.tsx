@@ -1,9 +1,7 @@
 // src/app/admin/(shell)/promos/page.tsx
-/**
- * @description Admin promos page. Loads all promos, maps them to
- * {@link PromoRow}s for the server > client boundary, and renders
- * {@link PromosView} for inline CRUD of time-limited pricing offers.
- */
+// Admin promos page. Loads all promos, maps them to PromoRows for the server > client
+// boundary, and renders PromosView for inline CRUD of time-limited pricing offers.
+
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { PromosView } from "@/features/business/components/PromosView";
 import { requireAdminAuth } from "@/shared/lib/auth";

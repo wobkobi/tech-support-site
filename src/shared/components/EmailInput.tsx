@@ -1,12 +1,10 @@
 "use client";
 // src/shared/components/EmailInput.tsx
-/**
- * @description Shared email input with consistent validation and inline error
- * display, keeping validation and typo-suggestion behaviour identical across
- * every email field even when wording differs. Input is lowercased as it is
- * typed - addresses are case-insensitive everywhere the site sends or matches
- * them, and {@link normaliseEmail} is what the server stores.
- */
+// Shared email input with consistent validation and inline error display, keeping
+// validation and typo-suggestion behaviour identical across every email field even when
+// wording differs. Input is lowercased as it is typed - addresses are case-insensitive
+// everywhere the site sends or matches them, and normaliseEmail is what the server
+// stores.
 
 import { validateEmail } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";

@@ -1,7 +1,5 @@
 // scripts/build-icons/config.ts
-/**
- * @description Configuration and specifications for icon/image generation.
- */
+// Configuration and specifications for icon/image generation.
 
 /* ---------- Brand Palette ---------- */
 

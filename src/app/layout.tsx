@@ -1,7 +1,5 @@
 // src/app/layout.tsx
-/**
- * @description Root layout for the App Router. Injects global styles, metadata, and JSON-LD.
- */
+// Root layout for the App Router. Injects global styles, metadata, and JSON-LD.
 
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { GoogleTag } from "@/shared/components/GoogleTag";

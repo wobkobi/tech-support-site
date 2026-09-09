@@ -1,13 +1,11 @@
 "use client";
 // src/features/business/components/invoice/PaymentDialog.tsx
-/**
- * @description Records a payment against an invoice via POST /pay. Collects the
- * date, method (INCOME_METHODS), an optional reference, whether to write an
- * income-ledger entry, and - when a reminder went out after the payment date -
- * whether to apologise for the chase. Shared by the invoices list and the
- * invoice detail page. Mount it fresh per payment (conditional render or key by
- * invoice id) so the form resets - it holds no reset effect.
- */
+// Records a payment against an invoice via POST /pay. Collects the date, method
+// (INCOME_METHODS), an optional reference, whether to write an income-ledger entry, and -
+// when a reminder went out after the payment date - whether to apologise for the chase.
+// Shared by the invoices list and the invoice detail page. Mount it fresh per payment
+// (conditional render or key by invoice id) so the form resets - it holds no reset
+// effect.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Modal } from "@/features/admin/components/ui/Modal";

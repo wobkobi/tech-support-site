@@ -1,10 +1,7 @@
 // src/app/privacy/page.tsx
-/**
- * @description Privacy policy: what the site collects, how it is used, the
- * analytics/ad tools it runs (Google, Meta Pixel incl. hashed advanced
- * matching), sharing, retention, and visitors' rights under the NZ Privacy
- * Act 2020.
- */
+// Privacy policy: what the site collects, how it is used, the analytics/ad tools it runs
+// (Google, Meta Pixel incl. hashed advanced matching), sharing, retention, and visitors'
+// rights under the NZ Privacy Act 2020.
 
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";

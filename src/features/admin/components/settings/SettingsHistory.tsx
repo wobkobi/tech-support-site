@@ -1,12 +1,9 @@
 "use client";
 // src/features/admin/components/settings/SettingsHistory.tsx
-/**
- * @description Collapsible per-group change-history panel shared by every
- * settings tab. Lazily fetches the recent SettingAudit rows on first open and
- * lets the operator load a prior version back into the editor draft (via
- * onRestore) to review and re-save - the re-save records its own audit row, so
- * a revert is just another tracked change.
- */
+// Collapsible per-group change-history panel shared by every settings tab. Lazily fetches
+// the recent SettingAudit rows on first open and lets the operator load a prior version
+// back into the editor draft (via onRestore) to review and re-save - the re-save records
+// its own audit row, so a revert is just another tracked change.
 
 import { formatDateTimeLong } from "@/shared/lib/date-format";
 import type { SettingsGroup } from "@/shared/lib/settings/types";

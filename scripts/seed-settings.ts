@@ -1,18 +1,15 @@
 // scripts/seed-settings.ts
-/**
- * @description One-shot, idempotent seed for the env > DB business-identity
- * handoff. Creates the `settings:identity` row from the code defaults - which
- * read the current bank-account / GST# / HOME_ADDRESS env vars - ONLY when the
- * row doesn't already exist, so it never clobbers operator edits made in the
- * admin panel. After running this against production and verifying the row, the
- * `NEXT_PUBLIC_BUSINESS_*` and `HOME_ADDRESS` Vercel env vars can be deleted;
- * the DB row is then the single source of truth.
- *
- * Only `identity` is seeded: every other settings group intentionally stays
- * absent so it keeps tracking the code defaults until the operator edits it.
- *
- * Run with: npm run settings:seed   (dotenv-cli loads .env.local first)
- */
+// One-shot, idempotent seed for the env > DB business-identity handoff. Creates the
+// `settings:identity` row from the code defaults - which read the current bank-account /
+// GST# / HOME_ADDRESS env vars - ONLY when the row doesn't already exist, so it never
+// clobbers operator edits made in the admin panel. After running this against production
+// and verifying the row, the `NEXT_PUBLIC_BUSINESS_*` and `HOME_ADDRESS` Vercel env vars
+// can be deleted; the DB row is then the single source of truth.
+//
+// Only `identity` is seeded: every other settings group intentionally stays absent so it
+// keeps tracking the code defaults until the operator edits it.
+//
+// Run with: npm run settings:seed   (dotenv-cli loads .env.local first)
 
 import { PrismaClient } from "@prisma/client";
 import { DEFAULT_SETTINGS } from "../src/shared/lib/settings/defaults";

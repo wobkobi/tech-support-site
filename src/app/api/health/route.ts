@@ -1,12 +1,9 @@
 // src/app/api/health/route.ts
-/**
- * @description Deployment health probe. Public callers get `{ ok, version }` so
- * a post-deploy check can confirm the app serves and which version is live.
- * Admin- or cron-authenticated callers additionally get per-dependency checks -
- * database connectivity and required-env presence (never the values) - and the
- * response flips to HTTP 503 when a critical dependency or required env var is
- * missing. Consumed by the post-deploy smoke workflow.
- */
+// Deployment health probe. Public callers get `{ ok, version }` so a post-deploy check
+// can confirm the app serves and which version is live. Admin- or cron-authenticated
+// callers additionally get per-dependency checks - database connectivity and required-env
+// presence (never the values) - and the response flips to HTTP 503 when a critical
+// dependency or required env var is missing. Consumed by the post-deploy smoke workflow.
 
 import { isAdminRequest, isCronAuthorised } from "@/shared/lib/auth";
 import { getEnvReport } from "@/shared/lib/env";

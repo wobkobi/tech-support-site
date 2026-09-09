@@ -1,9 +1,8 @@
 // src/app/admin/(shell)/settings/page.tsx
-/**
- * @description Admin settings panel. Loads the resolved settings server-side and
- * hands each editable group, paired with its {@link DEFAULT_SETTINGS} fallback,
- * to the tabbed {@link SettingsView} client component.
- */
+// Admin settings panel. Loads the resolved settings server-side and hands each editable
+// group, paired with its DEFAULT_SETTINGS fallback, to the tabbed SettingsView client
+// component.
+
 import { SettingsView } from "@/features/admin/components/settings/SettingsView";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { requireAdminAuth } from "@/shared/lib/auth";

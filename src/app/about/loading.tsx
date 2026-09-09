@@ -1,8 +1,6 @@
 // src/app/about/loading.tsx
-/**
- * @description Streaming skeleton for the about page: a heading card plus the
- * approach and "Who I help" list cards.
- */
+// Streaming skeleton for the about page: a heading card plus the approach and "Who I
+// help" list cards.
 
 import { CARD } from "@/shared/components/PageLayout";
 import { PageLoadingShell } from "@/shared/components/PageLoadingShell";

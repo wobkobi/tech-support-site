@@ -1,9 +1,7 @@
 // src/app/admin/(shell)/reviews/loading.tsx
-/**
- * @description Loading skeleton for the reviews moderation page: heading with
- * count chips and the 3-column layout - the approval list (2 cols) beside the
- * send-link and link-history cards.
- */
+// Loading skeleton for the reviews moderation page: heading with count chips and the
+// 3-column layout - the approval list (2 cols) beside the send-link and link-history
+// cards.
 
 import { Bone } from "@/shared/components/Skeleton";
 import type React from "react";

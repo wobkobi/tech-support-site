@@ -1,11 +1,9 @@
 "use client";
 // src/features/admin/components/settings/SettingsFields.tsx
-/**
- * @description Reusable settings inputs shared by every settings tab. Each field
- * renders its title, a plain-English description, the unit, an optional "what
- * off does" note, and an inline validation error - sourced from `field-meta`.
- * Inputs are sized larger than the app default for the older admin audience.
- */
+// Reusable settings inputs shared by every settings tab. Each field renders its title, a
+// plain-English description, the unit, an optional "what off does" note, and an inline
+// validation error - sourced from `field-meta`. Inputs are sized larger than the app
+// default for the older admin audience.
 
 import { hourLabel } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";

@@ -1,11 +1,8 @@
 // src/app/api/admin/blocked-days/[eventId]/route.ts
-/**
- * @description Admin endpoint to unblock a day. A multi-day block is ONE
- * all-day "Busy" event spanning the range, so unblocking a single day must
- * trim or split that event: an edge day shortens it, a middle day splits it,
- * the last remaining day deletes it. Without `?date` (legacy callers) the
- * whole event is deleted.
- */
+// Admin endpoint to unblock a day. A multi-day block is ONE all-day "Busy" event spanning
+// the range, so unblocking a single day must trim or split that event: an edge day
+// shortens it, a middle day splits it, the last remaining day deletes it. Without `?date`
+// (legacy callers) the whole event is deleted.
 
 import {
   deleteBookingEvent,

@@ -1,10 +1,7 @@
 // src/features/business/components/BusinessEnquiryForm.tsx
-/**
- * @description Public business enquiry form for the /business page. Posts to
- * /api/enquiry/business; on success the form swaps for a confirmation card.
- * Follows the public BookingForm field conventions (text-base sizing, shared
- * EmailInput/PhoneInput, hidden honeypot).
- */
+// Public business enquiry form for the /business page. Posts to /api/enquiry/business; on
+// success the form swaps for a confirmation card. Follows the public BookingForm field
+// conventions (text-base sizing, shared EmailInput/PhoneInput, hidden honeypot).
 
 "use client";
 

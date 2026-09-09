@@ -1,9 +1,6 @@
 // src/app/api/pricing/public-holiday/route.ts
-/**
- * @description Public endpoint exposing the NZ-local stat-day lookup so the
- * wizard can auto-apply the Public Holiday modifier when the customer's
- * chosen booking time falls on a holiday.
- */
+// Public endpoint exposing the NZ-local stat-day lookup so the wizard can auto-apply the
+// Public Holiday modifier when the customer's chosen booking time falls on a holiday.
 
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";

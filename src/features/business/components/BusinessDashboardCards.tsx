@@ -1,15 +1,12 @@
 "use client";
 // src/features/business/components/BusinessDashboardCards.tsx
-/**
- * @description Renders the overview stat cards for the business dashboard,
- * scoped to whatever FY (or "All time") was selected by the parent page. Each
- * card is a button that opens a BreakdownModal listing the contributing rows
- * (or showing the calculation steps), so any value that looks off can be
- * inspected without leaving the page.
- *
- * Past-FY scopes hide the "This month" cards, since the current calendar
- * month falls outside the FY window and would always show zero.
- */
+// Renders the overview stat cards for the business dashboard, scoped to whatever FY (or
+// "All time") was selected by the parent page. Each card is a button that opens a
+// BreakdownModal listing the contributing rows (or showing the calculation steps), so any
+// value that looks off can be inspected without leaving the page.
+//
+// Past-FY scopes hide the "This month" cards, since the current calendar month falls
+// outside the FY window and would always show zero.
 
 import { StatCard, type StatTone } from "@/features/admin/components/ui/StatCard";
 import {

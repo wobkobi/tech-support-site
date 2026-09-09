@@ -1,12 +1,9 @@
 // src/shared/lib/admin-session.ts
-/**
- * @description Signed session-cookie helpers for the admin panel. Uses the
- * Web Crypto API so the same helpers work in both Node (server components,
- * API routes) and Edge (Next.js proxy). The cookie value is
- * `<payloadB64Url>.<sigB64Url>` where the signature is an HMAC-SHA256 of the
- * payload signed with `ADMIN_SECRET`. Rotating the secret invalidates every
- * session - the desired behaviour.
- */
+// Signed session-cookie helpers for the admin panel. Uses the Web Crypto API so the same
+// helpers work in both Node (server components, API routes) and Edge (Next.js proxy). The
+// cookie value is `<payloadB64Url>.<sigB64Url>` where the signature is an HMAC-SHA256 of
+// the payload signed with `ADMIN_SECRET`. Rotating the secret invalidates every session -
+// the desired behaviour.
 
 /** Cookie name for the admin session. */
 export const ADMIN_SESSION_COOKIE = "__admin_session";

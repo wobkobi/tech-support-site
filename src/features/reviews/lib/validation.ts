@@ -1,8 +1,6 @@
 // src/features/reviews/lib/validation.ts
-/**
- * @description Shared review-text length validation (10-1000 characters) used
- * by both the public submission form and the server route.
- */
+// Shared review-text length validation (10-1000 characters) used by both the public
+// submission form and the server route.
 
 /**
  * Validates review text length constraints.

@@ -1,11 +1,9 @@
 // src/app/api/admin/contacts/merge/route.ts
-/**
- * @description Admin API to merge two Contact records into one. Reviews on the
- * secondary contact are reassigned to the primary, the primary's blank fields are
- * filled from the secondary, and the secondary is soft-deleted (its Google contact
- * removed best-effort). Used to collapse the duplicate a person creates by booking
- * under two different emails, which nothing merges automatically.
- */
+// Admin API to merge two Contact records into one. Reviews on the secondary contact are
+// reassigned to the primary, the primary's blank fields are filled from the secondary,
+// and the secondary is soft-deleted (its Google contact removed best-effort). Used to
+// collapse the duplicate a person creates by booking under two different emails, which
+// nothing merges automatically.
 
 import { deleteContactFromGoogle } from "@/features/contacts/lib/google-contacts";
 import { errorResponse } from "@/shared/lib/api-response";

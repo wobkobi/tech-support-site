@@ -1,8 +1,6 @@
 // src/features/reviews/lib/gridColumns.ts
-/**
- * @description Splits newest-first reviews into two balanced columns for the
- * gap-free masonry grid on the reviews page.
- */
+// Splits newest-first reviews into two balanced columns for the gap-free masonry grid on
+// the reviews page.
 
 /**
  * Estimate a review card's relative height for balancing the columns. Adds a

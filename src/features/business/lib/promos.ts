@@ -1,7 +1,5 @@
 // src/features/business/lib/promos.ts
-/**
- * @description Active-promo lookup + helpers. Cached 60s; admin writes revalidate.
- */
+// Active-promo lookup + helpers. Cached 60s; admin writes revalidate.
 
 import { promoForSpend, type PromoTierValues } from "@/features/business/lib/promo-tiers";
 import { normaliseEmail } from "@/shared/lib/normalise-email";

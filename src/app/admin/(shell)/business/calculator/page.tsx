@@ -1,15 +1,13 @@
 // src/app/admin/(shell)/business/calculator/page.tsx
-/**
- * @description Job calculator page. Resolves business identity, pricing
- * policy, rate configs, task templates, and the active promo server-side in
- * one parallel pass, then hands them to {@link CalculatorView} for AI job
- * parsing and time-tracked quoting - only the slow Google Contacts picker
- * list is left to a client fetch. `?eventId=` (the schedule's "Bill in
- * calculator" action) prefills the job from that calendar event's corrected
- * times plus its booking's client details, and links the saved invoice back
- * to both. `?eventIds=a,b,c` bills several of the day's events as one job,
- * each event keeping its own time slot so the gaps between them go unbilled.
- */
+// Job calculator page. Resolves business identity, pricing policy, rate configs, task
+// templates, and the active promo server-side in one parallel pass, then hands them to
+// CalculatorView for AI job parsing and time-tracked quoting - only the slow Google
+// Contacts picker list is left to a client fetch. `?eventId=` (the schedule's "Bill in
+// calculator" action) prefills the job from that calendar event's corrected times plus
+// its booking's client details, and links the saved invoice back to both.
+// `?eventIds=a,b,c` bills several of the day's events as one job, each event keeping its
+// own time slot so the gaps between them go unbilled.
+
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import {
   CalculatorView,

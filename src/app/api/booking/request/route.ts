@@ -1,7 +1,5 @@
 // src/app/api/booking/request/route.ts
-/**
- * @description API route with duration support (1hr vs 2hr jobs).
- */
+// API route with duration support (1hr vs 2hr jobs).
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {

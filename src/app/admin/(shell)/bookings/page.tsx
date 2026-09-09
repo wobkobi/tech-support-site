@@ -1,11 +1,10 @@
 // src/app/admin/(shell)/bookings/page.tsx
-/**
- * @description Admin bookings list. Loads the most recent 1000 bookings (soft
- * cap to avoid unbounded scans), maps them to {@link AdminBookingRow}s, and
- * renders the filterable {@link BookingAdminList} (which owns the summary
- * StatCards, search, date-range filter, and sort). The select is kept to just
- * the columns the list shows; the detail page loads the full booking row itself.
- */
+// Admin bookings list. Loads the most recent 1000 bookings (soft cap to avoid unbounded
+// scans), maps them to AdminBookingRows, and renders the filterable BookingAdminList
+// (which owns the summary StatCards, search, date-range filter, and sort). The select is
+// kept to just the columns the list shows; the detail page loads the full booking row
+// itself.
+
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import {
   BookingAdminList,

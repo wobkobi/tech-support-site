@@ -1,9 +1,6 @@
 // src/app/booking/cancel/layout.tsx
-/**
- * @description Metadata holder for the cancel page. The page itself is a
- * client component ("use client"), which cannot export metadata, so the
- * noindex rule lives here.
- */
+// Metadata holder for the cancel page. The page itself is a client component ("use
+// client"), which cannot export metadata, so the noindex rule lives here.
 
 import type { Metadata } from "next";
 import type React from "react";

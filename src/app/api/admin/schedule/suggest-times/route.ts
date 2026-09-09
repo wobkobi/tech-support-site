@@ -1,11 +1,9 @@
 // src/app/api/admin/schedule/suggest-times/route.ts
-/**
- * @description Admin "find open times" tool: returns the next N genuinely-
- * bookable slots for a job length + date range. Reuses the PUBLIC availability
- * engine (buildAvailableDays) so suggestions match exactly what the booking
- * page would allow, and injects TravelBlock rows as occupied padding so a
- * suggested slot leaves room for the drive to/from nearby jobs.
- */
+// Admin "find open times" tool: returns the next N genuinely- bookable slots for a job
+// length + date range. Reuses the PUBLIC availability engine (buildAvailableDays) so
+// suggestions match exactly what the booking page would allow, and injects TravelBlock
+// rows as occupied padding so a suggested slot leaves room for the drive to/from nearby
+// jobs.
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import { buildAvailableDays, type ExistingBooking } from "@/features/booking/lib/booking";

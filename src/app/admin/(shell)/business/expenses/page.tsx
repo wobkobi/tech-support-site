@@ -1,9 +1,8 @@
 // src/app/admin/(shell)/business/expenses/page.tsx
-/**
- * @description Admin expenses page. Renders {@link ExpensesPageView}, which pairs
- * the expenses ledger with the subscriptions list below and refreshes the latter
- * when an expense is migrated into a subscription.
- */
+// Admin expenses page. Renders ExpensesPageView, which pairs the expenses ledger with the
+// subscriptions list below and refreshes the latter when an expense is migrated into a
+// subscription.
+
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { ExpensesPageView } from "@/features/business/components/ExpensesPageView";
 import { requireAdminAuth } from "@/shared/lib/auth";

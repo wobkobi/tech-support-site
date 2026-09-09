@@ -1,9 +1,6 @@
 // scripts/build-icons/index.ts
-/**
- * @file index.ts
- * @description Entry point for icon generation script. Runs preflight checks, then all generators.
- * Run with: npm run build:icons
- */
+// Entry point for icon generation script. Runs preflight checks, then all generators.
+// Run with: npm run build:icons
 
 import fs from "node:fs/promises";
 import path from "node:path";

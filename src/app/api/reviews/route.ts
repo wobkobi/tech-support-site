@@ -1,7 +1,5 @@
 // src/app/api/reviews/route.ts
-/**
- * @description API routes for reviews with verification support.
- */
+// API routes for reviews with verification support.
 
 import { parseObjectId, parseString } from "@/features/business/lib/validation";
 import { sendOwnerPush } from "@/features/notifications/lib/push";

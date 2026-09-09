@@ -1,12 +1,10 @@
 // src/features/admin/components/ui/Modal.tsx
-/**
- * @description Shared admin dialog shell: backdrop-click and Escape close it,
- * focus moves into the dialog on open, body scroll locks while open, and the
- * whole overlay is `print:hidden`. Extracted from the two structurally-identical
- * modals in InvoiceActions. It appears without motion; a fade added later must
- * use `transition-[opacity]` (Tailwind v4 compiles translate/scale to separate
- * longhand props, so a transform-based transition would silently no-op).
- */
+// Shared admin dialog shell: backdrop-click and Escape close it, focus moves into the
+// dialog on open, body scroll locks while open, and the whole overlay is `print:hidden`.
+// Extracted from the two structurally-identical modals in InvoiceActions. It appears
+// without motion; a fade added later must use `transition-[opacity]` (Tailwind v4
+// compiles translate/scale to separate longhand props, so a transform-based transition
+// would silently no-op).
 
 "use client";
 

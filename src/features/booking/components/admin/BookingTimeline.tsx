@@ -1,13 +1,11 @@
 // src/features/booking/components/admin/BookingTimeline.tsx
-/**
- * @description Vertical lifecycle timeline for a booking: Created > Reminder sent
- * > Completed / Cancelled > Review sent > Review submitted. A cancelled booking
- * branches to a Cancelled step that spells out who cancelled and which fee flags
- * fired (late cancellation, travel charge, no-show). Steps render only once the
- * booking has reached them; a reached step whose timestamp is null (legacy rows,
- * or the completed marker which has no dedicated stamp) degrades to a muted note
- * rather than vanishing. Server component - no client hooks.
- */
+// Vertical lifecycle timeline for a booking: Created > Reminder sent > Completed /
+// Cancelled > Review sent > Review submitted. A cancelled booking branches to a Cancelled
+// step that spells out who cancelled and which fee flags fired (late cancellation, travel
+// charge, no-show). Steps render only once the booking has reached them; a reached step
+// whose timestamp is null (legacy rows, or the completed marker which has no dedicated
+// stamp) degrades to a muted note rather than vanishing. Server component - no client
+// hooks.
 
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";

@@ -1,8 +1,6 @@
 "use client";
 // src/shared/components/PromoBannerClient.tsx
-/**
- * @description Banner with 24h dismissal, first-load delay, and navbar offset coordination.
- */
+// Banner with 24h dismissal, first-load delay, and navbar offset coordination.
 
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";

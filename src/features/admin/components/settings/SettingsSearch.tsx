@@ -1,11 +1,9 @@
 "use client";
 // src/features/admin/components/settings/SettingsSearch.tsx
-/**
- * @description Filter box that searches every setting's title + description
- * (and its group title) across all tabs. Selecting a result asks the parent to
- * jump to that field's tab and focus it. The index is built once from the
- * shared field metadata, so search and the editors never drift apart.
- */
+// Filter box that searches every setting's title + description (and its group title)
+// across all tabs. Selecting a result asks the parent to jump to that field's tab and
+// focus it. The index is built once from the shared field metadata, so search and the
+// editors never drift apart.
 
 import { FIELD_META_BY_GROUP, GROUP_META } from "@/shared/lib/settings/field-meta";
 import type { SettingsGroup } from "@/shared/lib/settings/types";

@@ -1,12 +1,9 @@
 // src/app/api/booking/verify-address/route.ts
-/**
- * @description Public, rate-limited address verification endpoint. POST geocodes
- * a typed address via {@link geocodeAddressCandidates} and returns the confident
- * NZ candidates so the booking form can let the customer disambiguate when the
- * input matches more than one place (0 = not found, 1 = unambiguous, >1 =
- * ambiguous). Each request costs one Google Geocoding call; the rate limit keeps
- * that within quota.
- */
+// Public, rate-limited address verification endpoint. POST geocodes a typed address via
+// geocodeAddressCandidates and returns the confident NZ candidates so the booking form
+// can let the customer disambiguate when the input matches more than one place (0 = not
+// found, 1 = unambiguous, >1 = ambiguous). Each request costs one Google Geocoding call;
+// the rate limit keeps that within quota.
 
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { geocodeAddressCandidates } from "@/shared/lib/normalise-address";

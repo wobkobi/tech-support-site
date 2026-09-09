@@ -1,9 +1,7 @@
 // src/app/api/admin/contacts/enrich-from-reviews/route.ts
-/**
- * @description Admin trigger that returns review-sourced name conflicts (where a
- * reviewer's full name differs from the linked Contact's stored name) for manual
- * resolution. The comparison lives in the shared contacts maintenance module.
- */
+// Admin trigger that returns review-sourced name conflicts (where a reviewer's full name
+// differs from the linked Contact's stored name) for manual resolution. The comparison
+// lives in the shared contacts maintenance module.
 
 import { enrichContactsFromReviews } from "@/features/contacts/lib/maintenance";
 import { errorResponse } from "@/shared/lib/api-response";

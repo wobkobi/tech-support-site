@@ -1,10 +1,8 @@
 "use client";
 // src/features/admin/components/DayAgendaView.tsx
-/**
- * @description Mobile-friendly single-day schedule view: one NZ day as a
- * vertical agenda with prev/today/next navigation, swipe gestures, and the
- * same booking/block/travel data as the desktop week grid.
- */
+// Mobile-friendly single-day schedule view: one NZ day as a vertical agenda with
+// prev/today/next navigation, swipe gestures, and the same booking/block/travel data as
+// the desktop week grid.
 
 import { BlockDayButton } from "@/features/admin/components/BlockDayButton";
 import { EventActionSheet } from "@/features/admin/components/EventActionSheet";

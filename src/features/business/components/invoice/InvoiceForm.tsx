@@ -1,13 +1,11 @@
 "use client";
 // src/features/business/components/invoice/InvoiceForm.tsx
-/**
- * @description Presentational edit form for an invoice's client, dates, line
- * items, and notes. It owns the field state and mirrors every change to the
- * parent via `onChange` (so a live preview can render alongside); the PARENT
- * owns submission. Creation stays in the calculator - this form only edits an
- * existing DRAFT. Totals use {@link calcInvoiceTotals} (the same fn the server
- * recomputes with), and the email is checked with the booking `validateEmail`.
- */
+// Presentational edit form for an invoice's client, dates, line items, and notes. It owns
+// the field state and mirrors every change to the parent via `onChange` (so a live
+// preview can render alongside); the PARENT owns submission. Creation stays in the
+// calculator - this form only edits an existing DRAFT. Totals use calcInvoiceTotals (the
+// same fn the server recomputes with), and the email is checked with the booking
+// `validateEmail`.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
