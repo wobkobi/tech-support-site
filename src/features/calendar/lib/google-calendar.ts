@@ -1,7 +1,8 @@
 // src/features/calendar/lib/google-calendar.ts
 // Google Calendar API integration - multi-calendar without list permission.
 
-import { google, type calendar_v3 } from "googleapis";
+import { calendar as googleCalendar, type calendar_v3 } from "@googleapis/calendar";
+import { OAuth2Client } from "google-auth-library";
 import { unstable_cache } from "next/cache";
 
 import { requireEnv } from "@/shared/lib/env";
@@ -46,7 +47,7 @@ function fetchAccessibleCalendarIds(): string[] {
  * Gets OAuth2 client with credentials from environment variables
  * @returns Authenticated OAuth2 client
  */
-export function getOAuth2Client(): InstanceType<typeof google.auth.OAuth2> {
+export function getOAuth2Client(): OAuth2Client {
   // Per-var named asserts (non-empty) so a blanked credential - e.g. an
   // unescaped $ swallowed by dotenv-expand - fails with the offending var name
   // instead of a generic "missing credentials". Matches the env-layer convention.
@@ -55,7 +56,7 @@ export function getOAuth2Client(): InstanceType<typeof google.auth.OAuth2> {
   const redirectUri = requireEnv("GOOGLE_OAUTH_REDIRECT_URI");
   const refreshToken = requireEnv("GOOGLE_OAUTH_REFRESH_TOKEN");
 
-  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  const oauth2Client = new OAuth2Client(clientId, clientSecret, redirectUri);
   oauth2Client.setCredentials({ refresh_token: refreshToken });
 
   return oauth2Client;
@@ -65,9 +66,9 @@ export function getOAuth2Client(): InstanceType<typeof google.auth.OAuth2> {
  * Gets authenticated Calendar API client
  * @returns Calendar API instance
  */
-function getCalendarClient(): ReturnType<typeof google.calendar> {
+function getCalendarClient(): calendar_v3.Calendar {
   const auth = getOAuth2Client();
-  return google.calendar({ version: "v3", auth });
+  return googleCalendar({ version: "v3", auth });
 }
 
 export interface CalendarEvent {

@@ -5,7 +5,7 @@
 
 import { withRetry } from "@/features/business/lib/google-retry";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
-import { google } from "googleapis";
+import { sheets as googleSheets, type sheets_v4 } from "@googleapis/sheets";
 
 export interface InvoiceCounterData {
   prefix: string;
@@ -19,8 +19,8 @@ export interface InvoiceCounterData {
  * Returns an authenticated Google Sheets v4 client.
  * @returns Sheets client instance
  */
-export function getSheetsClient(): ReturnType<typeof google.sheets> {
-  return google.sheets({ version: "v4", auth: getOAuth2Client() });
+export function getSheetsClient(): sheets_v4.Sheets {
+  return googleSheets({ version: "v4", auth: getOAuth2Client() });
 }
 
 /**

@@ -10,7 +10,7 @@ import { mergeEmails } from "@/features/contacts/lib/merge-emails";
 import { addressCovers, resolveAddress } from "@/shared/lib/normalise-address";
 import { isNZMobileKey, normaliseContactPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
-import { google } from "googleapis";
+import { people as googlePeople, type people_v1 } from "@googleapis/people";
 import { clearContactConflict, recordContactConflict } from "./contact-conflicts";
 import { splitName } from "./split-name";
 
@@ -18,9 +18,9 @@ import { splitName } from "./split-name";
  * Returns an authenticated Google People API client.
  * @returns People API instance.
  */
-function getPeopleClient(): ReturnType<typeof google.people> {
+function getPeopleClient(): people_v1.People {
   const auth = getOAuth2Client();
-  return google.people({ version: "v1", auth });
+  return googlePeople({ version: "v1", auth });
 }
 
 /**

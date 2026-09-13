@@ -6,7 +6,7 @@ import { HOME_REGION, NZ_REGION } from "@/features/business/lib/pricing-policy";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorised } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
-import { google } from "googleapis";
+import { calendar as googleCalendar } from "@googleapis/calendar";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const years = [thisYear, thisYear + 1];
 
   try {
-    const calendar = google.calendar({ version: "v3", auth: apiKey });
+    const calendar = googleCalendar({ version: "v3", auth: apiKey });
     let upserted = 0;
     for (const year of years) {
       const res = await calendar.events.list({

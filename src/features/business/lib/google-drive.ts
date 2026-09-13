@@ -4,7 +4,7 @@
 // for the sheets importer.
 
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
-import { google } from "googleapis";
+import { drive as googleDrive, type drive_v3 } from "@googleapis/drive";
 import { Readable } from "stream";
 
 /** Module-level cache to avoid repeat folder lookups per deploy. */
@@ -14,8 +14,8 @@ const folderCache = new Map<string, string>();
  * Creates an authenticated Google Drive API v3 client.
  * @returns Drive v3 API client instance
  */
-export function getDriveClient(): ReturnType<typeof google.drive> {
-  return google.drive({ version: "v3", auth: getOAuth2Client() });
+export function getDriveClient(): drive_v3.Drive {
+  return googleDrive({ version: "v3", auth: getOAuth2Client() });
 }
 
 /**

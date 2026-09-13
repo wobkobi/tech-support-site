@@ -7,7 +7,7 @@ import type { GoogleContact } from "@/features/business/types/business";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { google, type people_v1 } from "googleapis";
+import { people as googlePeople, type people_v1 } from "@googleapis/people";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   try {
     const auth = getOAuth2Client();
-    const people = google.people({ version: "v1", auth });
+    const people = googlePeople({ version: "v1", auth });
 
     // Page through every connection - a single 100-row page silently drops the
     // operator's remaining contacts from the picker once they pass 100.
