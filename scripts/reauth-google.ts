@@ -7,7 +7,7 @@
 
 import * as dotenv from "dotenv";
 import * as fs from "fs";
-import { google } from "googleapis";
+import { OAuth2Client } from "google-auth-library";
 import * as readline from "readline";
 
 dotenv.config({ path: ".env.local" });
@@ -67,7 +67,7 @@ async function authorise(
   label: string,
   redirectUri: string,
 ): Promise<string | null> {
-  const client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  const client = new OAuth2Client(clientId, clientSecret, redirectUri);
   const authUrl = client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
