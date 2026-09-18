@@ -14,6 +14,7 @@ import { useBookingActions } from "@/features/booking/hooks/use-booking-actions"
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
+import { nzDateKey } from "@/shared/lib/timezone-utils";
 import Link from "next/link";
 import type React from "react";
 import { useMemo, useState } from "react";
@@ -128,7 +129,8 @@ export function BookingAdminList({
         const hay = `${b.name} ${b.email} ${b.phone ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
-      const day = b.startAt.slice(0, 10);
+      // NZ day, not the UTC one: a 9am NZ start is still yesterday in UTC.
+      const day = nzDateKey(new Date(b.startAt));
       if (dateFrom && day < dateFrom) return false;
       if (dateTo && day > dateTo) return false;
       return true;
@@ -177,7 +179,9 @@ export function BookingAdminList({
           return {
             ...b,
             status: "completed",
-            reviewSentAt: result.reviewSent ? new Date().toISOString() : b.reviewSentAt,
+            // The server's stamp, not reviewSent: a skipped send is stamped
+            // too, and the row should match what a reload shows.
+            reviewSentAt: result.reviewSentAt ?? b.reviewSentAt,
           };
         }
         return { ...b, reviewSentAt: new Date().toISOString() };

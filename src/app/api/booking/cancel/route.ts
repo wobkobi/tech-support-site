@@ -11,7 +11,10 @@ import { releaseBookingRedemptions } from "@/features/business/lib/promo-redempt
 import { parseString } from "@/features/business/lib/validation";
 import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { sendOwnerPush } from "@/features/notifications/lib/push";
-import { sendOwnerBookingCancellation } from "@/features/reviews/lib/email";
+import {
+  cancelHeldBookingEmails,
+  sendOwnerBookingCancellation,
+} from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
@@ -138,6 +141,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // The promo was never used, so its booking-time redemption stops counting
     // against the cap and the customer's own limit. Swallows its own errors.
     await releaseBookingRedemptions(booking.id);
+    // A reminder held overnight would otherwise still land in the morning.
+    // Also never throws.
+    await cancelHeldBookingEmails(booking.id);
 
     // Awaited, not detached: Vercel freezes the instance once the response is sent, so a
     // `void` call would usually never run and the fee would go unbilled and unlogged. The

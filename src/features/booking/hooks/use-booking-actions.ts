@@ -18,6 +18,11 @@ interface BookingActionResult {
   ok: boolean;
   /** Set by the complete path when the review-request email actually went out. */
   reviewSent?: boolean;
+  /**
+   * Set by the complete path when it stamped reviewSentAt (ISO), which it does
+   * for a skipped send too, so the cron never sends the declined email.
+   */
+  reviewSentAt?: string;
   /** Error message when {@link BookingActionResult.ok} is false. */
   error?: string;
 }
@@ -79,16 +84,16 @@ export function useBookingActions(): UseBookingActions {
 
   const patchBooking = useCallback<UseBookingActions["patchBooking"]>(
     async (id, body, successMsg) => {
-      const res = await apiFetch<{ reviewSent?: boolean }>(`/api/admin/bookings/${id}`, {
-        method: "PATCH",
-        json: body,
-      });
+      const res = await apiFetch<{ reviewSent?: boolean; reviewSentAt?: string }>(
+        `/api/admin/bookings/${id}`,
+        { method: "PATCH", json: body },
+      );
       if (!res.ok) {
         toast(res.error, { tone: "error" });
         return { ok: false, error: res.error };
       }
       if (successMsg) toast(successMsg, { tone: "success" });
-      return { ok: true, reviewSent: res.data.reviewSent };
+      return { ok: true, reviewSent: res.data.reviewSent, reviewSentAt: res.data.reviewSentAt };
     },
     [toast],
   );

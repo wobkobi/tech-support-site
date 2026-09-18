@@ -16,6 +16,7 @@ import {
   SCHEDULE_CALENDAR_TAG,
 } from "@/features/calendar/lib/google-calendar";
 import {
+  cancelHeldBookingEmails,
   sendCustomerBookingConfirmation,
   sendCustomerReviewRequest,
   sendOwnerBookingNotification,
@@ -293,7 +294,9 @@ export async function PATCH(
     // No-show ~ a customer cancel at startAt: both windows are inside.
     if (booking.calendarEventId) {
       try {
-        await deleteBookingEvent({ eventId: booking.calendarEventId });
+        // Silently: a Google "event cancelled" email after they failed to turn
+        // up reads as the operator calling the visit off.
+        await deleteBookingEvent({ eventId: booking.calendarEventId, notifyAttendees: false });
       } catch (err) {
         console.error("[admin/bookings] Failed to delete calendar event:", err);
       }
@@ -356,6 +359,18 @@ export async function PATCH(
   });
   if (!updated) {
     return errorResponse("Another booking already starts at that time.", 409);
+  }
+
+  // Recall what Resend is holding overnight before it goes out wrong: a
+  // reminder for a visit just called off, or an earlier "moved" notice showing
+  // a time that has changed again. Runs before the new notice below is held.
+  // A moved start only, matching the reminder-stamp reset above, so a finish
+  // time nudge can't recall a reminder the cron would never re-send.
+  const cancelledNow = updated.status === "cancelled" && booking.status !== "cancelled";
+  const startMoved =
+    timeChange !== null && timeChange.startAt.getTime() !== booking.startAt.getTime();
+  if (cancelledNow || startMoved) {
+    await cancelHeldBookingEmails(id);
   }
 
   // Keep the Google event in step with the row. Best-effort by necessity - the
@@ -455,31 +470,34 @@ export async function PATCH(
   // booking back to the cron, which would send the email that was declined.
   // Sending it later is still one click away on the booking detail page.
   let reviewSent = false;
+  // Returned so a list can mirror the stamp, which lands on a skipped send too.
+  let reviewSentAt: Date | null = null;
   if (
     body.status === "completed" &&
     booking.status !== "completed" &&
     booking.email &&
     booking.reviewToken
   ) {
+    const stampedAt = new Date();
     const claim = await prisma.booking.updateMany({
       where: {
         id,
         OR: [{ reviewSentAt: null }, { reviewSentAt: { isSet: false } }],
       },
-      data: { reviewSentAt: new Date() },
+      data: { reviewSentAt: stampedAt },
     });
+    if (claim.count > 0) reviewSentAt = stampedAt;
 
     if (claim.count > 0 && body.sendReview !== false) {
       // Claim won - sendCustomerReviewRequest never throws (catches its own
       // errors and logs), so the PATCH response stays successful even if
       // Resend has a hiccup. Trade-off: a single failed send won't auto-retry.
-      await sendCustomerReviewRequest({
+      reviewSent = await sendCustomerReviewRequest({
         id,
         name: booking.name,
         email: booking.email,
         reviewToken: booking.reviewToken,
       });
-      reviewSent = true;
     }
   }
 
@@ -521,6 +539,7 @@ export async function PATCH(
   return NextResponse.json({
     ok: true,
     reviewSent,
+    ...(reviewSentAt ? { reviewSentAt: reviewSentAt.toISOString() } : {}),
     ...(timeChange ? { notified: timeChange.notify } : {}),
     ...(calendarWarning ? { calendarWarning } : {}),
   });
@@ -566,6 +585,7 @@ export async function DELETE(
   // against the promo's limits for good. A settled one records a discount that
   // was really given, so it stays.
   await releaseBookingRedemptions(id);
+  await cancelHeldBookingEmails(id);
   await prisma.booking.delete({ where: { id } });
 
   revalidateTag(SCHEDULE_CALENDAR_TAG, {});

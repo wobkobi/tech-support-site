@@ -24,6 +24,7 @@ import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-crea
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { sendOwnerPush } from "@/features/notifications/lib/push";
 import {
+  cancelHeldBookingEmails,
   sendCustomerBookingConfirmation,
   sendOwnerBookingNotification,
 } from "@/features/reviews/lib/email";
@@ -339,6 +340,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         );
       }
       throw error;
+    }
+
+    // Anything held overnight names the old time. Same gate as the reminder
+    // stamp above, which the cron then re-sends for the new time; recalling a
+    // held reminder without clearing that stamp would lose it for good.
+    if (startAt.getTime() !== booking.startAt.getTime()) {
+      await cancelHeldBookingEmails(booking.id);
     }
 
     // Upsert Contact + sync to Google so edit-form corrections reach Google Contacts.

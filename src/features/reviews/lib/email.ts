@@ -16,6 +16,7 @@ import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort, formatDateTimeLong } from "@/shared/lib/date-format";
+import { prisma } from "@/shared/lib/prisma";
 import { nextSendTime } from "@/shared/lib/quiet-hours";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
@@ -296,9 +297,12 @@ function sendNow(payload: MailPayload): Promise<MailResult> {
  * call resolves now either way: the caller's "sent" stamp still lands at click
  * time, which is what stops the crons sending a second copy.
  * @param payload - The Resend send payload.
+ * @param bookingId - The booking the email is about, when a later cancel or
+ *   reschedule would make it wrong. A held send is recorded on the booking so
+ *   {@link cancelHeldBookingEmails} can recall it.
  * @returns Resend's send response.
  */
-async function sendOutreach(payload: MailPayload): Promise<MailResult> {
+async function sendOutreach(payload: MailPayload, bookingId?: string): Promise<MailResult> {
   let holdUntil: Date | null = null;
   try {
     const { comms } = await getSettings();
@@ -314,7 +318,53 @@ async function sendOutreach(payload: MailPayload): Promise<MailResult> {
   }
   if (!holdUntil) return sendNow(payload);
   console.log(`[email] Quiet hours - holding until ${holdUntil.toISOString()}`);
-  return getResend().emails.send({ ...payload, scheduledAt: holdUntil.toISOString() });
+  const result = await getResend().emails.send({
+    ...payload,
+    scheduledAt: holdUntil.toISOString(),
+  });
+  const heldId = result.data?.id;
+  if (bookingId && heldId) {
+    // Best-effort: the email is already queued, and failing to record it only
+    // costs the ability to recall it.
+    await prisma.booking
+      .update({
+        where: { id: bookingId },
+        data: { heldEmails: { push: { id: heldId, sendAt: holdUntil } } },
+      })
+      .catch((err: unknown) =>
+        console.warn(`[email] Couldn't record held email ${heldId} on ${bookingId}:`, err),
+      );
+  }
+  return result;
+}
+
+/**
+ * Recalls the customer emails Resend is still holding for a booking's quiet
+ * window. For a cancel or reschedule that makes them wrong: otherwise the
+ * customer wakes to a reminder for a visit that was called off, or a "moved"
+ * notice showing a time that has since changed again. Clears the record
+ * either way. Never throws.
+ * @param bookingId - The booking whose held emails to recall.
+ */
+export async function cancelHeldBookingEmails(bookingId: string): Promise<void> {
+  try {
+    const row = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { heldEmails: true },
+    });
+    if (!row || row.heldEmails.length === 0) return;
+    const now = Date.now();
+    // One at a time: a booking holds one or two at most, and Resend's rate
+    // limit counts cancels.
+    for (const held of row.heldEmails) {
+      if (held.sendAt.getTime() <= now) continue; // already sent
+      const { error } = await getResend().emails.cancel(held.id);
+      if (error) console.warn(`[email] Couldn't recall held email ${held.id}:`, error.message);
+    }
+    await prisma.booking.update({ where: { id: bookingId }, data: { heldEmails: { set: [] } } });
+  } catch (err) {
+    console.error(`[email] Failed to recall held emails for booking ${bookingId}:`, err);
+  }
 }
 
 /**
@@ -658,7 +708,9 @@ export async function sendCustomerBookingConfirmation(
   booking: BookingNotificationData,
   options?: { kind?: "new" | "rescheduled"; previousStartAt?: Date; quietHours?: boolean },
 ): Promise<void> {
-  const send = options?.quietHours ? sendOutreach : sendNow;
+  const send = options?.quietHours
+    ? (payload: MailPayload) => sendOutreach(payload, booking.id)
+    : sendNow;
   const from = process.env.EMAIL_FROM;
   const siteUrl = getSiteUrl();
 
@@ -747,7 +799,7 @@ ${await buildEmailSignature(siteUrl)}
 
   // Send via Resend
   try {
-    await send({
+    const result = await send({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
@@ -756,6 +808,9 @@ ${await buildEmailSignature(siteUrl)}
       text: htmlToText(html),
       attachments,
     });
+    if (result.error) {
+      console.error(`[email] Resend rejected confirmation for ${booking.id}:`, result.error);
+    }
   } catch (error) {
     console.error(`[email] Failed to send booking confirmation for booking ${booking.id}:`, error);
   }
@@ -837,15 +892,24 @@ ${await buildEmailSignature(siteUrl)}
 
   // Send via Resend
   try {
-    await sendOutreach({
-      from,
-      replyTo: process.env.ADMIN_EMAIL,
-      to: booking.email,
-      subject: `Reminder: appointment tomorrow - ${start}`,
-      html,
-      text: htmlToText(html),
-      attachments,
-    });
+    const result = await sendOutreach(
+      {
+        from,
+        replyTo: process.env.ADMIN_EMAIL,
+        to: booking.email,
+        subject: `Reminder: appointment tomorrow - ${start}`,
+        html,
+        text: htmlToText(html),
+        attachments,
+      },
+      booking.id,
+    );
+    // Resend answers a rejection with { error }, not a throw, and the cron
+    // stamps the reminder sent on true - it would never be retried.
+    if (result.error) {
+      console.error(`[email] Resend rejected reminder for ${booking.id}:`, result.error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error(`[email] Failed to send reminder for booking ${booking.id}:`, error);
@@ -970,7 +1034,7 @@ ${await buildEmailSignature(siteUrl)}
 `);
 
   try {
-    await sendOutreach({
+    const result = await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
@@ -978,6 +1042,11 @@ ${await buildEmailSignature(siteUrl)}
       html,
       text: htmlToText(html),
     });
+    // A rejection comes back as { error }, not a throw; false keeps it retryable.
+    if (result.error) {
+      console.error(`[email] Resend rejected review request for ${booking.id}:`, result.error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error(`[email] Failed to send review request for booking ${booking.id}:`, error);
@@ -1042,7 +1111,7 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
   const html = await buildPastClientReviewEmailHtml(firstName, reviewUrl);
 
   try {
-    await sendOutreach({
+    const result = await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
@@ -1050,6 +1119,14 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
       html,
       text: htmlToText(html),
     });
+    // A rejection comes back as { error }, not a throw.
+    if (result.error) {
+      console.error(
+        `[email] Resend rejected past client review request for ${booking.id}:`,
+        result.error,
+      );
+      return false;
+    }
     return true;
   } catch (error) {
     console.error(
@@ -1219,7 +1296,7 @@ export async function sendInvoiceEmail({
     customBody,
   });
   try {
-    await sendOutreach({
+    const result = await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: invoice.clientEmail,
@@ -1233,6 +1310,11 @@ export async function sendInvoiceEmail({
         },
       ],
     });
+    // A rejection comes back as { error }, not a throw; true would mark it sent.
+    if (result.error) {
+      console.error(`[email] Resend rejected invoice ${invoice.number}:`, result.error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error(`[email] Failed to send invoice ${invoice.number}:`, error);
@@ -1310,7 +1392,7 @@ export async function sendInvoiceReminderEmail({
 `);
 
   try {
-    await sendOutreach({
+    const result = await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: invoice.clientEmail,
@@ -1324,6 +1406,11 @@ export async function sendInvoiceReminderEmail({
         },
       ],
     });
+    // A rejection comes back as { error }, not a throw; true would stamp it sent.
+    if (result.error) {
+      console.error(`[email] Resend rejected reminder for ${invoice.number}:`, result.error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error(`[email] Failed to send reminder for invoice ${invoice.number}:`, error);

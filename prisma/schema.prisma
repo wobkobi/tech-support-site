@@ -148,6 +148,12 @@ model Booking {
   // 24h-out email reminder fires at most once per booking.
   emailReminderSentAt DateTime?
 
+  // Customer emails Resend is holding for the quiet window (the reminder, an
+  // operator's reschedule notice). A cancel or reschedule before they go out
+  // recalls them, so the customer doesn't wake to a reminder for a visit that
+  // was called off. Cleared on recall; entries past sendAt have already gone.
+  heldEmails HeldEmail[]
+
   // Structured booking inputs. Currently mirrored into the notes text for
   // backwards compat with the admin UI / contacts backfill / auto-maintain
   // code paths that regex "Address: X" out of notes. Future PR migrates
@@ -774,6 +780,15 @@ model Promo {
 type EstimateTask {
   label String
   mins  Int
+}
+
+// A customer email Resend accepted with a scheduledAt, recallable until then.
+// Embedded in Booking.heldEmails.
+type HeldEmail {
+  // Resend's email id, what emails.cancel takes.
+  id     String
+  // When Resend will send it; past this there is nothing left to recall.
+  sendAt DateTime
 }
 
 // Audit log for the public price estimator. Captures what the user typed,

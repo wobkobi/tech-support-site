@@ -190,15 +190,20 @@ export async function patchBookingEvent(params: {
  * Deletes a calendar event
  * @param params - Delete parameters
  * @param params.eventId - Calendar event ID to delete
+ * @param params.notifyAttendees - Whether Google emails the attendee a cancellation.
+ *   Defaults to true; a no-show passes false, since the visit was not called off.
  * @returns Promise that resolves when deleted
  */
-export async function deleteBookingEvent(params: { eventId: string }): Promise<void> {
+export async function deleteBookingEvent(params: {
+  eventId: string;
+  notifyAttendees?: boolean;
+}): Promise<void> {
   const calendar = getCalendarClient();
 
   await calendar.events.delete({
     calendarId: getBookingCalendarId(),
     eventId: params.eventId,
-    sendUpdates: "all", // Notify attendees of cancellation
+    sendUpdates: params.notifyAttendees === false ? "none" : "all",
   });
 }
 
