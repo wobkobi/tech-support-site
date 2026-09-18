@@ -456,6 +456,11 @@ export function CalculatorView({
   const [saveQuoteMode, setSaveQuoteMode] = useState(false);
   const [saveInvoiceError, setSaveInvoiceError] = useState<string | null>(null);
   const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
+  // Name of an existing contact (matched by Google link) that lacks the typed email,
+  // so the add-to-contacts popup offers to add the email instead of a new contact.
+  const [pendingExistingName, setPendingExistingName] = useState<string | null>(null);
+  // That contact's id, so the invoice still links to it when the operator declines.
+  const [pendingExistingId, setPendingExistingId] = useState<string | null>(null);
   const { toast } = useToast();
   // Rate confirm dialogs (replacing window.confirm on reset / delete-rate).
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
@@ -1172,14 +1177,17 @@ export function CalculatorView({
    * before navigating to the detail page. Best-effort backfill - the invoice
    * still navigates without the FK if PATCH fails.
    * @param contactDbId - DB id returned by the modal when the operator
-   *   confirmed and a Contact was created. Null on dismiss / failure.
+   *   confirmed and a Contact was created or updated. Null on dismiss / failure,
+   *   in which case an already-known contact missing the email is linked instead.
    */
   async function handleAddContactClose(contactDbId?: string | null): Promise<void> {
     const invoiceId = pendingInvoiceId;
     if (!invoiceId) return;
     setPendingInvoiceId(null);
-    if (contactDbId) {
-      await linkInvoiceToContact(invoiceId, contactDbId);
+    // Declining to add the email still links the invoice to the contact it belongs to.
+    const linkId = contactDbId ?? pendingExistingId;
+    if (linkId) {
+      await linkInvoiceToContact(invoiceId, linkId);
     }
     clearDraft();
     router.push(`/admin/business/invoices/${invoiceId}`);
@@ -1546,20 +1554,31 @@ export function CalculatorView({
       // history read, so resolve it here whether or not the prompt fires.
       if (clientEmail.trim()) {
         try {
-          const checkRes = await fetch(
-            `/api/admin/contacts/check?email=${encodeURIComponent(clientEmail.trim())}`,
-          );
+          const checkParams = new URLSearchParams({ email: clientEmail.trim() });
+          if (pickedContactGoogleId) checkParams.set("googleContactId", pickedContactGoogleId);
+          const checkRes = await fetch(`/api/admin/contacts/check?${checkParams.toString()}`);
           const checkData = (await checkRes.json()) as {
             exists?: boolean;
             contactId?: string | null;
+            existingContactId?: string | null;
+            existingContactName?: string | null;
           };
           if (checkRes.ok) {
+            const existingId = checkData.existingContactId ?? null;
             if (checkData.contactId) {
               await linkInvoiceToContact(invoiceId, checkData.contactId);
+            } else if (existingId && send) {
+              // Client picked from Google is already a contact, just without this
+              // email. Link now so the send page finds the contact instead of
+              // offering to add a duplicate.
+              await linkInvoiceToContact(invoiceId, existingId);
             } else if (checkData.exists === false && !send) {
-              // Unknown email: defer nav so handleAddContactClose can create
-              // the contact and link it. "Save & send" skips the prompt - the
-              // detail send flow runs its own add-to-contacts hook-in.
+              // Unknown email (or a known contact missing it): defer nav so
+              // handleAddContactClose can create or update the contact and link
+              // it. "Save & send" skips the prompt - the detail send flow runs
+              // its own add-to-contacts hook-in.
+              setPendingExistingId(existingId);
+              setPendingExistingName(checkData.existingContactName ?? null);
               setPendingInvoiceId(invoiceId);
               setSavingInvoice(false);
               return;
@@ -1923,6 +1942,7 @@ export function CalculatorView({
           name={clientName}
           email={clientEmail}
           googleContactId={pickedContactGoogleId}
+          existingContactName={pendingExistingName}
           onClose={(contactDbId) => void handleAddContactClose(contactDbId)}
         />
       )}
