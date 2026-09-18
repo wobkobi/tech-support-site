@@ -570,10 +570,14 @@ export function NavBar(): React.ReactElement | null {
       <nav
         ref={mobileDrawerRef}
         className={cn(
-          "overscroll-behavior-contain fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border border-seasalt-200/40 bg-white/95 shadow-2xl backdrop-blur-xl lg:hidden",
+          "fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto overscroll-contain rounded-2xl border border-seasalt-200/40 bg-white/95 shadow-2xl backdrop-blur-xl lg:hidden",
           // `.app-mobile-drawer` (globals.css) owns top + translate transition.
           "app-mobile-drawer",
-          mobileMenuOpen ? "translate-x-0" : "translate-x-full",
+          // Closed, it has to clear its own right-4 inset as well as its width, or
+          // a 16px strip of it peeks in at the edge of every page. Hidden too, so
+          // the shadow's tail does not show; globals.css holds it visible until
+          // the slide-out finishes.
+          mobileMenuOpen ? "translate-x-0" : "invisible translate-x-[calc(100%+2rem)]",
         )}
         id="mobile-nav"
         aria-label="Mobile navigation"

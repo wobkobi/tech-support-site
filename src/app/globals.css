@@ -243,6 +243,16 @@ nav.app-mobile-drawer {
     translate 300ms ease-out,
     top 500ms ease-out !important;
 }
+/* Closing (the drawer turns inert), visibility holds until the slide-out ends,
+   so the hidden drawer's shadow never shows at the edge. Opening skips it: a
+   visibility transition starts at hidden, and the focus trap's first focus()
+   would land on a still-hidden link and silently fail. */
+nav.app-mobile-drawer[inert] {
+  transition:
+    translate 300ms ease-out,
+    visibility 300ms,
+    top 500ms ease-out !important;
+}
 @media (min-width: 640px) {
   nav.app-mobile-drawer {
     top: calc(7.5rem + var(--promo-h, 0px)) !important;
@@ -287,6 +297,7 @@ aside.app-admin-drawer {
   div.app-nav-spacer,
   header.app-nav-header,
   nav.app-mobile-drawer,
+  nav.app-mobile-drawer[inert],
   aside.app-admin-drawer {
     transition-duration: 0.01ms !important;
   }
