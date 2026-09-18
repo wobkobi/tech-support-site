@@ -22,7 +22,7 @@ import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
-import { NZ_TZ, nzDateKey } from "@/shared/lib/timezone-utils";
+import { NZ_TZ, nzDateKey, nzWeekday } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type React from "react";
@@ -190,7 +190,7 @@ export default async function EditBookingPage({
       }).format(booking.startAt),
       isToday: false,
       isTomorrow: false,
-      isWeekend: [0, 6].includes(booking.startAt.getDay()),
+      isWeekend: [0, 6].includes(nzWeekday(booking.startAt)),
       hasAnySlots: true,
       timeWindows: TIME_OF_DAY_OPTIONS.map((t) => {
         const isSelected = t.value === timeOfDay;

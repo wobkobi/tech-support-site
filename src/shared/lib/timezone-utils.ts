@@ -203,7 +203,7 @@ export function toNzInputValue(input: Date | string): string {
 
 /**
  * Parses a NZ-local "YYYY-MM-DDTHH:mm" datetime-local value back into a UTC
- * Date, applying the NZDT/NZST offset in force on that calendar date.
+ * Date, applying the NZDT/NZST offset in force at that wall-clock time.
  * Callers must reject an empty input first - a cleared field has no parts to
  * read and cannot be given a sensible instant.
  * @param local - Input value from a datetime-local field, read as NZ time.
@@ -218,8 +218,7 @@ export function fromNzInputValue(local: string): Date {
   }
   const [y = NaN, m = NaN, d = NaN] = datePart.split("-").map(Number);
   const [hh = NaN, mm = NaN] = timePart.split(":").map(Number);
-  const offset = getPacificAucklandOffset(y, m, d);
-  return new Date(Date.UTC(y, m - 1, d, hh - offset, mm, 0));
+  return nzWallClockUtc(y, m, d, hh, mm);
 }
 
 /**
@@ -242,9 +241,15 @@ export function nzMidnightUtc(year: number, month: number, day: number): Date {
  * and assembling it inline is where the sign of the offset and the 0-indexed
  * month get fumbled.
  *
- * The offset is read at NZ midnight of that date, so on the two DST transition
- * days a 2-3am wall-clock time is ambiguous. Appointments do not run then, and
- * this matches what every caller already did.
+ * Two passes, because {@link getPacificAucklandOffset} reads the offset at NZ
+ * midday. On the two changeover days the small hours sit on the other side of
+ * the 2-3am switch, and a single pass put NZ midnight an hour out (23:00 the
+ * night before in September, 01:00 in April). The first guess is re-checked
+ * against the offset actually in force at that instant.
+ *
+ * A time the September switch skips (2:30am) comes out an hour later, as the
+ * clock reads; the April hour that happens twice resolves to the second, NZST
+ * pass. Appointments never run then.
  * @param year - Full year.
  * @param month - Month 1-12 (overflow wraps).
  * @param day - Day of month (overflow wraps).
@@ -259,8 +264,34 @@ export function nzWallClockUtc(
   hour: number,
   minute = 0,
 ): Date {
-  const offset = getPacificAucklandOffset(year, month, day);
-  return new Date(Date.UTC(year, month - 1, day, hour - offset, minute, 0));
+  const middayOffset = getPacificAucklandOffset(year, month, day);
+  const guess = new Date(Date.UTC(year, month - 1, day, hour - middayOffset, minute, 0));
+  // Bad parts give an Invalid Date, which callers test for; formatting one throws.
+  if (Number.isNaN(guess.getTime())) return guess;
+  const offset = nzOffsetHoursAt(guess);
+  return offset === middayOffset
+    ? guess
+    : new Date(Date.UTC(year, month - 1, day, hour - offset, minute, 0));
+}
+
+/**
+ * The NZ offset in force at an exact instant, in hours: the NZ wall clock read
+ * as if it were UTC, minus the instant itself.
+ * @param instant - The instant to read.
+ * @returns 12 (NZST) or 13 (NZDT).
+ */
+function nzOffsetHoursAt(instant: Date): number {
+  const parts = new Map(nzInputFormat.formatToParts(instant).map((p) => [p.type, p.value]));
+  const wallAsUtc = Date.UTC(
+    Number(parts.get("year")),
+    Number(parts.get("month")) - 1,
+    Number(parts.get("day")),
+    // Some ICU builds write midnight as "24" under hour12: false.
+    Number(parts.get("hour")) % 24,
+    Number(parts.get("minute")),
+  );
+  // The wall clock drops the seconds, so round off the difference.
+  return Math.round((wallAsUtc - instant.getTime()) / 3_600_000);
 }
 
 /**

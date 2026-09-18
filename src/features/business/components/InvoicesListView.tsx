@@ -20,6 +20,7 @@ import {
 import type { Invoice } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { nzDateKey } from "@/shared/lib/timezone-utils";
 import Link from "next/link";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -243,8 +244,6 @@ export function InvoicesListView(): React.ReactElement {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const from = fromDate ? new Date(fromDate) : null;
-    const to = toDate ? new Date(`${toDate}T23:59:59`) : null;
     return invoices.filter((inv) => {
       if (q && !inv.number.toLowerCase().includes(q) && !inv.clientName.toLowerCase().includes(q)) {
         return false;
@@ -258,9 +257,12 @@ export function InvoicesListView(): React.ReactElement {
         // the hood but must not surface under those filters.
         return false;
       }
-      const issued = new Date(inv.issueDate);
-      if (from && issued < from) return false;
-      if (to && issued > to) return false;
+      // Compare NZ calendar days as strings. Parsing an input's YYYY-MM-DD as a
+      // Date gives UTC midnight, midday in NZ, which cuts the morning off the
+      // first day.
+      const issued = nzDateKey(new Date(inv.issueDate));
+      if (fromDate && issued < fromDate) return false;
+      if (toDate && issued > toDate) return false;
       return true;
     });
   }, [invoices, search, statusFilter, fromDate, toDate, now]);
