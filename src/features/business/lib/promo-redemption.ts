@@ -4,6 +4,13 @@
 
 import { prisma } from "@/shared/lib/prisma";
 
+/**
+ * Matches a redemption no invoice has settled. The explicit unset branch is
+ * there because a row written without the field has none at all, and a Mongo
+ * null match does not see a missing field.
+ */
+const UNSETTLED = { OR: [{ invoiceId: null }, { invoiceId: { isSet: false } }] };
+
 /** One promo use to record. */
 export interface RedemptionInput {
   /** The promo that applied. */
@@ -65,6 +72,10 @@ export interface SettleInput {
  * (walk-up, phone) has no row yet and gets one here, which is also what makes
  * calculator jobs count toward a cap at all.
  *
+ * A job billed under a different promo from the one it was booked with (a code
+ * given at the job, say) releases the booking-time row, so the promo the
+ * customer did not end up using stops counting against them.
+ *
  * Bookkeeping only: it never throws, because saving an invoice must not fail
  * over analytics.
  * @param input - The redemption to settle.
@@ -88,19 +99,47 @@ export async function settlePromoRedemption(input: SettleInput): Promise<void> {
           ...(input.contactId ? { contactId: input.contactId } : {}),
         },
       });
-      return;
+    } else {
+      await prisma.promoRedemption.create({
+        data: {
+          promoId: input.promoId,
+          bookingId: input.bookingId ?? null,
+          invoiceId: input.invoiceId,
+          contactId: input.contactId ?? null,
+          discountValue: input.discountValue,
+        },
+      });
     }
 
-    await prisma.promoRedemption.create({
-      data: {
-        promoId: input.promoId,
-        bookingId: input.bookingId ?? null,
-        invoiceId: input.invoiceId,
-        contactId: input.contactId ?? null,
-        discountValue: input.discountValue,
-      },
-    });
+    if (input.bookingId) {
+      await prisma.promoRedemption.deleteMany({
+        where: { bookingId: input.bookingId, promoId: { not: input.promoId }, ...UNSETTLED },
+      });
+    }
   } catch (err) {
     console.error("[promos] Failed to settle redemption:", err);
+  }
+}
+
+/**
+ * Releases the redemption a booking recorded when it was made, once it is
+ * clear the promo will not be used: the booking was cancelled or no-showed, or
+ * its job was billed with no promo discount.
+ *
+ * Left in place, the row keeps counting against the promo's cap and the
+ * customer's own limit, so someone who cancels and rebooks is refused the promo
+ * they never used. Only unsettled rows go - a row an invoice has settled
+ * records a discount that was really given.
+ *
+ * Bookkeeping only: it never throws, because a cancellation must not fail over
+ * analytics.
+ * @param bookingId - The booking whose unsettled redemptions to release.
+ * @returns Promise that resolves once the delete has been attempted.
+ */
+export async function releaseBookingRedemptions(bookingId: string): Promise<void> {
+  try {
+    await prisma.promoRedemption.deleteMany({ where: { bookingId, ...UNSETTLED } });
+  } catch (err) {
+    console.error("[promos] Failed to release booking redemptions:", err);
   }
 }

@@ -18,11 +18,11 @@ import {
 } from "@/features/business/lib/pricing-policy";
 import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import {
-  describePromoDiscount,
+  describePromoOffer,
   describeRecurringWindow,
   getActivePromo,
   promoDisplayRate,
-  promoForAppointment,
+  promoForRateCard,
   promoModifierRate,
   promoRateBeforeAfter,
   promoTravelBeforeAfter,
@@ -98,10 +98,11 @@ export default async function PricingPage(): Promise<React.ReactElement> {
   const baseRate = pricing.baseRate;
   // Words and numbers part company here. `promo` still announces the offer and
   // names its restriction; `pricedPromo` is null for a promo whose weekday or
-  // time-of-day restriction this page cannot check, because nobody has picked
-  // an appointment yet. Quoting a Tuesday discount to someone who has not
-  // chosen a day promises a price the invoice will not honour.
-  const pricedPromo = promoForAppointment(promo, null);
+  // time-of-day restriction or spend floor this page cannot check, because
+  // nobody has picked an appointment or priced a job yet. Quoting a Tuesday
+  // discount to someone who has not chosen a day, or a $100-minimum discount
+  // as an hourly rate, promises a price the invoice will not honour.
+  const pricedPromo = promoForRateCard(promo);
   // Named wherever the promo is announced, since the figures on this page stay
   // undiscounted for it.
   const promoRestriction = promo ? describeRecurringWindow(promo) : null;
@@ -193,7 +194,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                       and for a fixed amount the pair is only a one-hour
                       illustration. */}
                   <p className="mt-1 text-base font-semibold sm:text-lg">
-                    {describePromoDiscount(promo)}
+                    {describePromoOffer(promo)}
                   </p>
                   {/* Without this a restricted promo reads as a discount that
                       applies now, beside a headline rate that has not moved.

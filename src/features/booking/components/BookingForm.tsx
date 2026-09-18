@@ -305,6 +305,7 @@ export default function BookingForm({
         departureTimeIso: slotStart?.toISOString(),
         returnDepartureTimeIso: slotEnd?.toISOString(),
         promoCode,
+        email,
       });
       setQuote({
         low: res.low,
@@ -1677,6 +1678,10 @@ export default function BookingForm({
               if (quote) void runInlineEstimate();
             }}
             applyOnMount={promoParam !== null}
+            // Judged as the booking will judge it: against the picked slot for
+            // a day-restricted code, and this customer for a per-customer one.
+            startAt={slotStartInstant()}
+            email={email}
             className="max-w-sm"
           />
         )}

@@ -854,10 +854,16 @@ export function computeJobPromoDiscount(
   if (labourSubtotal <= 0) return 0;
 
   if (promo.flatHourlyRate !== null) {
-    const totalHours = hourlyTasks.reduce((s, t) => s + t.qty, 0);
-    const promoTotal = totalHours * promo.flatHourlyRate;
-    const discount = labourSubtotal - promoTotal;
-    return discount > 0 ? Math.round(discount * 100) / 100 : 0;
+    // Per line, never netted across the job. A $40/hr line under a $55/hr flat
+    // rate is already cheaper and stays as it is, as applyPromoToHourlyRate
+    // never raises a rate; netting its shortfall against a $65/hr line would
+    // cancel the $10/hr the pricing page promises there.
+    const flat = promo.flatHourlyRate;
+    const discount = hourlyTasks.reduce((s, t) => {
+      const line = Math.round(t.qty * t.unitPrice * 100) / 100;
+      return s + Math.max(0, line - t.qty * flat);
+    }, 0);
+    return Math.round(discount * 100) / 100;
   }
   if (promo.percentDiscount !== null) {
     const pct = Math.max(0, Math.min(1, promo.percentDiscount));

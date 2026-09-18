@@ -545,6 +545,15 @@ export function CalculatorView({
     uplift: 0,
   });
 
+  // The job's earliest start, so a time-of-day promo is judged at the real start
+  // rather than the lookup's midday default. HH:MM strings sort as times.
+  const jobStartTime =
+    timeRanges
+      .map((r) => r.startTime)
+      .filter((t) => /^\d{2}:\d{2}$/.test(t))
+      .sort()[0] ?? "";
+  const prefillBookingId = eventPrefill?.bookingId ?? null;
+
   // Resolve the job date > { holiday, promo } whenever the date changes. Best
   // effort: failures leave the prior context in place. Overwrites activePromo
   // with the date-resolved promo so every downstream consumer is date-aware.
@@ -552,11 +561,15 @@ export function CalculatorView({
     if (!jobDate) return;
     let cancelled = false;
     const query = new URLSearchParams({ date: jobDate });
+    if (jobStartTime) query.set("time", jobStartTime);
     if (promoCode) query.set("code", promoCode);
     // Sent so per-customer and new-customer limits bind an operator-priced job
     // the same way they bind a public booking. Debounced below, since this is
     // typed a character at a time.
     if (clientEmail.trim()) query.set("email", clientEmail.trim());
+    // A booked job keeps the promo it was booked with, and its own redemption
+    // does not count against the customer's limits.
+    if (prefillBookingId) query.set("bookingId", prefillBookingId);
     /** Fetches the holiday + promo context for the current date, code and customer. */
     const run = (): void => {
       fetch(`/api/business/job-context?${query.toString()}`)
@@ -587,7 +600,7 @@ export function CalculatorView({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [jobDate, promoCode, clientEmail]);
+  }, [jobDate, jobStartTime, promoCode, clientEmail, prefillBookingId]);
 
   /**
    * Applies a picked Places suggestion: keep the full formatted address and
@@ -851,6 +864,18 @@ export function CalculatorView({
       }
       setTimeRanges([{ startTime, endTime }]);
       parsedWindowMin = outMins + inSessionMins;
+    }
+    // The server's durationMins is the billable figure after its clamps: free work the
+    // description states is already subtracted, and the longest-billable-day ceiling
+    // applied. Fitting the tasks to the raw range sum would grow them back over both.
+    // A merged job keeps its slot sum - its windows are the corrected calendar times.
+    if (
+      !mergedSlots &&
+      result.durationMins !== null &&
+      result.durationMins > 0 &&
+      result.durationMins < parsedWindowMin
+    ) {
+      parsedWindowMin = result.durationMins;
     }
 
     // Hydrate task and part lines

@@ -36,6 +36,16 @@ interface PromoCodeFieldProps {
    * link) without making the customer press Apply a second time.
    */
   applyOnMount?: boolean;
+  /**
+   * The chosen appointment start, when there is one, so a code restricted to
+   * certain days or hours is judged against it as the booking will judge it.
+   */
+  startAt?: Date | null;
+  /**
+   * The email being booked with, when entered, so a new-customers-only or
+   * once-per-customer code is judged against this customer.
+   */
+  email?: string | null;
   /** Extra classes for the wrapper. */
   className?: string;
 }
@@ -52,6 +62,8 @@ interface PromoCodeFieldProps {
  * @param props.onApplied - Called with the unlocked promo, or null.
  * @param props.label - Field label; defaults to the customer-facing wording.
  * @param props.applyOnMount - Check a pre-filled code once on mount.
+ * @param props.startAt - The chosen appointment start, when there is one.
+ * @param props.email - The email being booked with, when entered.
  * @param props.className - Extra classes for the wrapper.
  * @returns The rendered field.
  */
@@ -61,6 +73,8 @@ export function PromoCodeField({
   onApplied,
   label = "Have a promo code?",
   applyOnMount = false,
+  startAt = null,
+  email = null,
   className,
 }: PromoCodeFieldProps): React.ReactElement {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
@@ -82,7 +96,11 @@ export function PromoCodeField({
       const res = await fetch("/api/promos/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({
+          code,
+          startAt: startAt?.toISOString() ?? null,
+          email: email?.trim() || null,
+        }),
       });
       // A 429 lands here too: the body is not the success shape, so it reads as
       // a failure to check rather than as a rejected code. Saying "not valid"

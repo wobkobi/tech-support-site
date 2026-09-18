@@ -7,6 +7,7 @@ import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.s
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 import { assessCancellation } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { releaseBookingRedemptions } from "@/features/business/lib/promo-redemption";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import {
   deleteBookingEvent,
@@ -417,6 +418,13 @@ export async function PATCH(
     ]);
   }
 
+  // A cancelled or no-show booking never used its promo, so the booking-time
+  // redemption stops counting against the cap and the customer's own limit.
+  // Swallows its own errors.
+  if (updated.status === "cancelled" && booking.status !== "cancelled") {
+    await releaseBookingRedemptions(id);
+  }
+
   // Same cancellation draft applies to on-behalf and no-show paths. Opting out
   // skips only the invoice - the fee assessment stays on the booking, so a job
   // recorded as chargeable can still be billed later from the invoices tab.
@@ -554,6 +562,10 @@ export async function DELETE(
   // relation, so deleting the booking would leave reviews pointing at nothing. The review
   // is kept - it stays linked to its contact via contactId/customerRef.
   await prisma.review.updateMany({ where: { bookingId: id }, data: { bookingId: null } });
+  // An unsettled redemption would otherwise outlive its booking and count
+  // against the promo's limits for good. A settled one records a discount that
+  // was really given, so it stays.
+  await releaseBookingRedemptions(id);
   await prisma.booking.delete({ where: { id } });
 
   revalidateTag(SCHEDULE_CALENDAR_TAG, {});

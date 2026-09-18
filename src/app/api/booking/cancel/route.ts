@@ -7,6 +7,7 @@
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 import { assessCancellation } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { releaseBookingRedemptions } from "@/features/business/lib/promo-redemption";
 import { parseString } from "@/features/business/lib/validation";
 import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { sendOwnerPush } from "@/features/notifications/lib/push";
@@ -133,6 +134,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         travelChargeApplies,
       },
     });
+
+    // The promo was never used, so its booking-time redemption stops counting
+    // against the cap and the customer's own limit. Swallows its own errors.
+    await releaseBookingRedemptions(booking.id);
 
     // Awaited, not detached: Vercel freezes the instance once the response is sent, so a
     // `void` call would usually never run and the fee would go unbilled and unlogged. The
