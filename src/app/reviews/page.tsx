@@ -27,8 +27,7 @@ export const metadata: Metadata = {
 // Long fallback avoids waking a cold DB on a fixed timer.
 export const revalidate = 86400;
 
-const linkStyle =
-  "text-coquelicot-500 hover:text-coquelicot-400 underline-offset-4 hover:underline";
+const linkStyle = "text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800";
 
 /**
  * Reviews page component.

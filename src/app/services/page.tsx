@@ -198,7 +198,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
               {serviceAreas.map((area) => (
                 <div
                   key={area.label}
-                  className="rounded-lg border border-seasalt-200/60 bg-white p-3 shadow-sm transition-all hover:shadow-md"
+                  className="rounded-lg border border-seasalt-200/60 bg-white p-3 shadow-sm transition-shadow hover:shadow-md"
                 >
                   <div className="mb-2 flex items-center gap-2">
                     <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-moonstone-500/40 bg-moonstone-400/20">

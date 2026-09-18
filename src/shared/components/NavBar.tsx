@@ -490,7 +490,7 @@ export function NavBar(): React.ReactElement | null {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "shrink-0 rounded-lg px-4 py-2.5 text-lg font-semibold whitespace-nowrap transition-all duration-200 select-none xl:text-xl",
+                    "shrink-0 rounded-lg px-4 py-2.5 text-lg font-semibold whitespace-nowrap transition-[scale,background-color,color,box-shadow] duration-200 select-none xl:text-xl",
                     active
                       ? "bg-moonstone-400/20 text-russian-violet shadow-sm"
                       : "text-rich-black hover:scale-105 hover:bg-moonstone-400/15 hover:text-russian-violet hover:shadow-md",
@@ -526,7 +526,7 @@ export function NavBar(): React.ReactElement | null {
 
             <button
               onClick={toggleMobileMenu}
-              className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/20 transition-all hover:bg-white/30 lg:hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/20 transition-colors hover:bg-white/30 lg:hidden"
               aria-label="Toggle mobile menu"
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-nav"
@@ -534,19 +534,19 @@ export function NavBar(): React.ReactElement | null {
               <div className="flex h-5 w-5 flex-col justify-center gap-1">
                 <span
                   className={cn(
-                    "h-0.5 w-full rounded-full bg-russian-violet transition-all",
+                    "h-0.5 w-full rounded-full bg-russian-violet transition-[translate,rotate]",
                     mobileMenuOpen && "translate-y-1.5 rotate-45",
                   )}
                 />
                 <span
                   className={cn(
-                    "h-0.5 w-full rounded-full bg-russian-violet transition-all",
+                    "h-0.5 w-full rounded-full bg-russian-violet transition-opacity",
                     mobileMenuOpen && "opacity-0",
                   )}
                 />
                 <span
                   className={cn(
-                    "h-0.5 w-full rounded-full bg-russian-violet transition-all",
+                    "h-0.5 w-full rounded-full bg-russian-violet transition-[translate,rotate]",
                     mobileMenuOpen && "-translate-y-1.5 -rotate-45",
                   )}
                 />
@@ -597,7 +597,7 @@ export function NavBar(): React.ReactElement | null {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "rounded-lg px-4 py-3 text-base font-semibold transition-all duration-200 select-none",
+                  "rounded-lg px-4 py-3 text-base font-semibold transition-[scale,background-color,color,box-shadow] duration-200 select-none",
                   active
                     ? "bg-moonstone-400/20 text-russian-violet shadow-sm"
                     : "text-rich-black hover:scale-[1.02] hover:bg-moonstone-400/15 hover:text-russian-violet hover:shadow-md",

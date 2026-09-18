@@ -84,14 +84,14 @@ function getVariantClasses(variant: ButtonVariant): string {
         "bg-moonstone-400 text-russian-violet",
         "hover:bg-moonstone-300",
         "shadow-md hover:shadow-lg",
-        "transition-all",
+        "transition-[background-color,box-shadow]",
       );
     case "ghost":
       return cn(
         "bg-transparent text-russian-violet",
         "border border-russian-violet/40",
         "hover:border-russian-violet/70 hover:bg-russian-violet/10",
-        "transition-all",
+        "transition-colors",
       );
   }
 }

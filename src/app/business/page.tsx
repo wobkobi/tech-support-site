@@ -268,7 +268,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
               {businessServices.map((area) => (
                 <div
                   key={area.label}
-                  className="rounded-lg border border-seasalt-200/60 bg-white p-3 shadow-sm transition-all hover:shadow-md"
+                  className="rounded-lg border border-seasalt-200/60 bg-white p-3 shadow-sm transition-shadow hover:shadow-md"
                 >
                   <div className="mb-2 flex items-center gap-2">
                     <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-moonstone-500/40 bg-moonstone-400/20">
@@ -351,7 +351,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
               {retainerTiers.map((tier) => (
                 <div
                   key={tier.name}
-                  className="flex flex-col rounded-lg border border-seasalt-200/60 bg-white p-4 shadow-sm transition-all hover:shadow-md"
+                  className="flex flex-col rounded-lg border border-seasalt-200/60 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
                 >
                   <h3 className="text-lg font-semibold text-rich-black sm:text-xl">{tier.name}</h3>
                   <p className="mb-1 text-lg font-bold text-russian-violet sm:text-xl">

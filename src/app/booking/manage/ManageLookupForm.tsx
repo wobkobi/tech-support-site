@@ -5,6 +5,7 @@
 // match either way.
 
 import { Button } from "@/shared/components/Button";
+import { PhoneLink } from "@/shared/components/PhoneLink";
 import type React from "react";
 import { useState } from "react";
 
@@ -19,7 +20,7 @@ type State =
 interface ManageLookupFormProps {
   /** Display phone number, e.g. "021 297 1237". */
   phone: string;
-  /** Dialable form for the tel: link. */
+  /** The identity setting's tel: URI, used as the link href as-is. */
   phoneTel: string;
 }
 
@@ -69,13 +70,7 @@ export function ManageLookupForm({ phone, phoneTel }: ManageLookupFormProps): Re
             back at their inbox is a dead end - give them the phone number. */}
         <p className="mt-4 text-base text-rich-black/80 sm:text-lg">
           Nothing arrives, or not sure which address you used? Call or text me on{" "}
-          <a
-            href={`tel:${phoneTel}`}
-            className="font-semibold text-russian-violet underline underline-offset-2 hover:opacity-80"
-          >
-            {phone}
-          </a>{" "}
-          and I'll sort it out.
+          <PhoneLink phone={phone} phoneTel={phoneTel} /> and I'll sort it out.
         </p>
       </div>
     );
@@ -100,14 +95,13 @@ export function ManageLookupForm({ phone, phoneTel }: ManageLookupFormProps): Re
           placeholder="you@example.com"
           className="w-full rounded-lg border border-seasalt-200 bg-white px-4 py-3 text-base focus:border-russian-violet focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:text-lg"
         />
-        <p className="mt-1 text-sm text-rich-black/60 sm:text-base">
-          Use the same address you booked with.
-        </p>
+        <p className="mt-1 text-base text-rich-black/70">Use the same address you booked with.</p>
       </div>
 
       {state.kind === "error" && (
-        <p role="alert" className="text-base text-coquelicot-500">
-          {state.message}
+        <p role="alert" className="text-base text-error">
+          {state.message} If it keeps happening, call or text me on{" "}
+          <PhoneLink phone={phone} phoneTel={phoneTel} />.
         </p>
       )}
 

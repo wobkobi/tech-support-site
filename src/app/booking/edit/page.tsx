@@ -220,7 +220,7 @@ export default async function EditBookingPage({
             <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
               Edit booking
             </h1>
-            <p className="text-sm text-rich-black sm:text-base">
+            <p className="text-base text-rich-black">
               {blocked
                 ? "This booking can no longer be changed online."
                 : "Update your appointment details below. A new calendar invite will be sent when you save."}
@@ -242,14 +242,14 @@ export default async function EditBookingPage({
               </p>
               <div className="flex flex-wrap gap-3">
                 {identity.phoneTel && (
-                  <Button href={`tel:${identity.phoneTel}`} variant="secondary" size="sm">
+                  <Button href={identity.phoneTel} variant="secondary" size="md">
                     Call {identity.phone}
                   </Button>
                 )}
                 <Button
                   href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}
                   variant="ghost"
-                  size="sm"
+                  size="md"
                 >
                   Cancel instead
                 </Button>
@@ -259,7 +259,7 @@ export default async function EditBookingPage({
             <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
               {/* Only worth saying when a limit is actually configured. */}
               {(changesLeft !== null || reschedule.cutoffHours > 0) && (
-                <p className="mb-4 rounded-lg border border-mustard-400 bg-mustard-50 px-4 py-3 text-sm text-rich-black/80 sm:text-base">
+                <p className="mb-4 rounded-lg border border-mustard-400 bg-mustard-50 px-4 py-3 text-base text-rich-black/80">
                   {changesLeft !== null && (
                     <>
                       You can change this booking{" "}
@@ -282,6 +282,8 @@ export default async function EditBookingPage({
                 durations={availabilityConfig.durations}
                 cancelToken={cancelToken}
                 initialValues={initialValues}
+                phone={identity.phone}
+                phoneTel={identity.phoneTel}
               />
             </section>
           )}

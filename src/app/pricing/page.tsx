@@ -70,8 +70,7 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-const linkStyle =
-  "text-coquelicot-500 hover:text-coquelicot-400 underline-offset-4 hover:underline";
+const linkStyle = "text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800";
 
 const ACCORDION_DETAILS =
   "group rounded-xl border border-seasalt-200/60 bg-white/40 p-0 open:bg-white open:shadow-sm";
@@ -569,7 +568,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
           </section>
 
           {pricing.ratesUpdatedAt && (
-            <p className="text-center text-sm text-rich-black/50 sm:text-base">
+            <p className="text-center text-base text-rich-black/70">
               Rates last updated on {formatDateShort(pricing.ratesUpdatedAt)}.
             </p>
           )}

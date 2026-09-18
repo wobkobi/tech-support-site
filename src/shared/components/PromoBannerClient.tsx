@@ -135,18 +135,22 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
         "transition-[translate] duration-500 ease-out",
         visible ? "translate-y-0" : "pointer-events-none -translate-y-full",
       )}
-      role="status"
     >
+      {/* No aria-label: the visible offer is the link's name, so what a
+          screen reader announces matches what a voice-control user says. */}
       <Link
         href="/pricing"
-        aria-label="See pricing details for the current offer"
-        className="block hover:underline focus:outline-none focus-visible:underline"
+        className={cn(
+          "block rounded hover:underline",
+          "focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet-900",
+        )}
       >
         <FaBolt
           className="mr-2 inline-block h-4 w-4 text-russian-violet-900 sm:h-5 sm:w-5"
           aria-hidden="true"
         />
         <span className="font-bold">Limited offer:</span> {summariseForBanner(promo)}
+        <span className="sr-only"> - see pricing details</span>
       </Link>
       <button
         type="button"
@@ -165,7 +169,7 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
           "hover:bg-russian-violet-900 hover:text-mustard-300 hover:ring-russian-violet-900",
           "hover:scale-110 hover:rotate-90 active:scale-95",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-russian-violet-900/60",
-          "transition-all duration-200 ease-out",
+          "transition-[background-color,color,box-shadow,scale,rotate] duration-200 ease-out",
         )}
       >
         <FaXmark className="h-4 w-4" aria-hidden="true" />

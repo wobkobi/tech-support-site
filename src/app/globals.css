@@ -58,6 +58,11 @@
   --color-coquelicot-900: #300c03;
   --color-coquelicot-950: #220902;
 
+  /* Customer-facing error copy. coquelicot-700 keeps the brand red while
+     clearing WCAG AA on the frosted panels (~8:1); the 400/500 steps the
+     errors used sat near 3:1. */
+  --color-error: var(--color-coquelicot-700);
+
   /* russian-violet */
   --color-russian-violet: #0c0a3e;
   --color-russian-violet-50: #eae9fb;
@@ -353,9 +358,11 @@ aside.app-admin-drawer {
   will-change: transform;
 }
 
-/* Hold the scroll still while a reader hovers or tabs into a card. */
+/* Hold the scroll still while a reader hovers or tabs into a card, or has
+   pressed the carousel's pause button (PausableMarquee sets data-paused). */
 .animate-marquee:hover,
-.animate-marquee:focus-within {
+.animate-marquee:focus-within,
+[data-paused] .animate-marquee {
   animation-play-state: paused;
 }
 
@@ -536,10 +543,16 @@ html {
    --------------------------------------------
    The site is designed at 16px root and looks "right" on 1080p (1920px wide).
    On bigger viewports the layout should scale proportionally - the formula
-   below pins 16px at 1920px and scales linearly to 26px at 3840px (4K), with
-   a floor at 16px for anything narrower. Everything Tailwind sizes in rem
-   (text, padding, gaps, max-widths) follows automatically.
+   below pins the base size at 1920px and scales linearly to 1.625x at 3840px
+   (4K), with a floor at the base size for anything narrower. Everything
+   Tailwind sizes in rem (text, padding, gaps, max-widths) follows
+   automatically.
+
+   Written relative to the browser's text-size setting rather than in px, so a
+   visitor who has turned their default text size up keeps it: on the root
+   element both % and rem resolve against that setting, not against this rule.
+   At the default 16px it is the same curve as 16px > 26px.
    ============================================ */
 html {
-  font-size: clamp(16px, calc(6px + 0.521vw), 26px);
+  font-size: clamp(100%, 0.375rem + 0.521vw, 162.5%);
 }

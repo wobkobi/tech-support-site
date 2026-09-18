@@ -1,6 +1,7 @@
 // src/features/reviews/components/Reviews.tsx
 // Reviews module with responsive rows (1-3 items) or marquee scroll (4+ items).
 
+import { PausableMarquee } from "@/features/reviews/components/PausableMarquee";
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import React from "react";
@@ -133,31 +134,33 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
           What People Say
         </h2>
 
-        <div
-          className={cn(
-            // Sit within the FrostedSection padding so the carousel's edges line up
-            // with the content column above (hero, cards) instead of bleeding wider.
-            "relative w-full overflow-hidden rounded-xl",
-            // Dissolve cards near the left/right edges instead of hard-clipping them.
-            "marquee-fade",
-          )}
-        >
-          <ul className="marquee-track animate-marquee flex w-max gap-3">
-            {track.map((r, i) => (
-              <ReviewCard
-                key={`${r.name}-${i}`}
-                r={r}
-                decorative={i >= items.length}
-                className={cn(
-                  cardBase,
-                  "w-[min(26rem,calc(100vw-3rem))] shrink-0 sm:w-md",
-                  i < items.length && "animate-fade-in animate-fill-both",
-                )}
-                style={i < items.length ? { animationDelay: `${i * 150}ms` } : undefined}
-              />
-            ))}
-          </ul>
-        </div>
+        <PausableMarquee>
+          <div
+            className={cn(
+              // Sit within the FrostedSection padding so the carousel's edges line up
+              // with the content column above (hero, cards) instead of bleeding wider.
+              "relative w-full overflow-hidden rounded-xl",
+              // Dissolve cards near the left/right edges instead of hard-clipping them.
+              "marquee-fade",
+            )}
+          >
+            <ul className="marquee-track animate-marquee flex w-max gap-3">
+              {track.map((r, i) => (
+                <ReviewCard
+                  key={`${r.name}-${i}`}
+                  r={r}
+                  decorative={i >= items.length}
+                  className={cn(
+                    cardBase,
+                    "w-[min(26rem,calc(100vw-3rem))] shrink-0 sm:w-md",
+                    i < items.length && "animate-fade-in animate-fill-both",
+                  )}
+                  style={i < items.length ? { animationDelay: `${i * 150}ms` } : undefined}
+                />
+              ))}
+            </ul>
+          </div>
+        </PausableMarquee>
       </section>
     );
   }

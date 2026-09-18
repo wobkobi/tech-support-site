@@ -234,7 +234,7 @@ export default async function Home(): Promise<React.ReactElement> {
               {supportItems.map(({ label, icon: Icon }) => (
                 <li
                   key={label}
-                  className="flex items-center gap-3 rounded-xl border border-seasalt-200/60 bg-white p-3 shadow-sm transition-all hover:shadow-md"
+                  className="flex items-center gap-3 rounded-xl border border-seasalt-200/60 bg-white p-3 shadow-sm transition-shadow hover:shadow-md"
                 >
                   <span className="grid size-12 shrink-0 place-items-center rounded-lg border border-moonstone-500/50 bg-moonstone-400/30 sm:size-14">
                     <Icon className="h-7 w-7 text-moonstone-400 sm:h-8 sm:w-8" aria-hidden />

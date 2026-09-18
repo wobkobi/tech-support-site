@@ -24,8 +24,7 @@ export const metadata: Metadata = {
   },
 };
 
-const linkStyle =
-  "text-coquelicot-500 hover:text-coquelicot-400 underline-offset-4 hover:underline";
+const linkStyle = "text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800";
 
 /**
  * About page component.

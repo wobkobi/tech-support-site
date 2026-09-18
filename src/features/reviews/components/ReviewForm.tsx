@@ -6,10 +6,18 @@
 import { Button } from "@/shared/components/Button";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
+import { PhoneLink } from "@/shared/components/PhoneLink";
 import { cn } from "@/shared/lib/cn";
+import { focusAndReveal } from "@/shared/lib/focus-and-reveal";
 import { formatNZPhone, normalisePhone, validatePhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+
+/** Input styling shared by the name and review fields and the phone/email overrides. */
+const FIELD_CLASSES = cn(
+  "border-seasalt-200/60 bg-seasalt text-rich-black",
+  "focus:border-russian-violet focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
+);
 
 type NameDisplay = "name" | "anonymous";
 
@@ -29,6 +37,10 @@ interface ReviewFormProtectedProps {
     lastName: string | null;
     isAnonymous: boolean;
   };
+  /** Display phone number, offered when a submission fails. */
+  phone?: string;
+  /** tel: URI for the same number. */
+  phoneTel?: string;
 }
 
 /**
@@ -41,6 +53,8 @@ interface ReviewFormProtectedProps {
  * @param props.prefillEmail - Pre-fill email from booking/contact.
  * @param props.prefillPhone - Pre-fill phone from contact.
  * @param props.existingReview - Existing review data for editing.
+ * @param props.phone - Display phone number, offered when a submission fails.
+ * @param props.phoneTel - tel: URI for the same number.
  * @returns Review form element.
  */
 export default function ReviewFormProtected({
@@ -51,6 +65,8 @@ export default function ReviewFormProtected({
   prefillEmail,
   prefillPhone,
   existingReview,
+  phone,
+  phoneTel,
 }: ReviewFormProtectedProps): React.ReactElement {
   // Stable literal ids for fields the error summary links to, so the "#id"
   // anchors are URL-safe fragments (useId tokens are not). Unlinked fields
@@ -96,6 +112,30 @@ export default function ReviewFormProtected({
   const [sent, setSent] = useState(false);
   /** True when the submission auto-approved, so the copy can say it's already live. */
   const [liveNow, setLiveNow] = useState(false);
+  // Bumped by each stopped submit, so the summary takes focus even when the
+  // same error comes back twice in a row.
+  const [attention, setAttention] = useState(0);
+  const summaryRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (attention === 0) return;
+    const el = summaryRef.current;
+    // An empty summary is display:none and cannot take focus.
+    if (el?.hasChildNodes()) focusAndReveal(el);
+  }, [attention]);
+
+  /**
+   * Drops one field's error once the customer starts fixing it.
+   * @param key - Field-error key.
+   */
+  function clearError(key: string): void {
+    setErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
 
   const textMax = 1000;
   const textMin = 10;
@@ -139,7 +179,10 @@ export default function ReviewFormProtected({
     }
 
     setErrors(fieldErrors);
-    if (Object.keys(fieldErrors).length > 0) return;
+    if (Object.keys(fieldErrors).length > 0) {
+      setAttention((n) => n + 1);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -176,8 +219,17 @@ export default function ReviewFormProtected({
       }
 
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || `Request failed with ${res.status}`);
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        // A 4xx body says what to fix (too short, already reviewed). A 5xx or
+        // an auth refusal is server shorthand, so say it plainly instead.
+        const usable = res.status < 500 && res.status !== 401 && res.status !== 403;
+        setSubmitError(
+          usable && data?.error
+            ? data.error
+            : "Your review couldn't be sent just now. Please try again in a minute.",
+        );
+        setAttention((n) => n + 1);
+        return;
       }
 
       // Persistent success view instead of a flash + auto-redirect: a 2-second
@@ -186,8 +238,10 @@ export default function ReviewFormProtected({
       const data = (await res.json().catch(() => null)) as { status?: string } | null;
       setLiveNow(data?.status === "approved");
       setSent(true);
-    } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : "Something went wrong.");
+    } catch {
+      // fetch only throws when the request never completed.
+      setSubmitError("Your review couldn't be sent - check your connection and try again.");
+      setAttention((n) => n + 1);
     } finally {
       setLoading(false);
     }
@@ -229,8 +283,13 @@ export default function ReviewFormProtected({
     <form onSubmit={handleSubmit} aria-busy={loading} className="space-y-4">
       {/* Personal-link banner: reassures without the "Verified" jargon. */}
       {isVerified && (
-        <div className="flex items-center gap-2 rounded-lg border border-moonstone-500/50 bg-moonstone-400/10 p-3 text-base text-moonstone-400">
-          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+        <div className="flex items-center gap-2 rounded-lg border border-moonstone-500/50 bg-moonstone-400/10 p-3 text-base text-moonstone-800">
+          <svg
+            className="h-5 w-5 shrink-0"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+            aria-hidden="true"
+          >
             <path
               fillRule="evenodd"
               d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -238,54 +297,72 @@ export default function ReviewFormProtected({
             />
           </svg>
           <span className="font-semibold">Your personal review link</span>
-          <span className="text-moonstone-400/80">
+          <span className="text-moonstone-800/80">
             • tied to your appointment, no sign-in needed
           </span>
         </div>
       )}
 
-      {/* Status */}
-      {hasFieldErrors && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          className="rounded-lg border border-coquelicot-500/50 bg-coquelicot-500/10 p-3 text-base text-rich-black"
-        >
-          <p className="font-semibold">Please fix the following:</p>
-          <ul className="mt-1 list-disc space-y-0.5 pl-5">
-            {errorEntries.map(([key, msg]) => {
-              const anchor =
-                key === "text"
-                  ? textId
-                  : key === "firstName"
-                    ? firstId
-                    : key === "phone"
-                      ? phoneId
-                      : undefined;
-              return (
-                <li key={key}>
-                  {anchor ? (
-                    <a href={`#${anchor}`} className="underline">
-                      {msg}
-                    </a>
-                  ) : (
-                    msg
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-      {/* Success is handled by the view above; only errors surface here. */}
-      {!hasFieldErrors && submitError && (
-        <div
-          role="alert"
-          className="rounded-lg border border-coquelicot-500/50 bg-coquelicot-500/10 p-3 text-base text-coquelicot-500"
-        >
-          {submitError}
-        </div>
-      )}
+      {/* Status: takes focus on a stopped submit, so a phone user whose error
+          sits above the fold still lands on it. */}
+      <div ref={summaryRef} tabIndex={-1} className="empty:hidden">
+        {hasFieldErrors && (
+          <div
+            role="alert"
+            className="rounded-lg border border-coquelicot-500/50 bg-coquelicot-500/10 p-3 text-base text-rich-black"
+          >
+            <p className="font-semibold">Please fix the following:</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+              {errorEntries.map(([key, msg]) => {
+                const anchor =
+                  key === "text"
+                    ? textId
+                    : key === "firstName"
+                      ? firstId
+                      : key === "phone"
+                        ? phoneId
+                        : undefined;
+                return (
+                  <li key={key}>
+                    {anchor ? (
+                      <a
+                        href={`#${anchor}`}
+                        // A bare #anchor jump scrolls without focusing the field.
+                        onClick={(e) => {
+                          const el = document.getElementById(anchor);
+                          if (!el) return;
+                          e.preventDefault();
+                          focusAndReveal(el);
+                        }}
+                        className="underline"
+                      >
+                        {msg}
+                      </a>
+                    ) : (
+                      msg
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        {/* Success is handled by the view above; only errors surface here. */}
+        {!hasFieldErrors && submitError && (
+          <div
+            role="alert"
+            className="rounded-lg border border-coquelicot-500/50 bg-coquelicot-500/10 p-3 text-base text-rich-black"
+          >
+            <p className="font-medium text-error">{submitError}</p>
+            {phone && phoneTel && (
+              <p className="mt-1">
+                If it keeps happening, call or text me on{" "}
+                <PhoneLink phone={phone} phoneTel={phoneTel} />.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Identity */}
       <div className="space-y-4 rounded-xl border border-seasalt-200/80 bg-white/60 p-4">
@@ -299,9 +376,12 @@ export default function ReviewFormProtected({
                 type="button"
                 aria-pressed={nameDisplay === opt.value}
                 disabled={loading}
-                onClick={() => setNameDisplay(opt.value)}
+                onClick={() => {
+                  setNameDisplay(opt.value);
+                  if (opt.value === "anonymous") clearError("firstName");
+                }}
                 className={cn(
-                  "rounded-lg border px-4 py-1.5 text-base font-medium whitespace-nowrap transition-colors",
+                  "min-h-11 rounded-lg border px-4 py-1.5 text-base font-medium whitespace-nowrap transition-colors",
                   nameDisplay === opt.value
                     ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
                     : "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
@@ -314,7 +394,7 @@ export default function ReviewFormProtected({
         </div>
 
         {/* Live name preview */}
-        <p className="text-base text-rich-black/60">
+        <p className="text-base text-rich-black/80">
           {"Appears as: "}
           <span className="font-semibold text-russian-violet">
             {nameDisplay === "anonymous"
@@ -336,19 +416,22 @@ export default function ReviewFormProtected({
                 htmlFor={firstId}
                 className="mb-1 block text-base font-semibold text-rich-black"
               >
-                First name <span className="text-coquelicot-500">*</span>
+                First name <span className="text-error">*</span>
               </label>
               <input
                 id={firstId}
                 type="text"
                 autoComplete="given-name"
                 className={cn(
-                  "border-seasalt-200/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
-                  "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
+                  FIELD_CLASSES,
+                  "w-full rounded-md border px-3 py-2",
                   errors.firstName && "border-coquelicot-500/60",
                 )}
                 value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                onChange={(e) => {
+                  setFirstName(e.target.value);
+                  clearError("firstName");
+                }}
                 maxLength={60}
                 required
                 disabled={loading}
@@ -356,7 +439,7 @@ export default function ReviewFormProtected({
                 aria-describedby={errors.firstName ? `${firstId}-error` : undefined}
               />
               {errors.firstName && (
-                <p id={`${firstId}-error`} className="mt-1 text-base text-coquelicot-500">
+                <p id={`${firstId}-error`} className="mt-1 text-base text-error">
                   {errors.firstName}
                 </p>
               )}
@@ -367,16 +450,13 @@ export default function ReviewFormProtected({
                 htmlFor={lastId}
                 className="mb-1 block text-base font-semibold text-rich-black"
               >
-                Last name <span className="font-normal text-rich-black/50">(optional)</span>
+                Last name <span className="font-normal text-rich-black/70">(optional)</span>
               </label>
               <input
                 id={lastId}
                 type="text"
                 autoComplete="family-name"
-                className={cn(
-                  "border-seasalt-200/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
-                  "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
-                )}
+                className={cn(FIELD_CLASSES, "w-full rounded-md border px-3 py-2")}
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 maxLength={60}
@@ -391,9 +471,9 @@ export default function ReviewFormProtected({
       <div className="space-y-3 rounded-xl border border-seasalt-200/80 bg-white/60 p-4">
         <div>
           <p className="text-base font-semibold text-rich-black">
-            Stay in touch <span className="font-normal text-rich-black/40">(optional)</span>
+            Stay in touch <span className="font-normal text-rich-black/70">(optional)</span>
           </p>
-          <p className="mt-0.5 text-base text-rich-black/50">
+          <p className="mt-0.5 text-base text-rich-black/80">
             Leave your number or email if you'd like me to be able to reach you - totally up to you.
           </p>
         </div>
@@ -406,13 +486,13 @@ export default function ReviewFormProtected({
             <PhoneInput
               id={phoneId}
               value={phoneInput}
-              onChange={setPhoneInput}
+              onChange={(next) => {
+                setPhoneInput(next);
+                clearError("phone");
+              }}
               disabled={loading}
               errorMessages={{ invalid: "Doesn't look right - check the number." }}
-              className={cn(
-                "border-seasalt-200/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
-                "border px-3 py-2 focus:ring-2",
-              )}
+              className={cn(FIELD_CLASSES, "text-base")}
             />
           </div>
 
@@ -426,10 +506,7 @@ export default function ReviewFormProtected({
               onChange={setContactEmail}
               placeholder="you@example.com"
               disabled={loading}
-              className={cn(
-                "border-seasalt-200/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
-                "border px-3 py-2 focus:ring-2",
-              )}
+              className={cn(FIELD_CLASSES, "text-base")}
             />
           </div>
         </div>
@@ -439,21 +516,19 @@ export default function ReviewFormProtected({
       <div className="rounded-xl border border-seasalt-200/80 bg-white/60 p-4">
         <div className="flex items-baseline justify-between gap-3">
           <label htmlFor={textId} className="block text-base font-semibold text-rich-black">
-            Review <span className="text-coquelicot-500">*</span>
+            Review <span className="text-error">*</span>
           </label>
           <span
             id={counterId}
             className={cn(
-              "tabular-nums transition-all duration-200",
+              "text-sm tabular-nums transition-colors duration-200",
               textCount > textMax
-                ? "text-sm font-bold text-coquelicot-500"
+                ? "font-bold text-error"
                 : remaining <= 50
-                  ? "text-sm font-semibold text-coquelicot-500"
-                  : remaining <= 150
-                    ? "text-sm font-medium text-coquelicot-500/80"
-                    : textCount > 0 && textCount < textMin
-                      ? "text-sm text-coquelicot-500/80"
-                      : "text-sm text-rich-black/70",
+                  ? "font-semibold text-error"
+                  : remaining <= 150 || (textCount > 0 && textCount < textMin)
+                    ? "font-medium text-error"
+                    : "text-rich-black/70",
             )}
           >
             {textCount}/{textMax}
@@ -466,12 +541,15 @@ export default function ReviewFormProtected({
           autoComplete="off"
           placeholder={`Share your experience (at least ${textMin} characters)...`}
           className={cn(
-            "border-seasalt-200/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
-            "mt-1 min-h-35 w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
+            FIELD_CLASSES,
+            "mt-1 min-h-35 w-full rounded-md border px-3 py-2",
             errors.text && "border-coquelicot-500/60",
           )}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            clearError("text");
+          }}
           maxLength={textMax}
           required
           disabled={loading}
@@ -479,7 +557,7 @@ export default function ReviewFormProtected({
           aria-describedby={cn(counterId, errors.text && `${textId}-error`)}
         />
         {errors.text && (
-          <p id={`${textId}-error`} className="mt-1 text-base text-coquelicot-500">
+          <p id={`${textId}-error`} className="mt-1 text-base text-error">
             {errors.text}
           </p>
         )}
@@ -488,7 +566,7 @@ export default function ReviewFormProtected({
           <Button
             type="submit"
             variant="secondary"
-            size="sm"
+            size="md"
             aria-busy={loading}
             disabled={loading}
           >

@@ -175,13 +175,16 @@ export function PromoCodeField({
           }}
           autoComplete="off"
           autoCapitalize="characters"
+          // Enter applies the code (above), so the phone keyboard's action key
+          // should say so rather than offering to submit the whole form.
+          enterKeyHint="done"
           spellCheck={false}
           maxLength={32}
           placeholder="Enter code"
           aria-describedby={statusId}
           className={cn(
-            "min-w-0 flex-1 rounded-xl border px-3 py-2 tracking-wider uppercase",
-            isValid ? "border-emerald-400 bg-emerald-50" : "border-slate-200 bg-white",
+            "min-h-11 min-w-0 flex-1 rounded-xl border px-3 py-2 tracking-wider uppercase",
+            isValid ? "border-emerald-400 bg-emerald-50" : "border-slate-300 bg-white",
           )}
         />
         <button
@@ -189,7 +192,7 @@ export function PromoCodeField({
           onClick={() => void apply()}
           disabled={status.kind === "checking" || !value.trim()}
           className={cn(
-            "rounded-xl px-4 py-2 font-semibold text-white",
+            "min-h-11 rounded-xl px-4 py-2 font-semibold text-white",
             status.kind === "checking" || !value.trim()
               ? "cursor-not-allowed bg-slate-300"
               : "bg-russian-violet hover:bg-russian-violet/90",
@@ -206,7 +209,7 @@ export function PromoCodeField({
         aria-live="polite"
         className={cn(
           "mt-1.5 min-h-6 font-medium",
-          status.kind === "valid" ? "text-emerald-700" : "text-coquelicot-500",
+          status.kind === "valid" ? "text-emerald-700" : "text-error",
         )}
       >
         {status.kind === "valid" &&

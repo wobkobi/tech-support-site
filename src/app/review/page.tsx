@@ -4,6 +4,8 @@
 import ReviewFormProtected from "@/features/reviews/components/ReviewForm";
 import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { PhoneLink } from "@/shared/components/PhoneLink";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
@@ -30,7 +32,7 @@ export default async function ReviewPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<React.ReactElement> {
-  const params = await searchParams;
+  const [params, identity] = await Promise.all([searchParams, getIdentity()]);
   const tokenValue = params.token;
   const token = Array.isArray(tokenValue) ? tokenValue[0] : tokenValue;
 
@@ -128,9 +130,11 @@ export default async function ReviewPage({
               </h1>
               <p className="mb-4 text-base text-rich-black/80">
                 This review link is invalid or has expired. If you recently had an appointment,
-                please check your email for the correct link.
+                please check your email for the correct link, or call or text me on{" "}
+                <PhoneLink phone={identity.phone} phoneTel={identity.phoneTel} /> and I'll send you
+                a fresh one.
               </p>
-              <Button href="/" variant="secondary" size="sm">
+              <Button href="/" variant="secondary" size="md">
                 Back to home
               </Button>
             </section>
@@ -159,6 +163,8 @@ export default async function ReviewPage({
                   prefillEmail={prefillEmail ?? undefined}
                   prefillPhone={prefillPhone ?? undefined}
                   existingReview={existingReview ?? undefined}
+                  phone={identity.phone}
+                  phoneTel={identity.phoneTel}
                 />
               </section>
             </>
@@ -176,13 +182,17 @@ export default async function ReviewPage({
               </p>
               <p className="mb-4 text-base text-rich-black/80">
                 This helps ensure all reviews are from verified customers. If you can't find your
-                review link, feel free to{" "}
-                <Link href="/contact" className="text-coquelicot-500 hover:underline">
-                  get in touch
+                review link, call or text me on{" "}
+                <PhoneLink phone={identity.phone} phoneTel={identity.phoneTel} />, or{" "}
+                <Link
+                  href="/contact"
+                  className="font-semibold text-russian-violet underline underline-offset-2 hover:opacity-80"
+                >
+                  send me a message
                 </Link>
-                .
+                , and I'll send you a fresh one.
               </p>
-              <Button href="/" variant="secondary" size="sm">
+              <Button href="/" variant="secondary" size="md">
                 Back to home
               </Button>
             </section>
