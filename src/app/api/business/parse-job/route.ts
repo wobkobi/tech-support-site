@@ -158,7 +158,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  // The SDK defaults (10-minute timeout, 2 retries with retry-after sleeps) can
+  // outlive the 60s function ceiling, and swallow a 429 that the catch below
+  // hands back as retryable. One attempt, well inside the budget, leaves room
+  // for the travel lookups that follow.
+  const client = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    timeout: 25_000,
+    maxRetries: 0,
+  });
 
   try {
     // Load rates, templates and settings
