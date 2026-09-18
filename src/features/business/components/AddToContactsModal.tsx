@@ -3,7 +3,8 @@
 // Post-action prompt asking the operator whether to save the current client to the DB
 // Contact table (and Google Contacts via the fire-and-forget sync). Triggered after an
 // invoice save succeeds or when the calculator hands off to the invoice builder, but only
-// when the email doesn't already exist in the DB.
+// when the email doesn't already exist in the DB. When the client is a known contact
+// missing that email, it offers to add the email to them instead.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Modal } from "@/features/admin/components/ui/Modal";
@@ -24,6 +25,11 @@ export interface AddToContactsModalProps {
   /** Optional Google People API resource name (e.g. "people/c1234"). */
   googleContactId?: string | null;
   /**
+   * Name of the contact already linked to `googleContactId` that lacks this email.
+   * When set, the popup offers to add the email to that contact instead.
+   */
+  existingContactName?: string | null;
+  /**
    * Called whenever the modal closes - Yes, No, backdrop, Escape.
    * When the operator confirmed and the POST returned a Contact id, that id
    * is passed back so the caller can backfill an FK (e.g. patch the just-
@@ -33,13 +39,16 @@ export interface AddToContactsModalProps {
 }
 
 /**
- * Confirmation popup: "{name} isn't in your contacts yet - add them?".
- * On Yes, POSTs to /api/admin/contacts and closes once the request settles.
+ * Confirmation popup: "{name} isn't in your contacts yet - add them?", or, when
+ * the client is already a contact without this email, "add the email to them?".
+ * On Yes, POSTs to /api/admin/contacts (which attaches the email to the linked
+ * contact in the second case) and closes once the request settles.
  * @param props - Component props.
  * @param props.name - Client name to seed the new Contact row with.
  * @param props.email - Client email; the dedup key on the server.
  * @param props.phone - Optional phone number (E.164 or local format).
  * @param props.googleContactId - Optional Google People API resource name.
+ * @param props.existingContactName - Existing contact that lacks this email, if any.
  * @param props.onClose - Called whenever the modal closes.
  * @returns Modal element.
  */
@@ -48,6 +57,7 @@ export function AddToContactsModal({
   email,
   phone,
   googleContactId,
+  existingContactName,
   onClose,
 }: AddToContactsModalProps): React.ReactElement {
   const [saving, setSaving] = useState(false);
@@ -77,7 +87,9 @@ export function AddToContactsModal({
         ok?: boolean;
         contact?: { id?: string };
       };
-      toast("Contact saved.", { tone: "success" });
+      toast(existingContactName ? "Email added to contact." : "Contact saved.", {
+        tone: "success",
+      });
       onClose(data.contact?.id ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save contact");
@@ -89,7 +101,7 @@ export function AddToContactsModal({
     <Modal
       open
       onClose={() => onClose(null)}
-      title="Add to contacts?"
+      title={existingContactName ? "Add email to contact?" : "Add to contacts?"}
       size="sm"
       footer={
         <>
@@ -97,18 +109,27 @@ export function AddToContactsModal({
             Not now
           </AdminButton>
           <AdminButton variant="primary" onClick={() => void handleConfirm()} busy={saving}>
-            Yes, add
+            {existingContactName ? "Yes, add email" : "Yes, add"}
           </AdminButton>
         </>
       }
     >
       <div className="space-y-3 text-sm text-admin-text">
-        <p>
-          <span className="font-semibold">{name}</span>
-          {
-            " isn't in your contacts yet. Add them so you can send review links and pre-fill future invoices?"
-          }
-        </p>
+        {existingContactName ? (
+          <p>
+            <span className="font-semibold">{existingContactName}</span>
+            {
+              " is in your contacts but doesn't have this email. Add it so you can send review links and pre-fill future invoices?"
+            }
+          </p>
+        ) : (
+          <p>
+            <span className="font-semibold">{name}</span>
+            {
+              " isn't in your contacts yet. Add them so you can send review links and pre-fill future invoices?"
+            }
+          </p>
+        )}
         <p className="text-xs text-admin-muted">{email}</p>
         {error && <p className="text-xs text-coquelicot-500">{error}</p>}
       </div>

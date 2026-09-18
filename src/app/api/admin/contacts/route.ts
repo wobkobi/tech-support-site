@@ -41,10 +41,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 /**
  * POST /api/admin/contacts
- * Find-or-creates a Contact by email. On create, fires a best-effort sync to
- * Google Contacts.
+ * Find-or-creates a Contact by email. A contact already linked to
+ * `googleContactId` gets the email attached rather than a duplicate row. On
+ * create or attach, fires a best-effort sync to Google Contacts.
  * @param request - Incoming request with { name, email, phone?, address?, googleContactId? }.
- * @returns JSON { ok, created, contact }.
+ * @returns JSON { ok, created, emailAttached, contact }.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     resolution?.status === "ambiguous" || resolution?.status === "unresolved";
   const addressCandidates = resolution?.status === "ambiguous" ? resolution.candidates : [];
 
-  const { contact, created } = await findOrCreateContactByEmail(email, {
+  const { contact, created, emailAttached } = await findOrCreateContactByEmail(email, {
     name: body.name.trim(),
     phone: phoneE164,
     address,
@@ -89,11 +90,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     googleContactId: body.googleContactId?.trim() || null,
   });
 
-  if (!created) {
+  if (!created && !emailAttached) {
     return NextResponse.json({ ok: true, created: false, contact });
   }
 
-  // Push to Google Contacts so it appears on the operator's phone.
+  // Push to Google Contacts so it appears on the operator's phone - a new row, or
+  // an existing one that just gained an email.
   // Awaited, not detached: Vercel freezes the instance once the response
   // is sent. Still best-effort - a Google hiccup must not fail the create.
   try {
@@ -102,5 +104,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     console.error("[admin/contacts] syncContactToGoogle failed:", err);
   }
 
-  return NextResponse.json({ ok: true, created: true, contact }, { status: 201 });
+  return NextResponse.json(
+    { ok: true, created, emailAttached: Boolean(emailAttached), contact },
+    { status: created ? 201 : 200 },
+  );
 }
