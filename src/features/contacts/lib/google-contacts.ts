@@ -245,9 +245,12 @@ export async function importFromGoogleContacts(): Promise<number> {
             // domestic form, which is what made the row unmatchable on import.
             if (phone && phone !== existing.phone) updates.phone = phone;
             // Add, never replace: contact merges also write altEmails, and
-            // setting the list here would discard what a merge folded in.
+            // setting the list here would discard what a merge folded in. An
+            // email adopted as the primary just above is already known, or it
+            // would land in both places.
             const knownEmails = new Set([
               ...(existing.email ? [existing.email.toLowerCase()] : []),
+              ...(typeof updates.email === "string" ? [updates.email] : []),
               ...existing.altEmails.map((e) => e.toLowerCase()),
             ]);
             const newAlts = emailList.filter((e) => !knownEmails.has(e));
@@ -269,6 +272,7 @@ export async function importFromGoogleContacts(): Promise<number> {
             if (typeof updates.email === "string") existing.email = updates.email;
             if (typeof updates.phone === "string") existing.phone = updates.phone;
             if (typeof updates.address === "string") existing.address = updates.address;
+            if (newAlts.length > 0) existing.altEmails = [...existing.altEmails, ...newAlts];
             byGoogleId.set(resourceName, existing);
           } else {
             // Nothing to match this person on - skip rather than store a row no
