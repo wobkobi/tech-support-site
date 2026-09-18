@@ -32,14 +32,23 @@ self.addEventListener("notificationclick", (event) => {
 
   // Focus an admin tab that is already open rather than opening a second one.
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+    (async () => {
+      const clientList = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       for (const client of clientList) {
         if (client.url.includes("/admin") && "focus" in client) {
-          client.navigate(target);
-          return client.focus();
+          try {
+            await client.focus();
+            await client.navigate(target);
+            return;
+          } catch {
+            // navigate() rejects for a tab this worker does not control, and
+            // includeUncontrolled lists those too. Open the page instead of
+            // leaving the tab focused on whatever it was showing.
+            break;
+          }
         }
       }
-      return self.clients.openWindow(target);
-    }),
+      await self.clients.openWindow(target);
+    })(),
   );
 });

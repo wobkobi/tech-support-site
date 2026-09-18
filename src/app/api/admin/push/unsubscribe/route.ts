@@ -17,8 +17,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
 
-  const { endpoint } = (await request.json()) as { endpoint?: string };
-  if (!endpoint) return errorResponse("endpoint is required", 400);
+  // A malformed body is the caller's mistake: 400, not a 500 from the throw.
+  const body = (await request.json().catch(() => null)) as { endpoint?: unknown } | null;
+  const endpoint = body?.endpoint;
+  if (typeof endpoint !== "string" || !endpoint) {
+    return errorResponse("endpoint is required", 400);
+  }
 
   // deleteMany rather than delete: removing a device that is already gone is
   // the expected outcome of a double click, not an error worth surfacing.
