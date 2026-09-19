@@ -8,8 +8,10 @@
 
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
+import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { cn } from "@/shared/lib/cn";
@@ -45,6 +47,23 @@ type StatusFilter = "all" | "held" | "confirmed" | "cancelled" | "completed";
 type SortKey = "name" | "start" | "status";
 type SortDir = "asc" | "desc";
 
+/** Rows per "Show more" batch. */
+const BATCH = 25;
+
+/** Shared classes for the search and date inputs. */
+const INPUT_CLS =
+  "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none";
+
+/**
+ * Natural date order for a status bucket: work still ahead (confirmed, held)
+ * reads soonest first, history reads newest first.
+ * @param filter - The status bucket.
+ * @returns Sort direction for the start date.
+ */
+function startDirFor(filter: StatusFilter): SortDir {
+  return filter === "confirmed" || filter === "held" ? "asc" : "desc";
+}
+
 /** StatusPill tone for each booking status. */
 const STATUS_TONE: Record<AdminBookingRow["status"], StatusTone> = {
   confirmed: "info",
@@ -75,12 +94,16 @@ export function BookingAdminList({
 }): React.ReactElement {
   const actions = useBookingActions();
   const [bookings, setBookings] = useState<AdminBookingRow[]>(initial);
-  const [filter, setFilter] = useState<StatusFilter>("confirmed");
+  // Opens on confirmed work, or on everything when nothing is confirmed, so the
+  // page never lands on an empty list.
+  const [filter, setFilter] = useState<StatusFilter>(() =>
+    initial.some((b) => b.status === "confirmed") ? "confirmed" : "all",
+  );
   const [query, setQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("start");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortDir, setSortDir] = useState<SortDir>(() => startDirFor(filter));
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
   // Ticked by default: sending the review request is the normal way to finish a job.
@@ -158,6 +181,99 @@ export function BookingAdminList({
   }
 
   /**
+   * Switches the status bucket. A date sort follows the bucket's natural order;
+   * a name or status sort the operator picked is left alone.
+   * @param f - Status bucket to show.
+   */
+  function selectFilter(f: StatusFilter): void {
+    setFilter(f);
+    if (sortKey === "start") setSortDir(startDirFor(f));
+  }
+
+  /** Clears the search and date range. */
+  function clearSearch(): void {
+    setDateFrom("");
+    setDateTo("");
+    setQuery("");
+  }
+
+  const pager = useShowMore(
+    filtered,
+    BATCH,
+    [filter, query, dateFrom, dateTo, sortKey, sortDir].join("|"),
+  );
+  const searchActive = dateFrom !== "" || dateTo !== "" || query !== "";
+
+  /**
+   * The quick actions for one row, shared by the phone cards and the table.
+   * @param b - The booking row.
+   * @returns The action buttons.
+   */
+  function renderActions(b: AdminBookingRow): React.ReactElement {
+    const isBusy = busyId === b.id;
+    const reviewable = b.status === "confirmed" || b.status === "completed";
+    return (
+      <>
+        {b.status === "confirmed" && (
+          <button
+            onClick={() => {
+              setSendReview(true);
+              setPending({
+                id: b.id,
+                kind: "complete",
+                alreadySent: b.reviewSentAt != null,
+              });
+            }}
+            disabled={isBusy}
+            className="rounded-lg bg-green-500/20 px-2.5 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-500/30 disabled:opacity-50 max-md:min-h-9"
+          >
+            Complete
+          </button>
+        )}
+        {reviewable && (
+          <button
+            onClick={() =>
+              setPending({
+                id: b.id,
+                kind: "review",
+                alreadySent: b.reviewSentAt != null,
+              })
+            }
+            disabled={isBusy}
+            className="rounded-lg bg-moonstone-400/15 px-2.5 py-1.5 text-xs font-medium text-moonstone-300 transition-colors hover:bg-moonstone-400/25 disabled:opacity-50 max-md:min-h-9"
+          >
+            {b.reviewSentAt ? "Resend review" : "Send review"}
+          </button>
+        )}
+        <Link
+          href={`/admin/bookings/${b.id}`}
+          className="inline-flex items-center rounded-lg bg-russian-violet/10 px-2.5 py-1.5 text-xs font-medium text-russian-violet transition-colors select-none hover:bg-russian-violet/20 max-md:min-h-9"
+        >
+          View
+        </Link>
+      </>
+    );
+  }
+
+  /**
+   * Flags a live booking whose calendar event is gone: reminder and review
+   * emails are paused for it.
+   * @param b - The booking row.
+   * @returns The flag, or null when the event is there or the booking is cancelled.
+   */
+  function renderMissingEvent(b: AdminBookingRow): React.ReactElement | null {
+    if (!b.calendarEventMissingAt || b.status === "cancelled") return null;
+    return (
+      <span
+        className="mt-1 block text-xs font-medium text-coquelicot-700"
+        title="The Google Calendar event was deleted. Reminder and review emails are paused until this booking is cancelled or re-booked."
+      >
+        no calendar event
+      </span>
+    );
+  }
+
+  /**
    * Runs the pending quick action (mark completed / send review), applies the
    * optimistic local update on success, and closes the dialog.
    */
@@ -215,9 +331,10 @@ export function BookingAdminList({
             return (
               <button
                 key={f}
-                onClick={() => setFilter(f)}
+                onClick={() => selectFilter(f)}
+                aria-pressed={isActive}
                 className={cn(
-                  "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                  "rounded-md px-3 py-1.5 text-xs font-medium transition-colors max-sm:min-h-9",
                   isActive
                     ? "bg-white text-russian-violet shadow-sm"
                     : "text-slate-500 hover:text-slate-700",
@@ -238,30 +355,30 @@ export function BookingAdminList({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search name, email, phone"
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none sm:w-56"
+            className={cn(INPUT_CLS, "w-full sm:w-56")}
           />
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            aria-label="From date"
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
-          />
-          <span className="text-xs text-slate-400">to</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            aria-label="To date"
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
-          />
-          {(dateFrom || dateTo || query) && (
+          {/* One unit, so "to" can't wrap away from the dates it joins. On a
+              phone the pair shares the row; from sm up each keeps its width. */}
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              aria-label="From date"
+              className={cn(INPUT_CLS, "min-w-0 flex-1 sm:flex-none")}
+            />
+            <span className="text-xs text-slate-400">to</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              aria-label="To date"
+              className={cn(INPUT_CLS, "min-w-0 flex-1 sm:flex-none")}
+            />
+          </div>
+          {searchActive && (
             <button
-              onClick={() => {
-                setDateFrom("");
-                setDateTo("");
-                setQuery("");
-              }}
+              onClick={clearSearch}
               className="text-xs font-medium text-slate-500 underline hover:text-slate-700"
             >
               Clear
@@ -271,120 +388,125 @@ export function BookingAdminList({
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-sm text-slate-400">No bookings found.</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-400">
+          <p>No bookings found.</p>
+          {searchActive ? (
+            <button
+              onClick={clearSearch}
+              className="font-medium text-russian-violet underline underline-offset-2"
+            >
+              Clear the search
+            </button>
+          ) : (
+            filter !== "all" && (
+              <button
+                onClick={() => selectFilter("all")}
+                className="font-medium text-russian-violet underline underline-offset-2"
+              >
+                Show all bookings
+              </button>
+            )
+          )}
+        </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-160 text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-                <SortHeader
-                  label="Customer"
-                  active={sortKey === "name"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("name")}
-                />
-                <SortHeader
-                  label="When"
-                  active={sortKey === "start"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("start")}
-                />
-                <SortHeader
-                  label="Status"
-                  active={sortKey === "status"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("status")}
-                />
-                <th className="px-3 py-2 font-semibold">Quoted</th>
-                <th className="px-3 py-2 text-right font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((b) => {
-                const isBusy = busyId === b.id;
-                const reviewable = b.status === "confirmed" || b.status === "completed";
-                return (
-                  <tr key={b.id} className="border-b border-slate-100 last:border-0">
-                    <td className="px-3 py-3 align-top">
-                      <Link
-                        href={`/admin/bookings/${b.id}`}
-                        className="font-semibold text-russian-violet hover:underline"
-                      >
-                        {b.name}
-                      </Link>
-                      <div className="text-xs break-all text-slate-500">{b.email}</div>
-                      {b.phone && <div className="text-xs text-slate-500">{b.phone}</div>}
-                    </td>
-                    <td className="px-3 py-3 align-top whitespace-nowrap text-slate-600">
-                      {formatDateTimeShort(b.startAt)}
-                    </td>
-                    <td className="px-3 py-3 align-top">
-                      <StatusPill tone={STATUS_TONE[b.status]}>{b.status}</StatusPill>
-                      {/* Reminder and review emails are paused for this row - the
-                          calendar event behind it is gone. */}
-                      {b.calendarEventMissingAt && b.status !== "cancelled" && (
-                        <span
-                          className="mt-1 block text-xs font-medium text-coquelicot-700"
-                          title="The Google Calendar event was deleted. Reminder and review emails are paused until this booking is cancelled or re-booked."
-                        >
-                          no calendar event
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 align-top whitespace-nowrap text-slate-600">
-                      {b.quotedLow != null && b.quotedHigh != null ? (
-                        formatQuotedRange(b.quotedLow, b.quotedHigh, b.quotedTravel)
-                      ) : (
-                        <span className="text-slate-300">-</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-right align-top">
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {b.status === "confirmed" && (
-                          <button
-                            onClick={() => {
-                              setSendReview(true);
-                              setPending({
-                                id: b.id,
-                                kind: "complete",
-                                alreadySent: b.reviewSentAt != null,
-                              });
-                            }}
-                            disabled={isBusy}
-                            className="rounded-lg bg-green-500/20 px-2.5 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-500/30 disabled:opacity-50"
-                          >
-                            Complete
-                          </button>
-                        )}
-                        {reviewable && (
-                          <button
-                            onClick={() =>
-                              setPending({
-                                id: b.id,
-                                kind: "review",
-                                alreadySent: b.reviewSentAt != null,
-                              })
-                            }
-                            disabled={isBusy}
-                            className="rounded-lg bg-moonstone-400/15 px-2.5 py-1.5 text-xs font-medium text-moonstone-300 transition-colors hover:bg-moonstone-400/25 disabled:opacity-50"
-                          >
-                            {b.reviewSentAt ? "Resend review" : "Send review"}
-                          </button>
-                        )}
+        <>
+          {/* Phone cards: the five-column table needs about 640px. */}
+          <ul className="flex flex-col gap-2 md:hidden">
+            {pager.visible.map((b) => (
+              <li key={b.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <Link
+                    href={`/admin/bookings/${b.id}`}
+                    className="min-w-0 font-semibold wrap-break-word text-russian-violet hover:underline"
+                  >
+                    {b.name}
+                  </Link>
+                  <StatusPill tone={STATUS_TONE[b.status]}>{b.status}</StatusPill>
+                </div>
+                <p className="mt-1 text-sm text-slate-600">{formatDateTimeShort(b.startAt)}</p>
+                {b.phone && (
+                  <a
+                    href={`tel:${b.phone}`}
+                    className="text-sm text-slate-500 hover:text-slate-700"
+                  >
+                    {b.phone}
+                  </a>
+                )}
+                {b.quotedLow != null && b.quotedHigh != null && (
+                  <p className="text-xs text-slate-500">
+                    Quoted {formatQuotedRange(b.quotedLow, b.quotedHigh, b.quotedTravel)}
+                  </p>
+                )}
+                {renderMissingEvent(b)}
+                <div className="mt-2 flex flex-wrap gap-2">{renderActions(b)}</div>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full min-w-160 text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                  <SortHeader
+                    label="Customer"
+                    active={sortKey === "name"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("name")}
+                  />
+                  <SortHeader
+                    label="When"
+                    active={sortKey === "start"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("start")}
+                  />
+                  <SortHeader
+                    label="Status"
+                    active={sortKey === "status"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("status")}
+                  />
+                  <th className="px-3 py-2 font-semibold">Quoted</th>
+                  <th className="px-3 py-2 text-right font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pager.visible.map((b) => {
+                  return (
+                    <tr key={b.id} className="border-b border-slate-100 last:border-0">
+                      <td className="px-3 py-3 align-top">
                         <Link
                           href={`/admin/bookings/${b.id}`}
-                          className="rounded-lg bg-russian-violet/10 px-2.5 py-1.5 text-xs font-medium text-russian-violet transition-colors select-none hover:bg-russian-violet/20"
+                          className="font-semibold text-russian-violet hover:underline"
                         >
-                          View
+                          {b.name}
                         </Link>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                        <div className="text-xs break-all text-slate-500">{b.email}</div>
+                        {b.phone && <div className="text-xs text-slate-500">{b.phone}</div>}
+                      </td>
+                      <td className="px-3 py-3 align-top whitespace-nowrap text-slate-600">
+                        {formatDateTimeShort(b.startAt)}
+                      </td>
+                      <td className="px-3 py-3 align-top">
+                        <StatusPill tone={STATUS_TONE[b.status]}>{b.status}</StatusPill>
+                        {renderMissingEvent(b)}
+                      </td>
+                      <td className="px-3 py-3 align-top whitespace-nowrap text-slate-600">
+                        {b.quotedLow != null && b.quotedHigh != null ? (
+                          formatQuotedRange(b.quotedLow, b.quotedHigh, b.quotedTravel)
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right align-top">
+                        <div className="flex flex-wrap justify-end gap-2">{renderActions(b)}</div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <ShowMoreButton pager={pager} noun={["booking", "bookings"]} />
+        </>
       )}
 
       <ConfirmDialog

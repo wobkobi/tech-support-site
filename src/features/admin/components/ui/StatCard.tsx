@@ -77,7 +77,7 @@ export function StatCard({
   className,
 }: StatCardProps): React.ReactElement {
   const base = cn(
-    "rounded-xl border bg-admin-surface px-4 py-4 text-left shadow-sm",
+    "rounded-xl border bg-admin-surface p-3 text-left shadow-sm sm:p-4",
     active ? "border-russian-violet ring-1 ring-russian-violet" : "border-admin-border",
     className,
   );

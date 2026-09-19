@@ -151,18 +151,17 @@ export function DayAgendaView({
   const [yy, mm, dd] = dateKeyParts(selectedDayKey);
   const offset = getPacificAucklandOffset(yy, mm, dd);
 
-  const { dayLabel, yearLabel, prevDayKey, nextDayKey } = useMemo(() => {
+  const { dayLabel, prevDayKey, nextDayKey } = useMemo(() => {
     const noonUtc = nzWallClockUtc(yy, mm, dd, 12);
+    // Short month: "Wednesday 17 September" truncates on a 360px phone.
     const dayFmt = new Intl.DateTimeFormat("en-NZ", {
       timeZone: NZ_TZ,
       weekday: "long",
       day: "numeric",
-      month: "long",
+      month: "short",
     });
-    const yearFmt = new Intl.DateTimeFormat("en-NZ", { timeZone: NZ_TZ, year: "numeric" });
     return {
       dayLabel: dayFmt.format(noonUtc),
-      yearLabel: yearFmt.format(noonUtc),
       prevDayKey: addDaysToDateKey(selectedDayKey, -1),
       nextDayKey: addDaysToDateKey(selectedDayKey, 1),
     };
@@ -461,13 +460,6 @@ export function DayAgendaView({
         isPending && "opacity-60",
       )}
     >
-      <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold text-russian-violet">Schedule</h1>
-          <p className="mt-1 text-sm text-admin-muted">{yearLabel}</p>
-        </div>
-      </div>
-
       {/* Sticky header band - mini week strip + day-picker bar pinned to the
           top of the viewport while the events list scrolls under them. The
           band sits at `top-14` to clear the mobile hamburger button (the admin

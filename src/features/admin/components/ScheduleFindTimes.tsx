@@ -160,7 +160,7 @@ export function ScheduleFindTimes(): React.ReactElement {
           ))}
         </div>
 
-        <div ref={addressWrapRef} className="relative">
+        <div ref={addressWrapRef} className="relative w-full sm:w-auto">
           <input
             type="text"
             value={address}
@@ -173,10 +173,10 @@ export function ScheduleFindTimes(): React.ReactElement {
               setContactsOpen(true);
             }}
             placeholder="Customer address (optional)"
-            className="h-9 w-56 rounded-lg border border-slate-200 px-3 text-sm placeholder:text-slate-400"
+            className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm placeholder:text-slate-400 sm:w-56"
           />
           {contactMatches.length > 0 && (
-            <ul className="absolute z-20 mt-1 max-h-56 w-72 overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+            <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg sm:w-72">
               {contactMatches.map((c) => (
                 <li key={c.id}>
                   <button
@@ -196,7 +196,9 @@ export function ScheduleFindTimes(): React.ReactElement {
           )}
         </div>
 
-        <div className="flex flex-1 flex-wrap items-center gap-1.5">
+        {/* Full row on a phone, so the times start at the left edge instead of
+            wrapping into whatever space the address input leaves. */}
+        <div className="flex basis-full flex-wrap items-center gap-1.5 sm:flex-1 sm:basis-auto">
           {loading && <span className="text-sm text-slate-400">Finding...</span>}
           {!loading && error && <span className="text-sm text-red-600">{error}</span>}
           {!loading && !error && slots?.length === 0 && (

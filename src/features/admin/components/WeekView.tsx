@@ -292,19 +292,16 @@ export function WeekView({
 
   return (
     <div className={cn("transition-opacity", isPending && "opacity-60")}>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold text-russian-violet">Schedule</h1>
-          <p className="mt-1 text-sm text-admin-muted">
-            {days[0]?.subLabel} - {days[6]?.subLabel} (
-            {days[0]?.date
-              ? new Intl.DateTimeFormat("en-NZ", { timeZone: NZ_TZ, year: "numeric" }).format(
-                  days[0].date,
-                )
-              : ""}
-            )
-          </p>
-        </div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-base font-semibold text-admin-text">
+          {days[0]?.subLabel} - {days[6]?.subLabel} (
+          {days[0]?.date
+            ? new Intl.DateTimeFormat("en-NZ", { timeZone: NZ_TZ, year: "numeric" }).format(
+                days[0].date,
+              )
+            : ""}
+          )
+        </p>
         <div className="flex items-center gap-2">
           <button
             type="button"

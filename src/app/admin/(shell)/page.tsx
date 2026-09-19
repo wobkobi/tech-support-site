@@ -562,7 +562,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
                           : "I"}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-admin-text">{e.title}</p>
+                    <p className="text-sm font-medium wrap-break-word text-admin-text">{e.title}</p>
                     <p className="truncate text-xs text-admin-faint">{e.detail}</p>
                   </div>
                   <p className="shrink-0 text-xs text-admin-faint">

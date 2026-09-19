@@ -27,6 +27,7 @@ import {
   effectiveHourlyRate,
   enforceMinBillable,
   explicitRoundingAllowanceMins,
+  formatNZD,
   hourlyTaskMinutes,
   isChannelModifier,
   jobToLineItems,
@@ -429,6 +430,19 @@ export function CalculatorView({
   // in-person booking has a drive, so the travel window never applies remotely.
   const [cancelMeetingType, setCancelMeetingType] = useState<CancelMeetingType>("in-person");
   const cancelSectionRef = useRef<HTMLDivElement>(null);
+  // Client, save buttons and preview. The phone total bar stands down while
+  // any of it is on screen, since the real buttons and total are showing.
+  const finishRef = useRef<HTMLDivElement>(null);
+  const [finishInView, setFinishInView] = useState(false);
+  useEffect(() => {
+    const el = finishRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) =>
+      setFinishInView(entry?.isIntersecting ?? false),
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   // Travel entries parked while the policy says no round trip, so flipping the
   // decision back restores the figure instead of forcing a fresh lookup.
   const [stashedTravel, setStashedTravel] = useState<TravelEntry[]>([]);
@@ -2218,7 +2232,7 @@ export function CalculatorView({
 
           {/* AI input */}
           {!cancelMode && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <h2 className="mb-3 text-sm font-semibold text-russian-violet">Describe the job</h2>
               <textarea
                 value={aiInput}
@@ -2391,7 +2405,7 @@ export function CalculatorView({
           )}
 
           {/* Notes */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <label className="mb-1 block text-xs font-medium text-slate-600">Notes</label>
             <textarea
               value={notes}
@@ -2416,7 +2430,7 @@ export function CalculatorView({
 
         {/* RIGHT column - live invoice preview (replaces the legacy Summary
             panel - same totals, just inside the actual invoice layout). */}
-        <div className="min-w-0 space-y-4">
+        <div ref={finishRef} className="min-w-0 scroll-mt-16 space-y-4">
           {/* Client - moved above the preview so it stays in reach without
               scrolling past the full A4-sized invoice render. */}
           <ClientPickerSection
@@ -2521,6 +2535,28 @@ export function CalculatorView({
             }
           />
         </div>
+      </div>
+
+      {/* Phone total bar. Below lg the preview, and the total in it, sits under
+          every section, so the running figure stays pinned here while the job
+          is built, with a jump down to the client and save buttons. */}
+      <div
+        className={cn(
+          "sticky bottom-0 z-10 -mx-4 mt-4 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:-mx-6 sm:px-6 lg:hidden",
+          finishInView && "hidden",
+        )}
+      >
+        <p className="text-sm text-slate-600">
+          Total{" "}
+          <span className="text-lg font-bold text-russian-violet">{formatNZD(totals.total)}</span>
+        </p>
+        <button
+          type="button"
+          onClick={() => finishRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          className="rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+        >
+          Client &amp; save
+        </button>
       </div>
     </>
   );

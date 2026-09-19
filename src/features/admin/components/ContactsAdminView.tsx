@@ -4,6 +4,7 @@
 // resolution and drives the Google Contacts sync (import + push) with a confirmation step
 // and result message.
 
+import { FLUSH_ON_PHONE } from "@/features/admin/components/ui/Card";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import type { ConflictEntry } from "@/features/contacts/lib/maintenance";
 import { cn } from "@/shared/lib/cn";
@@ -269,7 +270,12 @@ export function ContactsAdminView({
         )}
 
         {/* Contact list */}
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div
+          className={cn(
+            "rounded-xl border border-slate-200 bg-white p-6 shadow-sm",
+            FLUSH_ON_PHONE,
+          )}
+        >
           <ContactAdminList contacts={contacts} />
         </div>
       </div>
@@ -277,7 +283,7 @@ export function ContactsAdminView({
 
       {/* Right column: Google sync */}
       <div className="lg:sticky lg:top-8">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-slate-700">Google Contacts sync</p>
@@ -330,7 +336,7 @@ export function ContactsAdminView({
           {syncResult && <p className="mt-3 text-xs text-slate-500">{syncResult}</p>}
         </div>
 
-        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <p className="text-sm font-semibold text-slate-700">Address check</p>
           <p className="mt-0.5 text-xs text-slate-400">
             Re-checks every stored address and flags the ones that don&apos;t match a single

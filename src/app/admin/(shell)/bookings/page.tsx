@@ -5,6 +5,7 @@
 // kept to just the columns the list shows; the detail page loads the full booking row
 // itself.
 
+import { Card } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import {
   BookingAdminList,
@@ -76,9 +77,9 @@ export default async function AdminBookingsPage(): Promise<React.ReactElement> {
   return (
     <>
       <PageHeader title="Bookings" description="Search, filter, and manage customer bookings." />
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <Card flushOnPhone className="sm:p-6">
         <BookingAdminList bookings={bookingRows} />
-      </div>
+      </Card>
     </>
   );
 }

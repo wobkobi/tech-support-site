@@ -9,22 +9,29 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { ADMIN_CONTROL_CLS, ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import { formatNZD, todayISO } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import { fyKeyOf, listFinancialYears } from "@/features/business/lib/financial-year";
 import type { IncomeEntry } from "@/features/business/types/business";
 import { Field } from "@/shared/components/Field";
+import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import Link from "next/link";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FaPlus } from "react-icons/fa6";
 
 /** Sortable column keys. */
 type SortKey = "date" | "customer" | "amount";
 /** Sort direction. */
 type SortDir = "asc" | "desc";
+
+/** Rows per "Show more" batch. */
+const BATCH = 25;
 
 /**
  * Client component for recording, filtering, and displaying income entries.
@@ -49,6 +56,9 @@ export function IncomeView(): React.ReactElement {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  // Phones only: the form starts folded so the list isn't pushed a screen down.
+  // lg+ always shows it.
+  const [formOpen, setFormOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   // Filters + sort.
@@ -109,6 +119,7 @@ export function IncomeView(): React.ReactElement {
         }
         setForm(emptyForm);
         setEditingId(null);
+        setFormOpen(false);
       } else {
         setFormError(d.error ?? "Failed to save.");
       }
@@ -134,14 +145,19 @@ export function IncomeView(): React.ReactElement {
     });
     setEditingId(entry.id);
     setFormError(null);
-    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setFormOpen(true);
+    // Next frame: on a phone the form is still hidden until this render lands.
+    requestAnimationFrame(() =>
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
   }
 
-  /** Leaves edit mode and clears the form. */
+  /** Leaves edit mode, clears the form and folds it away again on phones. */
   function cancelEdit(): void {
     setForm(emptyForm);
     setEditingId(null);
     setFormError(null);
+    setFormOpen(false);
   }
 
   /**
@@ -214,6 +230,12 @@ export function IncomeView(): React.ReactElement {
     });
   }, [filtered, sortKey, sortDir]);
 
+  const pager = useShowMore(
+    sorted,
+    BATCH,
+    [search, fyKey, fromDate, toDate, methodFilter, sortKey, sortDir].join("|"),
+  );
+
   const filteredTotal = filtered.reduce((s, e) => s + e.amount, 0);
   const anyFilterActive =
     search !== "" || fyKey !== "all" || fromDate !== "" || toDate !== "" || methodFilter !== "all";
@@ -226,11 +248,21 @@ export function IncomeView(): React.ReactElement {
         <StatCard label="Entries" value={sorted.length} />
       </div>
 
+      {!formOpen && (
+        <AdminButton className="mb-6 w-full lg:hidden" onClick={() => setFormOpen(true)}>
+          <FaPlus aria-hidden />
+          Add income
+        </AdminButton>
+      )}
+
       {/* Add/edit form. */}
       <form
         ref={formRef}
         onSubmit={handleSubmit}
-        className="mb-6 rounded-xl border border-admin-border bg-admin-surface p-5 shadow-sm"
+        className={cn(
+          "mb-6 scroll-mt-16 rounded-xl border border-admin-border bg-admin-surface p-4 shadow-sm sm:p-5",
+          !formOpen && "max-lg:hidden",
+        )}
       >
         <h2 className="mb-4 text-sm font-semibold text-russian-violet">
           {editingId ? "Edit income" : "Add income"}
@@ -305,9 +337,13 @@ export function IncomeView(): React.ReactElement {
           <AdminButton type="submit" busy={saving}>
             {editingId ? "Save changes" : "Add income"}
           </AdminButton>
-          {editingId && (
+          {editingId ? (
             <AdminButton type="button" variant="ghost" onClick={cancelEdit}>
               Cancel edit
+            </AdminButton>
+          ) : (
+            <AdminButton type="button" variant="ghost" onClick={cancelEdit} className="lg:hidden">
+              Cancel
             </AdminButton>
           )}
         </div>
@@ -400,7 +436,7 @@ export function IncomeView(): React.ReactElement {
             {entries.length === 0 ? "No income entries yet." : "No entries match your filters."}
           </p>
         ) : (
-          sorted.map((e) => (
+          pager.visible.map((e) => (
             <div
               key={e.id}
               className="rounded-xl border border-admin-border bg-admin-surface p-3 shadow-sm"
@@ -503,7 +539,7 @@ export function IncomeView(): React.ReactElement {
               </tr>
             </thead>
             <tbody className="divide-y divide-admin-border">
-              {sorted.map((e) => (
+              {pager.visible.map((e) => (
                 <tr key={e.id} className="hover:bg-admin-bg">
                   <td className="px-4 py-3 text-xs whitespace-nowrap text-admin-muted">
                     {formatDateShort(e.date)}
@@ -546,6 +582,8 @@ export function IncomeView(): React.ReactElement {
           </table>
         )}
       </div>
+
+      {!loading && <ShowMoreButton pager={pager} noun={["entry", "entries"]} className="mt-3" />}
 
       <ConfirmDialog
         open={confirmDeleteId !== null}

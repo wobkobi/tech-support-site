@@ -5,7 +5,9 @@
 // sections: unsynced (needs attention) and synced (already linked to Google Contacts,
 // shown in a collapsible drawer).
 
+import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { validateEmail } from "@/features/booking/lib/booking";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
@@ -290,8 +292,10 @@ function ContactCard({
         >
           {c.name}
         </Link>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">{formatDateShort(c.createdAt)}</span>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-xs whitespace-nowrap text-slate-400">
+            {formatDateShort(c.createdAt)}
+          </span>
           {!c.googleContactId &&
             (isSyncing ? (
               <span className="text-xs text-slate-400">Syncing…</span>
@@ -474,6 +478,9 @@ function ContactCard({
 
 const PAGE_LOAD_TIME = Date.now();
 
+/** Synced contacts per "Show more" batch. */
+const BATCH = 25;
+
 /**
  * Editable list of contacts captured from booking submissions.
  * Unsynced contacts (no Google Contact link) are shown prominently at the top.
@@ -588,6 +595,13 @@ export function ContactAdminList({
   const rest = filtered.filter((c) => !isNew(c));
   const unsynced = rest.filter((c) => !c.googleContactId).sort(bySort);
   const synced = rest.filter((c) => !!c.googleContactId).sort(bySort);
+  // Only the synced group is capped: it holds nearly everyone, while the new and
+  // needs-syncing groups are short and are the ones that want attention.
+  const syncedPager = useShowMore(
+    synced,
+    BATCH,
+    [q, syncFilter, reviewedOnly, retainerOnly, noEmail, noPhone, sort].join("|"),
+  );
 
   /**
    * Opens the inline edit form for a contact row.
@@ -1050,9 +1064,10 @@ export function ContactAdminList({
           </button>
           {syncedOpen && (
             <div className="flex flex-col gap-3">
-              {synced.map((c) => (
+              {syncedPager.visible.map((c) => (
                 <ContactCard key={c.id} c={c} {...buildCardProps(c)} />
               ))}
+              <ShowMoreButton pager={syncedPager} noun={["contact", "contacts"]} />
             </div>
           )}
         </div>

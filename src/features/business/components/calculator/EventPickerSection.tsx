@@ -275,7 +275,7 @@ export function EventPickerSection({
 
   if (!prefill) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-russian-violet">Bill a calendar event</h2>
           <button
@@ -304,7 +304,7 @@ export function EventPickerSection({
   const unbilledGap = gapMinutesBetween(timeRanges);
 
   return (
-    <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-5 text-sm shadow-sm">
+    <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-5">
       <div className="flex items-start justify-between gap-2">
         <p className="min-w-0 text-slate-600">
           <span className="font-semibold text-russian-violet">
