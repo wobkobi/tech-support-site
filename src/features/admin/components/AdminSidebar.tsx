@@ -55,24 +55,14 @@ interface NavItem {
   path: string;
 }
 
+// Ordered by how often each page is opened: the day's jobs first, then the
+// people behind them, then the occasional tools.
 const NAV_ITEMS: NavItem[] = [
   {
     page: "dashboard",
     label: "Dashboard",
     icon: <FaGaugeHigh className="shrink-0" />,
     path: "/admin",
-  },
-  {
-    page: "reviews",
-    label: "Reviews",
-    icon: <FaStar className="shrink-0" />,
-    path: "/admin/reviews",
-  },
-  {
-    page: "contacts",
-    label: "Contacts",
-    icon: <FaAddressBook className="shrink-0" />,
-    path: "/admin/contacts",
   },
   {
     page: "schedule",
@@ -85,6 +75,18 @@ const NAV_ITEMS: NavItem[] = [
     label: "Bookings",
     icon: <FaCalendarDays className="shrink-0" />,
     path: "/admin/bookings",
+  },
+  {
+    page: "contacts",
+    label: "Contacts",
+    icon: <FaAddressBook className="shrink-0" />,
+    path: "/admin/contacts",
+  },
+  {
+    page: "reviews",
+    label: "Reviews",
+    icon: <FaStar className="shrink-0" />,
+    path: "/admin/reviews",
   },
   {
     page: "travel",
@@ -100,12 +102,26 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+// Overview heads the group; the rest follow the billing flow: price the job,
+// invoice it, then the ledger it lands in.
 const BUSINESS_NAV_ITEMS: NavItem[] = [
   {
     page: "business",
     label: "Overview",
     icon: <FaBriefcase className="shrink-0" />,
     path: "/admin/business",
+  },
+  {
+    page: "business-calculator",
+    label: "Calculator",
+    icon: <FaCalculator className="shrink-0" />,
+    path: "/admin/business/calculator",
+  },
+  {
+    page: "business-invoices",
+    label: "Invoices",
+    icon: <FaFileInvoiceDollar className="shrink-0" />,
+    path: "/admin/business/invoices",
   },
   {
     page: "business-income",
@@ -118,18 +134,6 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
     label: "Expenses",
     icon: <FaReceipt className="shrink-0" />,
     path: "/admin/business/expenses",
-  },
-  {
-    page: "business-invoices",
-    label: "Invoices",
-    icon: <FaFileInvoiceDollar className="shrink-0" />,
-    path: "/admin/business/invoices",
-  },
-  {
-    page: "business-calculator",
-    label: "Calculator",
-    icon: <FaCalculator className="shrink-0" />,
-    path: "/admin/business/calculator",
   },
 ];
 

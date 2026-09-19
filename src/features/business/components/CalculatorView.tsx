@@ -2039,35 +2039,106 @@ export function CalculatorView({
         onCancel={() => setConfirmClearOpen(false)}
       />
 
-      {/* Job date - drives the public-holiday + promo lookup for this job. */}
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <label htmlFor="job-date" className="text-sm font-semibold text-slate-700">
-          Job date
-        </label>
-        <input
-          id="job-date"
-          type="date"
-          value={jobDate}
-          onChange={(e) => setJobDate(e.target.value || todayISO())}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
-        />
-        <span className="text-xs text-slate-500">
-          Sets which promo and public-holiday rate apply.
-        </span>
-        {holiday.name && (
-          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
-            {holiday.name} - labour +{Math.round(holiday.uplift * 100)}%
-          </span>
-        )}
-      </div>
+      {/* Job settings strip: the date, the promo code and the form tools share
+          one box, so the first screen reaches the event picker and the job
+          description. The date drives the public-holiday and promo lookup. */}
+      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <div className="flex items-center gap-2">
+            {/* Matching label widths line the two boxes up when they stack on a phone. */}
+            <label
+              htmlFor="job-date"
+              className="shrink-0 text-sm font-semibold text-slate-700 max-sm:w-22"
+            >
+              Job date
+            </label>
+            <input
+              id="job-date"
+              type="date"
+              value={jobDate}
+              onChange={(e) => setJobDate(e.target.value || todayISO())}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            />
+          </div>
 
-      {/* Promo chip with per-job skip toggle, plus code entry for a job taken
-          over the phone. The code box renders whether or not a promo resolved -
-          without one there would be nowhere to type a code when no automatic
-          promo is running, which is exactly when a code matters. */}
-      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          {/* Code entry for a job taken over the phone. It renders whether or
+              not a promo resolved - without it there would be nowhere to type a
+              code when no automatic promo is running, which is exactly when a
+              code matters. */}
+          <div className="flex items-center gap-2">
+            <label
+              htmlFor="calc-promo-code"
+              className="shrink-0 text-sm font-semibold text-slate-700 max-sm:w-22"
+            >
+              Promo code
+            </label>
+            <input
+              id="calc-promo-code"
+              value={promoCodeInput}
+              onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  setPromoCode(promoCodeInput.trim());
+                }
+              }}
+              placeholder="None"
+              maxLength={32}
+              autoComplete="off"
+              spellCheck={false}
+              className="w-32 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm tracking-wider uppercase focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setPromoCode(promoCodeInput.trim())}
+              disabled={promoCodeInput.trim() === promoCode}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+            >
+              Apply
+            </button>
+          </div>
+
+          {/* The full clear lives up here rather than under the save buttons: it
+              is the "start over" action, reached mid-form far more often than at
+              the end, and destructive styling keeps it from reading as a fifth
+              way to save. */}
+          <div className="ml-auto flex gap-2">
+            <button
+              onClick={() => setConfirmClearOpen(true)}
+              className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+            >
+              Clear form
+            </button>
+            <button
+              onClick={() => setShowRates((p) => !p)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              {showRates ? "Hide rates" : "Manage rates"}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <span>The job date sets which promo and public-holiday rate apply.</span>
+          {holiday.name && (
+            <span className="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-800">
+              {holiday.name} - labour +{Math.round(holiday.uplift * 100)}%
+            </span>
+          )}
+        </div>
+
+        {/* The verdict comes from the job-date lookup, not a live check: a
+            code can be valid today and not on the day the job was done. */}
+        {promoCode !== "" && activePromo?.code !== promoCode && (
+          <p className="text-sm font-medium text-red-700">
+            {promoCode} isn&apos;t valid on {jobDate} - pricing uses whatever promo applied that
+            day.
+          </p>
+        )}
+
+        {/* The promo that applies, with a per-job skip toggle. */}
         {activePromo && (
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
             <div className="flex items-center gap-2 text-sm text-amber-800">
               <span aria-hidden="true">⚡</span>
               <span className="font-semibold">Promo: {activePromo.title}</span>
@@ -2090,61 +2161,6 @@ export function CalculatorView({
             </label>
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-2 text-sm text-amber-800">
-          <label htmlFor="calc-promo-code" className="font-medium">
-            Promo code
-          </label>
-          <input
-            id="calc-promo-code"
-            value={promoCodeInput}
-            onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                setPromoCode(promoCodeInput.trim());
-              }
-            }}
-            placeholder="None"
-            maxLength={32}
-            autoComplete="off"
-            spellCheck={false}
-            className="w-40 rounded-lg border border-amber-300 bg-white px-2 py-1 tracking-wider uppercase"
-          />
-          <button
-            type="button"
-            onClick={() => setPromoCode(promoCodeInput.trim())}
-            disabled={promoCodeInput.trim() === promoCode}
-            className="rounded-lg border border-amber-300 bg-white px-3 py-1 font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
-          >
-            Apply
-          </button>
-          {/* The verdict comes from the job-date lookup, not a live check: a
-              code can be valid today and not on the day the job was done. */}
-          {promoCode !== "" && activePromo?.code !== promoCode && (
-            <span className="font-medium text-red-700">
-              Not valid on {jobDate} - pricing uses whatever promo applied that day.
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Form toolbar. The full clear lives here rather than under the save
-          buttons: it is the "start over" action, reached mid-form far more
-          often than at the end, and destructive styling keeps it from reading
-          as a fifth way to save. */}
-      <div className="mb-4 flex justify-end gap-2">
-        <button
-          onClick={() => setConfirmClearOpen(true)}
-          className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
-        >
-          Clear form
-        </button>
-        <button
-          onClick={() => setShowRates((p) => !p)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-        >
-          {showRates ? "Hide rates" : "Manage rates"}
-        </button>
       </div>
 
       {/* Rate settings panel */}
@@ -2345,26 +2361,11 @@ export function CalculatorView({
             />
           )}
 
-          {/* Travel. Stays available in cancel mode while the round trip is
-              being billed, so the amount can still be looked up or corrected. */}
-          {(!cancelMode || includeCancelTravel) && (
-            <TravelSection
-              jobAddress={jobAddress}
-              onJobAddressChange={setJobAddress}
-              onAddressSelected={handleAddressSelected}
-              travelEntries={travelEntries}
-              onTravelEntriesChange={setTravelEntries}
-              lookingUpTravel={lookingUpTravel}
-              onLookup={() => void handleTravelLookup()}
-              travelRatePerHour={pricing.travelRatePerHour}
-              minTravelCharge={pricing.minTravelCharge}
-            />
-          )}
-
-          {/* Tasks - inline warning when hourly task minutes drift from the
-              listed job window. AI parses auto-collapse in applyParseResult,
-              so this only fires on manual edits or window changes. Cancel mode
-              has no work lines, so the whole block goes. */}
+          {/* Tasks, straight under Time: they are most of the bill, and the
+              inline warning compares their minutes against that job window.
+              AI parses auto-collapse in applyParseResult, so the warning only
+              fires on manual edits or window changes. Cancel mode has no work
+              lines, so the whole block goes. */}
           {!cancelMode && (
             <>
               <TaskTimeWarning
@@ -2391,6 +2392,22 @@ export function CalculatorView({
                 flatRates={flatRates}
               />
             </>
+          )}
+
+          {/* Travel. Stays available in cancel mode while the round trip is
+              being billed, so the amount can still be looked up or corrected. */}
+          {(!cancelMode || includeCancelTravel) && (
+            <TravelSection
+              jobAddress={jobAddress}
+              onJobAddressChange={setJobAddress}
+              onAddressSelected={handleAddressSelected}
+              travelEntries={travelEntries}
+              onTravelEntriesChange={setTravelEntries}
+              lookingUpTravel={lookingUpTravel}
+              onLookup={() => void handleTravelLookup()}
+              travelRatePerHour={pricing.travelRatePerHour}
+              minTravelCharge={pricing.minTravelCharge}
+            />
           )}
 
           {/* Parts. Nothing was fitted on a cancelled job, so it is hidden and

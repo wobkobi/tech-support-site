@@ -1,16 +1,17 @@
 // src/app/admin/(shell)/page.tsx
 // Admin dashboard. Runs a batch of parallel Prisma queries for booking, review, contact,
-// invoice, and income stats, then renders stat cards, DashboardQuickActions, and live
-// data panels (upcoming bookings, pending reviews, recent contacts, outstanding
-// invoices).
+// invoice, and income stats, then renders what needs doing first (upcoming bookings,
+// events to complete, pending reviews, retainers due), then the stat cards, then the
+// review-link form, recent activity and system status.
 
-import { DashboardQuickActions } from "@/features/admin/components/DashboardQuickActions";
+import { CompleteEventsPanel } from "@/features/admin/components/CompleteEventsPanel";
 import { Card } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { formatNZD } from "@/features/business/lib/business";
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
+import { SendReviewLinkForm } from "@/features/reviews/components/admin/SendReviewLinkForm";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort, formatDateTimeShort } from "@/shared/lib/date-format";
@@ -40,6 +41,7 @@ export const metadata: Metadata = {
  * @param props.action.href - Link destination.
  * @param props.empty - Text shown when there are no rows.
  * @param props.children - The list element, or null to show the empty state.
+ * @param props.className - Extra classes for the card (e.g. a grid span).
  * @returns Panel element.
  */
 function Panel({
@@ -48,15 +50,17 @@ function Panel({
   action,
   empty,
   children,
+  className,
 }: {
   title: string;
   badge?: React.ReactNode;
   action?: { label: string; href: string };
   empty: string;
   children: React.ReactNode | null;
+  className?: string;
 }): React.ReactElement {
   return (
-    <Card padding="none">
+    <Card padding="none" className={className}>
       <div className="flex items-center justify-between gap-3 border-b border-admin-border px-5 py-4">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-admin-text">
           {title}
@@ -414,31 +418,9 @@ export default async function AdminPage(): Promise<React.ReactElement> {
         )}
       </div>
 
-      <DashboardQuickActions
-        pastConfirmedBookings={pastConfirmedBookings.map((b) => ({
-          id: b.id,
-          name: b.name,
-          email: b.email,
-          startAt: b.startAt.toISOString(),
-          reviewSentAt: b.reviewSentAt ? b.reviewSentAt.toISOString() : null,
-        }))}
-        contactSuggestions={contactsWithoutReviewLinks}
-      />
-
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {stats.map((s) => (
-          <StatCard
-            key={s.label}
-            label={s.label}
-            value={s.value}
-            sub={s.sub}
-            href={s.href}
-            tone={s.urgent ? "critical" : "violet"}
-          />
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {/* What needs doing comes first: the next jobs, then anything waiting on a
+          decision. Stats and history sit below. */}
+      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Upcoming bookings */}
         <Panel
           title="Upcoming bookings"
@@ -465,6 +447,16 @@ export default async function AdminPage(): Promise<React.ReactElement> {
           )}
         </Panel>
 
+        <CompleteEventsPanel
+          pastConfirmedBookings={pastConfirmedBookings.map((b) => ({
+            id: b.id,
+            name: b.name,
+            email: b.email,
+            startAt: b.startAt.toISOString(),
+            reviewSentAt: b.reviewSentAt ? b.reviewSentAt.toISOString() : null,
+          }))}
+        />
+
         {/* Pending reviews */}
         <Panel
           title="Pending reviews"
@@ -475,6 +467,8 @@ export default async function AdminPage(): Promise<React.ReactElement> {
           }
           action={{ label: "Review all", href: "/admin/reviews" }}
           empty="No reviews pending approval."
+          // Full width when there is no retainers panel to sit beside it.
+          className={retainerContacts.length === 0 ? "lg:col-span-2" : undefined}
         >
           {pendingReviews.length === 0 ? null : (
             <ul className="divide-y divide-admin-border">
@@ -533,6 +527,26 @@ export default async function AdminPage(): Promise<React.ReactElement> {
             )}
           </Panel>
         )}
+      </div>
+
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {stats.map((s) => (
+          <StatCard
+            key={s.label}
+            label={s.label}
+            value={s.value}
+            sub={s.sub}
+            href={s.href}
+            tone={s.urgent ? "critical" : "violet"}
+          />
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card>
+          <h2 className="mb-4 text-sm font-semibold text-admin-text">Send review link</h2>
+          <SendReviewLinkForm contactSuggestions={contactsWithoutReviewLinks} defaultOpen />
+        </Card>
 
         {/* Recent activity - unified timeline of bookings, reviews, contacts, invoices. */}
         <Panel title="Recent activity" empty="No activity yet.">
