@@ -9,6 +9,12 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "daily"
+    ignore:
+      # dotenv 18 ships its own `dotenv` bin, which replaces dotenv-cli's and breaks
+      # every `dotenv -e .env.local --` script. Its CLI also skips the `\$`
+      # unescaping that .env.local relies on.
+      - dependency-name: "dotenv"
+        update-types: ["version-update:semver-major"]
 
   # Keeps the `uses:` tags in .github/workflows current. Without this, pinned
   # actions silently fall behind and the runner warns about their declared
