@@ -67,11 +67,13 @@ function variantClasses(variant: AdminButtonVariant): string {
  * @returns Class string.
  */
 function sizeClasses(size: AdminButtonSize): string {
+  // A finger needs about 44px where a mouse is happy with 32-36px, so touch
+  // screens grow the button without changing the desktop density.
   switch (size) {
     case "xs":
-      return "h-8 gap-1.5 px-3 text-xs";
+      return "h-8 gap-1.5 px-3 text-xs pointer-coarse:min-h-11";
     case "sm":
-      return "h-9 gap-2 px-4 text-sm";
+      return "h-9 gap-2 px-4 text-sm pointer-coarse:min-h-11";
   }
 }
 

@@ -75,7 +75,7 @@ function InfoRow({
  */
 function Chip({ children }: { children: React.ReactNode }): React.ReactElement {
   return (
-    <span className="rounded-full bg-admin-bg px-2.5 py-0.5 text-xs font-medium text-admin-text-secondary">
+    <span className="rounded-full border border-admin-border bg-admin-surface px-2.5 py-0.5 text-xs font-medium text-admin-text-secondary">
       {children}
     </span>
   );
@@ -144,6 +144,8 @@ export default async function BookingDetailPage({
   // Without the fallback the chip is the one place it was visible, so it would
   // simply vanish for those rows.
   const meetingType = booking.meetingType ?? meetingTypeFromNotes(booking.notes);
+  // A voided invoice leaves the job unbilled, so Bill comes back.
+  const liveInvoice = invoices.find((inv) => inv.status !== "VOIDED") ?? null;
 
   // Which price-snapshot fields exist decides whether to show the card.
   const hasPriceSnapshot =
@@ -313,7 +315,10 @@ export default async function BookingDetailPage({
               startAt={booking.startAt.toISOString()}
               endAt={booking.endAt.toISOString()}
               lockHours={settings.scheduling.pastEditLockHours}
-              hasCalendarEvent={booking.calendarEventId != null}
+              calendarEventId={booking.calendarEventId}
+              phone={booking.phone || null}
+              address={meetingType === "remote" ? null : booking.address || null}
+              invoiceId={liveInvoice?.id ?? null}
               cancelToken={booking.cancelToken}
               reviewAlreadySent={booking.reviewSentAt != null}
               isTest={isTest}

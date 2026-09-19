@@ -269,6 +269,30 @@ aside.app-admin-drawer {
   transition: translate 200ms ease-out !important;
 }
 
+/* iOS Safari zooms the whole page when a field under 16px takes focus, and the
+   admin sets its fields at text-sm (14px). On a touch screen they render at 16px
+   instead; a mouse keeps the denser 14px. Outside @layer so it beats the text-sm
+   utility on each field without touching every class string. */
+@media (pointer: coarse) {
+  .app-admin :is(input, select, textarea) {
+    font-size: max(1rem, 16px);
+  }
+}
+
+/* Admin phone action bars (booking and invoice detail pin one to the screen bottom;
+   the calculator's total bar sticks there). Toasts lift above any of them. A fixed
+   bar also covers the end of the page, so the page pads past it; the sticky one
+   takes its own room in the flow. The 3.6rem is the bar less its bottom padding,
+   which grows with the home indicator. Below lg, matching the bars' lg:hidden. */
+@media (width < 64rem) {
+  .app-admin:has([data-phone-bar]) {
+    --phone-bar-h: calc(3.6rem + max(0.75rem, env(safe-area-inset-bottom)));
+  }
+  .app-admin:has([data-phone-bar="fixed"]) main {
+    padding-bottom: calc(var(--phone-bar-h) + 2rem);
+  }
+}
+
 /* Phone Call + Book bar (MobileActionBar). Off while the nav drawer is open
    (NavBar flags data-nav-open on body) so the two don't stack, and while a form
    field has focus: iOS keeps fixed elements pinned above the on-screen keyboard,

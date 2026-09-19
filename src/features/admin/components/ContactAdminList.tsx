@@ -408,7 +408,7 @@ function ContactCard({
       {c.email ? (
         <a
           href={`mailto:${c.email}`}
-          className="text-sm break-all text-moonstone-400 transition-colors hover:text-moonstone-300"
+          className="text-sm break-all text-moonstone-700 transition-colors hover:text-moonstone-800"
         >
           {c.email}
         </a>
@@ -458,7 +458,7 @@ function ContactCard({
                         href={`/review?token=${rv.customerRef}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="shrink-0 text-xs font-medium text-moonstone-400 transition-colors hover:text-moonstone-300"
+                        className="shrink-0 text-xs font-medium text-moonstone-700 transition-colors hover:text-moonstone-800"
                       >
                         Review link ↗
                       </a>
@@ -972,7 +972,7 @@ export function ContactAdminList({
           type="button"
           onClick={() => void exportContacts()}
           disabled={exporting}
-          className="shrink-0 text-xs font-medium text-moonstone-400 underline underline-offset-2 hover:text-moonstone-300 disabled:opacity-50"
+          className="shrink-0 text-xs font-medium text-moonstone-700 underline underline-offset-2 hover:text-moonstone-800 disabled:opacity-50"
         >
           {exporting ? "Exporting…" : "Export CSV"}
         </button>
@@ -1068,7 +1068,7 @@ export function ContactAdminList({
         <div className="flex flex-col gap-3">
           <h3 className="flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-700 uppercase">
             New
-            <span className="rounded-full bg-moonstone-400/15 px-2 py-0.5 text-[10px] font-semibold text-moonstone-400">
+            <span className="rounded-full bg-moonstone-400/15 px-2 py-0.5 text-[10px] font-semibold text-moonstone-700">
               {newContacts.length}
             </span>
           </h3>

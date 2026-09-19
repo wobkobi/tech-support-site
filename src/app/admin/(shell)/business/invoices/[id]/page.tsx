@@ -403,16 +403,18 @@ export default async function InvoiceViewPage({
             </div>
           </div>
 
-          {/* Bill to (left) + dates (right) - mirrors PDF layout. */}
-          <div className="mb-6 flex items-start justify-between gap-6">
-            <div>
+          {/* Bill to (left) + dates (right) - mirrors PDF layout. A phone can't fit
+              both beside a long email, so the dates drop below instead of wrapping
+              a word per line. */}
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+            <div className="min-w-0">
               <p className="mb-1 text-xs font-bold tracking-wider text-slate-400 uppercase">
                 Bill to
               </p>
               <p className="text-base font-bold text-slate-800">{invoice.clientName}</p>
-              <p className="text-sm text-slate-500">{invoice.clientEmail}</p>
+              <p className="text-sm wrap-break-word text-slate-500">{invoice.clientEmail}</p>
             </div>
-            <div className="space-y-1 text-sm">
+            <div className="space-y-1 self-start text-sm whitespace-nowrap">
               <p className="flex justify-between gap-4">
                 <span className="text-slate-500">Issued:</span>
                 <span className="font-bold text-slate-800">

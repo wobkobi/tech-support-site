@@ -201,7 +201,7 @@ export function ReviewLinkHistoryTable({
                 className={cn(
                   "rounded-full px-2 py-0.5 text-[10px] font-medium",
                   entry.source === "Auto"
-                    ? "bg-moonstone-400/15 text-moonstone-400"
+                    ? "bg-moonstone-400/15 text-moonstone-700"
                     : entry.source === "Manual SMS"
                       ? "bg-coquelicot-500/10 text-coquelicot-500"
                       : entry.source === "Legacy"

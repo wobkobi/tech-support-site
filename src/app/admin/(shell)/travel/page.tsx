@@ -113,7 +113,7 @@ export default async function AdminTravelPage(): Promise<React.ReactElement> {
         actions={<RecalculateButton />}
       />
 
-      <Card>
+      <Card flushOnPhone>
         <TravelBlockAdminList blocks={travelBlockRows} calendarLabels={calendarLabels} />
       </Card>
     </>

@@ -560,7 +560,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
                   <span
                     className={cn(
                       "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                      e.kind === "booking" && "bg-moonstone-400/15 text-moonstone-400",
+                      e.kind === "booking" && "bg-moonstone-400/15 text-moonstone-700",
                       e.kind === "review" && "bg-yellow-500/15 text-yellow-600",
                       e.kind === "contact" && "bg-admin-border text-admin-muted",
                       e.kind === "invoice" && "bg-russian-violet/15 text-russian-violet",

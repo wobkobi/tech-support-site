@@ -70,7 +70,7 @@ const MIN_GAP_MINUTES = 30;
 
 /** Tailwind pill colours per booking status - mirrors BookingAdminList. */
 const BOOKING_STATUS_CHIP: Record<"held" | "confirmed" | "cancelled" | "completed", string> = {
-  confirmed: "bg-moonstone-400/20 text-moonstone-400",
+  confirmed: "bg-moonstone-400/20 text-moonstone-700",
   held: "bg-yellow-500/20 text-yellow-600",
   cancelled: "bg-red-500/20 text-red-500",
   completed: "bg-green-500/20 text-green-600",

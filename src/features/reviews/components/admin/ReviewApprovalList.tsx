@@ -218,7 +218,7 @@ export function ReviewApprovalList({
       return (
         <button
           onClick={() => setLinkingId(row.id)}
-          className="rounded-full bg-moonstone-400/10 px-2 py-0.5 text-xs font-medium text-moonstone-400 transition-colors hover:bg-moonstone-400/20"
+          className="rounded-full bg-moonstone-400/10 px-2 py-0.5 text-xs font-medium text-moonstone-700 transition-colors hover:bg-moonstone-400/20"
           title="Change linked contact"
         >
           {row.contactName}

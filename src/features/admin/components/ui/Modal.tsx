@@ -1,6 +1,7 @@
 // src/features/admin/components/ui/Modal.tsx
 // Shared admin dialog shell: backdrop-click and Escape close it, focus moves into the
-// dialog on open, body scroll locks while open, and the whole overlay is `print:hidden`.
+// dialog on open and Tab stays inside it, body scroll locks while open, and the whole
+// overlay is `print:hidden`.
 // A `dirty` dialog asks before a backdrop tap, Escape or the close button throws away
 // what was typed. It appears without motion; a fade added later must use
 // `transition-[opacity]` (Tailwind v4 compiles translate/scale to separate longhand
@@ -9,6 +10,7 @@
 "use client";
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { useDialogKeys } from "@/features/admin/hooks/use-dialog-keys";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -95,39 +97,24 @@ export function Modal({
     else onClose();
   }
 
-  // The Escape listener reads these through refs, so a re-render (a fresh
-  // onClose arrow from the parent, `dirty` flipping on the first keystroke)
-  // doesn't re-run the open effect and yank focus out of the field in use.
-  const requestCloseRef = useRef(requestClose);
-  const confirmingRef = useRef(confirmingDiscard);
-  useEffect(() => {
-    requestCloseRef.current = requestClose;
-    confirmingRef.current = confirmingDiscard;
+  // With the discard question up, Escape backs out of the question instead.
+  useDialogKeys(dialogRef, open, () => {
+    if (confirmingDiscard) setConfirmingDiscard(false);
+    else requestClose();
   });
 
+  // Keyed on `open` alone: a re-render (a fresh onClose arrow from the parent,
+  // `dirty` flipping on the first keystroke) must not re-run this and yank
+  // focus out of the field in use.
   useEffect(() => {
     if (!open) return;
-    // While open: lock body scroll, move focus into the dialog (restored to the
-    // trigger on close), and close on Escape.
+    // While open: lock body scroll and move focus into the dialog (restored to
+    // the trigger on close).
     const prevFocus = document.activeElement as HTMLElement | null;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     dialogRef.current?.focus();
-
-    /**
-     * Closes the dialog on Escape. With the discard question up, Escape backs
-     * out of the question instead.
-     * @param e - The keyboard event.
-     */
-    function onKey(e: KeyboardEvent): void {
-      if (e.key !== "Escape") return;
-      if (confirmingRef.current) setConfirmingDiscard(false);
-      else requestCloseRef.current();
-    }
-    document.addEventListener("keydown", onKey);
-
     return () => {
-      document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
       prevFocus?.focus?.();
     };
@@ -169,11 +156,13 @@ export function Modal({
               </p>
             )}
           </div>
+          {/* Full 44px target, pulled into the header padding so the header
+              doesn't grow. */}
           <button
             type="button"
             onClick={requestClose}
             aria-label="Close"
-            className="-mr-1 text-2xl leading-none text-admin-faint transition-colors hover:text-admin-text"
+            className="-my-2 -mr-3 inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-2xl leading-none text-admin-muted transition-colors hover:bg-admin-bg hover:text-admin-text"
           >
             &times;
           </button>

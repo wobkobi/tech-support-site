@@ -7,6 +7,7 @@
 
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { useDialogKeys } from "@/features/admin/hooks/use-dialog-keys";
 import type {
   BookingStatus,
   WeekEvent,
@@ -76,35 +77,16 @@ export function EventActionSheet({
   const [sendReview, setSendReview] = useState(true);
   const [draftInvoice, setDraftInvoice] = useState(true);
 
-  // Keep the latest onClose without re-running the dialog effect (parent passes
-  // a fresh closure each render). Updated in an effect so the ref is never
-  // written during render.
-  const onCloseRef = useRef(onClose);
-  // Mirrors `pending` so the Escape handler can defer to the confirm dialog
-  // without the effect depending on it.
-  const pendingRef = useRef<PendingAction | null>(pending);
-  useEffect(() => {
-    onCloseRef.current = onClose;
-    pendingRef.current = pending;
-  });
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Escape closes and Tab stays in the sheet. While a confirm dialog is open
+  // over it, that dialog takes the keys instead.
+  useDialogKeys(panelRef, true, onClose);
 
-  // Close on Escape and restore focus to the opener when the sheet unmounts.
+  // Move focus into the sheet, and back to the opener when it unmounts.
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
-    /**
-     * Closes the sheet when Escape is pressed. While a confirm dialog is open
-     * the key belongs to that dialog, so the sheet stays put.
-     * @param e - Keydown event.
-     */
-    function onKey(e: KeyboardEvent): void {
-      if (e.key !== "Escape" || pendingRef.current) return;
-      onCloseRef.current();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      opener?.focus?.();
-    };
+    panelRef.current?.focus();
+    return () => opener?.focus?.();
   }, []);
 
   const booking = event.booking;
@@ -239,8 +221,10 @@ export function EventActionSheet({
       onClick={onClose}
     >
       <div
+        ref={panelRef}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg rounded-xl bg-admin-surface p-4 shadow-xl"
+        className="w-full max-w-lg rounded-xl bg-admin-surface p-4 shadow-xl outline-none"
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -251,7 +235,7 @@ export function EventActionSheet({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-admin-faint hover:bg-admin-bg hover:text-admin-text"
+            className="-my-1.5 -mr-2 inline-flex size-11 shrink-0 items-center justify-center rounded-md text-xl text-admin-muted hover:bg-admin-bg hover:text-admin-text"
           >
             ×
           </button>
@@ -338,7 +322,7 @@ export function EventActionSheet({
                 type="button"
                 onClick={handleResendReview}
                 disabled={busy}
-                className="inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-400/15 px-4 text-sm font-semibold text-moonstone-300 hover:bg-moonstone-400/25 disabled:opacity-50"
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-400/15 px-4 text-sm font-semibold text-moonstone-700 hover:bg-moonstone-400/25 disabled:opacity-50"
               >
                 Send review email
               </button>

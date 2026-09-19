@@ -2558,6 +2558,7 @@ export function CalculatorView({
           every section, so the running figure stays pinned here while the job
           is built, with a jump down to the client and save buttons. */}
       <div
+        data-phone-bar={finishInView ? undefined : "sticky"}
         className={cn(
           "sticky bottom-0 z-10 -mx-4 mt-4 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:-mx-6 sm:px-6 lg:hidden",
           finishInView && "hidden",

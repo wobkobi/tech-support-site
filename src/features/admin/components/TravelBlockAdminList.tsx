@@ -305,14 +305,14 @@ export function TravelBlockAdminList({
                 {/* Destination address - wrap long unbroken strings on mobile. */}
                 {b.destination && (
                   <p className="text-xs wrap-break-word text-admin-muted">
-                    <span className="font-medium text-admin-faint">To: </span>
+                    <span className="font-medium text-admin-muted">To: </span>
                     {b.destination}
                   </p>
                 )}
 
                 {/* Transport mode selector */}
                 <div>
-                  <p className="mb-1 text-xs font-medium tracking-wide text-admin-faint uppercase">
+                  <p className="mb-1 text-xs font-medium tracking-wide text-admin-muted uppercase">
                     How I'm getting there
                   </p>
                   <div className="flex flex-wrap gap-1">
@@ -322,7 +322,7 @@ export function TravelBlockAdminList({
                         disabled={isSaving}
                         onClick={() => void setMode(b.id, m.value)}
                         className={cn(
-                          "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50",
+                          "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 pointer-coarse:min-h-11",
                           currentMode === m.value
                             ? "bg-russian-violet text-white"
                             : "bg-admin-bg text-admin-muted hover:bg-admin-border",
@@ -335,7 +335,7 @@ export function TravelBlockAdminList({
                   {!isPast &&
                     (b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
                     b.transportMode !== null && (
-                      <p className="mt-1 text-xs text-amber-500">
+                      <p className="mt-1 text-xs text-amber-700">
                         Mode changed - recalculate to update travel times
                       </p>
                     )}
@@ -343,7 +343,7 @@ export function TravelBlockAdminList({
 
                 {/* Origin */}
                 <div>
-                  <p className="mb-1 text-xs font-medium tracking-wide text-admin-faint uppercase">
+                  <p className="mb-1 text-xs font-medium tracking-wide text-admin-muted uppercase">
                     Departing from
                   </p>
                   {isEditingOrigin ? (
@@ -361,14 +361,14 @@ export function TravelBlockAdminList({
                         <button
                           disabled={isSaving || !originInput.trim()}
                           onClick={() => void saveOrigin(b.id, originInput.trim() || null)}
-                          className="rounded-lg bg-russian-violet px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50"
+                          className="rounded-lg bg-russian-violet px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 pointer-coarse:min-h-11"
                         >
                           Save
                         </button>
                         <button
                           disabled={isSaving}
                           onClick={() => setEditingOriginId(null)}
-                          className="rounded-lg bg-admin-bg px-2.5 py-1 text-xs font-medium text-admin-muted hover:bg-admin-border disabled:opacity-50"
+                          className="rounded-lg bg-admin-bg px-2.5 py-1 text-xs font-medium text-admin-muted hover:bg-admin-border disabled:opacity-50 pointer-coarse:min-h-11"
                         >
                           Cancel
                         </button>
@@ -376,7 +376,7 @@ export function TravelBlockAdminList({
                           <button
                             disabled={isSaving}
                             onClick={() => void saveOrigin(b.id, null)}
-                            className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-100 disabled:opacity-50"
+                            className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 pointer-coarse:min-h-11"
                           >
                             Clear override
                           </button>
@@ -403,7 +403,7 @@ export function TravelBlockAdminList({
                           setEditingOriginId(b.id);
                           setOriginInput(b.customOrigin ?? "");
                         }}
-                        className="rounded px-1.5 py-0.5 text-xs text-admin-faint hover:bg-admin-bg hover:text-admin-text-secondary disabled:opacity-50"
+                        className="rounded px-1.5 py-0.5 text-xs font-medium text-admin-muted hover:bg-admin-bg hover:text-admin-text-secondary disabled:opacity-50 pointer-coarse:min-h-11 pointer-coarse:px-3"
                       >
                         Edit
                       </button>
@@ -412,7 +412,7 @@ export function TravelBlockAdminList({
                   {!isPast &&
                     (b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
                     b.customOrigin !== null && (
-                      <p className="mt-1 text-xs text-amber-500">
+                      <p className="mt-1 text-xs text-amber-700">
                         Origin changed - recalculate to update travel times
                       </p>
                     )}
@@ -421,7 +421,7 @@ export function TravelBlockAdminList({
                 {/* Travel times grid */}
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div>
-                    <p className="mb-0.5 text-xs font-medium tracking-wide text-admin-faint uppercase">
+                    <p className="mb-0.5 text-xs font-medium tracking-wide text-admin-muted uppercase">
                       Travel there
                     </p>
                     <p className="text-sm text-admin-text">
@@ -432,7 +432,7 @@ export function TravelBlockAdminList({
                         className={cn(
                           "text-xs",
                           !b.beforeExpiresAt || new Date(b.beforeExpiresAt) < new Date()
-                            ? "text-red-500"
+                            ? "text-red-600"
                             : "text-admin-faint",
                         )}
                         suppressHydrationWarning
@@ -442,7 +442,7 @@ export function TravelBlockAdminList({
                     )}
                   </div>
                   <div>
-                    <p className="mb-0.5 text-xs font-medium tracking-wide text-admin-faint uppercase">
+                    <p className="mb-0.5 text-xs font-medium tracking-wide text-admin-muted uppercase">
                       Travel back
                     </p>
                     <p className="text-sm text-admin-text">
@@ -459,7 +459,7 @@ export function TravelBlockAdminList({
                         className={cn(
                           "text-xs",
                           !b.afterExpiresAt || new Date(b.afterExpiresAt) < new Date()
-                            ? "text-red-500"
+                            ? "text-red-600"
                             : "text-admin-faint",
                         )}
                         suppressHydrationWarning

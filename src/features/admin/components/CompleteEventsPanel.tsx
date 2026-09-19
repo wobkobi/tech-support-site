@@ -130,7 +130,7 @@ export function CompleteEventsPanel({
                   {err && <p className="text-xs text-coquelicot-600">{err}</p>}
                 </div>
                 {isDone ? (
-                  <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-moonstone-400">
+                  <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-moonstone-700">
                     Done
                     <FaCheck className="h-3 w-3" aria-hidden />
                   </span>

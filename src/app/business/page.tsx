@@ -382,7 +382,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {howItWorks.map((item) => (
                 <div key={item.step} className="flex gap-3">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-full border border-moonstone-500/40 bg-moonstone-400/20 text-lg font-bold text-moonstone-400">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-full border border-moonstone-500/40 bg-moonstone-400/20 text-lg font-bold text-moonstone-700">
                     {item.step}
                   </span>
                   <div>

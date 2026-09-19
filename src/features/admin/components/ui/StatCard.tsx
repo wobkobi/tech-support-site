@@ -30,7 +30,7 @@ function valueToneClass(tone: StatTone): string {
     case "violet":
       return "text-russian-violet";
     case "info":
-      return "text-moonstone-400";
+      return "text-moonstone-700";
   }
 }
 

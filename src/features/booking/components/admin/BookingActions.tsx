@@ -1,11 +1,13 @@
 "use client";
 // src/features/booking/components/admin/BookingActions.tsx
-// Lifecycle actions for the booking detail page: mark completed, cancel (my call / for
-// customer), mark no-show (past bookings only), send / resend the review email,
-// reschedule (magic link), and delete (test bookings only). Every mutating action routes
-// through useBookingActions and is gated by a ConfirmDialog; on success the page
-// refreshes so the info, timeline, and linked-records cards reflect the new state. Delete
-// redirects back to the bookings list.
+// Lifecycle actions for the booking detail page: mark completed, bill in the calculator,
+// cancel (my call / for customer), mark no-show (past bookings only), send / resend the
+// review email, reschedule (magic link), and delete (test bookings only). Every mutating
+// action routes through useBookingActions and is gated by a ConfirmDialog; on success the
+// page refreshes so the info, timeline, and linked-records cards reflect the new state.
+// Delete redirects back to the bookings list. Below lg, where this rail sits under the
+// customer and times cards, a bar pinned to the screen bottom keeps Call, Maps and the
+// next step (Complete, then Bill) in reach.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
@@ -28,8 +30,17 @@ interface BookingActionsProps {
   endAt: string;
   /** Live past-edit lock window (hours) - scheduling.pastEditLockHours. */
   lockHours: number;
-  /** Whether a Google event exists, which decides whether a cancel emails the customer. */
-  hasCalendarEvent: boolean;
+  /**
+   * Google event id: a cancel emails the customer only when one exists, and the
+   * calculator's bill link keys on it.
+   */
+  calendarEventId: string | null;
+  /** Customer phone for the phone bar's Call button. */
+  phone: string | null;
+  /** Visit address for the phone bar's Maps button; null for remote jobs. */
+  address: string | null;
+  /** Newest invoice that isn't voided; replaces Bill once the job is billed. */
+  invoiceId: string | null;
   /** Cancel/reschedule magic-link token. */
   cancelToken: string;
   /** Whether a review email has already gone out (tunes the button label + toast). */
@@ -90,7 +101,10 @@ const CONFIRM_COPY: Record<
  * @param props.startAt - Appointment start (ISO).
  * @param props.endAt - Appointment end (ISO).
  * @param props.lockHours - Live past-edit lock window (hours).
- * @param props.hasCalendarEvent - Whether the booking has a Google event.
+ * @param props.calendarEventId - Google event id, if the booking has one.
+ * @param props.phone - Customer phone for the Call button.
+ * @param props.address - Visit address for the Maps button (null for remote).
+ * @param props.invoiceId - Newest non-voided invoice for this booking.
  * @param props.cancelToken - Cancel/reschedule magic-link token.
  * @param props.reviewAlreadySent - Whether a review email already went out.
  * @param props.isTest - Whether this is a deletable test booking.
@@ -102,7 +116,10 @@ export function BookingActions({
   startAt,
   endAt,
   lockHours,
-  hasCalendarEvent,
+  calendarEventId,
+  phone,
+  address,
+  invoiceId,
   cancelToken,
   reviewAlreadySent,
   isTest,
@@ -129,6 +146,26 @@ export function BookingActions({
   // Cancel / no-show lock after the booking ends, mirroring the PATCH route's
   // gate, so the lock shows up front rather than as a rejection toast.
   const isEditLocked = isPastEditWindow(new Date(endAt).getTime(), renderedAt, lockHours);
+  const hasCalendarEvent = calendarEventId != null;
+  // The calculator prefills times, client and address from the (operator-corrected)
+  // calendar event, so billing needs one.
+  const billHref =
+    (isConfirmed || isCompleted) && calendarEventId
+      ? `/admin/business/calculator?eventId=${encodeURIComponent(calendarEventId)}`
+      : null;
+  const invoiceHref = invoiceId ? `/admin/business/invoices/${invoiceId}` : null;
+  // Directions only matter while the visit is still ahead.
+  const mapsHref =
+    isOpen && address
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+      : null;
+  const showPhoneBar = phone != null || mapsHref != null || isConfirmed || isCompleted;
+
+  /** Opens the complete dialog with the review email ticked. */
+  function openComplete(): void {
+    setSendReview(true);
+    setConfirm("complete");
+  }
 
   /**
    * Runs the mutation for the confirmed action, then refreshes (or, for delete,
@@ -220,16 +257,20 @@ export function BookingActions({
     <>
       <div className="flex flex-col gap-2">
         {isConfirmed && (
-          <AdminButton
-            variant="secondary"
-            onClick={() => {
-              setSendReview(true);
-              setConfirm("complete");
-            }}
-            disabled={busy}
-          >
+          <AdminButton variant="secondary" onClick={openComplete} disabled={busy}>
             Mark completed
           </AdminButton>
+        )}
+        {invoiceHref ? (
+          <AdminButton variant="secondary" href={invoiceHref}>
+            View invoice
+          </AdminButton>
+        ) : (
+          billHref && (
+            <AdminButton variant="secondary" href={billHref}>
+              Bill in calculator
+            </AdminButton>
+          )
         )}
         {isConfirmed && isPast && (
           <AdminButton
@@ -286,6 +327,40 @@ export function BookingActions({
           </AdminButton>
         )}
       </div>
+
+      {/* Phone bar. The page reserves room under it (see globals.css). */}
+      {showPhoneBar && (
+        <div
+          data-phone-bar="fixed"
+          className="fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-admin-border bg-admin-surface/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:px-6 lg:hidden print:hidden"
+        >
+          {phone && (
+            <AdminButton variant="secondary" href={`tel:${phone}`} className="flex-1">
+              Call
+            </AdminButton>
+          )}
+          {mapsHref && (
+            <AdminButton variant="secondary" href={mapsHref} className="flex-1">
+              Maps ↗
+            </AdminButton>
+          )}
+          {isConfirmed ? (
+            <AdminButton onClick={openComplete} disabled={busy} className="flex-1">
+              Complete
+            </AdminButton>
+          ) : invoiceHref ? (
+            <AdminButton href={invoiceHref} className="flex-1">
+              Invoice
+            </AdminButton>
+          ) : (
+            billHref && (
+              <AdminButton href={billHref} className="flex-1">
+                Bill
+              </AdminButton>
+            )
+          )}
+        </div>
+      )}
 
       <ConfirmDialog
         open={confirm !== null}
