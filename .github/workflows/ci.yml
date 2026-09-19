@@ -22,8 +22,19 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # The build prerenders pages that read settings from MongoDB, so it runs
+    # against an empty database on the runner rather than the real one:
+    # Dependabot runs get no secrets, and no pull request's code sees the
+    # production connection string. Every setting falls back to its default.
+    # The container goes away with the job.
+    services:
+      mongo:
+        image: mongo:8
+        ports:
+          - 27017:27017
+
     env:
-      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      MONGODB_URI: mongodb://localhost:27017/ci
 
     steps:
       - name: Checkout code
@@ -44,17 +55,14 @@ jobs:
       - name: Run linter
         run: npm run lint
 
-      # Dependabot pull requests are built too. The build reads no secrets, and
-      # auto-merge queues patch and minor bumps, so this is the signal that a
-      # bump still compiles.
+      # Dependabot pull requests are built too, against the same empty
+      # database, and auto-merge queues patch and minor bumps, so this is the
+      # signal that a bump still compiles.
       - name: Build application
         run: npm run build
 
   type-check:
     runs-on: ubuntu-latest
-
-    env:
-      MONGODB_URI: ${{ secrets.MONGODB_URI }}
 
     steps:
       - name: Checkout code

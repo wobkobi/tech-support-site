@@ -65,12 +65,14 @@ next-env.d.ts
 # claude AI workspace
 .claude/
 
-# generated docs & analysis artifacts. CRON.md is the exception: it is
-# hand-maintained and has to match what cron-job.org is actually calling, so it
-# is versioned with the routes it documents. A negation only works against
-# /docs/* - git cannot re-include a file whose parent directory is excluded.
+# generated docs & analysis artifacts. CRON.md and DEPLOY.md are the exceptions:
+# both are hand-maintained and have to match live setup (what cron-job.org is
+# calling, how deploys are gated and smoked), so they are versioned with the code
+# they document. A negation only works against /docs/* - git cannot re-include a
+# file whose parent directory is excluded.
 /docs/*
 !/docs/CRON.md
+!/docs/DEPLOY.md
 google-tokens.txt
 
 # generated ad creatives (regenerate with `npm run build:ads`)
