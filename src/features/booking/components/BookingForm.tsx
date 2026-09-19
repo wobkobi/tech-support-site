@@ -699,8 +699,9 @@ export default function BookingForm({
     setDraftRestored(false);
   }
 
-  const weekdays = availableDays.filter((d) => !d.isWeekend);
-  const weekends = availableDays.filter((d) => d.isWeekend);
+  // One run in date order, so tomorrow always sits next to today even when it's a
+  // Saturday. Each label carries its weekday name, so weekends still read as such.
+  const daysInOrder = [...availableDays].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 
   /**
    * Handle day selection and reset time if needed
@@ -1050,86 +1051,38 @@ export default function BookingForm({
               {phoneLink ? <> on {phoneLink}</> : " directly"}.
             </p>
           ) : (
-            <div className="space-y-3">
-              {weekdays.length > 0 && (
-                <div>
-                  <p className="mb-1.5 text-base font-medium tracking-wide text-rich-black/70 uppercase">
-                    Weekdays
-                  </p>
-                  {/* pt-5 reserves space above the first row for the
-                      Today/Tomorrow labels that sit fully outside their button. */}
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-3 pt-5">
-                    {weekdays.map((day) => (
-                      <div key={day.dateKey} className="relative">
-                        {(day.isToday || day.isTomorrow) && day.hasAnySlots && (
-                          <span className="absolute -top-5 right-0 left-0 text-center text-sm leading-5 font-bold tracking-wide text-coquelicot-600 uppercase">
-                            {day.isToday ? "Today" : "Tomorrow"}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          aria-pressed={selectedDay?.dateKey === day.dateKey}
-                          disabled={!day.hasAnySlots}
-                          onClick={() => handleDaySelect(day)}
-                          className={cn(
-                            "w-full rounded-lg border px-3 py-3 text-base font-medium whitespace-nowrap",
-                            !day.hasAnySlots && "cursor-not-allowed opacity-50",
-                            selectedDay?.dateKey === day.dateKey
-                              ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                              : day.hasAnySlots
-                                ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                                : "border-seasalt-200/40 bg-white/20 text-rich-black/60",
-                            day.isToday &&
-                              day.hasAnySlots &&
-                              "ring-2 ring-coquelicot-500/50 ring-offset-1",
-                          )}
-                        >
-                          {day.dayLabel}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+            // pt-5 reserves space above the first row for the Today/Tomorrow labels
+            // that sit fully outside their button; both are always first in date order.
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-3 pt-5">
+              {daysInOrder.map((day) => (
+                <div key={day.dateKey} className="relative">
+                  {(day.isToday || day.isTomorrow) && day.hasAnySlots && (
+                    <span className="absolute -top-5 right-0 left-0 text-center text-sm leading-5 font-bold tracking-wide text-coquelicot-600 uppercase">
+                      {day.isToday ? "Today" : "Tomorrow"}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    aria-pressed={selectedDay?.dateKey === day.dateKey}
+                    disabled={!day.hasAnySlots}
+                    onClick={() => handleDaySelect(day)}
+                    className={cn(
+                      "w-full rounded-lg border px-3 py-3 text-base font-medium whitespace-nowrap",
+                      !day.hasAnySlots && "cursor-not-allowed opacity-50",
+                      selectedDay?.dateKey === day.dateKey
+                        ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
+                        : day.hasAnySlots
+                          ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
+                          : "border-seasalt-200/40 bg-white/20 text-rich-black/60",
+                      day.isToday &&
+                        day.hasAnySlots &&
+                        "ring-2 ring-coquelicot-500/50 ring-offset-1",
+                    )}
+                  >
+                    {day.dayLabel}
+                  </button>
                 </div>
-              )}
-
-              {weekends.length > 0 && (
-                <div>
-                  <p className="mb-1.5 text-base font-medium tracking-wide text-rich-black/70 uppercase">
-                    Weekends
-                  </p>
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-3 pt-5">
-                    {weekends.map((day) => (
-                      <div key={day.dateKey} className="relative">
-                        {(day.isToday || day.isTomorrow) && day.hasAnySlots && (
-                          <span className="absolute -top-5 right-0 left-0 text-center text-sm leading-5 font-bold tracking-wide text-coquelicot-600 uppercase">
-                            {day.isToday ? "Today" : "Tomorrow"}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          aria-pressed={selectedDay?.dateKey === day.dateKey}
-                          disabled={!day.hasAnySlots}
-                          onClick={() => handleDaySelect(day)}
-                          className={cn(
-                            "w-full rounded-lg border px-3 py-3 text-base font-medium whitespace-nowrap",
-                            !day.hasAnySlots && "cursor-not-allowed opacity-50",
-                            selectedDay?.dateKey === day.dateKey
-                              ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                              : day.hasAnySlots
-                                ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                                : "border-seasalt-200/40 bg-white/20 text-rich-black/60",
-                            day.isToday &&
-                              day.hasAnySlots &&
-                              "ring-2 ring-coquelicot-500/50 ring-offset-1",
-                          )}
-                        >
-                          {day.dayLabel}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              ))}
             </div>
           )}
         </fieldset>

@@ -134,16 +134,16 @@ export function EventActionSheet({
 
   /**
    * Cancels the booking. operator = no customer fee; on-behalf = standard
-   * cancellation-fee rules (same wording as BookingAdminList for parity).
+   * cancellation-fee rules. Keep the wording in step with BookingActions.
    * @param mode - Cancellation policy mode.
    */
   function handleCancel(mode: "operator" | "on-behalf"): void {
     setPending({
-      title: mode === "operator" ? "Cancel this booking?" : "Cancel for the customer?",
+      title: mode === "operator" ? "Cancel this booking on my end?" : "Cancel for the customer?",
       body:
         mode === "operator"
-          ? "Cancelled on your end - no fee will be charged to the customer."
-          : "The standard cancellation fee rules will apply (call-out + travel inside the fee windows).",
+          ? "No fee will be charged. Google Calendar emails the customer a cancellation notice."
+          : "The standard cancellation fee rules apply (call-out + travel inside the fee windows). Google Calendar emails the customer a cancellation notice.",
       confirmLabel: "Cancel booking",
       tone: "danger",
       target: { kind: "cancel", mode },

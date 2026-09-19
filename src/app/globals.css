@@ -115,7 +115,10 @@
   --color-admin-text: #1e293b;
   --color-admin-text-secondary: #475569;
   --color-admin-muted: #64748b;
-  --color-admin-faint: #94a3b8;
+  /* Same as muted: slate-500 is the lightest grey that still reads at 4.5:1 on
+     admin-bg, and faint is nearly all text (dates, hints, empty states). Its
+     lower rank comes from its smaller size, not a paler colour. */
+  --color-admin-faint: #64748b;
 }
 
 /* Fixed light theme base colours */
