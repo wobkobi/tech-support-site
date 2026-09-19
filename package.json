@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.36.7",
+  "version": "4.36.8",
   "private": true,
   "type": "module",
   "scripts": {
@@ -50,18 +50,12 @@
     "safari >= 15.4",
     "edge >= 93"
   ],
-  "overrides": {
-    "gaxios": "^7.3.0",
-    "postcss": "$postcss",
-    "sharp": "$sharp"
-  },
   "dependencies": {
     "@googleapis/calendar": "^20.0.0",
     "@googleapis/drive": "^26.0.0",
     "@googleapis/people": "^12.0.0",
     "@googleapis/sheets": "^18.0.0",
     "@prisma/client": "6.19.3",
-    "@swc/helpers": "^0.5.23",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "clsx": "^2.1.1",
@@ -100,7 +94,6 @@
     "jsdom": "^30.1.0",
     "lint-staged": "^17.5.1",
     "png-to-ico": "^3.0.2",
-    "postcss": "^8.5.28",
     "prettier": "^3.9.8",
     "prettier-plugin-organize-imports": "^4.3.0",
     "prettier-plugin-packagejson": "^3.0.2",
