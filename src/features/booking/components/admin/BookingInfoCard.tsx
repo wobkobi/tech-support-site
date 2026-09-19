@@ -1,17 +1,27 @@
 "use client";
 // src/features/booking/components/admin/BookingInfoCard.tsx
 // Editable customer/booking info card on the booking detail page:
-// name, email, phone, address, and notes. View mode shows the values; Edit mode
-// swaps in inputs (address uses the Places autocomplete) and saves via the sparse
-// admin bookings PATCH, then refreshes the page. Only the free text is shown and
-// edited - the notes blob's metadata block is machine-written mirror, surfaced on
-// this page as chips - but the address is still written back into its "Address:"
-// line, the convention the PATCH route and contact backfill both read.
+// name, email, phone, address, and notes. View mode shows the values, with a Maps link
+// on the address; Edit mode swaps in the shared email and phone inputs and the Places
+// autocomplete, checks them before saving via the sparse admin bookings PATCH, then
+// refreshes the page. Only the free text is shown and edited - the notes blob's
+// metadata block is machine-written mirror, surfaced on this page as chips - but the
+// address is still written back into its "Address:" line, the convention the PATCH
+// route and contact backfill both read.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { FieldError } from "@/features/admin/components/ui/FieldError";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import {
+  type ContactFieldErrors,
+  checkContactFields,
+  focusFirstInvalid,
+} from "@/features/admin/lib/contact-fields";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
-import { parseBookingNotes, replaceUserNotes } from "@/features/booking/lib/booking";
+import { mapsSearchUrl, parseBookingNotes, replaceUserNotes } from "@/features/booking/lib/booking";
+import { EmailInput } from "@/shared/components/EmailInput";
+import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -33,10 +43,6 @@ interface BookingInfoCardProps {
   notes: string | null;
 }
 
-const INPUT_CLS = cn(
-  "w-full rounded-lg border border-admin-border-strong bg-admin-surface px-3 py-2 text-sm text-admin-text",
-  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet",
-);
 const LABEL_CLS = "text-xs font-semibold text-admin-muted uppercase";
 
 /**
@@ -84,6 +90,12 @@ export function BookingInfoCard({
   const { patchBooking } = useBookingActions();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<ContactFieldErrors>({});
+  const fieldIds = {
+    name: `edit-name-${id}`,
+    email: `edit-email-${id}`,
+    phone: `edit-phone-${id}`,
+  };
 
   // Prefer the column; legacy rows predate it and carry the address only in the
   // notes text, which parseBookingNotes reads back off the "Address:" line.
@@ -98,6 +110,16 @@ export function BookingInfoCard({
   });
 
   /**
+   * Updates one field and clears its error, so a fix is acknowledged as it's typed.
+   * @param key - Field to update.
+   * @param value - New value.
+   */
+  function setField(key: keyof typeof form, value: string): void {
+    setForm((f) => ({ ...f, [key]: value }));
+    setErrors((e) => (key in e ? { ...e, [key]: undefined } : e));
+  }
+
+  /**
    * Resets the form to the current props and leaves edit mode.
    */
   function cancel(): void {
@@ -108,21 +130,28 @@ export function BookingInfoCard({
       address: initialAddress,
       notes: parsed.userNotes,
     });
+    setErrors({});
     setEditing(false);
   }
 
   /**
-   * Saves the edits. Puts the edited free text back in front of the untouched
-   * metadata block, merges the address into its "Address:" line, and sends
-   * `address` so the linked contact syncs too; refreshes on success.
+   * Saves the edits once the fields check out. Puts the edited free text back in
+   * front of the untouched metadata block and keeps its "Address:" line in step.
+   * `address` is sent only when it changed, since the route copies it onto the
+   * linked contact; refreshes on success.
    */
   async function save(): Promise<void> {
+    const found = checkContactFields(form, { emailRequired: true });
+    setErrors(found);
+    if (focusFirstInvalid(found, fieldIds)) return;
     setSaving(true);
+    const nextAddress = form.address.trim();
+    const addressChanged = nextAddress !== initialAddress.trim();
     const rebuilt = replaceUserNotes(notes, form.notes);
-    // Keep the notes "Address:" line in step with the edited address (same as the
-    // route's contact sync); when there's no Address line the replace is a no-op.
-    const mergedNotes = form.address
-      ? rebuilt.replace(/^(Address:\s*).*$/im, `$1${form.address.trim()}`)
+    // A cleared address drops the notes line too, or the card would read it back
+    // as the address.
+    const mergedNotes = addressChanged
+      ? rebuilt.replace(/^(Address:\s*).*$/im, nextAddress ? `$1${nextAddress}` : "")
       : rebuilt;
     const result = await patchBooking(
       id,
@@ -131,7 +160,7 @@ export function BookingInfoCard({
         email: form.email,
         phone: form.phone || undefined,
         notes: mergedNotes,
-        address: form.address || undefined,
+        address: addressChanged ? nextAddress : undefined,
       },
       "Booking updated.",
     );
@@ -166,7 +195,19 @@ export function BookingInfoCard({
             <span className="text-admin-faint">Not provided</span>
           )}
         </Row>
-        {initialAddress && <Row label="Address">{initialAddress}</Row>}
+        {initialAddress && (
+          <Row label="Address">
+            {initialAddress}{" "}
+            <a
+              href={mapsSearchUrl(initialAddress)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="whitespace-nowrap text-blue-500 hover:text-blue-700"
+            >
+              Maps ↗
+            </a>
+          </Row>
+        )}
         <Row label="Notes">
           {parsed.userNotes ? (
             <span className="whitespace-pre-wrap">{parsed.userNotes}</span>
@@ -181,56 +222,75 @@ export function BookingInfoCard({
   return (
     <div className="flex flex-col gap-3">
       <h2 className="text-base font-bold text-admin-text">Edit customer</h2>
-      <label className="flex flex-col gap-1">
-        <span className={LABEL_CLS}>Name</span>
+      <div className="flex flex-col gap-1">
+        <label htmlFor={fieldIds.name} className={LABEL_CLS}>
+          Name
+        </label>
         <input
-          className={INPUT_CLS}
+          id={fieldIds.name}
+          className={cn(ADMIN_INPUT_CLS, errors.name && "border-coquelicot-500/60")}
           value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          onChange={(e) => setField("name", e.target.value)}
+          aria-invalid={errors.name ? true : undefined}
+          aria-describedby={errors.name ? `${fieldIds.name}-error` : undefined}
+          autoComplete="off"
           disabled={saving}
         />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className={LABEL_CLS}>Email</span>
-        <input
-          type="email"
-          className={INPUT_CLS}
+        <FieldError id={`${fieldIds.name}-error`} message={errors.name} />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor={fieldIds.email} className={LABEL_CLS}>
+          Email
+        </label>
+        <EmailInput
+          id={fieldIds.email}
           value={form.email}
-          onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+          onChange={(v) => setField("email", v)}
+          error={errors.email}
+          maxLength={320}
+          autoComplete="off"
+          className={ADMIN_INPUT_CLS}
           disabled={saving}
         />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className={LABEL_CLS}>Phone</span>
-        <input
-          type="tel"
-          className={INPUT_CLS}
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor={fieldIds.phone} className={LABEL_CLS}>
+          Phone
+        </label>
+        <PhoneInput
+          id={fieldIds.phone}
           value={form.phone}
-          onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+          onChange={(v) => setField("phone", v)}
+          error={errors.phone}
           placeholder="Phone number"
+          autoComplete="off"
+          className={ADMIN_INPUT_CLS}
           disabled={saving}
         />
-      </label>
-      {initialAddress !== "" && (
-        <div className="flex flex-col gap-1">
-          <span className={LABEL_CLS}>Address</span>
-          <AddressAutocomplete
-            id={`edit-address-${id}`}
-            value={form.address}
-            onChange={(v: string) => setForm((f) => ({ ...f, address: v }))}
-            placeholder="Full address for travel time calculations"
-          />
-        </div>
-      )}
-      <label className="flex flex-col gap-1">
-        <span className={LABEL_CLS}>Notes</span>
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor={`edit-address-${id}`} className={LABEL_CLS}>
+          Address
+        </label>
+        <AddressAutocomplete
+          id={`edit-address-${id}`}
+          value={form.address}
+          onChange={(v: string) => setField("address", v)}
+          placeholder="Leave blank for a remote job"
+        />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor={`edit-notes-${id}`} className={LABEL_CLS}>
+          Notes
+        </label>
         <textarea
-          className={cn(INPUT_CLS, "min-h-25 resize-y")}
+          id={`edit-notes-${id}`}
+          className={cn(ADMIN_INPUT_CLS, "min-h-25 resize-y")}
           value={form.notes}
-          onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+          onChange={(e) => setField("notes", e.target.value)}
           disabled={saving}
         />
-      </label>
+      </div>
       <div className="flex flex-wrap gap-2">
         <AdminButton onClick={() => void save()} busy={saving}>
           Save changes

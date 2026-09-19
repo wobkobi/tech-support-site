@@ -8,6 +8,7 @@
 import { ContactsAdminView } from "@/features/admin/components/ContactsAdminView";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import type { PageQuery } from "@/features/admin/hooks/use-query-sync";
 import { UNRESOLVED_CONFLICT_FILTER } from "@/features/contacts/lib/contact-conflicts";
 import { enrichContactsFromBookings } from "@/features/contacts/lib/maintenance";
 import { requireAdminAuth } from "@/shared/lib/auth";
@@ -26,10 +27,17 @@ export const metadata: Metadata = {
 /**
  * Admin contacts hub page. Enriches contacts from bookings (for the conflict
  * banner) and loads the list in one parallel pass.
+ * @param props - Page props.
+ * @param props.searchParams - The list's filters (q, sync, reviewed, retainer, noemail, nophone, sort).
  * @returns Contacts hub page element.
  */
-export default async function AdminContactsPage(): Promise<React.ReactElement> {
+export default async function AdminContactsPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageQuery>;
+}): Promise<React.ReactElement> {
   await requireAdminAuth();
+  const query = await searchParams;
 
   // Everything is independent, so run in one parallel pass. Fields enrich
   // writes this pass show on the next load - acceptable lag for a rare write,
@@ -149,7 +157,7 @@ export default async function AdminContactsPage(): Promise<React.ReactElement> {
           <span className="font-semibold">Review &amp; resolve →</span>
         </Link>
       )}
-      <ContactsAdminView initialConflicts={initialConflicts} contacts={contactRows} />
+      <ContactsAdminView initialConflicts={initialConflicts} contacts={contactRows} query={query} />
     </>
   );
 }

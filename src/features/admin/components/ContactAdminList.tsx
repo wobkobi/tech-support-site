@@ -8,6 +8,7 @@
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { validateEmail } from "@/features/booking/lib/booking";
@@ -488,12 +489,15 @@ const BATCH = 25;
  * Synced contacts are grouped in a collapsible section below.
  * @param props - Component props.
  * @param props.contacts - Contact rows to display.
+ * @param props.query - The page's searchParams, the starting filters.
  * @returns Contact list element.
  */
 export function ContactAdminList({
   contacts: initialContacts,
+  query: pageQuery,
 }: {
   contacts: ContactRow[];
+  query: PageQuery;
 }): React.ReactElement {
   const [contacts, setContacts] = useState<ContactRow[]>(initialContacts);
   useEffect(() => {
@@ -515,15 +519,31 @@ export function ContactAdminList({
   const [confirmSyncId, setConfirmSyncId] = useState<string | null>(null);
   const [expandedReviewsId, setExpandedReviewsId] = useState<string | null>(null);
   const [syncedOpen, setSyncedOpen] = useState(true);
-  const [query, setQuery] = useState("");
+  // The search, chips and sort start from the URL and write back to it.
+  const [query, setQuery] = useState(() => queryValue(pageQuery, "q"));
   // Filter chips, AND-combined with the search. Sync is tri-state (all/one/other)
   // since a contact is exactly one of synced or not.
-  const [syncFilter, setSyncFilter] = useState<"all" | "synced" | "unsynced">("all");
-  const [reviewedOnly, setReviewedOnly] = useState(false);
-  const [retainerOnly, setRetainerOnly] = useState(false);
-  const [noEmail, setNoEmail] = useState(false);
-  const [noPhone, setNoPhone] = useState(false);
-  const [sort, setSort] = useState<"name" | "newest" | "oldest">("name");
+  const [syncFilter, setSyncFilter] = useState<"all" | "synced" | "unsynced">(() => {
+    const v = queryValue(pageQuery, "sync");
+    return v === "synced" || v === "unsynced" ? v : "all";
+  });
+  const [reviewedOnly, setReviewedOnly] = useState(() => queryValue(pageQuery, "reviewed") === "1");
+  const [retainerOnly, setRetainerOnly] = useState(() => queryValue(pageQuery, "retainer") === "1");
+  const [noEmail, setNoEmail] = useState(() => queryValue(pageQuery, "noemail") === "1");
+  const [noPhone, setNoPhone] = useState(() => queryValue(pageQuery, "nophone") === "1");
+  const [sort, setSort] = useState<"name" | "newest" | "oldest">(() => {
+    const v = queryValue(pageQuery, "sort");
+    return v === "newest" || v === "oldest" ? v : "name";
+  });
+  useQuerySync({
+    q: query,
+    sync: syncFilter === "all" ? "" : syncFilter,
+    reviewed: reviewedOnly ? "1" : "",
+    retainer: retainerOnly ? "1" : "",
+    noemail: noEmail ? "1" : "",
+    nophone: noPhone ? "1" : "",
+    sort: sort === "name" ? "" : sort,
+  });
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   // Ticked by default: deleting a contact normally means dropping the person
   // altogether, and leaving the Google entry would let the sync pull them back.
@@ -1005,6 +1025,7 @@ export function ContactAdminList({
         <button
           type="button"
           onClick={() => setSyncFilter((f) => (f === "synced" ? "all" : "synced"))}
+          aria-pressed={syncFilter === "synced"}
           className={chipClass(syncFilter === "synced")}
         >
           Synced
@@ -1012,6 +1033,7 @@ export function ContactAdminList({
         <button
           type="button"
           onClick={() => setSyncFilter((f) => (f === "unsynced" ? "all" : "unsynced"))}
+          aria-pressed={syncFilter === "unsynced"}
           className={chipClass(syncFilter === "unsynced")}
         >
           Unsynced
@@ -1019,6 +1041,7 @@ export function ContactAdminList({
         <button
           type="button"
           onClick={() => setReviewedOnly((v) => !v)}
+          aria-pressed={reviewedOnly}
           className={chipClass(reviewedOnly)}
         >
           Has reviews
@@ -1026,14 +1049,25 @@ export function ContactAdminList({
         <button
           type="button"
           onClick={() => setRetainerOnly((v) => !v)}
+          aria-pressed={retainerOnly}
           className={chipClass(retainerOnly)}
         >
           Retainer
         </button>
-        <button type="button" onClick={() => setNoEmail((v) => !v)} className={chipClass(noEmail)}>
+        <button
+          type="button"
+          onClick={() => setNoEmail((v) => !v)}
+          aria-pressed={noEmail}
+          className={chipClass(noEmail)}
+        >
           No email
         </button>
-        <button type="button" onClick={() => setNoPhone((v) => !v)} className={chipClass(noPhone)}>
+        <button
+          type="button"
+          onClick={() => setNoPhone((v) => !v)}
+          aria-pressed={noPhone}
+          className={chipClass(noPhone)}
+        >
           No phone
         </button>
         {anyFilter && (

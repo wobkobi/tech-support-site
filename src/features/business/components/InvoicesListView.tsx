@@ -4,12 +4,14 @@
 // and clickable summary cards. Status is shown as a derived badge (SENT-past-due surfaces
 // as OVERDUE) - there is no inline status dropdown; a payment is recorded through
 // PaymentDialog (POST /pay), and voiding lives on the invoice detail page so a client
-// notification can be sent.
+// notification can be sent. Filters, sort and page live in the URL (?status=overdue),
+// so Back from an invoice and the dashboard's deep links land on the same view.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
 import { InvoiceStatusBadge } from "@/features/business/components/invoice/InvoiceStatusBadge";
 import { PaymentDialog } from "@/features/business/components/invoice/PaymentDialog";
 import { formatNZD } from "@/features/business/lib/business";
@@ -88,9 +90,11 @@ async function fetchInvoices(): Promise<Invoice[]> {
 /**
  * Client component listing all invoices with search, filters, sortable columns,
  * summary cards, and a payment-recording action.
+ * @param props - Component props.
+ * @param props.query - The page's searchParams, the starting filters.
  * @returns The invoices list element.
  */
-export function InvoicesListView(): React.ReactElement {
+export function InvoicesListView({ query }: { query: PageQuery }): React.ReactElement {
   const { toast } = useToast();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,13 +102,31 @@ export function InvoicesListView(): React.ReactElement {
   const [retrying, setRetrying] = useState(false);
   const [syncMode, setSyncMode] = useState<SyncMode>(null);
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<FilterKey>("all");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("issued");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [page, setPage] = useState(1);
+  // The URL carries statuses in lower case (?status=overdue).
+  const [search, setSearch] = useState(() => queryValue(query, "q"));
+  const [statusFilter, setStatusFilter] = useState<FilterKey>(() => {
+    const v = queryValue(query, "status").toUpperCase();
+    return FILTER_OPTIONS.find((o) => o.value === v)?.value ?? "all";
+  });
+  const [fromDate, setFromDate] = useState(() => queryValue(query, "from"));
+  const [toDate, setToDate] = useState(() => queryValue(query, "to"));
+  const [sortKey, setSortKey] = useState<SortKey>(() => {
+    const v = queryValue(query, "sort");
+    return COLUMNS.find((c) => c.key === v)?.key ?? "issued";
+  });
+  const [sortDir, setSortDir] = useState<SortDir>(() =>
+    queryValue(query, "dir") === "asc" ? "asc" : "desc",
+  );
+  const [page, setPage] = useState(() => Math.max(1, Number(queryValue(query, "page")) || 1));
+  useQuerySync({
+    q: search,
+    status: statusFilter === "all" ? "" : statusFilter.toLowerCase(),
+    from: fromDate,
+    to: toDate,
+    sort: sortKey === "issued" && sortDir === "desc" ? "" : sortKey,
+    dir: sortKey === "issued" && sortDir === "desc" ? "" : sortDir,
+    page: page > 1 ? String(page) : "",
+  });
   const [payTarget, setPayTarget] = useState<Invoice | null>(null);
 
   // One "now" per mount so the OVERDUE derivation stays stable across renders.

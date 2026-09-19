@@ -13,6 +13,7 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
+import { mapsSearchUrl } from "@/features/booking/lib/booking";
 import { isPastEditWindow } from "@/shared/lib/edit-window";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -155,10 +156,7 @@ export function BookingActions({
       : null;
   const invoiceHref = invoiceId ? `/admin/business/invoices/${invoiceId}` : null;
   // Directions only matter while the visit is still ahead.
-  const mapsHref =
-    isOpen && address
-      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
-      : null;
+  const mapsHref = isOpen && address ? mapsSearchUrl(address) : null;
   const showPhoneBar = phone != null || mapsHref != null || isConfirmed || isCompleted;
 
   /** Opens the complete dialog with the review email ticked. */

@@ -203,6 +203,8 @@ export async function PATCH(
   if (body.email !== undefined) data.email = body.email.trim();
   if (body.phone !== undefined) data.phone = toE164NZ(body.phone) || null;
   if (body.notes !== undefined) data.notes = body.notes;
+  // The column is what the detail page, its Maps button and the emails read.
+  if (body.address !== undefined) data.address = body.address.trim() || null;
 
   if (body.address !== undefined && body.notes === undefined) {
     const currentNotes = booking.notes ?? "";

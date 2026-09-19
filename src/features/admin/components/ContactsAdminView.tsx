@@ -6,6 +6,7 @@
 
 import { FLUSH_ON_PHONE } from "@/features/admin/components/ui/Card";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import type { PageQuery } from "@/features/admin/hooks/use-query-sync";
 import type { ConflictEntry } from "@/features/contacts/lib/maintenance";
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
@@ -16,6 +17,8 @@ import { ContactAdminList, type ContactRow } from "./ContactAdminList";
 interface ContactsAdminViewProps {
   initialConflicts: ConflictEntry[];
   contacts: ContactRow[];
+  /** The page's searchParams, the list's starting filters. */
+  query: PageQuery;
 }
 
 /**
@@ -23,11 +26,13 @@ interface ContactsAdminViewProps {
  * @param props - Component props.
  * @param props.initialConflicts - Conflicts pre-computed by enrichContactsFromBookings on page load.
  * @param props.contacts - All contact rows to display.
+ * @param props.query - The page's searchParams, the list's starting filters.
  * @returns Contacts admin view element.
  */
 export function ContactsAdminView({
   initialConflicts,
   contacts,
+  query,
 }: ContactsAdminViewProps): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -276,7 +281,7 @@ export function ContactsAdminView({
             FLUSH_ON_PHONE,
           )}
         >
-          <ContactAdminList contacts={contacts} />
+          <ContactAdminList contacts={contacts} query={query} />
         </div>
       </div>
       {/* end left column */}

@@ -7,6 +7,7 @@
 
 import { Card } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
+import type { PageQuery } from "@/features/admin/hooks/use-query-sync";
 import {
   BookingAdminList,
   type AdminBookingRow,
@@ -25,10 +26,17 @@ export const metadata: Metadata = {
 
 /**
  * Admin bookings page listing all bookings with StatCards, filters, and sort.
+ * @param props - Page props.
+ * @param props.searchParams - The list's filters (status, q, from, to).
  * @returns Bookings page element.
  */
-export default async function AdminBookingsPage(): Promise<React.ReactElement> {
+export default async function AdminBookingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageQuery>;
+}): Promise<React.ReactElement> {
   await requireAdminAuth();
+  const query = await searchParams;
 
   // Soft cap to prevent unbounded scans as the booking history grows.
   // Swap for cursor pagination if more than the most recent 1000 bookings ever needs to be visible.
@@ -78,7 +86,7 @@ export default async function AdminBookingsPage(): Promise<React.ReactElement> {
     <>
       <PageHeader title="Bookings" description="Search, filter, and manage customer bookings." />
       <Card flushOnPhone className="sm:p-6">
-        <BookingAdminList bookings={bookingRows} />
+        <BookingAdminList bookings={bookingRows} query={query} />
       </Card>
     </>
   );

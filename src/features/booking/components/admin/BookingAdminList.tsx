@@ -5,12 +5,15 @@
 // set (cancel, no-show, delete) live on the booking detail page now; the list keeps only
 // the two common quick actions - mark completed and send / resend review - each behind a
 // ConfirmDialog and routed through useBookingActions. Each row links to its detail page.
+// The status, search and date range live in the URL (?status=held&q=...), so Back from
+// a booking and the dashboard's deep links land on the same view.
 
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
+import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
@@ -44,6 +47,7 @@ export interface AdminBookingRow {
 }
 
 type StatusFilter = "all" | "held" | "confirmed" | "cancelled" | "completed";
+const FILTERS: StatusFilter[] = ["all", "confirmed", "held", "completed", "cancelled"];
 type SortKey = "name" | "start" | "status";
 type SortDir = "asc" | "desc";
 
@@ -85,23 +89,36 @@ interface PendingAction {
  * quick actions (mark completed, send review).
  * @param props - Component props.
  * @param props.bookings - Initial booking rows from the server.
+ * @param props.query - The page's searchParams, the starting filters.
  * @returns Booking admin list element.
  */
 export function BookingAdminList({
   bookings: initial,
+  query: pageQuery,
 }: {
   bookings: AdminBookingRow[];
+  query: PageQuery;
 }): React.ReactElement {
   const actions = useBookingActions();
   const [bookings, setBookings] = useState<AdminBookingRow[]>(initial);
-  // Opens on confirmed work, or on everything when nothing is confirmed, so the
-  // page never lands on an empty list.
-  const [filter, setFilter] = useState<StatusFilter>(() =>
+  // With no status in the URL: confirmed work, or everything when nothing is
+  // confirmed, so the page never lands on an empty list.
+  const [defaultFilter] = useState<StatusFilter>(() =>
     initial.some((b) => b.status === "confirmed") ? "confirmed" : "all",
   );
-  const [query, setQuery] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [filter, setFilter] = useState<StatusFilter>(() => {
+    const fromUrl = queryValue(pageQuery, "status");
+    return FILTERS.find((f) => f === fromUrl) ?? defaultFilter;
+  });
+  const [query, setQuery] = useState(() => queryValue(pageQuery, "q"));
+  const [dateFrom, setDateFrom] = useState(() => queryValue(pageQuery, "from"));
+  const [dateTo, setDateTo] = useState(() => queryValue(pageQuery, "to"));
+  useQuerySync({
+    status: filter === defaultFilter ? "" : filter,
+    q: query,
+    from: dateFrom,
+    to: dateTo,
+  });
   const [sortKey, setSortKey] = useState<SortKey>("start");
   const [sortDir, setSortDir] = useState<SortDir>(() => startDirFor(filter));
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -304,8 +321,6 @@ export function BookingAdminList({
       }),
     );
   }
-
-  const FILTERS: StatusFilter[] = ["all", "confirmed", "held", "completed", "cancelled"];
 
   return (
     <div className="flex flex-col gap-4">
