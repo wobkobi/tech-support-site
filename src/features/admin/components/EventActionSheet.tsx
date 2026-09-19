@@ -7,6 +7,7 @@
 
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { useDialogKeys } from "@/features/admin/hooks/use-dialog-keys";
 import type {
   BookingStatus,
   WeekEvent,
@@ -76,35 +77,16 @@ export function EventActionSheet({
   const [sendReview, setSendReview] = useState(true);
   const [draftInvoice, setDraftInvoice] = useState(true);
 
-  // Keep the latest onClose without re-running the dialog effect (parent passes
-  // a fresh closure each render). Updated in an effect so the ref is never
-  // written during render.
-  const onCloseRef = useRef(onClose);
-  // Mirrors `pending` so the Escape handler can defer to the confirm dialog
-  // without the effect depending on it.
-  const pendingRef = useRef<PendingAction | null>(pending);
-  useEffect(() => {
-    onCloseRef.current = onClose;
-    pendingRef.current = pending;
-  });
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Escape closes and Tab stays in the sheet. While a confirm dialog is open
+  // over it, that dialog takes the keys instead.
+  useDialogKeys(panelRef, true, onClose);
 
-  // Close on Escape and restore focus to the opener when the sheet unmounts.
+  // Move focus into the sheet, and back to the opener when it unmounts.
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
-    /**
-     * Closes the sheet when Escape is pressed. While a confirm dialog is open
-     * the key belongs to that dialog, so the sheet stays put.
-     * @param e - Keydown event.
-     */
-    function onKey(e: KeyboardEvent): void {
-      if (e.key !== "Escape" || pendingRef.current) return;
-      onCloseRef.current();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      opener?.focus?.();
-    };
+    panelRef.current?.focus();
+    return () => opener?.focus?.();
   }, []);
 
   const booking = event.booking;
@@ -113,6 +95,9 @@ export function EventActionSheet({
   const isCancelled = status === "cancelled";
   const isCompleted = status === "completed";
   const isConfirmed = status === "confirmed";
+  // A completed job already happened, so cancelling it would only send the
+  // customer a Google "cancelled" email for a visit they had.
+  const isOpen = !isCancelled && !isCompleted;
   const isTestBooking = booking.name.toLowerCase().includes("test");
   // Cancel / no-show lock 18h after the booking ends, mirroring the server
   // guard, so the operator sees it up front rather than via a rejection toast.
@@ -149,16 +134,16 @@ export function EventActionSheet({
 
   /**
    * Cancels the booking. operator = no customer fee; on-behalf = standard
-   * cancellation-fee rules (same wording as BookingAdminList for parity).
+   * cancellation-fee rules. Keep the wording in step with BookingActions.
    * @param mode - Cancellation policy mode.
    */
   function handleCancel(mode: "operator" | "on-behalf"): void {
     setPending({
-      title: mode === "operator" ? "Cancel this booking?" : "Cancel for the customer?",
+      title: mode === "operator" ? "Cancel this booking on my end?" : "Cancel for the customer?",
       body:
         mode === "operator"
-          ? "Cancelled on your end - no fee will be charged to the customer."
-          : "The standard cancellation fee rules will apply (call-out + travel inside the fee windows).",
+          ? "No fee will be charged to the customer."
+          : "The standard cancellation fee rules apply (call-out + travel inside the fee windows).",
       confirmLabel: "Cancel booking",
       tone: "danger",
       target: { kind: "cancel", mode },
@@ -206,12 +191,22 @@ export function EventActionSheet({
     ) : pending?.target.kind === "no-show" ? (
       <div className="flex flex-col gap-2">
         <p>The call-out fee plus round-trip travel is charged for a no-show.</p>
+        <p>The calendar event is removed without emailing the customer.</p>
         <AdminCheckbox
           checked={draftInvoice}
           onChange={setDraftInvoice}
           disabled={busy}
           label="Draft the invoice for it"
         />
+      </div>
+    ) : pending?.target.kind === "cancel" ? (
+      // Every booking on the schedule has its Google event, and deleting it is
+      // the only notice the customer gets - the site sends none of its own.
+      <div className="flex flex-col gap-2">
+        <p>{pending.body}</p>
+        <p className="font-medium text-admin-text">
+          Google Calendar emails the customer that the visit is cancelled.
+        </p>
       </div>
     ) : (
       pending?.body
@@ -226,8 +221,10 @@ export function EventActionSheet({
       onClick={onClose}
     >
       <div
+        ref={panelRef}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg rounded-xl bg-admin-surface p-4 shadow-xl"
+        className="w-full max-w-lg rounded-xl bg-admin-surface p-4 shadow-xl outline-none"
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -238,7 +235,7 @@ export function EventActionSheet({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-admin-faint hover:bg-admin-bg hover:text-admin-text"
+            className="-my-1.5 -mr-2 inline-flex size-11 shrink-0 items-center justify-center rounded-md text-xl text-admin-muted hover:bg-admin-bg hover:text-admin-text"
           >
             ×
           </button>
@@ -252,7 +249,7 @@ export function EventActionSheet({
             View details
           </a>
 
-          {isEditLocked && !isCancelled && (
+          {isEditLocked && isOpen && (
             <p className="px-1 text-center text-xs text-admin-faint">
               Cancelling locks {lockHours}h after a booking ends. Completing stays open.
             </p>
@@ -280,7 +277,7 @@ export function EventActionSheet({
             </button>
           )}
 
-          {!isCancelled && (
+          {isOpen && (
             <>
               <button
                 type="button"
@@ -325,7 +322,7 @@ export function EventActionSheet({
                 type="button"
                 onClick={handleResendReview}
                 disabled={busy}
-                className="inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-400/15 px-4 text-sm font-semibold text-moonstone-300 hover:bg-moonstone-400/25 disabled:opacity-50"
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-400/15 px-4 text-sm font-semibold text-moonstone-700 hover:bg-moonstone-400/25 disabled:opacity-50"
               >
                 Send review email
               </button>

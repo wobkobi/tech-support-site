@@ -15,7 +15,10 @@ import {
 } from "@/features/business/lib/invoice-numbering";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
-import { settlePromoRedemption } from "@/features/business/lib/promo-redemption";
+import {
+  releaseBookingRedemptions,
+  settlePromoRedemption,
+} from "@/features/business/lib/promo-redemption";
 import { parseAmount, parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -232,14 +235,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   //
   // Quotes are excluded: a quote is not a use of the promo, and counting one
   // would burn a redemption on work that may never happen.
+  const billedBookingId = parseObjectId(bookingId);
   if (!isQuote && promoId && discount > 0) {
     await settlePromoRedemption({
       promoId,
       invoiceId: invoice.id,
-      bookingId: parseObjectId(bookingId),
+      bookingId: billedBookingId,
       contactId: parseObjectId(contactId),
       discountValue: discount,
     });
+  } else if (!isQuote && billedBookingId) {
+    // Billed with no promo discount (skipped, or the job fell short of the
+    // spend floor), so the booking-time redemption was never really used.
+    await releaseBookingRedemptions(billedBookingId);
   }
 
   // Keep the Sheets counter in sync; the helper swallows + logs failures so the

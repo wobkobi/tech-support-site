@@ -165,24 +165,29 @@ async function generateEstimate(
   incrementMins: number,
   maxJobMins: number,
 ): Promise<EstimateResult> {
-  // A client-side timeout well under the 60s function ceiling turns a hung
-  // upstream call into the route's 422 shape instead of burning the full budget.
+  // Keep the whole call under the 60s function ceiling, so a hung upstream
+  // lands in the route's 422 shape instead of a 504. Per-attempt timeouts alone
+  // can't: the SDK sleeps for a 429's retry-after (up to 60s) before its one
+  // retry, so the signal caps attempts and that sleep together.
   const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
-    timeout: 30_000,
+    timeout: 20_000,
     maxRetries: 1,
   });
-  const completion = await client.chat.completions.create({
-    model: "gpt-4.1-mini",
-    max_tokens: 350,
-    temperature: 0,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "system", content: context },
-      { role: "user", content: userMessage },
-    ],
-  });
+  const completion = await client.chat.completions.create(
+    {
+      model: "gpt-4.1-mini",
+      max_tokens: 350,
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: context },
+        { role: "user", content: userMessage },
+      ],
+    },
+    { signal: AbortSignal.timeout(45_000) },
+  );
 
   const text = completion.choices[0]?.message?.content ?? "";
   const parsed = JSON.parse(text) as EstimateResult;

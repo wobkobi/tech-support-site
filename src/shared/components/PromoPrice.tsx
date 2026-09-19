@@ -33,6 +33,6 @@ export function PromoPrice({
   className,
 }: PromoPriceProps): React.ReactElement {
   return (
-    <span className={cn(discounted && "font-bold text-coquelicot-500", className)}>{children}</span>
+    <span className={cn(discounted && "font-bold text-coquelicot-700", className)}>{children}</span>
   );
 }

@@ -136,7 +136,7 @@ export function PhoneInput({
           renders on customer-facing forms, and at text-xs it was the smallest
           error message on the site - on the field most likely to be mistyped. */}
       {!hideError && activeError && (
-        <p id={describedBy} className="mt-1 text-sm text-coquelicot-400">
+        <p id={describedBy} className="mt-1 text-sm text-error">
           {activeError}
         </p>
       )}

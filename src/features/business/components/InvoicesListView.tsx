@@ -4,12 +4,14 @@
 // and clickable summary cards. Status is shown as a derived badge (SENT-past-due surfaces
 // as OVERDUE) - there is no inline status dropdown; a payment is recorded through
 // PaymentDialog (POST /pay), and voiding lives on the invoice detail page so a client
-// notification can be sent.
+// notification can be sent. Filters, sort and page live in the URL (?status=overdue),
+// so Back from an invoice and the dashboard's deep links land on the same view.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
 import { InvoiceStatusBadge } from "@/features/business/components/invoice/InvoiceStatusBadge";
 import { PaymentDialog } from "@/features/business/components/invoice/PaymentDialog";
 import { formatNZD } from "@/features/business/lib/business";
@@ -20,6 +22,7 @@ import {
 import type { Invoice } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { nzDateKey } from "@/shared/lib/timezone-utils";
 import Link from "next/link";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -74,43 +77,83 @@ function canPay(inv: Invoice): boolean {
 }
 
 /**
+ * Fetches the full invoice list.
+ * @returns The invoices.
+ */
+async function fetchInvoices(): Promise<Invoice[]> {
+  const r = await fetch("/api/business/invoices");
+  const d = (await r.json().catch(() => null)) as { ok?: boolean; invoices?: Invoice[] } | null;
+  if (!d?.ok || !d.invoices) throw new Error(`Invoice list failed to load (${r.status})`);
+  return d.invoices;
+}
+
+/**
  * Client component listing all invoices with search, filters, sortable columns,
  * summary cards, and a payment-recording action.
+ * @param props - Component props.
+ * @param props.query - The page's searchParams, the starting filters.
  * @returns The invoices list element.
  */
-export function InvoicesListView(): React.ReactElement {
+export function InvoicesListView({ query }: { query: PageQuery }): React.ReactElement {
   const { toast } = useToast();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [syncMode, setSyncMode] = useState<SyncMode>(null);
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<FilterKey>("all");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("issued");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [page, setPage] = useState(1);
+  // The URL carries statuses in lower case (?status=overdue).
+  const [search, setSearch] = useState(() => queryValue(query, "q"));
+  const [statusFilter, setStatusFilter] = useState<FilterKey>(() => {
+    const v = queryValue(query, "status").toUpperCase();
+    return FILTER_OPTIONS.find((o) => o.value === v)?.value ?? "all";
+  });
+  const [fromDate, setFromDate] = useState(() => queryValue(query, "from"));
+  const [toDate, setToDate] = useState(() => queryValue(query, "to"));
+  const [sortKey, setSortKey] = useState<SortKey>(() => {
+    const v = queryValue(query, "sort");
+    return COLUMNS.find((c) => c.key === v)?.key ?? "issued";
+  });
+  const [sortDir, setSortDir] = useState<SortDir>(() =>
+    queryValue(query, "dir") === "asc" ? "asc" : "desc",
+  );
+  const [page, setPage] = useState(() => Math.max(1, Number(queryValue(query, "page")) || 1));
+  useQuerySync({
+    q: search,
+    status: statusFilter === "all" ? "" : statusFilter.toLowerCase(),
+    from: fromDate,
+    to: toDate,
+    sort: sortKey === "issued" && sortDir === "desc" ? "" : sortKey,
+    dir: sortKey === "issued" && sortDir === "desc" ? "" : sortDir,
+    page: page > 1 ? String(page) : "",
+  });
   const [payTarget, setPayTarget] = useState<Invoice | null>(null);
 
   // One "now" per mount so the OVERDUE derivation stays stable across renders.
   const now = useMemo(() => new Date(), []);
 
   useEffect(() => {
-    fetch("/api/business/invoices")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.ok) setInvoices(d.invoices);
-      })
-      .catch(() => toast("Couldn't load invoices. Refresh to try again.", { tone: "error" }))
+    fetchInvoices()
+      .then(setInvoices)
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
-  }, [toast]);
+  }, []);
 
-  /** Reloads the full invoice list from the server. */
+  /**
+   * Reloads the full invoice list from the server. A failure keeps the rows
+   * already on screen and raises the banner, so an outage never reads as an
+   * empty ledger.
+   */
   async function reload(): Promise<void> {
-    const r = await fetch("/api/business/invoices");
-    const d = await r.json();
-    if (d.ok) setInvoices(d.invoices);
+    setRetrying(true);
+    try {
+      setInvoices(await fetchInvoices());
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setRetrying(false);
+    }
   }
 
   /**
@@ -118,9 +161,15 @@ export function InvoicesListView(): React.ReactElement {
    * @param id - Invoice ID to refresh.
    */
   async function refreshInvoice(id: string): Promise<void> {
-    const r = await fetch(`/api/business/invoices/${id}`);
-    const d = await r.json();
-    if (d.ok) setInvoices((prev) => prev.map((i) => (i.id === id ? d.invoice : i)));
+    try {
+      const r = await fetch(`/api/business/invoices/${id}`);
+      const d = await r.json();
+      if (!d.ok) throw new Error(`refresh failed (${r.status})`);
+      setInvoices((prev) => prev.map((i) => (i.id === id ? d.invoice : i)));
+    } catch {
+      // The payment itself saved; only this row is stale.
+      setLoadError(true);
+    }
   }
 
   /** Imports new invoices from Google Drive PDFs and refreshes the list. */
@@ -243,8 +292,6 @@ export function InvoicesListView(): React.ReactElement {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const from = fromDate ? new Date(fromDate) : null;
-    const to = toDate ? new Date(`${toDate}T23:59:59`) : null;
     return invoices.filter((inv) => {
       if (q && !inv.number.toLowerCase().includes(q) && !inv.clientName.toLowerCase().includes(q)) {
         return false;
@@ -258,9 +305,12 @@ export function InvoicesListView(): React.ReactElement {
         // the hood but must not surface under those filters.
         return false;
       }
-      const issued = new Date(inv.issueDate);
-      if (from && issued < from) return false;
-      if (to && issued > to) return false;
+      // Compare NZ calendar days as strings. Parsing an input's YYYY-MM-DD as a
+      // Date gives UTC midnight, midday in NZ, which cuts the morning off the
+      // first day.
+      const issued = nzDateKey(new Date(inv.issueDate));
+      if (fromDate && issued < fromDate) return false;
+      if (toDate && issued > toDate) return false;
       return true;
     });
   }, [invoices, search, statusFilter, fromDate, toDate, now]);
@@ -302,6 +352,12 @@ export function InvoicesListView(): React.ReactElement {
   );
   const rangeStart = sorted.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(currentPage * PAGE_SIZE, sorted.length);
+  const emptyText =
+    invoices.length > 0
+      ? "No invoices match your filters."
+      : loadError
+        ? "Invoices didn't load."
+        : "No invoices yet.";
 
   return (
     <div>
@@ -444,6 +500,22 @@ export function InvoicesListView(): React.ReactElement {
         )}
       </div>
 
+      {loadError && (
+        <div
+          role="alert"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+        >
+          <span>
+            {invoices.length === 0
+              ? "Couldn't load invoices."
+              : "Couldn't refresh invoices - the list may be out of date."}
+          </span>
+          <AdminButton size="xs" variant="secondary" onClick={() => void reload()} busy={retrying}>
+            Try again
+          </AdminButton>
+        </div>
+      )}
+
       {/* Mobile card list - below lg the table is hard to read; stack each row
           as a tap-to-open card with the derived status badge. */}
       <div className="space-y-2 lg:hidden">
@@ -453,7 +525,7 @@ export function InvoicesListView(): React.ReactElement {
           </p>
         ) : sorted.length === 0 ? (
           <p className="rounded-xl border border-admin-border bg-admin-surface px-5 py-6 text-sm text-admin-faint shadow-sm">
-            {invoices.length === 0 ? "No invoices yet." : "No invoices match your filters."}
+            {emptyText}
           </p>
         ) : (
           paged.map((inv) => (
@@ -529,9 +601,7 @@ export function InvoicesListView(): React.ReactElement {
         {loading ? (
           <p className="px-5 py-6 text-sm text-admin-faint">Loading...</p>
         ) : sorted.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-admin-faint">
-            {invoices.length === 0 ? "No invoices yet." : "No invoices match your filters."}
-          </p>
+          <p className="px-5 py-6 text-sm text-admin-faint">{emptyText}</p>
         ) : (
           <table className="w-full text-sm">
             <thead className="border-b border-admin-border bg-admin-bg">

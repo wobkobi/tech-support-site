@@ -4,16 +4,24 @@
 // the field state and mirrors every change to the parent via `onChange` (so a live
 // preview can render alongside); the PARENT owns submission. Creation stays in the
 // calculator - this form only edits an existing DRAFT. Totals use calcInvoiceTotals (the
-// same fn the server recomputes with), and the email is checked with the booking
-// `validateEmail`.
+// same fn the server recomputes with). Client name and email problems show under their
+// fields; line-item and total problems show above the save button.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { FieldError } from "@/features/admin/components/ui/FieldError";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
-import { validateEmail } from "@/features/booking/lib/booking";
+import { useUnsavedChangesWarning } from "@/features/admin/hooks/use-unsaved-changes-warning";
+import {
+  type ContactFieldErrors,
+  checkContactFields,
+  focusFirstInvalid,
+} from "@/features/admin/lib/contact-fields";
 import { LineItemsEditor } from "@/features/business/components/invoice/LineItemsEditor";
 import { calcInvoiceTotals, formatNZD, isValidLineItem } from "@/features/business/lib/business";
 import type { LineItem } from "@/features/business/types/business";
+import { EmailInput } from "@/shared/components/EmailInput";
 import { cn } from "@/shared/lib/cn";
+import { addDaysToDateKey } from "@/shared/lib/timezone-utils";
 import type React from "react";
 import { useState } from "react";
 
@@ -58,17 +66,20 @@ interface InvoiceFormProps {
 
 const LABEL_CLS = "mb-1 block text-xs font-semibold text-admin-muted uppercase";
 
+/** DOM ids of the client fields, for focusing the first bad one. */
+const FIELD_IDS = { name: "invoice-client-name", email: "invoice-client-email" };
+
 /**
- * Adds `days` to an ISO YYYY-MM-DD date, returning ISO YYYY-MM-DD.
+ * Adds `days` to an ISO YYYY-MM-DD date, returning ISO YYYY-MM-DD. Works on the
+ * date string alone: reading a local midnight back through toISOString (UTC)
+ * lands on the day before anywhere east of Greenwich, NZ included.
  * @param iso - Base date (YYYY-MM-DD).
  * @param days - Days to add.
- * @returns The shifted date, or the input unchanged when unparseable.
+ * @returns The shifted date, or the input unchanged when it isn't a full date
+ *   (a cleared date input gives "").
  */
 function addDaysISO(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? addDaysToDateKey(iso, days) : iso;
 }
 
 /**
@@ -96,6 +107,10 @@ export function InvoiceForm({
 }: InvoiceFormProps): React.ReactElement {
   const [form, setForm] = useState<InvoiceFormData>(initial);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<ContactFieldErrors>({});
+  // Saving routes away client-side, which never fires beforeunload, so the
+  // prompt only ever guards edits that haven't gone in.
+  useUnsavedChangesWarning(JSON.stringify(form) !== JSON.stringify(initial));
 
   /**
    * Merges a patch into the form and notifies the parent for the live preview.
@@ -119,21 +134,13 @@ export function InvoiceForm({
    * Validates the form and hands off to the parent on success.
    */
   function submit(): void {
-    if (!form.clientName.trim()) {
-      setError("Client name is required.");
-      return;
-    }
-    const emailCheck = validateEmail(form.clientEmail);
-    if (emailCheck === "empty") {
-      setError("Client email is required.");
-      return;
-    }
-    if (emailCheck === "invalid") {
-      setError("Enter a valid email address.");
-      return;
-    }
-    if (emailCheck === "too-long") {
-      setError("Email is too long.");
+    const found = checkContactFields(
+      { name: form.clientName, email: form.clientEmail },
+      { emailRequired: true },
+    );
+    setFieldErrors(found);
+    if (focusFirstInvalid(found, FIELD_IDS)) {
+      setError(null);
       return;
     }
     if (form.lineItems.length === 0) {
@@ -161,26 +168,43 @@ export function InvoiceForm({
       className="space-y-5"
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <label>
-          <span className={LABEL_CLS}>Client name</span>
+        <div>
+          <label htmlFor={FIELD_IDS.name} className={LABEL_CLS}>
+            Client name
+          </label>
           <input
+            id={FIELD_IDS.name}
             type="text"
             value={form.clientName}
-            onChange={(e) => update({ clientName: e.target.value })}
+            onChange={(e) => {
+              update({ clientName: e.target.value });
+              setFieldErrors((prev) => ({ ...prev, name: undefined }));
+            }}
             disabled={busy}
-            className={ADMIN_INPUT_CLS}
+            aria-invalid={fieldErrors.name ? true : undefined}
+            aria-describedby={fieldErrors.name ? `${FIELD_IDS.name}-error` : undefined}
+            className={cn(ADMIN_INPUT_CLS, fieldErrors.name && "border-coquelicot-500/60")}
           />
-        </label>
-        <label>
-          <span className={LABEL_CLS}>Client email</span>
-          <input
-            type="email"
+          <FieldError id={`${FIELD_IDS.name}-error`} message={fieldErrors.name} />
+        </div>
+        <div>
+          <label htmlFor={FIELD_IDS.email} className={LABEL_CLS}>
+            Client email
+          </label>
+          <EmailInput
+            id={FIELD_IDS.email}
             value={form.clientEmail}
-            onChange={(e) => update({ clientEmail: e.target.value })}
+            onChange={(v) => {
+              update({ clientEmail: v });
+              setFieldErrors((prev) => ({ ...prev, email: undefined }));
+            }}
+            error={fieldErrors.email}
+            maxLength={320}
+            autoComplete="off"
             disabled={busy}
             className={ADMIN_INPUT_CLS}
           />
-        </label>
+        </div>
         <label>
           <span className={LABEL_CLS}>Issue date</span>
           <input

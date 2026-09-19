@@ -49,7 +49,7 @@ export function Field({
     <div className={className}>
       <label htmlFor={htmlFor} className="mb-1 block text-xs font-semibold text-slate-600">
         {label}
-        {required && <span className="ml-0.5 text-coquelicot-500">*</span>}
+        {required && <span className="ml-0.5 text-error">*</span>}
         {!required && optional && (
           <span className="ml-1 font-normal text-slate-400">(optional)</span>
         )}

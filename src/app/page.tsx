@@ -7,31 +7,22 @@ import { Button } from "@/shared/components/Button";
 import { FrostedSection, PageShell, CARD as SHARED_CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
+import { SERVICE_AREAS } from "@/shared/lib/service-areas";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import { unstable_cache } from "next/cache";
 import Image from "next/image";
+import Link from "next/link";
 import type React from "react";
 import type { IconType } from "react-icons";
 import {
   FaCalendarCheck,
   FaCircleCheck,
-  FaCloud,
   FaDownload,
   FaEnvelope,
   FaHandshake,
-  FaHouse,
-  FaImages,
-  FaLaptop,
   FaMapLocationDot,
-  FaMobileScreen,
   FaPhone,
-  FaPrint,
-  FaRightLeft,
-  FaShieldHalved,
-  FaToolbox,
-  FaTv,
-  FaWifi,
 } from "react-icons/fa6";
 
 export const metadata: Metadata = {
@@ -65,24 +56,33 @@ const getApprovedReviews = unstable_cache(
   { tags: ["reviews"], revalidate: 86400 },
 );
 
-interface SupportItem {
-  label: string;
+interface TrustPoint {
+  title: string;
+  body: string;
   icon: IconType;
+  /** Stagger class, written out whole so Tailwind picks it up. */
+  delay: string;
 }
 
-const supportItems: ReadonlyArray<SupportItem> = [
-  { label: "Computers & Laptops", icon: FaLaptop },
-  { label: "Phones & Tablets", icon: FaMobileScreen },
-  { label: "Wi-Fi & Networks", icon: FaWifi },
-  { label: "Smart TVs", icon: FaTv },
-  { label: "Smart Home", icon: FaHouse },
-  { label: "Printers", icon: FaPrint },
-  { label: "Cloud & Backups", icon: FaCloud },
-  { label: "Email Setup", icon: FaEnvelope },
-  { label: "Security", icon: FaShieldHalved },
-  { label: "Data Transfer", icon: FaRightLeft },
-  { label: "Repairs", icon: FaToolbox },
-  { label: "Photo Storage", icon: FaImages },
+const trustPoints: ReadonlyArray<TrustPoint> = [
+  {
+    title: "Computer Science Graduate",
+    body: "A computer science degree behind the advice, plus years of hands-on experience",
+    icon: FaCircleCheck,
+    delay: "animate-delay-100",
+  },
+  {
+    title: "Proudly Local",
+    body: "Auckland born and raised, and I come to you anywhere in the city",
+    icon: FaMapLocationDot,
+    delay: "animate-delay-200",
+  },
+  {
+    title: "No Upselling",
+    body: "If you don't need something, I'll say so - you won't be sold anything extra",
+    icon: FaHandshake,
+    delay: "animate-delay-300",
+  },
 ];
 
 // Home cards are the shared CARD with a touch more padding on md+. Deriving
@@ -143,12 +143,17 @@ export default async function Home(): Promise<React.ReactElement> {
               English, and don't leave until it actually works.
             </p>
 
-            <div className="flex flex-wrap items-center justify-center gap-4">
-              <Button href="/booking" variant="primary" size="md" className="h-12">
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">
+              <Button href="/booking" variant="primary" size="md" className="w-full sm:w-auto">
                 <FaCalendarCheck className="h-5 w-5" aria-hidden />
                 Book appointment
               </Button>
-              <Button href={settings.identity.phoneTel} variant="secondary" size="md">
+              <Button
+                href={settings.identity.phoneTel}
+                variant="secondary"
+                size="md"
+                className="w-full sm:w-auto"
+              >
                 <FaPhone className="h-4 w-4" aria-hidden />
                 {settings.identity.phone}
               </Button>
@@ -166,56 +171,28 @@ export default async function Home(): Promise<React.ReactElement> {
             <h2 id="trust-heading" className="sr-only">
               Why choose us
             </h2>
-            <div
-              className={cn(
-                CARD,
-                "animate-slide-up animate-fill-both animate-delay-100 text-center",
-              )}
-            >
-              <div className="mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-400/30">
-                <FaCircleCheck className="h-8 w-8 text-moonstone-400" aria-hidden />
+            {/* A compact row on phones (icon beside the text) instead of three
+                tall centred cards, each of which filled most of a screen. */}
+            {trustPoints.map(({ title, body, icon: Icon, delay }) => (
+              <div
+                key={title}
+                className={cn(
+                  CARD,
+                  "animate-slide-up animate-fill-both flex items-start gap-4 sm:block sm:text-center",
+                  delay,
+                )}
+              >
+                <div className="grid size-12 shrink-0 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-400/30 sm:mx-auto sm:mb-3 sm:size-16">
+                  <Icon className="h-6 w-6 text-moonstone-400 sm:h-8 sm:w-8" aria-hidden />
+                </div>
+                <div>
+                  <h3 className="mb-1 text-lg font-bold text-russian-violet sm:mb-2 sm:text-2xl">
+                    {title}
+                  </h3>
+                  <p className="text-base text-rich-black/80 sm:text-lg">{body}</p>
+                </div>
               </div>
-              <h3 className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl">
-                Computer Science Graduate
-              </h3>
-              <p className="text-base text-rich-black/80 sm:text-lg">
-                A computer science degree behind the advice, plus years of hands-on experience
-              </p>
-            </div>
-
-            <div
-              className={cn(
-                CARD,
-                "animate-slide-up animate-fill-both animate-delay-200 text-center",
-              )}
-            >
-              <div className="mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-400/30">
-                <FaMapLocationDot className="h-8 w-8 text-moonstone-400" aria-hidden />
-              </div>
-              <h3 className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl">
-                Proudly Local
-              </h3>
-              <p className="text-base text-rich-black/80 sm:text-lg">
-                Auckland born and raised, and I come to you anywhere in the city
-              </p>
-            </div>
-
-            <div
-              className={cn(
-                CARD,
-                "animate-slide-up animate-fill-both animate-delay-300 text-center",
-              )}
-            >
-              <div className="mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-400/30">
-                <FaHandshake className="h-8 w-8 text-moonstone-400" aria-hidden />
-              </div>
-              <h3 className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl">
-                No Upselling
-              </h3>
-              <p className="text-base text-rich-black/80 sm:text-lg">
-                If you don't need something, I'll say so - you won't be sold anything extra
-              </p>
-            </div>
+            ))}
           </section>
 
           {/* Services Grid */}
@@ -230,18 +207,26 @@ export default async function Home(): Promise<React.ReactElement> {
               What I can help with
             </h2>
 
-            <ul className="mx-auto grid max-w-6xl grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {supportItems.map(({ label, icon: Icon }) => (
-                <li
-                  key={label}
-                  className="flex items-center gap-3 rounded-xl border border-seasalt-200/60 bg-white p-3 shadow-sm transition-all hover:shadow-md"
-                >
-                  <span className="grid size-12 shrink-0 place-items-center rounded-lg border border-moonstone-500/50 bg-moonstone-400/30 sm:size-14">
-                    <Icon className="h-7 w-7 text-moonstone-400 sm:h-8 sm:w-8" aria-hidden />
-                  </span>
-                  <span className="line-clamp-2 text-left text-base leading-tight font-medium text-rich-black sm:text-lg">
-                    {label}
-                  </span>
+            {/* Two tiles a row on phones, with a smaller icon so a two-line label
+                still fits beside it. Each tile opens its card on /services.
+                The label's flex basis is its longest word (basis-0 floored by
+                min-w-min), so on a narrow phone or a large text setting a word
+                that can't fit wraps the label under the icon instead of being
+                clipped. */}
+            <ul className="mx-auto grid max-w-6xl grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+              {SERVICE_AREAS.map(({ slug, homeLabel, icon: Icon }) => (
+                <li key={slug}>
+                  <Link
+                    href={`/services#${slug}`}
+                    className="flex h-full flex-wrap items-center gap-2 rounded-xl border border-seasalt-200/60 bg-white p-2.5 text-left shadow-sm transition-[border-color,box-shadow] hover:border-moonstone-500/60 hover:shadow-md sm:gap-3 sm:p-3"
+                  >
+                    <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-moonstone-500/50 bg-moonstone-400/30 sm:size-14">
+                      <Icon className="h-6 w-6 text-moonstone-400 sm:h-8 sm:w-8" aria-hidden />
+                    </span>
+                    <span className="min-w-min grow basis-0 text-base leading-tight font-medium text-rich-black sm:text-lg">
+                      {homeLabel}
+                    </span>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -313,6 +298,13 @@ export default async function Home(): Promise<React.ReactElement> {
             </article>
           </section>
 
+          {/* Reviews come before the flyer: proof first, then the referral ask. */}
+          {hasReviews && (
+            <div className="animate-fade-in animate-fill-both animate-delay-400">
+              <Reviews items={items} />
+            </div>
+          )}
+
           {/* Download Flyer */}
           <section
             aria-labelledby="flyer-heading"
@@ -348,15 +340,6 @@ export default async function Home(): Promise<React.ReactElement> {
           </section>
         </div>
       </FrostedSection>
-
-      {/* Reviews Section */}
-      {hasReviews && (
-        <div className="animate-fade-in animate-delay-500 animate-fill-both pb-6 sm:pb-8">
-          <FrostedSection>
-            <Reviews items={items} />
-          </FrostedSection>
-        </div>
-      )}
 
       {/* Contact Footer */}
       <footer className="mx-auto mb-6 w-fit max-w-[calc(100vw-2rem)] sm:mb-8">

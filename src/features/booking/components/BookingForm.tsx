@@ -16,14 +16,17 @@ import {
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
 import { PromoCodeField } from "@/features/business/components/PromoCodeField";
+import { formatMoneyCompact } from "@/features/business/lib/business";
 import { normalisePromoCode } from "@/features/business/lib/promos";
 import { fetchQuickEstimate } from "@/features/business/lib/quick-estimate";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { Button } from "@/shared/components/Button";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
+import { PhoneLink } from "@/shared/components/PhoneLink";
 import { cn } from "@/shared/lib/cn";
 import { suggestEmailCorrection } from "@/shared/lib/email-typo-suggestion";
+import { focusAndReveal } from "@/shared/lib/focus-and-reveal";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { isPlausibleName, normaliseName } from "@/shared/lib/normalise-name";
 import { validatePhone } from "@/shared/lib/normalise-phone";
@@ -38,6 +41,45 @@ import { FaCheck } from "react-icons/fa6";
 const DRAFT_KEY = "booking-draft-v2";
 /** Soft warning kicks in this many chars before the notes hard cap. */
 const NOTES_WARN_GAP = 50;
+
+/** Element id of the day picker, the fallback while the time picker is not rendered. */
+const DAY_ANCHOR = "booking-day";
+
+/**
+ * Field-error key > the element id it points at, in form order. The order
+ * matters: the mobile "N issues" link jumps to the first key with an error.
+ */
+const FIELD_ANCHORS: Record<string, string> = {
+  duration: "booking-duration",
+  day: DAY_ANCHOR,
+  time: "booking-time",
+  name: "booking-name",
+  email: "booking-email",
+  phone: "booking-phone",
+  meetingType: "booking-meeting-type",
+  address: "booking-address",
+  notes: "booking-notes",
+};
+
+/**
+ * Moves focus to the field an error names. A button group has no single
+ * input, so focus lands on its selected button, else its first enabled one. A
+ * bare #anchor jump would scroll without focusing anything.
+ * @param key - Field-error key from {@link FIELD_ANCHORS}.
+ */
+function focusField(key: string): void {
+  const anchor = FIELD_ANCHORS[key];
+  // The time picker only renders once a day is picked; fall back to the days.
+  const el =
+    (anchor ? document.getElementById(anchor) : null) ?? document.getElementById(DAY_ANCHOR);
+  if (!el) return;
+  const target = el.matches("input, textarea, button")
+    ? el
+    : (el.querySelector<HTMLElement>('[aria-pressed="true"]') ??
+      el.querySelector<HTMLElement>("input, textarea, button:not(:disabled)") ??
+      el);
+  focusAndReveal(target);
+}
 
 /**
  * Formats a job duration in minutes as a short label ("1 hour", "2 hours", "90 min").
@@ -124,6 +166,10 @@ export interface BookingFormProps {
   travelRatePerHour?: number;
   /** Low-end floor fraction (live setting) for the inline estimate. */
   lowEndFloorFactor?: number;
+  /** Display phone number for the "call or text me" fallbacks. */
+  phone?: string;
+  /** tel: URI for the same fallbacks. */
+  phoneTel?: string;
 }
 
 /**
@@ -138,6 +184,8 @@ export interface BookingFormProps {
  * @param props.minTravelCharge - Travel floor for the inline estimate.
  * @param props.travelRatePerHour - Travel $/hr for the inline estimate.
  * @param props.lowEndFloorFactor - Low-end floor fraction for the inline estimate.
+ * @param props.phone - Display phone number for the call-or-text fallbacks.
+ * @param props.phoneTel - tel: URI for the call-or-text fallbacks.
  * @returns Booking form element
  */
 export default function BookingForm({
@@ -150,6 +198,8 @@ export default function BookingForm({
   minTravelCharge,
   travelRatePerHour,
   lowEndFloorFactor,
+  phone: ownerPhone,
+  phoneTel: ownerPhoneTel,
 }: BookingFormProps): React.ReactElement {
   const router = useRouter();
   const isEditMode = Boolean(cancelToken);
@@ -305,6 +355,7 @@ export default function BookingForm({
         departureTimeIso: slotStart?.toISOString(),
         returnDepartureTimeIso: slotEnd?.toISOString(),
         promoCode,
+        email,
       });
       setQuote({
         low: res.low,
@@ -363,9 +414,13 @@ export default function BookingForm({
   const [error, setError] = useState<string | null>(null);
   // Submit-time validation errors. Rendered both in a top summary and inline.
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  // Anchors the error summary so a submit failure can be scrolled into view -
-  // on a long mobile form the alerts sit above the scrolled-to submit button.
+  // Anchors the error summary so a submit failure can be focused - on a long
+  // mobile form the alerts sit above the scrolled-to submit button.
   const errorSummaryRef = useRef<HTMLDivElement>(null);
+  // The "did you mean?" prompts sit up by their fields, well away from the
+  // submit button that raised them, so a stopped submit moves focus to them.
+  const emailPromptRef = useRef<HTMLDivElement>(null);
+  const addressPromptRef = useRef<HTMLDivElement>(null);
   // True when the server returned 409 (someone booked the same slot first).
   // Drives a more prominent error with a "Refresh available times" link.
   const [slotStale, setSlotStale] = useState(false);
@@ -379,20 +434,34 @@ export default function BookingForm({
   // form then skips the "must pick a suggestion" gate.
   const [mapsFallback, setMapsFallback] = useState(false);
 
-  // Bring the error summary into view when a submit attempt surfaces any alert -
-  // a scrolled-down user on a long mobile form would otherwise miss it.
-  // Honour reduced-motion by jumping instead of smooth-scrolling.
-  const hasSubmitError = slotStale || Boolean(error) || Object.keys(fieldErrors).length > 0;
+  // Where a stopped submit sends focus. `seq` bumps on every attempt so a second
+  // click with the same problem still moves focus. Driven by submits only: the
+  // name and notes checks that run on blur must not yank the page away from the
+  // field being typed in. Null until the first attempt, which also keeps those
+  // blur-time errors inline-only until then.
+  const [attention, setAttention] = useState<{
+    target: "summary" | "email" | "address";
+    seq: number;
+  } | null>(null);
+
+  /**
+   * Sends focus to whatever stopped the submit, once it has rendered.
+   * @param target - The error summary, or one of the "did you mean?" prompts.
+   */
+  function requestAttention(target: "summary" | "email" | "address"): void {
+    setAttention((prev) => ({ target, seq: (prev?.seq ?? 0) + 1 }));
+  }
+
   useEffect(() => {
-    if (!hasSubmitError) return;
-    const reduceMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    errorSummaryRef.current?.scrollIntoView({
-      behavior: reduceMotion ? "auto" : "smooth",
-      block: "center",
-    });
-  }, [hasSubmitError]);
+    if (!attention) return;
+    const el = {
+      summary: errorSummaryRef,
+      email: emailPromptRef,
+      address: addressPromptRef,
+    }[attention.target].current;
+    // An empty summary is display:none and cannot take focus.
+    if (el?.hasChildNodes()) focusAndReveal(el);
+  }, [attention]);
 
   // `submittingRef` blocks Enter-key spam regardless of React's setState timing.
   // `idempotencyKey` is minted once per mount in the lazy useState initialiser (allowed to
@@ -625,12 +694,14 @@ export default function BookingForm({
     setNotes("");
     setContactHint(null);
     setFieldErrors({});
+    setAttention(null);
     setError(null);
     setDraftRestored(false);
   }
 
-  const weekdays = availableDays.filter((d) => !d.isWeekend);
-  const weekends = availableDays.filter((d) => d.isWeekend);
+  // One run in date order, so tomorrow always sits next to today even when it's a
+  // Saturday. Each label carries its weekday name, so weekends still read as such.
+  const daysInOrder = [...availableDays].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 
   /**
    * Handle day selection and reset time if needed
@@ -638,6 +709,7 @@ export default function BookingForm({
    */
   function handleDaySelect(day: BookableDay): void {
     setSelectedDateKey(day.dateKey);
+    clearFieldError("day");
     // Picking a different day clears the stale-slot warning if it was set.
     setSlotStale(false);
     // Time + minute validity gets re-checked during render against the new day
@@ -650,6 +722,7 @@ export default function BookingForm({
    */
   function handleDurationChange(newDuration: JobDuration): void {
     setDuration(newDuration);
+    clearFieldError("duration");
     // Reset time if current selection + minute not available for new duration
     if (selectedTime && selectedDay) {
       const window = selectedDay.timeWindows.find((w) => w.value === selectedTime);
@@ -717,7 +790,10 @@ export default function BookingForm({
     }
 
     setFieldErrors(fe);
-    if (Object.keys(fe).length > 0) return;
+    if (Object.keys(fe).length > 0) {
+      requestAttention("summary");
+      return;
+    }
 
     // Field-errors guard above guarantees these are set; narrow for TS.
     if (!selectedDay || !selectedTime || !duration || !meetingType) return;
@@ -729,6 +805,7 @@ export default function BookingForm({
       const suggestion = suggestEmailCorrection(email);
       if (suggestion) {
         setEmailSuggestion(suggestion);
+        requestAttention("email");
         return;
       }
     }
@@ -755,6 +832,7 @@ export default function BookingForm({
               "We couldn't find that address on the map. Double-check the spelling, or click Submit again to use it as-is.",
             );
             setAddressOverrideAcked(true);
+            requestAttention("summary");
             submittingRef.current = false;
             setSubmitting(false);
             return;
@@ -764,6 +842,7 @@ export default function BookingForm({
           if (!exact) {
             // One candidate > "did you mean?"; several > "which did you mean?".
             setAddressCandidates(candidates);
+            requestAttention("address");
             submittingRef.current = false;
             setSubmitting(false);
             return;
@@ -827,6 +906,7 @@ export default function BookingForm({
         } else {
           setError(data.error || "Could not submit request.");
         }
+        requestAttention("summary");
         submittingRef.current = false;
         setSubmitting(false);
         return;
@@ -854,10 +934,36 @@ export default function BookingForm({
       }
     } catch {
       setError("Network error. Please try again.");
+      requestAttention("summary");
       submittingRef.current = false;
       setSubmitting(false);
     }
   }
+
+  // Resolved once per render: the screen-reader status line and the summary
+  // card both read the picked start time.
+  const activeWindow =
+    selectedDay && selectedTime
+      ? (selectedDay.timeWindows.find((w) => w.value === selectedTime) ?? null)
+      : null;
+  const timeLabel = activeWindow ? subSlotLabel(activeWindow.startHour, selectedMinute) : null;
+  const dayHasNoRoom =
+    selectedDay?.timeWindows.every((w) =>
+      duration === "short" ? !w.availableShort : !w.availableLong,
+    ) ?? false;
+  // One polite status line for the schedule picker, instead of a live region
+  // over the whole time grid that re-announced every button on each change.
+  const scheduleStatus = !selectedDay
+    ? ""
+    : dayHasNoRoom
+      ? `${selectedDay.fullLabel} has no room for ${durationText(durations[duration])}.`
+      : timeLabel
+        ? `${timeLabel} on ${selectedDay.fullLabel} selected.`
+        : `${selectedDay.fullLabel}: choose a start time.`;
+  const fieldErrorKeys = Object.keys(fieldErrors);
+  const firstErrorKey = Object.keys(FIELD_ANCHORS).find((k) => fieldErrors[k]) ?? fieldErrorKeys[0];
+  const phoneLink =
+    ownerPhone && ownerPhoneTel ? <PhoneLink phone={ownerPhone} phoneTel={ownerPhoneTel} /> : null;
 
   return (
     <form
@@ -897,11 +1003,15 @@ export default function BookingForm({
       <fieldset className="flex flex-col gap-6">
         <legend className="mb-1 text-xl font-bold text-russian-violet sm:text-2xl">Schedule</legend>
 
+        <p aria-live="polite" className="sr-only">
+          {scheduleStatus}
+        </p>
+
         {/* Duration */}
-        <div id="booking-duration">
-          <label className="mb-2 block text-base font-semibold text-rich-black">
-            How long do you need? <span className="text-coquelicot-500">*</span>
-          </label>
+        <fieldset id="booking-duration" className="min-w-0">
+          <legend className="mb-2 text-base font-semibold text-rich-black">
+            How long do you need? <span className="text-error">*</span>
+          </legend>
           <div className="grid gap-3 sm:grid-cols-2">
             {durationOptions.map((opt) => (
               <button
@@ -925,125 +1035,71 @@ export default function BookingForm({
               </button>
             ))}
           </div>
-          <p className="mt-2 text-base text-rich-black/60">
+          <p className="mt-2 text-base text-rich-black/70">
             Duration is just an estimate for scheduling. Most appointments are 1 hour. Choose 2
             hours if you have multiple issues or complex setup needs.
           </p>
-        </div>
+        </fieldset>
 
         {/* Day Selection */}
-        <div id="booking-day">
-          <label className="mb-2 block text-base font-semibold text-rich-black">Choose a day</label>
+        <fieldset id={DAY_ANCHOR} className="min-w-0">
+          <legend className="mb-2 text-base font-semibold text-rich-black">Choose a day</legend>
 
           {!availableDays.some((d) => d.hasAnySlots) ? (
             <p className="text-base text-rich-black/70">
-              No availability in the next two weeks. Please call or text me directly.
+              No availability in the next two weeks. Please call or text me
+              {phoneLink ? <> on {phoneLink}</> : " directly"}.
             </p>
           ) : (
-            <div className="space-y-3">
-              {weekdays.length > 0 && (
-                <div>
-                  <p className="mb-1.5 text-base font-medium tracking-wide text-rich-black/60 uppercase">
-                    Weekdays
-                  </p>
-                  {/* pt-5 reserves space above the first row for the
-                      Today/Tomorrow labels that sit fully outside their button. */}
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-3 pt-5">
-                    {weekdays.map((day) => (
-                      <div key={day.dateKey} className="relative">
-                        {(day.isToday || day.isTomorrow) && day.hasAnySlots && (
-                          <span className="absolute -top-5 right-0 left-0 text-center text-[10px] font-bold tracking-wide text-coquelicot-400 uppercase">
-                            {day.isToday ? "Today" : "Tomorrow"}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          aria-pressed={selectedDay?.dateKey === day.dateKey}
-                          disabled={!day.hasAnySlots}
-                          onClick={() => handleDaySelect(day)}
-                          className={cn(
-                            "w-full rounded-lg border px-3 py-3 text-base font-medium whitespace-nowrap",
-                            !day.hasAnySlots && "cursor-not-allowed opacity-50",
-                            selectedDay?.dateKey === day.dateKey
-                              ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                              : day.hasAnySlots
-                                ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                                : "border-seasalt-200/40 bg-white/20 text-rich-black/60",
-                            day.isToday &&
-                              day.hasAnySlots &&
-                              "ring-2 ring-coquelicot-500/50 ring-offset-1",
-                          )}
-                        >
-                          {day.dayLabel}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+            // pt-5 reserves space above the first row for the Today/Tomorrow labels
+            // that sit fully outside their button; both are always first in date order.
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-3 pt-5">
+              {daysInOrder.map((day) => (
+                <div key={day.dateKey} className="relative">
+                  {(day.isToday || day.isTomorrow) && day.hasAnySlots && (
+                    <span className="absolute -top-5 right-0 left-0 text-center text-sm leading-5 font-bold tracking-wide text-coquelicot-600 uppercase">
+                      {day.isToday ? "Today" : "Tomorrow"}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    aria-pressed={selectedDay?.dateKey === day.dateKey}
+                    disabled={!day.hasAnySlots}
+                    onClick={() => handleDaySelect(day)}
+                    className={cn(
+                      "w-full rounded-lg border px-3 py-3 text-base font-medium whitespace-nowrap",
+                      !day.hasAnySlots && "cursor-not-allowed opacity-50",
+                      selectedDay?.dateKey === day.dateKey
+                        ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
+                        : day.hasAnySlots
+                          ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
+                          : "border-seasalt-200/40 bg-white/20 text-rich-black/60",
+                      day.isToday &&
+                        day.hasAnySlots &&
+                        "ring-2 ring-coquelicot-500/50 ring-offset-1",
+                    )}
+                  >
+                    {day.dayLabel}
+                  </button>
                 </div>
-              )}
-
-              {weekends.length > 0 && (
-                <div>
-                  <p className="mb-1.5 text-base font-medium tracking-wide text-rich-black/60 uppercase">
-                    Weekends
-                  </p>
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-3 pt-3">
-                    {weekends.map((day) => (
-                      <div key={day.dateKey} className="relative">
-                        {(day.isToday || day.isTomorrow) && day.hasAnySlots && (
-                          <span className="absolute -top-5 right-0 left-0 text-center text-[10px] font-bold tracking-wide text-coquelicot-400 uppercase">
-                            {day.isToday ? "Today" : "Tomorrow"}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          aria-pressed={selectedDay?.dateKey === day.dateKey}
-                          disabled={!day.hasAnySlots}
-                          onClick={() => handleDaySelect(day)}
-                          className={cn(
-                            "w-full rounded-lg border px-3 py-3 text-base font-medium whitespace-nowrap",
-                            !day.hasAnySlots && "cursor-not-allowed opacity-50",
-                            selectedDay?.dateKey === day.dateKey
-                              ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                              : day.hasAnySlots
-                                ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                                : "border-seasalt-200/40 bg-white/20 text-rich-black/60",
-                            day.isToday &&
-                              day.hasAnySlots &&
-                              "ring-2 ring-coquelicot-500/50 ring-offset-1",
-                          )}
-                        >
-                          {day.dayLabel}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              ))}
             </div>
           )}
-        </div>
+        </fieldset>
 
         {/* Time Selection */}
         {selectedDay && (
-          <div
-            id="booking-time"
-            className="flex flex-col gap-3"
-            aria-live="polite"
-            aria-atomic="false"
-          >
-            <label className="block text-base font-semibold text-rich-black">
+          <fieldset id="booking-time" className="flex min-w-0 flex-col gap-3">
+            <legend className="mb-3 text-base font-semibold text-rich-black">
               Start time for {selectedDay.fullLabel}
-            </label>
+            </legend>
 
-            {selectedDay.timeWindows.every((w) =>
-              duration === "short" ? !w.availableShort : !w.availableLong,
-            ) ? (
+            {dayHasNoRoom ? (
               <div className="rounded-lg border border-seasalt-200/80 bg-white/30 p-4">
                 <p className="text-base text-rich-black/70">
-                  Sorry, no {duration === "short" ? "1-hour" : "2-hour"} slots available on this
-                  day.
-                  {duration === "long" && " Try selecting 1 hour instead, or choose another day."}
+                  Sorry, this day has no room for {durationText(durations[duration])}.
+                  {duration === "long" &&
+                    ` Try ${durationText(durations.short)} instead, or choose another day.`}
                 </p>
               </div>
             ) : (
@@ -1062,13 +1118,14 @@ export default function BookingForm({
                         disabled={!available}
                         onClick={() => {
                           setSelectedTime(window.value);
+                          clearFieldError("time");
                           const firstAvailable = window.subSlots.find((s) =>
                             duration === "short" ? s.availableShort : s.availableLong,
                           );
                           setSelectedMinute(firstAvailable?.minute ?? 0);
                         }}
                         className={cn(
-                          "rounded-lg border px-4 py-2.5 text-base font-medium",
+                          "min-h-11 rounded-lg border px-4 py-2.5 text-base font-medium",
                           !available && "cursor-not-allowed opacity-40",
                           isSelected
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -1084,45 +1141,38 @@ export default function BookingForm({
                 </div>
 
                 {/* Sub-slot picker - shown once an hour is selected */}
-                {selectedTime &&
-                  (() => {
-                    const activeWindow = selectedDay.timeWindows.find(
-                      (w) => w.value === selectedTime,
-                    );
-                    if (!activeWindow) return null;
-                    return (
-                      <div className="flex flex-wrap gap-2">
-                        {activeWindow.subSlots.map((sub) => {
-                          const minute = sub.minute;
-                          const available =
-                            duration === "short" ? sub.availableShort : sub.availableLong;
-                          return (
-                            <button
-                              key={minute}
-                              type="button"
-                              aria-pressed={selectedMinute === minute}
-                              disabled={!available}
-                              onClick={() => setSelectedMinute(minute)}
-                              className={cn(
-                                "rounded-lg border px-4 py-2 text-base font-medium",
-                                !available && "cursor-not-allowed opacity-40",
-                                selectedMinute === minute
-                                  ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                                  : available
-                                    ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                                    : "border-seasalt-200/40 bg-white/30 text-rich-black/60",
-                              )}
-                            >
-                              {subSlotLabel(activeWindow.startHour, minute)}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
+                {activeWindow && (
+                  <div className="flex flex-wrap gap-2">
+                    {activeWindow.subSlots.map((sub) => {
+                      const minute = sub.minute;
+                      const available =
+                        duration === "short" ? sub.availableShort : sub.availableLong;
+                      return (
+                        <button
+                          key={minute}
+                          type="button"
+                          aria-pressed={selectedMinute === minute}
+                          disabled={!available}
+                          onClick={() => setSelectedMinute(minute)}
+                          className={cn(
+                            "min-h-11 rounded-lg border px-4 py-2 text-base font-medium",
+                            !available && "cursor-not-allowed opacity-40",
+                            selectedMinute === minute
+                              ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
+                              : available
+                                ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
+                                : "border-seasalt-200/40 bg-white/30 text-rich-black/60",
+                          )}
+                        >
+                          {subSlotLabel(activeWindow.startHour, minute)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </>
             )}
-          </div>
+          </fieldset>
         )}
       </fieldset>
 
@@ -1138,7 +1188,7 @@ export default function BookingForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="booking-name" className="text-base font-semibold text-rich-black">
-              Name <span className="text-coquelicot-500">*</span>
+              Name <span className="text-error">*</span>
             </label>
             <input
               id="booking-name"
@@ -1170,7 +1220,7 @@ export default function BookingForm({
               )}
             />
             {fieldErrors.name && (
-              <p id="booking-name-error" className="text-sm text-coquelicot-400">
+              <p id="booking-name-error" className="text-sm text-error">
                 {fieldErrors.name}
               </p>
             )}
@@ -1178,13 +1228,14 @@ export default function BookingForm({
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="booking-email" className="text-base font-semibold text-rich-black">
-              Email <span className="text-coquelicot-500">*</span>
+              Email <span className="text-error">*</span>
             </label>
             <EmailInput
               id="booking-email"
               value={email}
               onChange={(next) => {
                 setEmail(next);
+                clearFieldError("email");
                 setContactHint(null);
                 // A fresh edit invalidates any prior submit-time typo prompt.
                 setEmailSuggestion(null);
@@ -1203,18 +1254,24 @@ export default function BookingForm({
             />
             {contactHint && <p className="text-sm text-rich-black/70">{contactHint}</p>}
             {emailSuggestion && (
-              <div className="flex flex-col gap-1.5 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-sm">
-                <span className="text-rich-black">
+              <div
+                ref={emailPromptRef}
+                tabIndex={-1}
+                role="group"
+                aria-labelledby="booking-email-suggestion"
+                className="flex flex-col gap-1 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-base"
+              >
+                <span id="booking-email-suggestion" className="text-rich-black">
                   Did you mean <strong>{emailSuggestion}</strong>?
                 </span>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-x-4">
                   <button
                     type="button"
                     onClick={() => {
                       setEmail(emailSuggestion);
                       setEmailSuggestion(null);
                     }}
-                    className="font-semibold text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
+                    className="min-h-11 font-semibold text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
                   >
                     Yes, use it
                   </button>
@@ -1224,7 +1281,7 @@ export default function BookingForm({
                       setEmailSuggestion(null);
                       setEmailSuggestionAcked(true);
                     }}
-                    className="text-rich-black/70 underline underline-offset-2 hover:text-rich-black"
+                    className="min-h-11 text-rich-black/80 underline underline-offset-2 hover:text-rich-black"
                   >
                     No, my email is correct
                   </button>
@@ -1238,7 +1295,7 @@ export default function BookingForm({
           <label htmlFor="booking-phone" className="text-base font-semibold text-rich-black">
             Phone{" "}
             {meetingType === "in-person" ? (
-              <span className="text-coquelicot-500">*</span>
+              <span className="text-error">*</span>
             ) : (
               <span className="text-base text-rich-black/70">(optional)</span>
             )}
@@ -1246,7 +1303,10 @@ export default function BookingForm({
           <PhoneInput
             id="booking-phone"
             value={phone}
-            onChange={setPhone}
+            onChange={(next) => {
+              setPhone(next);
+              clearFieldError("phone");
+            }}
             required={meetingType === "in-person"}
             error={fieldErrors.phone}
             errorId="booking-phone-error"
@@ -1259,51 +1319,53 @@ export default function BookingForm({
             )}
           />
           {meetingType === "in-person" && (
-            <p className="text-sm text-rich-black/60">
+            <p className="text-sm text-rich-black/70">
               Needed so I can contact you on arrival (running late, gate codes, etc.).
             </p>
           )}
         </div>
 
         {/* Meeting Type */}
-        <div id="booking-meeting-type" className="flex flex-col gap-2">
-          <label className="text-base font-semibold text-rich-black">
-            Meeting type <span className="text-coquelicot-500">*</span>
-          </label>
+        <fieldset id="booking-meeting-type" className="min-w-0">
+          <legend className="mb-2 text-base font-semibold text-rich-black">
+            Meeting type <span className="text-error">*</span>
+          </legend>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2">
-            <button
-              type="button"
-              aria-pressed={meetingType === "in-person"}
-              onClick={() => setMeetingType("in-person")}
-              className={cn(
-                "rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
-                meetingType === "in-person"
-                  ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                  : "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
-              )}
-            >
-              In-person
-            </button>
-            <button
-              type="button"
-              aria-pressed={meetingType === "remote"}
-              onClick={() => setMeetingType("remote")}
-              className={cn(
-                "rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
-                meetingType === "remote"
-                  ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                  : "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
-              )}
-            >
-              Remote
-            </button>
+            {(
+              [
+                { value: "in-person", label: "In-person" },
+                { value: "remote", label: "Remote" },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                aria-pressed={meetingType === opt.value}
+                onClick={() => {
+                  setMeetingType(opt.value);
+                  // Phone and address requirements both hang off the meeting
+                  // type, so their errors are re-judged at the next submit.
+                  clearFieldError("meetingType");
+                  clearFieldError("phone");
+                  clearFieldError("address");
+                }}
+                className={cn(
+                  "min-h-11 rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
+                  meetingType === opt.value
+                    ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
+                    : "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
-        </div>
+        </fieldset>
 
         {/* Address (only for in-person) - animated reveal */}
         <div
           className={cn(
-            "grid transition-all duration-300 ease-in-out",
+            "grid transition-[grid-template-rows,opacity] duration-300 ease-in-out",
             meetingType === "in-person"
               ? "grid-rows-[1fr] opacity-100"
               : "grid-rows-[0fr] opacity-0",
@@ -1312,7 +1374,7 @@ export default function BookingForm({
           <div className={cn(meetingType === "in-person" ? "overflow-visible" : "overflow-hidden")}>
             <div className="pt-0.5 pb-0.5">
               <div className="mb-2 block text-base font-semibold text-rich-black">
-                Address <span className="text-coquelicot-500">*</span>
+                Address <span className="text-error">*</span>
               </div>
               {/* Only mount when in-person so Google Maps script never loads for remote sessions */}
               {meetingType === "in-person" && (
@@ -1333,6 +1395,7 @@ export default function BookingForm({
                       maxLength={BOOKING_FIELD_LIMITS.address}
                       onChange={(v) => {
                         setAddress(v);
+                        clearFieldError("address");
                         setAddressCandidates(null);
                         // Any keystroke invalidates the prior pick. onChange
                         // fires before onPlaceSelected, so batching leaves
@@ -1362,7 +1425,7 @@ export default function BookingForm({
                       aria-describedby={fieldErrors.address ? "booking-address-error" : undefined}
                     />
                     {fieldErrors.address && (
-                      <p id="booking-address-error" className="text-sm text-coquelicot-400">
+                      <p id="booking-address-error" className="text-sm text-error">
                         {fieldErrors.address}
                       </p>
                     )}
@@ -1404,7 +1467,9 @@ export default function BookingForm({
                             setAddressCandidates(null);
                             setAddressOverrideAcked(false);
                           }}
-                          className="text-sm text-rich-black/60 underline underline-offset-2 hover:text-rich-black"
+                          // Negative margin keeps the label row compact while the
+                          // tap target still reaches 44px.
+                          className="-my-3 min-h-11 px-1 text-sm text-rich-black/70 underline underline-offset-2 hover:text-rich-black"
                         >
                           Remove
                         </button>
@@ -1444,7 +1509,7 @@ export default function BookingForm({
                     <button
                       type="button"
                       onClick={() => setShowUnit(true)}
-                      className="self-start text-sm font-medium text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
+                      className="min-h-11 self-start text-left text-base font-medium text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
                     >
                       Live in an apartment, unit or flat? Add your unit number
                     </button>
@@ -1453,8 +1518,14 @@ export default function BookingForm({
                   {/* Google returned candidates for a typed address - let the
                       customer pick; never assume when there's more than one. */}
                   {addressCandidates && addressCandidates.length > 0 && (
-                    <div className="flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
-                      <p className="font-medium text-rich-black">
+                    <div
+                      ref={addressPromptRef}
+                      tabIndex={-1}
+                      role="group"
+                      aria-labelledby="booking-address-candidates"
+                      className="flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-base"
+                    >
+                      <p id="booking-address-candidates" className="font-medium text-rich-black">
                         {addressCandidates.length === 1
                           ? "Did you mean this address?"
                           : "Which address did you mean?"}
@@ -1466,7 +1537,7 @@ export default function BookingForm({
                             type="button"
                             onClick={() => applyAddressCandidate(candidate)}
                             className={cn(
-                              "rounded-md border border-russian-violet/40 bg-white px-3 py-2 text-left text-rich-black",
+                              "min-h-11 rounded-md border border-russian-violet/40 bg-white px-3 py-2 text-left text-rich-black",
                               "hover:border-russian-violet hover:bg-russian-violet/5 focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                             )}
                           >
@@ -1477,7 +1548,7 @@ export default function BookingForm({
                       <button
                         type="button"
                         onClick={keepTypedAddress}
-                        className="self-start text-rich-black/70 underline underline-offset-2 hover:text-rich-black"
+                        className="min-h-11 self-start text-left text-rich-black/80 underline underline-offset-2 hover:text-rich-black"
                       >
                         None of these - use what I typed
                       </button>
@@ -1501,7 +1572,7 @@ export default function BookingForm({
 
         <div className="flex flex-col gap-1.5">
           <label htmlFor="booking-notes" className="text-base font-semibold text-rich-black">
-            What do you need help with? <span className="text-coquelicot-500">*</span>
+            What do you need help with? <span className="text-error">*</span>
           </label>
           <textarea
             id="booking-notes"
@@ -1552,7 +1623,7 @@ export default function BookingForm({
             className="flex items-center justify-between gap-3 text-sm"
           >
             <span
-              className={cn(pasteTrimmed ? "text-coquelicot-400" : "text-rich-black/60")}
+              className={cn(pasteTrimmed ? "text-error" : "text-rich-black/70")}
               aria-live="polite"
             >
               {pasteTrimmed
@@ -1574,7 +1645,8 @@ export default function BookingForm({
                   }}
                   aria-label="Clear the issue description"
                   className={cn(
-                    "text-sm text-rich-black/70 underline underline-offset-2",
+                    // Negative margin: a 44px target without growing the counter row.
+                    "-my-3 min-h-11 px-1 text-sm text-rich-black/70 underline underline-offset-2",
                     "rounded hover:text-rich-black focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                   )}
                 >
@@ -1585,8 +1657,8 @@ export default function BookingForm({
                 className={cn(
                   "tabular-nums",
                   notes.length >= BOOKING_FIELD_LIMITS.notes - NOTES_WARN_GAP
-                    ? "font-medium text-coquelicot-400"
-                    : "text-rich-black/60",
+                    ? "font-medium text-error"
+                    : "text-rich-black/70",
                 )}
               >
                 {notes.length} / {BOOKING_FIELD_LIMITS.notes}
@@ -1594,7 +1666,7 @@ export default function BookingForm({
             </span>
           </div>
           {fieldErrors.notes && (
-            <p id="booking-notes-error" className="text-sm text-coquelicot-400">
+            <p id="booking-notes-error" className="text-sm text-error">
               {fieldErrors.notes}
             </p>
           )}
@@ -1604,7 +1676,7 @@ export default function BookingForm({
           <div className="flex flex-col gap-2">
             <div className="flex flex-col gap-0.5">
               <h3 className="text-base font-semibold text-rich-black">Want a rough price first?</h3>
-              <p className="text-sm text-rich-black/70">
+              <p className="text-base text-rich-black/70">
                 Get a ballpark estimate from your description before you book.
               </p>
             </div>
@@ -1612,9 +1684,9 @@ export default function BookingForm({
               type="button"
               onClick={() => void runInlineEstimate()}
               disabled={estimating || notes.trim().length < BOOKING_FIELD_LIMITS.notesMin}
-              className="self-start rounded-md border border-russian-violet/40 px-4 py-2 text-sm font-semibold text-russian-violet transition-colors hover:bg-russian-violet/5 disabled:opacity-50"
+              className="min-h-11 self-start rounded-md border border-russian-violet/40 px-4 py-2 text-base font-semibold text-russian-violet transition-colors hover:bg-russian-violet/5 disabled:opacity-50"
             >
-              {estimating ? "Estimating..." : "Click here"}
+              {estimating ? "Estimating..." : "Get a price estimate"}
             </button>
             {quote && (
               <div
@@ -1628,11 +1700,11 @@ export default function BookingForm({
                   </span>
                 </div>
                 <p className="mt-1 text-3xl font-extrabold text-russian-violet">
-                  ${quote.low} &ndash; ${quote.high}
+                  {formatMoneyCompact(quote.low)} - {formatMoneyCompact(quote.high)}
                 </p>
                 {quote.travelCharge > 0 && (
                   <p className="mt-1 text-sm font-medium text-rich-black/80">
-                    + ${quote.travelCharge} round-trip travel
+                    + {formatMoneyCompact(quote.travelCharge)} round-trip travel
                   </p>
                 )}
                 <p className="mt-2 text-sm text-rich-black/70">
@@ -1651,7 +1723,7 @@ export default function BookingForm({
                     <button
                       type="button"
                       onClick={() => handleDurationChange("long")}
-                      className="self-start rounded-md bg-russian-violet px-4 py-2 text-sm font-semibold text-white hover:bg-russian-violet/90 sm:shrink-0 sm:self-auto"
+                      className="min-h-11 self-start rounded-md bg-russian-violet px-4 py-2 text-base font-semibold text-white hover:bg-russian-violet/90 sm:shrink-0 sm:self-auto"
                     >
                       Book 2 hours
                     </button>
@@ -1659,7 +1731,7 @@ export default function BookingForm({
                 )}
               </div>
             )}
-            {quoteError && <p className="text-sm text-coquelicot-400">{quoteError}</p>}
+            {quoteError && <p className="text-base text-error">{quoteError}</p>}
           </div>
         )}
 
@@ -1677,6 +1749,10 @@ export default function BookingForm({
               if (quote) void runInlineEstimate();
             }}
             applyOnMount={promoParam !== null}
+            // Judged as the booking will judge it: against the picked slot for
+            // a day-restricted code, and this customer for a per-customer one.
+            startAt={slotStartInstant()}
+            email={email}
             className="max-w-sm"
           />
         )}
@@ -1685,13 +1761,6 @@ export default function BookingForm({
       {/* Booking summary - live recap of what's selected so the user can see
           their choices before submit. */}
       {(() => {
-        const activeWindow =
-          selectedDay && selectedTime
-            ? (selectedDay.timeWindows.find((w) => w.value === selectedTime) ?? null)
-            : null;
-        const timeLabel = activeWindow
-          ? subSlotLabel(activeWindow.startHour, selectedMinute)
-          : null;
         const durationLabel = durationOptions.find((d) => d.value === duration)?.label ?? null;
         const combinedAddress =
           meetingType === "in-person" ? combineUnitAndAddress(unit, address) : "";
@@ -1709,7 +1778,8 @@ export default function BookingForm({
                   type="button"
                   onClick={clearDraft}
                   className={cn(
-                    "text-sm text-rich-black/70 underline underline-offset-2",
+                    // Negative margin: a 44px target without pushing the heading down.
+                    "-my-2.5 min-h-11 px-1 text-sm text-rich-black/70 underline underline-offset-2",
                     "rounded hover:text-rich-black focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                   )}
                 >
@@ -1787,13 +1857,13 @@ export default function BookingForm({
 
       {/* Cancellation / rescheduling policy - keeps expectations clear so a
           customer who later wants to change their booking knows it's easy. */}
-      <p className="text-sm text-rich-black/70">
+      <p className="text-base text-rich-black/70">
         Need to change or cancel? Use the link in the confirmation email any time before your
-        appointment, or text/call directly.
+        appointment, or call or text me{phoneLink ? <> on {phoneLink}</> : " directly"}.
       </p>
 
       {/* Submit */}
-      <div ref={errorSummaryRef} className="flex flex-col gap-8 empty:hidden">
+      <div ref={errorSummaryRef} tabIndex={-1} className="flex flex-col gap-8 empty:hidden">
         {slotStale && (
           <div
             role="alert"
@@ -1802,10 +1872,10 @@ export default function BookingForm({
               "flex flex-col gap-2",
             )}
           >
-            <p className="text-base font-medium text-coquelicot-300">
+            <p className="text-base font-medium text-error">
               That time slot was just taken by another customer.
             </p>
-            <p className="text-sm text-rich-black/70">
+            <p className="text-base text-rich-black/70">
               Tap below to load the up-to-date availability - your form details will stay where they
               are.
             </p>
@@ -1822,45 +1892,36 @@ export default function BookingForm({
             </Button>
           </div>
         )}
-        {Object.keys(fieldErrors).length > 0 && (
+        {attention && fieldErrorKeys.length > 0 && (
           <div
             role="alert"
-            aria-live="assertive"
             className="rounded-md border border-coquelicot-500/50 bg-coquelicot-500/10 p-4 text-rich-black"
           >
             <p className="text-base font-semibold">Please fix the following:</p>
             <ul className="mt-1 list-disc space-y-0.5 pl-5 text-base">
-              {Object.entries(fieldErrors).map(([key, msg]) => {
-                const anchors: Record<string, string> = {
-                  duration: "booking-duration",
-                  day: "booking-day",
-                  time: "booking-time",
-                  name: "booking-name",
-                  email: "booking-email",
-                  phone: "booking-phone",
-                  meetingType: "booking-meeting-type",
-                  address: "booking-address",
-                  notes: "booking-notes",
-                };
-                const anchor = anchors[key];
-                return (
+              {Object.keys(FIELD_ANCHORS)
+                .filter((key) => fieldErrors[key])
+                .map((key) => (
                   <li key={key}>
-                    {anchor ? (
-                      <a href={`#${anchor}`} className="underline">
-                        {msg}
-                      </a>
-                    ) : (
-                      msg
-                    )}
+                    <a
+                      href={`#${FIELD_ANCHORS[key]}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        focusField(key);
+                      }}
+                      className="underline"
+                    >
+                      {fieldErrors[key]}
+                    </a>
                   </li>
-                );
-              })}
+                ))}
             </ul>
           </div>
         )}
         {error && (
-          <p className="text-base font-medium text-coquelicot-400" role="alert">
+          <p className="text-base font-medium text-error" role="alert">
             {error}
+            {phoneLink && <> Having trouble? Call or text me on {phoneLink}.</>}
           </p>
         )}
       </div>
@@ -1889,13 +1950,17 @@ export default function BookingForm({
               ? "Save changes"
               : "Submit request"}
         </Button>
-        {Object.keys(fieldErrors).length > 0 && (
+        {attention && firstErrorKey && (
           <a
-            href="#booking-duration"
-            className="text-sm font-medium text-coquelicot-400 underline sm:hidden"
+            href={`#${FIELD_ANCHORS[firstErrorKey] ?? FIELD_ANCHORS.duration}`}
+            onClick={(e) => {
+              e.preventDefault();
+              focusField(firstErrorKey);
+            }}
+            className="inline-flex min-h-11 items-center text-base font-medium text-error underline sm:hidden"
           >
-            {Object.keys(fieldErrors).length} issue
-            {Object.keys(fieldErrors).length === 1 ? "" : "s"} - tap to review
+            {fieldErrorKeys.length} issue
+            {fieldErrorKeys.length === 1 ? "" : "s"} - tap to review
           </a>
         )}
         {isEditMode && cancelToken && (

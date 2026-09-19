@@ -106,8 +106,21 @@ export default async function AdminPromosPage(): Promise<React.ReactElement> {
     <>
       <PageHeader
         title="Promos"
-        description="Time-limited offers. An automatic promo applies to every visitor and shows on the site-wide banner; a code promo applies only to someone who enters its code, and is never advertised. Only one applies at a time - a valid code beats an automatic promo, and where windows overlap the highest priority wins, then the most recently created."
+        description="Time-limited offers. Automatic ones show on the site banner; code ones apply only when someone enters the code."
       />
+      {/* The precedence rules matter when setting up an overlap, not on every
+          visit, so they fold away instead of filling a phone's first screen. */}
+      <details className="mb-6 rounded-xl border border-admin-border bg-admin-surface px-4 py-3 text-sm text-admin-text-secondary">
+        <summary className="cursor-pointer font-semibold text-admin-text">
+          Which promo applies
+        </summary>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          <li>Only one promo applies to a booking at a time.</li>
+          <li>A valid code beats an automatic promo.</li>
+          <li>Where windows overlap, the highest priority wins, then the most recently created.</li>
+          <li>A code promo is never advertised, on the banner or anywhere else.</li>
+        </ul>
+      </details>
       <PromosView initial={initial} />
     </>
   );

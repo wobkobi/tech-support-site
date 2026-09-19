@@ -255,6 +255,9 @@ export function NavBar(): React.ReactElement | null {
 
     const body = document.body;
 
+    // Also flags the open drawer on <body>, which MobileActionBar hides on.
+    body.toggleAttribute("data-nav-open", mobileMenuOpen);
+
     if (mobileMenuOpen) {
       scrollLockRef.current = window.scrollY;
       body.style.overflow = "hidden";
@@ -272,6 +275,7 @@ export function NavBar(): React.ReactElement | null {
     }
 
     return () => {
+      body.removeAttribute("data-nav-open");
       body.style.overflow = "";
       body.style.position = "";
       body.style.width = "";
@@ -433,10 +437,11 @@ export function NavBar(): React.ReactElement | null {
       <header
         ref={headerRef}
         className={cn(
-          "fixed inset-x-0 z-50 mx-auto w-full px-4 will-change-transform",
+          "fixed inset-x-0 z-50 mx-auto w-full px-2 will-change-transform sm:px-4",
           // `.app-nav-header` (globals.css) - top driven by --promo-h.
           "app-nav-header",
-          "max-w-[min(100vw-2rem,clamp(90rem,75vw,140rem))]",
+          // Narrower gutters on phones, in step with FrostedSection's.
+          "max-w-[min(100vw-1rem,clamp(90rem,75vw,140rem))] sm:max-w-[min(100vw-2rem,clamp(90rem,75vw,140rem))]",
           isHidden && !isHoveringTop && "pointer-events-none opacity-0",
         )}
         onMouseEnter={handleNavInteractionStart}
@@ -490,7 +495,7 @@ export function NavBar(): React.ReactElement | null {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "shrink-0 rounded-lg px-4 py-2.5 text-lg font-semibold whitespace-nowrap transition-all duration-200 select-none xl:text-xl",
+                    "shrink-0 rounded-lg px-4 py-2.5 text-lg font-semibold whitespace-nowrap transition-[scale,background-color,color,box-shadow] duration-200 select-none xl:text-xl",
                     active
                       ? "bg-moonstone-400/20 text-russian-violet shadow-sm"
                       : "text-rich-black hover:scale-105 hover:bg-moonstone-400/15 hover:text-russian-violet hover:shadow-md",
@@ -526,7 +531,7 @@ export function NavBar(): React.ReactElement | null {
 
             <button
               onClick={toggleMobileMenu}
-              className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/20 transition-all hover:bg-white/30 lg:hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/20 transition-colors hover:bg-white/30 lg:hidden"
               aria-label="Toggle mobile menu"
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-nav"
@@ -534,19 +539,19 @@ export function NavBar(): React.ReactElement | null {
               <div className="flex h-5 w-5 flex-col justify-center gap-1">
                 <span
                   className={cn(
-                    "h-0.5 w-full rounded-full bg-russian-violet transition-all",
+                    "h-0.5 w-full rounded-full bg-russian-violet transition-[translate,rotate]",
                     mobileMenuOpen && "translate-y-1.5 rotate-45",
                   )}
                 />
                 <span
                   className={cn(
-                    "h-0.5 w-full rounded-full bg-russian-violet transition-all",
+                    "h-0.5 w-full rounded-full bg-russian-violet transition-opacity",
                     mobileMenuOpen && "opacity-0",
                   )}
                 />
                 <span
                   className={cn(
-                    "h-0.5 w-full rounded-full bg-russian-violet transition-all",
+                    "h-0.5 w-full rounded-full bg-russian-violet transition-[translate,rotate]",
                     mobileMenuOpen && "-translate-y-1.5 -rotate-45",
                   )}
                 />
@@ -570,10 +575,14 @@ export function NavBar(): React.ReactElement | null {
       <nav
         ref={mobileDrawerRef}
         className={cn(
-          "overscroll-behavior-contain fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border border-seasalt-200/40 bg-white/95 shadow-2xl backdrop-blur-xl lg:hidden",
+          "fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto overscroll-contain rounded-2xl border border-seasalt-200/40 bg-white/95 shadow-2xl backdrop-blur-xl lg:hidden",
           // `.app-mobile-drawer` (globals.css) owns top + translate transition.
           "app-mobile-drawer",
-          mobileMenuOpen ? "translate-x-0" : "translate-x-full",
+          // Closed, it has to clear its own right-4 inset as well as its width, or
+          // a 16px strip of it peeks in at the edge of every page. Hidden too, so
+          // the shadow's tail does not show; globals.css holds it visible until
+          // the slide-out finishes.
+          mobileMenuOpen ? "translate-x-0" : "invisible translate-x-[calc(100%+2rem)]",
         )}
         id="mobile-nav"
         aria-label="Mobile navigation"
@@ -593,7 +602,7 @@ export function NavBar(): React.ReactElement | null {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "rounded-lg px-4 py-3 text-base font-semibold transition-all duration-200 select-none",
+                  "rounded-lg px-4 py-3 text-base font-semibold transition-[scale,background-color,color,box-shadow] duration-200 select-none",
                   active
                     ? "bg-moonstone-400/20 text-russian-violet shadow-sm"
                     : "text-rich-black hover:scale-[1.02] hover:bg-moonstone-400/15 hover:text-russian-violet hover:shadow-md",

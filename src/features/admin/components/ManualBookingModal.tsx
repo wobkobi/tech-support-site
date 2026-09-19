@@ -1,19 +1,22 @@
 "use client";
 // src/features/admin/components/ManualBookingModal.tsx
-// Modal for adding a booking from the admin schedule view. Used when Harrison takes a
-// booking over the phone or by email - prefills date/time from the clicked slot and POSTs
-// to the admin booking-create endpoint.
+// Modal for adding a booking from the admin schedule view, for one taken over the phone
+// or by email - prefills date/time from the clicked slot, checks the customer fields
+// inline, and POSTs to the admin booking-create endpoint.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { FieldError } from "@/features/admin/components/ui/FieldError";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import {
-  combineUnitAndAddress,
-  splitUnitFromAddress,
-  validateEmail,
-} from "@/features/booking/lib/booking";
+  type ContactField,
+  type ContactFieldErrors,
+  checkContactFields,
+  focusFirstInvalid,
+} from "@/features/admin/lib/contact-fields";
+import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { combineUnitAndAddress, splitUnitFromAddress } from "@/features/booking/lib/booking";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { Field } from "@/shared/components/Field";
 import { PhoneInput } from "@/shared/components/PhoneInput";
@@ -79,7 +82,9 @@ export function ManualBookingModal({
   const [sendConfirmation, setSendConfirmation] = useState(true);
   const [startAtLocal, setStartAtLocal] = useState(() => toNzInputValue(startAtIso));
   const [submitting, setSubmitting] = useState(false);
+  // Server and network failures; field problems show under their field.
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<ContactFieldErrors>({});
 
   const [contacts, setContacts] = useState<ContactSuggestion[]>([]);
   const [nameListOpen, setNameListOpen] = useState(false);
@@ -150,20 +155,10 @@ export function ManualBookingModal({
     e.preventDefault();
     setError(null);
 
-    if (!name.trim()) {
-      setError("Customer name is required.");
-      return;
-    }
-    if (validateEmail(email) !== "ok") {
-      setError("Enter a valid email address.");
-      return;
-    }
-    const phoneCheck = validatePhone(phone);
-    if (phoneCheck.result === "invalid") {
-      setError("Enter a valid phone number, or leave it blank.");
-      return;
-    }
-    const phoneE164 = phoneCheck.e164;
+    const found = checkContactFields({ name, email, phone }, { emailRequired: true });
+    setFieldErrors(found);
+    if (focusFirstInvalid(found, FIELD_IDS)) return;
+    const phoneE164 = validatePhone(phone).e164;
 
     setSubmitting(true);
     try {
@@ -202,12 +197,25 @@ export function ManualBookingModal({
     }
   }
 
+  /**
+   * Clears one field's error as it's edited, so a fix is acknowledged as it's typed.
+   * @param key - The field being edited.
+   */
+  function clearFieldError(key: ContactField): void {
+    setFieldErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+  }
+
+  // A booking taken over the phone is typed while talking, so a stray backdrop
+  // tap or Escape must not wipe it. The prefilled start and duration don't count.
+  const dirty = [name, phone, email, unit, address, notes].some((v) => v.trim() !== "");
+
   return (
     <Modal
       open
       // Block Escape/backdrop dismissal while the create POST is in flight -
       // the booking would still save invisibly behind a closed modal.
       onClose={submitting ? () => undefined : onClose}
+      dirty={dirty && !submitting}
       title="New booking"
       size="md"
       footer={
@@ -279,13 +287,16 @@ export function ManualBookingModal({
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
+                clearFieldError("name");
                 setNameListOpen(true);
               }}
               onFocus={() => setNameListOpen(true)}
               autoComplete="off"
               required
               maxLength={100}
-              className={textInputClasses}
+              aria-invalid={fieldErrors.name ? true : undefined}
+              aria-describedby={fieldErrors.name ? "mb-name-error" : undefined}
+              className={cn(textInputClasses, fieldErrors.name && "border-coquelicot-500/60")}
             />
             {nameListOpen &&
               contacts.length > 0 &&
@@ -319,6 +330,7 @@ export function ManualBookingModal({
                             setUnit(split.unit);
                             setAddress(split.rest);
                           }
+                          setFieldErrors({});
                           setNameListOpen(false);
                         }}
                         className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-admin-bg"
@@ -336,14 +348,33 @@ export function ManualBookingModal({
                 );
               })()}
           </div>
+          <FieldError id="mb-name-error" message={fieldErrors.name} />
         </Field>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Phone" htmlFor="mb-phone" optional>
-            <PhoneInput id="mb-phone" value={phone} onChange={setPhone} />
+            <PhoneInput
+              id="mb-phone"
+              value={phone}
+              onChange={(v) => {
+                setPhone(v);
+                clearFieldError("phone");
+              }}
+              error={fieldErrors.phone}
+            />
           </Field>
           <Field label="Email" htmlFor="mb-email" required>
-            <EmailInput id="mb-email" value={email} onChange={setEmail} required maxLength={320} />
+            <EmailInput
+              id="mb-email"
+              value={email}
+              onChange={(v) => {
+                setEmail(v);
+                clearFieldError("email");
+              }}
+              error={fieldErrors.email}
+              required
+              maxLength={320}
+            />
           </Field>
         </div>
 
@@ -406,6 +437,9 @@ export function ManualBookingModal({
     </Modal>
   );
 }
+
+/** DOM ids of the checked fields, for focusing the first bad one. */
+const FIELD_IDS = { name: "mb-name", email: "mb-email", phone: "mb-phone" };
 
 const textInputClasses = cn(
   "w-full rounded-md border border-admin-border-strong bg-admin-surface px-3 py-2 text-sm text-admin-text",

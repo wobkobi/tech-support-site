@@ -170,7 +170,16 @@ export async function generateVariant(
     const targetUrl = config.urlSuffix ? url + config.urlSuffix : url;
     console.log(`Loading: ${targetUrl}`);
 
-    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 30000 });
+    // Refuse anything but a 2xx: a 404 or 500 still renders a full page, and
+    // capturing it would overwrite good artwork with an error page wearing the
+    // site chrome (a route not yet deployed to prod is the usual cause).
+    const response = await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 30000 });
+    const status = response?.status() ?? 0;
+    if (status < 200 || status >= 300) {
+      throw new Error(
+        `${targetUrl} returned HTTP ${status || "no response"}; not exporting. Is the route deployed? Try --local.`,
+      );
+    }
 
     // The dev server paints its route indicator into a <nextjs-portal> element,
     // which otherwise lands in the corner of artwork captured with --local. No

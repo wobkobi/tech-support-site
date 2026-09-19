@@ -241,6 +241,17 @@ export async function PATCH(
   if (body.contactId !== undefined && body.status === undefined) {
     const contactId = parseObjectId(body.contactId);
     const invoice = await prisma.invoice.update({ where: { id }, data: { contactId } });
+    // The invoice's promo redemption was settled before the contact existed, so
+    // it carries none, and a per-customer limit never binds a phone or walk-up
+    // job. Only a real link is copied: clearing the invoice's contact does not
+    // unlink who already used the promo. Bookkeeping, so a failure is logged.
+    if (contactId) {
+      await prisma.promoRedemption
+        .updateMany({ where: { invoiceId: id }, data: { contactId } })
+        .catch((err: unknown) => {
+          console.error("[invoice-patch] Failed to link promo redemption to contact:", err);
+        });
+    }
     return NextResponse.json({ ok: true, invoice });
   }
 

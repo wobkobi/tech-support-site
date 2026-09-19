@@ -16,7 +16,9 @@ import {
   applyPromoToHourlyRate,
   applyPromoToQuote,
   describePromoDiscount,
+  describePromoOffer,
   promoForAppointment,
+  promoForRateCard,
   promoForSpend,
   promoModifierRate,
   promoRateBeforeAfter,
@@ -712,6 +714,54 @@ function main(): void {
       99,
     ),
     0,
+  );
+
+  // ---- A flat rate on a mixed-rate job ----
+  //
+  // Discounted per line, never netted across the job: a line already under the
+  // flat rate stays as it is, and its shortfall must not cancel the saving on a
+  // line above it. Netted, $65 + $40 under $55/hr gave $0 off where the pricing
+  // page promises $10.
+
+  const mixed = job(65, false);
+  mixed.tasks.push({ ...mixed.tasks[0]!, unitPrice: 40, lineTotal: 40 });
+  expectEqual(
+    "a flat rate discounts only the line above it",
+    computeJobPromoDiscount(mixed, promo("flat_hourly", 55), 0, BIZ),
+    10,
+  );
+  expectEqual(
+    "and a single line exactly as before",
+    computeJobPromoDiscount(job(65, false), promo("flat_hourly", 55), 0, BIZ),
+    10,
+  );
+
+  // ---- The rate card ----
+  //
+  // /pricing and /faq have no job total, so a promo with a spend floor or tiers
+  // is named there but never priced: a crossed-out $/hr beside a $100 minimum
+  // promises a one-hour job a discount it never earns.
+
+  expectEqual(
+    "an unconditional promo prices the rate card",
+    promoForRateCard(promo("percent", 0.2))?.id ?? null,
+    "p1",
+  );
+  expectEqual(
+    "a spend floor keeps it off the rate card",
+    promoForRateCard({ ...promo("percent", 0.2), minSpend: 100 })?.id ?? null,
+    null,
+  );
+  expectEqual("so do tiers", promoForRateCard(TIERED)?.id ?? null, null);
+  expectEqual(
+    "and a weekday restriction, as before",
+    promoForRateCard({ ...promo("percent", 0.2), activeWeekdays: [2] })?.id ?? null,
+    null,
+  );
+  expectEqual(
+    "the offer line names the floor",
+    describePromoOffer({ ...promo("percent", 0.2), minSpend: 100 }),
+    "20% off on jobs over $100",
   );
 
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);

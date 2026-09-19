@@ -5,10 +5,11 @@
 // errors, 409 warnings, 422 blocks) into UI state. Reused by every settings tab so the
 // save/validation flow stays consistent.
 
+import { useUnsavedChangesWarning } from "@/features/admin/hooks/use-unsaved-changes-warning";
 import type { Settings, SettingsGroup } from "@/shared/lib/settings/types";
 import { checkGuardrails, type FieldError } from "@/shared/lib/settings/validate";
 import type React from "react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 /**
  * Full resolved settings, provided by SettingsView so each tab's form can run
@@ -124,18 +125,7 @@ export function useSettingsForm<G extends SettingsGroup>(
   // Warn before a full-page unload (reload / close / external nav) with unsaved
   // edits. This does not cover in-app settings tab switches: SettingsView renders
   // only the active tab, so switching tabs unmounts the current draft.
-  useEffect(() => {
-    if (!dirty) return;
-    /**
-     * Triggers the browser's native unsaved-changes prompt.
-     * @param e - The beforeunload event.
-     */
-    const handler = (e: BeforeUnloadEvent): void => {
-      e.preventDefault();
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty]);
+  useUnsavedChangesWarning(dirty);
 
   const save = useCallback(
     async (confirmWarnings = false): Promise<boolean> => {

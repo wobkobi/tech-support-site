@@ -18,11 +18,11 @@ import {
 } from "@/features/business/lib/pricing-policy";
 import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import {
-  describePromoDiscount,
+  describePromoOffer,
   describeRecurringWindow,
   getActivePromo,
   promoDisplayRate,
-  promoForAppointment,
+  promoForRateCard,
   promoModifierRate,
   promoRateBeforeAfter,
   promoTravelBeforeAfter,
@@ -30,7 +30,8 @@ import {
   summariseForBanner,
 } from "@/features/business/lib/promos";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
-import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
+import { Bullet } from "@/shared/components/Bullet";
+import { CARD, FrostedSection, NESTED_CARD, PageShell } from "@/shared/components/PageLayout";
 import { PixelEvent } from "@/shared/components/PixelEvent";
 import { PromoPrice } from "@/shared/components/PromoPrice";
 import { renderEmphasised } from "@/shared/components/renderEmphasised";
@@ -70,8 +71,7 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-const linkStyle =
-  "text-coquelicot-500 hover:text-coquelicot-400 underline-offset-4 hover:underline";
+const linkStyle = "text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800";
 
 const ACCORDION_DETAILS =
   "group rounded-xl border border-seasalt-200/60 bg-white/40 p-0 open:bg-white open:shadow-sm";
@@ -98,10 +98,11 @@ export default async function PricingPage(): Promise<React.ReactElement> {
   const baseRate = pricing.baseRate;
   // Words and numbers part company here. `promo` still announces the offer and
   // names its restriction; `pricedPromo` is null for a promo whose weekday or
-  // time-of-day restriction this page cannot check, because nobody has picked
-  // an appointment yet. Quoting a Tuesday discount to someone who has not
-  // chosen a day promises a price the invoice will not honour.
-  const pricedPromo = promoForAppointment(promo, null);
+  // time-of-day restriction or spend floor this page cannot check, because
+  // nobody has picked an appointment or priced a job yet. Quoting a Tuesday
+  // discount to someone who has not chosen a day, or a $100-minimum discount
+  // as an hourly rate, promises a price the invoice will not honour.
+  const pricedPromo = promoForRateCard(promo);
   // Named wherever the promo is announced, since the figures on this page stay
   // undiscounted for it.
   const promoRestriction = promo ? describeRecurringWindow(promo) : null;
@@ -193,7 +194,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                       and for a fixed amount the pair is only a one-hour
                       illustration. */}
                   <p className="mt-1 text-base font-semibold sm:text-lg">
-                    {describePromoDiscount(promo)}
+                    {describePromoOffer(promo)}
                   </p>
                   {/* Without this a restricted promo reads as a discount that
                       applies now, beside a headline rate that has not moved.
@@ -270,14 +271,14 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               On-site vs Remote
             </h2>
 
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div className={cn(SOFT_CARD)}>
+            <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+              <div className={NESTED_CARD}>
                 <h3 className="mb-3 text-lg font-semibold text-russian-violet sm:text-xl">
                   On-site visits
                 </h3>
                 <ul className="space-y-2.5 text-base text-rich-black sm:text-lg">
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-400">•</span>
+                    <Bullet />
                     <span>
                       Hourly rate (
                       <PromoPrice discounted={rateDiscounted}>
@@ -287,7 +288,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     </span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-400">•</span>
+                    <Bullet />
                     <span>
                       <strong>One round trip</strong> billed at{" "}
                       <PromoPrice discounted={travelDiscounted} className="font-bold">
@@ -302,7 +303,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     </span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-400">•</span>
+                    <Bullet />
                     <span>
                       Best for: Wi-Fi setup, printers, smart TVs, physical hardware, anything
                       needing hands-on work
@@ -311,21 +312,21 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 </ul>
               </div>
 
-              <div className={cn(SOFT_CARD)}>
+              <div className={NESTED_CARD}>
                 <h3 className="mb-3 text-lg font-semibold text-russian-violet sm:text-xl">
                   Remote support
                 </h3>
                 <ul className="space-y-2.5 text-base text-rich-black sm:text-lg">
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-400">•</span>
+                    <Bullet />
                     <span>Discounted rate, no travel charge</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-400">•</span>
+                    <Bullet />
                     <span>No drive time means quicker turnaround</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-400">•</span>
+                    <Bullet />
                     <span>
                       Best for: account issues, software setup, email problems, quick fixes,
                       follow-up support
@@ -349,20 +350,20 @@ export default async function PricingPage(): Promise<React.ReactElement> {
 
             <ul className="mb-5 space-y-2.5 text-base text-rich-black sm:text-lg">
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>
                   <strong>No hidden fees.</strong> The price I quote is the price you pay.
                 </span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>
                   <strong>No upselling.</strong> I don't sell hardware or earn commission on
                   products.
                 </span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>
                   <strong>Clear communication.</strong> If a job is taking longer than expected,
                   I'll let you know before continuing.
@@ -568,7 +569,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
           </section>
 
           {pricing.ratesUpdatedAt && (
-            <p className="text-center text-sm text-rich-black/50 sm:text-base">
+            <p className="text-center text-base text-rich-black/70">
               Rates last updated on {formatDateShort(pricing.ratesUpdatedAt)}.
             </p>
           )}

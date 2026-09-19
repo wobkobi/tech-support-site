@@ -61,6 +61,16 @@ export function meetingTypeFromNotes(raw: string | null): "in_person" | "remote"
 }
 
 /**
+ * Google Maps search link for a visit address. On a phone it opens the Maps app,
+ * where one more tap starts directions.
+ * @param address - Visit address as stored.
+ * @returns The Maps URL.
+ */
+export function mapsSearchUrl(address: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+}
+
+/**
  * Parses the structured booking notes blob back into its parts.
  * Format: `{userNotes}\n\n[{timeLabel} - {durationLabel}]\nMeeting type: ...\n[Address: ...]\n[Phone: ...]`
  * The structured columns (`address`, `meetingType`) are preferred now; this

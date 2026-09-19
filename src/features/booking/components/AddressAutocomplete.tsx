@@ -89,7 +89,7 @@ function renderHighlighted(
   for (const [i, m] of matches.entries()) {
     if (m.start > cursor) out.push(text.slice(cursor, m.start));
     out.push(
-      <span key={i} className="font-bold text-coquelicot-500">
+      <span key={i} className="font-bold text-coquelicot-700">
         {text.slice(m.start, m.end)}
       </span>,
     );

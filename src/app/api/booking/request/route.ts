@@ -154,7 +154,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         : (address?.trim() ?? null);
 
     const now = new Date();
-    const { config, acceptingBookings } = await getAvailabilityConfig();
+    // Settings are read once, here, before anything is created. A failed read
+    // after the calendar invite or the booking row would 500 a booking that
+    // actually went through, and the customer would book it again.
+    const [{ config, acceptingBookings }, settings] = await Promise.all([
+      getAvailabilityConfig(),
+      getSettings(),
+    ]);
     if (!acceptingBookings) {
       return NextResponse.json(
         { ok: false, error: "Online booking is currently paused." },
@@ -315,9 +321,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     //
     // The submitted code is re-resolved here rather than believed. A client can
     // post any string; resolvePromo decides what it actually unlocks, and an
-    // unrecognised code silently falls back to the automatic promo. Resolved
-    // against startAt, not now, so a booking made today for a job next month is
-    // priced by the promo that will be running on the day.
+    // unrecognised code silently falls back to the automatic promo. The promo's
+    // dates are judged at booking time (booking during a promo locks the rate
+    // in, as the confirmation email says) and its weekday and time-of-day
+    // restriction at startAt, the appointment itself.
     //
     // The email goes with it so per-customer and new-customer limits bind a
     // public booking, which has no Contact row yet.
@@ -326,7 +333,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         console.warn("[booking/request] RateConfig snapshot fetch failed:", err);
         return [] as Awaited<ReturnType<typeof prisma.rateConfig.findMany>>;
       }),
-      resolvePromo({ at: startAt, code: promoCode, email }).catch((err) => {
+      resolvePromo({ at: startAt, bookedAt: new Date(), code: promoCode, email }).catch((err) => {
         console.warn("[booking/request] promo resolution failed:", err);
         return null;
       }),
@@ -337,7 +344,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const baseRateAtBooking = baseRow?.ratePerHour ?? null;
     // Travel rate is a pricing setting; snapshot it so later settings edits
     // can't reprice an already-quoted booking.
-    const travelRatePerHourAtBooking = (await getSettings()).pricing.travelRatePerHour;
+    const travelRatePerHourAtBooking = settings.pricing.travelRatePerHour;
 
     // Drive-time snapshot for in-person bookings: outbound quoted at the start, return at
     // the end, so both are real traffic predictions for the actual drives. Lets the
@@ -454,7 +461,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // Send before returning, or Vercel kills the function mid-request; both helpers
       // swallow their own errors and never throw. The owner alert always fires, the
       // customer confirmation honours the notifyConfirmation setting.
-      const { comms } = await getSettings();
+      const { comms } = settings;
       await Promise.all([
         sendOwnerBookingNotification({
           id: booking.id,

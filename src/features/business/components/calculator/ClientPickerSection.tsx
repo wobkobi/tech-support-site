@@ -112,7 +112,7 @@ export function ClientPickerSection({
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-russian-violet">Client</h2>
         {pickedContactName && (

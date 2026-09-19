@@ -92,9 +92,16 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
     );
   }
 
+  // Headed like the address list above it: the breadcrumb already leads back to
+  // Contacts, and a bare back link here read as the start of a new page.
   return (
-    <div className="flex flex-col gap-4">
-      {backLink}
+    <section className="flex flex-col gap-3">
+      <div>
+        <h2 className="text-lg font-semibold text-admin-text">Fields that changed on both sides</h2>
+        <p className="text-sm text-admin-faint">
+          Pick the value to keep. It&apos;s saved here and pushed back to Google Contacts.
+        </p>
+      </div>
       <ul className="flex flex-col gap-3">
         {rows.map((c) => {
           const isResolving = resolving === c.id;
@@ -158,6 +165,6 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
           );
         })}
       </ul>
-    </div>
+    </section>
   );
 }

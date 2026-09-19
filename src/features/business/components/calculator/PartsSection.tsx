@@ -29,7 +29,7 @@ interface Props {
  */
 export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): React.ReactElement {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       {/* Clear sits beside the collapse toggle rather than inside it - a button
           cannot nest inside another button. */}
       <div className="flex items-center gap-3">

@@ -102,7 +102,7 @@ export function JobDetailsSection({
   const hasEntry = multi || followUpMins > 0 || timeRanges.some((r) => r.startTime || r.endTime);
 
   return (
-    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-russian-violet">Time</h2>
         {hasEntry && (

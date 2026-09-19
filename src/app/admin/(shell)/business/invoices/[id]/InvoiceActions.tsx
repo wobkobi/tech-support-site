@@ -1,12 +1,13 @@
 "use client";
 // src/app/admin/(shell)/business/invoices/[id]/InvoiceActions.tsx
 // Action buttons + modals for the invoice detail page: save PDF, open Drive PDF, record
-// payment (via PaymentDialog), send-to-client, void, and delete-draft. The send flow
-// opens a preview modal with an editable email body/greeting plus an optional review link
-// based on eligibility; the void flow previews the notification and warns when linked
-// income entries would be left behind. Housed beside the page so it ships in the
-// PageHeader actions slot. Built on the shared admin primitives (Modal / ConfirmDialog /
-// AdminButton / Toast).
+// payment (via PaymentDialog), send-to-client, void, and delete-draft. Below lg, an
+// invoice still awaiting payment pins Mark as paid and Send to the screen bottom. The
+// send flow opens a preview modal with an editable email body/greeting plus an optional
+// review link based on eligibility; the void flow previews the notification and warns
+// when linked income entries would be left behind. Housed beside the page so it ships in
+// the PageHeader actions slot. Built on the shared admin primitives (Modal /
+// ConfirmDialog / AdminButton / Toast).
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
@@ -172,6 +173,8 @@ export function InvoiceActions({
   const isPaid = currentStatus === "PAID";
   const isDraft = currentStatus === "DRAFT";
   const isVoided = currentStatus === "VOIDED";
+  // Paid and voided invoices have nothing left to chase, so their buttons stay in the row.
+  const showPhoneBar = !isPaid && !isVoided;
 
   /**
    * Opens the SENT/PAID void modal, resetting the message to the default so a
@@ -570,16 +573,6 @@ export function InvoiceActions({
             Resend void notification
           </AdminButton>
         )}
-        {!isPaid && !isVoided && !isQuote && (
-          <AdminButton variant="secondary" onClick={() => setPayOpen(true)}>
-            Mark as paid
-          </AdminButton>
-        )}
-        {isQuote && !isVoided && (
-          <AdminButton onClick={() => setConfirmConvertOpen(true)} busy={converting}>
-            Convert to invoice
-          </AdminButton>
-        )}
         {isOverdue && !isPaid && !isVoided && clientEmail && (
           <AdminButton
             variant="secondary"
@@ -595,15 +588,46 @@ export function InvoiceActions({
             Record payment details
           </AdminButton>
         )}
-        {!isVoided && (
-          <AdminButton
-            onClick={() => void openPreview()}
-            disabled={!clientEmail}
-            aria-label={!clientEmail ? "Add a client email to enable sending" : undefined}
-          >
-            {alreadySent ? "Re-send to client" : "Send to client"}
-          </AdminButton>
-        )}
+        {/* The phone bar. On lg, or with no bar, `contents` drops the wrapper's box
+            and the buttons join the row. The page reserves room under it (see
+            globals.css). */}
+        <div
+          data-phone-bar={showPhoneBar ? "fixed" : undefined}
+          className={
+            showPhoneBar
+              ? "fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-admin-border bg-admin-surface/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:px-6 lg:contents"
+              : "contents"
+          }
+        >
+          {!isPaid && !isVoided && !isQuote && (
+            <AdminButton
+              variant="secondary"
+              onClick={() => setPayOpen(true)}
+              className="max-lg:flex-1"
+            >
+              Mark as paid
+            </AdminButton>
+          )}
+          {isQuote && !isVoided && (
+            <AdminButton
+              onClick={() => setConfirmConvertOpen(true)}
+              busy={converting}
+              className="max-lg:flex-1"
+            >
+              Convert to invoice
+            </AdminButton>
+          )}
+          {!isVoided && (
+            <AdminButton
+              onClick={() => void openPreview()}
+              disabled={!clientEmail}
+              aria-label={!clientEmail ? "Add a client email to enable sending" : undefined}
+              className={cn(showPhoneBar && "max-lg:flex-1")}
+            >
+              {alreadySent ? "Re-send to client" : "Send to client"}
+            </AdminButton>
+          )}
+        </div>
       </div>
 
       {/* Convert-to-invoice confirm. */}
@@ -648,6 +672,7 @@ export function InvoiceActions({
       <Modal
         open={notesOpen}
         onClose={() => !notesSaving && setNotesOpen(false)}
+        dirty={!notesSaving && notesDraft !== (notes ?? "")}
         title="Edit notes"
         description="Shown on the invoice; the Drive PDF re-syncs on save."
         size="md"
@@ -824,6 +849,7 @@ export function InvoiceActions({
       <Modal
         open={voidModalOpen}
         onClose={closeVoidModal}
+        dirty={!voiding && (voidGreetingName !== "" || voidCustomBody !== DEFAULT_VOID_EMAIL_BODY)}
         title={isVoided ? "Resend void notification" : "Void invoice"}
         description={
           clientEmail ? (

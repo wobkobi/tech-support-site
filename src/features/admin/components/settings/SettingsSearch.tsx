@@ -61,7 +61,7 @@ export function SettingsSearch({ onJump }: Props): React.ReactElement {
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search settings (e.g. cancellation, GST, reminder)..."
+        placeholder="Search settings, e.g. GST"
         className="w-full rounded-lg border border-admin-border-strong px-4 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
       />
       {results.length > 0 && (

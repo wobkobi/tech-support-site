@@ -5,7 +5,7 @@
 // exported PDF and is printed onto the finished product.
 
 /** Exact paths whose rendered output is print artwork, not a web page. */
-export const PRINT_ROUTES: ReadonlyArray<string> = ["/poster", "/card"];
+export const PRINT_ROUTES: ReadonlyArray<string> = ["/poster", "/card", "/sign"];
 
 /**
  * Whether a path renders print artwork and so must not receive site chrome.

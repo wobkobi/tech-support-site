@@ -15,7 +15,16 @@ interface CardProps {
   className?: string;
   /** Inner padding: "none" (self-managed), "sm", or "md" (default). */
   padding?: CardPadding;
+  /**
+   * Drop the surface below `sm`. For a card that wraps a list of cards: on a
+   * phone the extra border and padding only narrow the cards inside it.
+   */
+  flushOnPhone?: boolean;
 }
+
+/** Strips the card surface below `sm`; see {@link CardProps.flushOnPhone}. */
+export const FLUSH_ON_PHONE =
+  "max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none";
 
 /**
  * Padding utility for the given preset.
@@ -39,14 +48,21 @@ function paddingClass(padding: CardPadding): string {
  * @param props.children - Card contents.
  * @param props.className - Extra classes.
  * @param props.padding - Inner padding preset (defaults to "md").
+ * @param props.flushOnPhone - Drop the surface below `sm`.
  * @returns The card element.
  */
-export function Card({ children, className, padding = "md" }: CardProps): React.ReactElement {
+export function Card({
+  children,
+  className,
+  padding = "md",
+  flushOnPhone = false,
+}: CardProps): React.ReactElement {
   return (
     <div
       className={cn(
         "rounded-xl border border-admin-border bg-admin-surface shadow-sm",
         paddingClass(padding),
+        flushOnPhone && FLUSH_ON_PHONE,
         className,
       )}
     >

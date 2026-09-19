@@ -41,6 +41,11 @@ export interface QuickEstimateInput {
    * an invalid one is ignored and the automatic promo still applies.
    */
   promoCode?: string | null;
+  /**
+   * The email being booked with, when entered, so a per-customer code is
+   * judged against this customer as the booking will judge it.
+   */
+  email?: string | null;
 }
 
 /** Result of a one-shot estimate. `estimateId` is null when logging failed. */
@@ -95,7 +100,11 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
       ? fetch("/api/promos/validate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({
+            code,
+            startAt: input.departureTimeIso ?? null,
+            email: input.email?.trim() || null,
+          }),
         }).then((r) => r.json() as Promise<{ valid?: boolean; promo?: ActivePromo | null }>)
       : Promise.resolve({ valid: false, promo: null }),
     dest

@@ -10,6 +10,7 @@ import {
   matchesRecurringWindow,
   normalisePromoCode,
   pickWinningPromo,
+  resolutionInstants,
   type PromoCandidate,
   type RecurringWindow,
 } from "@/features/business/lib/promos";
@@ -73,6 +74,15 @@ function window(
   return { activeWeekdays: weekdays, activeFromMinute: from, activeToMinute: to };
 }
 
+/**
+ * An instant as comparable text, so a case reports the time it got.
+ * @param d - The instant, or null.
+ * @returns Its ISO string, or null.
+ */
+function iso(d: Date | null): string | null {
+  return d?.toISOString() ?? null;
+}
+
 /** Runs every fixture case and exits non-zero if any failed. */
 function main(): void {
   console.log("promo selection fixtures\n");
@@ -130,6 +140,51 @@ function main(): void {
   expectWinner("undefined becomes null", normalisePromoCode(undefined), null);
   expectWinner("null stays null", normalisePromoCode(null), null);
   expectWinner("already uppercase is unchanged", normalisePromoCode("SPRING25"), "SPRING25");
+  // Public routes hand over whatever JSON arrived. A throw here took the
+  // automatic promo down with the code in booking/request.
+  expectWinner("a number is not a code", normalisePromoCode(25), null);
+  expectWinner("an object is not a code", normalisePromoCode({ $ne: "" }), null);
+
+  // ---- Booking date vs appointment ----
+  //
+  // A promo's start and end dates bound when the booking was made; its weekday
+  // restriction is judged at the appointment. Booking on the last day of a promo
+  // for a visit the week after keeps it.
+
+  const NOW = new Date("2026-09-18T01:00:00Z");
+  const SLOT = new Date("2026-09-29T21:00:00Z");
+  const BOOKED = new Date("2026-09-10T02:00:00Z");
+
+  expectWinner(
+    "a booking judges dates at booking time",
+    iso(resolutionInstants({ at: SLOT, bookedAt: BOOKED }, NOW).datesAt),
+    iso(BOOKED),
+  );
+  expectWinner(
+    "and its weekday restriction at the slot",
+    iso(resolutionInstants({ at: SLOT, bookedAt: BOOKED }, NOW).windowAt),
+    iso(SLOT),
+  );
+  expectWinner(
+    "a walk-up job with no booking time judges dates at the job",
+    iso(resolutionInstants({ at: SLOT }, NOW).datesAt),
+    iso(SLOT),
+  );
+  expectWinner(
+    "no slot chosen yet skips the weekday restriction",
+    iso(resolutionInstants({ at: null, bookedAt: NOW }, NOW).windowAt),
+    null,
+  );
+  expectWinner(
+    "but still judges dates at booking time",
+    iso(resolutionInstants({ at: null, bookedAt: NOW }, NOW).datesAt),
+    iso(NOW),
+  );
+  expectWinner(
+    "nothing given judges both at now",
+    iso(resolutionInstants({}, NOW).windowAt),
+    iso(NOW),
+  );
 
   // ---- Recurring windows, in NZ time ----
   //

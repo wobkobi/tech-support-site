@@ -1,15 +1,28 @@
 "use client";
 // src/features/admin/components/ContactDetailActions.tsx
 // Header actions for the customer-360 detail page: edit the core fields, sync to Google,
-// send a review link, and soft-delete. Edits and the sync PATCH/POST the same routes the
-// contacts list uses; a delete routes back to the list, since the contact no longer
-// exists to show.
+// send a review link, and soft-delete. The edit modal uses the shared email, phone and
+// address inputs and shows name, email and phone problems under their fields. Edits and
+// the sync PATCH/POST the same routes the contacts list uses; a delete routes back to the
+// list, since the contact no longer exists to show.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { FieldError } from "@/features/admin/components/ui/FieldError";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import {
+  type ContactField,
+  type ContactFieldErrors,
+  checkContactFields,
+  focusFirstInvalid,
+} from "@/features/admin/lib/contact-fields";
+import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { EmailInput } from "@/shared/components/EmailInput";
+import { PhoneInput } from "@/shared/components/PhoneInput";
+import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
@@ -45,8 +58,12 @@ interface ContactDetailActionsProps {
 /** Tier options offered in the edit modal; matches the /business page tiers. */
 const RETAINER_TIERS = ["Essentials", "Standard", "Custom"] as const;
 
-const inputClass =
-  "w-full rounded-lg border border-admin-border bg-admin-surface px-3 py-2 text-sm text-admin-text focus:border-russian-violet focus:outline-none";
+/** DOM ids of the checked fields, for focusing the first bad one. */
+const FIELD_IDS = {
+  name: "contact-edit-name",
+  email: "contact-edit-email",
+  phone: "contact-edit-phone",
+};
 
 /**
  * Action bar for the contact detail page.
@@ -87,6 +104,7 @@ export function ContactDetailActions({
   // altogether, and leaving the Google entry would let the sync pull them back.
   const [deleteGoogle, setDeleteGoogle] = useState(true);
   const [busy, setBusy] = useState<null | "save" | "sync" | "delete">(null);
+  const [fieldErrors, setFieldErrors] = useState<ContactFieldErrors>({});
 
   const [form, setForm] = useState({
     name,
@@ -101,12 +119,25 @@ export function ContactDetailActions({
     siteNotes: siteNotes ?? "",
   });
 
+  /**
+   * Updates one form field, clearing its error when it's a checked one.
+   * @param key - Field to update.
+   * @param value - New value.
+   */
+  function setField(key: keyof typeof form, value: string): void {
+    setForm((f) => ({ ...f, [key]: value }));
+    if (key === "name" || key === "email" || key === "phone") {
+      const field: ContactField = key;
+      setFieldErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
+    }
+  }
+
   /** PATCHes the edited fields, then refreshes the server data on success. */
   async function save(): Promise<void> {
-    if (!form.name.trim()) {
-      toast("Name can't be empty.", { tone: "error" });
-      return;
-    }
+    // A contact can be phone-only, so a blank email is fine here.
+    const found = checkContactFields(form, { emailRequired: false });
+    setFieldErrors(found);
+    if (focusFirstInvalid(found, FIELD_IDS)) return;
     const price = form.retainerPrice.trim() ? Number(form.retainerPrice) : null;
     const hours = form.retainerHours.trim() ? Number(form.retainerHours) : null;
     if (
@@ -183,7 +214,13 @@ export function ContactDetailActions({
 
   return (
     <div className="flex flex-wrap gap-2">
-      <AdminButton variant="secondary" onClick={() => setEditOpen(true)}>
+      <AdminButton
+        variant="secondary"
+        onClick={() => {
+          setFieldErrors({});
+          setEditOpen(true);
+        }}
+      >
         Edit
       </AdminButton>
       <AdminButton variant="secondary" onClick={() => void syncGoogle()} busy={busy === "sync"}>
@@ -218,47 +255,67 @@ export function ContactDetailActions({
         }
       >
         <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-admin-muted">Name</span>
+          <div className="flex flex-col gap-1 text-sm">
+            <label htmlFor={FIELD_IDS.name} className="font-medium text-admin-muted">
+              Name
+            </label>
             <input
+              id={FIELD_IDS.name}
               value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className={inputClass}
+              onChange={(e) => setField("name", e.target.value)}
+              autoComplete="off"
+              aria-invalid={fieldErrors.name ? true : undefined}
+              aria-describedby={fieldErrors.name ? `${FIELD_IDS.name}-error` : undefined}
+              className={cn(ADMIN_INPUT_CLS, fieldErrors.name && "border-coquelicot-500/60")}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-admin-muted">Email</span>
-            <input
-              type="email"
+            <FieldError id={`${FIELD_IDS.name}-error`} message={fieldErrors.name} />
+          </div>
+          <div className="flex flex-col gap-1 text-sm">
+            <label htmlFor={FIELD_IDS.email} className="font-medium text-admin-muted">
+              Email
+            </label>
+            <EmailInput
+              id={FIELD_IDS.email}
               value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-              className={inputClass}
+              onChange={(v) => setField("email", v)}
+              error={fieldErrors.email}
+              maxLength={320}
+              autoComplete="off"
+              className={ADMIN_INPUT_CLS}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-admin-muted">Phone</span>
-            <input
-              type="tel"
+          </div>
+          <div className="flex flex-col gap-1 text-sm">
+            <label htmlFor={FIELD_IDS.phone} className="font-medium text-admin-muted">
+              Phone
+            </label>
+            <PhoneInput
+              id={FIELD_IDS.phone}
               value={form.phone}
-              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-              className={inputClass}
+              onChange={(v) => setField("phone", v)}
+              error={fieldErrors.phone}
+              autoComplete="off"
+              className={ADMIN_INPUT_CLS}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-admin-muted">Address</span>
-            <input
+          </div>
+          <div className="flex flex-col gap-1 text-sm">
+            <label htmlFor="contact-edit-address" className="font-medium text-admin-muted">
+              Address
+            </label>
+            <AddressAutocomplete
+              id="contact-edit-address"
               value={form.address}
-              onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-              className={inputClass}
+              onChange={(v: string) => setField("address", v)}
+              placeholder="Street address"
+              maxLength={250}
             />
-          </label>
+          </div>
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-admin-muted">Site notes</span>
             <textarea
               rows={3}
               value={form.siteNotes}
               onChange={(e) => setForm((f) => ({ ...f, siteNotes: e.target.value }))}
-              className={inputClass}
+              className={ADMIN_INPUT_CLS}
               placeholder="Router model, ISP, M365 tenant, where the NAS lives... never passwords."
             />
           </label>
@@ -273,7 +330,7 @@ export function ContactDetailActions({
                 <select
                   value={form.retainerTier}
                   onChange={(e) => setForm((f) => ({ ...f, retainerTier: e.target.value }))}
-                  className={inputClass}
+                  className={ADMIN_INPUT_CLS}
                 >
                   <option value="">Not a retainer client</option>
                   {RETAINER_TIERS.map((t) => (
@@ -294,7 +351,7 @@ export function ContactDetailActions({
                         step="1"
                         value={form.retainerPrice}
                         onChange={(e) => setForm((f) => ({ ...f, retainerPrice: e.target.value }))}
-                        className={inputClass}
+                        className={ADMIN_INPUT_CLS}
                       />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
@@ -305,7 +362,7 @@ export function ContactDetailActions({
                         step="0.5"
                         value={form.retainerHours}
                         onChange={(e) => setForm((f) => ({ ...f, retainerHours: e.target.value }))}
-                        className={inputClass}
+                        className={ADMIN_INPUT_CLS}
                       />
                     </label>
                   </div>
@@ -315,7 +372,7 @@ export function ContactDetailActions({
                       type="date"
                       value={form.retainerSince}
                       onChange={(e) => setForm((f) => ({ ...f, retainerSince: e.target.value }))}
-                      className={inputClass}
+                      className={ADMIN_INPUT_CLS}
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
@@ -324,7 +381,7 @@ export function ContactDetailActions({
                       rows={2}
                       value={form.retainerNotes}
                       onChange={(e) => setForm((f) => ({ ...f, retainerNotes: e.target.value }))}
-                      className={inputClass}
+                      className={ADMIN_INPUT_CLS}
                       placeholder="Agreed scope, rollover stance, discounted rate..."
                     />
                   </label>

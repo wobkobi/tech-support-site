@@ -16,7 +16,8 @@ import {
 } from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { FaPlus } from "react-icons/fa6";
 
 /** Shared classes for the promo form inputs. */
 const inputClass =
@@ -600,6 +601,10 @@ export function PromosView({ initial }: Props): React.ReactElement {
   const { toast } = useToast();
   const [confirmDelete, setConfirmDelete] = useState<PromoRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Phones only: the form starts folded so the promo list isn't a long form
+  // away. lg+ always shows it.
+  const [formOpen, setFormOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const { ids: overlaps, winners: overlapWinners } = findOverlaps(promos);
   const [stats, setStats] = useState<Record<string, PromoStats>>({});
@@ -642,20 +647,27 @@ export function PromosView({ initial }: Props): React.ReactElement {
     });
   }
 
-  /** Resets the form back to its blank state and exits edit mode. */
+  /** Resets the form back to its blank state, exits edit mode and folds it on phones. */
   function resetForm(): void {
     setForm(emptyForm());
     setEditingId(null);
     setError(null);
+    setFormOpen(false);
   }
 
   /**
-   * Loads a promo into the form for editing.
+   * Loads a promo into the form for editing and scrolls up to it, since the
+   * row's Edit button sits below the whole form.
    * @param p - Promo row.
    */
   function startEdit(p: PromoRow): void {
     setEditingId(p.id);
     setError(null);
+    setFormOpen(true);
+    // Next frame: on a phone the form is still hidden until this render lands.
+    requestAnimationFrame(() =>
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
     setForm({
       title: p.title,
       description: p.description ?? "",
@@ -838,10 +850,21 @@ export function PromosView({ initial }: Props): React.ReactElement {
 
   return (
     <div className="space-y-6">
+      {!formOpen && (
+        <AdminButton className="w-full lg:hidden" onClick={() => setFormOpen(true)}>
+          <FaPlus aria-hidden />
+          New promo
+        </AdminButton>
+      )}
+
       {/* Inline form */}
       <form
+        ref={formRef}
         onSubmit={(e) => void handleSubmit(e)}
-        className="space-y-3 rounded-xl border border-admin-border bg-admin-surface p-5 shadow-sm"
+        className={cn(
+          "scroll-mt-16 space-y-3 rounded-xl border border-admin-border bg-admin-surface p-4 shadow-sm sm:p-5",
+          !formOpen && "max-lg:hidden",
+        )}
       >
         <h2 className="text-sm font-semibold text-russian-violet">
           {editingId ? "Edit promo" : "New promo"}
@@ -1227,11 +1250,14 @@ export function PromosView({ initial }: Props): React.ReactElement {
           <AdminButton type="submit" busy={busy}>
             {editingId ? "Update promo" : "Create promo"}
           </AdminButton>
-          {editingId && (
-            <AdminButton type="button" variant="secondary" onClick={resetForm}>
-              Cancel
-            </AdminButton>
-          )}
+          <AdminButton
+            type="button"
+            variant="secondary"
+            onClick={resetForm}
+            className={cn(!editingId && "lg:hidden")}
+          >
+            Cancel
+          </AdminButton>
         </div>
       </form>
 

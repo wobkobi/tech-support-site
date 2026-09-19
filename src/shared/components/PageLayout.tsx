@@ -4,7 +4,20 @@
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
-export const CARD = "border-seasalt-200/80 bg-white rounded-xl border p-5 shadow-sm sm:p-6";
+// Phone padding is deliberately tight: FrostedSection, CARD and any item card inside
+// it each add their own inset, and at 390px wide that stack left body text barely
+// half the screen, so every line wrapped and long pages ran to 5-7 screens.
+export const CARD = "border-seasalt-200/80 bg-white rounded-xl border p-4 shadow-sm sm:p-6";
+
+/**
+ * Item card nested inside a CARD (a service category, a pricing box). On phones
+ * it drops its border and shadow for a top divider, so the text gets the width
+ * the extra frame would take; from sm up it is a card again. Use it on the
+ * direct children of a single-column-on-phones grid or stack: the first child
+ * skips the divider, and the container's gap sits above each divider.
+ */
+export const NESTED_CARD =
+  "border-seasalt-200/60 border-t pt-4 first:border-t-0 first:pt-0 sm:rounded-lg sm:border sm:bg-white sm:p-4 sm:shadow-sm sm:first:border-t sm:first:pt-4";
 
 export const SOFT_CARD =
   "border-seasalt-200/80 bg-white/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg";
@@ -69,10 +82,10 @@ export function FrostedSection({
 }: FrostedSectionProps): React.ReactElement {
   return (
     <div
-      className={cn("mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-10", className)}
+      className={cn("mx-auto w-full px-2 py-4 sm:px-6 sm:py-8 md:px-8 md:py-10", className)}
       style={{ maxWidth }}
     >
-      <div className="rounded-2xl border border-seasalt-200/40 bg-white/60 p-4 shadow-lg backdrop-blur-md sm:p-6 md:p-8">
+      <div className="rounded-2xl border border-seasalt-200/40 bg-white/60 p-3 shadow-lg backdrop-blur-md sm:p-6 md:p-8">
         {children}
       </div>
     </div>

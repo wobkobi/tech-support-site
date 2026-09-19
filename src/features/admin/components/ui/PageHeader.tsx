@@ -74,7 +74,9 @@ export function PageHeader({
           <h1 className="text-2xl font-extrabold text-russian-violet">{title}</h1>
           {description && <p className="mt-1 text-sm text-admin-text-secondary">{description}</p>}
         </div>
-        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+        {/* No shrink-0: once the row wraps below the title it must be able to
+            narrow to the page, or its buttons stay on one line and run off a phone. */}
+        {actions && <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div>}
       </div>
     </div>
   );

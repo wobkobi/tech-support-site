@@ -17,7 +17,7 @@ import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-pol
 import {
   getActivePromo,
   promoDisplayRate,
-  promoForAppointment,
+  promoForRateCard,
   promoTravelFactor,
 } from "@/features/business/lib/promos";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
@@ -53,8 +53,7 @@ interface FaqItem {
   plainAnswer: string;
 }
 
-const linkStyle =
-  "text-coquelicot-500 hover:text-coquelicot-400 underline-offset-4 hover:underline";
+const linkStyle = "text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800";
 
 /**
  * Strips `**…**` markers for JSON-LD plain-text contexts.
@@ -77,10 +76,10 @@ export default async function FaqPage(): Promise<React.ReactElement> {
     getActivePromo(),
   ]);
   // Quote the promo prices, or the FAQ contradicts the banner running above it.
-  // A promo restricted to certain days is deliberately not priced in: the FAQ
-  // has no appointment to check it against, so it would quote a discount the
-  // reader may not earn.
-  const pricedPromo = promoForAppointment(promo, null);
+  // A promo restricted to certain days or to jobs over a spend floor is
+  // deliberately not priced in: the FAQ has no appointment or job total to
+  // check it against, so it would quote a discount the reader may not earn.
+  const pricedPromo = promoForRateCard(promo);
   const displayRate = promoDisplayRate(pricing.baseRate, pricedPromo);
   const travelFactor = promoTravelFactor(pricedPromo);
   const displayTravelRate = Math.round(pricing.travelRatePerHour * travelFactor * 100) / 100;

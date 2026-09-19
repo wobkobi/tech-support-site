@@ -137,7 +137,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
       {/* Business vs personal: gates whether the company field shows. */}
       <div className="flex flex-col gap-2">
         <span className="text-base font-semibold text-rich-black">
-          Who's this for? <span className="text-coquelicot-500">*</span>
+          Who's this for? <span className="text-error">*</span>
         </span>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-2">
           <button
@@ -173,7 +173,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
         {enquiryFor === "business" && (
           <div className="flex flex-col gap-1.5">
             <label htmlFor="enquiry-company" className="text-base font-semibold text-rich-black">
-              Company <span className="text-coquelicot-500">*</span>
+              Company <span className="text-error">*</span>
             </label>
             <input
               id="enquiry-company"
@@ -191,7 +191,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
 
         <div className="flex flex-col gap-1.5">
           <label htmlFor="enquiry-name" className="text-base font-semibold text-rich-black">
-            Your name <span className="text-coquelicot-500">*</span>
+            Your name <span className="text-error">*</span>
           </label>
           <input
             id="enquiry-name"
@@ -210,7 +210,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="enquiry-email" className="text-base font-semibold text-rich-black">
-            Email <span className="text-coquelicot-500">*</span>
+            Email <span className="text-error">*</span>
           </label>
           <EmailInput
             id="enquiry-email"
@@ -244,7 +244,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="enquiry-needs" className="text-base font-semibold text-rich-black">
-          What do you need help with? <span className="text-coquelicot-500">*</span>
+          What do you need help with? <span className="text-error">*</span>
         </label>
         <textarea
           id="enquiry-needs"
@@ -300,7 +300,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
       </div>
 
       {error && (
-        <p role="alert" className="text-base font-medium text-coquelicot-400">
+        <p role="alert" className="text-base font-medium text-error">
           {error}
         </p>
       )}

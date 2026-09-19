@@ -2,6 +2,7 @@
 // About page: background, approach, and who the service helps.
 
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
+import { Bullet } from "@/shared/components/Bullet";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import { getSiteUrl } from "@/shared/lib/site-url";
@@ -24,8 +25,7 @@ export const metadata: Metadata = {
   },
 };
 
-const linkStyle =
-  "text-coquelicot-500 hover:text-coquelicot-400 underline-offset-4 hover:underline";
+const linkStyle = "text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800";
 
 /**
  * About page component.
@@ -95,28 +95,28 @@ export default function AboutPage(): React.ReactElement {
 
             <ul className="mb-4 space-y-2.5 text-base text-rich-black sm:text-lg">
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>
                   <strong>Listen first.</strong> I start with a quick chat to understand what's
                   happening and what you want to achieve.
                 </span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>
                   <strong>Explain before acting.</strong> You'll know what I'm planning to do and
                   roughly how long it should take before I touch anything.
                 </span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>
                   <strong>Work transparently.</strong> I make changes in small steps so you can see
                   what's happening and ask questions.
                 </span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>
                   <strong>Leave clear notes.</strong> After every visit, you get a simple summary of
                   what changed and any tips for next time.
@@ -149,15 +149,15 @@ export default function AboutPage(): React.ReactElement {
 
             <ul className="mb-4 space-y-2.5 text-base text-rich-black sm:text-lg">
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>Home users wanting reliable Wi-Fi, secure accounts, and proper backups.</span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>Families helping parents or grandparents get comfortable with devices.</span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>
                   Sole traders and small teams who need occasional IT help, or ongoing cover with a
                   simple monthly retainer.

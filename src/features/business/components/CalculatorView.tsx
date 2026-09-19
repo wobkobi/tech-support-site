@@ -27,6 +27,7 @@ import {
   effectiveHourlyRate,
   enforceMinBillable,
   explicitRoundingAllowanceMins,
+  formatNZD,
   hourlyTaskMinutes,
   isChannelModifier,
   jobToLineItems,
@@ -429,6 +430,19 @@ export function CalculatorView({
   // in-person booking has a drive, so the travel window never applies remotely.
   const [cancelMeetingType, setCancelMeetingType] = useState<CancelMeetingType>("in-person");
   const cancelSectionRef = useRef<HTMLDivElement>(null);
+  // Client, save buttons and preview. The phone total bar stands down while
+  // any of it is on screen, since the real buttons and total are showing.
+  const finishRef = useRef<HTMLDivElement>(null);
+  const [finishInView, setFinishInView] = useState(false);
+  useEffect(() => {
+    const el = finishRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) =>
+      setFinishInView(entry?.isIntersecting ?? false),
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   // Travel entries parked while the policy says no round trip, so flipping the
   // decision back restores the figure instead of forcing a fresh lookup.
   const [stashedTravel, setStashedTravel] = useState<TravelEntry[]>([]);
@@ -545,6 +559,15 @@ export function CalculatorView({
     uplift: 0,
   });
 
+  // The job's earliest start, so a time-of-day promo is judged at the real start
+  // rather than the lookup's midday default. HH:MM strings sort as times.
+  const jobStartTime =
+    timeRanges
+      .map((r) => r.startTime)
+      .filter((t) => /^\d{2}:\d{2}$/.test(t))
+      .sort()[0] ?? "";
+  const prefillBookingId = eventPrefill?.bookingId ?? null;
+
   // Resolve the job date > { holiday, promo } whenever the date changes. Best
   // effort: failures leave the prior context in place. Overwrites activePromo
   // with the date-resolved promo so every downstream consumer is date-aware.
@@ -552,11 +575,15 @@ export function CalculatorView({
     if (!jobDate) return;
     let cancelled = false;
     const query = new URLSearchParams({ date: jobDate });
+    if (jobStartTime) query.set("time", jobStartTime);
     if (promoCode) query.set("code", promoCode);
     // Sent so per-customer and new-customer limits bind an operator-priced job
     // the same way they bind a public booking. Debounced below, since this is
     // typed a character at a time.
     if (clientEmail.trim()) query.set("email", clientEmail.trim());
+    // A booked job keeps the promo it was booked with, and its own redemption
+    // does not count against the customer's limits.
+    if (prefillBookingId) query.set("bookingId", prefillBookingId);
     /** Fetches the holiday + promo context for the current date, code and customer. */
     const run = (): void => {
       fetch(`/api/business/job-context?${query.toString()}`)
@@ -587,7 +614,7 @@ export function CalculatorView({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [jobDate, promoCode, clientEmail]);
+  }, [jobDate, jobStartTime, promoCode, clientEmail, prefillBookingId]);
 
   /**
    * Applies a picked Places suggestion: keep the full formatted address and
@@ -769,6 +796,7 @@ export function CalculatorView({
     rates.find((r) => r.label === "Business" && r.unit === "modifier")?.id ?? null;
   const jobPricing = { ...pricing, holidayUplift: holiday.uplift, businessModifierId };
   const totals = calcJobTotal(job, !skipPromo ? activePromo : null, jobPricing);
+  const showTotalBar = !finishInView && totals.total > 0;
   // Memoise the flattened line items so the preview panel's React.memo can
   // skip re-render when unrelated parent state changes (e.g. typing in the
   // AI input box). Recomputes when any meaningful input shifts.
@@ -851,6 +879,18 @@ export function CalculatorView({
       }
       setTimeRanges([{ startTime, endTime }]);
       parsedWindowMin = outMins + inSessionMins;
+    }
+    // The server's durationMins is the billable figure after its clamps: free work the
+    // description states is already subtracted, and the longest-billable-day ceiling
+    // applied. Fitting the tasks to the raw range sum would grow them back over both.
+    // A merged job keeps its slot sum - its windows are the corrected calendar times.
+    if (
+      !mergedSlots &&
+      result.durationMins !== null &&
+      result.durationMins > 0 &&
+      result.durationMins < parsedWindowMin
+    ) {
+      parsedWindowMin = result.durationMins;
     }
 
     // Hydrate task and part lines
@@ -2000,35 +2040,106 @@ export function CalculatorView({
         onCancel={() => setConfirmClearOpen(false)}
       />
 
-      {/* Job date - drives the public-holiday + promo lookup for this job. */}
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <label htmlFor="job-date" className="text-sm font-semibold text-slate-700">
-          Job date
-        </label>
-        <input
-          id="job-date"
-          type="date"
-          value={jobDate}
-          onChange={(e) => setJobDate(e.target.value || todayISO())}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
-        />
-        <span className="text-xs text-slate-500">
-          Sets which promo and public-holiday rate apply.
-        </span>
-        {holiday.name && (
-          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
-            {holiday.name} - labour +{Math.round(holiday.uplift * 100)}%
-          </span>
-        )}
-      </div>
+      {/* Job settings strip: the date, the promo code and the form tools share
+          one box, so the first screen reaches the event picker and the job
+          description. The date drives the public-holiday and promo lookup. */}
+      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <div className="flex items-center gap-2">
+            {/* Matching label widths line the two boxes up when they stack on a phone. */}
+            <label
+              htmlFor="job-date"
+              className="shrink-0 text-sm font-semibold text-slate-700 max-sm:w-22"
+            >
+              Job date
+            </label>
+            <input
+              id="job-date"
+              type="date"
+              value={jobDate}
+              onChange={(e) => setJobDate(e.target.value || todayISO())}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            />
+          </div>
 
-      {/* Promo chip with per-job skip toggle, plus code entry for a job taken
-          over the phone. The code box renders whether or not a promo resolved -
-          without one there would be nowhere to type a code when no automatic
-          promo is running, which is exactly when a code matters. */}
-      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          {/* Code entry for a job taken over the phone. It renders whether or
+              not a promo resolved - without it there would be nowhere to type a
+              code when no automatic promo is running, which is exactly when a
+              code matters. */}
+          <div className="flex items-center gap-2">
+            <label
+              htmlFor="calc-promo-code"
+              className="shrink-0 text-sm font-semibold text-slate-700 max-sm:w-22"
+            >
+              Promo code
+            </label>
+            <input
+              id="calc-promo-code"
+              value={promoCodeInput}
+              onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  setPromoCode(promoCodeInput.trim());
+                }
+              }}
+              placeholder="None"
+              maxLength={32}
+              autoComplete="off"
+              spellCheck={false}
+              className="w-32 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm tracking-wider uppercase focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setPromoCode(promoCodeInput.trim())}
+              disabled={promoCodeInput.trim() === promoCode}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+            >
+              Apply
+            </button>
+          </div>
+
+          {/* The full clear lives up here rather than under the save buttons: it
+              is the "start over" action, reached mid-form far more often than at
+              the end, and destructive styling keeps it from reading as a fifth
+              way to save. */}
+          <div className="ml-auto flex gap-2">
+            <button
+              onClick={() => setConfirmClearOpen(true)}
+              className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+            >
+              Clear form
+            </button>
+            <button
+              onClick={() => setShowRates((p) => !p)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              {showRates ? "Hide rates" : "Manage rates"}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <span>The job date sets which promo and public-holiday rate apply.</span>
+          {holiday.name && (
+            <span className="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-800">
+              {holiday.name} - labour +{Math.round(holiday.uplift * 100)}%
+            </span>
+          )}
+        </div>
+
+        {/* The verdict comes from the job-date lookup, not a live check: a
+            code can be valid today and not on the day the job was done. */}
+        {promoCode !== "" && activePromo?.code !== promoCode && (
+          <p className="text-sm font-medium text-red-700">
+            {promoCode} isn&apos;t valid on {jobDate} - pricing uses whatever promo applied that
+            day.
+          </p>
+        )}
+
+        {/* The promo that applies, with a per-job skip toggle. */}
         {activePromo && (
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
             <div className="flex items-center gap-2 text-sm text-amber-800">
               <span aria-hidden="true">⚡</span>
               <span className="font-semibold">Promo: {activePromo.title}</span>
@@ -2051,61 +2162,6 @@ export function CalculatorView({
             </label>
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-2 text-sm text-amber-800">
-          <label htmlFor="calc-promo-code" className="font-medium">
-            Promo code
-          </label>
-          <input
-            id="calc-promo-code"
-            value={promoCodeInput}
-            onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                setPromoCode(promoCodeInput.trim());
-              }
-            }}
-            placeholder="None"
-            maxLength={32}
-            autoComplete="off"
-            spellCheck={false}
-            className="w-40 rounded-lg border border-amber-300 bg-white px-2 py-1 tracking-wider uppercase"
-          />
-          <button
-            type="button"
-            onClick={() => setPromoCode(promoCodeInput.trim())}
-            disabled={promoCodeInput.trim() === promoCode}
-            className="rounded-lg border border-amber-300 bg-white px-3 py-1 font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
-          >
-            Apply
-          </button>
-          {/* The verdict comes from the job-date lookup, not a live check: a
-              code can be valid today and not on the day the job was done. */}
-          {promoCode !== "" && activePromo?.code !== promoCode && (
-            <span className="font-medium text-red-700">
-              Not valid on {jobDate} - pricing uses whatever promo applied that day.
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Form toolbar. The full clear lives here rather than under the save
-          buttons: it is the "start over" action, reached mid-form far more
-          often than at the end, and destructive styling keeps it from reading
-          as a fifth way to save. */}
-      <div className="mb-4 flex justify-end gap-2">
-        <button
-          onClick={() => setConfirmClearOpen(true)}
-          className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
-        >
-          Clear form
-        </button>
-        <button
-          onClick={() => setShowRates((p) => !p)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-        >
-          {showRates ? "Hide rates" : "Manage rates"}
-        </button>
       </div>
 
       {/* Rate settings panel */}
@@ -2193,7 +2249,7 @@ export function CalculatorView({
 
           {/* AI input */}
           {!cancelMode && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <h2 className="mb-3 text-sm font-semibold text-russian-violet">Describe the job</h2>
               <textarea
                 value={aiInput}
@@ -2306,26 +2362,11 @@ export function CalculatorView({
             />
           )}
 
-          {/* Travel. Stays available in cancel mode while the round trip is
-              being billed, so the amount can still be looked up or corrected. */}
-          {(!cancelMode || includeCancelTravel) && (
-            <TravelSection
-              jobAddress={jobAddress}
-              onJobAddressChange={setJobAddress}
-              onAddressSelected={handleAddressSelected}
-              travelEntries={travelEntries}
-              onTravelEntriesChange={setTravelEntries}
-              lookingUpTravel={lookingUpTravel}
-              onLookup={() => void handleTravelLookup()}
-              travelRatePerHour={pricing.travelRatePerHour}
-              minTravelCharge={pricing.minTravelCharge}
-            />
-          )}
-
-          {/* Tasks - inline warning when hourly task minutes drift from the
-              listed job window. AI parses auto-collapse in applyParseResult,
-              so this only fires on manual edits or window changes. Cancel mode
-              has no work lines, so the whole block goes. */}
+          {/* Tasks, straight under Time: they are most of the bill, and the
+              inline warning compares their minutes against that job window.
+              AI parses auto-collapse in applyParseResult, so the warning only
+              fires on manual edits or window changes. Cancel mode has no work
+              lines, so the whole block goes. */}
           {!cancelMode && (
             <>
               <TaskTimeWarning
@@ -2354,6 +2395,22 @@ export function CalculatorView({
             </>
           )}
 
+          {/* Travel. Stays available in cancel mode while the round trip is
+              being billed, so the amount can still be looked up or corrected. */}
+          {(!cancelMode || includeCancelTravel) && (
+            <TravelSection
+              jobAddress={jobAddress}
+              onJobAddressChange={setJobAddress}
+              onAddressSelected={handleAddressSelected}
+              travelEntries={travelEntries}
+              onTravelEntriesChange={setTravelEntries}
+              lookingUpTravel={lookingUpTravel}
+              onLookup={() => void handleTravelLookup()}
+              travelRatePerHour={pricing.travelRatePerHour}
+              minTravelCharge={pricing.minTravelCharge}
+            />
+          )}
+
           {/* Parts. Nothing was fitted on a cancelled job, so it is hidden and
               enterCancelMode clears whatever was there. */}
           {!cancelMode && (
@@ -2366,7 +2423,7 @@ export function CalculatorView({
           )}
 
           {/* Notes */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <label className="mb-1 block text-xs font-medium text-slate-600">Notes</label>
             <textarea
               value={notes}
@@ -2391,7 +2448,7 @@ export function CalculatorView({
 
         {/* RIGHT column - live invoice preview (replaces the legacy Summary
             panel - same totals, just inside the actual invoice layout). */}
-        <div className="min-w-0 space-y-4">
+        <div ref={finishRef} className="min-w-0 scroll-mt-16 space-y-4">
           {/* Client - moved above the preview so it stays in reach without
               scrolling past the full A4-sized invoice render. */}
           <ClientPickerSection
@@ -2496,6 +2553,31 @@ export function CalculatorView({
             }
           />
         </div>
+      </div>
+
+      {/* Phone total bar. Below lg the preview, and the total in it, sits under
+          every section, so the running figure stays pinned here while the job
+          is built, with a jump down to the client and save buttons. It stays
+          hidden until the job has a total, so an empty calculator isn't
+          topped by a $0.00 bar. */}
+      <div
+        data-phone-bar={showTotalBar ? "sticky" : undefined}
+        className={cn(
+          "sticky bottom-0 z-10 -mx-4 mt-4 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:-mx-6 sm:px-6 lg:hidden",
+          !showTotalBar && "hidden",
+        )}
+      >
+        <p className="text-sm text-slate-600">
+          Total{" "}
+          <span className="text-lg font-bold text-russian-violet">{formatNZD(totals.total)}</span>
+        </p>
+        <button
+          type="button"
+          onClick={() => finishRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          className="rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+        >
+          Client &amp; save
+        </button>
       </div>
     </>
   );

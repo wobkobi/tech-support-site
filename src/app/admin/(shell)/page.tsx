@@ -1,22 +1,26 @@
 // src/app/admin/(shell)/page.tsx
 // Admin dashboard. Runs a batch of parallel Prisma queries for booking, review, contact,
-// invoice, and income stats, then renders stat cards, DashboardQuickActions, and live
-// data panels (upcoming bookings, pending reviews, recent contacts, outstanding
-// invoices).
+// invoice, and income stats, then renders what needs doing first (the next job with Call
+// and Maps, upcoming bookings, events to complete, pending reviews, retainers due), then
+// the stat cards, then the review-link form, recent activity and system status. Counts
+// link to the list filtered to what they count (?status=held), and rows to their record.
 
-import { DashboardQuickActions } from "@/features/admin/components/DashboardQuickActions";
+import { CompleteEventsPanel } from "@/features/admin/components/CompleteEventsPanel";
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
+import { mapsSearchUrl, meetingTypeFromNotes } from "@/features/booking/lib/booking";
 import { formatNZD } from "@/features/business/lib/business";
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
+import { SendReviewLinkForm } from "@/features/reviews/components/admin/SendReviewLinkForm";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort, formatDateTimeShort } from "@/shared/lib/date-format";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
-import { nzDateParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
+import { nzDateKey, nzDateParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
@@ -29,6 +33,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/** One count in the Today strip, linked to the list it counts. */
+const SNAPSHOT_LINK =
+  "rounded text-sm text-admin-text-secondary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet";
+
 /**
  * A titled list-panel card for the dashboard grid: header (title + optional
  * count badge + optional "view all" link) over a list or an empty state.
@@ -40,6 +48,7 @@ export const metadata: Metadata = {
  * @param props.action.href - Link destination.
  * @param props.empty - Text shown when there are no rows.
  * @param props.children - The list element, or null to show the empty state.
+ * @param props.className - Extra classes for the card (e.g. a grid span).
  * @returns Panel element.
  */
 function Panel({
@@ -48,15 +57,17 @@ function Panel({
   action,
   empty,
   children,
+  className,
 }: {
   title: string;
   badge?: React.ReactNode;
   action?: { label: string; href: string };
   empty: string;
   children: React.ReactNode | null;
+  className?: string;
 }): React.ReactElement {
   return (
-    <Card padding="none">
+    <Card padding="none" className={className}>
       <div className="flex items-center justify-between gap-3 border-b border-admin-border px-5 py-4">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-admin-text">
           {title}
@@ -65,7 +76,7 @@ function Panel({
         {action && (
           <Link
             href={action.href}
-            className="inline-flex items-center gap-1 text-xs text-admin-faint hover:text-russian-violet"
+            className="inline-flex items-center gap-1 text-xs text-admin-muted hover:text-russian-violet"
           >
             {action.label}
             <FaCaretRight className="h-3 w-3" aria-hidden />
@@ -133,7 +144,17 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       where: { status: "confirmed", startAt: { gte: now } },
       orderBy: { startAt: "asc" },
       take: 6,
-      select: { id: true, name: true, email: true, phone: true, startAt: true, endAt: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        startAt: true,
+        endAt: true,
+        address: true,
+        meetingType: true,
+        notes: true,
+      },
     }),
     prisma.review.findMany({
       where: { status: "pending" },
@@ -279,6 +300,15 @@ export default async function AdminPage(): Promise<React.ReactElement> {
   const overdueInvoices = outstandingInvoices.filter(
     (inv) => inv.status === "SENT" && inv.dueDate < now,
   );
+  const todayKey = nzDateKey(now);
+
+  // --- Next job ---
+  // Remote jobs get no Maps button; an unknown meeting type with an address still does.
+  const [nextJob, ...laterBookings] = upcomingBookings;
+  const nextJobAddress =
+    nextJob && (nextJob.meetingType ?? meetingTypeFromNotes(nextJob.notes)) !== "remote"
+      ? nextJob.address || null
+      : null;
 
   // --- Unified activity feed: merge recent events across tables and sort by time ---
   type ActivityKind = "booking" | "review" | "contact" | "invoice";
@@ -287,6 +317,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     timestamp: Date;
     title: string;
     detail: string;
+    href: string;
   }
   const activity: ActivityEvent[] = [
     ...upcomingBookings.map((b) => ({
@@ -294,26 +325,28 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       timestamp: b.startAt,
       title: `Booking: ${b.name}`,
       detail: `${formatDateTimeShort(b.startAt.toISOString())}`,
+      href: `/admin/bookings/${b.id}`,
     })),
     ...pendingReviews.map((r) => ({
       kind: "review" as const,
       timestamp: r.createdAt,
       title: `Review pending`,
       detail: r.text.length > 60 ? r.text.slice(0, 60) + "..." : r.text,
+      href: "/admin/reviews",
     })),
     ...recentContacts.map((c) => ({
       kind: "contact" as const,
       timestamp: c.createdAt,
       title: `New contact: ${c.name}`,
       detail: c.email ?? c.phone ?? "no contact info",
+      href: `/admin/contacts/${c.id}`,
     })),
     ...recentInvoices.map((inv) => ({
       kind: "invoice" as const,
       timestamp: inv.createdAt,
       title: `${inv.isQuote ? "Quote" : "Invoice"} ${inv.number}: ${inv.clientName}`,
-      detail: inv.isQuote
-        ? `QUOTE - ${inv.total < 0 ? "-" : ""}$${Math.abs(inv.total).toFixed(2)}`
-        : `${inv.status} - ${inv.total < 0 ? "-" : ""}$${Math.abs(inv.total).toFixed(2)}`,
+      detail: `${inv.isQuote ? "Quote" : inv.status.charAt(0) + inv.status.slice(1).toLowerCase()} - ${formatNZD(inv.total)}`,
+      href: `/admin/business/invoices/${inv.id}`,
     })),
   ]
     .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
@@ -337,7 +370,12 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       label: "Outstanding",
       value: formatNZD(outstandingTotal),
       sub: `${outstandingInvoices.length} invoice${outstandingInvoices.length === 1 ? "" : "s"}${overdueInvoices.length > 0 ? `, ${overdueInvoices.length} overdue` : ""}`,
-      href: `/admin/business/invoices`,
+      // Overdue ones are the ones to chase; otherwise the list's own cards split
+      // drafts from sent.
+      href:
+        overdueInvoices.length > 0
+          ? `/admin/business/invoices?status=overdue`
+          : `/admin/business/invoices`,
       urgent: overdueInvoices.length > 0,
     },
     {
@@ -355,13 +393,13 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     {
       label: "Confirmed bookings",
       value: confirmedCount,
-      href: `/admin/bookings`,
+      href: `/admin/bookings?status=confirmed`,
       urgent: false,
     },
     {
       label: "Held bookings",
       value: heldCount,
-      href: `/admin/bookings`,
+      href: `/admin/bookings?status=held`,
       urgent: heldCount > 0,
     },
     {
@@ -373,7 +411,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     {
       label: "Unsynced",
       value: unsyncedCount,
-      href: `/admin/contacts`,
+      href: `/admin/contacts?sync=unsynced`,
       urgent: unsyncedCount > 0,
     },
   ] as { label: string; value: number | string; sub?: string; href: string; urgent: boolean }[];
@@ -385,11 +423,11 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       {/* Today's snapshot - pinned at the top so the morning glance is instant. */}
       <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-russian-violet/20 bg-linear-to-r from-russian-violet/5 to-admin-surface px-5 py-4">
         <p className="text-sm font-semibold text-russian-violet">Today</p>
-        <p className="text-sm text-admin-text-secondary">
+        <Link href={`/admin/bookings?from=${todayKey}&to=${todayKey}`} className={SNAPSHOT_LINK}>
           <span className="font-bold text-russian-violet">{todaysBookings.length}</span> booking
           {todaysBookings.length === 1 ? "" : "s"}
-        </p>
-        <p className="text-sm text-admin-text-secondary">
+        </Link>
+        <Link href="/admin/reviews" className={SNAPSHOT_LINK}>
           <span
             className={cn(
               "font-bold",
@@ -399,71 +437,94 @@ export default async function AdminPage(): Promise<React.ReactElement> {
             {pendingCount}
           </span>{" "}
           review{pendingCount === 1 ? "" : "s"} to approve
-        </p>
+        </Link>
         {overdueInvoices.length > 0 && (
-          <p className="text-sm text-admin-text-secondary">
+          <Link href="/admin/business/invoices?status=overdue" className={SNAPSHOT_LINK}>
             <span className="font-bold text-coquelicot-600">{overdueInvoices.length}</span> overdue
             invoice{overdueInvoices.length === 1 ? "" : "s"}
-          </p>
+          </Link>
         )}
         {heldCount > 0 && (
-          <p className="text-sm text-admin-text-secondary">
+          <Link href="/admin/bookings?status=held" className={SNAPSHOT_LINK}>
             <span className="font-bold text-coquelicot-600">{heldCount}</span> held booking
             {heldCount === 1 ? "" : "s"} to action
-          </p>
+          </Link>
         )}
       </div>
 
-      <DashboardQuickActions
-        pastConfirmedBookings={pastConfirmedBookings.map((b) => ({
-          id: b.id,
-          name: b.name,
-          email: b.email,
-          startAt: b.startAt.toISOString(),
-          reviewSentAt: b.reviewSentAt ? b.reviewSentAt.toISOString() : null,
-        }))}
-        contactSuggestions={contactsWithoutReviewLinks}
-      />
-
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {stats.map((s) => (
-          <StatCard
-            key={s.label}
-            label={s.label}
-            value={s.value}
-            sub={s.sub}
-            href={s.href}
-            tone={s.urgent ? "critical" : "violet"}
-          />
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {/* What needs doing comes first: the next jobs, then anything waiting on a
+          decision. Stats and history sit below. */}
+      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Upcoming bookings */}
         <Panel
           title="Upcoming bookings"
           action={{ label: "View all", href: "/admin/bookings" }}
           empty="No upcoming confirmed bookings."
         >
-          {upcomingBookings.length === 0 ? null : (
-            <ul className="divide-y divide-admin-border">
-              {upcomingBookings.map((b) => (
-                <li key={b.id} className="flex items-start justify-between gap-3 px-5 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-admin-text">{b.name}</p>
-                    <p className="truncate text-xs text-admin-faint">
-                      {b.email}
-                      {b.phone ? ` · ${b.phone}` : ""}
-                    </p>
-                  </div>
-                  <p className="shrink-0 text-right text-xs text-admin-muted">
-                    {formatDateTimeShort(b.startAt.toISOString())}
-                  </p>
-                </li>
-              ))}
-            </ul>
+          {!nextJob ? null : (
+            <>
+              {/* Next job: the calls a morning needs, one tap each. */}
+              <div className="border-b border-admin-border bg-russian-violet/5 px-5 py-4">
+                <p className="text-xs font-semibold text-russian-violet">Next job</p>
+                <p className="mt-1 font-semibold wrap-break-word text-admin-text">{nextJob.name}</p>
+                <p className="text-sm text-admin-text-secondary">
+                  {formatDateTimeShort(nextJob.startAt.toISOString())}
+                </p>
+                <p className="text-sm wrap-break-word text-admin-muted">
+                  {nextJobAddress ?? "Remote"}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {nextJob.phone && (
+                    <AdminButton variant="secondary" href={`tel:${nextJob.phone}`}>
+                      Call
+                    </AdminButton>
+                  )}
+                  {nextJobAddress && (
+                    <AdminButton variant="secondary" href={mapsSearchUrl(nextJobAddress)}>
+                      Maps ↗
+                    </AdminButton>
+                  )}
+                  <AdminButton variant="secondary" href={`/admin/bookings/${nextJob.id}`}>
+                    Open
+                  </AdminButton>
+                </div>
+              </div>
+              {laterBookings.length > 0 && (
+                <ul className="divide-y divide-admin-border">
+                  {laterBookings.map((b) => (
+                    <li key={b.id}>
+                      <Link
+                        href={`/admin/bookings/${b.id}`}
+                        className="flex items-start justify-between gap-3 px-5 py-3 transition-colors hover:bg-admin-bg"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-admin-text">{b.name}</p>
+                          <p className="truncate text-xs text-admin-faint">
+                            {b.email}
+                            {b.phone ? ` · ${b.phone}` : ""}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-right text-xs text-admin-muted">
+                          {formatDateTimeShort(b.startAt.toISOString())}
+                        </p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </Panel>
+
+        <CompleteEventsPanel
+          pastConfirmedBookings={pastConfirmedBookings.map((b) => ({
+            id: b.id,
+            name: b.name,
+            email: b.email,
+            startAt: b.startAt.toISOString(),
+            reviewSentAt: b.reviewSentAt ? b.reviewSentAt.toISOString() : null,
+          }))}
+        />
 
         {/* Pending reviews */}
         <Panel
@@ -475,6 +536,8 @@ export default async function AdminPage(): Promise<React.ReactElement> {
           }
           action={{ label: "Review all", href: "/admin/reviews" }}
           empty="No reviews pending approval."
+          // Full width when there is no retainers panel to sit beside it.
+          className={retainerContacts.length === 0 ? "lg:col-span-2" : undefined}
         >
           {pendingReviews.length === 0 ? null : (
             <ul className="divide-y divide-admin-border">
@@ -483,14 +546,19 @@ export default async function AdminPage(): Promise<React.ReactElement> {
                   ? "Anonymous"
                   : [r.firstName, r.lastName].filter(Boolean).join(" ") || "Unknown";
                 return (
-                  <li key={r.id} className="px-5 py-3">
-                    <div className="mb-1 flex items-center justify-between gap-3">
-                      <p className="text-xs font-medium text-admin-text-secondary">{name}</p>
-                      <p className="shrink-0 text-xs text-admin-faint">
-                        {formatDateShort(r.createdAt.toISOString())}
-                      </p>
-                    </div>
-                    <p className="line-clamp-2 text-xs text-admin-muted">{r.text}</p>
+                  <li key={r.id}>
+                    <Link
+                      href="/admin/reviews"
+                      className="block px-5 py-3 transition-colors hover:bg-admin-bg"
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-3">
+                        <p className="text-xs font-medium text-admin-text-secondary">{name}</p>
+                        <p className="shrink-0 text-xs text-admin-faint">
+                          {formatDateShort(r.createdAt.toISOString())}
+                        </p>
+                      </div>
+                      <p className="line-clamp-2 text-xs text-admin-muted">{r.text}</p>
+                    </Link>
                   </li>
                 );
               })}
@@ -533,41 +601,65 @@ export default async function AdminPage(): Promise<React.ReactElement> {
             )}
           </Panel>
         )}
+      </div>
+
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {stats.map((s) => (
+          <StatCard
+            key={s.label}
+            label={s.label}
+            value={s.value}
+            sub={s.sub}
+            href={s.href}
+            tone={s.urgent ? "critical" : "violet"}
+          />
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card>
+          <h2 className="mb-4 text-sm font-semibold text-admin-text">Send review link</h2>
+          <SendReviewLinkForm contactSuggestions={contactsWithoutReviewLinks} defaultOpen />
+        </Card>
 
         {/* Recent activity - unified timeline of bookings, reviews, contacts, invoices. */}
         <Panel title="Recent activity" empty="No activity yet.">
           {activity.length === 0 ? null : (
             <ul className="divide-y divide-admin-border">
               {activity.map((e, i) => (
-                <li
-                  key={`${e.kind}:${i}:${e.timestamp.getTime()}`}
-                  className="flex items-start gap-3 px-5 py-3"
-                >
-                  <span
-                    className={cn(
-                      "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                      e.kind === "booking" && "bg-moonstone-400/15 text-moonstone-400",
-                      e.kind === "review" && "bg-yellow-500/15 text-yellow-600",
-                      e.kind === "contact" && "bg-admin-border text-admin-muted",
-                      e.kind === "invoice" && "bg-russian-violet/15 text-russian-violet",
-                    )}
-                    aria-hidden="true"
+                <li key={`${e.kind}:${i}:${e.timestamp.getTime()}`}>
+                  <Link
+                    href={e.href}
+                    className="flex items-start gap-3 px-5 py-3 transition-colors hover:bg-admin-bg"
                   >
-                    {e.kind === "booking"
-                      ? "B"
-                      : e.kind === "review"
-                        ? "R"
-                        : e.kind === "contact"
-                          ? "C"
-                          : "I"}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-admin-text">{e.title}</p>
-                    <p className="truncate text-xs text-admin-faint">{e.detail}</p>
-                  </div>
-                  <p className="shrink-0 text-xs text-admin-faint">
-                    {formatDateShort(e.timestamp.toISOString())}
-                  </p>
+                    <span
+                      className={cn(
+                        "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                        e.kind === "booking" && "bg-moonstone-400/15 text-moonstone-700",
+                        e.kind === "review" && "bg-yellow-500/15 text-yellow-600",
+                        e.kind === "contact" && "bg-admin-border text-admin-muted",
+                        e.kind === "invoice" && "bg-russian-violet/15 text-russian-violet",
+                      )}
+                      aria-hidden="true"
+                    >
+                      {e.kind === "booking"
+                        ? "B"
+                        : e.kind === "review"
+                          ? "R"
+                          : e.kind === "contact"
+                            ? "C"
+                            : "I"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium wrap-break-word text-admin-text">
+                        {e.title}
+                      </p>
+                      <p className="truncate text-xs text-admin-faint">{e.detail}</p>
+                    </div>
+                    <p className="shrink-0 text-xs text-admin-faint">
+                      {formatDateShort(e.timestamp.toISOString())}
+                    </p>
+                  </Link>
                 </li>
               ))}
             </ul>

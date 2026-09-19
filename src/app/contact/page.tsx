@@ -2,30 +2,39 @@
 // Contact page: how to get in touch.
 
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
+import { Bullet } from "@/shared/components/Bullet";
 import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import type { Metadata } from "next";
 import type React from "react";
 import { FaEnvelope, FaMapLocationDot, FaPhone } from "react-icons/fa6";
 
-export const metadata: Metadata = {
-  title: "Contact - Local Tech Support in Auckland",
-  description:
-    "Call 021 297 1237 or email harrison@tothepoint.co.nz for friendly tech support across Auckland. Same-day, evening and weekend appointments available.",
-  alternates: { canonical: "/contact" },
-  openGraph: {
-    title: "Contact - To the Point Tech",
-    description: "Reach out by phone or email for tech help across Auckland.",
-    url: "/contact",
-  },
-};
+/**
+ * Contact page metadata, with the live phone and email from the identity settings.
+ * @returns Page metadata.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const { phone, email } = await getIdentity();
+  return {
+    title: "Contact - Local Tech Support in Auckland",
+    description: `Call ${phone} or email ${email} for friendly tech support across Auckland. Same-day, evening and weekend appointments available.`,
+    alternates: { canonical: "/contact" },
+    openGraph: {
+      title: "Contact - To the Point Tech",
+      description: "Reach out by phone or email for tech help across Auckland.",
+      url: "/contact",
+    },
+  };
+}
 
 /**
  * Contact page component.
  * @returns React element for the contact page.
  */
-export default function ContactPage(): React.ReactElement {
+export default async function ContactPage(): Promise<React.ReactElement> {
+  const identity = await getIdentity();
   return (
     <PageShell>
       <BreadcrumbJsonLd
@@ -54,16 +63,16 @@ export default function ContactPage(): React.ReactElement {
 
             <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <Button
-                href="tel:+64212971237"
+                href={identity.phoneTel}
                 variant="secondary"
                 size="lg"
                 className="w-full sm:w-auto"
               >
                 <FaPhone className="h-6 w-6" aria-hidden />
-                021 297 1237
+                {identity.phone}
               </Button>
               <Button
-                href="mailto:harrison@tothepoint.co.nz"
+                href={`mailto:${identity.email}`}
                 variant="tertiary"
                 size="lg"
                 className="w-full sm:w-auto"
@@ -126,19 +135,19 @@ export default function ContactPage(): React.ReactElement {
 
             <ul className="space-y-2.5 text-base text-rich-black sm:text-lg">
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>What's happening or what you want to achieve</span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>Which devices are involved (e.g., laptop, phone, printer)</span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>Whether it's for home or business</span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>Your availability (mornings, evenings, weekends)</span>
               </li>
             </ul>

@@ -3,8 +3,10 @@
 // Interactive client component for approving, revoking, and deleting reviews, with
 // search, filter chips (status / verified / unlinked), and sort.
 
+import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useState } from "react";
@@ -42,6 +44,9 @@ interface ReviewApprovalListProps {
 
 type StatusFilter = "all" | "pending" | "approved";
 type Sort = "newest" | "oldest";
+
+/** Approved reviews per "Show more" batch. */
+const APPROVED_BATCH = 10;
 
 /**
  * Classes for a filter chip button.
@@ -213,7 +218,7 @@ export function ReviewApprovalList({
       return (
         <button
           onClick={() => setLinkingId(row.id)}
-          className="rounded-full bg-moonstone-400/10 px-2 py-0.5 text-xs font-medium text-moonstone-400 transition-colors hover:bg-moonstone-400/20"
+          className="rounded-full bg-moonstone-400/10 px-2 py-0.5 text-xs font-medium text-moonstone-700 transition-colors hover:bg-moonstone-400/20"
           title="Change linked contact"
         >
           {row.contactName}
@@ -245,6 +250,13 @@ export function ReviewApprovalList({
 
   const visiblePending = pending.filter(passesFilters).sort(bySort);
   const visibleApproved = approved.filter(passesFilters).sort(bySort);
+  // Pending stays whole: every one of those wants a decision. Approved reviews
+  // are long cards and only grow, so they come in batches.
+  const approvedPager = useShowMore(
+    visibleApproved,
+    APPROVED_BATCH,
+    [query, statusFilter, verifiedOnly, unlinkedOnly, sort].join("|"),
+  );
   const filtered = query.trim() !== "" || verifiedOnly || unlinkedOnly;
   const showPending = statusFilter !== "approved";
   const showApproved = statusFilter !== "pending";
@@ -348,7 +360,7 @@ export function ReviewApprovalList({
             </p>
           ) : (
             <div className="flex flex-col gap-3">
-              {visibleApproved.map((row) => (
+              {approvedPager.visible.map((row) => (
                 <div key={row.id} className="flex flex-col gap-1">
                   <ReviewCard
                     row={row}
@@ -358,6 +370,7 @@ export function ReviewApprovalList({
                   <div className="pl-1">{renderContactLink(row)}</div>
                 </div>
               ))}
+              <ShowMoreButton pager={approvedPager} noun={["review", "reviews"]} />
             </div>
           )}
         </section>

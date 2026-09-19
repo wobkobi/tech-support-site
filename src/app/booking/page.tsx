@@ -15,7 +15,9 @@ import {
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
+import { PhoneLink } from "@/shared/components/PhoneLink";
 import { PixelEvent } from "@/shared/components/PixelEvent";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -264,7 +266,11 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
         className="flex flex-col gap-2 rounded-lg border-2 border-mustard-300/60 bg-mustard-50/40 p-5 text-rich-black"
       >
         <p className="text-base font-semibold">Online booking is paused</p>
-        <p className="text-sm sm:text-base">{closedMessage}</p>
+        <p className="text-base">{closedMessage}</p>
+        <p className="text-base">
+          Call or text me on{" "}
+          <PhoneLink phone={settings.identity.phone} phoneTel={settings.identity.phoneTel} />.
+        </p>
       </div>
     );
   }
@@ -276,7 +282,9 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
       >
         <p className="text-base font-semibold sm:text-lg">Availability isn't loading right now.</p>
         <p className="text-base sm:text-lg">
-          Please refresh the page in a minute, or call/text me directly and I'll get you booked in.
+          Please refresh the page in a minute, or call or text me on{" "}
+          <PhoneLink phone={settings.identity.phone} phoneTel={settings.identity.phoneTel} /> and
+          I'll get you booked in.
         </p>
       </div>
     );
@@ -299,6 +307,8 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
         minBillableMins={settings.pricing.minBillableMins}
         minTravelCharge={settings.pricing.minTravelCharge}
         travelRatePerHour={settings.pricing.travelRatePerHour}
+        phone={settings.identity.phone}
+        phoneTel={settings.identity.phoneTel}
       />
     </div>
   );
@@ -388,7 +398,9 @@ function BookingFormSkeleton(): React.ReactElement {
  * Booking page component
  * @returns React element for booking page
  */
-export default function BookingPage(): React.ReactElement {
+export default async function BookingPage(): Promise<React.ReactElement> {
+  // Cached settings read, so the static shell still renders ahead of the slot data.
+  const identity = await getIdentity();
   return (
     <PageShell>
       <PixelEvent event="InitiateCheckout" />
@@ -405,13 +417,14 @@ export default function BookingPage(): React.ReactElement {
             <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
               Request an appointment
             </h1>
-            <p className="text-sm text-rich-black sm:text-base">
+            <p className="text-base text-rich-black">
               Pick a time that works for you and tell me what you need help with. I'll confirm the
               details and send you a calendar invite.
               <br />
-              Prefer to call or text? Feel free to reach out directly.
+              Prefer to call or text? Reach me on{" "}
+              <PhoneLink phone={identity.phone} phoneTel={identity.phoneTel} />.
             </p>
-            <p className="mt-3 text-sm text-rich-black sm:text-base">
+            <p className="mt-3 text-base text-rich-black">
               Already booked?{" "}
               <Link
                 href="/booking/manage"

@@ -37,7 +37,7 @@ export function SiteFooter(): React.ReactElement | null {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="mx-auto mt-8 mb-6 w-full max-w-[min(100vw-2rem,clamp(90rem,75vw,140rem))] px-4">
+    <footer className="mx-auto mt-8 mb-6 w-full max-w-[min(100vw-1rem,clamp(90rem,75vw,140rem))] px-2 sm:max-w-[min(100vw-2rem,clamp(90rem,75vw,140rem))] sm:px-4">
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-seasalt-200/40 bg-white/70 p-6 shadow-lg backdrop-blur-md sm:p-8">
         <nav
           aria-label="Footer"

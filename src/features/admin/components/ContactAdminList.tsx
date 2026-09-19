@@ -5,7 +5,11 @@
 // sections: unsynced (needs attention) and synced (already linked to Google Contacts,
 // shown in a collapsible drawer).
 
+import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
+import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { validateEmail } from "@/features/booking/lib/booking";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
@@ -290,8 +294,10 @@ function ContactCard({
         >
           {c.name}
         </Link>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">{formatDateShort(c.createdAt)}</span>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-xs whitespace-nowrap text-slate-400">
+            {formatDateShort(c.createdAt)}
+          </span>
           {!c.googleContactId &&
             (isSyncing ? (
               <span className="text-xs text-slate-400">Syncing…</span>
@@ -403,7 +409,7 @@ function ContactCard({
       {c.email ? (
         <a
           href={`mailto:${c.email}`}
-          className="text-sm break-all text-moonstone-400 transition-colors hover:text-moonstone-300"
+          className="text-sm break-all text-moonstone-700 transition-colors hover:text-moonstone-800"
         >
           {c.email}
         </a>
@@ -453,7 +459,7 @@ function ContactCard({
                         href={`/review?token=${rv.customerRef}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="shrink-0 text-xs font-medium text-moonstone-400 transition-colors hover:text-moonstone-300"
+                        className="shrink-0 text-xs font-medium text-moonstone-700 transition-colors hover:text-moonstone-800"
                       >
                         Review link ↗
                       </a>
@@ -474,18 +480,24 @@ function ContactCard({
 
 const PAGE_LOAD_TIME = Date.now();
 
+/** Synced contacts per "Show more" batch. */
+const BATCH = 25;
+
 /**
  * Editable list of contacts captured from booking submissions.
  * Unsynced contacts (no Google Contact link) are shown prominently at the top.
  * Synced contacts are grouped in a collapsible section below.
  * @param props - Component props.
  * @param props.contacts - Contact rows to display.
+ * @param props.query - The page's searchParams, the starting filters.
  * @returns Contact list element.
  */
 export function ContactAdminList({
   contacts: initialContacts,
+  query: pageQuery,
 }: {
   contacts: ContactRow[];
+  query: PageQuery;
 }): React.ReactElement {
   const [contacts, setContacts] = useState<ContactRow[]>(initialContacts);
   useEffect(() => {
@@ -507,15 +519,31 @@ export function ContactAdminList({
   const [confirmSyncId, setConfirmSyncId] = useState<string | null>(null);
   const [expandedReviewsId, setExpandedReviewsId] = useState<string | null>(null);
   const [syncedOpen, setSyncedOpen] = useState(true);
-  const [query, setQuery] = useState("");
+  // The search, chips and sort start from the URL and write back to it.
+  const [query, setQuery] = useState(() => queryValue(pageQuery, "q"));
   // Filter chips, AND-combined with the search. Sync is tri-state (all/one/other)
   // since a contact is exactly one of synced or not.
-  const [syncFilter, setSyncFilter] = useState<"all" | "synced" | "unsynced">("all");
-  const [reviewedOnly, setReviewedOnly] = useState(false);
-  const [retainerOnly, setRetainerOnly] = useState(false);
-  const [noEmail, setNoEmail] = useState(false);
-  const [noPhone, setNoPhone] = useState(false);
-  const [sort, setSort] = useState<"name" | "newest" | "oldest">("name");
+  const [syncFilter, setSyncFilter] = useState<"all" | "synced" | "unsynced">(() => {
+    const v = queryValue(pageQuery, "sync");
+    return v === "synced" || v === "unsynced" ? v : "all";
+  });
+  const [reviewedOnly, setReviewedOnly] = useState(() => queryValue(pageQuery, "reviewed") === "1");
+  const [retainerOnly, setRetainerOnly] = useState(() => queryValue(pageQuery, "retainer") === "1");
+  const [noEmail, setNoEmail] = useState(() => queryValue(pageQuery, "noemail") === "1");
+  const [noPhone, setNoPhone] = useState(() => queryValue(pageQuery, "nophone") === "1");
+  const [sort, setSort] = useState<"name" | "newest" | "oldest">(() => {
+    const v = queryValue(pageQuery, "sort");
+    return v === "newest" || v === "oldest" ? v : "name";
+  });
+  useQuerySync({
+    q: query,
+    sync: syncFilter === "all" ? "" : syncFilter,
+    reviewed: reviewedOnly ? "1" : "",
+    retainer: retainerOnly ? "1" : "",
+    noemail: noEmail ? "1" : "",
+    nophone: noPhone ? "1" : "",
+    sort: sort === "name" ? "" : sort,
+  });
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   // Ticked by default: deleting a contact normally means dropping the person
   // altogether, and leaving the Google entry would let the sync pull them back.
@@ -524,6 +552,10 @@ export function ContactAdminList({
   // Contact currently selected to merge away; while set, every other card offers
   // to become the survivor. Null when no merge is in progress.
   const [mergeSourceId, setMergeSourceId] = useState<string | null>(null);
+  // The survivor picked for that merge, held while the confirm dialog is open.
+  const [mergeTargetId, setMergeTargetId] = useState<string | null>(null);
+  const [merging, setMerging] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const NEW_CONTACT_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -588,6 +620,13 @@ export function ContactAdminList({
   const rest = filtered.filter((c) => !isNew(c));
   const unsynced = rest.filter((c) => !c.googleContactId).sort(bySort);
   const synced = rest.filter((c) => !!c.googleContactId).sort(bySort);
+  // Only the synced group is capped: it holds nearly everyone, while the new and
+  // needs-syncing groups are short and are the ones that want attention.
+  const syncedPager = useShowMore(
+    synced,
+    BATCH,
+    [q, syncFilter, reviewedOnly, retainerOnly, noEmail, noPhone, sort].join("|"),
+  );
 
   /**
    * Opens the inline edit form for a contact row.
@@ -623,13 +662,15 @@ export function ContactAdminList({
 
   /**
    * Downloads the full contacts CSV via the admin API and triggers a browser save dialog.
-   * Uses fetch + blob so the admin secret can be sent as a header rather than in the URL.
+   * Uses fetch + blob rather than a plain download link, so a failed export is reported
+   * instead of the browser saving the error page as contacts.csv.
    */
   async function exportContacts(): Promise<void> {
+    setExporting(true);
     try {
-      const res = await fetch("/api/admin/contacts/export", {});
+      const res = await fetch("/api/admin/contacts/export");
       if (!res.ok) {
-        console.error("[ContactAdminList] Export failed:", res.status);
+        toast(`Export failed (error ${res.status}) - try again.`, { tone: "error" });
         return;
       }
       const blob = await res.blob();
@@ -643,6 +684,9 @@ export function ContactAdminList({
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("[ContactAdminList] Export error:", err);
+      toast("Network error - the export didn't download.", { tone: "error" });
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -663,11 +707,13 @@ export function ContactAdminList({
         setContacts((prev) =>
           prev.map((c) => (c.id === id ? { ...c, googleContactId: "synced" } : c)),
         );
+        toast("Synced to Google Contacts.", { tone: "success" });
       } else {
-        console.error("[ContactAdminList] Sync failed:", data.error);
+        toast(data.error ?? "Couldn't sync that contact - try again.", { tone: "error" });
       }
     } catch (err) {
       console.error("[ContactAdminList] Sync network error:", err);
+      toast("Network error - the contact wasn't synced.", { tone: "error" });
     } finally {
       setSyncingId(null);
     }
@@ -794,8 +840,10 @@ export function ContactAdminList({
     const secondaryId = mergeSourceId;
     if (!secondaryId || secondaryId === primaryId) {
       setMergeSourceId(null);
+      setMergeTargetId(null);
       return;
     }
+    setMerging(true);
     try {
       const res = await fetch(`/api/admin/contacts/merge`, {
         method: "POST",
@@ -816,7 +864,9 @@ export function ContactAdminList({
       console.error("[ContactAdminList] Merge error:", err);
       toast("Network error - the contacts weren't merged.", { tone: "error" });
     } finally {
+      setMerging(false);
       setMergeSourceId(null);
+      setMergeTargetId(null);
     }
   }
 
@@ -859,6 +909,9 @@ export function ContactAdminList({
     void mergeInto(id);
   }
 
+  const mergeSource = contacts.find((c) => c.id === mergeSourceId);
+  const mergeTarget = contacts.find((c) => c.id === mergeTargetId);
+
   /**
    * Builds the per-card props (everything except `c` itself).
    * @param c - Contact row this card is for.
@@ -894,7 +947,8 @@ export function ContactAdminList({
       onConfirmDelete: handleDeleteContact.bind(null, c.id),
       onCancelDelete: setDeleteConfirmId.bind(null, null),
       onStartMerge: setMergeSourceId.bind(null, c.id),
-      onMergeHere: handleMergeInto.bind(null, c.id),
+      // Merging can't be undone, so picking the survivor asks first.
+      onMergeHere: setMergeTargetId.bind(null, c.id),
       onCancelMerge: setMergeSourceId.bind(null, null),
     };
   }
@@ -912,10 +966,9 @@ export function ContactAdminList({
       {mergeSourceId && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <span>
-            Merging{" "}
-            <strong>{contacts.find((c) => c.id === mergeSourceId)?.name ?? "contact"}</strong> -
-            pick the contact to keep by clicking &ldquo;Keep this one&rdquo;. Its reviews move over
-            and this duplicate is removed.
+            Merging <strong>{mergeSource?.name ?? "contact"}</strong> - pick the contact to keep by
+            clicking &ldquo;Keep this one&rdquo;. Its reviews move over and this duplicate is
+            removed.
           </span>
           <button
             onClick={() => setMergeSourceId(null)}
@@ -938,17 +991,41 @@ export function ContactAdminList({
         <button
           type="button"
           onClick={() => void exportContacts()}
-          className="shrink-0 text-xs font-medium text-moonstone-400 underline underline-offset-2 hover:text-moonstone-300"
+          disabled={exporting}
+          className="shrink-0 text-xs font-medium text-moonstone-700 underline underline-offset-2 hover:text-moonstone-800 disabled:opacity-50"
         >
-          Export CSV
+          {exporting ? "Exporting…" : "Export CSV"}
         </button>
       </div>
+
+      <ConfirmDialog
+        open={mergeSource !== undefined && mergeTarget !== undefined}
+        title={`Merge into ${mergeTarget?.name ?? "this contact"}?`}
+        body={
+          <p>
+            <strong>{mergeTarget?.name}</strong> keeps its details and fills any blanks from{" "}
+            <strong>{mergeSource?.name}</strong>. Reviews, emails and phone numbers move across,
+            then <strong>{mergeSource?.name}</strong> is deleted
+            {mergeSource?.googleContactId &&
+            mergeSource.googleContactId !== mergeTarget?.googleContactId
+              ? " here and from Google Contacts"
+              : ""}
+            . This can&apos;t be undone.
+          </p>
+        }
+        confirmLabel="Merge"
+        tone="danger"
+        busy={merging}
+        onConfirm={() => mergeTargetId && handleMergeInto(mergeTargetId)}
+        onCancel={() => setMergeTargetId(null)}
+      />
 
       {/* Filter chips - narrow the list without leaving the page. */}
       <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
           onClick={() => setSyncFilter((f) => (f === "synced" ? "all" : "synced"))}
+          aria-pressed={syncFilter === "synced"}
           className={chipClass(syncFilter === "synced")}
         >
           Synced
@@ -956,6 +1033,7 @@ export function ContactAdminList({
         <button
           type="button"
           onClick={() => setSyncFilter((f) => (f === "unsynced" ? "all" : "unsynced"))}
+          aria-pressed={syncFilter === "unsynced"}
           className={chipClass(syncFilter === "unsynced")}
         >
           Unsynced
@@ -963,6 +1041,7 @@ export function ContactAdminList({
         <button
           type="button"
           onClick={() => setReviewedOnly((v) => !v)}
+          aria-pressed={reviewedOnly}
           className={chipClass(reviewedOnly)}
         >
           Has reviews
@@ -970,14 +1049,25 @@ export function ContactAdminList({
         <button
           type="button"
           onClick={() => setRetainerOnly((v) => !v)}
+          aria-pressed={retainerOnly}
           className={chipClass(retainerOnly)}
         >
           Retainer
         </button>
-        <button type="button" onClick={() => setNoEmail((v) => !v)} className={chipClass(noEmail)}>
+        <button
+          type="button"
+          onClick={() => setNoEmail((v) => !v)}
+          aria-pressed={noEmail}
+          className={chipClass(noEmail)}
+        >
           No email
         </button>
-        <button type="button" onClick={() => setNoPhone((v) => !v)} className={chipClass(noPhone)}>
+        <button
+          type="button"
+          onClick={() => setNoPhone((v) => !v)}
+          aria-pressed={noPhone}
+          className={chipClass(noPhone)}
+        >
           No phone
         </button>
         {anyFilter && (
@@ -1012,7 +1102,7 @@ export function ContactAdminList({
         <div className="flex flex-col gap-3">
           <h3 className="flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-700 uppercase">
             New
-            <span className="rounded-full bg-moonstone-400/15 px-2 py-0.5 text-[10px] font-semibold text-moonstone-400">
+            <span className="rounded-full bg-moonstone-400/15 px-2 py-0.5 text-[10px] font-semibold text-moonstone-700">
               {newContacts.length}
             </span>
           </h3>
@@ -1050,9 +1140,10 @@ export function ContactAdminList({
           </button>
           {syncedOpen && (
             <div className="flex flex-col gap-3">
-              {synced.map((c) => (
+              {syncedPager.visible.map((c) => (
                 <ContactCard key={c.id} c={c} {...buildCardProps(c)} />
               ))}
+              <ShowMoreButton pager={syncedPager} noun={["contact", "contacts"]} />
             </div>
           )}
         </div>

@@ -309,6 +309,9 @@ export function PricingWizard({
   const [aiExplanation, setAiExplanation] = useState("");
   const [aiEstimatedMins, setAiEstimatedMins] = useState(0);
   const [aiConfidence, setAiConfidence] = useState<EstimateConfidence>("medium");
+  // True when the AI estimate failed and the quote rests on the fallback
+  // duration, which must not be presented as a reading of the description.
+  const [aiFailed, setAiFailed] = useState(false);
   const [result, setResult] = useState<PriceRange | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   // Id of the logged estimate, carried to /booking so the booking snapshots
@@ -426,20 +429,25 @@ export function PricingWizard({
       FALLBACK_BASE_RATE;
     const fullRate = baseStandard + remoteRateDelta(rates, meeting);
 
-    // Fallback defaults when the AI estimate fails
+    // Fallback defaults when the AI estimate fails. The results copy calls this
+    // "a typical one-hour job", so keep the two in step.
     let estimatedMins = 60;
     let explanation = "";
     let confidence: EstimateConfidence = "medium";
     let tasks: { label: string; mins: number }[] = [];
+    const ai =
+      estimateRes.status === "fulfilled" && estimateRes.value.ok
+        ? estimateRes.value.result
+        : undefined;
 
-    if (estimateRes.status === "fulfilled" && estimateRes.value.ok && estimateRes.value.result) {
-      const ai = estimateRes.value.result;
+    if (ai) {
       estimatedMins = ai.estimatedMins;
       explanation = ai.explanation;
       confidence = ai.confidence ?? "medium";
       tasks = Array.isArray(ai.tasks) ? ai.tasks : [];
     }
 
+    setAiFailed(!ai);
     setAiExplanation(explanation);
     setAiEstimatedMins(estimatedMins);
     setAiConfidence(confidence);
@@ -587,6 +595,7 @@ export function PricingWizard({
     setAddressNotFound(false);
     setAiExplanation("");
     setAiEstimatedMins(0);
+    setAiFailed(false);
     setResult(null);
     setEstimateId(null);
   }
@@ -607,7 +616,11 @@ export function PricingWizard({
   const stepIndex = step === "issue" ? 0 : step === "meeting" ? 1 : 2;
 
   if (loading) {
-    return <div className="py-8 text-center text-sm text-slate-400">Loading calculator...</div>;
+    return (
+      <div role="status" className="py-8 text-center text-base text-slate-600">
+        Loading calculator...
+      </div>
+    );
   }
 
   // An offer the estimate could not price in, because it only runs on certain
@@ -672,7 +685,8 @@ export function PricingWizard({
               )}
             />
           ))}
-          <span className="ml-2 text-xs whitespace-nowrap text-slate-400">
+          <span className="ml-2 text-base whitespace-nowrap text-slate-600">
+            <span className="sr-only">Step </span>
             {stepIndex + 1} / {totalSteps}
           </span>
         </div>
@@ -680,7 +694,9 @@ export function PricingWizard({
 
       {step === "issue" && (
         <div>
-          <h3 className="mb-1 text-lg font-bold text-coquelicot">What do you need help with?</h3>
+          <h3 className="mb-1 text-lg font-bold text-russian-violet">
+            What do you need help with?
+          </h3>
           <p className="mb-4 text-base text-slate-600">
             Describe the issue or job - the more detail, the better the estimate.
           </p>
@@ -692,14 +708,14 @@ export function PricingWizard({
             aria-label="Describe the issue or job you need help with"
             placeholder="e.g. My laptop is running really slow and I think it has a virus. Also want to set up my new phone."
             className={cn(
-              "w-full resize-none rounded-xl border px-4 py-3 text-base text-slate-700 transition-all outline-none",
-              "border-coquelicot/40 bg-white",
-              "focus:border-coquelicot focus:ring-2 focus:ring-coquelicot/30",
+              "w-full resize-none rounded-xl border px-4 py-3 text-base text-slate-700 transition-colors",
+              "border-slate-300 bg-white",
+              "focus:border-russian-violet focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
             )}
           />
           {issueDescription.trim().length > 0 &&
             issueDescription.trim().length < BOOKING_FIELD_LIMITS.notesMin && (
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-base text-slate-600">
                 Add a bit more detail for a better estimate.
               </p>
             )}
@@ -738,14 +754,14 @@ export function PricingWizard({
                   aria-pressed={selected}
                   onClick={() => setMeeting(option.value)}
                   className={cn(
-                    "rounded-xl border p-4 text-left transition-all",
+                    "rounded-xl border p-4 text-left transition-[color,background-color,border-color,box-shadow]",
                     selected
                       ? "border-russian-violet bg-russian-violet/5 ring-2 ring-russian-violet/30"
                       : "border-slate-200 bg-white hover:border-slate-300",
                   )}
                 >
                   <p className="text-base font-bold text-russian-violet">{option.title}</p>
-                  <p className="mt-1 text-sm text-slate-600">{option.body}</p>
+                  <p className="mt-1 text-base text-slate-700">{option.body}</p>
                 </button>
               );
             })}
@@ -775,10 +791,18 @@ export function PricingWizard({
             role="status"
             className="mb-4 rounded-2xl border border-russian-violet/20 bg-russian-violet/5 p-6 text-center"
           >
-            {aiEstimatedMins > 0 && (
-              <p className="mb-3 text-2xl font-bold text-rich-black sm:text-3xl">
-                {formatDuration(aiEstimatedMins)}
+            {aiFailed ? (
+              <p className="mb-3 text-base font-medium text-rich-black">
+                The automatic estimate isn't working just now, so this price assumes a typical
+                one-hour job. Try again in a minute, or book and I'll confirm the price once I know
+                the details.
               </p>
+            ) : (
+              aiEstimatedMins > 0 && (
+                <p className="mb-3 text-2xl font-bold text-rich-black sm:text-3xl">
+                  {formatDuration(aiEstimatedMins)}
+                </p>
+              )
             )}
             <p className="mb-1 text-base font-medium text-slate-600">Estimated cost</p>
             {result.originalLow !== undefined && result.originalHigh !== undefined && (
@@ -795,13 +819,13 @@ export function PricingWizard({
               </p>
             )}
             {result.promoLabel && (
-              <p className="mt-2 text-sm font-semibold text-amber-700">⚡ {result.promoLabel}</p>
+              <p className="mt-2 text-base font-semibold text-amber-700">⚡ {result.promoLabel}</p>
             )}
-            <p className="mt-4 rounded-lg border border-coquelicot/30 bg-coquelicot/5 px-3 py-2 text-base font-bold text-coquelicot-500">
+            <p className="mt-4 rounded-lg border border-coquelicot/30 bg-coquelicot/5 px-3 py-2 text-base font-bold text-coquelicot-700">
               You're charged for the actual time worked at the agreed hourly rate. Jobs that turn
               out more involved than described will cost more than this estimate.
             </p>
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-2 text-base text-slate-600">
               {meeting === "remote"
                 ? "Remote session - no travel charge. "
                 : result.includesTravel
@@ -816,8 +840,8 @@ export function PricingWizard({
                     : ""}
               All prices in NZD. No GST.
             </p>
-            {aiConfidence === "low" && (
-              <p className="mt-3 text-sm font-medium text-coquelicot-400">
+            {aiConfidence === "low" && !aiFailed && (
+              <p className="mt-3 text-base font-medium text-coquelicot-700">
                 Your description was brief, so this is a wide ballpark - I'll pin it down once I see
                 it.
               </p>
@@ -847,7 +871,7 @@ export function PricingWizard({
 
           {result.breakdown.length > 0 && (
             <div className={cn(SOFT_CARD, "mb-4")}>
-              <p className="mb-2 text-sm font-semibold tracking-wide text-slate-500 uppercase">
+              <p className="mb-2 text-sm font-semibold tracking-wide text-slate-600 uppercase">
                 Breakdown
               </p>
               <div className="divide-y divide-slate-100">
@@ -865,7 +889,7 @@ export function PricingWizard({
             </div>
           )}
 
-          <p className="mb-5 text-sm text-slate-600">
+          <p className="mb-5 text-base text-slate-600">
             This is a rough estimate only. The actual cost depends on the complexity of the job and
             will be confirmed before work begins. No GST is charged.
           </p>

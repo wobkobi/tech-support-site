@@ -9,7 +9,9 @@ const cspProd =
   "default-src 'self'; " +
   "script-src 'self' 'unsafe-inline' blob: https://maps.googleapis.com https://maps.gstatic.com https://www.googletagmanager.com https://connect.facebook.net; " +
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-  "img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com https://*.google.com https://*.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://googleads.g.doubleclick.net https://www.facebook.com; " +
+  // www.google.co.nz: the Google Ads audiences pixel loads from the visitor's
+  // country domain, which the *.google.com wildcard does not cover.
+  "img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com https://*.google.com https://*.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://googleads.g.doubleclick.net https://www.google.co.nz https://www.facebook.com; " +
   "font-src 'self' data: https://fonts.gstatic.com; " +
   // analytics.google.com (apex) and www.google.com are both required: gtag posts
   // GA4 hits to the bare analytics.google.com host, which the *.analytics.google.com
@@ -27,7 +29,7 @@ const cspDev =
   "default-src 'self' blob: data:; " +
   "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://maps.googleapis.com https://maps.gstatic.com https://va.vercel-scripts.com https://www.googletagmanager.com https://connect.facebook.net; " +
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-  "img-src 'self' data: blob: https://tothepoint.co.nz https://www.tothepoint.co.nz https://maps.googleapis.com https://maps.gstatic.com https://*.google.com https://*.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://googleads.g.doubleclick.net https://www.facebook.com; " +
+  "img-src 'self' data: blob: https://tothepoint.co.nz https://www.tothepoint.co.nz https://maps.googleapis.com https://maps.gstatic.com https://*.google.com https://*.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://googleads.g.doubleclick.net https://www.google.co.nz https://www.facebook.com; " +
   "font-src 'self' data: https://fonts.gstatic.com; " +
   "connect-src 'self' ws: http://localhost:3000 http://127.0.0.1:3000 https://maps.googleapis.com https://places.googleapis.com https://va.vercel-scripts.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.google.com https://googleads.g.doubleclick.net https://stats.g.doubleclick.net https://connect.facebook.net https://www.facebook.com; " +
   "worker-src 'self' blob:; " +
@@ -105,6 +107,38 @@ const nextConfig: NextConfig = {
   },
 
   serverExternalPackages: ["nodemailer"],
+
+  /**
+   * Trim the serverless function bundles Vercel stores for every deployment.
+   *
+   * Next traces `@prisma/client/runtime` wholesale into every route's
+   * function, which drags in ~55 MB of engines this app can never load:
+   * base64-encoded wasm query engines and compilers for Postgres, MySQL,
+   * SQLite, CockroachDB and SQL Server, plus the edge, browser, binary and
+   * React Native runtimes. The app is MongoDB on the default "library"
+   * engine, so the only files it needs at runtime are `runtime/library.js`
+   * and the native `.prisma/client/libquery_engine-*.so.node`, both of which
+   * are still traced. The bundle drops from ~130 MB to ~75 MB per function,
+   * which is what counts against Vercel's Function Storage quota (bundles
+   * are retained for every deployment kept under the retention policy).
+   *
+   * Keys are route globs; "*" matches every route.
+   */
+  outputFileTracingExcludes: {
+    "*": [
+      "node_modules/@prisma/client/runtime/query_engine_bg.*",
+      "node_modules/@prisma/client/runtime/query_compiler_bg.*",
+      "node_modules/@prisma/client/runtime/wasm-*",
+      "node_modules/@prisma/client/runtime/edge*",
+      "node_modules/@prisma/client/runtime/binary.*",
+      "node_modules/@prisma/client/runtime/react-native.*",
+      "node_modules/@prisma/client/runtime/index-browser.*",
+      "node_modules/@prisma/client/runtime/*.d.mts",
+      "node_modules/.prisma/client/edge.js",
+      "node_modules/.prisma/client/wasm*",
+      "node_modules/.prisma/client/index-browser.js",
+    ],
+  },
 } satisfies NextConfig;
 
 const withBundleAnalyzer = bundleAnalyzer({

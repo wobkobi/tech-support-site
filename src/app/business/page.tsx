@@ -7,9 +7,11 @@ import { BusinessEnquiryForm } from "@/features/business/components/BusinessEnqu
 import { formatMoneyCompact } from "@/features/business/lib/business";
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
+import { Bullet } from "@/shared/components/Bullet";
 import { Button } from "@/shared/components/Button";
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { CARD, FrostedSection, NESTED_CARD, PageShell } from "@/shared/components/PageLayout";
 import { PixelEvent } from "@/shared/components/PixelEvent";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
@@ -166,7 +168,7 @@ const siteUrl = getSiteUrl();
  * @returns Business page element.
  */
 export default async function BusinessPage(): Promise<React.ReactElement> {
-  const pricing = await getPublicPricing();
+  const [pricing, identity] = await Promise.all([getPublicPricing(), getIdentity()]);
   // Deliberately undiscounted. Promos are a home offer, and the calculator
   // charges a business visit's travel in full, so discounting it here would
   // quote a rate the invoice does not honour.
@@ -237,13 +239,13 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
                 Send an enquiry
               </Button>
               <Button
-                href="tel:+64212971237"
+                href={identity.phoneTel}
                 variant="secondary"
                 size="lg"
                 className="w-full sm:w-auto"
               >
                 <FaPhone className="h-6 w-6" aria-hidden />
-                021 297 1237
+                {identity.phone}
               </Button>
             </div>
           </section>
@@ -264,12 +266,9 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
               One-off jobs, sorted properly and explained in plain English:
             </p>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3 md:grid-cols-3">
               {businessServices.map((area) => (
-                <div
-                  key={area.label}
-                  className="rounded-lg border border-seasalt-200/60 bg-white p-3 shadow-sm transition-all hover:shadow-md"
-                >
+                <div key={area.label} className={NESTED_CARD}>
                   <div className="mb-2 flex items-center gap-2">
                     <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-moonstone-500/40 bg-moonstone-400/20">
                       <span className="text-2xl text-moonstone-400" aria-hidden>
@@ -283,7 +282,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
                   <ul className="space-y-1 text-base text-rich-black/80 sm:text-lg">
                     {area.examples.map((example) => (
                       <li key={example} className="flex gap-2">
-                        <span className="mt-0.5 text-moonstone-400">•</span>
+                        <Bullet />
                         <span>{example}</span>
                       </li>
                     ))}
@@ -313,18 +312,18 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
 
             <ul className="space-y-2 text-base text-rich-black/90 sm:text-lg">
               <li className="flex gap-2">
-                <span className="mt-1 text-moonstone-400">•</span>
+                <Bullet />
                 <span>
                   Travel billed at {formatMoneyCompact(displayTravelRate)}/hr for one round trip per
                   visit
                 </span>
               </li>
               <li className="flex gap-2">
-                <span className="mt-1 text-moonstone-400">•</span>
+                <Bullet />
                 <span>Quick phone questions are usually free</span>
               </li>
               <li className="flex gap-2">
-                <span className="mt-1 text-moonstone-400">•</span>
+                <Bullet />
                 <span>Itemised invoice after every job</span>
               </li>
             </ul>
@@ -347,12 +346,9 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
               ongoing basis. No lock-in, cancel any time, billed by invoice each month.
             </p>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
               {retainerTiers.map((tier) => (
-                <div
-                  key={tier.name}
-                  className="flex flex-col rounded-lg border border-seasalt-200/60 bg-white p-4 shadow-sm transition-all hover:shadow-md"
-                >
+                <div key={tier.name} className={cn(NESTED_CARD, "flex flex-col")}>
                   <h3 className="text-lg font-semibold text-rich-black sm:text-xl">{tier.name}</h3>
                   <p className="mb-1 text-lg font-bold text-russian-violet sm:text-xl">
                     {tier.fromPrice}
@@ -361,7 +357,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
                   <ul className="mb-4 flex-1 space-y-1 text-base text-rich-black/80 sm:text-lg">
                     {tier.inclusions.map((inc) => (
                       <li key={inc} className="flex gap-2">
-                        <span className="mt-0.5 text-moonstone-400">•</span>
+                        <Bullet />
                         <span>{inc}</span>
                       </li>
                     ))}
@@ -386,7 +382,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {howItWorks.map((item) => (
                 <div key={item.step} className="flex gap-3">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-full border border-moonstone-500/40 bg-moonstone-400/20 text-lg font-bold text-moonstone-400">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-full border border-moonstone-500/40 bg-moonstone-400/20 text-lg font-bold text-moonstone-700">
                     {item.step}
                   </span>
                   <div>
@@ -449,17 +445,17 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
             <p className="mt-6 text-base text-rich-black/80 sm:text-lg">
               Prefer to talk? Ring{" "}
               <a
-                href="tel:+64212971237"
+                href={identity.phoneTel}
                 className="font-semibold text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
               >
-                021 297 1237
+                {identity.phone}
               </a>{" "}
               or email{" "}
               <a
-                href="mailto:harrison@tothepoint.co.nz"
+                href={`mailto:${identity.email}`}
                 className="font-semibold text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
               >
-                harrison@tothepoint.co.nz
+                {identity.email}
               </a>
               .
             </p>

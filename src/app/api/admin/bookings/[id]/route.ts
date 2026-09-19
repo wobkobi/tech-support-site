@@ -7,6 +7,7 @@ import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.s
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 import { assessCancellation } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { releaseBookingRedemptions } from "@/features/business/lib/promo-redemption";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import {
   deleteBookingEvent,
@@ -15,6 +16,7 @@ import {
   SCHEDULE_CALENDAR_TAG,
 } from "@/features/calendar/lib/google-calendar";
 import {
+  cancelHeldBookingEmails,
   sendCustomerBookingConfirmation,
   sendCustomerReviewRequest,
   sendOwnerBookingNotification,
@@ -187,6 +189,13 @@ export async function PATCH(
     );
   }
 
+  // A completed job happened. Cancelling it would delete the Google event,
+  // emailing the customer a cancellation for a visit they had, and a no-show
+  // would bill them for one they turned up to.
+  if (booking.status === "completed" && (body.status === "cancelled" || body.markNoShow === true)) {
+    return errorResponse("This booking is already completed.", 409);
+  }
+
   // Sparse update: only fields present in the body get written.
   const data: Record<string, unknown> = {};
 
@@ -194,6 +203,8 @@ export async function PATCH(
   if (body.email !== undefined) data.email = body.email.trim();
   if (body.phone !== undefined) data.phone = toE164NZ(body.phone) || null;
   if (body.notes !== undefined) data.notes = body.notes;
+  // The column is what the detail page, its Maps button and the emails read.
+  if (body.address !== undefined) data.address = body.address.trim() || null;
 
   if (body.address !== undefined && body.notes === undefined) {
     const currentNotes = booking.notes ?? "";
@@ -292,7 +303,9 @@ export async function PATCH(
     // No-show ~ a customer cancel at startAt: both windows are inside.
     if (booking.calendarEventId) {
       try {
-        await deleteBookingEvent({ eventId: booking.calendarEventId });
+        // Silently: a Google "event cancelled" email after they failed to turn
+        // up reads as the operator calling the visit off.
+        await deleteBookingEvent({ eventId: booking.calendarEventId, notifyAttendees: false });
       } catch (err) {
         console.error("[admin/bookings] Failed to delete calendar event:", err);
       }
@@ -357,6 +370,18 @@ export async function PATCH(
     return errorResponse("Another booking already starts at that time.", 409);
   }
 
+  // Recall what Resend is holding overnight before it goes out wrong: a
+  // reminder for a visit just called off, or an earlier "moved" notice showing
+  // a time that has changed again. Runs before the new notice below is held.
+  // A moved start only, matching the reminder-stamp reset above, so a finish
+  // time nudge can't recall a reminder the cron would never re-send.
+  const cancelledNow = updated.status === "cancelled" && booking.status !== "cancelled";
+  const startMoved =
+    timeChange !== null && timeChange.startAt.getTime() !== booking.startAt.getTime();
+  if (cancelledNow || startMoved) {
+    await cancelHeldBookingEmails(id);
+  }
+
   // Keep the Google event in step with the row. Best-effort by necessity - the
   // booking is already written - but a silent failure would recreate the exact
   // drift this exists to remove, so it comes back as a warning.
@@ -417,6 +442,13 @@ export async function PATCH(
     ]);
   }
 
+  // A cancelled or no-show booking never used its promo, so the booking-time
+  // redemption stops counting against the cap and the customer's own limit.
+  // Swallows its own errors.
+  if (updated.status === "cancelled" && booking.status !== "cancelled") {
+    await releaseBookingRedemptions(id);
+  }
+
   // Same cancellation draft applies to on-behalf and no-show paths. Opting out
   // skips only the invoice - the fee assessment stays on the booking, so a job
   // recorded as chargeable can still be billed later from the invoices tab.
@@ -447,31 +479,34 @@ export async function PATCH(
   // booking back to the cron, which would send the email that was declined.
   // Sending it later is still one click away on the booking detail page.
   let reviewSent = false;
+  // Returned so a list can mirror the stamp, which lands on a skipped send too.
+  let reviewSentAt: Date | null = null;
   if (
     body.status === "completed" &&
     booking.status !== "completed" &&
     booking.email &&
     booking.reviewToken
   ) {
+    const stampedAt = new Date();
     const claim = await prisma.booking.updateMany({
       where: {
         id,
         OR: [{ reviewSentAt: null }, { reviewSentAt: { isSet: false } }],
       },
-      data: { reviewSentAt: new Date() },
+      data: { reviewSentAt: stampedAt },
     });
+    if (claim.count > 0) reviewSentAt = stampedAt;
 
     if (claim.count > 0 && body.sendReview !== false) {
       // Claim won - sendCustomerReviewRequest never throws (catches its own
       // errors and logs), so the PATCH response stays successful even if
       // Resend has a hiccup. Trade-off: a single failed send won't auto-retry.
-      await sendCustomerReviewRequest({
+      reviewSent = await sendCustomerReviewRequest({
         id,
         name: booking.name,
         email: booking.email,
         reviewToken: booking.reviewToken,
       });
-      reviewSent = true;
     }
   }
 
@@ -513,6 +548,7 @@ export async function PATCH(
   return NextResponse.json({
     ok: true,
     reviewSent,
+    ...(reviewSentAt ? { reviewSentAt: reviewSentAt.toISOString() } : {}),
     ...(timeChange ? { notified: timeChange.notify } : {}),
     ...(calendarWarning ? { calendarWarning } : {}),
   });
@@ -554,6 +590,11 @@ export async function DELETE(
   // relation, so deleting the booking would leave reviews pointing at nothing. The review
   // is kept - it stays linked to its contact via contactId/customerRef.
   await prisma.review.updateMany({ where: { bookingId: id }, data: { bookingId: null } });
+  // An unsettled redemption would otherwise outlive its booking and count
+  // against the promo's limits for good. A settled one records a discount that
+  // was really given, so it stays.
+  await releaseBookingRedemptions(id);
+  await cancelHeldBookingEmails(id);
   await prisma.booking.delete({ where: { id } });
 
   revalidateTag(SCHEDULE_CALENDAR_TAG, {});

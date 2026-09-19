@@ -4,7 +4,9 @@
 // rights under the NZ Privacy Act 2020.
 
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
+import { Bullet } from "@/shared/components/Bullet";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import type { Metadata } from "next";
 import type React from "react";
@@ -27,14 +29,14 @@ const LAST_UPDATED = "2 July 2026";
 const H2 = "mb-3 text-xl font-bold text-russian-violet sm:text-2xl";
 const P = "text-base text-rich-black/90 sm:text-lg";
 const LI = "flex gap-3 text-base text-rich-black/90 sm:text-lg";
-const DOT = "mt-1 shrink-0 text-lg text-moonstone-400";
 const LINK = "font-semibold text-russian-violet underline hover:text-coquelicot-500";
 
 /**
  * Privacy policy page.
  * @returns React element for the privacy page.
  */
-export default function PrivacyPage(): React.ReactElement {
+export default async function PrivacyPage(): Promise<React.ReactElement> {
+  const identity = await getIdentity();
   return (
     <PageShell>
       <BreadcrumbJsonLd
@@ -56,8 +58,8 @@ export default function PrivacyPage(): React.ReactElement {
               Auckland. We respect your privacy and only collect what we need to help you. This
               policy explains what information we collect, how we use it, who we share it with, and
               the choices you have. If you have any questions, email{" "}
-              <a href="mailto:harrison@tothepoint.co.nz" className={LINK}>
-                harrison@tothepoint.co.nz
+              <a href={`mailto:${identity.email}`} className={LINK}>
+                {identity.email}
               </a>
               .
             </p>
@@ -73,15 +75,15 @@ export default function PrivacyPage(): React.ReactElement {
                 </p>
                 <ul className="flex flex-col gap-2.5">
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>Your name, email address and phone number</span>
                   </li>
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>Your address, when a visit is on-site</span>
                   </li>
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>Details about the device or problem you need help with</span>
                   </li>
                 </ul>
@@ -96,19 +98,19 @@ export default function PrivacyPage(): React.ReactElement {
                 <h2 className={H2}>How we use your information</h2>
                 <ul className="flex flex-col gap-2.5">
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>To arrange, provide and follow up on your tech support</span>
                   </li>
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>To send booking confirmations, calendar invites and reminders</span>
                   </li>
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>To reply to your enquiries and, after a job, invite a review</span>
                   </li>
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>To improve the website and measure how well our advertising works</span>
                   </li>
                 </ul>
@@ -122,13 +124,13 @@ export default function PrivacyPage(): React.ReactElement {
                 </p>
                 <ul className="flex flex-col gap-2.5">
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>
                       <strong>Google Analytics</strong> - to see how visitors use the site.
                     </span>
                   </li>
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>
                       <strong>Google Ads</strong> and the{" "}
                       <strong>Meta (Facebook/Instagram) Pixel</strong> - to measure ad performance
@@ -136,7 +138,7 @@ export default function PrivacyPage(): React.ReactElement {
                     </span>
                   </li>
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>
                       <strong>Meta advanced matching:</strong> when you submit your booking or
                       contact details, a scrambled (hashed, one-way) version of information like
@@ -145,7 +147,7 @@ export default function PrivacyPage(): React.ReactElement {
                     </span>
                   </li>
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>
                       <strong>Vercel Analytics</strong> - privacy-friendly performance statistics.
                     </span>
@@ -183,19 +185,19 @@ export default function PrivacyPage(): React.ReactElement {
                 </p>
                 <ul className="flex flex-col gap-2.5">
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>Google (Analytics, Ads, Maps and Calendar)</span>
                   </li>
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>Meta Platforms (advertising pixel)</span>
                   </li>
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>Our email provider, for booking and review emails</span>
                   </li>
                   <li className={LI}>
-                    <span className={DOT}>&bull;</span>
+                    <Bullet />
                     <span>Our website hosting and database providers</span>
                   </li>
                 </ul>
@@ -220,8 +222,8 @@ export default function PrivacyPage(): React.ReactElement {
                 <p className={P}>
                   Under the New Zealand Privacy Act 2020 you can ask to see the personal information
                   we hold about you and request corrections. Email{" "}
-                  <a href="mailto:harrison@tothepoint.co.nz" className={LINK}>
-                    harrison@tothepoint.co.nz
+                  <a href={`mailto:${identity.email}`} className={LINK}>
+                    {identity.email}
                   </a>{" "}
                   and we'll help. If you're not satisfied, you can contact the{" "}
                   <a
@@ -256,12 +258,12 @@ export default function PrivacyPage(): React.ReactElement {
                 <h2 className={H2}>Contact us</h2>
                 <p className={P}>
                   Questions about your privacy? Email{" "}
-                  <a href="mailto:harrison@tothepoint.co.nz" className={LINK}>
-                    harrison@tothepoint.co.nz
+                  <a href={`mailto:${identity.email}`} className={LINK}>
+                    {identity.email}
                   </a>{" "}
                   or call{" "}
-                  <a href="tel:+64212971237" className={LINK}>
-                    021 297 1237
+                  <a href={identity.phoneTel} className={LINK}>
+                    {identity.phone}
                   </a>
                   .
                 </p>
