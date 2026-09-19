@@ -75,6 +75,17 @@ function canPay(inv: Invoice): boolean {
 }
 
 /**
+ * Fetches the full invoice list.
+ * @returns The invoices.
+ */
+async function fetchInvoices(): Promise<Invoice[]> {
+  const r = await fetch("/api/business/invoices");
+  const d = (await r.json().catch(() => null)) as { ok?: boolean; invoices?: Invoice[] } | null;
+  if (!d?.ok || !d.invoices) throw new Error(`Invoice list failed to load (${r.status})`);
+  return d.invoices;
+}
+
+/**
  * Client component listing all invoices with search, filters, sortable columns,
  * summary cards, and a payment-recording action.
  * @returns The invoices list element.
@@ -83,6 +94,8 @@ export function InvoicesListView(): React.ReactElement {
   const { toast } = useToast();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [syncMode, setSyncMode] = useState<SyncMode>(null);
 
   const [search, setSearch] = useState("");
@@ -98,20 +111,27 @@ export function InvoicesListView(): React.ReactElement {
   const now = useMemo(() => new Date(), []);
 
   useEffect(() => {
-    fetch("/api/business/invoices")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.ok) setInvoices(d.invoices);
-      })
-      .catch(() => toast("Couldn't load invoices. Refresh to try again.", { tone: "error" }))
+    fetchInvoices()
+      .then(setInvoices)
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
-  }, [toast]);
+  }, []);
 
-  /** Reloads the full invoice list from the server. */
+  /**
+   * Reloads the full invoice list from the server. A failure keeps the rows
+   * already on screen and raises the banner, so an outage never reads as an
+   * empty ledger.
+   */
   async function reload(): Promise<void> {
-    const r = await fetch("/api/business/invoices");
-    const d = await r.json();
-    if (d.ok) setInvoices(d.invoices);
+    setRetrying(true);
+    try {
+      setInvoices(await fetchInvoices());
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setRetrying(false);
+    }
   }
 
   /**
@@ -119,9 +139,15 @@ export function InvoicesListView(): React.ReactElement {
    * @param id - Invoice ID to refresh.
    */
   async function refreshInvoice(id: string): Promise<void> {
-    const r = await fetch(`/api/business/invoices/${id}`);
-    const d = await r.json();
-    if (d.ok) setInvoices((prev) => prev.map((i) => (i.id === id ? d.invoice : i)));
+    try {
+      const r = await fetch(`/api/business/invoices/${id}`);
+      const d = await r.json();
+      if (!d.ok) throw new Error(`refresh failed (${r.status})`);
+      setInvoices((prev) => prev.map((i) => (i.id === id ? d.invoice : i)));
+    } catch {
+      // The payment itself saved; only this row is stale.
+      setLoadError(true);
+    }
   }
 
   /** Imports new invoices from Google Drive PDFs and refreshes the list. */
@@ -304,6 +330,12 @@ export function InvoicesListView(): React.ReactElement {
   );
   const rangeStart = sorted.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(currentPage * PAGE_SIZE, sorted.length);
+  const emptyText =
+    invoices.length > 0
+      ? "No invoices match your filters."
+      : loadError
+        ? "Invoices didn't load."
+        : "No invoices yet.";
 
   return (
     <div>
@@ -446,6 +478,22 @@ export function InvoicesListView(): React.ReactElement {
         )}
       </div>
 
+      {loadError && (
+        <div
+          role="alert"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+        >
+          <span>
+            {invoices.length === 0
+              ? "Couldn't load invoices."
+              : "Couldn't refresh invoices - the list may be out of date."}
+          </span>
+          <AdminButton size="xs" variant="secondary" onClick={() => void reload()} busy={retrying}>
+            Try again
+          </AdminButton>
+        </div>
+      )}
+
       {/* Mobile card list - below lg the table is hard to read; stack each row
           as a tap-to-open card with the derived status badge. */}
       <div className="space-y-2 lg:hidden">
@@ -455,7 +503,7 @@ export function InvoicesListView(): React.ReactElement {
           </p>
         ) : sorted.length === 0 ? (
           <p className="rounded-xl border border-admin-border bg-admin-surface px-5 py-6 text-sm text-admin-faint shadow-sm">
-            {invoices.length === 0 ? "No invoices yet." : "No invoices match your filters."}
+            {emptyText}
           </p>
         ) : (
           paged.map((inv) => (
@@ -531,9 +579,7 @@ export function InvoicesListView(): React.ReactElement {
         {loading ? (
           <p className="px-5 py-6 text-sm text-admin-faint">Loading...</p>
         ) : sorted.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-admin-faint">
-            {invoices.length === 0 ? "No invoices yet." : "No invoices match your filters."}
-          </p>
+          <p className="px-5 py-6 text-sm text-admin-faint">{emptyText}</p>
         ) : (
           <table className="w-full text-sm">
             <thead className="border-b border-admin-border bg-admin-bg">

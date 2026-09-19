@@ -202,12 +202,17 @@ export function ManualBookingModal({
     }
   }
 
+  // A booking taken over the phone is typed while talking, so a stray backdrop
+  // tap or Escape must not wipe it. The prefilled start and duration don't count.
+  const dirty = [name, phone, email, unit, address, notes].some((v) => v.trim() !== "");
+
   return (
     <Modal
       open
       // Block Escape/backdrop dismissal while the create POST is in flight -
       // the booking would still save invisibly behind a closed modal.
       onClose={submitting ? () => undefined : onClose}
+      dirty={dirty && !submitting}
       title="New booking"
       size="md"
       footer={

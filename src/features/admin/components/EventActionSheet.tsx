@@ -113,6 +113,9 @@ export function EventActionSheet({
   const isCancelled = status === "cancelled";
   const isCompleted = status === "completed";
   const isConfirmed = status === "confirmed";
+  // A completed job already happened, so cancelling it would only send the
+  // customer a Google "cancelled" email for a visit they had.
+  const isOpen = !isCancelled && !isCompleted;
   const isTestBooking = booking.name.toLowerCase().includes("test");
   // Cancel / no-show lock 18h after the booking ends, mirroring the server
   // guard, so the operator sees it up front rather than via a rejection toast.
@@ -206,12 +209,22 @@ export function EventActionSheet({
     ) : pending?.target.kind === "no-show" ? (
       <div className="flex flex-col gap-2">
         <p>The call-out fee plus round-trip travel is charged for a no-show.</p>
+        <p>The calendar event is removed without emailing the customer.</p>
         <AdminCheckbox
           checked={draftInvoice}
           onChange={setDraftInvoice}
           disabled={busy}
           label="Draft the invoice for it"
         />
+      </div>
+    ) : pending?.target.kind === "cancel" ? (
+      // Every booking on the schedule has its Google event, and deleting it is
+      // the only notice the customer gets - the site sends none of its own.
+      <div className="flex flex-col gap-2">
+        <p>{pending.body}</p>
+        <p className="font-medium text-admin-text">
+          Google Calendar emails the customer that the visit is cancelled.
+        </p>
       </div>
     ) : (
       pending?.body
@@ -252,7 +265,7 @@ export function EventActionSheet({
             View details
           </a>
 
-          {isEditLocked && !isCancelled && (
+          {isEditLocked && isOpen && (
             <p className="px-1 text-center text-xs text-admin-faint">
               Cancelling locks {lockHours}h after a booking ends. Completing stays open.
             </p>
@@ -280,7 +293,7 @@ export function EventActionSheet({
             </button>
           )}
 
-          {!isCancelled && (
+          {isOpen && (
             <>
               <button
                 type="button"

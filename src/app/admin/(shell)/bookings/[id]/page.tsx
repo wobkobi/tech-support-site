@@ -131,7 +131,7 @@ export default async function BookingDetailPage({
           select: { id: true, status: true, verified: true, createdAt: true },
         })
         .catch(() => null),
-      // Only for the times card's lock, which mirrors the PATCH route's gate.
+      // Only for the times card's and actions' lock, which mirror the PATCH route's gate.
       getSettings(),
     ]),
   );
@@ -311,6 +311,9 @@ export default async function BookingDetailPage({
               id={booking.id}
               status={booking.status}
               startAt={booking.startAt.toISOString()}
+              endAt={booking.endAt.toISOString()}
+              lockHours={settings.scheduling.pastEditLockHours}
+              hasCalendarEvent={booking.calendarEventId != null}
               cancelToken={booking.cancelToken}
               reviewAlreadySent={booking.reviewSentAt != null}
               isTest={isTest}

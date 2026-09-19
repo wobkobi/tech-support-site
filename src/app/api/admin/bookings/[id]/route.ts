@@ -189,6 +189,13 @@ export async function PATCH(
     );
   }
 
+  // A completed job happened. Cancelling it would delete the Google event,
+  // emailing the customer a cancellation for a visit they had, and a no-show
+  // would bill them for one they turned up to.
+  if (booking.status === "completed" && (body.status === "cancelled" || body.markNoShow === true)) {
+    return errorResponse("This booking is already completed.", 409);
+  }
+
   // Sparse update: only fields present in the body get written.
   const data: Record<string, unknown> = {};
 

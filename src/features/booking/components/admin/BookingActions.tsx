@@ -11,6 +11,7 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
+import { isPastEditWindow } from "@/shared/lib/edit-window";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
@@ -23,6 +24,12 @@ interface BookingActionsProps {
   status: "held" | "confirmed" | "cancelled" | "completed";
   /** Appointment start (ISO) - gates the no-show + reschedule actions. */
   startAt: string;
+  /** Appointment end (ISO) - starts the past-edit lock. */
+  endAt: string;
+  /** Live past-edit lock window (hours) - scheduling.pastEditLockHours. */
+  lockHours: number;
+  /** Whether a Google event exists, which decides whether a cancel emails the customer. */
+  hasCalendarEvent: boolean;
   /** Cancel/reschedule magic-link token. */
   cancelToken: string;
   /** Whether a review email has already gone out (tunes the button label + toast). */
@@ -81,6 +88,9 @@ const CONFIRM_COPY: Record<
  * @param props.id - Booking id.
  * @param props.status - Booking lifecycle status.
  * @param props.startAt - Appointment start (ISO).
+ * @param props.endAt - Appointment end (ISO).
+ * @param props.lockHours - Live past-edit lock window (hours).
+ * @param props.hasCalendarEvent - Whether the booking has a Google event.
  * @param props.cancelToken - Cancel/reschedule magic-link token.
  * @param props.reviewAlreadySent - Whether a review email already went out.
  * @param props.isTest - Whether this is a deletable test booking.
@@ -90,6 +100,9 @@ export function BookingActions({
   id,
   status,
   startAt,
+  endAt,
+  lockHours,
+  hasCalendarEvent,
   cancelToken,
   reviewAlreadySent,
   isTest,
@@ -110,6 +123,12 @@ export function BookingActions({
   const isCompleted = status === "completed";
   const isPast = new Date(startAt).getTime() < renderedAt;
   const isFuture = !isPast;
+  // A completed job already happened, so cancelling it would only send the
+  // customer a Google "cancelled" email for a visit they had.
+  const isOpen = !isCancelled && !isCompleted;
+  // Cancel / no-show lock after the booking ends, mirroring the PATCH route's
+  // gate, so the lock shows up front rather than as a rejection toast.
+  const isEditLocked = isPastEditWindow(new Date(endAt).getTime(), renderedAt, lockHours);
 
   /**
    * Runs the mutation for the confirmed action, then refreshes (or, for delete,
@@ -164,6 +183,7 @@ export function BookingActions({
   const noShowBody = (
     <div className="flex flex-col gap-2">
       <p>The call-out fee plus round-trip travel is charged for a no-show.</p>
+      <p>The calendar event is removed without emailing the customer.</p>
       <AdminCheckbox
         checked={draftInvoice}
         onChange={setDraftInvoice}
@@ -173,9 +193,28 @@ export function BookingActions({
     </div>
   );
 
-  /** Body for the open dialog: the two with a checkbox, else their copy. */
+  // The site sends no cancellation email of its own; the customer hears only
+  // through Google deleting the invite they were added to.
+  const cancelBody = (
+    <div className="flex flex-col gap-2">
+      <p>{copy?.body}</p>
+      <p className="font-medium text-admin-text">
+        {hasCalendarEvent
+          ? "Google Calendar emails the customer that the visit is cancelled."
+          : "The customer isn't emailed - let them know yourself."}
+      </p>
+    </div>
+  );
+
+  /** Body for the open dialog: the ones built from live state, else the copy. */
   const body =
-    confirm === "complete" ? completeBody : confirm === "noshow" ? noShowBody : copy?.body;
+    confirm === "complete"
+      ? completeBody
+      : confirm === "noshow"
+        ? noShowBody
+        : confirm === "cancel-operator" || confirm === "cancel-onbehalf"
+          ? cancelBody
+          : copy?.body;
 
   return (
     <>
@@ -199,7 +238,7 @@ export function BookingActions({
               setDraftInvoice(true);
               setConfirm("noshow");
             }}
-            disabled={busy}
+            disabled={busy || isEditLocked}
           >
             Mark no-show
           </AdminButton>
@@ -209,7 +248,7 @@ export function BookingActions({
             {reviewAlreadySent ? "Resend review email" : "Send review email"}
           </AdminButton>
         )}
-        {!isCancelled && isFuture && (
+        {isOpen && isFuture && (
           <AdminButton
             variant="secondary"
             href={`/booking/edit?token=${cancelToken}`}
@@ -218,22 +257,27 @@ export function BookingActions({
             Reschedule ↗
           </AdminButton>
         )}
-        {!isCancelled && (
+        {isOpen && (
           <>
             <AdminButton
               variant="secondary"
               onClick={() => setConfirm("cancel-operator")}
-              disabled={busy}
+              disabled={busy || isEditLocked}
             >
               Cancel - my call
             </AdminButton>
             <AdminButton
               variant="danger"
               onClick={() => setConfirm("cancel-onbehalf")}
-              disabled={busy}
+              disabled={busy || isEditLocked}
             >
               Cancel - for customer
             </AdminButton>
+            {isEditLocked && (
+              <p className="text-xs text-admin-muted">
+                Cancelling locks {lockHours}h after a booking ends. Completing stays open.
+              </p>
+            )}
           </>
         )}
         {isTest && (

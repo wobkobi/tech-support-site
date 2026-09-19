@@ -1,16 +1,17 @@
 // src/features/admin/components/ui/Modal.tsx
 // Shared admin dialog shell: backdrop-click and Escape close it, focus moves into the
 // dialog on open, body scroll locks while open, and the whole overlay is `print:hidden`.
-// Extracted from the two structurally-identical modals in InvoiceActions. It appears
-// without motion; a fade added later must use `transition-[opacity]` (Tailwind v4
-// compiles translate/scale to separate longhand props, so a transform-based transition
-// would silently no-op).
+// A `dirty` dialog asks before a backdrop tap, Escape or the close button throws away
+// what was typed. It appears without motion; a fade added later must use
+// `transition-[opacity]` (Tailwind v4 compiles translate/scale to separate longhand
+// props, so a transform-based transition would silently no-op).
 
 "use client";
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 /** Dialog width. */
 type ModalSize = "sm" | "md" | "lg";
@@ -29,6 +30,8 @@ interface ModalProps {
   footer?: React.ReactNode;
   /** Dialog width (defaults to "md"). */
   size?: ModalSize;
+  /** Unsaved input: a backdrop tap, Escape or the close button asks before discarding. */
+  dirty?: boolean;
   children: React.ReactNode;
 }
 
@@ -57,6 +60,7 @@ function sizeClass(size: ModalSize): string {
  * @param props.description - Optional description under the title.
  * @param props.footer - Optional footer content.
  * @param props.size - Dialog width.
+ * @param props.dirty - Whether dismissing would throw away unsaved input.
  * @param props.children - Dialog body.
  * @returns The dialog element, or null when closed.
  */
@@ -67,11 +71,39 @@ export function Modal({
   description,
   footer,
   size = "md",
+  dirty = false,
   children,
 }: ModalProps): React.ReactElement | null {
   const titleId = useId();
   const descId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const discardBarRef = useRef<HTMLDivElement>(null);
+  // Set when a dismiss is attempted with unsaved input; the footer then asks
+  // before anything is thrown away.
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  // A question left open when the parent closes the dialog must not greet the
+  // next open.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    setConfirmingDiscard(false);
+  }
+
+  /** Closes, or asks first when there is unsaved input. */
+  function requestClose(): void {
+    if (dirty) setConfirmingDiscard(true);
+    else onClose();
+  }
+
+  // The Escape listener reads these through refs, so a re-render (a fresh
+  // onClose arrow from the parent, `dirty` flipping on the first keystroke)
+  // doesn't re-run the open effect and yank focus out of the field in use.
+  const requestCloseRef = useRef(requestClose);
+  const confirmingRef = useRef(confirmingDiscard);
+  useEffect(() => {
+    requestCloseRef.current = requestClose;
+    confirmingRef.current = confirmingDiscard;
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -83,11 +115,14 @@ export function Modal({
     dialogRef.current?.focus();
 
     /**
-     * Closes the dialog on Escape.
+     * Closes the dialog on Escape. With the discard question up, Escape backs
+     * out of the question instead.
      * @param e - The keyboard event.
      */
     function onKey(e: KeyboardEvent): void {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      if (confirmingRef.current) setConfirmingDiscard(false);
+      else requestCloseRef.current();
     }
     document.addEventListener("keydown", onKey);
 
@@ -96,14 +131,19 @@ export function Modal({
       document.body.style.overflow = prevOverflow;
       prevFocus?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
+
+  // Land keyboard focus on "Keep editing", the safe answer.
+  useEffect(() => {
+    if (confirmingDiscard) discardBarRef.current?.querySelector("button")?.focus();
+  }, [confirmingDiscard]);
 
   if (!open) return null;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden"
-      onClick={onClose}
+      onClick={requestClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -131,7 +171,7 @@ export function Modal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             aria-label="Close"
             className="-mr-1 text-2xl leading-none text-admin-faint transition-colors hover:text-admin-text"
           >
@@ -141,10 +181,33 @@ export function Modal({
 
         <div className="overflow-y-auto px-5 py-4">{children}</div>
 
-        {footer && (
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-admin-border bg-admin-bg px-5 py-3">
-            {footer}
+        {confirmingDiscard ? (
+          <div
+            ref={discardBarRef}
+            className="flex flex-wrap items-center justify-end gap-2 border-t border-amber-200 bg-amber-50 px-5 py-3"
+          >
+            <p role="alert" className="mr-auto text-sm font-medium text-amber-900">
+              Discard what you&apos;ve entered?
+            </p>
+            <AdminButton variant="secondary" onClick={() => setConfirmingDiscard(false)}>
+              Keep editing
+            </AdminButton>
+            <AdminButton
+              variant="danger"
+              onClick={() => {
+                setConfirmingDiscard(false);
+                onClose();
+              }}
+            >
+              Discard
+            </AdminButton>
           </div>
+        ) : (
+          footer && (
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-admin-border bg-admin-bg px-5 py-3">
+              {footer}
+            </div>
+          )
         )}
       </div>
     </div>

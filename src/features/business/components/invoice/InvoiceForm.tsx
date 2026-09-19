@@ -9,11 +9,13 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { useUnsavedChangesWarning } from "@/features/admin/hooks/use-unsaved-changes-warning";
 import { validateEmail } from "@/features/booking/lib/booking";
 import { LineItemsEditor } from "@/features/business/components/invoice/LineItemsEditor";
 import { calcInvoiceTotals, formatNZD, isValidLineItem } from "@/features/business/lib/business";
 import type { LineItem } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
+import { addDaysToDateKey } from "@/shared/lib/timezone-utils";
 import type React from "react";
 import { useState } from "react";
 
@@ -59,16 +61,16 @@ interface InvoiceFormProps {
 const LABEL_CLS = "mb-1 block text-xs font-semibold text-admin-muted uppercase";
 
 /**
- * Adds `days` to an ISO YYYY-MM-DD date, returning ISO YYYY-MM-DD.
+ * Adds `days` to an ISO YYYY-MM-DD date, returning ISO YYYY-MM-DD. Works on the
+ * date string alone: reading a local midnight back through toISOString (UTC)
+ * lands on the day before anywhere east of Greenwich, NZ included.
  * @param iso - Base date (YYYY-MM-DD).
  * @param days - Days to add.
- * @returns The shifted date, or the input unchanged when unparseable.
+ * @returns The shifted date, or the input unchanged when it isn't a full date
+ *   (a cleared date input gives "").
  */
 function addDaysISO(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? addDaysToDateKey(iso, days) : iso;
 }
 
 /**
@@ -96,6 +98,9 @@ export function InvoiceForm({
 }: InvoiceFormProps): React.ReactElement {
   const [form, setForm] = useState<InvoiceFormData>(initial);
   const [error, setError] = useState<string | null>(null);
+  // Saving routes away client-side, which never fires beforeunload, so the
+  // prompt only ever guards edits that haven't gone in.
+  useUnsavedChangesWarning(JSON.stringify(form) !== JSON.stringify(initial));
 
   /**
    * Merges a patch into the form and notifies the parent for the live preview.

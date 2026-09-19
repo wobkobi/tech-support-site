@@ -5,6 +5,7 @@
 // sections: unsynced (needs attention) and synced (already linked to Google Contacts,
 // shown in a collapsible drawer).
 
+import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
@@ -531,6 +532,10 @@ export function ContactAdminList({
   // Contact currently selected to merge away; while set, every other card offers
   // to become the survivor. Null when no merge is in progress.
   const [mergeSourceId, setMergeSourceId] = useState<string | null>(null);
+  // The survivor picked for that merge, held while the confirm dialog is open.
+  const [mergeTargetId, setMergeTargetId] = useState<string | null>(null);
+  const [merging, setMerging] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const NEW_CONTACT_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -637,13 +642,15 @@ export function ContactAdminList({
 
   /**
    * Downloads the full contacts CSV via the admin API and triggers a browser save dialog.
-   * Uses fetch + blob so the admin secret can be sent as a header rather than in the URL.
+   * Uses fetch + blob rather than a plain download link, so a failed export is reported
+   * instead of the browser saving the error page as contacts.csv.
    */
   async function exportContacts(): Promise<void> {
+    setExporting(true);
     try {
-      const res = await fetch("/api/admin/contacts/export", {});
+      const res = await fetch("/api/admin/contacts/export");
       if (!res.ok) {
-        console.error("[ContactAdminList] Export failed:", res.status);
+        toast(`Export failed (error ${res.status}) - try again.`, { tone: "error" });
         return;
       }
       const blob = await res.blob();
@@ -657,6 +664,9 @@ export function ContactAdminList({
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("[ContactAdminList] Export error:", err);
+      toast("Network error - the export didn't download.", { tone: "error" });
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -677,11 +687,13 @@ export function ContactAdminList({
         setContacts((prev) =>
           prev.map((c) => (c.id === id ? { ...c, googleContactId: "synced" } : c)),
         );
+        toast("Synced to Google Contacts.", { tone: "success" });
       } else {
-        console.error("[ContactAdminList] Sync failed:", data.error);
+        toast(data.error ?? "Couldn't sync that contact - try again.", { tone: "error" });
       }
     } catch (err) {
       console.error("[ContactAdminList] Sync network error:", err);
+      toast("Network error - the contact wasn't synced.", { tone: "error" });
     } finally {
       setSyncingId(null);
     }
@@ -808,8 +820,10 @@ export function ContactAdminList({
     const secondaryId = mergeSourceId;
     if (!secondaryId || secondaryId === primaryId) {
       setMergeSourceId(null);
+      setMergeTargetId(null);
       return;
     }
+    setMerging(true);
     try {
       const res = await fetch(`/api/admin/contacts/merge`, {
         method: "POST",
@@ -830,7 +844,9 @@ export function ContactAdminList({
       console.error("[ContactAdminList] Merge error:", err);
       toast("Network error - the contacts weren't merged.", { tone: "error" });
     } finally {
+      setMerging(false);
       setMergeSourceId(null);
+      setMergeTargetId(null);
     }
   }
 
@@ -873,6 +889,9 @@ export function ContactAdminList({
     void mergeInto(id);
   }
 
+  const mergeSource = contacts.find((c) => c.id === mergeSourceId);
+  const mergeTarget = contacts.find((c) => c.id === mergeTargetId);
+
   /**
    * Builds the per-card props (everything except `c` itself).
    * @param c - Contact row this card is for.
@@ -908,7 +927,8 @@ export function ContactAdminList({
       onConfirmDelete: handleDeleteContact.bind(null, c.id),
       onCancelDelete: setDeleteConfirmId.bind(null, null),
       onStartMerge: setMergeSourceId.bind(null, c.id),
-      onMergeHere: handleMergeInto.bind(null, c.id),
+      // Merging can't be undone, so picking the survivor asks first.
+      onMergeHere: setMergeTargetId.bind(null, c.id),
       onCancelMerge: setMergeSourceId.bind(null, null),
     };
   }
@@ -926,10 +946,9 @@ export function ContactAdminList({
       {mergeSourceId && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <span>
-            Merging{" "}
-            <strong>{contacts.find((c) => c.id === mergeSourceId)?.name ?? "contact"}</strong> -
-            pick the contact to keep by clicking &ldquo;Keep this one&rdquo;. Its reviews move over
-            and this duplicate is removed.
+            Merging <strong>{mergeSource?.name ?? "contact"}</strong> - pick the contact to keep by
+            clicking &ldquo;Keep this one&rdquo;. Its reviews move over and this duplicate is
+            removed.
           </span>
           <button
             onClick={() => setMergeSourceId(null)}
@@ -952,11 +971,34 @@ export function ContactAdminList({
         <button
           type="button"
           onClick={() => void exportContacts()}
-          className="shrink-0 text-xs font-medium text-moonstone-400 underline underline-offset-2 hover:text-moonstone-300"
+          disabled={exporting}
+          className="shrink-0 text-xs font-medium text-moonstone-400 underline underline-offset-2 hover:text-moonstone-300 disabled:opacity-50"
         >
-          Export CSV
+          {exporting ? "Exporting…" : "Export CSV"}
         </button>
       </div>
+
+      <ConfirmDialog
+        open={mergeSource !== undefined && mergeTarget !== undefined}
+        title={`Merge into ${mergeTarget?.name ?? "this contact"}?`}
+        body={
+          <p>
+            <strong>{mergeTarget?.name}</strong> keeps its details and fills any blanks from{" "}
+            <strong>{mergeSource?.name}</strong>. Reviews, emails and phone numbers move across,
+            then <strong>{mergeSource?.name}</strong> is deleted
+            {mergeSource?.googleContactId &&
+            mergeSource.googleContactId !== mergeTarget?.googleContactId
+              ? " here and from Google Contacts"
+              : ""}
+            . This can&apos;t be undone.
+          </p>
+        }
+        confirmLabel="Merge"
+        tone="danger"
+        busy={merging}
+        onConfirm={() => mergeTargetId && handleMergeInto(mergeTargetId)}
+        onCancel={() => setMergeTargetId(null)}
+      />
 
       {/* Filter chips - narrow the list without leaving the page. */}
       <div className="flex flex-wrap items-center gap-1.5">
