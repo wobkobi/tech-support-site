@@ -1,11 +1,12 @@
 name: Post-deploy smoke
 
 # Vercel records every deployment (production and preview) as a GitHub
-# deployment and marks it with a status; the status event fires only for the
-# workflow file on the default branch (main), so the automatic path is inert
-# until this merges. "Run workflow" with a URL smokes any deployment on demand
-# from any branch: the checked-out ref must be the commit that URL is running,
-# because the health probe expects that ref's package.json version.
+# deployment and marks it with a status. GitHub runs this file from the
+# deployed commit, so the job fires for a preview of any branch as well as for
+# production, and its result shows on the pull request. "Run workflow" with a
+# URL smokes any deployment on demand (production after an incident, say): the
+# checked-out ref must be the commit that URL is running, because the health
+# probe expects that ref's package.json version.
 on:
   deployment_status:
   workflow_dispatch:
@@ -19,7 +20,10 @@ permissions:
   contents: read
 
 jobs:
-  smoke:
+  # Named deployment-smoke to match at-route-performance, where CI also has a
+  # "smoke" job. Not a required check on main: vercel.json skips Dependabot
+  # previews, so those pull requests never get a run.
+  deployment-smoke:
     # Automatic runs: only after the deployment succeeded, and only when Vercel
     # gave a URL to hit. Manual runs always have a URL.
     if: github.event_name == 'workflow_dispatch' || (github.event.deployment_status.state == 'success' && github.event.deployment_status.environment_url != '')

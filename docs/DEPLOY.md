@@ -10,16 +10,17 @@ building - see the warning below.
 | ------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | pre-commit                                              | each commit                               | lock refresh (`npm update` + `npm install`, both `--package-lock-only`), lint-staged (`prettier --write` + `eslint --fix` on staged files), `typecheck`, `check:addresses` |
 | pre-push                                                | each push                                 | `lint` + `build` + `smoke` (localhost)                                                                                                                                     |
-| CI (`.github/workflows/ci.yml`)                         | PRs + pushes to `main`/`dev`              | `lint`, `build`, `tsc --noEmit`                                                                                                                                            |
+| CI (`.github/workflows/ci.yml`)                         | PRs to `main`/`dev`, pushes to `main`     | `lint`, `build`, `tsc --noEmit`                                                                                                                                            |
 | Post-deploy (`.github/workflows/post-deploy-smoke.yml`) | every Vercel `deployment_status: success` | remote smoke (`smoke-test.ts --url`) + `/api/health` probe                                                                                                                 |
 
 Nothing before the post-deploy step verifies the **live** deployment, so a missing/mis-escaped
 Vercel env var, a runtime-only failure, or an unregistered cron passes every earlier gate. The
 post-deploy workflow closes that gap.
 
-> `deployment_status` only fires for the workflow file on the **default branch (main)**, so the
-> post-deploy workflow is inert until it has merged to `main`. Dev-branch previews are only smoked
-> after that merge.
+> GitHub runs the post-deploy workflow from the deployed commit, so previews of any branch are
+> smoked as well as production. Its check is `deployment-smoke`, which is not required on `main`:
+> Vercel skips Dependabot previews (`ignoreCommand` in `vercel.json`), so those pull requests never
+> get a run.
 
 ## Health endpoint
 
