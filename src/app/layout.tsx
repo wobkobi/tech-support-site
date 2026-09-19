@@ -4,6 +4,7 @@
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { GoogleTag } from "@/shared/components/GoogleTag";
 import { MetaPixel } from "@/shared/components/MetaPixel";
+import { MobileActionBar } from "@/shared/components/MobileActionBar";
 import { NavBar } from "@/shared/components/NavBar";
 import { PromoBanner } from "@/shared/components/PromoBanner";
 import { SiteFooter } from "@/shared/components/SiteFooter";
@@ -342,6 +343,7 @@ export default async function RootLayout({
         <NavBar />
         {children}
         <SiteFooter />
+        <MobileActionBar phoneTel={identity.phoneTel} />
 
         <Analytics />
         <SpeedInsights />

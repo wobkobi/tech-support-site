@@ -3,27 +3,16 @@
 
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
+import { Bullet } from "@/shared/components/Bullet";
 import { Button } from "@/shared/components/Button";
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { CARD, FrostedSection, NESTED_CARD, PageShell } from "@/shared/components/PageLayout";
 import { PixelEvent } from "@/shared/components/PixelEvent";
 import { cn } from "@/shared/lib/cn";
+import { SERVICE_AREAS } from "@/shared/lib/service-areas";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
 import type React from "react";
-import {
-  FaCloud,
-  FaEnvelope,
-  FaHouse,
-  FaImages,
-  FaLaptop,
-  FaMobileScreen,
-  FaPrint,
-  FaRightLeft,
-  FaShieldHalved,
-  FaToolbox,
-  FaTv,
-  FaWifi,
-} from "react-icons/fa6";
+import { Fragment } from "react";
 
 // ISR so rate edits propagate via the rate-config tag purge instead of
 // requiring a redeploy (the page was previously baked at build time).
@@ -42,76 +31,28 @@ export const metadata: Metadata = {
   },
 };
 
-interface ServiceArea {
-  icon: React.ReactElement;
-  label: string;
-  examples: string[];
-}
-
-const serviceAreas: ReadonlyArray<ServiceArea> = [
-  {
-    icon: <FaLaptop />,
-    label: "Computers & Laptops",
-    examples: ["Slow PC investigation", "Software installs", "Virus cleanup", "General tune-ups"],
-  },
-  {
-    icon: <FaMobileScreen />,
-    label: "Phones & Tablets",
-    examples: ["New device setup", "Data transfer", "App help", "Account sync"],
-  },
-  {
-    icon: <FaWifi />,
-    label: "Wi-Fi & Internet",
-    examples: ["Fixing dropouts", "Extending coverage", "Router setup", "Speed issues"],
-  },
-  {
-    icon: <FaTv />,
-    label: "TV & Streaming",
-    examples: ["Smart TV setup", "Streaming apps", "Chromecast/AirPlay", "Sound systems"],
-  },
-  {
-    icon: <FaHouse />,
-    label: "Smart Home",
-    examples: ["Smart lights", "Security cameras", "Voice assistants", "App setup"],
-  },
-  {
-    icon: <FaPrint />,
-    label: "Printers & Scanners",
-    examples: ["Getting online", "Driver issues", "Network printing", "Scan setup"],
-  },
-  {
-    icon: <FaCloud />,
-    label: "Cloud & Backups",
-    examples: ["OneDrive/iCloud/Google", "External drives", "Auto-backup setup", "Recovery"],
-  },
-  {
-    icon: <FaImages />,
-    label: "Photos & Storage",
-    examples: ["Organising photos", "Freeing space", "Photo backup", "File management"],
-  },
-  {
-    icon: <FaRightLeft />,
-    label: "Setup & Transfer",
-    examples: ["New device migration", "Old to new PC", "Email setup", "Account moves"],
-  },
-  {
-    icon: <FaToolbox />,
-    label: "Tune-ups & Repairs",
-    examples: ["Speed improvements", "Update installs", "Cleanup", "Basic repairs"],
-  },
-  {
-    icon: <FaShieldHalved />,
-    label: "Security",
-    examples: ["Password help", "Scam removal", "Safety checks", "Secure setup"],
-  },
-  {
-    icon: <FaEnvelope />,
-    label: "Email & Accounts",
-    examples: ["Email setup", "Password recovery", "Account sync", "Spam filtering"],
-  },
-];
-
 const siteUrl = getSiteUrl();
+
+/**
+ * Lets a slash-joined example ("Chromecast/AirPlay") wrap after a slash. Browsers
+ * treat the whole run as one word, so the half-width phone column otherwise
+ * breaks it mid-word.
+ * @param text - Example text.
+ * @returns The text with a break opportunity after each slash.
+ */
+function breakAfterSlashes(text: string): React.ReactNode {
+  const parts = text.split("/");
+  return parts.map((part, i) => (
+    <Fragment key={i}>
+      {part}
+      {i < parts.length - 1 && (
+        <>
+          /<wbr />
+        </>
+      )}
+    </Fragment>
+  ));
+}
 
 /**
  * Services page component
@@ -123,7 +64,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
     "@context": "https://schema.org",
     "@type": "ItemList",
     name: "To the Point Tech - Services",
-    itemListElement: serviceAreas.map((area, idx) => ({
+    itemListElement: SERVICE_AREAS.map((area, idx) => ({
       "@type": "ListItem",
       position: idx + 1,
       item: {
@@ -194,27 +135,26 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
               What I help with
             </h2>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {serviceAreas.map((area) => (
-                <div
-                  key={area.label}
-                  className="rounded-lg border border-seasalt-200/60 bg-white p-3 shadow-sm transition-shadow hover:shadow-md"
-                >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-4">
+              {SERVICE_AREAS.map(({ slug, label, icon: Icon, examples }) => (
+                // id is the anchor the home page's service tiles link to;
+                // scroll-mt clears the fixed nav on the jump.
+                <div key={slug} id={slug} className={cn(NESTED_CARD, "scroll-mt-24")}>
                   <div className="mb-2 flex items-center gap-2">
                     <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-moonstone-500/40 bg-moonstone-400/20">
-                      <span className="text-2xl text-moonstone-400" aria-hidden>
-                        {area.icon}
-                      </span>
+                      <Icon className="text-2xl text-moonstone-400" aria-hidden />
                     </span>
-                    <h3 className="text-lg font-semibold text-rich-black sm:text-xl">
-                      {area.label}
-                    </h3>
+                    <h3 className="text-lg font-semibold text-rich-black sm:text-xl">{label}</h3>
                   </div>
-                  <ul className="space-y-1 text-base text-rich-black/80 sm:text-lg">
-                    {area.examples.map((example) => (
+                  {/* Two columns on phones: the examples are two or three words
+                      each, so a single column left most of the width empty. */}
+                  <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-base text-rich-black/80 sm:grid-cols-1 sm:text-lg">
+                    {examples.map((example) => (
                       <li key={example} className="flex gap-2">
-                        <span className="mt-0.5 text-moonstone-400">•</span>
-                        <span>{example}</span>
+                        <Bullet />
+                        <span className="min-w-0 wrap-break-word">
+                          {breakAfterSlashes(example)}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -246,27 +186,27 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
 
               <ul className="space-y-2 text-base text-rich-black/90 sm:text-lg">
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-400">•</span>
+                  <Bullet />
                   <span>Setting up a new laptop, phone, or tablet with all your accounts</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-400">•</span>
+                  <Bullet />
                   <span>Fixing Wi-Fi dead spots or unreliable connections</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-400">•</span>
+                  <Bullet />
                   <span>Organising and backing up photos to the cloud</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-400">•</span>
+                  <Bullet />
                   <span>Helping parents or grandparents get comfortable with devices</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-400">•</span>
+                  <Bullet />
                   <span>Sorting out email and account login issues</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-400">•</span>
+                  <Bullet />
                   <span>Removing unwanted software, scams, or malware</span>
                 </li>
               </ul>
@@ -289,23 +229,23 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
 
               <ul className="space-y-2 text-base text-rich-black/90 sm:text-lg">
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-400">•</span>
+                  <Bullet />
                   <span>Setting up workstations, email, and shared files</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-400">•</span>
+                  <Bullet />
                   <span>Basic network and Wi-Fi improvements</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-400">•</span>
+                  <Bullet />
                   <span>Backup and security checks</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-400">•</span>
+                  <Bullet />
                   <span>New staff device setup</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-400">•</span>
+                  <Bullet />
                   <span>One-off projects like office moves</span>
                 </li>
               </ul>

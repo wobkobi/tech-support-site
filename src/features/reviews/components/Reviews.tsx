@@ -1,5 +1,6 @@
 // src/features/reviews/components/Reviews.tsx
-// Reviews module with responsive rows (1-3 items) or marquee scroll (4+ items).
+// Reviews module with responsive rows (1-3 items) or marquee scroll (4+ items; phones
+// get a still list of the newest three instead).
 
 import { PausableMarquee } from "@/features/reviews/components/PausableMarquee";
 import { cn } from "@/shared/lib/cn";
@@ -120,6 +121,17 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
     "border-seasalt-200/60 transition-colors hover:border-coquelicot-500/60",
   );
 
+  const readAll = (
+    <p className="mt-3 text-center sm:hidden">
+      <Link
+        href="/reviews"
+        className="inline-flex min-h-11 items-center text-base font-semibold text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800"
+      >
+        Read all reviews
+      </Link>
+    </p>
+  );
+
   // Marquee when more than three reviews
   if (items.length > 3) {
     const track = [...items, ...items];
@@ -134,7 +146,17 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
           What People Say
         </h2>
 
-        <PausableMarquee>
+        {/* Phones get the newest three as a still list. A marquee card is nearly
+            screen-wide there, so it showed one card at a time with its
+            neighbours clipped, and scrolled past before it could be read. */}
+        <ul className="grid grid-cols-1 gap-3 sm:hidden">
+          {items.slice(0, 3).map((r) => (
+            <ReviewCard key={r.id} r={r} className={cn(cardBase, "w-full shadow-sm")} />
+          ))}
+        </ul>
+        {readAll}
+
+        <PausableMarquee className="hidden sm:block">
           <div
             className={cn(
               // Sit within the FrostedSection padding so the carousel's edges line up
@@ -152,7 +174,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
                   decorative={i >= items.length}
                   className={cn(
                     cardBase,
-                    "w-[min(26rem,calc(100vw-3rem))] shrink-0 sm:w-md",
+                    "w-md shrink-0",
                     i < items.length && "animate-fade-in animate-fill-both",
                   )}
                   style={i < items.length ? { animationDelay: `${i * 150}ms` } : undefined}
@@ -180,6 +202,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
           <ReviewCard key={`${r.name}-${i}`} r={r} className={cn(cardBase, "w-full shadow-sm")} />
         ))}
       </ul>
+      {readAll}
     </section>
   );
 }

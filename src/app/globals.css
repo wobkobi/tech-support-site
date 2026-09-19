@@ -269,6 +269,16 @@ aside.app-admin-drawer {
   transition: translate 200ms ease-out !important;
 }
 
+/* Phone Call + Book bar (MobileActionBar). Off while the nav drawer is open
+   (NavBar flags data-nav-open on body) so the two don't stack, and while a form
+   field has focus: iOS keeps fixed elements pinned above the on-screen keyboard,
+   where the bar would sit over the field being typed in. */
+body[data-nav-open] nav.mobile-action-bar,
+body:has(:is(input:not([type="checkbox"], [type="radio"]), textarea, select):focus)
+  nav.mobile-action-bar {
+  display: none;
+}
+
 /* ============================================
    A11y: focus + selection highlights
    ============================================ */

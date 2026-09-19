@@ -13,12 +13,19 @@ import { FaPause, FaPlay } from "react-icons/fa6";
  * `[data-paused] .animate-marquee` in globals.css.
  * @param props - Component props.
  * @param props.children - The marquee viewport and track.
+ * @param [props.className] - Classes for the wrapper.
  * @returns The wrapped marquee with its pause button.
  */
-export function PausableMarquee({ children }: { children: React.ReactNode }): React.ReactElement {
+export function PausableMarquee({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}): React.ReactElement {
   const [paused, setPaused] = useState(false);
   return (
-    <div data-paused={paused || undefined}>
+    <div data-paused={paused || undefined} className={className}>
       {children}
       {/* Hidden under reduced motion, where the carousel does not move. */}
       <div className="mt-2 flex justify-end motion-reduce:hidden">

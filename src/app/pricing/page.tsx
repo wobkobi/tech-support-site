@@ -30,7 +30,8 @@ import {
   summariseForBanner,
 } from "@/features/business/lib/promos";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
-import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
+import { Bullet } from "@/shared/components/Bullet";
+import { CARD, FrostedSection, NESTED_CARD, PageShell } from "@/shared/components/PageLayout";
 import { PixelEvent } from "@/shared/components/PixelEvent";
 import { PromoPrice } from "@/shared/components/PromoPrice";
 import { renderEmphasised } from "@/shared/components/renderEmphasised";
@@ -270,14 +271,14 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               On-site vs Remote
             </h2>
 
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div className={cn(SOFT_CARD)}>
+            <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+              <div className={NESTED_CARD}>
                 <h3 className="mb-3 text-lg font-semibold text-russian-violet sm:text-xl">
                   On-site visits
                 </h3>
                 <ul className="space-y-2.5 text-base text-rich-black sm:text-lg">
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-400">•</span>
+                    <Bullet />
                     <span>
                       Hourly rate (
                       <PromoPrice discounted={rateDiscounted}>
@@ -287,7 +288,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     </span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-400">•</span>
+                    <Bullet />
                     <span>
                       <strong>One round trip</strong> billed at{" "}
                       <PromoPrice discounted={travelDiscounted} className="font-bold">
@@ -302,7 +303,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     </span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-400">•</span>
+                    <Bullet />
                     <span>
                       Best for: Wi-Fi setup, printers, smart TVs, physical hardware, anything
                       needing hands-on work
@@ -311,21 +312,21 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 </ul>
               </div>
 
-              <div className={cn(SOFT_CARD)}>
+              <div className={NESTED_CARD}>
                 <h3 className="mb-3 text-lg font-semibold text-russian-violet sm:text-xl">
                   Remote support
                 </h3>
                 <ul className="space-y-2.5 text-base text-rich-black sm:text-lg">
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-400">•</span>
+                    <Bullet />
                     <span>Discounted rate, no travel charge</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-400">•</span>
+                    <Bullet />
                     <span>No drive time means quicker turnaround</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-400">•</span>
+                    <Bullet />
                     <span>
                       Best for: account issues, software setup, email problems, quick fixes,
                       follow-up support
@@ -349,20 +350,20 @@ export default async function PricingPage(): Promise<React.ReactElement> {
 
             <ul className="mb-5 space-y-2.5 text-base text-rich-black sm:text-lg">
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>
                   <strong>No hidden fees.</strong> The price I quote is the price you pay.
                 </span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>
                   <strong>No upselling.</strong> I don't sell hardware or earn commission on
                   products.
                 </span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-400">•</span>
+                <Bullet />
                 <span>
                   <strong>Clear communication.</strong> If a job is taking longer than expected,
                   I'll let you know before continuing.

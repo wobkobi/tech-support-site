@@ -255,6 +255,9 @@ export function NavBar(): React.ReactElement | null {
 
     const body = document.body;
 
+    // Also flags the open drawer on <body>, which MobileActionBar hides on.
+    body.toggleAttribute("data-nav-open", mobileMenuOpen);
+
     if (mobileMenuOpen) {
       scrollLockRef.current = window.scrollY;
       body.style.overflow = "hidden";
@@ -272,6 +275,7 @@ export function NavBar(): React.ReactElement | null {
     }
 
     return () => {
+      body.removeAttribute("data-nav-open");
       body.style.overflow = "";
       body.style.position = "";
       body.style.width = "";
@@ -433,10 +437,11 @@ export function NavBar(): React.ReactElement | null {
       <header
         ref={headerRef}
         className={cn(
-          "fixed inset-x-0 z-50 mx-auto w-full px-4 will-change-transform",
+          "fixed inset-x-0 z-50 mx-auto w-full px-2 will-change-transform sm:px-4",
           // `.app-nav-header` (globals.css) - top driven by --promo-h.
           "app-nav-header",
-          "max-w-[min(100vw-2rem,clamp(90rem,75vw,140rem))]",
+          // Narrower gutters on phones, in step with FrostedSection's.
+          "max-w-[min(100vw-1rem,clamp(90rem,75vw,140rem))] sm:max-w-[min(100vw-2rem,clamp(90rem,75vw,140rem))]",
           isHidden && !isHoveringTop && "pointer-events-none opacity-0",
         )}
         onMouseEnter={handleNavInteractionStart}
