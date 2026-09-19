@@ -142,8 +142,8 @@ export function EventActionSheet({
       title: mode === "operator" ? "Cancel this booking on my end?" : "Cancel for the customer?",
       body:
         mode === "operator"
-          ? "No fee will be charged. Google Calendar emails the customer a cancellation notice."
-          : "The standard cancellation fee rules apply (call-out + travel inside the fee windows). Google Calendar emails the customer a cancellation notice.",
+          ? "No fee will be charged to the customer."
+          : "The standard cancellation fee rules apply (call-out + travel inside the fee windows).",
       confirmLabel: "Cancel booking",
       tone: "danger",
       target: { kind: "cancel", mode },

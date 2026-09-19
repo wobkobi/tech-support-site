@@ -72,12 +72,12 @@ const CONFIRM_COPY: Record<
   },
   "cancel-operator": {
     title: "Cancel this booking on my end?",
-    body: "No fee will be charged. Google Calendar emails the customer a cancellation notice.",
+    body: "No fee will be charged to the customer.",
     confirmLabel: "Cancel booking",
   },
   "cancel-onbehalf": {
     title: "Cancel for the customer?",
-    body: "The standard cancellation fee rules apply (call-out + travel inside the fee windows). Google Calendar emails the customer a cancellation notice.",
+    body: "The standard cancellation fee rules apply (call-out + travel inside the fee windows).",
     confirmLabel: "Cancel for customer",
     tone: "danger",
   },
