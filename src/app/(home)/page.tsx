@@ -1,4 +1,4 @@
-// src/app/page.tsx
+// src/app/(home)/page.tsx
 // Main landing page for tech support company.
 
 import Reviews, { type ReviewItem } from "@/features/reviews/components/Reviews";
