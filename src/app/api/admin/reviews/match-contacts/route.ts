@@ -9,9 +9,6 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
-export const maxDuration = 60;
-
 /**
  * POST /api/admin/reviews/match-contacts
  * Links reviews that have no contactId to their matching Contact.

@@ -10,9 +10,6 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { people as googlePeople, type people_v1 } from "@googleapis/people";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
-export const maxDuration = 60;
-
 /**
  * GET /api/business/contacts - Returns sanitised Google Contacts for the contact picker.
  * @param request - Incoming Next.js request

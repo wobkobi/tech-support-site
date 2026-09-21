@@ -8,9 +8,6 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
-export const maxDuration = 60;
-
 /**
  * Escapes a value for CSV: guards against formula injection, wraps in double
  * quotes, and escapes inner quotes.

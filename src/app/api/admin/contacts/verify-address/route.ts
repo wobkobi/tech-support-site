@@ -9,9 +9,6 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { geocodeAddressCandidates } from "@/shared/lib/normalise-address";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow Google Geocoding call cannot 504 on the default timeout.
-export const maxDuration = 60;
-
 /**
  * POST /api/admin/contacts/verify-address - Geocode a typed address to
  * confident NZ candidates so the operator can confirm it before saving.

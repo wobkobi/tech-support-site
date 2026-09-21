@@ -15,9 +15,6 @@ import { prisma } from "@/shared/lib/prisma";
 import { addDaysToDateKey, dateKeyParts, nzWallClockUtc } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
-// A slow Google/DB round-trip must not 504 on the default timeout.
-export const maxDuration = 60;
-
 // Cap results so a wide range doesn't return hundreds of rows; the operator only
 // needs a handful of times to read out over the phone.
 const DEFAULT_LIMIT = 8;

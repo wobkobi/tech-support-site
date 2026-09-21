@@ -7,9 +7,6 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
-export const maxDuration = 60;
-
 /**
  * POST /api/admin/bookings/[id]/resend-review
  * Sends (or resends) the review request email for a booking, bypassing the

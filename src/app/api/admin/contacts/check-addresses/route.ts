@@ -11,9 +11,6 @@ import { resolveAddress } from "@/shared/lib/normalise-address";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
-// One Geocoding call per contact, run sequentially - needs the full ceiling.
-export const maxDuration = 300;
-
 /**
  * POST /api/admin/contacts/check-addresses - Re-checks every contact address
  * and updates the review flags. Only ever flags; never rewrites an address, so

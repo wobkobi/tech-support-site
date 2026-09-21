@@ -9,10 +9,6 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorised } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
-// Reconciliation walks every per-FY workbook and can retry transient Google
-// API failures with backoff, so give it well beyond the 60s default.
-export const maxDuration = 300;
-
 /**
  * GET /api/cron/sync-sheets
  * Reconciles the Cashbook and Expenses Google Sheets tabs with MongoDB.

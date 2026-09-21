@@ -65,10 +65,12 @@ schedule Record subscriptions in `Pacific/Auckland` so it stays at 8am across DS
 
 - Routes respond synchronously with `{ ok: true, ...counts }`. The two sync jobs return 503 on
   failure so cron-job.org flags the run; the rest return 500 with an error message.
-- `sync-sheets` and `sync-contacts` set `maxDuration = 300` (many sequential Google API calls);
-  everything else runs with `maxDuration = 60`. A long sync run can outlive cron-job.org's 30 s
-  response window, so a cron-job.org "timeout" does not necessarily mean the run failed - check the
-  Vercel function logs for the actual outcome.
+- No route sets `maxDuration`; every function runs on the project's 300 s default. Vercel bundles
+  routes together only when their function config matches, and each bundle carries its own Prisma
+  engine, so a per-route value splits off an extra bundle and inflates function storage. The two
+  sync jobs make many sequential Google API calls, and a long sync run can outlive cron-job.org's 30
+  s response window, so a cron-job.org "timeout" does not necessarily mean the run failed - check
+  the Vercel function logs for the actual outcome.
 - Overlapping or retried runs are safe by design: release-holds guards each update on status +
   expiry, booking reminders stamp `emailReminderSentAt` only after Resend accepts the send, invoice
   reminders stamp `reminderLastSentAt`/`reminderCount` the same way (max 2 per invoice, offsets live
@@ -124,7 +126,8 @@ schedule Record subscriptions in `Pacific/Auckland` so it stays at 8am across DS
 
 1. Create `src/app/api/cron/<name>/route.ts` with a `GET` handler that checks `isCronAuthorized`
    first and returns 401 otherwise.
-2. Set `maxDuration` to match the worst-case upstream latency.
+2. Don't export `maxDuration` - the 300 s project default covers it, and a per-route value adds a
+   function bundle (see Notes).
 3. Make the work idempotent - a run can be retried or overlap the next one.
 4. Register the job on cron-job.org with the Bearer header and the intended cadence.
 5. Add a row to the table above.

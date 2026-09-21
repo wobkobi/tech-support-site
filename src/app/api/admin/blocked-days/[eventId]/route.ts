@@ -20,9 +20,6 @@ import { addDaysToDateKey } from "@/shared/lib/timezone-utils";
 import { revalidateTag } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
-export const maxDuration = 60;
-
 /** A surviving all-day span after a day is removed; `endDateKey` exclusive. */
 interface Segment {
   startDateKey: string;

@@ -13,9 +13,6 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { NZ_TZ } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
-export const maxDuration = 60;
-
 /** NZ-local YYYY-MM-DD, for the same-day test below. */
 const NZ_DAY = new Intl.DateTimeFormat("en-CA", {
   timeZone: NZ_TZ,

@@ -19,9 +19,6 @@ import { prisma } from "@/shared/lib/prisma";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
-export const maxDuration = 60;
-
 /**
  * POST /api/business/invoices/[id]/send-email
  * Re-generates the invoice PDF, emails it to the client (with the friendly

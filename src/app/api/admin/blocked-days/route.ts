@@ -24,9 +24,6 @@ import {
 import { revalidateTag } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
-export const maxDuration = 60;
-
 interface BlockedDayPayload {
   dateKey?: string;
   summary?: string;

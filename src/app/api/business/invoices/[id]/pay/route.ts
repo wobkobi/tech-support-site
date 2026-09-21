@@ -21,9 +21,6 @@ import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so the awaited Drive re-upload can't 504.
-export const maxDuration = 60;
-
 /**
  * POST /api/business/invoices/[id]/pay
  * Body: `{ paidAt?, method, reference?, createIncome?, sendApology? }`. `method`

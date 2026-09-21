@@ -10,8 +10,6 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
-export const maxDuration = 60;
 // The response must never be cached: the whole job is observing the underlying
 // event cache move, and a cached token would pin the grid to stale data.
 export const dynamic = "force-dynamic";

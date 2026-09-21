@@ -14,10 +14,6 @@ import { prisma } from "@/shared/lib/prisma";
 import { TransportMode } from "@prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
 
-// A mode/origin change makes up to two Distance Matrix calls (there + back), so
-// lift the ceiling above the default to avoid a 504 on a slow upstream.
-export const maxDuration = 60;
-
 const VALID_MODES = new Set<string>(Object.values(TransportMode));
 
 /**
