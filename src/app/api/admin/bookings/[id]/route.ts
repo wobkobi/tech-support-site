@@ -32,9 +32,6 @@ import { Prisma } from "@prisma/client";
 import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
-export const maxDuration = 60;
-
 /**
  * Longest span a hand-typed time edit may produce. Not a policy limit - it's a
  * typo guard, since getting the date wrong on one of the two fields yields a

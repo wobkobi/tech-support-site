@@ -16,9 +16,6 @@ import { unstable_cache } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
-// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
-export const maxDuration = 60;
-
 interface EstimateTask {
   label: string;
   mins: number;

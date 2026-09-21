@@ -9,10 +9,6 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { isRunLocked } from "@/shared/lib/run-lock";
 import { NextRequest, NextResponse } from "next/server";
 
-// Full mode pushes EVERY email-bearing contact at ~1s per sequential People API
-// call, so the run scales with the contact count - give it the full ceiling.
-export const maxDuration = 300;
-
 /**
  * POST /api/admin/contacts/sync
  * Full two-way sync: dedup/merge locally, push every contact to Google, then pull

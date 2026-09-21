@@ -16,9 +16,6 @@ import { prisma } from "@/shared/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling: the awaited Drive re-upload can be slow.
-export const maxDuration = 60;
-
 /**
  * POST /api/business/invoices/[id]/convert - promotes a quote to an invoice.
  * @param request - Incoming Next.js request.

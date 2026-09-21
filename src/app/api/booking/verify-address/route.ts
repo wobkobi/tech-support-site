@@ -10,9 +10,6 @@ import { geocodeAddressCandidates } from "@/shared/lib/normalise-address";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow Google Geocoding call cannot 504 on the default timeout.
-export const maxDuration = 60;
-
 /**
  * POST /api/booking/verify-address - Geocode a typed address to confident NZ
  * candidates for the client "did you mean?" / disambiguation prompt.

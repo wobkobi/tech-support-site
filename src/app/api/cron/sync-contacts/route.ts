@@ -9,10 +9,6 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorised } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
-// A catch-up sync that pushes many contacts (sequential People API calls at
-// ~1s each) can run well past 60s; give it the full serverless ceiling.
-export const maxDuration = 300;
-
 /**
  * GET /api/cron/sync-contacts
  * Runs an incremental two-way Google Contacts sync.

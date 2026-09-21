@@ -11,9 +11,6 @@ import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getPacificAucklandOffset, nzDateParts } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
-export const maxDuration = 60;
-
 /**
  * Parses an optional ISO timestamp body field into a Date.
  * @param value - Raw body value.
