@@ -30,11 +30,20 @@ const TAGLINE = "Computer and tech support";
 const SERVICE_AREA = "On-site across Auckland, or remote";
 
 /**
- * Quiet zone held around the QR, in CSS pixels at 300 DPI. The generated SVG
- * carries a 10px margin on a 2000px canvas, well under the four modules the QR
- * spec wants, so the clear space has to come from the layout instead.
+ * QR edge length in CSS pixels at 300 DPI: 260px prints at 22mm, over the 2cm
+ * floor printers quote for a scannable code, and puts each of the 29 modules
+ * at about 0.76mm.
  */
-const QR_QUIET_ZONE = 30;
+const QR_SIZE = 260;
+
+/**
+ * Quiet zone above and below the QR, in CSS pixels at 300 DPI: four modules,
+ * as the QR spec asks. The generated SVG carries only a 10px margin on a
+ * 2000px canvas, so the clear space has to come from the layout. Sideways it
+ * is already there: the row's 40px gap on the left, the 50px safe margin on
+ * the right.
+ */
+const QR_QUIET_ZONE = 36;
 
 /**
  * One contact line: brand-navy icon, then the value at a size that stays
@@ -110,13 +119,13 @@ function CardBack({ identity }: { identity: IdentitySettings }): React.ReactElem
       </div>
 
       <div className="flex shrink-0 flex-col items-center">
-        <div style={{ padding: `${QR_QUIET_ZONE}px` }}>
+        <div style={{ paddingBlock: `${QR_QUIET_ZONE}px` }}>
           <Image
             src="/qr-booking.svg"
             alt="Scan to book"
-            width={220}
-            height={220}
-            className="size-55"
+            width={QR_SIZE}
+            height={QR_SIZE}
+            style={{ width: QR_SIZE, height: QR_SIZE }}
           />
         </div>
         <span className="text-[35px] leading-none font-semibold text-russian-violet">
