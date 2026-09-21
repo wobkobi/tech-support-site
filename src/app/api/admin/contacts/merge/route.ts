@@ -11,6 +11,7 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { normaliseEmailOrNull } from "@/shared/lib/normalise-email";
 import { normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
+import type { ReviewLinkMode } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
@@ -71,6 +72,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     retainerSince?: Date;
     retainerNotes?: string;
     siteNotes?: string;
+    reviewLinkSentAt?: Date;
+    reviewLinkSentMode?: ReviewLinkMode | null;
+    reviewLinkSubmittedAt?: Date;
     altEmails: { set: string[] };
     altPhones: { set: string[] };
     altReviewTokens: { set: string[] };
@@ -112,6 +116,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (key && key !== survivingPrimaryPhone) altPhones.add(key);
   }
   data.altPhones = { set: [...altPhones] };
+
+  // Carry the review-link history across. It is not a blank-fill like the rest:
+  // the later ask is the one the send cooldown and the "already asked" picker
+  // gate must see, so the newer timestamp wins and brings its own mode. Dropping
+  // this loses the ask entirely, because the row holding it is soft-deleted
+  // below - which is what made an invoice-era reviewer resurface as "Legacy".
+  if (
+    secondary.reviewLinkSentAt &&
+    (!primary.reviewLinkSentAt || secondary.reviewLinkSentAt > primary.reviewLinkSentAt)
+  ) {
+    data.reviewLinkSentAt = secondary.reviewLinkSentAt;
+    data.reviewLinkSentMode = secondary.reviewLinkSentMode;
+  }
+  // Having reviewed is permanent, so either row saying so is enough.
+  if (!primary.reviewLinkSubmittedAt && secondary.reviewLinkSubmittedAt) {
+    data.reviewLinkSubmittedAt = secondary.reviewLinkSubmittedAt;
+  }
 
   // Fold review tokens the same way so links already sent under the secondary's
   // token keep working (the /review page, submission verify, and review matcher

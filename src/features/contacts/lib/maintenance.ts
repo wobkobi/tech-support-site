@@ -7,6 +7,7 @@
 
 import { isNZMobileKey, normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
+import type { ReviewLinkMode } from "@prisma/client";
 
 /** A single field divergence between a Contact and a source record (Booking or Review). */
 export interface ConflictEntry {
@@ -63,6 +64,9 @@ const MERGE_SELECT = {
   googleContactId: true,
   reviewToken: true,
   altReviewTokens: true,
+  reviewLinkSentAt: true,
+  reviewLinkSentMode: true,
+  reviewLinkSubmittedAt: true,
   createdAt: true,
 } as const;
 
@@ -77,6 +81,9 @@ interface MergeableContact {
   googleContactId: string | null;
   reviewToken: string | null;
   altReviewTokens: string[];
+  reviewLinkSentAt: Date | null;
+  reviewLinkSentMode: ReviewLinkMode | null;
+  reviewLinkSubmittedAt: Date | null;
 }
 
 /**
@@ -143,6 +150,23 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
   if (!keeper.googleContactId && dup.googleContactId) {
     fill.googleContactId = dup.googleContactId;
   }
+  // Carry the review-link history across. Not a blank-fill like the rest: the
+  // later ask is the one the send cooldown and the "already asked" picker gate
+  // must see, so the newer timestamp wins and brings its own mode. Dropping it
+  // loses the ask with the row, which is what made an invoice-era reviewer
+  // resurface in the link history as "Legacy".
+  if (
+    dup.reviewLinkSentAt &&
+    (!keeper.reviewLinkSentAt || dup.reviewLinkSentAt > keeper.reviewLinkSentAt)
+  ) {
+    fill.reviewLinkSentAt = dup.reviewLinkSentAt;
+    fill.reviewLinkSentMode = dup.reviewLinkSentMode;
+  }
+  // Having reviewed is permanent, so either row saying so is enough.
+  if (!keeper.reviewLinkSubmittedAt && dup.reviewLinkSubmittedAt) {
+    fill.reviewLinkSubmittedAt = dup.reviewLinkSubmittedAt;
+  }
+
   // Fold the dup's review tokens too, so links already sent under the dup
   // keep resolving to the keeper.
   const keeperToken = (fill.reviewToken as string | undefined) ?? keeper.reviewToken ?? null;
@@ -180,6 +204,13 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
   if (fill.phone) keeper.phone = fill.phone as string;
   if (fill.address) keeper.address = fill.address as string;
   if (fill.reviewToken) keeper.reviewToken = fill.reviewToken as string;
+  if (fill.reviewLinkSentAt) {
+    keeper.reviewLinkSentAt = fill.reviewLinkSentAt as Date;
+    keeper.reviewLinkSentMode = fill.reviewLinkSentMode as ReviewLinkMode | null;
+  }
+  if (fill.reviewLinkSubmittedAt) {
+    keeper.reviewLinkSubmittedAt = fill.reviewLinkSubmittedAt as Date;
+  }
   if (fill.email) keeper.email = fill.email as string;
   if (fill.googleContactId) keeper.googleContactId = fill.googleContactId as string;
   if (fill.altPhones) keeper.altPhones = [...altSet];
