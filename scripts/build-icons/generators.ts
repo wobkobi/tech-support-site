@@ -388,7 +388,9 @@ export async function buildQRCodes(): Promise<void> {
         qrOptions: {
           typeNumber: 0,
           mode: "Byte",
-          errorCorrectionLevel: "H",
+          // Q, not H: nothing is overlaid on the code, and Q fits the booking URL in a
+          // 29-module grid (H needs 33), so each module prints ~14% larger at a given size
+          errorCorrectionLevel: "Q",
         },
         dotsOptions: {
           type: "rounded",

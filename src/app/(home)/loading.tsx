@@ -1,4 +1,4 @@
-// src/app/loading.tsx
+// src/app/(home)/loading.tsx
 // Streaming skeleton for the home page: hero, trust cards, support grid, about/approach
 // pair and flyer card. Matches the real page layout so the swap causes no layout shift
 // once the approved-reviews query resolves.

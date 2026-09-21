@@ -1,0 +1,63 @@
+TO THE POINT TECH - LEFT CHEST EMBROIDERY
+=========================================
+
+WHAT IS ON THIS DRIVE
+  1 - Vector artwork (digitise from these)   Every option as both SVG and PDF, drawn at finished size
+                                              in millimetres. The two match, so use whichever your
+                                              software prefers. The navy in the PDFs is the garment
+                                              colour, shown so the white thread is visible. It is not
+                                              a shape to be stitched.
+  2 - Previews on navy                        What each option looks like stitched on a navy garment.
+  3 - PNG (transparent, 600dpi)               Raster back-up only. Use the vectors if you can.
+
+  Each option has a code (A1, B3 and so on) at the start of its filename, the same in all three
+  folders and on the proof page. The finished size is at the end of every filename. C1 is left out
+  on purpose: it is too fine to stitch.
+  These are artwork files, not stitch files. Please digitise to DST/PES, and send me a photo of a
+  test stitch-out on the actual garment before the order runs.
+
+THE OPTIONS                                        Size (mm)   Stitches (est.)   Smallest hoop
+  A1   Logo and name, wide                              114 x 26         3,000          5 x 7 in
+  A2   Logo and name, stacked                           103 x 46         4,500          5 x 7 in
+  A3   Logo, TO THE POINT, tech support under           103 x 60         5,500          5 x 7 in
+  A4   Logo, full name, tech support under              103 x 60         6,000          5 x 7 in
+  B1   Square badge                                      86 x 86         9,000          4 x 4 in
+  B2   Square badge, tech support under                  86 x 100       10,000          5 x 7 in
+  B3   Square badge, TO THE POINT, tech support under    86 x 100        9,500          5 x 7 in
+  C2   TTP with tech support stacked beside it          105 x 19         2,000          5 x 7 in
+
+  Stitch counts are my estimates as a sanity check only. Your digitised file is the real number.
+  A3, A4, B2 and B3 need the height as well as the width, so please check the frame takes both.
+  B2 and B3 are 100 mm deep, which is more than a left chest usually carries. They may suit a centre
+  front or back better.
+
+GARMENTS
+  AS Colour 5411 cotton pique polo (240 gsm), navy.
+  AS Colour 5125 half-zip fleece (350 gsm cotton / recycled polyester), navy.
+  Placement: left chest. On the 5125, keep the nearest edge of the logo about 25 mm clear of the zip.
+
+THREAD
+  2 colours, polyester (holds the orange through warm washes better than rayon).
+    White: the chip, and TECH SUPPORT on A3, A4, B2, B3 and C2.
+    Orange, matched as closely as you can to hex #F34213: the rest of the lettering and the divider.
+  Orange varies a lot between thread brands, so please show me the spool before running.
+  The SVG layers are named thread-white then thread-orange, in stitch order.
+
+STITCH
+  Satin throughout: letters, chip lines, pins and divider. No fills needed.
+  The chip pins match the logo: 12 per side in three groups of four (A1 has 6, as its chip
+  is too small for 12). Please keep the slightly wider gaps between the groups.
+  The gap between the chip's two frames equals the frame line, the same as the gap between pins.
+  Every line has been checked at finished size: thinnest line 1.2 mm or more, narrowest gap
+  1.3 mm or more, widest satin column 3.6 mm, so nothing needs splitting.
+  The tightest spots are the chamfered letter corners and the diagonal of the N in POINT.
+  Rounding those off as normal is fine.
+
+BACKING AND TOPPING
+  Cut-away backing on both garments (tear-away lets the logo pucker after a few washes).
+  Water-soluble topping on both, so the stitches sit on the pique and the fleece nap.
+
+SIZING
+  Each file is already at the finished size. If a size has to change, scale the whole design as one
+  group, and check with me first: the line weights are set close to the minimum a satin will hold,
+  so shrinking any option takes its lines under that.
