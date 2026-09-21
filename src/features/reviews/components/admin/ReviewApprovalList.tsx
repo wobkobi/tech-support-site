@@ -10,23 +10,10 @@ import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useState } from "react";
+import { ContactPicker, type ContactPickerEntry } from "./ContactPicker";
 import type { ReviewRow } from "./review-types";
 import { ReviewCard } from "./ReviewCard";
 import { SendReviewLinkForm } from "./SendReviewLinkForm";
-
-/**
- * A slim contact entry for the contact picker.
- */
-interface ContactPickerEntry {
-  /** Contact database ID */
-  id: string;
-  /** Display name */
-  name: string;
-  /** Email address, or null for phone-only contacts */
-  email: string | null;
-  /** Number of reviews already linked to this contact */
-  reviewCount: number;
-}
 
 /**
  * Props for the {@link ReviewApprovalList} component.
@@ -183,33 +170,14 @@ export function ReviewApprovalList({
   function renderContactLink(row: ReviewRow): React.ReactElement {
     if (linkingId === row.id) {
       return (
-        <div className="flex items-center gap-2">
-          <select
-            aria-label="Select contact"
-            defaultValue=""
-            disabled={linkSaving === row.id}
-            onChange={(e) => {
-              const val = e.target.value;
-              void handleLinkContact(row.id, val || null);
-            }}
-            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
-          >
-            <option value="">-- no contact --</option>
-            {contacts
-              .filter((c) => c.id !== row.contactId && c.reviewCount === 0)
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                  {c.email ? ` (${c.email})` : ""}
-                </option>
-              ))}
-          </select>
-          <button
-            onClick={() => setLinkingId(null)}
-            className="text-xs text-slate-400 hover:text-slate-600"
-          >
-            Cancel
-          </button>
+        <div className="max-w-sm">
+          <ContactPicker
+            contacts={contacts}
+            value={row.contactId}
+            busy={linkSaving === row.id}
+            onSelect={(contactId) => void handleLinkContact(row.id, contactId)}
+            onCancel={() => setLinkingId(null)}
+          />
         </div>
       );
     }

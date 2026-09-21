@@ -1,7 +1,7 @@
 "use client";
 // src/features/reviews/components/admin/ReviewLinkHistoryTable.tsx
 // Table of review link history with inline editing of a contact's email/phone, and revoke
-// for links not yet used. Legacy entries (customerRef or reviewId only) are read-only.
+// for links not yet used. Rows that resolve to no contact at all (Legacy) are read-only.
 
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
@@ -14,26 +14,33 @@ import { useState } from "react";
 import { CopyLinkButton } from "./CopyLinkButton";
 
 /**
+ * Which channel the review link went out on. The first four are tracked sends
+ * with a real send date; the last two are reconstructed from the review itself,
+ * so their date is when the review landed, not when the ask went out.
+ * - `Linked` - a review attached to a contact with no send on record.
+ * - `Legacy` - a review nobody in the contact book answers for.
+ */
+export type LinkSource = "Auto" | "Manual email" | "Manual SMS" | "Invoice" | "Linked" | "Legacy";
+
+/**
  * A single row in the review link history table.
  */
-interface LinkHistoryEntry {
-  /** Contact id for manual sends; null for auto-sent booking entries and legacy entries. */
+export interface LinkHistoryEntry {
+  /** Contact id, for every row that resolves to one; null for booking sends and Legacy rows. */
   id: string | null;
-  /**
-   * Review token used as the customerRef on the Review record.
-   * Set for manual and legacy entries; null for auto booking entries.
-   */
+  /** Review token used as the customerRef on the Review record; null when the row has no link. */
   customerRef: string | null;
-  /** Original Review document id - set for legacy entries (read-only in the new model). */
+  /** Review document id - set on rows reconstructed from a review (Linked / Legacy). */
   reviewId: string | null;
   name: string;
-  /** Email address, or null for SMS-only or legacy entries */
+  /** Email address, or null when none is on file */
   email: string | null;
   /** Phone number (normalised), or null if not stored */
   phone: string | null;
+  /** Send date for tracked sends; the review date on Linked and Legacy rows. */
   sentAt: string;
   reviewed: boolean;
-  source: "Auto" | "Manual email" | "Manual SMS" | "Legacy";
+  source: LinkSource;
   reviewUrl: string;
 }
 
@@ -42,7 +49,31 @@ interface ReviewLinkHistoryTableProps {
 }
 
 /**
- * Renders the review link history table with inline editing for manual and legacy entries.
+ * Badge colour per source. Tracked sends get a channel colour; the two
+ * reconstructed sources stay grey so they read as "no send on record".
+ */
+const SOURCE_BADGE: Record<LinkSource, string> = {
+  Auto: "bg-moonstone-400/15 text-moonstone-700",
+  "Manual email": "bg-russian-violet/10 text-russian-violet",
+  "Manual SMS": "bg-coquelicot-500/10 text-coquelicot-500",
+  Invoice: "bg-mustard-300/25 text-mustard-700",
+  Linked: "bg-slate-100 text-slate-500",
+  Legacy: "bg-slate-100 text-slate-400",
+};
+
+/** Hover text spelling out where each kind of row came from. */
+const SOURCE_HINT: Record<LinkSource, string> = {
+  Auto: "Sent automatically after the booking",
+  "Manual email": "Emailed from the send form",
+  "Manual SMS": "Sent as a text from the send form",
+  Invoice: "Went out on the invoice email as the review line",
+  Linked: "Review attached to this contact - no send on record",
+  Legacy: "Review with no contact and no send on record",
+};
+
+/**
+ * Renders the review link history table. Any row that resolves to a contact can
+ * have its email/phone edited inline.
  * @param props - Component props.
  * @param props.entries - History rows to display.
  * @returns History table element.
@@ -54,10 +85,8 @@ export function ReviewLinkHistoryTable({
   const [entries, setEntries] = useState(initialEntries);
   const [query, setQuery] = useState("");
   /**
-   * Key used to track which row is being edited.
-   * For manual entries: the ReviewRequest id.
-   * For legacy entries with token: "legacy:<customerRef>".
-   * For tokenless legacy entries: "rev:<reviewId>".
+   * Key used to track which row is being edited. Review-derived rows key on the
+   * review first, so two reviews resolving to one contact stay distinct rows.
    */
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editEmail, setEditEmail] = useState("");
@@ -72,9 +101,9 @@ export function ReviewLinkHistoryTable({
    * @returns A stable string key, or null if the entry is not editable.
    */
   function entryKey(entry: LinkHistoryEntry): string | null {
-    if (entry.id) return entry.id;
-    if (entry.customerRef) return `legacy:${entry.customerRef}`;
     if (entry.reviewId) return `rev:${entry.reviewId}`;
+    if (entry.id) return entry.id;
+    if (entry.customerRef) return `token:${entry.customerRef}`;
     return null;
   }
 
@@ -126,9 +155,9 @@ export function ReviewLinkHistoryTable({
     if (!entry.id) return;
     setSaving(true);
     try {
-      // PATCH the Contact row - email/phone live there now that the
-      // standalone ReviewRequest model has been retired. Legacy entries
-      // (customerRef / reviewId only) are read-only.
+      // PATCH the Contact row - email/phone live there now that the standalone
+      // ReviewRequest model has been retired. Rows with no contact behind them
+      // are read-only, so `entry.id` is the gate above.
       const res = await fetch(`/api/admin/contacts/${entry.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -192,21 +221,16 @@ export function ReviewLinkHistoryTable({
           {visibleEntries.map((entry) => {
             const key = entryKey(entry);
             const isEditing = key !== null && editingKey === key;
-            // Only contact-backed rows are editable; legacy and auto-booking
-            // rows display read-only since their fields live elsewhere.
+            // Only contact-backed rows are editable; booking sends and rows with
+            // nobody behind them display read-only, their fields living elsewhere.
             const canEdit = entry.id !== null;
 
             const sourceBadge = (
               <span
+                title={SOURCE_HINT[entry.source]}
                 className={cn(
                   "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                  entry.source === "Auto"
-                    ? "bg-moonstone-400/15 text-moonstone-700"
-                    : entry.source === "Manual SMS"
-                      ? "bg-coquelicot-500/10 text-coquelicot-500"
-                      : entry.source === "Legacy"
-                        ? "bg-slate-100 text-slate-400"
-                        : "bg-russian-violet/10 text-russian-violet",
+                  SOURCE_BADGE[entry.source],
                 )}
               >
                 {entry.source}
@@ -236,11 +260,16 @@ export function ReviewLinkHistoryTable({
                     <p className="mt-0.5 text-xs text-slate-500">
                       {contact ?? (
                         <span className="text-slate-400 italic">
-                          {entry.source === "Legacy" ? "no contact info" : "SMS only"}
+                          {entry.id ? "no contact details" : "no contact on file"}
                         </span>
                       )}
                       {" · "}
-                      {formatDateShort(entry.sentAt)}
+                      {/* Linked and Legacy rows have no send on record, so the
+                          date is when the review landed - label it as such
+                          rather than letting it read as a send date. */}
+                      {entry.source === "Linked" || entry.source === "Legacy"
+                        ? `reviewed ${formatDateShort(entry.sentAt)}`
+                        : formatDateShort(entry.sentAt)}
                     </p>
                   </div>
                   {canEdit && !isEditing && (
@@ -320,7 +349,7 @@ export function ReviewLinkHistoryTable({
                     ) : (
                       <StatusPill tone="neutral">Not reviewed</StatusPill>
                     )}
-                    <CopyLinkButton url={entry.reviewUrl} />
+                    {entry.reviewUrl !== "" && <CopyLinkButton url={entry.reviewUrl} />}
                     {entry.id && !entry.reviewed && (
                       <button
                         type="button"

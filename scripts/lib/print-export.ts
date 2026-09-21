@@ -27,6 +27,11 @@ export interface PageConfig {
   filename: string;
   /** URL suffix appended to the base page URL (e.g. "?mode=print" > /poster?mode=print). */
   urlSuffix?: string;
+  /**
+   * URL suffixes rendered in order as the pages of one PDF, such as a card's
+   * front then back. Takes the place of `urlSuffix` when set.
+   */
+  pageSuffixes?: string[];
 }
 
 /* ---------- Constants ---------- */
@@ -145,7 +150,10 @@ function addCropMarks(page: PDFPage, trimWidth: number): void {
 /* ---------- Core ---------- */
 
 /**
- * Screenshots one variant and writes it as a single-page PDF.
+ * Screenshots one variant and writes it as a PDF: one page per entry in
+ * `pageSuffixes`, or a single page from `urlSuffix`. Every page carries a
+ * TrimBox at the trim size and a BleedBox at the full page, so a printer's
+ * preflight finds the bleed without relying on crop marks.
  * @param browser - Puppeteer browser instance.
  * @param config - Variant configuration (viewport, PDF size, crop marks).
  * @param url - Base URL of the page to screenshot.
@@ -167,53 +175,56 @@ export async function generateVariant(
       deviceScaleFactor: DEVICE_SCALE_FACTOR,
     });
 
-    const targetUrl = config.urlSuffix ? url + config.urlSuffix : url;
-    console.log(`Loading: ${targetUrl}`);
+    const pdfDoc = await PDFDocument.create();
+    const suffixes = config.pageSuffixes ?? [config.urlSuffix ?? ""];
+    const { width: pageW, height: pageH } = config.pdfSize;
+    const bleedX = (pageW - config.trimSize.width) / 2;
+    const bleedY = (pageH - config.trimSize.height) / 2;
 
-    // Refuse anything but a 2xx: a 404 or 500 still renders a full page, and
-    // capturing it would overwrite good artwork with an error page wearing the
-    // site chrome (a route not yet deployed to prod is the usual cause).
-    const response = await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 30000 });
-    const status = response?.status() ?? 0;
-    if (status < 200 || status >= 300) {
-      throw new Error(
-        `${targetUrl} returned HTTP ${status || "no response"}; not exporting. Is the route deployed? Try --local.`,
-      );
+    for (const suffix of suffixes) {
+      const targetUrl = url + suffix;
+      console.log(`Loading: ${targetUrl}`);
+
+      // Refuse anything but a 2xx: a 404 or 500 still renders a full page, and
+      // capturing it would overwrite good artwork with an error page wearing the
+      // site chrome (a route not yet deployed to prod is the usual cause).
+      const response = await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 30000 });
+      const status = response?.status() ?? 0;
+      if (status < 200 || status >= 300) {
+        throw new Error(
+          `${targetUrl} returned HTTP ${status || "no response"}; not exporting. Is the route deployed? Try --local.`,
+        );
+      }
+
+      // The dev server paints its route indicator into a <nextjs-portal> element,
+      // which otherwise lands in the corner of artwork captured with --local. No
+      // such element exists on a production capture, so this is a no-op there.
+      await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
+
+      // Allow fonts and lazy assets to finish rendering.
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      console.log("Taking screenshot...");
+
+      const screenshot = await page.screenshot({
+        type: "png",
+        fullPage: false,
+        omitBackground: false,
+      });
+
+      const pngImage = await pdfDoc.embedPng(screenshot);
+      const pdfPage = pdfDoc.addPage([pageW, pageH]);
+
+      pdfPage.drawImage(pngImage, { x: 0, y: 0, width: pageW, height: pageH });
+      pdfPage.setBleedBox(0, 0, pageW, pageH);
+      pdfPage.setTrimBox(bleedX, bleedY, config.trimSize.width, config.trimSize.height);
+
+      if (config.cropMarks) {
+        addCropMarks(pdfPage, config.trimSize.width);
+      }
     }
-
-    // The dev server paints its route indicator into a <nextjs-portal> element,
-    // which otherwise lands in the corner of artwork captured with --local. No
-    // such element exists on a production capture, so this is a no-op there.
-    await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
-
-    // Allow fonts and lazy assets to finish rendering.
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    console.log("Taking screenshot...");
-
-    const screenshot = await page.screenshot({
-      type: "png",
-      fullPage: false,
-      omitBackground: false,
-    });
 
     console.log("Creating PDF...");
-
-    const pdfDoc = await PDFDocument.create();
-    const pngImage = await pdfDoc.embedPng(screenshot);
-    const pdfPage = pdfDoc.addPage([config.pdfSize.width, config.pdfSize.height]);
-
-    pdfPage.drawImage(pngImage, {
-      x: 0,
-      y: 0,
-      width: config.pdfSize.width,
-      height: config.pdfSize.height,
-    });
-
-    // Add crop marks for print variant
-    if (config.cropMarks) {
-      addCropMarks(pdfPage, config.trimSize.width);
-    }
 
     const pdfBytes = await pdfDoc.save();
     const outputPath = `${outputDir}/${config.filename}`;

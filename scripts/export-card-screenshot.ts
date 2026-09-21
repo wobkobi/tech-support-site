@@ -1,16 +1,14 @@
 // scripts/export-card-screenshot.ts
 // Exports the /card page as print-ready business card PDFs (90x55mm, the standard NZ
 // size) by screenshotting each face via Puppeteer and embedding the result into a pdf-lib
-// document. Capture, PDF assembly and crop marks come from scripts/lib/print-export.ts,
-// shared with the poster exporter; this file owns the card's dimensions and CLI.
-// Run with: npm run build:card [-- --local] [--side=front|back] [--variant=digital|print]
+// document, front on page 1 and back on page 2. Capture and PDF assembly come from
+// scripts/lib/print-export.ts, shared with the poster exporter; this file owns the card's
+// dimensions and CLI.
+// Run with: npm run build:card [-- --local] [--variant=digital|print]
 
 import { logSummary, renderVariants, type PageConfig } from "./lib/print-export.js";
 
 /* ---------- Types ---------- */
-
-/** Which face of the card to export. */
-type CardSide = "front" | "back";
 
 /** Card export variant: trimmed artwork, or bled artwork with crop marks. */
 type CardVariant = "digital" | "print";
@@ -19,8 +17,6 @@ type CardVariant = "digital" | "print";
 interface ExportOptions {
   /** Fully-qualified URL of the card page to capture (without query string). */
   url: string;
-  /** Face(s) to export (default: both). */
-  sides: CardSide[];
   /** Variant(s) to export (default: both). */
   variants: CardVariant[];
   /** Output directory (default: "public/downloads"). */
@@ -62,19 +58,23 @@ function mmToPt(mm: number): number {
   return Math.round((mm / 25.4) * 72 * 100) / 100;
 }
 
+/** Card faces in page order: front on page 1, back on page 2. */
+const SIDES = ["front", "back"] as const;
+
 /* ---------- Page configs ---------- */
 
 /**
- * Builds the page config for one face at one variant.
+ * Builds the page config for one variant, with both faces as pages of one PDF.
  *
  * The print variant grows the viewport by the bleed on all four edges; the page
  * itself widens its outer padding to match, so the artwork extends under the
- * trim line instead of the layout simply shrinking.
- * @param side - Which face to render.
- * @param variant - "digital" for trim size, "print" for bleed plus crop marks.
- * @returns The {@link PageConfig} for that combination.
+ * trim line instead of the layout simply shrinking. It carries no crop marks:
+ * at 3mm of bleed they would land on the artwork's bleed edge, and the PDF's
+ * TrimBox already tells the printer where to cut.
+ * @param variant - "digital" for trim size, "print" for 3mm bleed.
+ * @returns The {@link PageConfig} for that variant.
  */
-function cardConfig(side: CardSide, variant: CardVariant): PageConfig {
+function cardConfig(variant: CardVariant): PageConfig {
   const bled = variant === "print";
   const pageMm = {
     width: TRIM_MM.width + (bled ? BLEED_MM * 2 : 0),
@@ -83,35 +83,30 @@ function cardConfig(side: CardSide, variant: CardVariant): PageConfig {
 
   return {
     label: bled
-      ? `${side} (print, ${TRIM_MM.width}x${TRIM_MM.height}mm + ${BLEED_MM}mm bleed)`
-      : `${side} (digital, ${TRIM_MM.width}x${TRIM_MM.height}mm)`,
+      ? `front + back (print, ${TRIM_MM.width}x${TRIM_MM.height}mm + ${BLEED_MM}mm bleed)`
+      : `front + back (digital, ${TRIM_MM.width}x${TRIM_MM.height}mm)`,
     viewport: { width: mmToPx(pageMm.width), height: mmToPx(pageMm.height) },
     pdfSize: { width: mmToPt(pageMm.width), height: mmToPt(pageMm.height) },
     trimSize: { width: mmToPt(TRIM_MM.width), height: mmToPt(TRIM_MM.height) },
-    cropMarks: bled,
-    filename: bled ? `card-${side}-print.pdf` : `card-${side}.pdf`,
-    urlSuffix: bled ? `?side=${side}&mode=print` : `?side=${side}`,
+    cropMarks: false,
+    filename: bled ? "card-print.pdf" : "card.pdf",
+    pageSuffixes: SIDES.map((side) => (bled ? `?side=${side}&mode=print` : `?side=${side}`)),
   };
 }
 
 /* ---------- Core ---------- */
 
 /**
- * Generates the requested card faces and variants through one browser instance.
- * @param options - Export options (URL, sides, variants, output directory).
+ * Generates the requested card variants through one browser instance.
+ * @param options - Export options (URL, variants, output directory).
  * @returns Promise resolving to the list of generated file paths.
  */
 async function exportCard(options: ExportOptions): Promise<string[]> {
-  const { url, sides, variants, outputDir } = options;
+  const { url, variants, outputDir } = options;
 
-  console.log(
-    `Exporting ${sides.join("/")} ${variants.join("/")} card variant(s) to ${outputDir}...`,
-  );
+  console.log(`Exporting ${variants.join("/")} card variant(s) to ${outputDir}...`);
 
-  // Faces outer, variants inner, so a --side=front run reads front-then-print.
-  const configs = sides.flatMap((side) => variants.map((variant) => cardConfig(side, variant)));
-
-  return renderVariants(configs, url, outputDir);
+  return renderVariants(variants.map(cardConfig), url, outputDir);
 }
 
 /* ---------- CLI ---------- */
@@ -151,7 +146,6 @@ function readFlag(
  * Flags:
  * - `--local`              Use the local dev server instead of production.
  * - `--url=<value>`        Override the target URL entirely.
- * - `--side=<value>`       Face to export: "front", "back", or "both" (default: "both").
  * - `--variant=<value>`    Export variant: "digital", "print", or "both" (default: "both").
  * - `--output-dir=<value>` Override output directory (default: "public/downloads").
  * @returns Parsed {@link ExportOptions} ready for {@link exportCard}.
@@ -160,7 +154,6 @@ function parseArgs(): ExportOptions {
   const args = process.argv.slice(2);
   const options: ExportOptions = {
     url: PROD_URL,
-    sides: ["front", "back"],
     variants: ["digital", "print"],
     outputDir: "public/downloads",
   };
@@ -175,18 +168,6 @@ function parseArgs(): ExportOptions {
     if (url) {
       options.url = url.value;
       i += url.consumed;
-      continue;
-    }
-
-    const side = readFlag(args, i, "side");
-    if (side) {
-      if (side.value === "front" || side.value === "back") {
-        options.sides = [side.value];
-      } else if (side.value !== "both") {
-        console.error(`Invalid side: ${side.value}. Must be "front", "back", or "both".`);
-        process.exit(1);
-      }
-      i += side.consumed;
       continue;
     }
 
