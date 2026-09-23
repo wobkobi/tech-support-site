@@ -6,6 +6,7 @@
 // field it has populated.
 
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
+import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { mergeEmails } from "@/features/contacts/lib/merge-emails";
 import { addressCovers, resolveAddress } from "@/shared/lib/normalise-address";
 import { isNZMobileKey, normaliseContactPhone, toE164NZ } from "@/shared/lib/normalise-phone";
@@ -61,6 +62,98 @@ export async function deleteContactFromGoogle(resourceName: string): Promise<voi
     await getPeopleClient().people.deleteContact({ resourceName });
   } catch (err) {
     console.error(`[google-contacts] deleteContactFromGoogle failed for ${resourceName}:`, err);
+  }
+}
+
+/**
+ * Pulls a single saved Google contact into the local table, matched by email.
+ *
+ * The local table only mirrors Google Contacts as often as the sync cron runs,
+ * so someone added to the phone minutes ago is missing from every lookup that
+ * reads it - and the invoice flow then offers to add a person who is already a
+ * contact. This closes that window for the one address being looked up.
+ *
+ * Reads `connections.list` rather than `searchContacts`: the search endpoint
+ * answers from a per-account cache that a separate empty query has to warm, so
+ * a cold call can report no match for a contact that exists. Listing is a
+ * single request for an address book this size and can never disagree with what
+ * a full import would have found.
+ *
+ * Finding the person by this email is Google confirming the address is theirs,
+ * so a local row that is merely missing it gets it attached rather than
+ * prompted for - the same write the next import would make. Matching (email,
+ * then Google link, then NZ mobile) is delegated to
+ * {@link findOrCreateContactByEmail} so this path lands on the same row the
+ * sync would. Callers are expected to have missed on email locally already.
+ *
+ * Never throws: a People API failure returns null and leaves the caller on
+ * whatever path it would have taken without this lookup.
+ * @param email - Address to match, compared case-insensitively.
+ * @returns The local contact id, or null when Google has no such person.
+ */
+export async function importGoogleContactByEmail(
+  email: string,
+): Promise<{ contactId: string } | null> {
+  const needle = email.trim().toLowerCase();
+  if (!needle) return null;
+  try {
+    const people = getPeopleClient();
+
+    let pageToken: string | undefined;
+    let person: people_v1.Schema$Person | null = null;
+    do {
+      const response = await people.people.connections.list({
+        resourceName: "people/me",
+        personFields: "names,emailAddresses,phoneNumbers,addresses,organizations",
+        pageSize: 1000,
+        ...(pageToken ? { pageToken } : {}),
+      });
+      person =
+        (response.data.connections ?? []).find((p) =>
+          (p.emailAddresses ?? []).some((e) => e.value?.trim().toLowerCase() === needle),
+        ) ?? null;
+      // Stop paging the moment the address is found.
+      pageToken = person ? undefined : (response.data.nextPageToken ?? undefined);
+    } while (pageToken);
+
+    const resourceName = person?.resourceName;
+    if (!person || !resourceName) return null;
+
+    const rawPhone = person.phoneNumbers?.[0]?.value?.trim() ?? null;
+    const rawAddress = person.addresses?.[0]?.formattedValue?.trim() ?? null;
+    const { contact, created } = await findOrCreateContactByEmail(needle, {
+      name:
+        person.names?.[0]?.displayName?.trim() ??
+        person.names?.[0]?.givenName?.trim() ??
+        person.organizations?.[0]?.name?.trim() ??
+        needle,
+      phone: rawPhone ? toE164NZ(rawPhone) || rawPhone : null,
+      ...(rawAddress ? await addressFields(rawAddress) : {}),
+      googleContactId: resourceName,
+    });
+
+    // A fresh row holds Google's values verbatim, so stamp it as synced: without
+    // the etag and timestamp the next push reads both sides as changed and
+    // conflicts every field - the canonicalised address against Google's raw one
+    // first. One Date for both stamps, or an auto @updatedAt lands a few ms later
+    // and re-dirties the row. An attach is a genuine local change and stays dirty.
+    if (created) {
+      const stampedAt = new Date();
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: {
+          lastSyncedAt: stampedAt,
+          updatedAt: stampedAt,
+          lastGoogleEtag: person.etag ?? null,
+        },
+      });
+    }
+    return { contactId: contact.id };
+  } catch (err) {
+    // Address passed as an argument, not interpolated: it arrives from a query
+    // string, and console treats its first argument as a format string.
+    console.error("[google-contacts] importGoogleContactByEmail failed for %s:", needle, err);
+    return null;
   }
 }
 
