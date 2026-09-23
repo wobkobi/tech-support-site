@@ -150,7 +150,9 @@ export async function importGoogleContactByEmail(
     }
     return { contactId: contact.id };
   } catch (err) {
-    console.error(`[google-contacts] importGoogleContactByEmail failed for ${needle}:`, err);
+    // Address passed as an argument, not interpolated: it arrives from a query
+    // string, and console treats its first argument as a format string.
+    console.error("[google-contacts] importGoogleContactByEmail failed for %s:", needle, err);
     return null;
   }
 }
