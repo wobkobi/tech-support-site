@@ -7,295 +7,39 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { PromoAdvancedOptions } from "@/features/business/components/PromoAdvancedOptions";
+import {
+  PromoPricePreview,
+  type PromoPreviewRates,
+} from "@/features/business/components/PromoPricePreview";
 import { formatNZD } from "@/features/business/lib/business";
+import {
+  advancedChips,
+  AMOUNT_LABEL,
+  DISCOUNT_TYPE,
+  discountColumns,
+  emptyForm,
+  endIsoToInclusiveDate,
+  endOfDayISO,
+  formFromPromo,
+  previewPromo,
+  PROMO_INPUT_CLASS,
+  promoTypeOf,
+  startOfDayISO,
+  toDateInput,
+  toMinuteOfDay,
+  type FormState,
+  type PromoType,
+} from "@/features/business/lib/promo-form";
 import {
   describeRecurringWindow,
   pickWinningPromo,
   summariseForBanner,
-  type ActivePromo,
 } from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import React, { useEffect, useRef, useState } from "react";
 import { FaPlus } from "react-icons/fa6";
-
-/** Shared classes for the promo form inputs. */
-const inputClass =
-  "rounded-lg border border-admin-border bg-admin-surface px-3 py-2 text-sm text-admin-text focus:ring-2 focus:ring-russian-violet/30 focus:outline-none";
-
-type PromoType = "flat" | "percent" | "fixed" | "travel";
-
-/** Form type > the column the API stores it under. */
-/**
- * The stored columns for one amount of a given type.
- *
- * Shared by the promo's own value and every tier, so a band cannot be stored
- * differently from the promo it belongs to - the travel inversion in particular
- * is easy to apply once and forget the second time.
- * @param type - The form's discount type.
- * @param amount - The number the operator typed.
- * @returns The four value columns, exactly one of them set.
- */
-function discountColumns(
-  type: PromoType,
-  amount: number,
-): {
-  flatHourlyRate: number | null;
-  percentDiscount: number | null;
-  fixedAmount: number | null;
-  travelPercent: number | null;
-} {
-  return {
-    flatHourlyRate: type === "flat" ? amount : null,
-    percentDiscount: type === "percent" ? amount / 100 : null,
-    fixedAmount: type === "fixed" ? amount : null,
-    // The operator enters "% off travel"; the column stores the fraction still
-    // charged, so 100% off is 0.
-    travelPercent: type === "travel" ? 1 - amount / 100 : null,
-  };
-}
-
-/**
- * The number to show in a tier's amount input, read the same way as the
- * promo's own.
- * @param tier - The stored tier.
- * @param promo - Its parent, which decides how the value is read.
- * @returns The operator-facing amount, or "" when the tier is blank.
- */
-function tierAmountFor(tier: PromoRow["tiers"][number], promo: PromoRow): number | string {
-  return amountFor({ ...promo, ...tier });
-}
-
-const DISCOUNT_TYPE: Record<PromoType, "flat_hourly" | "percent" | "fixed_amount" | "free_travel"> =
-  {
-    flat: "flat_hourly",
-    percent: "percent",
-    fixed: "fixed_amount",
-    travel: "free_travel",
-  };
-
-/** What the amount field means for each type, shown beside the input. */
-const AMOUNT_LABEL: Record<PromoType, string> = {
-  flat: "Hourly rate ($/hr)",
-  percent: "Discount (%)",
-  fixed: "Amount off ($)",
-  travel: "Travel discount (%)",
-};
-
-/**
- * The form type a stored promo corresponds to. Falls back to the value columns
- * for rows written before discountType existed.
- * @param p - Stored promo row.
- * @returns The matching form type.
- */
-function promoTypeOf(p: PromoRow): PromoType {
-  if (p.discountType === "fixed_amount") return "fixed";
-  if (p.discountType === "free_travel") return "travel";
-  if (p.discountType === "flat_hourly") return "flat";
-  if (p.discountType === "percent") return "percent";
-  return p.flatHourlyRate !== null ? "flat" : "percent";
-}
-
-/**
- * The number to show in the amount field for a stored promo, in the units the
- * operator types rather than the units the column stores.
- * @param p - Stored promo row.
- * @returns The amount, or an empty string when the promo has no value set.
- */
-function amountFor(p: PromoRow): number | string {
-  switch (promoTypeOf(p)) {
-    case "flat":
-      return p.flatHourlyRate ?? "";
-    case "percent":
-      return p.percentDiscount !== null ? Math.round(p.percentDiscount * 100) : "";
-    case "fixed":
-      return p.fixedAmount ?? "";
-    case "travel":
-      // Stored as the fraction still charged; shown as the discount.
-      return p.travelPercent !== null ? Math.round((1 - p.travelPercent) * 100) : "";
-  }
-}
-
-interface FormState {
-  title: string;
-  description: string;
-  /** Start date in YYYY-MM-DD form. Internally widened to local-midnight when sent. */
-  startDate: string;
-  /** End date (inclusive) in YYYY-MM-DD form. Internally widened to start-of-next-day. */
-  endDate: string;
-  type: PromoType;
-  amount: string;
-  isActive: boolean;
-  /** Higher wins when windows overlap. Held as a string for the input. */
-  priority: string;
-  /** Automatic promos apply to everyone; a code promo only to whoever enters it. */
-  kind: "automatic" | "code";
-  /** The code, uppercase. Ignored when the kind is automatic. */
-  code: string;
-  /** Total uses allowed across everyone. Blank for no cap. */
-  maxRedemptions: string;
-  /** Uses allowed per customer. Blank for no cap. */
-  perCustomerLimit: string;
-  newCustomersOnly: boolean;
-  /** NZ weekdays it applies on (0 = Sunday); empty means every day. */
-  activeWeekdays: number[];
-  /** NZ start time as "HH:mm", or "" for no time restriction. */
-  activeFrom: string;
-  /** NZ end time as "HH:mm", or "" for no time restriction. */
-  activeTo: string;
-  /** Floor for the pre-discount total. Blank for none. */
-  minSpend: string;
-  /**
-   * Spend bands, held as strings for the inputs. Empty is the ordinary
-   * single-value promo; the amount is read the same way the top-level one is,
-   * so a percent band is entered as "20" and stored as 0.2.
-   */
-  tiers: { minSpend: string; amount: string }[];
-}
-
-/**
- * "HH:mm" > minutes past midnight, or null when blank or unparseable.
- * @param value - Time-input value.
- * @returns Minutes past midnight, or null.
- */
-function toMinuteOfDay(value: string): number | null {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
-  if (!match) return null;
-  const minute = Number(match[1]) * 60 + Number(match[2]);
-  return minute >= 0 && minute <= 1439 ? minute : null;
-}
-
-/**
- * Minutes past midnight > the "HH:mm" a time input expects.
- * @param minute - Minutes past midnight, or null.
- * @returns Time-input value, or "" when there is none.
- */
-function fromMinuteOfDay(minute: number | null): string {
-  if (minute == null) return "";
-  const h = Math.floor(minute / 60);
-  const m = minute % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-/** Weekday labels for the recurring-window picker, indexed 0 = Sunday. */
-const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-/**
- * ISO timestamp > "YYYY-MM-DD" (local date parts) for <input type="date">.
- * @param iso - ISO 8601 timestamp.
- * @returns Date-input string, or empty for invalid input.
- */
-function toDateInput(iso: string): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  /**
-   * Left-pads a single digit with a leading zero.
-   * @param n - Number to pad.
-   * @returns Two-character string.
-   */
-  const pad = (n: number): string => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-/**
- * YYYY-MM-DD > ISO timestamp at local-midnight (start of day).
- * @param date - YYYY-MM-DD string.
- * @returns ISO timestamp.
- */
-function startOfDayISO(date: string): string {
-  return new Date(`${date}T00:00:00`).toISOString();
-}
-
-/**
- * YYYY-MM-DD > ISO timestamp at start of next day (so end is inclusive).
- * @param date - YYYY-MM-DD string.
- * @returns ISO timestamp.
- */
-function endOfDayISO(date: string): string {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() + 1);
-  return d.toISOString();
-}
-
-/**
- * `endAt` ISO > inclusive YYYY-MM-DD (subtracts the day added on save).
- * @param iso - ISO 8601 timestamp.
- * @returns Date-input string.
- */
-function endIsoToInclusiveDate(iso: string): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  d.setDate(d.getDate() - 1);
-  return toDateInput(d.toISOString());
-}
-
-/**
- * Turns the form into the promo shape the customer-facing helpers read, so the
- * preview below is produced by the same code that writes the real banner.
- *
- * Null until there is an amount to describe - a half-typed form would otherwise
- * preview "Limited offer", which is the fallback for a misconfigured promo and
- * would read as a warning.
- * @param form - Current form state.
- * @returns A promo to describe, or null when the form is not ready.
- */
-function previewPromo(form: FormState): ActivePromo | null {
-  const amount = parseFloat(form.amount);
-  if (isNaN(amount) || amount <= 0) return null;
-  if (!form.endDate) return null;
-  return {
-    id: "preview",
-    title: form.title,
-    description: form.description || null,
-    startAt: startOfDayISO(form.startDate),
-    endAt: endOfDayISO(form.endDate),
-    kind: form.kind,
-    code: form.kind === "code" ? form.code : null,
-    discountType: DISCOUNT_TYPE[form.type],
-    ...discountColumns(form.type, amount),
-    minSpend: form.minSpend.trim() ? parseFloat(form.minSpend) : null,
-    tiers: form.tiers
-      .filter((t) => t.minSpend.trim() && t.amount.trim())
-      .map((t) => ({
-        minSpend: parseFloat(t.minSpend),
-        ...discountColumns(form.type, parseFloat(t.amount)),
-      })),
-    activeWeekdays: form.activeWeekdays,
-    activeFromMinute: toMinuteOfDay(form.activeFrom),
-    activeToMinute: toMinuteOfDay(form.activeTo),
-  };
-}
-
-/**
- * Empty form pre-populated with today + a week-out end.
- * @returns Default FormState.
- */
-function emptyForm(): FormState {
-  const now = new Date();
-  const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  return {
-    title: "",
-    description: "",
-    startDate: toDateInput(now.toISOString()),
-    endDate: toDateInput(nextWeek.toISOString()),
-    type: "flat",
-    amount: "",
-    isActive: true,
-    priority: "0",
-    kind: "automatic",
-    code: "",
-    maxRedemptions: "",
-    perCustomerLimit: "",
-    newCustomersOnly: false,
-    activeWeekdays: [],
-    activeFrom: "",
-    activeTo: "",
-    minSpend: "",
-    tiers: [],
-  };
-}
 
 type Status = "active" | "upcoming" | "expired" | "disabled";
 
@@ -580,19 +324,21 @@ function PromoChips({ promo }: PromoChipsProps): React.ReactElement | null {
     </span>
   );
 }
-
 interface Props {
   /** Initial server-fetched promo list. */
   initial: PromoRow[];
+  /** Live rates the price preview discounts. */
+  rates: PromoPreviewRates;
 }
 
 /**
  * Promos manager - list, add, edit, toggle, delete.
  * @param props - Component props.
  * @param props.initial - Initial promo list.
+ * @param props.rates - Live rates for the price preview.
  * @returns Promos view element.
  */
-export function PromosView({ initial }: Props): React.ReactElement {
+export function PromosView({ initial, rates }: Props): React.ReactElement {
   const [promos, setPromos] = useState<PromoRow[]>(initial);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -604,6 +350,9 @@ export function PromosView({ initial }: Props): React.ReactElement {
   // Phones only: the form starts folded so the promo list isn't a long form
   // away. lg+ always shows it.
   const [formOpen, setFormOpen] = useState(false);
+  // Held in state rather than derived, so clearing the last advanced field
+  // while typing doesn't snap the section shut under the cursor.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   const { ids: overlaps, winners: overlapWinners } = findOverlaps(promos);
@@ -653,6 +402,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
     setEditingId(null);
     setError(null);
     setFormOpen(false);
+    setAdvancedOpen(false);
   }
 
   /**
@@ -668,29 +418,9 @@ export function PromosView({ initial }: Props): React.ReactElement {
     requestAnimationFrame(() =>
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
     );
-    setForm({
-      title: p.title,
-      description: p.description ?? "",
-      startDate: toDateInput(p.startAt),
-      // Stored as start-of-next-day; render the inclusive end date.
-      endDate: endIsoToInclusiveDate(p.endAt),
-      type: promoTypeOf(p),
-      amount: String(amountFor(p)),
-      isActive: p.isActive,
-      priority: String(p.priority),
-      kind: p.kind,
-      code: p.code ?? "",
-      maxRedemptions: p.maxRedemptions != null ? String(p.maxRedemptions) : "",
-      perCustomerLimit: p.perCustomerLimit != null ? String(p.perCustomerLimit) : "",
-      newCustomersOnly: p.newCustomersOnly,
-      activeWeekdays: p.activeWeekdays,
-      activeFrom: fromMinuteOfDay(p.activeFromMinute),
-      activeTo: fromMinuteOfDay(p.activeToMinute),
-      minSpend: p.minSpend != null ? String(p.minSpend) : "",
-      tiers: [...p.tiers]
-        .sort((a, b) => a.minSpend - b.minSpend)
-        .map((t) => ({ minSpend: String(t.minSpend), amount: String(tierAmountFor(t, p)) })),
-    });
+    const next = formFromPromo(p);
+    setForm(next);
+    setAdvancedOpen(advancedChips(next).length > 0);
   }
 
   /**
@@ -879,7 +609,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
               value={form.title}
               onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
               placeholder="e.g. Soft launch"
-              className={inputClass}
+              className={PROMO_INPUT_CLASS}
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -889,7 +619,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
               placeholder="Shown on the pricing page"
-              className={inputClass}
+              className={PROMO_INPUT_CLASS}
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -899,7 +629,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
               required
               value={form.startDate}
               onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))}
-              className={inputClass}
+              className={PROMO_INPUT_CLASS}
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -909,7 +639,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
               required
               value={form.endDate}
               onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))}
-              className={inputClass}
+              className={PROMO_INPUT_CLASS}
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -919,7 +649,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
               onChange={(e) =>
                 setForm((p) => ({ ...p, type: e.target.value as PromoType, amount: "" }))
               }
-              className={inputClass}
+              className={PROMO_INPUT_CLASS}
             >
               <option value="flat">Flat $/hr</option>
               <option value="percent">% off the job</option>
@@ -933,14 +663,14 @@ export function PromosView({ initial }: Props): React.ReactElement {
               type="number"
               required
               min="0"
-              step={form.type === "flat" || form.type === "fixed" ? "0.01" : "1"}
+              step="0.01"
               // A travel discount may be the full 100%; a job discount of 100%
               // would be a free job, which is a mistake rather than an offer.
               max={form.type === "percent" ? 99 : form.type === "travel" ? 100 : undefined}
               value={form.amount}
               onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
               placeholder={form.type === "flat" ? "50" : form.type === "fixed" ? "20" : "20"}
-              className={inputClass}
+              className={PROMO_INPUT_CLASS}
             />
           </label>
         </div>
@@ -953,7 +683,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
               onChange={(e) =>
                 setForm((p) => ({ ...p, kind: e.target.value as "automatic" | "code" }))
               }
-              className={cn(inputClass, "w-56")}
+              className={cn(PROMO_INPUT_CLASS, "w-56")}
             >
               <option value="automatic">Everyone (automatic)</option>
               <option value="code">Only with a code</option>
@@ -980,7 +710,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
                 maxLength={32}
                 autoComplete="off"
                 spellCheck={false}
-                className={cn(inputClass, "w-48 tracking-wider uppercase")}
+                className={cn(PROMO_INPUT_CLASS, "w-48 tracking-wider uppercase")}
               />
               <span className="text-xs text-admin-faint">
                 Letters, numbers and dashes. 3 to 32 characters.
@@ -989,223 +719,12 @@ export function PromosView({ initial }: Props): React.ReactElement {
           )}
         </div>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">Priority</span>
-          <input
-            type="number"
-            step={1}
-            value={form.priority}
-            onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}
-            className={cn(inputClass, "w-32")}
-          />
-          <span className="text-xs text-admin-faint">
-            Higher wins when two promos overlap. Ties go to the newer one.
-          </span>
-        </label>
-
-        <fieldset className="flex flex-col gap-3 rounded-xl border border-admin-border p-4">
-          <legend className="px-1 text-xs font-medium text-admin-muted">
-            Spend thresholds (optional)
-          </legend>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-admin-muted">Minimum spend ($)</span>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.minSpend}
-              onChange={(e) => setForm((p) => ({ ...p, minSpend: e.target.value }))}
-              placeholder="No minimum"
-              className={cn(inputClass, "w-40")}
-            />
-          </label>
-
-          {form.tiers.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {form.tiers.map((tier, i) => (
-                <div key={i} className="flex flex-wrap items-end gap-2">
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-medium text-admin-muted">Spend over ($)</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={tier.minSpend}
-                      onChange={(e) =>
-                        setForm((p) => ({
-                          ...p,
-                          tiers: p.tiers.map((t, j) =>
-                            j === i ? { ...t, minSpend: e.target.value } : t,
-                          ),
-                        }))
-                      }
-                      className={cn(inputClass, "w-32")}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-medium text-admin-muted">
-                      {AMOUNT_LABEL[form.type]}
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      step={form.type === "flat" || form.type === "fixed" ? "0.01" : "1"}
-                      value={tier.amount}
-                      onChange={(e) =>
-                        setForm((p) => ({
-                          ...p,
-                          tiers: p.tiers.map((t, j) =>
-                            j === i ? { ...t, amount: e.target.value } : t,
-                          ),
-                        }))
-                      }
-                      className={cn(inputClass, "w-32")}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setForm((p) => ({ ...p, tiers: p.tiers.filter((_, j) => j !== i) }))
-                    }
-                    className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() =>
-              setForm((p) => ({ ...p, tiers: [...p.tiers, { minSpend: "", amount: "" }] }))
-            }
-            className="self-start rounded-lg border border-admin-border bg-admin-surface px-3 py-1.5 text-xs font-medium text-admin-muted hover:bg-admin-bg"
-          >
-            Add a spend tier
-          </button>
-          <p className="text-sm text-admin-faint">
-            With no tiers the promo gives its single amount above. With tiers, the highest one the
-            job reaches supplies the discount and the amount above is ignored - a job that reaches
-            none gets nothing rather than a smaller discount. Thresholds are read against the low
-            end of the quote before any discount, so the customer is quoted what they are certain to
-            get and a job that lands higher earns more on the invoice.
-          </p>
-        </fieldset>
-
-        <fieldset className="flex flex-col gap-3 rounded-xl border border-admin-border p-4">
-          <legend className="px-1 text-xs font-medium text-admin-muted">Who can use it</legend>
-          <div className="flex flex-wrap gap-4">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-admin-muted">Total uses</span>
-              <input
-                type="number"
-                min="1"
-                step={1}
-                value={form.maxRedemptions}
-                onChange={(e) => setForm((p) => ({ ...p, maxRedemptions: e.target.value }))}
-                placeholder="No limit"
-                className={cn(inputClass, "w-32")}
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-admin-muted">Uses per customer</span>
-              <input
-                type="number"
-                min="1"
-                step={1}
-                value={form.perCustomerLimit}
-                onChange={(e) => setForm((p) => ({ ...p, perCustomerLimit: e.target.value }))}
-                placeholder="No limit"
-                className={cn(inputClass, "w-32")}
-              />
-            </label>
-          </div>
-          <label className="flex items-center gap-2 text-sm text-admin-muted">
-            <input
-              type="checkbox"
-              checked={form.newCustomersOnly}
-              onChange={(e) => setForm((p) => ({ ...p, newCustomersOnly: e.target.checked }))}
-              className="h-4 w-4"
-            />
-            New customers only (nobody with a completed job on file)
-          </label>
-          <p className="text-sm text-admin-faint">
-            The total cap is approximate: two people can pass it at the same moment and both redeem.
-            Per-customer and new-customer rules need someone the site can identify, so an
-            unrecognised email is allowed through rather than refused.
-          </p>
-        </fieldset>
-
-        <fieldset className="flex flex-col gap-3 rounded-xl border border-admin-border p-4">
-          <legend className="px-1 text-xs font-medium text-admin-muted">
-            When it applies (optional)
-          </legend>
-          <div className="flex flex-wrap gap-1.5">
-            {WEEKDAY_LABELS.map((label, day) => {
-              const picked = form.activeWeekdays.includes(day);
-              return (
-                <button
-                  key={label}
-                  type="button"
-                  aria-pressed={picked}
-                  onClick={() =>
-                    setForm((p) => ({
-                      ...p,
-                      activeWeekdays: picked
-                        ? p.activeWeekdays.filter((d) => d !== day)
-                        : [...p.activeWeekdays, day].sort((a, b) => a - b),
-                    }))
-                  }
-                  className={cn(
-                    "rounded-lg border px-3 py-1.5 text-sm font-medium",
-                    picked
-                      ? "border-admin-text bg-admin-text text-admin-surface"
-                      : "border-admin-border bg-admin-surface text-admin-muted hover:bg-admin-bg",
-                  )}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex flex-wrap items-end gap-4">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-admin-muted">From</span>
-              <input
-                type="time"
-                value={form.activeFrom}
-                onChange={(e) => setForm((p) => ({ ...p, activeFrom: e.target.value }))}
-                className={cn(inputClass, "w-32")}
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-admin-muted">To</span>
-              <input
-                type="time"
-                value={form.activeTo}
-                onChange={(e) => setForm((p) => ({ ...p, activeTo: e.target.value }))}
-                className={cn(inputClass, "w-32")}
-              />
-            </label>
-            {(form.activeFrom || form.activeTo) && (
-              <button
-                type="button"
-                onClick={() => setForm((p) => ({ ...p, activeFrom: "", activeTo: "" }))}
-                className="pb-2 text-xs font-medium text-admin-muted underline hover:text-admin-text"
-              >
-                Clear times
-              </button>
-            )}
-          </div>
-          <p className="text-sm text-admin-faint">
-            Leave blank to run the whole window. These are matched against the appointment in NZ
-            time, not against when the customer is browsing, so a Tuesday offer is earned by booking
-            a Tuesday job on any day. The banner still advertises the promo throughout and names the
-            restriction.
-          </p>
-        </fieldset>
+        <PromoAdvancedOptions
+          form={form}
+          setForm={setForm}
+          open={advancedOpen}
+          onOpenChange={setAdvancedOpen}
+        />
 
         <label className="flex items-center gap-2 text-sm text-admin-muted">
           <input
@@ -1244,6 +763,11 @@ export function PromosView({ initial }: Props): React.ReactElement {
               )}
             </div>
           );
+        })()}
+
+        {(() => {
+          const preview = previewPromo(form);
+          return preview ? <PromoPricePreview promo={preview} rates={rates} /> : null;
         })()}
 
         <div className="flex gap-2">
