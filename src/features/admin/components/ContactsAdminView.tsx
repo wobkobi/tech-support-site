@@ -12,7 +12,8 @@ import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { ContactAdminList, type ContactRow } from "./ContactAdminList";
+import { ContactAdminList } from "./ContactAdminList";
+import type { ContactRow } from "./ContactCard";
 
 interface ContactsAdminViewProps {
   initialConflicts: ConflictEntry[];

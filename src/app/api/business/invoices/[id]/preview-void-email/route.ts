@@ -4,7 +4,7 @@
 // overrides (greetingName, customBody).
 
 import { parseInvoiceEmailOverrides } from "@/features/business/lib/invoice-email-request";
-import { buildVoidEmail } from "@/features/reviews/lib/email";
+import { buildVoidEmail } from "@/features/reviews/lib/email-invoice";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";

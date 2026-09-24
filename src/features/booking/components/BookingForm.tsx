@@ -3,141 +3,56 @@
 
 "use client";
 
-import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { BookingAddressFields } from "@/features/booking/components/BookingAddressFields";
 import {
-  BOOKING_FIELD_LIMITS,
+  BookingEmailField,
+  BookingMeetingTypeField,
+  BookingNameField,
+  BookingPhoneField,
+} from "@/features/booking/components/BookingContactFields";
+import { BookingEstimatePanel } from "@/features/booking/components/BookingEstimatePanel";
+import {
+  BookingAccessNotesField,
+  BookingNotesField,
+} from "@/features/booking/components/BookingNotesFields";
+import { BookingSchedulePicker } from "@/features/booking/components/BookingSchedulePicker";
+import {
+  BookingErrorSummary,
+  BookingSubmitBar,
+} from "@/features/booking/components/BookingSubmitSection";
+import { BookingSummaryCard } from "@/features/booking/components/BookingSummaryCard";
+import { useBookingAddress } from "@/features/booking/hooks/use-booking-address";
+import { useInlineEstimate } from "@/features/booking/hooks/use-inline-estimate";
+import {
   combineUnitAndAddress,
   splitUnitFromAddress,
-  unitMatchesStreetNumber,
-  validateEmail,
   type BookableDay,
   type JobDuration,
   type StartMinute,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
+import {
+  buildDurationOptions,
+  DRAFT_KEY,
+  lookupBookingContact,
+  removeBookingDraft,
+  saveBookingDraft,
+  subSlotLabel,
+  validateBookingFields,
+  type BookingDraft,
+} from "@/features/booking/lib/booking-form";
 import { PromoCodeField } from "@/features/business/components/PromoCodeField";
-import { formatMoneyCompact } from "@/features/business/lib/business";
 import { normalisePromoCode } from "@/features/business/lib/promos";
-import { fetchQuickEstimate } from "@/features/business/lib/quick-estimate";
 import { parseObjectId } from "@/features/business/lib/validation";
-import { Button } from "@/shared/components/Button";
-import { EmailInput } from "@/shared/components/EmailInput";
-import { PhoneInput } from "@/shared/components/PhoneInput";
 import { PhoneLink } from "@/shared/components/PhoneLink";
-import { cn } from "@/shared/lib/cn";
 import { suggestEmailCorrection } from "@/shared/lib/email-typo-suggestion";
 import { focusAndReveal } from "@/shared/lib/focus-and-reveal";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
-import { isPlausibleName, normaliseName } from "@/shared/lib/normalise-name";
-import { validatePhone } from "@/shared/lib/normalise-phone";
 import type { EstimatorRange } from "@/shared/lib/settings/types";
 import { dateKeyParts, nzWallClockUtc } from "@/shared/lib/timezone-utils";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { FaCheck } from "react-icons/fa6";
-
-/** localStorage key for the new-booking draft. Bumped when the shape changes. */
-const DRAFT_KEY = "booking-draft-v2";
-/** Soft warning kicks in this many chars before the notes hard cap. */
-const NOTES_WARN_GAP = 50;
-
-/** Element id of the day picker, the fallback while the time picker is not rendered. */
-const DAY_ANCHOR = "booking-day";
-
-/**
- * Field-error key > the element id it points at, in form order. The order
- * matters: the mobile "N issues" link jumps to the first key with an error.
- */
-const FIELD_ANCHORS: Record<string, string> = {
-  duration: "booking-duration",
-  day: DAY_ANCHOR,
-  time: "booking-time",
-  name: "booking-name",
-  email: "booking-email",
-  phone: "booking-phone",
-  meetingType: "booking-meeting-type",
-  address: "booking-address",
-  notes: "booking-notes",
-};
-
-/**
- * Moves focus to the field an error names. A button group has no single
- * input, so focus lands on its selected button, else its first enabled one. A
- * bare #anchor jump would scroll without focusing anything.
- * @param key - Field-error key from {@link FIELD_ANCHORS}.
- */
-function focusField(key: string): void {
-  const anchor = FIELD_ANCHORS[key];
-  // The time picker only renders once a day is picked; fall back to the days.
-  const el =
-    (anchor ? document.getElementById(anchor) : null) ?? document.getElementById(DAY_ANCHOR);
-  if (!el) return;
-  const target = el.matches("input, textarea, button")
-    ? el
-    : (el.querySelector<HTMLElement>('[aria-pressed="true"]') ??
-      el.querySelector<HTMLElement>("input, textarea, button:not(:disabled)") ??
-      el);
-  focusAndReveal(target);
-}
-
-/**
- * Formats a job duration in minutes as a short label ("1 hour", "2 hours", "90 min").
- * @param mins - Duration in minutes.
- * @returns Human label.
- */
-function durationText(mins: number): string {
-  if (mins % 60 === 0) {
-    const h = mins / 60;
-    return `${h} hour${h === 1 ? "" : "s"}`;
-  }
-  return `${mins} min`;
-}
-
-/**
- * Compact duration label ("45m", "1h", "1h 15m") - hours and minutes rather
- * than a raw "75 min", so over-an-hour estimates read naturally.
- * @param mins - Duration in minutes.
- * @returns Compact label.
- */
-function compactDuration(mins: number): string {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  if (h === 0) return `${m}m`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
-}
-
-/**
- * Formats a low/high minute band as a compact range ("15 - 30m",
- * "45m - 1h 15m"). Collapses to a single label when the ends match, and shares
- * the "m" unit when both ends are under an hour.
- * @param low - Low end in minutes.
- * @param high - High end in minutes.
- * @returns Human range label.
- */
-function durationRangeText(low: number, high: number): string {
-  if (low >= high) return compactDuration(high);
-  if (high < 60) return `${low} - ${high}m`;
-  return `${compactDuration(low)} - ${compactDuration(high)}`;
-}
-
-interface BookingDraft {
-  duration: JobDuration;
-  name: string;
-  email: string;
-  phone: string;
-  meetingType: "in-person" | "remote" | "";
-  unit: string;
-  address: string;
-  addressVerified: boolean;
-  notes: string;
-  accessNotes?: string;
-  dateKey?: string;
-  timeOfDay?: TimeOfDay;
-  startMinute?: StartMinute;
-}
 
 export interface BookingFormInitialValues {
   duration: JobDuration;
@@ -223,40 +138,6 @@ export default function BookingForm({
   // re-resolved server-side at submit, never trusted from here.
   const promoParam = normalisePromoCode(searchParams.get("promo"));
   const [promoCode, setPromoCode] = useState(promoParam ?? "");
-  // Inline "get a rough estimate" state (new bookings only).
-  const [estimating, setEstimating] = useState(false);
-  const [quote, setQuote] = useState<{
-    low: number;
-    high: number;
-    travelCharge: number;
-    minsLow: number;
-    minsHigh: number;
-  } | null>(null);
-  const [quoteError, setQuoteError] = useState<string | null>(null);
-  // Inputs the shown estimate was worked out from, so an edit afterwards marks it out of date.
-  const [quotedFor, setQuotedFor] = useState<string | null>(null);
-  const canInlineEstimate =
-    !isEditMode &&
-    estimatorRange != null &&
-    minBillableMins != null &&
-    minTravelCharge != null &&
-    travelRatePerHour != null &&
-    lowEndFloorFactor != null;
-
-  // Duration choices built from the live settings; labels reflect the operator's
-  // configured short/long lengths. Descriptions stay as fixed copy.
-  const durationOptions: { value: JobDuration; label: string; description: string }[] = [
-    {
-      value: "short",
-      label: `Standard (${durationText(durations.short)})`,
-      description: "Most common appointment length",
-    },
-    {
-      value: "long",
-      label: `Extended (${durationText(durations.long)})`,
-      description: "For complex issues or multiple tasks",
-    },
-  ];
 
   // `selectedDateKey` rather than the full BookableDay: when `availableDays` changes (a
   // router.refresh after a 409), the latest slot data is read from props during render,
@@ -287,24 +168,20 @@ export default function BookingForm({
   const [meetingType, setMeetingType] = useState<"in-person" | "remote" | "">(
     initialValues?.meetingType ?? "",
   );
-  // Unit kept separate so Places autocomplete can predict the street part
-  // (NZ "N/" prefixes break predictions). Re-combined on submit, split on
-  // pre-fill, so saved addresses stay in "12/160 Kepa Road Orakei" shape.
-  const initialSplit = splitUnitFromAddress(initialValues?.address ?? "");
-  const [unit, setUnit] = useState(initialSplit.unit);
-  const [address, setAddress] = useState(initialSplit.rest);
-  // True after picking an autocomplete suggestion (or pre-filled in edit mode);
-  // any keystroke resets it. Drives the green-tick hint + submit-time geocode.
-  const [addressVerified, setAddressVerified] = useState(Boolean(initialValues?.address));
-  // True after a failed submit-time geocode so a second click submits as-is.
-  // Resets on any address change to re-check different mistypes.
-  const [addressOverrideAcked, setAddressOverrideAcked] = useState(false);
-  // Google candidates for a typed-but-not-picked address. null = no prompt, one
-  // entry = "did you mean?", several = "which did you mean?" - never auto-picked.
-  const [addressCandidates, setAddressCandidates] = useState<string[] | null>(null);
-  // Apt/Unit is hidden by default (most customers are in a house) so nobody types
-  // their street number into it; revealed on request, pre-revealed in edit mode.
-  const [showUnit, setShowUnit] = useState(Boolean(initialSplit.unit));
+  const addressState = useBookingAddress(initialValues?.address ?? "");
+  const {
+    unit,
+    setUnit,
+    address,
+    setAddress,
+    addressVerified,
+    setAddressVerified,
+    addressOverrideAcked,
+    setAddressOverrideAcked,
+    setAddressCandidates,
+    setShowUnit,
+    mapsFallback,
+  } = addressState;
   // Likely email correction (e.g. gmial.com > gmail.com) surfaced at submit, so
   // an autofilled typo that never triggered the blur hint still gets caught.
   const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
@@ -328,78 +205,38 @@ export default function BookingForm({
     return nzWallClockUtc(y, m, d, window.startHour, selectedMinute);
   }
 
-  /**
-   * Everything the estimate depends on, joined into one comparable string.
-   * @returns The key for the current form inputs.
-   */
-  function currentEstimateKey(): string {
-    return JSON.stringify([
-      notes.trim(),
-      meetingType,
-      combineUnitAndAddress(unit, address),
-      selectedDay?.dateKey ?? null,
-      selectedTime,
-      selectedMinute,
-      duration,
-      promoCode.trim(),
-    ]);
-  }
-
-  /**
-   * Runs the inline rough estimate from the current description + meeting +
-   * address, shows the range, and captures the logged estimate id so the
-   * booking snapshots the quote the customer saw.
-   * @returns Resolves when the estimate completes.
-   */
-  async function runInlineEstimate(): Promise<void> {
-    const estimateInputsKey = currentEstimateKey();
-    if (
-      !estimatorRange ||
-      minBillableMins == null ||
-      minTravelCharge == null ||
-      travelRatePerHour == null ||
-      lowEndFloorFactor == null
-    )
-      return;
-    setEstimating(true);
-    setQuoteError(null);
-    try {
-      // Quote the drive at the picked slot so the estimate matches what the
-      // booking snapshots at submit.
-      const slotStart = selectedDay && selectedTime ? slotStartInstant() : null;
-      const slotEnd = slotStart
-        ? new Date(slotStart.getTime() + durations[duration] * 60_000)
-        : null;
-
-      const res = await fetchQuickEstimate({
-        description: notes.trim(),
-        meeting: meetingType === "remote" ? "remote" : "in-person",
-        address: meetingType === "remote" ? undefined : combineUnitAndAddress(unit, address),
-        estimatorRange,
-        minBillableMins,
-        minTravelCharge,
-        travelRatePerHour,
-        lowEndFloorFactor,
-        departureTimeIso: slotStart?.toISOString(),
-        returnDepartureTimeIso: slotEnd?.toISOString(),
-        promoCode,
-        email,
-      });
-      setQuote({
-        low: res.low,
-        high: res.high,
-        travelCharge: res.travelCharge,
-        minsLow: res.minsLow,
-        minsHigh: res.minsHigh,
-      });
-      if (res.estimateId) setEstimateId(res.estimateId);
-      setQuotedFor(estimateInputsKey);
-    } catch {
-      setQuoteError("Couldn't get an estimate just now - you can still book.");
-    } finally {
-      setEstimating(false);
-    }
-  }
+  // Inline "get a rough estimate" state (new bookings only).
+  const {
+    canInlineEstimate,
+    estimating,
+    quote,
+    quoteError,
+    quoteStale,
+    descriptionReady,
+    estimateHelp,
+    runInlineEstimate,
+    clearQuote,
+  } = useInlineEstimate({
+    enabled: !isEditMode,
+    estimatorRange,
+    minBillableMins,
+    minTravelCharge,
+    travelRatePerHour,
+    lowEndFloorFactor,
+    notes,
+    meetingType,
+    unit,
+    address,
+    dateKey: selectedDay?.dateKey ?? null,
+    selectedTime,
+    selectedMinute,
+    duration,
+    durations,
+    slotStart: slotStartInstant(),
+    promoCode,
+    email,
+    onEstimateId: setEstimateId,
+  });
 
   /**
    * Removes a single inline field error (used by on-blur/on-change handlers so a
@@ -413,31 +250,6 @@ export default function BookingForm({
       delete next[key];
       return next;
     });
-  }
-
-  /**
-   * Applies a Google address candidate the customer picked from the "did you
-   * mean?" prompt: splits any unit prefix back into its own field, marks the
-   * address verified so it won't re-prompt, and dismisses the prompt.
-   * @param candidate - The chosen canonical address (may carry a "unit/" prefix).
-   */
-  function applyAddressCandidate(candidate: string): void {
-    const split = splitUnitFromAddress(candidate);
-    if (split.unit) setShowUnit(true);
-    setUnit(split.unit);
-    setAddress(split.rest);
-    setAddressVerified(true);
-    setAddressCandidates(null);
-    setAddressOverrideAcked(false);
-  }
-
-  /**
-   * Dismisses the address prompt and keeps the customer's typed text, letting the
-   * next submit go through as-is (some genuine new addresses don't geocode).
-   */
-  function keepTypedAddress(): void {
-    setAddressCandidates(null);
-    setAddressOverrideAcked(true);
   }
 
   const [error, setError] = useState<string | null>(null);
@@ -457,11 +269,6 @@ export default function BookingForm({
   // True once a localStorage draft has been restored, so the UI can offer a
   // "Clear form" affordance. New-booking mode only.
   const [draftRestored, setDraftRestored] = useState(false);
-  // Lit when notes paste is trimmed to fit the cap; auto-clears after 4s.
-  const [pasteTrimmed, setPasteTrimmed] = useState(false);
-  // True once AddressAutocomplete reports the Maps API is unavailable. The
-  // form then skips the "must pick a suggestion" gate.
-  const [mapsFallback, setMapsFallback] = useState(false);
 
   // Where a stopped submit sends focus. `seq` bumps on every attempt so a second
   // click with the same problem still moves focus. Driven by submits only: the
@@ -531,17 +338,8 @@ export default function BookingForm({
     contactLookupEmailRef.current = trimmed;
 
     try {
-      const res = await fetch(`/api/booking/contact-lookup?email=${encodeURIComponent(trimmed)}`, {
-        signal: controller.signal,
-      });
-      if (!res.ok) return;
-      const data = (await res.json()) as {
-        ok: boolean;
-        name?: string;
-        phone?: string | null;
-        address?: string | null;
-      };
-      if (!data.ok) return;
+      const data = await lookupBookingContact(trimmed, controller.signal);
+      if (!data?.ok) return;
       // Drop the response if the user has since blurred a different email.
       if (contactLookupEmailRef.current !== trimmed) return;
       const filled: string[] = [];
@@ -668,11 +466,7 @@ export default function BookingForm({
         timeOfDay: selectedTime ?? undefined,
         startMinute: selectedTime ? selectedMinute : undefined,
       };
-      try {
-        window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-      } catch {
-        // Quota / private-mode: persistence is best-effort.
-      }
+      saveBookingDraft(draft);
     }, 300);
 
     return () => {
@@ -695,26 +489,13 @@ export default function BookingForm({
     selectedMinute,
   ]);
 
-  // Auto-clear the "paste was trimmed" hint after a few seconds.
-  useEffect(() => {
-    if (!pasteTrimmed) return;
-    const t = setTimeout(() => setPasteTrimmed(false), 4000);
-    return () => clearTimeout(t);
-  }, [pasteTrimmed]);
-
   /**
    * Clear the saved draft + reset all form fields the user filled in. Leaves
    * the schedule selection alone since that's already constrained by what's
    * available.
    */
   function clearDraft(): void {
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.removeItem(DRAFT_KEY);
-      } catch {
-        // Ignore - removal is best-effort.
-      }
-    }
+    removeBookingDraft();
     setName("");
     setEmail("");
     setPhone("");
@@ -733,10 +514,6 @@ export default function BookingForm({
     setError(null);
     setDraftRestored(false);
   }
-
-  // One run in date order, so tomorrow always sits next to today even when it's a
-  // Saturday. Each label carries its weekday name, so weekends still read as such.
-  const daysInOrder = [...availableDays].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 
   /**
    * Handle day selection and reset time if needed
@@ -771,15 +548,14 @@ export default function BookingForm({
   }
 
   /**
-   * Format a sub-slot time label, e.g. startHour=14, minute=15 > "2:15pm".
-   * @param startHour - The hour in 24h format (e.g. 14 for 2pm)
-   * @param minute - Minutes past the hour (0, 15, 30, or 45)
-   * @returns Formatted time string (e.g. "2:15pm")
+   * Handle hour selection, landing on the hour's first free minute.
+   * @param time - Selected time window
+   * @param minute - First available minute in that window
    */
-  function subSlotLabel(startHour: number, minute: StartMinute): string {
-    const period = startHour < 12 ? "am" : "pm";
-    const h = startHour > 12 ? startHour - 12 : startHour;
-    return minute === 0 ? `${h}:00${period}` : `${h}:${String(minute).padStart(2, "0")}${period}`;
+  function handleTimeSelect(time: TimeOfDay, minute: StartMinute): void {
+    setSelectedTime(time);
+    clearFieldError("time");
+    setSelectedMinute(minute);
   }
 
   /**
@@ -793,37 +569,17 @@ export default function BookingForm({
     if (submittingRef.current) return;
     setError(null);
 
-    // Collect all failures so the user fixes them in one pass. Keys match
-    // the input ids used below for aria-describedby + summary anchors.
-    const fe: Record<string, string> = {};
-    if (!duration) fe.duration = "Please select job duration.";
-    if (!selectedDay) fe.day = "Please select a day and time.";
-    if (!selectedTime) fe.time = "Please select a time.";
-    if (!name.trim()) fe.name = "Please enter your name.";
-    else if (!isPlausibleName(name)) fe.name = "Please enter your full name.";
-    if (validateEmail(email) !== "ok") {
-      fe.email = "Please enter a valid email address.";
-    }
-    const phoneCheck = validatePhone(phone).result;
-    if (meetingType === "in-person") {
-      if (!phone.trim()) {
-        fe.phone = "Please enter a phone number so I can contact you about arrival.";
-      } else if (phoneCheck === "invalid") {
-        fe.phone = "Please enter a valid phone number.";
-      }
-    } else if (phoneCheck === "invalid") {
-      fe.phone = "Please enter a valid phone number, or leave it blank.";
-    }
-    if (!meetingType) fe.meetingType = "Please select in-person or remote.";
-    if (meetingType === "in-person" && !address.trim()) {
-      fe.address = "Please enter your address for in-person appointments.";
-    }
-    if (!notes.trim()) {
-      fe.notes = "Please describe what you need help with.";
-    } else if (notes.trim().length < BOOKING_FIELD_LIMITS.notesMin) {
-      fe.notes = `Please describe the issue in at least ${BOOKING_FIELD_LIMITS.notesMin} characters so I have enough context.`;
-    }
-
+    const fe = validateBookingFields({
+      duration,
+      selectedDay,
+      selectedTime,
+      name,
+      email,
+      phone,
+      meetingType,
+      address,
+      notes,
+    });
     setFieldErrors(fe);
     if (Object.keys(fe).length > 0) {
       requestAttention("summary");
@@ -951,13 +707,7 @@ export default function BookingForm({
 
       // Successful submit: clear the saved draft so the next page load is a
       // clean slate.
-      if (!isEditMode && typeof window !== "undefined") {
-        try {
-          window.localStorage.removeItem(DRAFT_KEY);
-        } catch {
-          // Ignore - cleanup is best-effort.
-        }
-      }
+      if (!isEditMode) removeBookingDraft();
 
       // Redirect to the success page. Edit mode flags itself so the success
       // page does not report the reschedule as a fresh lead conversion.
@@ -984,32 +734,8 @@ export default function BookingForm({
       ? (selectedDay.timeWindows.find((w) => w.value === selectedTime) ?? null)
       : null;
   const timeLabel = activeWindow ? subSlotLabel(activeWindow.startHour, selectedMinute) : null;
-  const dayHasNoRoom =
-    selectedDay?.timeWindows.every((w) =>
-      duration === "short" ? !w.availableShort : !w.availableLong,
-    ) ?? false;
-  // One polite status line for the schedule picker, instead of a live region
-  // over the whole time grid that re-announced every button on each change.
-  const scheduleStatus = !selectedDay
-    ? ""
-    : dayHasNoRoom
-      ? `${selectedDay.fullLabel} has no room for ${durationText(durations[duration])}.`
-      : timeLabel
-        ? `${timeLabel} on ${selectedDay.fullLabel} selected.`
-        : `${selectedDay.fullLabel}: choose a start time.`;
-  const fieldErrorKeys = Object.keys(fieldErrors);
-  const firstErrorKey = Object.keys(FIELD_ANCHORS).find((k) => fieldErrors[k]) ?? fieldErrorKeys[0];
   const phoneLink =
     ownerPhone && ownerPhoneTel ? <PhoneLink phone={ownerPhone} phoneTel={ownerPhoneTel} /> : null;
-
-  const descriptionReady = notes.trim().length >= BOOKING_FIELD_LIMITS.notesMin;
-  const quoteStale = quote !== null && quotedFor !== currentEstimateKey();
-  // Why the estimate button is greyed out, or what it will leave out.
-  const estimateHelp = !descriptionReady
-    ? `Describe the problem above first (at least ${BOOKING_FIELD_LIMITS.notesMin} characters).`
-    : meetingType === "in-person" && !address.trim()
-      ? "Add your address above if you'd like travel included."
-      : null;
 
   return (
     <form
@@ -1046,181 +772,21 @@ export default function BookingForm({
         />
       </div>
       {/* ── Section 1: Scheduling ── */}
-      <fieldset className="flex flex-col gap-6">
-        <legend className="mb-1 text-xl font-bold text-russian-violet sm:text-2xl">Schedule</legend>
-
-        <p aria-live="polite" className="sr-only">
-          {scheduleStatus}
-        </p>
-
-        {/* Duration */}
-        <fieldset id="booking-duration" className="min-w-0">
-          <legend className="mb-2 text-base font-semibold text-rich-black">
-            How long do you need? <span className="text-error">*</span>
-          </legend>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {durationOptions.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                aria-pressed={duration === opt.value}
-                onClick={() => handleDurationChange(opt.value)}
-                className={cn(
-                  "rounded-lg border p-4 text-left transition-colors",
-                  duration === opt.value
-                    ? "border-russian-violet bg-russian-violet/10"
-                    : "border-seasalt-200/60 bg-seasalt hover:border-russian-violet/40",
-                )}
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-base font-semibold text-rich-black">{opt.label}</p>
-                    <p className="mt-1 text-base text-rich-black/70">{opt.description}</p>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-          <p className="mt-2 text-base text-rich-black/70">
-            Duration is just an estimate for scheduling. Most appointments are 1 hour. Choose 2
-            hours if you have multiple issues or complex setup needs.
-          </p>
-        </fieldset>
-
-        {/* Day Selection */}
-        <fieldset id={DAY_ANCHOR} className="min-w-0">
-          <legend className="mb-2 text-base font-semibold text-rich-black">Choose a day</legend>
-
-          {!availableDays.some((d) => d.hasAnySlots) ? (
-            <p className="text-base text-rich-black/70">
-              No availability in the next two weeks. Please call or text me
-              {phoneLink ? <> on {phoneLink}</> : " directly"}.
-            </p>
-          ) : (
-            // pt-5 reserves space above the first row for the Today/Tomorrow labels
-            // that sit fully outside their button; both are always first in date order.
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-3 pt-5">
-              {daysInOrder.map((day) => (
-                <div key={day.dateKey} className="relative">
-                  {(day.isToday || day.isTomorrow) && day.hasAnySlots && (
-                    <span className="absolute -top-5 right-0 left-0 text-center text-sm leading-5 font-bold tracking-wide text-coquelicot-600 uppercase">
-                      {day.isToday ? "Today" : "Tomorrow"}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    aria-pressed={selectedDay?.dateKey === day.dateKey}
-                    disabled={!day.hasAnySlots}
-                    onClick={() => handleDaySelect(day)}
-                    className={cn(
-                      "w-full rounded-lg border px-3 py-3 text-base font-medium whitespace-nowrap",
-                      !day.hasAnySlots && "cursor-not-allowed opacity-50",
-                      selectedDay?.dateKey === day.dateKey
-                        ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                        : day.hasAnySlots
-                          ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                          : "border-seasalt-200/40 bg-white/20 text-rich-black/60",
-                      day.isToday &&
-                        day.hasAnySlots &&
-                        "ring-2 ring-coquelicot-500/50 ring-offset-1",
-                    )}
-                  >
-                    {day.dayLabel}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </fieldset>
-
-        {/* Time Selection */}
-        {selectedDay && (
-          <fieldset id="booking-time" className="flex min-w-0 flex-col gap-3">
-            <legend className="mb-3 text-base font-semibold text-rich-black">
-              Start time for {selectedDay.fullLabel}
-            </legend>
-
-            {dayHasNoRoom ? (
-              <div className="rounded-lg border border-seasalt-200/80 bg-white/30 p-4">
-                <p className="text-base text-rich-black/70">
-                  Sorry, this day has no room for {durationText(durations[duration])}.
-                  {duration === "long" &&
-                    ` Try ${durationText(durations.short)} instead, or choose another day.`}
-                </p>
-              </div>
-            ) : (
-              <>
-                {/* Hour picker */}
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-2">
-                  {selectedDay.timeWindows.map((window) => {
-                    const available =
-                      duration === "short" ? window.availableShort : window.availableLong;
-                    const isSelected = selectedTime === window.value;
-                    return (
-                      <button
-                        key={window.value}
-                        type="button"
-                        aria-pressed={isSelected}
-                        disabled={!available}
-                        onClick={() => {
-                          setSelectedTime(window.value);
-                          clearFieldError("time");
-                          const firstAvailable = window.subSlots.find((s) =>
-                            duration === "short" ? s.availableShort : s.availableLong,
-                          );
-                          setSelectedMinute(firstAvailable?.minute ?? 0);
-                        }}
-                        className={cn(
-                          "min-h-11 rounded-lg border px-4 py-2.5 text-base font-medium",
-                          !available && "cursor-not-allowed opacity-40",
-                          isSelected
-                            ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                            : available
-                              ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                              : "border-seasalt-200/40 bg-white/30 text-rich-black/60",
-                        )}
-                      >
-                        {window.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Sub-slot picker - shown once an hour is selected */}
-                {activeWindow && (
-                  <div className="flex flex-wrap gap-2">
-                    {activeWindow.subSlots.map((sub) => {
-                      const minute = sub.minute;
-                      const available =
-                        duration === "short" ? sub.availableShort : sub.availableLong;
-                      return (
-                        <button
-                          key={minute}
-                          type="button"
-                          aria-pressed={selectedMinute === minute}
-                          disabled={!available}
-                          onClick={() => setSelectedMinute(minute)}
-                          className={cn(
-                            "min-h-11 rounded-lg border px-4 py-2 text-base font-medium",
-                            !available && "cursor-not-allowed opacity-40",
-                            selectedMinute === minute
-                              ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                              : available
-                                ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                                : "border-seasalt-200/40 bg-white/30 text-rich-black/60",
-                          )}
-                        >
-                          {subSlotLabel(activeWindow.startHour, minute)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-          </fieldset>
-        )}
-      </fieldset>
+      <BookingSchedulePicker
+        availableDays={availableDays}
+        durations={durations}
+        duration={duration}
+        onDurationChange={handleDurationChange}
+        selectedDay={selectedDay}
+        selectedTime={selectedTime}
+        selectedMinute={selectedMinute}
+        activeWindow={activeWindow}
+        timeLabel={timeLabel}
+        phoneLink={phoneLink}
+        onDaySelect={handleDaySelect}
+        onTimeSelect={handleTimeSelect}
+        onMinuteSelect={setSelectedMinute}
+      />
 
       {/* Divider */}
       <hr className="border-seasalt-200/80" />
@@ -1232,379 +798,72 @@ export default function BookingForm({
         </legend>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="booking-name" className="text-base font-semibold text-rich-black">
-              Name <span className="text-error">*</span>
-            </label>
-            <input
-              id="booking-name"
-              type="text"
-              autoComplete="name"
-              required
-              aria-required
-              maxLength={BOOKING_FIELD_LIMITS.name}
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                clearFieldError("name");
-              }}
-              onBlur={() => {
-                // Tidy casing/spacing in place (like phone formats on blur), then
-                // flag obvious non-names so the customer sees it before submit.
-                const tidied = normaliseName(name);
-                if (tidied !== name) setName(tidied);
-                if (tidied && !isPlausibleName(tidied)) {
-                  setFieldErrors((prev) => ({ ...prev, name: "Please enter your full name." }));
-                }
-              }}
-              aria-invalid={!!fieldErrors.name || undefined}
-              aria-describedby={fieldErrors.name ? "booking-name-error" : undefined}
-              className={cn(
-                "rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-                "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-                fieldErrors.name && "border-coquelicot-500/60",
-              )}
-            />
-            {fieldErrors.name && (
-              <p id="booking-name-error" className="text-sm text-error">
-                {fieldErrors.name}
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="booking-email" className="text-base font-semibold text-rich-black">
-              Email <span className="text-error">*</span>
-            </label>
-            <EmailInput
-              id="booking-email"
-              value={email}
-              onChange={(next) => {
-                setEmail(next);
-                clearFieldError("email");
-                setContactHint(null);
-                // A fresh edit invalidates any prior submit-time typo prompt.
-                setEmailSuggestion(null);
-                setEmailSuggestionAcked(false);
-              }}
-              onBlur={handleEmailBlur}
-              error={fieldErrors.email}
-              errorId="booking-email-error"
-              required
-              maxLength={BOOKING_FIELD_LIMITS.email}
-              errorMessages={{ invalid: "Please enter a valid email address." }}
-              className={cn(
-                "border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-                "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30",
-              )}
-            />
-            {contactHint && <p className="text-sm text-rich-black/70">{contactHint}</p>}
-            {emailSuggestion && (
-              <div
-                ref={emailPromptRef}
-                tabIndex={-1}
-                role="group"
-                aria-labelledby="booking-email-suggestion"
-                className="flex flex-col gap-1 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-base"
-              >
-                <span id="booking-email-suggestion" className="text-rich-black">
-                  Did you mean <strong>{emailSuggestion}</strong>?
-                </span>
-                <div className="flex flex-wrap gap-x-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail(emailSuggestion);
-                      setEmailSuggestion(null);
-                    }}
-                    className="min-h-11 font-semibold text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
-                  >
-                    Yes, use it
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmailSuggestion(null);
-                      setEmailSuggestionAcked(true);
-                    }}
-                    className="min-h-11 text-rich-black/80 underline underline-offset-2 hover:text-rich-black"
-                  >
-                    No, my email is correct
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div id="booking-phone-wrap" className="flex flex-col gap-1.5">
-          <label htmlFor="booking-phone" className="text-base font-semibold text-rich-black">
-            Phone{" "}
-            {meetingType === "in-person" ? (
-              <span className="text-error">*</span>
-            ) : (
-              <span className="text-base text-rich-black/70">(optional)</span>
-            )}
-          </label>
-          <PhoneInput
-            id="booking-phone"
-            value={phone}
+          <BookingNameField
+            value={name}
             onChange={(next) => {
-              setPhone(next);
-              clearFieldError("phone");
+              setName(next);
+              clearFieldError("name");
             }}
-            required={meetingType === "in-person"}
-            error={fieldErrors.phone}
-            errorId="booking-phone-error"
-            maxLength={BOOKING_FIELD_LIMITS.phone}
-            errorMessages={{ invalid: "Please enter a valid phone number." }}
-            className={cn(
-              "border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-              "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30",
-              "sm:max-w-sm",
-            )}
+            onNormalise={setName}
+            error={fieldErrors.name}
+            onError={(message) => setFieldErrors((prev) => ({ ...prev, name: message }))}
           />
-          {meetingType === "in-person" && (
-            <p className="text-sm text-rich-black/70">
-              Needed so I can contact you on arrival (running late, gate codes, etc.).
-            </p>
-          )}
+
+          <BookingEmailField
+            value={email}
+            onChange={(next) => {
+              setEmail(next);
+              clearFieldError("email");
+              setContactHint(null);
+              // A fresh edit invalidates any prior submit-time typo prompt.
+              setEmailSuggestion(null);
+              setEmailSuggestionAcked(false);
+            }}
+            onBlur={handleEmailBlur}
+            error={fieldErrors.email}
+            contactHint={contactHint}
+            suggestion={emailSuggestion}
+            promptRef={emailPromptRef}
+            onAcceptSuggestion={() => {
+              if (emailSuggestion) setEmail(emailSuggestion);
+              setEmailSuggestion(null);
+            }}
+            onDismissSuggestion={() => {
+              setEmailSuggestion(null);
+              setEmailSuggestionAcked(true);
+            }}
+          />
         </div>
 
-        {/* Meeting Type */}
-        <fieldset id="booking-meeting-type" className="min-w-0">
-          <legend className="mb-2 text-base font-semibold text-rich-black">
-            Meeting type <span className="text-error">*</span>
-          </legend>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2">
-            {(
-              [
-                { value: "in-person", label: "In-person" },
-                { value: "remote", label: "Remote" },
-              ] as const
-            ).map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                aria-pressed={meetingType === opt.value}
-                onClick={() => {
-                  setMeetingType(opt.value);
-                  // Phone and address requirements both hang off the meeting
-                  // type, so their errors are re-judged at the next submit.
-                  clearFieldError("meetingType");
-                  clearFieldError("phone");
-                  clearFieldError("address");
-                }}
-                className={cn(
-                  "min-h-11 rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
-                  meetingType === opt.value
-                    ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                    : "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
-                )}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </fieldset>
+        <BookingPhoneField
+          value={phone}
+          onChange={(next) => {
+            setPhone(next);
+            clearFieldError("phone");
+          }}
+          required={meetingType === "in-person"}
+          error={fieldErrors.phone}
+        />
 
-        {/* Address (only for in-person) - animated reveal */}
-        <div
-          className={cn(
-            "grid transition-[grid-template-rows,opacity] duration-300 ease-in-out",
-            meetingType === "in-person"
-              ? "grid-rows-[1fr] opacity-100"
-              : "grid-rows-[0fr] opacity-0",
-          )}
-        >
-          <div className={cn(meetingType === "in-person" ? "overflow-visible" : "overflow-hidden")}>
-            <div className="pt-0.5 pb-0.5">
-              <div className="mb-2 block text-base font-semibold text-rich-black">
-                Address <span className="text-error">*</span>
-              </div>
-              {/* Only mount when in-person so Google Maps script never loads for remote sessions */}
-              {meetingType === "in-person" && (
-                <div className="flex flex-col gap-3">
-                  {/* Street address takes the full width; the Apt/Unit box is
-                      revealed on demand below so nobody types their street
-                      number into it by mistake. */}
-                  <div className="flex flex-col gap-1">
-                    <label
-                      htmlFor="booking-address"
-                      className="text-sm font-medium text-rich-black/80"
-                    >
-                      Street address
-                    </label>
-                    <AddressAutocomplete
-                      id="booking-address"
-                      value={address}
-                      maxLength={BOOKING_FIELD_LIMITS.address}
-                      onChange={(v) => {
-                        setAddress(v);
-                        clearFieldError("address");
-                        setAddressCandidates(null);
-                        // Any keystroke invalidates the prior pick. onChange
-                        // fires before onPlaceSelected, so batching leaves
-                        // verified=true on a real pick. Skipped in fallback mode.
-                        if (!mapsFallback) {
-                          setAddressVerified(false);
-                          setAddressOverrideAcked(false);
-                        }
-                      }}
-                      onPlaceSelected={() => setAddressVerified(true)}
-                      onFallbackMode={() => {
-                        setMapsFallback(true);
-                        // No suggestions available > accept the typed address
-                        // outright; the submit-time verify (skipped in this
-                        // mode) was the only thing that would have gated it.
-                        setAddressVerified(true);
-                      }}
-                      onRecovered={() => {
-                        // Autocomplete is back - restore the verify gate.
-                        setMapsFallback(false);
-                        setAddressVerified(false);
-                        setAddressOverrideAcked(false);
-                      }}
-                      placeholder="Start typing your street address..."
-                      required
-                      aria-invalid={!!fieldErrors.address || undefined}
-                      aria-describedby={fieldErrors.address ? "booking-address-error" : undefined}
-                    />
-                    {fieldErrors.address && (
-                      <p id="booking-address-error" className="text-sm text-error">
-                        {fieldErrors.address}
-                      </p>
-                    )}
-                    {address.trim() &&
-                      !mapsFallback &&
-                      (addressVerified ? (
-                        <p
-                          className={cn(
-                            "text-sm font-medium text-green-700",
-                            "flex items-center gap-1",
-                          )}
-                        >
-                          <FaCheck className="h-4 w-4" aria-hidden /> Address verified
-                        </p>
-                      ) : (
-                        <p className="text-sm text-slate-600">
-                          Pick a suggestion from the dropdown to verify your address.
-                        </p>
-                      ))}
-                  </div>
+        <BookingMeetingTypeField
+          value={meetingType}
+          onChange={(next) => {
+            setMeetingType(next);
+            // Phone and address requirements both hang off the meeting
+            // type, so their errors are re-judged at the next submit.
+            clearFieldError("meetingType");
+            clearFieldError("phone");
+            clearFieldError("address");
+          }}
+        />
 
-                  {/* Apt/Unit: hidden until the customer says they have one. */}
-                  {showUnit ? (
-                    <div className="flex flex-col gap-1 sm:max-w-56">
-                      <div className="flex items-center justify-between gap-2">
-                        <label
-                          htmlFor="booking-unit"
-                          className="truncate text-sm font-medium text-rich-black/80"
-                        >
-                          Apt / Unit (optional)
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            // Collapse and clear so a hidden field never carries a
-                            // stale value into combineUnitAndAddress.
-                            setShowUnit(false);
-                            setUnit("");
-                            setAddressCandidates(null);
-                            setAddressOverrideAcked(false);
-                          }}
-                          // Negative margin keeps the label row compact while the
-                          // tap target still reaches 44px.
-                          className="-my-3 min-h-11 px-1 text-sm text-rich-black/70 underline underline-offset-2 hover:text-rich-black"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <input
-                        id="booking-unit"
-                        type="text"
-                        value={unit}
-                        onChange={(e) => {
-                          setUnit(e.target.value);
-                          setAddressCandidates(null);
-                          // Unit edits invalidate any prior submit-time verify
-                          // override so the new combined address gets re-checked.
-                          setAddressOverrideAcked(false);
-                        }}
-                        placeholder="e.g. 12"
-                        inputMode="text"
-                        autoComplete="off"
-                        maxLength={8}
-                        aria-describedby="booking-unit-hint"
-                        className={cn(
-                          "w-full rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-                          "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-                        )}
-                      />
-                      <p id="booking-unit-hint" className="text-sm text-slate-600">
-                        Only for apartments, units or flats - leave blank for a house.
-                      </p>
-                      {unitMatchesStreetNumber(unit, address) && (
-                        <p className="text-sm font-medium text-amber-700">
-                          That looks like your street number. If this is a standalone house, leave
-                          Apt / Unit blank.
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowUnit(true)}
-                      className="min-h-11 self-start text-left text-base font-medium text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
-                    >
-                      Live in an apartment, unit or flat? Add your unit number
-                    </button>
-                  )}
-
-                  {/* Google returned candidates for a typed address - let the
-                      customer pick; never assume when there's more than one. */}
-                  {addressCandidates && addressCandidates.length > 0 && (
-                    <div
-                      ref={addressPromptRef}
-                      tabIndex={-1}
-                      role="group"
-                      aria-labelledby="booking-address-candidates"
-                      className="flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-base"
-                    >
-                      <p id="booking-address-candidates" className="font-medium text-rich-black">
-                        {addressCandidates.length === 1
-                          ? "Did you mean this address?"
-                          : "Which address did you mean?"}
-                      </p>
-                      <div className="flex flex-col gap-1.5">
-                        {addressCandidates.map((candidate) => (
-                          <button
-                            key={candidate}
-                            type="button"
-                            onClick={() => applyAddressCandidate(candidate)}
-                            className={cn(
-                              "min-h-11 rounded-md border border-russian-violet/40 bg-white px-3 py-2 text-left text-rich-black",
-                              "hover:border-russian-violet hover:bg-russian-violet/5 focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                            )}
-                          >
-                            {candidate}
-                          </button>
-                        ))}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={keepTypedAddress}
-                        className="min-h-11 self-start text-left text-rich-black/80 underline underline-offset-2 hover:text-rich-black"
-                      >
-                        None of these - use what I typed
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <BookingAddressFields
+          state={addressState}
+          visible={meetingType === "in-person"}
+          error={fieldErrors.address}
+          onEdited={() => clearFieldError("address")}
+          promptRef={addressPromptRef}
+        />
       </fieldset>
 
       {/* Divider */}
@@ -1616,203 +875,32 @@ export default function BookingForm({
           Describe the issue
         </legend>
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="booking-notes" className="text-base font-semibold text-rich-black">
-            What do you need help with? <span className="text-error">*</span>
-          </label>
-          <textarea
-            id="booking-notes"
-            name="booking-notes-no-autofill"
-            autoComplete="new-password"
-            rows={4}
-            required
-            aria-required
-            maxLength={BOOKING_FIELD_LIMITS.notes}
-            value={notes}
-            onChange={(e) => {
-              setNotes(e.target.value);
-              clearFieldError("notes");
-            }}
-            onBlur={() => {
-              // Nudge before submit if there's some text but not enough context.
-              const trimmed = notes.trim();
-              if (trimmed && trimmed.length < BOOKING_FIELD_LIMITS.notesMin) {
-                setFieldErrors((prev) => ({
-                  ...prev,
-                  notes: `Please describe the issue in at least ${BOOKING_FIELD_LIMITS.notesMin} characters so I have enough context.`,
-                }));
-              }
-            }}
-            onPaste={(e) => {
-              // Browsers truncate silently at maxLength, so detect an over-long
-              // paste and hint that the text was trimmed. The selection range
-              // narrows the check to whatever the paste actually replaces.
-              const pasted = e.clipboardData.getData("text") ?? "";
-              const target = e.currentTarget;
-              const selectionLen = (target.selectionEnd ?? 0) - (target.selectionStart ?? 0);
-              const projected = notes.length - selectionLen + pasted.length;
-              if (projected > BOOKING_FIELD_LIMITS.notes) {
-                setPasteTrimmed(true);
-              }
-            }}
-            aria-invalid={!!fieldErrors.notes || undefined}
-            aria-describedby={fieldErrors.notes ? "booking-notes-error" : "booking-notes-counter"}
-            className={cn(
-              "rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-              "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-              fieldErrors.notes && "border-coquelicot-500/60",
-            )}
-            placeholder="e.g., Wi-Fi not working, need help with email setup, laptop running slow..."
-          />
-          <div
-            id="booking-notes-counter"
-            className="flex items-center justify-between gap-3 text-sm"
-          >
-            <span
-              className={cn(pasteTrimmed ? "text-error" : "text-rich-black/70")}
-              aria-live="polite"
-            >
-              {pasteTrimmed
-                ? `Pasted text was trimmed to fit the ${BOOKING_FIELD_LIMITS.notes}-character limit.`
-                : " "}
-            </span>
-            <span className="flex items-center gap-3">
-              {/* Clear the description + the rough estimate it produced below.
-                  The description is draft-persisted, so restored text needs a
-                  one-tap way out on mobile. */}
-              {notes !== "" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNotes("");
-                    setQuote(null);
-                    setQuoteError(null);
-                    setPasteTrimmed(false);
-                  }}
-                  aria-label="Clear the issue description"
-                  className={cn(
-                    // Negative margin: a 44px target without growing the counter row.
-                    "-my-3 min-h-11 px-1 text-sm text-rich-black/70 underline underline-offset-2",
-                    "rounded hover:text-rich-black focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                  )}
-                >
-                  Clear
-                </button>
-              )}
-              <span
-                className={cn(
-                  "tabular-nums",
-                  notes.length >= BOOKING_FIELD_LIMITS.notes - NOTES_WARN_GAP
-                    ? "font-medium text-error"
-                    : "text-rich-black/70",
-                )}
-              >
-                {notes.length} / {BOOKING_FIELD_LIMITS.notes}
-              </span>
-            </span>
-          </div>
-          {fieldErrors.notes && (
-            <p id="booking-notes-error" className="text-sm text-error">
-              {fieldErrors.notes}
-            </p>
-          )}
-        </div>
+        <BookingNotesField
+          value={notes}
+          onChange={(next) => {
+            setNotes(next);
+            clearFieldError("notes");
+          }}
+          error={fieldErrors.notes}
+          onError={(message) => setFieldErrors((prev) => ({ ...prev, notes: message }))}
+          onClear={() => {
+            setNotes("");
+            clearQuote();
+          }}
+        />
 
         {canInlineEstimate && (
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-col gap-0.5">
-              <h3 className="text-base font-semibold text-rich-black">Want a rough price first?</h3>
-              <p className="text-base text-rich-black/70">
-                Press the button for a ballpark worked out from your description. It&apos;s free,
-                takes a few seconds and doesn&apos;t book anything.
-              </p>
-              <p className="text-base text-rich-black/70">
-                Rates and travel charges are on the{" "}
-                <Link
-                  href="/pricing"
-                  target="_blank"
-                  className="font-semibold text-russian-violet underline underline-offset-2 hover:opacity-80"
-                >
-                  pricing page
-                </Link>{" "}
-                (opens in a new tab, so you won&apos;t lose what you&apos;ve typed).
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => void runInlineEstimate()}
-              disabled={estimating || !descriptionReady}
-              aria-describedby={estimateHelp ? "booking-estimate-help" : undefined}
-              className="min-h-11 self-start rounded-md border border-russian-violet/40 px-4 py-2 text-base font-semibold text-russian-violet transition-colors hover:bg-russian-violet/5 disabled:opacity-50"
-            >
-              {estimating
-                ? "Working it out..."
-                : quote
-                  ? quoteStale
-                    ? "Update the estimate"
-                    : "Estimate again"
-                  : "Get a price estimate"}
-            </button>
-            {estimateHelp && (
-              <p id="booking-estimate-help" className="text-base text-rich-black/70">
-                {estimateHelp}
-              </p>
-            )}
-            {quote && (
-              <div
-                role="status"
-                className={cn(
-                  "rounded-xl border border-russian-violet/20 bg-russian-violet/5 p-4",
-                  quoteStale && "opacity-60",
-                )}
-              >
-                {quoteStale && (
-                  <p className="mb-2 text-base font-medium text-rich-black">
-                    You&apos;ve changed some details since this estimate. Press &quot;Update the
-                    estimate&quot; to see a new one.
-                  </p>
-                )}
-                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                  <p className="text-base font-medium text-rich-black/70">Rough estimate</p>
-                  <span className="rounded-full bg-russian-violet/10 px-2.5 py-0.5 text-sm font-semibold text-russian-violet">
-                    {durationRangeText(quote.minsLow, quote.minsHigh)}
-                  </span>
-                </div>
-                <p className="mt-1 text-3xl font-extrabold text-russian-violet">
-                  {formatMoneyCompact(quote.low)} - {formatMoneyCompact(quote.high)}
-                </p>
-                {quote.travelCharge > 0 && (
-                  <p className="mt-1 text-base font-medium text-rich-black/80">
-                    + {formatMoneyCompact(quote.travelCharge)} round-trip travel
-                  </p>
-                )}
-                <p className="mt-2 text-base text-rich-black/70">
-                  This is a guide only, based on what you&apos;ve written. The final cost is
-                  confirmed with you before any work starts.
-                </p>
-                {/* Gate on the MIDDLE of the range, not its high end: a wide
-                    band like 25m-1h10m has a typical case well under an hour,
-                    and nudging those to a 2-hour visit fires on almost every
-                    estimate. Only suggest it when the likely time runs over. */}
-                {duration === "short" && (quote.minsLow + quote.minsHigh) / 2 > 60 && (
-                  <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-400/50 bg-amber-50 p-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-base text-rich-black/80">
-                      This looks like it might take around 2 hours. You can book a 2-hour visit so
-                      the time is set aside.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => handleDurationChange("long")}
-                      className="min-h-11 self-start rounded-md bg-russian-violet px-4 py-2 text-base font-semibold text-white hover:bg-russian-violet/90 sm:shrink-0 sm:self-auto"
-                    >
-                      Book 2 hours
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            {quoteError && <p className="text-base text-error">{quoteError}</p>}
-          </div>
+          <BookingEstimatePanel
+            estimating={estimating}
+            descriptionReady={descriptionReady}
+            estimateHelp={estimateHelp}
+            quote={quote}
+            quoteStale={quoteStale}
+            quoteError={quoteError}
+            duration={duration}
+            onEstimate={() => void runInlineEstimate()}
+            onBookLong={() => handleDurationChange("long")}
+          />
         )}
 
         {/* Outside the estimate block on purpose: a code changes what the job
@@ -1838,139 +926,23 @@ export default function BookingForm({
           />
         )}
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="booking-access-notes" className="text-base font-semibold text-rich-black">
-            Anything else I should know for the visit?{" "}
-            <span className="font-normal text-rich-black/70">(optional)</span>
-          </label>
-          <p id="booking-access-notes-hint" className="text-base text-rich-black/70">
-            Parking, directions, gate or door codes, pets, or the best way in.
-          </p>
-          <textarea
-            id="booking-access-notes"
-            name="booking-access-notes-no-autofill"
-            autoComplete="off"
-            rows={3}
-            maxLength={BOOKING_FIELD_LIMITS.accessNotes}
-            value={accessNotes}
-            onChange={(e) => setAccessNotes(e.target.value)}
-            aria-describedby="booking-access-notes-hint booking-access-notes-counter"
-            className={cn(
-              "rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-              "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-            )}
-            placeholder="e.g., Park on the street, the driveway is steep. Side gate is unlocked. Friendly dog."
-          />
-          <p
-            id="booking-access-notes-counter"
-            className={cn(
-              "self-end text-sm tabular-nums",
-              accessNotes.length >= BOOKING_FIELD_LIMITS.accessNotes - NOTES_WARN_GAP
-                ? "font-medium text-error"
-                : "text-rich-black/70",
-            )}
-          >
-            {accessNotes.length} / {BOOKING_FIELD_LIMITS.accessNotes}
-          </p>
-        </div>
+        <BookingAccessNotesField value={accessNotes} onChange={setAccessNotes} />
       </fieldset>
 
-      {/* Booking summary - live recap of what's selected so the user can see
-          their choices before submit. */}
-      {(() => {
-        const durationLabel = durationOptions.find((d) => d.value === duration)?.label ?? null;
-        const combinedAddress =
-          meetingType === "in-person" ? combineUnitAndAddress(unit, address) : "";
-        return (
-          <section
-            aria-label="Your appointment so far"
-            className="flex flex-col gap-2 rounded-lg border border-moonstone-500/30 bg-moonstone-400/5 p-4"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <h3 className="text-base font-bold text-russian-violet sm:text-lg">
-                Your appointment
-              </h3>
-              {draftRestored && (
-                <button
-                  type="button"
-                  onClick={clearDraft}
-                  className={cn(
-                    // Negative margin: a 44px target without pushing the heading down.
-                    "-my-2.5 min-h-11 px-1 text-sm text-rich-black/70 underline underline-offset-2",
-                    "rounded hover:text-rich-black focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                  )}
-                >
-                  Clear form
-                </button>
-              )}
-            </div>
-            <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1.5 text-base">
-              <dt className="text-rich-black/60">Length</dt>
-              <dd className="text-rich-black">
-                {durationLabel ?? <span className="text-rich-black/50">—</span>}
-              </dd>
-
-              <dt className="text-rich-black/60">Date</dt>
-              <dd className="text-rich-black">
-                {selectedDay ? (
-                  selectedDay.fullLabel
-                ) : (
-                  <span className="text-rich-black/50">—</span>
-                )}
-              </dd>
-
-              <dt className="text-rich-black/60">Time</dt>
-              <dd className="text-rich-black">
-                {timeLabel ? timeLabel : <span className="text-rich-black/50">—</span>}
-              </dd>
-
-              <dt className="text-rich-black/60">Meeting</dt>
-              <dd className="text-rich-black capitalize">
-                {meetingType ? (
-                  meetingType.replace("-", " ")
-                ) : (
-                  <span className="text-rich-black/50">—</span>
-                )}
-              </dd>
-
-              {meetingType === "in-person" && (
-                <>
-                  <dt className="text-rich-black/60">Address</dt>
-                  <dd className="wrap-break-word text-rich-black">
-                    {combinedAddress.trim() ? (
-                      combinedAddress
-                    ) : (
-                      <span className="text-rich-black/50">—</span>
-                    )}
-                  </dd>
-                </>
-              )}
-
-              {/* Contact details read back so a typo (wrong email/phone) is
-                  visible before submit - the cheapest catch for a mistyped
-                  address that would otherwise send the confirmation nowhere. */}
-              {name.trim() && (
-                <>
-                  <dt className="text-rich-black/60">Name</dt>
-                  <dd className="wrap-break-word text-rich-black">{name}</dd>
-                </>
-              )}
-              {email.trim() && (
-                <>
-                  <dt className="text-rich-black/60">Email</dt>
-                  <dd className="wrap-break-word text-rich-black">{email}</dd>
-                </>
-              )}
-              {phone.trim() && (
-                <>
-                  <dt className="text-rich-black/60">Phone</dt>
-                  <dd className="wrap-break-word text-rich-black">{phone}</dd>
-                </>
-              )}
-            </dl>
-          </section>
-        );
-      })()}
+      <BookingSummaryCard
+        durationLabel={
+          buildDurationOptions(durations).find((d) => d.value === duration)?.label ?? null
+        }
+        dayLabel={selectedDay?.fullLabel ?? null}
+        timeLabel={timeLabel}
+        meetingType={meetingType}
+        combinedAddress={meetingType === "in-person" ? combineUnitAndAddress(unit, address) : ""}
+        name={name}
+        email={email}
+        phone={phone}
+        draftRestored={draftRestored}
+        onClearDraft={clearDraft}
+      />
 
       {/* Cancellation / rescheduling policy - keeps expectations clear so a
           customer who later wants to change their booking knows it's easy. */}
@@ -1980,117 +952,27 @@ export default function BookingForm({
       </p>
 
       {/* Submit */}
-      <div ref={errorSummaryRef} tabIndex={-1} className="flex flex-col gap-8 empty:hidden">
-        {slotStale && (
-          <div
-            role="alert"
-            className={cn(
-              "rounded-md border border-coquelicot-500/40 bg-coquelicot-50 p-4",
-              "flex flex-col gap-2",
-            )}
-          >
-            <p className="text-base font-medium text-error">
-              That time slot was just taken by another customer.
-            </p>
-            <p className="text-base text-rich-black/70">
-              Tap below to load the up-to-date availability - your form details will stay where they
-              are.
-            </p>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setSlotStale(false);
-                router.refresh();
-              }}
-            >
-              Refresh available times
-            </Button>
-          </div>
-        )}
-        {attention && fieldErrorKeys.length > 0 && (
-          <div
-            role="alert"
-            className="rounded-md border border-coquelicot-500/50 bg-coquelicot-500/10 p-4 text-rich-black"
-          >
-            <p className="text-base font-semibold">Please fix the following:</p>
-            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-base">
-              {Object.keys(FIELD_ANCHORS)
-                .filter((key) => fieldErrors[key])
-                .map((key) => (
-                  <li key={key}>
-                    <a
-                      href={`#${FIELD_ANCHORS[key]}`}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        focusField(key);
-                      }}
-                      className="underline"
-                    >
-                      {fieldErrors[key]}
-                    </a>
-                  </li>
-                ))}
-            </ul>
-          </div>
-        )}
-        {error && (
-          <p className="text-base font-medium text-error" role="alert">
-            {error}
-            {phoneLink && <> Having trouble? Call or text me on {phoneLink}.</>}
-          </p>
-        )}
-      </div>
+      <BookingErrorSummary
+        ref={errorSummaryRef}
+        slotStale={slotStale}
+        onRefreshSlots={() => {
+          setSlotStale(false);
+          router.refresh();
+        }}
+        showFieldErrors={attention !== null}
+        fieldErrors={fieldErrors}
+        error={error}
+        phoneLink={phoneLink}
+      />
 
-      {/* Submit band: sticky to the viewport bottom on mobile so users on a
-          long form never lose sight of the action; inline on >=sm. */}
-      <div
-        className={cn(
-          "sticky bottom-0 -mx-5 flex flex-wrap items-center gap-4 border-t",
-          "border-seasalt-200/80 bg-seasalt/90 px-5 py-3 backdrop-blur-md",
-          "sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none",
-        )}
-      >
-        <Button
-          type="submit"
-          variant="secondary"
-          size="md"
-          aria-busy={submitting}
-          disabled={submitting || !availableDays.some((d) => d.hasAnySlots)}
-        >
-          {submitting
-            ? isEditMode
-              ? "Saving..."
-              : "Sending..."
-            : isEditMode
-              ? "Save changes"
-              : "Submit request"}
-        </Button>
-        {attention && firstErrorKey && (
-          <a
-            href={`#${FIELD_ANCHORS[firstErrorKey] ?? FIELD_ANCHORS.duration}`}
-            onClick={(e) => {
-              e.preventDefault();
-              focusField(firstErrorKey);
-            }}
-            className="inline-flex min-h-11 items-center text-base font-medium text-error underline sm:hidden"
-          >
-            {fieldErrorKeys.length} issue
-            {fieldErrorKeys.length === 1 ? "" : "s"} - tap to review
-          </a>
-        )}
-        {isEditMode && cancelToken && (
-          <Button
-            href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}
-            variant="ghost"
-            size="md"
-            disabled={submitting}
-          >
-            Cancel booking instead
-          </Button>
-        )}
-      </div>
+      <BookingSubmitBar
+        submitting={submitting}
+        isEditMode={isEditMode}
+        noSlots={!availableDays.some((d) => d.hasAnySlots)}
+        showIssuesLink={attention !== null}
+        fieldErrors={fieldErrors}
+        cancelToken={cancelToken}
+      />
     </form>
   );
 }

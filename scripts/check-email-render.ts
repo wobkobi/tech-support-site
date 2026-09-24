@@ -9,18 +9,18 @@
 // sends throw "incrementalCache missing" outside the server. The preview routes cover
 // those (/api/admin/preview-review-email, /api/business/invoices/[id]/preview-email).
 //
-// --conditions is required, not optional: email.ts reaches pricing-policy.server.ts,
+// --conditions is required, not optional: email-booking.ts reaches pricing-policy.server.ts,
 // which imports `server-only` - a package that throws on the default condition and is
 // empty under `react-server`, the condition Next builds with.
 // Run with:
 //   npx dotenv -e .env.local -- tsx --conditions=react-server scripts/check-email-render.ts
 
+import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
+import { sendOwnerBookingNotification } from "@/features/reviews/lib/email-booking";
 import {
   sendBusinessEnquiryNotification,
-  sendOwnerBookingNotification,
-  sendOwnerReviewNotification,
   type BusinessEnquiryData,
-} from "@/features/reviews/lib/email";
+} from "@/features/reviews/lib/email-enquiry";
 
 // Read inside the send functions rather than at module load, so setting them
 // here still takes effect despite import hoisting. A fake key is a second line

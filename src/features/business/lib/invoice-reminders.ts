@@ -3,7 +3,10 @@
 // the apology for a reminder that chased an already-paid invoice.
 
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
-import { sendInvoiceReminderEmail, sendPaymentApologyEmail } from "@/features/reviews/lib/email";
+import {
+  sendInvoiceReminderEmail,
+  sendPaymentApologyEmail,
+} from "@/features/reviews/lib/email-invoice";
 import { prisma } from "@/shared/lib/prisma";
 import type { Invoice as PrismaInvoice } from "@prisma/client";
 

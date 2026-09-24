@@ -22,7 +22,7 @@ import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import type { LineItem } from "@/features/business/types/business";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
-import { sendInvoiceEmail } from "@/features/reviews/lib/email";
+import { sendInvoiceEmail } from "@/features/reviews/lib/email-invoice";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
 import { Prisma, type Booking, type Invoice } from "@prisma/client";

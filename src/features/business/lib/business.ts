@@ -1,9 +1,12 @@
 // src/features/business/lib/business.ts
-// Core business calculation and display helpers - NZD/date formatting, GST extraction,
-// billable-minute and hourly-rate maths, job-to-line-item building, invoice totals, and
-// admin minute-count display. Shared by the calculator, invoice, ledger, and admin
+// Core business calculation helpers - billable-minute and hourly-rate maths, travel
+// totals, job-to-line-item building, promo discounts and job totals. Also the stable
+// public entry for the display helpers (business-format.ts), task-timing maths
+// (task-timing.ts) and invoice/GST/ledger helpers (invoice-maths.ts), re-exported below
+// so importers keep one path. Shared by the calculator, invoice, ledger, and admin
 // booking views.
 
+import { calcGstFromInclusive, calcInvoiceTotals } from "@/features/business/lib/invoice-maths";
 import {
   BILLING_INCREMENT_MINS,
   GST_RATE,
@@ -11,15 +14,50 @@ import {
   MIN_BILLABLE_MINS,
 } from "@/features/business/lib/pricing-policy";
 import { promoForSpend, type PromoTierValues } from "@/features/business/lib/promo-tiers";
+import {
+  collapseToWindow,
+  enforceMinBillable,
+  explicitRoundingAllowanceMins,
+  isHourlyTask,
+  TASK_TIMING_FALLBACK,
+  type TaskTimingConfig,
+} from "@/features/business/lib/task-timing";
 import type {
   JobCalculation,
   LineItem,
   RateConfig,
-  TaskLine,
   TravelEntry,
 } from "@/features/business/types/business";
-import { formatDateSlash } from "@/shared/lib/date-format";
-import { nzTodayKey, timeParts } from "@/shared/lib/timezone-utils";
+import { timeParts } from "@/shared/lib/timezone-utils";
+
+export {
+  composeDescription,
+  formatBilledTime,
+  formatMins,
+  formatMoneyCompact,
+  formatNZD,
+  lineItemQtyLabel,
+  minsToHoursLabel,
+  todayISO,
+} from "@/features/business/lib/business-format";
+export {
+  advanceNextDue,
+  buildIncomeDescription,
+  calcGstFromInclusive,
+  calcInvoiceTotals,
+  isValidLineItem,
+  nextInvoiceNumber,
+  splitGstInclusive,
+} from "@/features/business/lib/invoice-maths";
+export {
+  collapseToWindow,
+  enforceMinBillable,
+  explicitRoundingAllowanceMins,
+  hourlyTaskMinutes,
+  TASK_TIMING_FALLBACK,
+  taskMinutes,
+  type TaskTimingConfig,
+} from "@/features/business/lib/task-timing";
 
 /**
  * Minimum travel cost (NZD) below which a calculated travel charge is
@@ -27,168 +65,6 @@ import { nzTodayKey, timeParts } from "@/shared/lib/timezone-utils";
  * The travelInfo is still surfaced in the UI so the operator can add it manually.
  */
 export const MIN_TRAVEL_CHARGE = 10;
-
-/**
- * Formats a number as NZD currency string with the sign before the dollar.
- * @param amount - Amount in dollars (positive or negative).
- * @returns Formatted currency string (e.g. "$1,234.56" or "-$1,234.56").
- */
-export function formatNZD(amount: number): string {
-  const sign = amount < 0 ? "-" : "";
-  const body = Math.abs(amount)
-    .toFixed(2)
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return `${sign}$${body}`;
-}
-
-/**
- * Money for customer-facing prose: whole dollars stay whole ("$65"), cents
- * appear only when they exist ("$7.50"). {@link formatNZD} always prints cents,
- * which reads wrong in a rate like "$65.00/hr", while bare arithmetic prints
- * "$7.5", which is not a price.
- * @param amount - Dollar amount.
- * @returns The formatted amount.
- */
-export function formatMoneyCompact(amount: number): string {
-  return Number.isInteger(amount) ? `$${amount}` : formatNZD(amount);
-}
-
-/**
- * Formats a minute count as a compact "Xh Ym" string for admin display.
- * @param mins - Minutes (non-negative integer).
- * @returns "45 min" / "1h" / "1h 30m".
- */
-export function formatMins(mins: number): string {
-  if (mins < 60) return `${mins} min`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m === 0 ? `${h}h` : `${h}h ${m}m`;
-}
-
-/**
- * Returns today's date as a YYYY-MM-DD string in NZ (Pacific/Auckland) time.
- * The ledger/invoice forms that default to "today" run for a NZ operator, and
- * UTC would show yesterday every NZ morning.
- * @returns ISO date string for today in NZ.
- */
-export function todayISO(): string {
-  return nzTodayKey();
-}
-
-/**
- * Extracts GST from a GST-inclusive amount.
- * @param amountIncl - Amount including GST
- * @param gstRate - GST rate as a decimal (e.g. 0.15)
- * @returns GST component, rounded to 2 decimal places
- */
-export function calcGstFromInclusive(amountIncl: number, gstRate: number): number {
-  return Math.round(((amountIncl * gstRate) / (1 + gstRate)) * 100) / 100;
-}
-
-/**
- * Splits a GST-inclusive amount into its GST component and GST-exclusive base.
- * Both ledger writers and the subscription recorders need the pair, and deriving
- * `amountExcl` separately is where the two drifted apart.
- * @param amountIncl - Amount including GST.
- * @param gstRate - GST rate as a decimal (e.g. 0.15).
- * @returns GST component and exclusive base, each rounded to 2 decimal places.
- */
-export function splitGstInclusive(
-  amountIncl: number,
-  gstRate: number,
-): { gstAmount: number; amountExcl: number } {
-  const gstAmount = calcGstFromInclusive(amountIncl, gstRate);
-  return { gstAmount, amountExcl: Math.round((amountIncl - gstAmount) * 100) / 100 };
-}
-
-/**
- * Invoice totals with an optional discount. GST mode is driven by
- * {@link GST_REGISTERED} in pricing-policy.ts. When false (today), gstAmount=0;
- * when true (future), gstAmount is back-calculated from the inclusive
- * total via {@link calcGstFromInclusive} and total stays equal to taxableAmount
- * (GST is already inside the displayed price). Discount is subtracted
- * before GST is computed, matching IRD's price-reduction treatment.
- * @param lineItems - Array of line items with qty and unit price.
- * @param promoDiscount - Optional dollar discount (e.g. from a promo snapshot).
- * @param gstRegistered - Live GST-registration flag (defaults to the constant).
- * @returns Subtotal (gross), GST amount, and total (post-discount, post-GST).
- */
-export function calcInvoiceTotals(
-  lineItems: { qty: number; unitPrice: number }[],
-  promoDiscount = 0,
-  gstRegistered: boolean = GST_REGISTERED,
-): { subtotal: number; gstAmount: number; total: number } {
-  // Round EACH line before summing, matching the lineTotal jobToLineItems stores and the
-  // PDF prints. Summing unrounded lets the Total column disagree with the Subtotal under
-  // it: two 35-min lines at $65/hr print $37.92 each but sum to $75.83, not $75.84.
-  const subtotal =
-    Math.round(
-      lineItems.reduce((sum, item) => sum + Math.round(item.qty * item.unitPrice * 100) / 100, 0) *
-        100,
-    ) / 100;
-  const taxableAmount = Math.max(0, Math.round((subtotal - promoDiscount) * 100) / 100);
-  const gstAmount = gstRegistered ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
-  return {
-    subtotal,
-    gstAmount,
-    total: taxableAmount,
-  };
-}
-
-/**
- * Every key a persisted line item may carry. Must match the Prisma `LineItem`
- * composite type exactly: Prisma rejects a composite field it doesn't declare,
- * and an unguarded extra key turns that into a 500 on invoice create/update.
- * Rejecting here fails loudly as a 400 instead, and surfaces the mismatch in
- * local dev rather than in production.
- */
-const LINE_ITEM_FIELDS = new Set(["description", "qty", "unitPrice", "lineTotal", "minutes"]);
-
-/**
- * Validates one untrusted line-item payload before it reaches
- * {@link calcInvoiceTotals} or the database. Rejects non-object items, blank
- * descriptions, non-finite numerics (which would otherwise yield NaN totals or a
- * malformed persisted invoice), and any key outside {@link LINE_ITEM_FIELDS}.
- * @param item - Candidate line item from a request body.
- * @returns True when the item carries only known fields, a non-empty description, finite qty, unit price and line total, and minutes either absent or finite.
- */
-export function isValidLineItem(item: unknown): item is LineItem {
-  if (!item || typeof item !== "object") return false;
-  if (!Object.keys(item).every((key) => LINE_ITEM_FIELDS.has(key))) return false;
-  const { description, qty, unitPrice, lineTotal, minutes } = item as Record<string, unknown>;
-  return (
-    typeof description === "string" &&
-    description.trim().length > 0 &&
-    typeof qty === "number" &&
-    Number.isFinite(qty) &&
-    typeof unitPrice === "number" &&
-    Number.isFinite(unitPrice) &&
-    typeof lineTotal === "number" &&
-    Number.isFinite(lineTotal) &&
-    (minutes == null || (typeof minutes === "number" && Number.isFinite(minutes)))
-  );
-}
-
-/**
- * Generates the next sequential invoice number in TTP-YYYY-XXXX format.
- * @param lastNumber - Last used invoice number, or null for first
- * @param yearCode - Financial year code (e.g. "2627")
- * @param prefix - Invoice prefix (default "TTP")
- * @returns Next formatted invoice number
- */
-export function nextInvoiceNumber(
-  lastNumber: string | null,
-  yearCode: string,
-  prefix: string = "TTP",
-): string {
-  if (!lastNumber) return `${prefix}-${yearCode}-0001`;
-  // Match 4+ trailing digits so a 5-digit counter (10000+) still increments
-  // instead of silently restarting the sequence at 0001.
-  const match = lastNumber.match(/-(\d{4,})$/);
-  if (!match) return `${prefix}-${yearCode}-0001`;
-  const next = parseInt(match[1] ?? "", 10) + 1;
-  return `${prefix}-${yearCode}-${String(next).padStart(4, "0")}`;
-}
 
 /**
  * Rounds a duration to the nearest {@link BILLING_INCREMENT_MINS} slot. Symmetric
@@ -237,361 +113,6 @@ export function travelEntriesTotal(entries: TravelEntry[]): number {
 }
 
 /**
- * Total minutes contributed by hourly tasks. Flat-rate tasks (Travel, etc.)
- * carry no time so they're excluded.
- * @param tasks - Task lines from the calculator.
- * @returns Sum of hourly task minutes (`qty * 60`).
- */
-export function hourlyTaskMinutes(tasks: TaskLine[]): number {
-  return tasks.filter((t) => t.baseRateId != null).reduce((sum, t) => sum + t.qty * 60, 0);
-}
-
-/**
- * Overshoot allowance for operator-stated tasks: each explicit task's stated
- * duration rounds UP to the snap grid, so pinned tasks can exceed the raw
- * window by one step apiece. Overshoot within this allowance is rounding, not
- * an over-estimate to rebalance or warn on.
- * @param tasks - Task lines to assess.
- * @param snapMins - Live billing increment in minutes; defaults to the code fallback.
- * @returns Allowance in minutes (explicit hourly task count * snap step).
- */
-export function explicitRoundingAllowanceMins(
-  tasks: TaskLine[],
-  snapMins: number = TASK_TIMING_FALLBACK.snapMins,
-): number {
-  return tasks.filter((t) => t.baseRateId != null && t.isExplicit).length * snapMins;
-}
-
-/**
- * Live task-timing values threaded in from pricing settings. Every consumer
- * reads the operator's settings; {@link TASK_TIMING_FALLBACK} is the in-code
- * default only, so editing Settings changes the apportionment everywhere.
- */
-export interface TaskTimingConfig {
-  /** Rounding granularity for task qty; the live `billingIncrementMins`. */
-  snapMins: number;
-  /** Minutes an `isShort` task is pinned to; the live `shortTaskMins`. */
-  shortTaskMins: number;
-  /** Minutes a floating task can shrink to before it's dropped; the live `minTaskMins`. */
-  minTaskMins: number;
-}
-
-/**
- * Fallbacks matching the settings defaults. Literals rather than reads of
- * BILLING_INCREMENT_MINS et al: importing those here re-introduces a
- * circular-import TDZ with the pricing-policy module.
- */
-export const TASK_TIMING_FALLBACK: TaskTimingConfig = {
-  snapMins: 5,
-  shortTaskMins: 15,
-  minTaskMins: 5,
-};
-
-/**
- * Fits task lines to the listed job window, in both directions.
- * Pinned tasks (isShort or isExplicit) keep their parser-emitted qty - short
- * tasks at the live `shortTaskMins`, explicit tasks at whatever the operator
- * stated, with a one-snap-step-per-task overshoot allowance (see
- * {@link explicitRoundingAllowanceMins}) before an explicit task is dropped
- * for not fitting. The remaining floating tasks scale proportionally to fill what's
- * left of the window, so an over-long primary task absorbs more of the
- * correction than a correctly-sized one. Floating tasks that would scale
- * below the live `minTaskMins` are dropped, then the rest rescale. Snaps
- * qty to the live billing increment and parks any rounding remainder on the
- * largest floating survivor so totals match exactly. Flat-rate tasks pass through.
- * @param tasks - Task lines to collapse.
- * @param windowMin - Target window in minutes (`durationMins`).
- * @param timing - Live task-timing settings; defaults to {@link TASK_TIMING_FALLBACK}.
- * @returns Adjusted task list, count of dropped tasks, and whether any qty was rescaled.
- */
-export function collapseToWindow(
-  tasks: TaskLine[],
-  windowMin: number,
-  timing: TaskTimingConfig = TASK_TIMING_FALLBACK,
-): { tasks: TaskLine[]; dropped: number; rescaled: boolean } {
-  if (windowMin <= 0) return { tasks, dropped: 0, rescaled: false };
-  const hourlyIn = tasks.filter((t) => t.baseRateId != null);
-  const flat = tasks.filter((t) => t.baseRateId == null);
-  if (hourlyIn.length === 0) return { tasks, dropped: 0, rescaled: false };
-
-  // The classification below splits tasks into short / explicit / floating groups, so the
-  // survivors have to be restored to the operator's order - otherwise a quick task leads
-  // the invoice and the main work sinks. Clones carry their position via {@link derive}.
-  const orderOf = new Map<TaskLine, number>();
-  tasks.forEach((t, i) => orderOf.set(t, i));
-  /**
-   * {@link withMinutes} that carries the source task's input position onto the
-   * clone, so {@link inInputOrder} can still place it.
-   * @param task - Source task line.
-   * @param mins - New duration in minutes.
-   * @returns Updated task line, registered at the source task's position.
-   */
-  const derive = (task: TaskLine, mins: number): TaskLine => {
-    const next = withMinutes(task, mins);
-    orderOf.set(next, orderOf.get(task) ?? 0);
-    return next;
-  };
-  /**
-   * Restores input order across the classification groups.
-   * @param list - Surviving task lines in group order.
-   * @returns The same lines ordered as the operator listed them.
-   */
-  const inInputOrder = (list: TaskLine[]): TaskLine[] =>
-    [...list].sort((a, b) => (orderOf.get(a) ?? 0) - (orderOf.get(b) ?? 0));
-
-  const hourlyMin = sumTaskMinutes(hourlyIn);
-
-  // Exactly right - nothing to move in either direction.
-  if (hourlyMin === windowMin) {
-    return { tasks, dropped: 0, rescaled: false };
-  }
-
-  // Short of the window. The event end is the actual finish, so the difference
-  // is real time on the job that the parsed durations did not account for -
-  // typically because a description rounds to "an hour and a half". Grown to
-  // meet the window, mirroring how an overflow is scaled down to match it
-  // exactly; leaving it would quietly bill less than the job took.
-  if (hourlyMin < windowMin) {
-    const floatingUp = hourlyIn.filter((t) => !t.isShort && !t.isExplicit);
-    let grown: TaskLine[];
-    if (floatingUp.length > 0) {
-      // Floating tasks carry no stated duration, so they absorb the difference
-      // first and pinned ones keep the operator's own measurement.
-      const pinned = hourlyIn.filter((t) => t.isShort || t.isExplicit);
-      const target = windowMin - sumTaskMinutes(pinned);
-      const multiplier = target / sumTaskMinutes(floatingUp);
-      grown = [
-        ...pinned,
-        ...floatingUp.map((t) =>
-          derive(t, snapMinutes(taskMinutes(t) * multiplier, timing.snapMins)),
-        ),
-      ];
-    } else {
-      // Every task is pinned. The largest line takes the remainder, which is the
-      // one case where a stated duration is overridden - preferred to billing
-      // under the window, since the window is what the job actually ran.
-      grown = [...hourlyIn];
-    }
-    // Park what the snap grid left over on the largest adjustable line, so the
-    // billed total lands on the window exactly - the same reconciliation the
-    // collapse path below does.
-    const adjustable =
-      floatingUp.length > 0 ? grown.filter((t) => !t.isShort && !t.isExplicit) : grown;
-    const error = windowMin - sumTaskMinutes(grown);
-    if (error !== 0 && adjustable.length > 0) {
-      let biggest = adjustable[0]!;
-      for (const t of adjustable) if (taskMinutes(t) > taskMinutes(biggest)) biggest = t;
-      grown[grown.indexOf(biggest)] = derive(
-        biggest,
-        Math.max(timing.minTaskMins, taskMinutes(biggest) + error),
-      );
-    }
-    return { tasks: inInputOrder([...grown, ...flat]), dropped: 0, rescaled: true };
-  }
-
-  // Pin short tasks at the operator's quick-task time and drop any that don't fit.
-  // isExplicit beats isShort - a stated duration is the operator's own measurement, so it
-  // keeps its qty. The parser emits the flags exclusive; this is the guard.
-  const short: TaskLine[] = hourlyIn
-    .filter((t) => t.isShort && !t.isExplicit)
-    .map((t) => derive(t, timing.shortTaskMins));
-  let dropped = 0;
-  while (short.length * timing.shortTaskMins > windowMin) {
-    short.pop();
-    dropped++;
-  }
-
-  // Explicit tasks keep their parser-emitted qty. Stated durations round UP to
-  // the snap grid, so tolerate one step of overshoot per explicit task; drop
-  // (newest first) only genuine overflow beyond that.
-  const explicit: TaskLine[] = hourlyIn.filter((t) => t.isExplicit);
-  const shortMin = short.length * timing.shortTaskMins;
-  while (
-    explicit.length > 0 &&
-    shortMin + sumTaskMinutes(explicit) > windowMin + explicit.length * timing.snapMins
-  ) {
-    explicit.pop();
-    dropped++;
-  }
-  const pinnedMin = shortMin + sumTaskMinutes(explicit);
-
-  let floating: TaskLine[] = hourlyIn.filter((t) => !t.isShort && !t.isExplicit);
-  const remainingMin = windowMin - pinnedMin;
-
-  if (floating.length === 0) {
-    // Nothing floating: pinned tasks stand as-is, so only report a rescale
-    // when something was actually dropped - otherwise the caller would toast
-    // "Rebalanced tasks" over an untouched list.
-    return {
-      tasks: inInputOrder([...short, ...explicit, ...flat]),
-      dropped,
-      rescaled: dropped > 0,
-    };
-  }
-
-  if (remainingMin <= 0) {
-    // Pinned tasks already cover the whole window; drop every floating one.
-    dropped += floating.length;
-    return {
-      tasks: inInputOrder([...short, ...explicit, ...flat]),
-      dropped,
-      rescaled: true,
-    };
-  }
-
-  // Scale floating tasks proportionally to fill remainingMin; drop tasks that
-  // would land below the operator's smallest-task time and rescale until
-  // everything fits.
-  while (floating.length > 0) {
-    const sum = sumTaskMinutes(floating);
-    if (sum <= remainingMin) break;
-    const multiplier = remainingMin / sum;
-    const scaled = floating.map((t) => ({ task: t, scaledMin: t.qty * 60 * multiplier }));
-    const tooSmall = scaled.filter((s) => s.scaledMin < timing.minTaskMins);
-    if (tooSmall.length === 0) {
-      floating = scaled.map((s) => derive(s.task, snapMinutes(s.scaledMin, timing.snapMins)));
-      break;
-    }
-    scaled.sort((a, b) => a.scaledMin - b.scaledMin);
-    const removed = scaled[0]!.task;
-    floating = floating.filter((t) => t !== removed);
-    dropped++;
-  }
-
-  // Park rounding remainder on the largest floating survivor so totals match.
-  const combined = [...short, ...explicit, ...floating];
-  if (combined.length > 0) {
-    const error = windowMin - sumTaskMinutes(combined);
-    if (error !== 0 && floating.length > 0) {
-      let biggestIdx = 0;
-      for (let i = 1; i < floating.length; i++) {
-        if (floating[i]!.qty > floating[biggestIdx]!.qty) biggestIdx = i;
-      }
-      const winner = floating[biggestIdx]!;
-      const adjustedMin = Math.max(timing.minTaskMins, winner.qty * 60 + error);
-      floating[biggestIdx] = derive(winner, adjustedMin);
-    }
-  }
-
-  return {
-    tasks: inInputOrder([...short, ...explicit, ...floating, ...flat]),
-    dropped,
-    rescaled: true,
-  };
-}
-
-/**
- * Rounds a minute value to the nearest task-qty snap step.
- * @param mins - Raw minutes.
- * @param snapMins - Live billing increment in minutes; defaults to the code fallback.
- * @returns Minutes rounded to the nearest snap step.
- */
-function snapMinutes(mins: number, snapMins: number = TASK_TIMING_FALLBACK.snapMins): number {
-  return Math.round(mins / snapMins) * snapMins;
-}
-
-/**
- * A task's billed minutes. Prefers the authoritative `minutes`, falling back to
- * the decimal-hour `qty` for rows that predate it (manual flat lines, legacy
- * drafts).
- * @param task - Task line.
- * @returns Billed minutes.
- */
-export function taskMinutes(task: TaskLine): number {
-  return task.minutes ?? task.qty * 60;
-}
-
-/**
- * Total minutes across the given task lines.
- * @param arr - Task lines.
- * @returns Sum of minute durations.
- */
-function sumTaskMinutes(arr: TaskLine[]): number {
-  return arr.reduce((s, t) => s + taskMinutes(t), 0);
-}
-
-/**
- * Returns a clone of `task` billed for `mins` whole minutes.
- *
- * `minutes` is the authoritative figure; `qty` is it in hours, deliberately
- * NOT rounded to 2 dp. Two decimals cannot represent a 5-minute grid - only
- * 15/30/45/60 land exactly - so rounding here is what used to make a 140-minute
- * job bill 139.8 or 140.4 and never 140. Carrying full precision keeps
- * `qty * unitPrice` exact everywhere it is summed.
- * @param task - Source task line.
- * @param mins - New duration in minutes; rounded to a whole minute.
- * @returns Updated task line.
- */
-function withMinutes(task: TaskLine, mins: number): TaskLine {
-  const minutes = Math.round(mins);
-  const qty = minutes / 60;
-  return {
-    ...task,
-    minutes,
-    qty,
-    lineTotal: Math.round(qty * task.unitPrice * 100) / 100,
-  };
-}
-
-/**
- * Formats billed time for an invoice's quantity column as h:mm ("2:20", "0:45").
- * Chosen over decimal hours because the column then visibly sums to the session
- * length, and over a bare minute count because nothing invites a reader to
- * multiply it by the hourly rate.
- * @param mins - Billed minutes.
- * @returns h:mm string.
- */
-export function formatBilledTime(mins: number): string {
-  const whole = Math.max(0, Math.round(mins));
-  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
-}
-
-/**
- * Quantity column text for one invoice line: h:mm for hourly labour, the plain
- * count for flat rows (travel, parts, a surcharge) and for invoices issued
- * before minutes were recorded.
- * @param item - Invoice line item.
- * @param item.qty - Decimal quantity (hours on labour rows, a count on flat rows).
- * @param item.minutes - Billed minutes; present only on hourly labour rows. Null on rows Prisma read back without the field.
- * @returns Text for the Qty cell.
- */
-export function lineItemQtyLabel(item: { qty: number; minutes?: number | null }): string {
-  return item.minutes == null ? String(item.qty) : formatBilledTime(item.minutes);
-}
-
-/**
- * Converts a duration in minutes to a human-readable label.
- * @param mins - Duration in minutes
- * @returns Formatted label (e.g. "1h 30min")
- */
-export function minsToHoursLabel(mins: number): string {
-  if (mins < 60) return `${mins}min`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m === 0 ? `${h}h` : `${h}h ${m}min`;
-}
-
-/**
- * Composes the line-item description from device + action + optional details.
- * Single source of truth so AI-generated and operator-entered tasks all read
- * identically on the invoice and in the calculator preview.
- * @param device - Device tag (e.g. "Phone").
- * @param action - Action tag (e.g. "Setup").
- * @param details - Optional free-text qualifier appended after " - ".
- * @returns Composed string "Device action" / "Device action - details", or empty when device or action is missing.
- */
-export function composeDescription(
-  device: string | null | undefined,
-  action: string | null | undefined,
-  details?: string | null,
-): string {
-  if (!device || !action) return "";
-  const base = `${device} ${action.toLowerCase()}`;
-  const trimmed = details?.trim();
-  return trimmed ? `${base} - ${trimmed}` : base;
-}
-
-/**
  * Delivery-channel modifier labels, lower-cased. A task has exactly one channel
  * - the work happened at the client's place, at the operator's, over a screen
  * share, or on a call - so these never stack, and picking one replaces any
@@ -635,38 +156,6 @@ export function effectiveHourlyRate(
   const sumDelta = mods.reduce((s, m) => s + (m.hourlyDelta ?? 0), 0);
   const percentFactor = mods.reduce((f, m) => f * (1 + (m.percentDelta ?? 0)), 1);
   return Math.round((base.ratePerHour + sumDelta) * percentFactor * 100) / 100;
-}
-
-/**
- * Enforces the whole-job minimum-billable floor. When the hourly task lines
- * carry some time but sum below minBillableMins, grows the most significant
- * line so the billed labour is at least the minimum - the largest floating
- * (neither operator-stated nor quick) task, or the largest hourly task when
- * every line is pinned. A job with no hourly time stays at 0 so the floor never invents a
- * charge on an empty or parts-only job. Applied by both {@link calcJobTotal}
- * and {@link jobToLineItems} so the on-screen total and the issued invoice
- * agree, mirroring the {@link MIN_TRAVEL_CHARGE} floor.
- * @param tasks - Task lines (`qty` in decimal hours); flat-rate lines pass through untouched.
- * @param minBillableMins - Minimum billable labour minutes (live pricing setting); defaults to the code const.
- * @returns Task list with the floor applied, or the input unchanged when already at/above the minimum.
- */
-export function enforceMinBillable(
-  tasks: TaskLine[],
-  minBillableMins: number = MIN_BILLABLE_MINS,
-): TaskLine[] {
-  if (minBillableMins <= 0) return tasks;
-  const hourly = tasks.filter(isHourlyTask);
-  const totalMin = sumTaskMinutes(hourly);
-  if (totalMin <= 0 || totalMin >= minBillableMins) return tasks;
-  // Land the deficit on the most significant line: the largest floating task,
-  // falling back to the largest hourly task when every line is pinned.
-  const floating = hourly.filter((t) => !t.isExplicit && !t.isShort);
-  const pool = floating.length > 0 ? floating : hourly;
-  let biggest = pool[0];
-  if (!biggest) return tasks;
-  for (const t of pool) if (t.qty > biggest.qty) biggest = t;
-  const bumped = withMinutes(biggest, biggest.qty * 60 + (minBillableMins - totalMin));
-  return tasks.map((t) => (t === biggest ? bumped : t));
 }
 
 /**
@@ -879,17 +368,6 @@ export function computeJobPromoDiscount(
 }
 
 /**
- * Whether a task line counts as labour. Hourly tasks (an explicit base rate, or
- * no rate config at all) are labour; flat-rate rows like Travel never are, so
- * they're excluded from the unsuccessful-work discount.
- * @param task - Task line to classify.
- * @returns True when the line is hourly labour.
- */
-function isHourlyTask(task: TaskLine): boolean {
-  return task.baseRateId != null || task.rateConfigId == null;
-}
-
-/**
  * Cost breakdown for a job. Promo discount applies to labour only; travel +
  * parts stay at full price. The whole-job unsuccessful flag discounts the entire
  * labour portion (hourly task lines) by the unsuccessful-work factor; otherwise
@@ -999,69 +477,4 @@ export function calcJobTotal(
     gstAmount,
     total: taxableAmount,
   };
-}
-
-/**
- * Advances a subscription's next due date by its frequency.
- * Uses UTC date methods to avoid DST issues. Month/year steps clamp to the last
- * day of the target month when the source day doesn't exist there (e.g. 31 Jan
- * monthly lands on 28/29 Feb, not 3 Mar), so a short target month can't roll the
- * due date into the following month.
- * @param current - Current nextDue date
- * @param frequency - Billing frequency
- * @returns New nextDue date
- */
-export function advanceNextDue(current: Date, frequency: string): Date {
-  const d = new Date(current);
-  switch (frequency) {
-    case "weekly":
-      d.setUTCDate(d.getUTCDate() + 7);
-      break;
-    case "fortnightly":
-      d.setUTCDate(d.getUTCDate() + 14);
-      break;
-    case "monthly":
-      addUTCMonthsClamped(d, 1);
-      break;
-    case "quarterly":
-      addUTCMonthsClamped(d, 3);
-      break;
-    case "annually":
-      addUTCMonthsClamped(d, 12);
-      break;
-  }
-  return d;
-}
-
-/**
- * Adds whole months to a date in UTC, clamping the day to the last valid day of
- * the target month instead of letting {@link Date.setUTCMonth} overflow into the
- * next month. Mutates `d` in place.
- * @param d - Date to advance (mutated).
- * @param months - Whole months to add.
- */
-function addUTCMonthsClamped(d: Date, months: number): void {
-  const day = d.getUTCDate();
-  d.setUTCDate(1);
-  d.setUTCMonth(d.getUTCMonth() + months);
-  // Last day of the now-current month; clamp the original day down to it.
-  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
-  d.setUTCDate(Math.min(day, lastDay));
-}
-
-/**
- * Builds a short income entry description from a job calculation.
- * @param job - Job calculation to summarise
- * @returns Human-readable description for the income record
- */
-export function buildIncomeDescription(job: JobCalculation): string {
-  const parts: string[] = [];
-  if (job.tasks.length > 0) {
-    parts.push(job.tasks.map((t) => t.description).join(", "));
-  }
-  if (job.durationMins > 0) {
-    parts.push(`${minsToHoursLabel(job.durationMins)} labour`);
-  }
-  const today = formatDateSlash(new Date());
-  return `Job: ${parts.join(" + ")} - ${today}`;
 }

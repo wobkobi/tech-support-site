@@ -18,7 +18,7 @@ import {
 } from "@/features/calendar/lib/google-calendar";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
-import { sendCustomerBookingConfirmation } from "@/features/reviews/lib/email";
+import { sendCustomerBookingConfirmation } from "@/features/reviews/lib/email-booking";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
