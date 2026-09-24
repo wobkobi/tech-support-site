@@ -77,9 +77,7 @@ import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import {
   addDaysToDateKey,
-  dateKeyParts,
-  getPacificAucklandOffset,
-  nzDateParts,
+  nextNzWallClockOnWeekday,
   nzNowTime,
   timeParts,
 } from "@/shared/lib/timezone-utils";
@@ -120,23 +118,7 @@ function jobStartIsoFromTime(hhmm: string, anchorDate?: string): string | null {
   if (!/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
   const [h, m] = timeParts(hhmm);
   if (h < 0 || h > 23 || m < 0 || m > 59) return null;
-  const [y, mo, d] = nzDateParts(new Date());
-  // Weekday of a Y-M-D is timezone-independent when computed in UTC.
-  const todayDow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
-  let daysAhead = 0;
-  if (anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate)) {
-    const [ay, am, ad] = dateKeyParts(anchorDate);
-    const targetDow = new Date(Date.UTC(ay, am - 1, ad)).getUTCDay();
-    daysAhead = (targetDow - todayDow + 7) % 7;
-  }
-  const offset = getPacificAucklandOffset(y, mo, d);
-  let utc = new Date(Date.UTC(y, mo - 1, d + daysAhead, h - offset, m, 0));
-  if (utc.getTime() < Date.now()) {
-    // Same-day time already passed: next day without an anchor, next week
-    // with one (keeping the weekday).
-    utc = new Date(utc.getTime() + (daysAhead === 0 && !anchorDate ? 1 : 7) * 24 * 60 * 60 * 1000);
-  }
-  return utc.toISOString();
+  return nextNzWallClockOnWeekday(h, m, anchorDate).toISOString();
 }
 
 /**

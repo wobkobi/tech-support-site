@@ -269,16 +269,58 @@ export interface ParsedJobPricing {
   holidayUplift: number;
 }
 
+/** The invoice's current travel, for {@link parsedJobToLineItems} to keep when it should. */
+export interface ExistingInvoiceTravel {
+  /** The invoice's "Round-trip travel" line, or null when it has none. */
+  line: LineItem | null;
+  /** The booked job's address; a re-parse to the same place keeps the measured drive. */
+  destination: string | null;
+}
+
+/**
+ * The drive part of an existing travel line, as an auto entry. The line total also holds
+ * any parking or tolls from the last parse, which the new parse re-adds, so a line that
+ * records its drive minutes is re-priced from those minutes alone. One without minutes
+ * keeps its total, since the drive can't be separated from the rest.
+ * @param line - The invoice's travel line.
+ * @param pricing - Live pricing inputs.
+ * @returns The kept drive as a travel entry.
+ */
+function keptTravelEntry(line: LineItem, pricing: ParsedJobPricing): TravelEntry {
+  // "(N min drive)" is the round-trip total, so it rides entirely on the outbound leg.
+  const driveMins = Number(/\((\d+) min drive\)/.exec(line.description)?.[1] ?? 0);
+  if (driveMins <= 0) return { label: line.description, cost: line.lineTotal, isAuto: true };
+  return {
+    label: line.description,
+    cost: calcTravelCharge(driveMins, 0, pricing.travelRatePerHour, pricing.minTravelCharge),
+    isAuto: true,
+    durationMinsOneWay: driveMins,
+    durationMinsBack: 0,
+  };
+}
+
+/**
+ * Normalises an address for a same-place comparison.
+ * @param address - Address text, or null.
+ * @returns Trimmed lowercase text, or "" when missing.
+ */
+function sameAddressKey(address: string | null | undefined): string {
+  return address?.trim().toLowerCase() ?? "";
+}
+
 /**
  * Turns a parse straight into invoice line items, for editing an existing invoice where
- * there is no calculator state to hydrate. A booked job whose description never mentions
- * the trip keeps the invoice's existing travel line - that drive was measured, and silence
- * is not evidence it didn't happen. noTravelCharge still drops it.
+ * there is no calculator state to hydrate.
+ *
+ * A booked job keeps the invoice's measured drive in two cases, as the calculator does:
+ * the description never mentions the trip (silence is not evidence it didn't happen), or
+ * it parses to the booked address again (Google's live quote drifts between calls, so a
+ * re-parse must not silently move the price). noTravelCharge still drops it.
  * @param result - The parse response.
  * @param slots - Booked event slots; empty for an unbooked job.
  * @param now - Current NZ wall-clock HH:MM.
  * @param pricing - Live pricing inputs.
- * @param existingTravel - The invoice's current travel line, kept when booked and unmentioned.
+ * @param existing - The invoice's current travel line and booked address.
  * @returns Line items plus the window fit (for a rebalance toast).
  */
 export function parsedJobToLineItems(
@@ -286,7 +328,7 @@ export function parsedJobToLineItems(
   slots: EventPrefillSlot[],
   now: string,
   pricing: ParsedJobPricing,
-  existingTravel: LineItem | null,
+  existing: ExistingInvoiceTravel,
 ): { lineItems: LineItem[]; fit: FittedTasks; windowMins: number } {
   const { windowMins } = parsedWindow(result, slots, now);
   const fit = fitTasksToWindow(
@@ -297,18 +339,15 @@ export function parsedJobToLineItems(
   );
   const auto = parsedAutoTravel(result, pricing.travelRatePerHour, pricing.minTravelCharge);
   const travelEntries: TravelEntry[] = parsedCostEntries(result);
-  if (auto) {
+  const booked = slots.length > 0 && !result.noTravelCharge && existing.line !== null;
+  const sameBookedPlace =
+    auto !== null &&
+    sameAddressKey(existing.destination) !== "" &&
+    sameAddressKey(auto.destination) === sameAddressKey(existing.destination);
+  if (existing.line && booked && (auto === null || sameBookedPlace)) {
+    travelEntries.unshift(keptTravelEntry(existing.line, pricing));
+  } else if (auto) {
     travelEntries.unshift(auto);
-  } else if (slots.length > 0 && !result.noTravelCharge && existingTravel) {
-    // Re-enter the kept line as an auto entry so parking sums into the same travel line.
-    // Its "(N min drive)" wording round-trips through the one-way minutes.
-    const driveMins = Number(/\((\d+) min drive\)/.exec(existingTravel.description)?.[1] ?? 0);
-    travelEntries.unshift({
-      label: existingTravel.description,
-      cost: existingTravel.lineTotal,
-      isAuto: true,
-      ...(driveMins > 0 && { durationMinsOneWay: driveMins, durationMinsBack: 0 }),
-    });
   }
   const lineItems = jobToLineItems(
     {

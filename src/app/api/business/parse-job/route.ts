@@ -27,13 +27,7 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { openAiRateLimitResponse } from "@/shared/lib/openai-rate-limit";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
-import {
-  NZ_TZ,
-  dateKeyParts,
-  getPacificAucklandOffset,
-  nzDateParts,
-  timeParts,
-} from "@/shared/lib/timezone-utils";
+import { NZ_TZ, nextNzWallClockOnWeekday, timeParts } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -51,23 +45,7 @@ function nzTimeToDate(hhmm: string | null | undefined, anchorDate?: string): Dat
   if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return undefined;
   const [h, m] = timeParts(hhmm);
   if (h > 23 || m > 59) return undefined;
-  const [y, mo, d] = nzDateParts(new Date());
-  // Weekday of a Y-M-D is timezone-independent when computed in UTC.
-  const todayDow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
-  let daysAhead = 0;
-  if (anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate)) {
-    const [ay, am, ad] = dateKeyParts(anchorDate);
-    const targetDow = new Date(Date.UTC(ay, am - 1, ad)).getUTCDay();
-    daysAhead = (targetDow - todayDow + 7) % 7;
-  }
-  const offset = getPacificAucklandOffset(y, mo, d);
-  let utc = new Date(Date.UTC(y, mo - 1, d + daysAhead, h - offset, m, 0));
-  if (utc.getTime() < Date.now()) {
-    // Same-day time already passed: next day without an anchor, next week
-    // with one (keeping the weekday).
-    utc = new Date(utc.getTime() + (daysAhead === 0 && !anchorDate ? 1 : 7) * 24 * 60 * 60 * 1000);
-  }
-  return utc;
+  return nextNzWallClockOnWeekday(h, m, anchorDate);
 }
 
 /**
@@ -268,16 +246,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       parsed.destination = fallbackDest;
     }
 
-    if (!parsed.noTravelCharge && parsed.statedDistanceKm && parsed.statedDistanceKm > 0) {
-      // Operator stated round-trip km but no time. Halve back to a one-way
-      // figure so downstream consumers get the contract they expect; both
-      // leg durations stay 0 here because there is no time signal.
+    const statedKm =
+      !parsed.noTravelCharge && parsed.statedDistanceKm && parsed.statedDistanceKm > 0
+        ? parsed.statedDistanceKm
+        : null;
+    if (statedKm !== null && !parsed.destination) {
+      // Travel bills on drive time, so stated km with nowhere to route prices nothing.
+      // Keep the one-way km for display and tell the operator, rather than letting a
+      // real trip vanish from the invoice. With a destination, the lookup below bills it.
       parsed.travel = {
-        distanceKmOneWay: Math.round((parsed.statedDistanceKm / 2) * 10) / 10,
+        distanceKmOneWay: Math.round((statedKm / 2) * 10) / 10,
         durationMins: 0,
         durationMinsBack: 0,
-        destination: parsed.destination ?? undefined,
       };
+      parsed.warnings = [
+        ...(parsed.warnings ?? []),
+        `A ${statedKm} km trip was mentioned but there's no address to time the drive, so no travel was charged. Add the address or a travel line by hand.`,
+      ];
     } else if (!parsed.noTravelCharge && parsed.destination) {
       // Both drive legs at their own departure: outbound at the parsed start, return at
       // the parsed end (or start + duration). Direct helper call, not a self-fetch - works
@@ -305,6 +290,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           durationMinsBack: lookup.data.back.durationMins,
           destination: parsed.destination,
         };
+      } else if (lookup.status !== "ok") {
+        // A failed lookup would otherwise leave the invoice with no travel and no hint.
+        parsed.warnings = [
+          ...(parsed.warnings ?? []),
+          `Couldn't look up the drive to ${parsed.destination}, so no travel was charged. Check the address or add travel by hand.`,
+        ];
       }
     }
 
@@ -471,6 +462,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           )
       : [];
 
+    // Parts land on the invoice at face value, so the same untrusted output gets the
+    // same bar: a named part at a positive, plausible price. A dropped part is warned
+    // about rather than silently lost.
+    const rawParts: unknown[] = Array.isArray(parsed.parts) ? parsed.parts : [];
+    parsed.parts = rawParts
+      .slice(0, 20)
+      .map((p) => {
+        const part = p as { description?: unknown; cost?: unknown } | null;
+        return {
+          description:
+            typeof part?.description === "string" ? part.description.trim().slice(0, 120) : "",
+          cost: Number(part?.cost),
+        };
+      })
+      .filter(
+        (p) => p.description.length > 0 && Number.isFinite(p.cost) && p.cost > 0 && p.cost <= 10000,
+      );
+    if (parsed.parts.length < rawParts.length) {
+      parsed.warnings = [
+        ...(parsed.warnings ?? []),
+        "A part was left off because its name or price didn't make sense. Add it by hand if it belongs on the invoice.",
+      ];
+    }
+
     // Attach the operator-stated ranges so the calculator can render one row
     // per detected segment. Strip the internal durationMins - the calc derives
     // it from start/end on its own (extractedRanges was parsed once, above).
@@ -590,14 +605,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // job ever billing 140.
       /**
        * A model-emitted quantity read back as whole minutes on the billing grid,
-       * floored at one increment so no task lands at zero.
+       * floored at one increment so no task lands at zero. An operator-stated duration
+       * rounds UP, as the prompt's billing rule does, so "took 12 mins" never bills 10
+       * when the model emits the raw 0.2h. The epsilon stops float noise (0.25h * 60 =
+       * 15.000000000000002) ceiling an on-grid figure to the next increment.
        * @param qty - Task quantity in decimal hours, as the model emitted it.
+       * @param explicit - Whether the operator stated this task's duration.
        * @returns Billed minutes, a multiple of the billing increment.
        */
-      const snapTaskMins = (qty: number): number =>
-        Math.max(incMins, Math.round(((qty || 0) * 60) / incMins) * incMins);
+      const snapTaskMins = (qty: number, explicit: boolean): number => {
+        const steps = ((qty || 0) * 60) / incMins;
+        return Math.max(
+          incMins,
+          (explicit ? Math.ceil(steps - 1e-9) : Math.round(steps)) * incMins,
+        );
+      };
       parsed.tasks = parsed.tasks.map((t) => {
-        const mins = snapTaskMins(t.qty);
+        const mins = snapTaskMins(t.qty, !!(t as { isExplicit?: boolean }).isExplicit);
         return { ...t, minutes: mins, qty: mins / 60 };
       });
       const sumQty = parsed.tasks.reduce((s, t) => s + (t.qty || 0), 0);

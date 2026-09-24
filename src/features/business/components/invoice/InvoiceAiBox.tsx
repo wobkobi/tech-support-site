@@ -111,7 +111,7 @@ export function InvoiceAiBox({
           context.slots,
           nzNowTime(),
           context.pricing,
-          existingTravel,
+          { line: existingTravel, destination: context.fallbackDestination },
         );
         if (lineItems.length === 0) {
           setError(PARSE_ERROR);

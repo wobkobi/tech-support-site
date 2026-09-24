@@ -317,6 +317,54 @@ export function addDaysToDateKey(dateKey: string, n: number): string {
 }
 
 /**
+ * The next future instant at an NZ wall-clock time on the job date's weekday. Google
+ * only quotes traffic for future departures, so a past job is priced at the same weekday
+ * and time as a proxy for that day's traffic. The UTC offset is read on the target date
+ * itself, so a trip landing across a daylight-saving change keeps its wall-clock hour.
+ * @param hour - NZ hour, 0-23.
+ * @param minute - NZ minute, 0-59.
+ * @param anchorDate - YYYY-MM-DD whose weekday to match; missing or malformed means today.
+ * @param now - The current instant.
+ * @returns The departure instant: today while the time is still ahead, else the next
+ * matching day (tomorrow without an anchor, a week on with one).
+ */
+export function nextNzWallClockOnWeekday(
+  hour: number,
+  minute: number,
+  anchorDate?: string,
+  now: Date = new Date(),
+): Date {
+  const todayKey = nzDateKey(now);
+  const hasAnchor = !!anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate);
+  let daysAhead = 0;
+  if (hasAnchor) {
+    /**
+     * Weekday of a date key. Timezone-independent when computed in UTC.
+     * @param key - YYYY-MM-DD.
+     * @returns 0 = Sunday .. 6 = Saturday.
+     */
+    const dow = (key: string): number => {
+      const [y, m, d] = dateKeyParts(key);
+      return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    };
+    daysAhead = (dow(anchorDate) - dow(todayKey) + 7) % 7;
+  }
+  /**
+   * The requested wall-clock time on a given NZ date.
+   * @param key - YYYY-MM-DD.
+   * @returns That instant, with the offset in force on that date.
+   */
+  const at = (key: string): Date => {
+    const [y, m, d] = dateKeyParts(key);
+    return nzWallClockUtc(y, m, d, hour, minute);
+  };
+  const targetKey = addDaysToDateKey(todayKey, daysAhead);
+  const first = at(targetKey);
+  if (first.getTime() >= now.getTime()) return first;
+  return at(addDaysToDateKey(targetKey, hasAnchor ? 7 : 1));
+}
+
+/**
  * UTC offset (hours) for Pacific/Auckland on a given date.
  * Handles NZDT (UTC+13, Sep-Apr) and NZST (UTC+12, Apr-Sep) automatically.
  * @param year - Full year.
