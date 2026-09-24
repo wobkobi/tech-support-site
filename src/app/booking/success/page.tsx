@@ -107,6 +107,7 @@ export default async function BookingSuccessPage({
             unit: true,
             meetingType: true,
             notes: true,
+            accessNotes: true,
             status: true,
           },
         })
@@ -140,6 +141,7 @@ export default async function BookingSuccessPage({
             email: identity.email,
             isRemote: appointment.meetingType === "remote",
             userNotes: parseBookingNotes(appointment.notes).userNotes,
+            accessNotes: appointment.accessNotes,
             manageUrl: `${getSiteUrl()}/booking/edit?token=${encodeURIComponent(cancelToken)}`,
             cancelUrl: `${getSiteUrl()}/booking/cancel?token=${encodeURIComponent(cancelToken)}`,
           }),

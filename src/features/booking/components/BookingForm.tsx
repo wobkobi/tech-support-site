@@ -132,6 +132,7 @@ interface BookingDraft {
   address: string;
   addressVerified: boolean;
   notes: string;
+  accessNotes?: string;
   dateKey?: string;
   timeOfDay?: TimeOfDay;
   startMinute?: StartMinute;
@@ -148,6 +149,7 @@ export interface BookingFormInitialValues {
   meetingType: "in-person" | "remote" | "";
   address: string;
   notes: string;
+  accessNotes?: string;
 }
 
 export interface BookingFormProps {
@@ -301,6 +303,7 @@ export default function BookingForm({
   const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
   const [emailSuggestionAcked, setEmailSuggestionAcked] = useState(false);
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
+  const [accessNotes, setAccessNotes] = useState(initialValues?.accessNotes ?? "");
   // Honeypot value - see the hidden input in the form markup below.
   const [website, setWebsite] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -587,6 +590,9 @@ export default function BookingForm({
         setAddressVerified(draft.addressVerified === true);
       }
       if (typeof draft.notes === "string" && draft.notes) setNotes(draft.notes);
+      if (typeof draft.accessNotes === "string" && draft.accessNotes) {
+        setAccessNotes(draft.accessNotes);
+      }
 
       // Try to restore the time selection if the slot is still bookable.
       if (draft.dateKey && draft.timeOfDay && availableDays.length > 0) {
@@ -631,6 +637,7 @@ export default function BookingForm({
         address,
         addressVerified,
         notes,
+        accessNotes,
         dateKey: selectedDay?.dateKey,
         timeOfDay: selectedTime ?? undefined,
         startMinute: selectedTime ? selectedMinute : undefined,
@@ -656,6 +663,7 @@ export default function BookingForm({
     address,
     addressVerified,
     notes,
+    accessNotes,
     selectedDay,
     selectedTime,
     selectedMinute,
@@ -692,6 +700,7 @@ export default function BookingForm({
     setAddressOverrideAcked(false);
     setAddressCandidates(null);
     setNotes("");
+    setAccessNotes("");
     setContactHint(null);
     setFieldErrors({});
     setAttention(null);
@@ -870,6 +879,7 @@ export default function BookingForm({
             meetingType,
             address: meetingType === "in-person" ? combineUnitAndAddress(unit, address) : undefined,
             notes: notes.trim(),
+            accessNotes: accessNotes.trim() || undefined,
           }
         : {
             dateKey: selectedDay.dateKey,
@@ -882,6 +892,7 @@ export default function BookingForm({
             meetingType,
             address: meetingType === "in-person" ? combineUnitAndAddress(unit, address) : undefined,
             notes: notes.trim(),
+            accessNotes: accessNotes.trim() || undefined,
             website,
             idempotencyKey,
             estimateId,
@@ -1670,6 +1681,42 @@ export default function BookingForm({
               {fieldErrors.notes}
             </p>
           )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="booking-access-notes" className="text-base font-semibold text-rich-black">
+            Anything else I should know for the visit?{" "}
+            <span className="font-normal text-rich-black/70">(optional)</span>
+          </label>
+          <p id="booking-access-notes-hint" className="text-base text-rich-black/70">
+            Parking, directions, gate or door codes, pets, or the best way in.
+          </p>
+          <textarea
+            id="booking-access-notes"
+            name="booking-access-notes-no-autofill"
+            autoComplete="off"
+            rows={3}
+            maxLength={BOOKING_FIELD_LIMITS.accessNotes}
+            value={accessNotes}
+            onChange={(e) => setAccessNotes(e.target.value)}
+            aria-describedby="booking-access-notes-hint booking-access-notes-counter"
+            className={cn(
+              "rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
+              "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
+            )}
+            placeholder="e.g., Park on the street, the driveway is steep. Side gate is unlocked. Friendly dog."
+          />
+          <p
+            id="booking-access-notes-counter"
+            className={cn(
+              "self-end text-sm tabular-nums",
+              accessNotes.length >= BOOKING_FIELD_LIMITS.accessNotes - NOTES_WARN_GAP
+                ? "font-medium text-error"
+                : "text-rich-black/70",
+            )}
+          >
+            {accessNotes.length} / {BOOKING_FIELD_LIMITS.accessNotes}
+          </p>
         </div>
 
         {canInlineEstimate && (

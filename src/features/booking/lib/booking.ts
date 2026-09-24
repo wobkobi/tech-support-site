@@ -113,6 +113,7 @@ export function parseBookingNotes(raw: string | null): {
  * @param input.email - Contact email.
  * @param input.isRemote - Whether the appointment is remote.
  * @param input.userNotes - What the customer typed when booking.
+ * @param input.accessNotes - Parking, directions and other visit notes (optional).
  * @param input.manageUrl - Absolute reschedule link.
  * @param input.cancelUrl - Absolute cancel link.
  * @returns Plain-text description with newline separators.
@@ -123,15 +124,18 @@ export function buildAppointmentDescription(input: {
   email: string;
   isRemote: boolean;
   userNotes: string;
+  /** Parking, directions and other visit details; omitted when blank. */
+  accessNotes?: string | null;
   manageUrl: string;
   cancelUrl: string;
 }): string {
-  const { company, phone, email, isRemote, userNotes, manageUrl, cancelUrl } = input;
+  const { company, phone, email, isRemote, userNotes, accessNotes, manageUrl, cancelUrl } = input;
   return [
     isRemote
       ? `Remote session with ${company} - no visit required.`
       : `${company} is coming to you.`,
     userNotes ? `\nWhat you told me:\n${userNotes}` : "",
+    accessNotes?.trim() ? `\nOther notes for the visit:\n${accessNotes.trim()}` : "",
     `\nNeed to change or cancel?\nReschedule: ${manageUrl}\nCancel: ${cancelUrl}`,
     `\nQuestions? ${phone} or ${email}`,
   ]
@@ -792,6 +796,7 @@ export interface BookingPayloadFields {
   name?: string;
   email?: string;
   notes?: string;
+  accessNotes?: string;
   dateKey?: string;
   timeOfDay?: string;
   duration?: string;
@@ -810,6 +815,8 @@ export const BOOKING_FIELD_LIMITS = {
   email: 320, // RFC 5321 path-length max
   phone: 32,
   notes: 2000,
+  /** Optional second box: parking, directions, access. */
+  accessNotes: 1000,
   address: 250, // includes apartment prefix
   notesMin: 10,
 } as const;
@@ -887,6 +894,9 @@ export function validateBookingPayloadFields(
   }
   if (payload.notes && payload.notes.length > BOOKING_FIELD_LIMITS.notes) {
     return { valid: false, error: "Description is too long." };
+  }
+  if (payload.accessNotes && payload.accessNotes.length > BOOKING_FIELD_LIMITS.accessNotes) {
+    return { valid: false, error: "Other notes are too long." };
   }
   if (!payload.dateKey || !payload.timeOfDay) {
     return { valid: false, error: "Please select a day and time." };

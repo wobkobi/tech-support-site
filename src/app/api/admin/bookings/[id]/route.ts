@@ -2,7 +2,7 @@
 // Admin API for editing and cancelling bookings by ID.
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
-import { combineUnitAndAddress } from "@/features/booking/lib/booking";
+import { BOOKING_FIELD_LIMITS, combineUnitAndAddress } from "@/features/booking/lib/booking";
 import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 import { assessCancellation } from "@/features/business/lib/pricing-policy";
@@ -44,6 +44,8 @@ interface PatchPayload {
   email?: string;
   phone?: string;
   notes?: string;
+  /** Visit notes (parking, directions, access); blank clears them. */
+  accessNotes?: string;
   address?: string;
   status?: "confirmed" | "cancelled" | "completed";
   /**
@@ -200,6 +202,9 @@ export async function PATCH(
   if (body.email !== undefined) data.email = body.email.trim();
   if (body.phone !== undefined) data.phone = toE164NZ(body.phone) || null;
   if (body.notes !== undefined) data.notes = body.notes;
+  if (body.accessNotes !== undefined) {
+    data.accessNotes = body.accessNotes.trim().slice(0, BOOKING_FIELD_LIMITS.accessNotes) || null;
+  }
   // The column is what the detail page, its Maps button and the emails read.
   if (body.address !== undefined) data.address = body.address.trim() || null;
 
@@ -410,6 +415,7 @@ export async function PATCH(
           name: updated.name,
           email: updated.email,
           notes: updated.notes ?? "",
+          accessNotes: updated.accessNotes,
           startAt: timeChange.startAt,
           endAt: timeChange.endAt,
           cancelToken: updated.cancelToken,
@@ -428,6 +434,7 @@ export async function PATCH(
           name: updated.name,
           email: updated.email,
           notes: updated.notes ?? "",
+          accessNotes: updated.accessNotes,
           startAt: timeChange.startAt,
           endAt: timeChange.endAt,
           cancelToken: updated.cancelToken,

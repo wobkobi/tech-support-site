@@ -194,6 +194,7 @@ export default async function BookingDetailPage({
               phone={booking.phone}
               address={booking.address}
               notes={booking.notes}
+              accessNotes={booking.accessNotes}
             />
           </Card>
 

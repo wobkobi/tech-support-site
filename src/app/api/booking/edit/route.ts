@@ -53,6 +53,7 @@ interface EditBookingPayload {
   address?: string;
   meetingType: "in-person" | "remote";
   notes: string;
+  accessNotes?: string;
 }
 
 /**
@@ -77,6 +78,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       address,
       meetingType,
       notes,
+      accessNotes,
     } = body;
     // parseString, not a bare destructure: the payload type is a compile-time
     // claim only, and a filter object here would load somebody else's booking
@@ -101,7 +103,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Validate payload fields
     const payloadCheck = validateBookingPayloadFields(
-      { name, notes, dateKey, timeOfDay, duration, meetingType, address, phone },
+      { name, notes, accessNotes, dateKey, timeOfDay, duration, meetingType, address, phone },
       { requireEmail: false },
     );
     if (!payloadCheck.valid) {
@@ -199,6 +201,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const startAt = nzWallClockUtc(year, month, day, startHour, startMinute);
     const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
 
+    const cleanAccessNotes = typeof accessNotes === "string" ? accessNotes.trim() || null : null;
+
     // Build updated notes
     let bookingNotes = `${notes.trim()}\n\n`;
     const timeLabel =
@@ -225,6 +229,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       email: identity.email,
       isRemote: meetingType === "remote",
       userNotes: notes.trim(),
+      accessNotes: cleanAccessNotes,
       manageUrl: `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`,
       cancelUrl: `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`,
     });
@@ -297,6 +302,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         data: {
           name: cleanName,
           notes: bookingNotes,
+          accessNotes: cleanAccessNotes,
           startAt,
           endAt,
           calendarEventId,
@@ -386,6 +392,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           name: cleanName,
           email: booking.email,
           notes: bookingNotes,
+          accessNotes: cleanAccessNotes,
           startAt,
           endAt,
           cancelToken: booking.cancelToken,
@@ -405,6 +412,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           name: cleanName,
           email: booking.email,
           notes: bookingNotes,
+          accessNotes: cleanAccessNotes,
           startAt,
           endAt,
           cancelToken: booking.cancelToken,
