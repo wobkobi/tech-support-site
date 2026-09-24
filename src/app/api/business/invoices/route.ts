@@ -5,6 +5,7 @@
 // calcInvoiceTotals (promo + unsuccessful-work discounts reduce the taxable amount),
 // writes back the matching Sheets counter, then renders the PDF and uploads it to Drive.
 
+import { completeBilledBookings } from "@/features/booking/lib/complete-billed-bookings.server";
 import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
 import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
 import {
@@ -245,6 +246,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Billed with no promo discount (skipped, or the job fell short of the
     // spend floor), so the booking-time redemption was never really used.
     await releaseBookingRedemptions(billedBookingId);
+  }
+
+  // Invoicing a booked timeslot means the job happened. A quote bills nothing yet, so
+  // its booking completes on conversion instead.
+  if (!isQuote) {
+    await completeBilledBookings(
+      {
+        bookingId: billedBookingId,
+        calendarEventId: invoice.calendarEventId,
+        calendarEventIds: mergedEventIds,
+      },
+      "[invoices]",
+    );
   }
 
   // Keep the Sheets counter in sync; the helper swallows + logs failures so the

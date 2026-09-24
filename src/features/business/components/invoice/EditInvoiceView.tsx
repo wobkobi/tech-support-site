@@ -7,6 +7,10 @@
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import {
+  InvoiceAiBox,
+  type InvoiceAiContext,
+} from "@/features/business/components/invoice/InvoiceAiBox";
+import {
   InvoiceForm,
   type InvoiceFormData,
   type PreservedDiscounts,
@@ -32,6 +36,8 @@ interface EditInvoiceViewProps {
   gstRegistered: boolean;
   /** Net payment terms in days. */
   paymentTermsDays: number;
+  /** Booking and pricing context for the "Describe the job" box. */
+  aiContext: InvoiceAiContext;
 }
 
 /**
@@ -44,6 +50,7 @@ interface EditInvoiceViewProps {
  * @param props.identity - Live business identity for the preview.
  * @param props.gstRegistered - Live GST-registration flag.
  * @param props.paymentTermsDays - Net payment terms in days.
+ * @param props.aiContext - Booking and pricing context for the AI box.
  * @returns The edit view element.
  */
 export function EditInvoiceView({
@@ -54,6 +61,7 @@ export function EditInvoiceView({
   identity,
   gstRegistered,
   paymentTermsDays,
+  aiContext,
 }: EditInvoiceViewProps): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -106,6 +114,17 @@ export function EditInvoiceView({
           busy={busy}
           onSubmit={(data) => void handleSubmit(data)}
           onChange={setPreview}
+          renderAssist={(form, apply) => (
+            <InvoiceAiBox
+              context={aiContext}
+              currentItems={form.lineItems}
+              disabled={busy}
+              // Parsed notes only fill an empty field, so a hand-written note survives.
+              onApply={(lineItems, notes) =>
+                apply(notes && !form.notes.trim() ? { lineItems, notes } : { lineItems })
+              }
+            />
+          )}
         />
       </div>
       <div className="mt-6 lg:mt-0">
