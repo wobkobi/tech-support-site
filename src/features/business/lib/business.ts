@@ -273,6 +273,12 @@ export interface JobPricing {
    */
   businessModifierId?: string | null;
   /**
+   * The undiscounted Standard $/hr. A flat promo takes (Standard - flat) off
+   * every home-rate hour, so a remote or phone line moves down with it; without
+   * this each line is instead capped at the flat rate.
+   */
+  standardRate?: number | null;
+  /**
    * Live task-timing settings for {@link collapseToWindow} and
    * {@link explicitRoundingAllowanceMins}. Not a {@link calcJobTotal} input -
    * it rides along so the calculator's apportionment reads the same settings
@@ -291,6 +297,7 @@ export interface JobPricing {
  * @param travelTotal - The job's travel charge, which a free-travel promo discounts.
  * @param businessModifierId - Modifier marking business labour, which promos skip.
  * @param preDiscountSubtotal - The job's subtotal before any discount, which selects a tier.
+ * @param standardRate - Undiscounted Standard $/hr, which a flat promo's per-hour cut is taken from.
  * @returns Discount in dollars.
  */
 export function computeJobPromoDiscount(
@@ -299,6 +306,7 @@ export function computeJobPromoDiscount(
   travelTotal: number,
   businessModifierId?: string | null,
   preDiscountSubtotal?: number,
+  standardRate?: number | null,
 ): number {
   // Narrowed to the band this job actually earns, through the same function the
   // public estimate uses. Judged on the pre-discount subtotal the caller has
@@ -343,14 +351,18 @@ export function computeJobPromoDiscount(
   if (labourSubtotal <= 0) return 0;
 
   if (promo.flatHourlyRate !== null) {
-    // Per line, never netted across the job. A $40/hr line under a $55/hr flat
-    // rate is already cheaper and stays as it is, as applyPromoToHourlyRate
-    // never raises a rate; netting its shortfall against a $65/hr line would
-    // cancel the $10/hr the pricing page promises there.
     const flat = promo.flatHourlyRate;
+    // With the Standard rate known, the promo is a per-hour cut of
+    // (Standard - flat) off every home-rate hour, so each modified line keeps
+    // its usual gap from Standard, matching applyPromoToHourlyRate. Each
+    // line's cut is capped at the line, so no line goes negative.
+    const cut = standardRate != null ? Math.max(0, standardRate - flat) : null;
+    // Per line, never netted across the job. Without the Standard rate, a line
+    // already under the flat rate stays as it is; netting its shortfall against
+    // a line above would cancel the saving the pricing page promises there.
     const discount = hourlyTasks.reduce((s, t) => {
       const line = Math.round(t.qty * t.unitPrice * 100) / 100;
-      return s + Math.max(0, line - t.qty * flat);
+      return s + (cut != null ? Math.min(line, t.qty * cut) : Math.max(0, line - t.qty * flat));
     }, 0);
     return Math.round(discount * 100) / 100;
   }
@@ -441,6 +453,7 @@ export function calcJobTotal(
     // The subtotal above is exactly the pre-discount total a spend threshold and
     // a tier band are judged against.
     subtotal,
+    pricing.standardRate,
   );
   // Fraction removed from an unsuccessful line: 1 - the charged share.
   const unsuccessfulCut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
