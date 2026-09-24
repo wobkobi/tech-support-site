@@ -6,7 +6,7 @@
 
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
+import { asSettingsGroup } from "@/shared/lib/settings/defaults";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { saveSettingsGroup } from "@/shared/lib/settings/set-settings";
 import type { Settings, SettingsGroup } from "@/shared/lib/settings/types";
@@ -14,17 +14,6 @@ import { checkGuardrails, validateGroup } from "@/shared/lib/settings/validate";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
-
-const GROUPS = Object.keys(DEFAULT_SETTINGS) as SettingsGroup[];
-
-/**
- * Narrows a raw route param to a known settings group.
- * @param value - Raw `[group]` path segment.
- * @returns The group when valid, else null.
- */
-function asGroup(value: string): SettingsGroup | null {
-  return (GROUPS as string[]).includes(value) ? (value as SettingsGroup) : null;
-}
 
 /**
  * GET /api/admin/settings/[group] - returns the resolved value for one group.
@@ -40,7 +29,7 @@ export async function GET(
   if (!(await isAdminRequest(request))) {
     return errorResponse("Unauthorized", 401);
   }
-  const group = asGroup((await params).group);
+  const group = asSettingsGroup((await params).group);
   if (!group) return errorResponse("Unknown settings group", 404);
 
   const settings = await getSettings();
@@ -65,7 +54,7 @@ export async function PUT(
   if (!(await isAdminRequest(request))) {
     return errorResponse("Unauthorized", 401);
   }
-  const group = asGroup((await params).group);
+  const group = asSettingsGroup((await params).group);
   if (!group) return errorResponse("Unknown settings group", 404);
 
   const body = (await request.json().catch(() => null)) as {

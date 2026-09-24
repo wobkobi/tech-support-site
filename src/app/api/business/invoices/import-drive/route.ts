@@ -6,29 +6,16 @@
 // line items) are re-parsed and updated in place. Returns counts of created, updated,
 // skipped and errored records.
 
-import { downloadDriveFile, searchAllInvoicePdfs } from "@/features/business/lib/google-drive";
+import {
+  downloadDriveFile,
+  invoiceNumberCandidates,
+  searchAllInvoicePdfs,
+} from "@/features/business/lib/google-drive";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { inflateSync } from "node:zlib";
-
-const INVOICE_FILE_RE = /^Invoice\s+([A-Z]+-[\d-]+\d)\.pdf$/i;
-
-/**
- * Extracts invoice number candidates from a Drive PDF filename.
- * @param filename - Drive file name, e.g. "Invoice TTP-202627-0006.pdf"
- * @returns Array of invoice number strings to try (modern + legacy format)
- */
-function extractCandidates(filename: string): string[] {
-  const m = filename.match(INVOICE_FILE_RE);
-  if (!m) return [];
-  const raw = m[1] ?? "";
-  const candidates = [raw];
-  const yearMatch = raw.match(/^([A-Z]+-)(\d{6})(-.+)$/i);
-  if (yearMatch) candidates.push(`${yearMatch[1]}${(yearMatch[2] ?? "").slice(-4)}${yearMatch[3]}`);
-  return candidates;
-}
 
 /**
  * Estimates an issue date from the year code in an invoice number (falls back to April 2020).
@@ -379,7 +366,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const seen = new Set<string>();
 
     for (const file of files) {
-      const candidates = extractCandidates(file.name);
+      const candidates = invoiceNumberCandidates(file.name);
       if (candidates.length === 0) continue;
 
       const dedupeKey = candidates[0]!;

@@ -6,6 +6,7 @@
 // page's historically slow loads.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { InfoRow } from "@/features/admin/components/ui/InfoRow";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { InvoiceStatusBadge } from "@/features/business/components/invoice/InvoiceStatusBadge";
@@ -41,28 +42,6 @@ interface LinkedIncomeEntry {
   amount: number;
   date: Date;
   method: string;
-}
-
-/**
- * A label/value row inside a rail card.
- * @param props - Component props.
- * @param props.label - Left-hand label.
- * @param props.children - Right-hand value.
- * @returns The row element.
- */
-function InfoRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <div className="flex justify-between gap-3">
-      <span className="text-admin-muted">{label}</span>
-      <span className="text-right font-medium text-admin-text">{children}</span>
-    </div>
-  );
 }
 
 /**

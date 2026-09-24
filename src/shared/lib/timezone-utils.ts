@@ -80,6 +80,15 @@ export function nzMinuteOfDay(date: Date): number {
 }
 
 /**
+ * Current NZ wall-clock time, whatever timezone the browser or server runs in.
+ * @returns HH:MM (24-hour).
+ */
+export function nzNowTime(): string {
+  const mins = nzMinuteOfDay(new Date());
+  return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+}
+
+/**
  * Formats an instant as its NZ (Pacific/Auckland) calendar date.
  * The server runs in UTC, so reading local Date parts would land 12-13 hours off
  * and attribute an evening booking to the wrong day.

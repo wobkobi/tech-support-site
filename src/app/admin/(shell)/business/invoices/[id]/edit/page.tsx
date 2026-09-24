@@ -27,15 +27,6 @@ export const metadata: Metadata = {
 };
 
 /**
- * Formats a Date as an ISO YYYY-MM-DD string for a date input.
- * @param d - The date.
- * @returns The YYYY-MM-DD string.
- */
-function toDateInput(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-/**
  * DRAFT invoice edit page.
  * @param props - Page props.
  * @param props.params - Route params containing the invoice ID.
@@ -91,8 +82,10 @@ export default async function EditInvoicePage({
   const initial: InvoiceFormData = {
     clientName: invoice.clientName,
     clientEmail: invoice.clientEmail,
-    issueDate: toDateInput(invoice.issueDate),
-    dueDate: toDateInput(invoice.dueDate),
+    // NZ calendar dates: an invoice raised before midday NZ is still the previous
+    // day in UTC, and the form would save that shifted date back.
+    issueDate: nzDateKey(invoice.issueDate),
+    dueDate: nzDateKey(invoice.dueDate),
     lineItems: invoice.lineItems,
     notes: invoice.notes ?? "",
   };

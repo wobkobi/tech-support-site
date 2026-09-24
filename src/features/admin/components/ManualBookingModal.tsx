@@ -262,10 +262,10 @@ export function ManualBookingModal({
               <option value={120}>2 hours</option>
             </select>
             {estimating && (
-              <p className="mt-1 text-xs text-admin-faint">Estimating from notes...</p>
+              <p className="mt-1 text-sm text-admin-faint">Estimating from notes...</p>
             )}
             {!estimating && estimateHint && (
-              <p className="mt-1 text-xs text-admin-muted">{estimateHint}</p>
+              <p className="mt-1 text-sm text-admin-muted">{estimateHint}</p>
             )}
           </Field>
         </div>

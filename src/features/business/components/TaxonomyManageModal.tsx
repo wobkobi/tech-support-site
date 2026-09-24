@@ -202,7 +202,7 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
     >
       <div className="space-y-6">
         {loading && <p className="text-sm text-admin-muted">Loading...</p>}
-        {error && <p className="rounded bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
+        {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
         {!loading &&
           (["devices", "actions"] as const).map((kind) => (

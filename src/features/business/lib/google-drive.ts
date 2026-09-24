@@ -239,3 +239,23 @@ export async function downloadDriveFile(fileId: string): Promise<Buffer> {
   const res = await drive.files.get({ fileId, alt: "media" }, { responseType: "arraybuffer" });
   return Buffer.from(res.data as ArrayBuffer);
 }
+
+/** Matches "Invoice TTP-202627-0006.pdf" or "Invoice TTP-0001.pdf" (skips -old variants). */
+const INVOICE_FILE_RE = /^Invoice\s+([A-Z]+-[\d-]+\d)\.pdf$/i;
+
+/**
+ * Extracts the invoice number from a Drive PDF filename, as the DB candidates to try: the
+ * number as written, plus the 4-digit-year form when it carries a 6-digit year code
+ * ("TTP-202627-0006" > "TTP-2627-0006").
+ * @param filename - Drive file name, e.g. "Invoice TTP-202627-0006.pdf".
+ * @returns Candidate invoice numbers; empty when the name isn't an invoice PDF.
+ */
+export function invoiceNumberCandidates(filename: string): string[] {
+  const m = filename.match(INVOICE_FILE_RE);
+  if (!m) return [];
+  const raw = m[1] ?? "";
+  const candidates = [raw];
+  const yearMatch = raw.match(/^([A-Z]+-)(\d{6})(-.+)$/i);
+  if (yearMatch) candidates.push(`${yearMatch[1]}${(yearMatch[2] ?? "").slice(-4)}${yearMatch[3]}`);
+  return candidates;
+}

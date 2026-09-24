@@ -1085,7 +1085,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
           >
             Add a spend tier
           </button>
-          <p className="text-xs text-admin-faint">
+          <p className="text-sm text-admin-faint">
             With no tiers the promo gives its single amount above. With tiers, the highest one the
             job reaches supplies the discount and the amount above is ignored - a job that reaches
             none gets nothing rather than a smaller discount. Thresholds are read against the low
@@ -1131,7 +1131,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
             />
             New customers only (nobody with a completed job on file)
           </label>
-          <p className="text-xs text-admin-faint">
+          <p className="text-sm text-admin-faint">
             The total cap is approximate: two people can pass it at the same moment and both redeem.
             Per-customer and new-customer rules need someone the site can identify, so an
             unrecognised email is allowed through rather than refused.
@@ -1199,7 +1199,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
               </button>
             )}
           </div>
-          <p className="text-xs text-admin-faint">
+          <p className="text-sm text-admin-faint">
             Leave blank to run the whole window. These are matched against the appointment in NZ
             time, not against when the customer is browsing, so a Tuesday offer is earned by booking
             a Tuesday job on any day. The banner still advertises the promo throughout and names the
@@ -1218,7 +1218,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
         </label>
 
         {error && (
-          <p className="rounded bg-coquelicot-500/10 px-3 py-2 text-xs text-coquelicot-500">
+          <p className="rounded bg-coquelicot-500/10 px-3 py-2 text-sm text-coquelicot-500">
             {error}
           </p>
         )}
@@ -1237,7 +1237,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
                 ⚡ {summariseForBanner(preview)}
               </p>
               {form.kind === "code" && (
-                <p className="mt-1 text-xs text-admin-faint">
+                <p className="mt-1 text-sm text-admin-faint">
                   Not on the banner - a code promo is only ever shown to someone who enters
                   {form.code ? ` ${form.code}` : " the code"}.
                 </p>
@@ -1344,7 +1344,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
                         </button>
                         {openStats.has(p.id) && <PromoStatsBlock promo={p} stats={stats[p.id]} />}
                         {overlapping && (
-                          <p className="text-xs font-medium text-amber-700">
+                          <p className="text-sm font-medium text-amber-700">
                             {overlapNote(p, overlapWinners, promos)}
                           </p>
                         )}

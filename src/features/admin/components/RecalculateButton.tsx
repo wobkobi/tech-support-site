@@ -59,7 +59,7 @@ export function RecalculateButton(): React.ReactElement {
       >
         {recalculating ? "Recalculating…" : "Recalculate travel times"}
       </button>
-      {result && <p className="text-xs text-admin-muted">{result}</p>}
+      {result && <p className="text-sm text-admin-muted">{result}</p>}
     </div>
   );
 }

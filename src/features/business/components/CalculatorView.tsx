@@ -76,9 +76,11 @@ import { cn } from "@/shared/lib/cn";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import {
+  addDaysToDateKey,
   dateKeyParts,
   getPacificAucklandOffset,
   nzDateParts,
+  nzNowTime,
   timeParts,
 } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
@@ -86,24 +88,14 @@ import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * Returns the YYYY-MM-DD string for today + n days.
+ * Returns the NZ calendar date (YYYY-MM-DD) n days from today.
  * @param n - Number of days to add to today.
  * @returns ISO date string (YYYY-MM-DD).
  */
 function addDaysISO(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return addDaysToDateKey(todayISO(), n);
 }
 
-/**
- * Returns the current local time formatted as HH:MM.
- * @returns The current time string in HH:MM format.
- */
-function nowTime(): string {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
 /**
  * Adds one hour to a time string, wrapping around at midnight.
  * @param t - A time string in HH:MM format.
@@ -627,7 +619,7 @@ export function CalculatorView({
     setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
   }
 
-  // Mount seeding + contacts fetch. The "now" times must seed in an effect - nowTime() at
+  // Mount seeding + contacts fetch. The "now" times must seed in an effect - nzNowTime() at
   // render would mismatch between server render and hydration. Contacts stay a client
   // fetch: the People API pages through every connection, far too slow to block on.
   useEffect(() => {
@@ -660,7 +652,7 @@ export function CalculatorView({
       setAddressModeState(draft.addressMode ?? "custom");
       /* eslint-enable react-hooks/set-state-in-effect */
     } else if (!eventPrefill) {
-      const now = nowTime();
+      const now = nzNowTime();
       setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
     }
     // The prefill outranks the draft for dates/client/travel, but the description is the
@@ -831,7 +823,7 @@ export function CalculatorView({
    */
   function applyParseResult(result: ParseJobResponse): void {
     const slots = eventPrefill?.slots ?? [];
-    const span = parsedWindow(result, slots, nowTime());
+    const span = parsedWindow(result, slots, nzNowTime());
     setFollowUpMins(span.followUpMins);
     // A merged job's slots are the corrected calendar windows, so the parse fills
     // everything but the times. On a single event the description wins, and "Reset to
@@ -1094,7 +1086,7 @@ export function CalculatorView({
    * without the prefill.
    */
   function resetFormState(): void {
-    const now = nowTime();
+    const now = nzNowTime();
     setJobDate(todayISO());
     setSkipPromo(false);
     setPromoCode("");
@@ -2120,7 +2112,7 @@ export function CalculatorView({
                 placeholder={JOB_DESCRIPTION_PLACEHOLDER}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
               />
-              {parseError && <p className="mt-1 text-xs text-red-600">{parseError}</p>}
+              {parseError && <p className="mt-1 text-sm text-red-600">{parseError}</p>}
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   onClick={() => void handleParse()}
@@ -2163,7 +2155,7 @@ export function CalculatorView({
               )}
               {clarifyQuestions.length > 0 && (
                 <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <p className="mb-3 text-xs font-medium text-amber-800">
+                  <p className="mb-3 text-sm font-medium text-amber-800">
                     A few quick questions to fill in the gaps:
                   </p>
                   <div className="space-y-3">

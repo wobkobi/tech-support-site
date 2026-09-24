@@ -106,7 +106,7 @@ export function CompleteEventsPanel({
             </span>
           )}
         </h2>
-        <p className="mt-0.5 text-xs text-slate-400">
+        <p className="mt-0.5 text-sm text-slate-400">
           Past confirmed bookings - complete them, with or without the review email
         </p>
       </div>
@@ -127,7 +127,7 @@ export function CompleteEventsPanel({
                     {formatDateShort(b.startAt)}
                     {b.email ? ` · ${b.email}` : " · no email"}
                   </p>
-                  {err && <p className="text-xs text-coquelicot-600">{err}</p>}
+                  {err && <p className="text-sm text-coquelicot-600">{err}</p>}
                 </div>
                 {isDone ? (
                   <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-moonstone-700">

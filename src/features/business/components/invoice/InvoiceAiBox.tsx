@@ -25,6 +25,7 @@ import type {
   ParseJobResponse,
 } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
+import { nzNowTime } from "@/shared/lib/timezone-utils";
 import type React from "react";
 import { useState } from "react";
 
@@ -51,15 +52,6 @@ interface InvoiceAiBoxProps {
 }
 
 const PARSE_ERROR = "Couldn't parse that - try being more specific, or edit the line items below.";
-
-/**
- * Current local wall-clock time as HH:MM.
- * @returns The time string.
- */
-function nowTime(): string {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
 
 /**
  * AI description box that rebuilds a draft invoice's line items.
@@ -117,7 +109,7 @@ export function InvoiceAiBox({
         const { lineItems, fit, windowMins } = parsedJobToLineItems(
           parsed,
           context.slots,
-          nowTime(),
+          nzNowTime(),
           context.pricing,
           existingTravel,
         );

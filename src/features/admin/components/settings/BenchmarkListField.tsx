@@ -69,7 +69,7 @@ export function BenchmarkListField({
       <p className="mt-0.5 text-sm text-admin-muted">{meta.description}</p>
 
       {fieldErrors.benchmarks && (
-        <p className="mt-1 text-xs font-medium text-red-600">{fieldErrors.benchmarks}</p>
+        <p className="mt-1 text-sm font-medium text-red-600">{fieldErrors.benchmarks}</p>
       )}
 
       <div className="mt-3 space-y-2">
@@ -111,7 +111,7 @@ export function BenchmarkListField({
                 </button>
               </div>
               {(labelErr || minsErr) && (
-                <p className="mt-1 text-xs font-medium text-red-600">{labelErr ?? minsErr}</p>
+                <p className="mt-1 text-sm font-medium text-red-600">{labelErr ?? minsErr}</p>
               )}
             </div>
           );

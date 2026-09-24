@@ -477,7 +477,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
             <span className="text-sm text-admin-text-secondary">Receipt held</span>
           </label>
         </div>
-        {formError && <p className="mt-2 text-xs text-coquelicot-600">{formError}</p>}
+        {formError && <p className="mt-2 text-sm text-coquelicot-600">{formError}</p>}
         <div className="mt-4 flex items-center gap-3">
           <AdminButton type="submit" busy={saving}>
             {editingId ? "Save changes" : "Add expense"}

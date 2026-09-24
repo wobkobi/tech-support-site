@@ -96,9 +96,9 @@ export function FieldShell({
         </span>
       </label>
       <p className="mt-0.5 text-sm text-admin-muted">{meta.description}</p>
-      {meta.off && <p className="mt-0.5 text-xs text-admin-faint italic">{meta.off}</p>}
+      {meta.off && <p className="mt-0.5 text-sm text-admin-faint italic">{meta.off}</p>}
       <div className="mt-2">{children}</div>
-      {error && <p className="mt-1 text-xs font-medium text-coquelicot-500">{error}</p>}
+      {error && <p className="mt-1 text-sm font-medium text-coquelicot-500">{error}</p>}
     </div>
   );
 }

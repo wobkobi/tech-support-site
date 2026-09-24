@@ -4,13 +4,11 @@
 // step with a null timestamp (legacy rows) degrades to a muted "date not recorded" rather
 // than vanishing. Server component.
 
+import { dotClass, type StepTone } from "@/features/admin/components/ui/timeline-tone";
 import type { InvoiceStatus } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
-
-/** Accent tone for a timeline dot. */
-type StepTone = "neutral" | "info" | "success" | "critical" | "violet";
 
 /** Props for {@link InvoiceTimeline}. */
 interface InvoiceTimelineProps {
@@ -44,26 +42,6 @@ interface Step {
   date: Date | string | null;
   detail?: string | null;
   tone: StepTone;
-}
-
-/**
- * Dot colour for a step tone.
- * @param tone - Step tone.
- * @returns Background class.
- */
-function dotClass(tone: StepTone): string {
-  switch (tone) {
-    case "neutral":
-      return "bg-admin-faint";
-    case "info":
-      return "bg-blue-500";
-    case "success":
-      return "bg-emerald-500";
-    case "critical":
-      return "bg-coquelicot-600";
-    case "violet":
-      return "bg-russian-violet";
-  }
 }
 
 /**

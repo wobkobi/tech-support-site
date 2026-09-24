@@ -5,30 +5,14 @@
 // never creates or re-parses records. Returns counts of matched, not-found and skipped
 // (unparseable filename) files.
 
-import { searchAllInvoicePdfs } from "@/features/business/lib/google-drive";
+import {
+  invoiceNumberCandidates,
+  searchAllInvoicePdfs,
+} from "@/features/business/lib/google-drive";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-
-// Matches "Invoice TTP-202627-0006.pdf" or "Invoice TTP-0001.pdf" (skips -old variants)
-const INVOICE_FILE_RE = /^Invoice\s+([A-Z]+-[\d-]+\d)\.pdf$/i;
-
-/**
- * Extracts the number from a Drive filename and returns DB candidates to try.
- * @param filename - Drive PDF filename to parse
- * @returns Array of candidate invoice numbers to look up in the database
- */
-function extractCandidates(filename: string): string[] {
-  const m = filename.match(INVOICE_FILE_RE);
-  if (!m) return [];
-  const raw = m[1] ?? ""; // e.g. "TTP-202627-0006" or "TTP-0001"
-  const candidates = [raw];
-  // Normalise 6-digit year like "202627" > 4-digit "2627"
-  const yearMatch = raw.match(/^([A-Z]+-)(\d{6})(-.+)$/i);
-  if (yearMatch) candidates.push(`${yearMatch[1]}${(yearMatch[2] ?? "").slice(-4)}${yearMatch[3]}`);
-  return candidates;
-}
 
 /**
  * POST /api/business/invoices/sync-drive
@@ -49,7 +33,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const skippedNames: string[] = [];
 
     for (const file of files) {
-      const candidates = extractCandidates(file.name);
+      const candidates = invoiceNumberCandidates(file.name);
       if (candidates.length === 0) {
         skippedNames.push(file.name);
         continue;

@@ -292,7 +292,7 @@ export function ContactsAdminView({
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-slate-700">Google Contacts sync</p>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className="mt-0.5 text-sm text-slate-400">
                 {syncedCount} synced · {unsyncedCount} not yet in Google
               </p>
             </div>
@@ -338,12 +338,12 @@ export function ContactsAdminView({
             </div>
           )}
 
-          {syncResult && <p className="mt-3 text-xs text-slate-500">{syncResult}</p>}
+          {syncResult && <p className="mt-3 text-sm text-slate-500">{syncResult}</p>}
         </div>
 
         <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <p className="text-sm font-semibold text-slate-700">Address check</p>
-          <p className="mt-0.5 text-xs text-slate-400">
+          <p className="mt-0.5 text-sm text-slate-400">
             Re-checks every stored address and flags the ones that don&apos;t match a single
             Auckland address. Takes a while - one lookup per contact.
           </p>
@@ -359,7 +359,7 @@ export function ContactsAdminView({
           >
             {checkingAddresses ? "Checking…" : "Check all addresses"}
           </button>
-          {addressResult && <p className="mt-3 text-xs text-slate-500">{addressResult}</p>}
+          {addressResult && <p className="mt-3 text-sm text-slate-500">{addressResult}</p>}
         </div>
       </div>
       {/* end right column */}

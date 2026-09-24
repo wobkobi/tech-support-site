@@ -30,7 +30,7 @@ function enqueueBlockWrite<T>(task: () => Promise<T>): Promise<T> {
   return result;
 }
 
-export interface BlockDayButtonProps {
+interface BlockDayButtonProps {
   dateKey: string;
   busyEventId: string | null;
   /**

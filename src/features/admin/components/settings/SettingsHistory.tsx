@@ -130,7 +130,7 @@ export function SettingsHistory<T>({ group, onRestore }: Props<T>): React.ReactE
             </ul>
           )}
           {restoredId && (
-            <p className="mt-2 text-xs text-emerald-600">
+            <p className="mt-2 text-sm text-emerald-600">
               Loaded into the form above - review the values and Save to apply.
             </p>
           )}

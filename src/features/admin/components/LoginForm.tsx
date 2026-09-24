@@ -96,7 +96,7 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
         />
       </label>
       {error && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
           {error}
         </p>
       )}

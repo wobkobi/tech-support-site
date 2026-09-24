@@ -140,7 +140,7 @@ export default async function AdminPriceEstimatesPage({
                   </p>
 
                   {log.aiExplanation && (
-                    <p className="mb-2 text-xs text-admin-muted italic">AI: {log.aiExplanation}</p>
+                    <p className="mb-2 text-sm text-admin-muted italic">AI: {log.aiExplanation}</p>
                   )}
 
                   {log.aiTasks.length > 0 && (

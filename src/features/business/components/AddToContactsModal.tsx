@@ -15,7 +15,7 @@ import { useState } from "react";
 /**
  * Props for AddToContactsModal.
  */
-export interface AddToContactsModalProps {
+interface AddToContactsModalProps {
   /** Client name to seed the new Contact row with. */
   name: string;
   /** Client email - dedup key on the server. */
@@ -131,7 +131,7 @@ export function AddToContactsModal({
           </p>
         )}
         <p className="text-xs text-admin-muted">{email}</p>
-        {error && <p className="text-xs text-coquelicot-500">{error}</p>}
+        {error && <p className="text-sm text-coquelicot-500">{error}</p>}
       </div>
     </Modal>
   );
