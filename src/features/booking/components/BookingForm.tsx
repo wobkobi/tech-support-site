@@ -32,6 +32,7 @@ import { isPlausibleName, normaliseName } from "@/shared/lib/normalise-name";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import type { EstimatorRange } from "@/shared/lib/settings/types";
 import { dateKeyParts, nzWallClockUtc } from "@/shared/lib/timezone-utils";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
@@ -172,6 +173,8 @@ export interface BookingFormProps {
   phone?: string;
   /** tel: URI for the same fallbacks. */
   phoneTel?: string;
+  /** Whether a code promo is active right now; false hides the code box. Defaults to true. */
+  showPromoCode?: boolean;
 }
 
 /**
@@ -188,6 +191,7 @@ export interface BookingFormProps {
  * @param props.lowEndFloorFactor - Low-end floor fraction for the inline estimate.
  * @param props.phone - Display phone number for the call-or-text fallbacks.
  * @param props.phoneTel - tel: URI for the call-or-text fallbacks.
+ * @param props.showPromoCode - Whether to offer the promo code box.
  * @returns Booking form element
  */
 export default function BookingForm({
@@ -202,6 +206,7 @@ export default function BookingForm({
   lowEndFloorFactor,
   phone: ownerPhone,
   phoneTel: ownerPhoneTel,
+  showPromoCode = true,
 }: BookingFormProps): React.ReactElement {
   const router = useRouter();
   const isEditMode = Boolean(cancelToken);
@@ -228,6 +233,8 @@ export default function BookingForm({
     minsHigh: number;
   } | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+  // Inputs the shown estimate was worked out from, so an edit afterwards marks it out of date.
+  const [quotedFor, setQuotedFor] = useState<string | null>(null);
   const canInlineEstimate =
     !isEditMode &&
     estimatorRange != null &&
@@ -322,12 +329,30 @@ export default function BookingForm({
   }
 
   /**
+   * Everything the estimate depends on, joined into one comparable string.
+   * @returns The key for the current form inputs.
+   */
+  function currentEstimateKey(): string {
+    return JSON.stringify([
+      notes.trim(),
+      meetingType,
+      combineUnitAndAddress(unit, address),
+      selectedDay?.dateKey ?? null,
+      selectedTime,
+      selectedMinute,
+      duration,
+      promoCode.trim(),
+    ]);
+  }
+
+  /**
    * Runs the inline rough estimate from the current description + meeting +
    * address, shows the range, and captures the logged estimate id so the
    * booking snapshots the quote the customer saw.
    * @returns Resolves when the estimate completes.
    */
   async function runInlineEstimate(): Promise<void> {
+    const estimateInputsKey = currentEstimateKey();
     if (
       !estimatorRange ||
       minBillableMins == null ||
@@ -368,6 +393,7 @@ export default function BookingForm({
         minsHigh: res.minsHigh,
       });
       if (res.estimateId) setEstimateId(res.estimateId);
+      setQuotedFor(estimateInputsKey);
     } catch {
       setQuoteError("Couldn't get an estimate just now - you can still book.");
     } finally {
@@ -975,6 +1001,15 @@ export default function BookingForm({
   const firstErrorKey = Object.keys(FIELD_ANCHORS).find((k) => fieldErrors[k]) ?? fieldErrorKeys[0];
   const phoneLink =
     ownerPhone && ownerPhoneTel ? <PhoneLink phone={ownerPhone} phoneTel={ownerPhoneTel} /> : null;
+
+  const descriptionReady = notes.trim().length >= BOOKING_FIELD_LIMITS.notesMin;
+  const quoteStale = quote !== null && quotedFor !== currentEstimateKey();
+  // Why the estimate button is greyed out, or what it will leave out.
+  const estimateHelp = !descriptionReady
+    ? `Describe the problem above first (at least ${BOOKING_FIELD_LIMITS.notesMin} characters).`
+    : meetingType === "in-person" && !address.trim()
+      ? "Add your address above if you'd like travel included."
+      : null;
 
   return (
     <form
@@ -1683,6 +1718,126 @@ export default function BookingForm({
           )}
         </div>
 
+        {canInlineEstimate && (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-0.5">
+              <h3 className="text-base font-semibold text-rich-black">Want a rough price first?</h3>
+              <p className="text-base text-rich-black/70">
+                Press the button for a ballpark worked out from your description. It&apos;s free,
+                takes a few seconds and doesn&apos;t book anything.
+              </p>
+              <p className="text-base text-rich-black/70">
+                Rates and travel charges are on the{" "}
+                <Link
+                  href="/pricing"
+                  target="_blank"
+                  className="font-semibold text-russian-violet underline underline-offset-2 hover:opacity-80"
+                >
+                  pricing page
+                </Link>{" "}
+                (opens in a new tab, so you won&apos;t lose what you&apos;ve typed).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void runInlineEstimate()}
+              disabled={estimating || !descriptionReady}
+              aria-describedby={estimateHelp ? "booking-estimate-help" : undefined}
+              className="min-h-11 self-start rounded-md border border-russian-violet/40 px-4 py-2 text-base font-semibold text-russian-violet transition-colors hover:bg-russian-violet/5 disabled:opacity-50"
+            >
+              {estimating
+                ? "Working it out..."
+                : quote
+                  ? quoteStale
+                    ? "Update the estimate"
+                    : "Estimate again"
+                  : "Get a price estimate"}
+            </button>
+            {estimateHelp && (
+              <p id="booking-estimate-help" className="text-base text-rich-black/70">
+                {estimateHelp}
+              </p>
+            )}
+            {quote && (
+              <div
+                role="status"
+                className={cn(
+                  "rounded-xl border border-russian-violet/20 bg-russian-violet/5 p-4",
+                  quoteStale && "opacity-60",
+                )}
+              >
+                {quoteStale && (
+                  <p className="mb-2 text-base font-medium text-rich-black">
+                    You&apos;ve changed some details since this estimate. Press &quot;Update the
+                    estimate&quot; to see a new one.
+                  </p>
+                )}
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  <p className="text-base font-medium text-rich-black/70">Rough estimate</p>
+                  <span className="rounded-full bg-russian-violet/10 px-2.5 py-0.5 text-sm font-semibold text-russian-violet">
+                    {durationRangeText(quote.minsLow, quote.minsHigh)}
+                  </span>
+                </div>
+                <p className="mt-1 text-3xl font-extrabold text-russian-violet">
+                  {formatMoneyCompact(quote.low)} - {formatMoneyCompact(quote.high)}
+                </p>
+                {quote.travelCharge > 0 && (
+                  <p className="mt-1 text-base font-medium text-rich-black/80">
+                    + {formatMoneyCompact(quote.travelCharge)} round-trip travel
+                  </p>
+                )}
+                <p className="mt-2 text-base text-rich-black/70">
+                  This is a guide only, based on what you&apos;ve written. The final cost is
+                  confirmed with you before any work starts.
+                </p>
+                {/* Gate on the MIDDLE of the range, not its high end: a wide
+                    band like 25m-1h10m has a typical case well under an hour,
+                    and nudging those to a 2-hour visit fires on almost every
+                    estimate. Only suggest it when the likely time runs over. */}
+                {duration === "short" && (quote.minsLow + quote.minsHigh) / 2 > 60 && (
+                  <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-400/50 bg-amber-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-base text-rich-black/80">
+                      This looks like it might take around 2 hours. You can book a 2-hour visit so
+                      the time is set aside.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleDurationChange("long")}
+                      className="min-h-11 self-start rounded-md bg-russian-violet px-4 py-2 text-base font-semibold text-white hover:bg-russian-violet/90 sm:shrink-0 sm:self-auto"
+                    >
+                      Book 2 hours
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            {quoteError && <p className="text-base text-error">{quoteError}</p>}
+          </div>
+        )}
+
+        {/* Outside the estimate block on purpose: a code changes what the job
+            is invoiced at, so it must be enterable whether or not the customer
+            asked for a ballpark first. Hidden when editing, where the promo was
+            already snapshotted onto the booking, and when no code promo is
+            active right now, unless the link carried a code. */}
+        {!isEditMode && (showPromoCode || promoParam !== null) && (
+          <PromoCodeField
+            value={promoCode}
+            onChange={setPromoCode}
+            onApplied={() => {
+              // Refresh only a quote already on screen. Applying a code should
+              // not spend an AI estimate the customer never asked for.
+              if (quote) void runInlineEstimate();
+            }}
+            applyOnMount={promoParam !== null}
+            // Judged as the booking will judge it: against the picked slot for
+            // a day-restricted code, and this customer for a per-customer one.
+            startAt={slotStartInstant()}
+            email={email}
+            className="max-w-sm"
+          />
+        )}
+
         <div className="flex flex-col gap-1.5">
           <label htmlFor="booking-access-notes" className="text-base font-semibold text-rich-black">
             Anything else I should know for the visit?{" "}
@@ -1718,91 +1873,6 @@ export default function BookingForm({
             {accessNotes.length} / {BOOKING_FIELD_LIMITS.accessNotes}
           </p>
         </div>
-
-        {canInlineEstimate && (
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-col gap-0.5">
-              <h3 className="text-base font-semibold text-rich-black">Want a rough price first?</h3>
-              <p className="text-base text-rich-black/70">
-                Get a ballpark estimate from your description before you book.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => void runInlineEstimate()}
-              disabled={estimating || notes.trim().length < BOOKING_FIELD_LIMITS.notesMin}
-              className="min-h-11 self-start rounded-md border border-russian-violet/40 px-4 py-2 text-base font-semibold text-russian-violet transition-colors hover:bg-russian-violet/5 disabled:opacity-50"
-            >
-              {estimating ? "Estimating..." : "Get a price estimate"}
-            </button>
-            {quote && (
-              <div
-                role="status"
-                className="rounded-xl border border-russian-violet/20 bg-russian-violet/5 p-4"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                  <p className="text-sm font-medium text-rich-black/60">Rough estimate</p>
-                  <span className="rounded-full bg-russian-violet/10 px-2.5 py-0.5 text-sm font-semibold text-russian-violet">
-                    {durationRangeText(quote.minsLow, quote.minsHigh)}
-                  </span>
-                </div>
-                <p className="mt-1 text-3xl font-extrabold text-russian-violet">
-                  {formatMoneyCompact(quote.low)} - {formatMoneyCompact(quote.high)}
-                </p>
-                {quote.travelCharge > 0 && (
-                  <p className="mt-1 text-sm font-medium text-rich-black/80">
-                    + {formatMoneyCompact(quote.travelCharge)} round-trip travel
-                  </p>
-                )}
-                <p className="mt-2 text-sm text-rich-black/70">
-                  A ballpark from your description - the final cost is confirmed before any work.
-                </p>
-                {/* Gate on the MIDDLE of the range, not its high end: a wide
-                    band like 25m-1h10m has a typical case well under an hour,
-                    and nudging those to a 2-hour visit fires on almost every
-                    estimate. Only suggest it when the likely time runs over. */}
-                {duration === "short" && (quote.minsLow + quote.minsHigh) / 2 > 60 && (
-                  <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-400/50 bg-amber-50 p-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm text-rich-black/80">
-                      This looks like it might take around 2 hours - you can book a 2-hour visit so
-                      we&apos;ve got the time set aside.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => handleDurationChange("long")}
-                      className="min-h-11 self-start rounded-md bg-russian-violet px-4 py-2 text-base font-semibold text-white hover:bg-russian-violet/90 sm:shrink-0 sm:self-auto"
-                    >
-                      Book 2 hours
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            {quoteError && <p className="text-base text-error">{quoteError}</p>}
-          </div>
-        )}
-
-        {/* Outside the estimate block on purpose: a code changes what the job
-            is invoiced at, so it must be enterable whether or not the customer
-            asked for a ballpark first. Hidden when editing, where the promo was
-            already snapshotted onto the booking. */}
-        {!isEditMode && (
-          <PromoCodeField
-            value={promoCode}
-            onChange={setPromoCode}
-            onApplied={() => {
-              // Refresh only a quote already on screen. Applying a code should
-              // not spend an AI estimate the customer never asked for.
-              if (quote) void runInlineEstimate();
-            }}
-            applyOnMount={promoParam !== null}
-            // Judged as the booking will judge it: against the picked slot for
-            // a day-restricted code, and this customer for a per-customer one.
-            startAt={slotStartInstant()}
-            email={email}
-            className="max-w-sm"
-          />
-        )}
       </fieldset>
 
       {/* Booking summary - live recap of what's selected so the user can see

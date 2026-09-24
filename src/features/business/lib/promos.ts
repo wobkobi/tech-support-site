@@ -198,6 +198,24 @@ export const getActivePromo = unstable_cache(
   { tags: [ACTIVE_PROMO_TAG], revalidate: 60 },
 );
 
+/**
+ * Whether any code promo is active right now, so the booking form only offers a code
+ * box while a code could work. A weekday or time-of-day window doesn't count against
+ * it: the customer may be booking a slot inside that window.
+ * @returns True when at least one code promo is inside its start and end dates.
+ */
+export const hasActivePromoCode = unstable_cache(
+  async (): Promise<boolean> => {
+    const now = new Date();
+    const count = await prisma.promo.count({
+      where: { isActive: true, kind: "code", startAt: { lte: now }, endAt: { gt: now } },
+    });
+    return count > 0;
+  },
+  ["has-active-promo-code"],
+  { tags: [ACTIVE_PROMO_TAG], revalidate: 60 },
+);
+
 /** The recurring restriction a promo can carry inside its outer window. */
 export interface RecurringWindow {
   /** NZ weekdays the promo applies on (0 = Sunday); empty means every day. */

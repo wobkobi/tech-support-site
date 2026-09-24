@@ -12,6 +12,7 @@ import {
   type BookableDay,
   type ExistingBooking,
 } from "@/features/booking/lib/booking";
+import { hasActivePromoCode } from "@/features/business/lib/promos";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
@@ -248,7 +249,11 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
     sameDayCutoffHour,
   } = await getAvailableDays();
   // Pricing context for the inline "get a rough estimate" affordance.
-  const settings = await getSettings();
+  // A failed promo lookup shows the code box rather than hiding a code that works.
+  const [settings, showPromoCode] = await Promise.all([
+    getSettings(),
+    hasActivePromoCode().catch(() => true),
+  ]);
   // Explain the same-day closure from the live availability settings rather
   // than baked-in defaults, so editing either value updates the banner.
   const sameDayReasons: string[] = [];
@@ -309,6 +314,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
         travelRatePerHour={settings.pricing.travelRatePerHour}
         phone={settings.identity.phone}
         phoneTel={settings.identity.phoneTel}
+        showPromoCode={showPromoCode}
       />
     </div>
   );
@@ -425,6 +431,16 @@ export default async function BookingPage(): Promise<React.ReactElement> {
               <PhoneLink phone={identity.phone} phoneTel={identity.phoneTel} />.
             </p>
             <p className="mt-3 text-base text-rich-black">
+              Want to check the prices first?{" "}
+              <Link
+                href="/pricing"
+                className="font-semibold text-russian-violet underline underline-offset-2 hover:opacity-80"
+              >
+                See pricing
+              </Link>
+              .
+            </p>
+            <p className="mt-1 text-base text-rich-black">
               Already booked?{" "}
               <Link
                 href="/booking/manage"
