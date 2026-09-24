@@ -1,9 +1,10 @@
 // src/app/api/business/rates/route.ts
 // Admin rate-config collection endpoint. GET returns every rate, seeding any missing
-// DEFAULTS and running passive migrations (drop Student / Complex, retire the Travel row
+// DEFAULT_RATE_ROWS and running passive migrations (drop Student / Complex, retire the Travel row
 // into the pricing settings, backfill updatedAt). POST creates a rate (clearing other
-// defaults when isDefault is set); DELETE wipes all rows and reseeds the DEFAULTS.
+// defaults when isDefault is set); DELETE wipes all rows and reseeds DEFAULT_RATE_ROWS.
 
+import { DEFAULT_RATE_ROWS } from "@/features/business/lib/pricing-policy";
 import { RATE_CONFIG_TAG } from "@/features/business/lib/pricing-policy.server";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -13,72 +14,6 @@ import { saveSettingsGroup } from "@/shared/lib/settings/set-settings";
 import type { Settings } from "@/shared/lib/settings/types";
 import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
-
-// Seed shape: one base hourly rate (Standard), $/hr modifiers (At home -$15, Remote -$10)
-// and a percentage one (Public Holiday +25%). No separate Complex tier - everything bills
-// at Standard plus modifiers. The travel $/hr is a pricing setting, not a rate row.
-const DEFAULTS = [
-  {
-    label: "Standard",
-    ratePerHour: 65,
-    flatRate: null,
-    hourlyDelta: null,
-    percentDelta: null,
-    unit: "hour",
-    isDefault: true,
-  },
-  {
-    // Business callouts: on-site work for companies bills above the home
-    // Standard rate. Surfaced on /business as baseRate + this delta; kept off
-    // the consumer pricing accordion.
-    label: "Business",
-    ratePerHour: null,
-    flatRate: null,
-    hourlyDelta: 20,
-    percentDelta: null,
-    unit: "modifier",
-    isDefault: false,
-  },
-  {
-    label: "At home",
-    ratePerHour: null,
-    flatRate: null,
-    hourlyDelta: -15,
-    percentDelta: null,
-    unit: "modifier",
-    isDefault: false,
-  },
-  {
-    label: "Remote",
-    ratePerHour: null,
-    flatRate: null,
-    hourlyDelta: -10,
-    percentDelta: null,
-    unit: "modifier",
-    isDefault: false,
-  },
-  {
-    // Phone-delivered work: no screen share, no travel - cheaper again than
-    // Remote. Quick calls are often not charged at all (operator's call);
-    // this rate covers the ones long enough to bill.
-    label: "Phone",
-    ratePerHour: null,
-    flatRate: null,
-    hourlyDelta: -25,
-    percentDelta: null,
-    unit: "modifier",
-    isDefault: false,
-  },
-  {
-    label: "Public Holiday",
-    ratePerHour: null,
-    flatRate: null,
-    hourlyDelta: null,
-    percentDelta: 0.25,
-    unit: "modifier",
-    isDefault: false,
-  },
-];
 
 /**
  * GET /api/business/rates - Returns all rate configs, seeding any missing defaults on each call.
@@ -96,12 +31,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   let rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
 
   const existingLabels = new Set(rates.map((r) => r.label));
-  const missing = DEFAULTS.filter((d) => !existingLabels.has(d.label));
+  const missing = DEFAULT_RATE_ROWS.filter((d) => !existingLabels.has(d.label));
   if (missing.length > 0) {
     await prisma.rateConfig.createMany({ data: missing });
   }
 
-  // Passive cleanup: Student and Complex are no longer part of DEFAULTS.
+  // Passive cleanup: Student and Complex are no longer part of DEFAULT_RATE_ROWS.
   const hasRetiredLabels = rates.some((r) => r.label === "Student" || r.label === "Complex");
   if (hasRetiredLabels) {
     await prisma.rateConfig.deleteMany({ where: { label: { in: ["Student", "Complex"] } } });
@@ -221,7 +156,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
   await prisma.rateConfig.deleteMany({});
-  await prisma.rateConfig.createMany({ data: DEFAULTS });
+  await prisma.rateConfig.createMany({ data: DEFAULT_RATE_ROWS });
   const rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
   // Next 16's revalidateTag requires a second CacheLifeConfig arg.
   revalidateTag(RATE_CONFIG_TAG, {});

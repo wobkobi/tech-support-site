@@ -64,7 +64,7 @@ export const DISCOUNT_TYPE: Record<
 
 /** What the amount field means for each type, shown beside the input. */
 export const AMOUNT_LABEL: Record<PromoType, string> = {
-  flat: "Hourly rate ($/hr)",
+  flat: "Standard rate during the promo ($/hr)",
   percent: "Discount (%)",
   fixed: "Amount off ($)",
   travel: "Travel discount (%)",

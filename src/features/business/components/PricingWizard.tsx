@@ -58,6 +58,8 @@ function formatDuration(mins: number): string {
 interface QuoteInputs {
   /** Undiscounted $/hr for the chosen meeting mode. */
   fullRate: number;
+  /** Undiscounted Standard $/hr, which a flat promo replaces. */
+  baseRate: number;
   /** AI-estimated labour minutes. */
   estimatedMins: number;
   /** AI confidence, which sets the band width. */
@@ -156,7 +158,7 @@ function buildPriceRange(
   // figure below, so nothing is priced twice.
   const undiscounted = buildVisitRange(inputs.fullRate);
   const promo = promoForSpend(resolvedPromo, undiscounted.low + undiscounted.travel);
-  const promoRate = applyPromoToHourlyRate(inputs.fullRate, promo);
+  const promoRate = applyPromoToHourlyRate(inputs.fullRate, promo, inputs.baseRate);
   const promoApplied = promoRate < inputs.fullRate;
 
   // Quote-level promo types (fixed amount, free travel) act here, after the
@@ -454,6 +456,7 @@ export function PricingWizard({
 
     const inputs: QuoteInputs = {
       fullRate,
+      baseRate: baseStandard,
       estimatedMins,
       confidence,
       tasks,

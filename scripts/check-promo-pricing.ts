@@ -11,6 +11,7 @@
 // Run with: npm run check:promo-pricing
 
 import { computeJobPromoDiscount, formatMoneyCompact } from "@/features/business/lib/business";
+import { DEFAULT_RATE_ROWS, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
 import { validateDiscount, validateKind } from "@/features/business/lib/promo-validation";
 import {
   applyPromoToHourlyRate,
@@ -27,6 +28,7 @@ import {
   type ActivePromo,
   type QuoteParts,
 } from "@/features/business/lib/promos";
+import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 
 let failures = 0;
 
@@ -734,6 +736,99 @@ function main(): void {
     "and a single line exactly as before",
     computeJobPromoDiscount(job(65, false), promo("flat_hourly", 55), 0, BIZ),
     10,
+  );
+
+  // ---- A flat rate with the Standard rate known ----
+  //
+  // A flat promo is a cut of (Standard - flat) off every home-rate hour, so each
+  // modifier keeps its usual gap from Standard. Rates come from the seeded
+  // defaults and expectations are derived from them, so the cases track the
+  // real rate card instead of repeating its figures.
+
+  /**
+   * The seeded hourly delta for one modifier label.
+   * @param label - RateConfig label.
+   * @returns Its hourlyDelta.
+   */
+  const seededDelta = (label: string): number => {
+    const delta = DEFAULT_RATE_ROWS.find((r) => r.label === label)?.hourlyDelta;
+    if (delta == null) throw new Error(`No seeded hourlyDelta for ${label}`);
+    return delta;
+  };
+  const STANDARD = FALLBACK_BASE_RATE;
+  // Any flat rate under Standard; the gap is the per-hour cut.
+  const FLAT = STANDARD - 10;
+  const CUT = STANDARD - FLAT;
+  const REMOTE_DELTA = seededDelta("Remote");
+  const PHONE_DELTA = seededDelta("Phone");
+  const HOLIDAY_UPLIFT = DEFAULT_SETTINGS.pricing.publicHolidayUplift;
+  const remoteRate = STANDARD + REMOTE_DELTA;
+  const phoneRate = STANDARD + PHONE_DELTA;
+  const holidayRate = STANDARD * (1 + HOLIDAY_UPLIFT);
+
+  const cutJob = job(remoteRate, false);
+  cutJob.tasks.push({ ...cutJob.tasks[0]!, unitPrice: phoneRate, lineTotal: phoneRate });
+  expectEqual(
+    "a flat rate cuts every home line by Standard minus flat",
+    computeJobPromoDiscount(cutJob, promo("flat_hourly", FLAT), 0, BIZ, undefined, STANDARD),
+    2 * CUT,
+  );
+  const tinyRate = CUT / 2;
+  expectEqual(
+    "the cut never takes a line below zero",
+    computeJobPromoDiscount(
+      job(tinyRate, false),
+      promo("flat_hourly", FLAT),
+      0,
+      BIZ,
+      undefined,
+      STANDARD,
+    ),
+    tinyRate,
+  );
+  expectEqual(
+    "business labour is still excluded from the cut",
+    computeJobPromoDiscount(
+      job(STANDARD, true),
+      promo("flat_hourly", FLAT),
+      0,
+      BIZ,
+      undefined,
+      STANDARD,
+    ),
+    0,
+  );
+  expectEqual(
+    "a flat rate above Standard cuts nothing",
+    computeJobPromoDiscount(
+      job(remoteRate, false),
+      promo("flat_hourly", STANDARD + 1),
+      0,
+      BIZ,
+      undefined,
+      STANDARD,
+    ),
+    0,
+  );
+  expectEqual(
+    "the rate helper cuts a modified rate the same way",
+    applyPromoToHourlyRate(phoneRate, promo("flat_hourly", FLAT), STANDARD),
+    phoneRate - CUT,
+  );
+  expectEqual(
+    "the rate helper still reads a bare rate as Standard",
+    applyPromoToHourlyRate(STANDARD, promo("flat_hourly", FLAT)),
+    FLAT,
+  );
+  expectEqual(
+    "the pricing page's modifier rate keeps its gap from the flat rate",
+    promoModifierRate(STANDARD, remoteRate, "delta", promo("flat_hourly", FLAT)),
+    FLAT + REMOTE_DELTA,
+  );
+  expectEqual(
+    "a public holiday takes the same per-hour cut",
+    promoModifierRate(STANDARD, holidayRate, "uplift", promo("flat_hourly", FLAT)),
+    holidayRate - CUT,
   );
 
   // ---- The rate card ----

@@ -15,6 +15,7 @@ import {
   formatMoneyCompact,
 } from "@/features/business/lib/business";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 
 /** GST is back-calculated from the inclusive total via calcGstFromInclusive when enabled. */
 export const GST_RATE = 0.15;
@@ -54,6 +55,79 @@ export const FALLBACK_BASE_RATE = 65;
 
 /** Fallback Business modifier ($/hr on top of the base rate) when no Business RateConfig row exists; mirrors the seed default. */
 export const FALLBACK_BUSINESS_DELTA = 20;
+
+/**
+ * Default RateConfig rows, seeded by the rates route when a label is missing.
+ * One base hourly rate (Standard), $/hr modifiers, and a percentage one (Public
+ * Holiday). No separate Complex tier - everything bills at Standard plus
+ * modifiers. The travel $/hr is a pricing setting, not a rate row. Standard and
+ * Business read the fallback constants above, so the seed and the fallbacks
+ * cannot disagree.
+ */
+export const DEFAULT_RATE_ROWS = [
+  {
+    label: "Standard",
+    ratePerHour: FALLBACK_BASE_RATE,
+    flatRate: null,
+    hourlyDelta: null,
+    percentDelta: null,
+    unit: "hour",
+    isDefault: true,
+  },
+  {
+    // Business callouts: on-site work for companies bills above the home
+    // Standard rate. Surfaced on /business as baseRate + this delta; kept off
+    // the consumer pricing accordion.
+    label: "Business",
+    ratePerHour: null,
+    flatRate: null,
+    hourlyDelta: FALLBACK_BUSINESS_DELTA,
+    percentDelta: null,
+    unit: "modifier",
+    isDefault: false,
+  },
+  {
+    label: "At home",
+    ratePerHour: null,
+    flatRate: null,
+    hourlyDelta: -15,
+    percentDelta: null,
+    unit: "modifier",
+    isDefault: false,
+  },
+  {
+    label: "Remote",
+    ratePerHour: null,
+    flatRate: null,
+    hourlyDelta: -10,
+    percentDelta: null,
+    unit: "modifier",
+    isDefault: false,
+  },
+  {
+    // Phone-delivered work: no screen share, no travel - cheaper again than
+    // Remote. Quick calls are often not charged at all (operator's call);
+    // this rate covers the ones long enough to bill.
+    label: "Phone",
+    ratePerHour: null,
+    flatRate: null,
+    hourlyDelta: -25,
+    percentDelta: null,
+    unit: "modifier",
+    isDefault: false,
+  },
+  {
+    // The row only surfaces the modifier; the charged uplift is the pricing
+    // setting, so the seed takes its default from there.
+    label: "Public Holiday",
+    ratePerHour: null,
+    flatRate: null,
+    hourlyDelta: null,
+    percentDelta: DEFAULT_SETTINGS.pricing.publicHolidayUplift,
+    unit: "modifier",
+    isDefault: false,
+  },
+];
 
 /** Region label for nationwide NZ public holidays in the PublicHoliday table. */
 export const NZ_REGION = "NZ";

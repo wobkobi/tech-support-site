@@ -624,20 +624,33 @@ export async function isPromoCodeTaken(code: string | null, excludeId?: string):
 }
 
 /**
- * Applies a promo to one hourly rate. Flat overrides (capped at original); percent multiplies.
+ * Applies a promo to one hourly rate. Percent multiplies.
+ *
+ * A flat promo sets the Standard rate, and every other home rate moves down by
+ * the same dollars (Standard - flat per hour), so each modifier keeps its usual
+ * gap from Standard. Pass the Standard rate as `baseRate` when pricing a
+ * modified rate; without it the rate is treated as the Standard one, which is
+ * the plain min(rate, flat) override.
  * @param rate - Pre-promo $/hr.
  * @param promo - Active promo or null.
+ * @param baseRate - The undiscounted Standard rate the flat promo replaces; defaults to `rate`.
  * @returns Effective $/hr.
  */
-export function applyPromoToHourlyRate(rate: number, promo: ActivePromo | null): number {
+export function applyPromoToHourlyRate(
+  rate: number,
+  promo: ActivePromo | null,
+  baseRate: number = rate,
+): number {
   if (!promo) return rate;
   // fixed_amount and free_travel act on the priced quote, not the rate.
   if (promo.discountType === "fixed_amount" || promo.discountType === "free_travel") {
     return rate;
   }
   if (promo.flatHourlyRate !== null) {
-    // Never raise the price - a promo above the base rate is a misconfig.
-    return Math.min(rate, promo.flatHourlyRate);
+    // Never raise the price - a promo above the base rate is a misconfig, so
+    // the cut floors at zero, and so does the discounted rate.
+    const cut = Math.max(0, baseRate - promo.flatHourlyRate);
+    return Math.round(Math.max(0, rate - cut) * 100) / 100;
   }
   if (promo.percentDiscount !== null) {
     const factor = Math.max(0, 1 - promo.percentDiscount);
@@ -727,6 +740,11 @@ export function promoModifierRate(
   promo: ActivePromo | null,
 ): number {
   if (!promo) return modifierRate;
+  // A flat promo is a per-hour cut off the Standard rate, so it has to know
+  // that rate rather than treating the modified one as Standard.
+  if (kind === "delta" && promo.flatHourlyRate !== null) {
+    return applyPromoToHourlyRate(modifierRate, promo, baseRate);
+  }
   if (kind === "delta") return promoDisplayRate(modifierRate, promo);
   const discountPerHour = baseRate - promoDisplayRate(baseRate, promo);
   return Math.round((modifierRate - discountPerHour) * 100) / 100;

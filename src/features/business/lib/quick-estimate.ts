@@ -211,7 +211,7 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
   );
   const promo = promoForSpend(dateGated, undiscounted.low + rawTravel);
 
-  const promoRate = applyPromoToHourlyRate(fullRate, promo);
+  const promoRate = applyPromoToHourlyRate(fullRate, promo, baseStandard);
   const band = priceRangeFor(
     effectiveMins,
     promoRate,

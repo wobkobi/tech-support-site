@@ -520,7 +520,18 @@ export function CalculatorView({
   // page and the invoice cannot disagree about which modifier means business.
   const businessModifierId =
     rates.find((r) => r.label === "Business" && r.unit === "modifier")?.id ?? null;
-  const jobPricing = { ...pricing, holidayUplift: holiday.uplift, businessModifierId };
+  // The Standard rate a flat promo cuts from, picked the same way
+  // getPublicPricing picks the base rate.
+  const standardRate =
+    rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
+    rates.find((r) => r.ratePerHour !== null && r.unit === "hour")?.ratePerHour ??
+    null;
+  const jobPricing = {
+    ...pricing,
+    holidayUplift: holiday.uplift,
+    businessModifierId,
+    standardRate,
+  };
   const totals = calcJobTotal(job, !skipPromo ? activePromo : null, jobPricing);
   const showTotalBar = !finishInView && totals.total > 0;
   // Memoise the flattened line items so the preview panel's React.memo can
