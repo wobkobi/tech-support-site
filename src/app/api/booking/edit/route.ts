@@ -24,10 +24,10 @@ import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-crea
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { sendOwnerPush } from "@/features/notifications/lib/push";
 import {
-  cancelHeldBookingEmails,
   sendCustomerBookingConfirmation,
   sendOwnerBookingNotification,
-} from "@/features/reviews/lib/email";
+} from "@/features/reviews/lib/email-booking";
+import { cancelHeldBookingEmails } from "@/features/reviews/lib/email-core";
 import { errorResponse } from "@/shared/lib/api-response";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateTimeShort } from "@/shared/lib/date-format";

@@ -31,7 +31,7 @@ import { sendOwnerPush } from "@/features/notifications/lib/push";
 import {
   sendCustomerBookingConfirmation,
   sendOwnerBookingNotification,
-} from "@/features/reviews/lib/email";
+} from "@/features/reviews/lib/email-booking";
 import { errorResponse } from "@/shared/lib/api-response";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateTimeShort } from "@/shared/lib/date-format";

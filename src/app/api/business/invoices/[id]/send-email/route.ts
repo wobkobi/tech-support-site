@@ -12,7 +12,7 @@ import {
   toInvoiceEmailPayload,
 } from "@/features/business/lib/invoice-email-request";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
-import { sendInvoiceEmail } from "@/features/reviews/lib/email";
+import { sendInvoiceEmail } from "@/features/reviews/lib/email-invoice";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";

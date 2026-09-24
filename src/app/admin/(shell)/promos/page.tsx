@@ -3,7 +3,9 @@
 // boundary, and renders PromosView for inline CRUD of time-limited pricing offers.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
+import type { PromoPreviewRates } from "@/features/business/components/PromoPricePreview";
 import { PromosView } from "@/features/business/components/PromosView";
+import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
@@ -69,7 +71,22 @@ export interface PromoRow {
 export default async function AdminPromosPage(): Promise<React.ReactElement> {
   await requireAdminAuth();
 
-  const promos = await prisma.promo.findMany({ orderBy: { startAt: "desc" } });
+  const [promos, pricing, policy] = await Promise.all([
+    prisma.promo.findMany({ orderBy: { startAt: "desc" } }),
+    getPublicPricing(),
+    getPolicy(),
+  ]);
+  const rates: PromoPreviewRates = {
+    baseRate: pricing.baseRate,
+    businessRate: pricing.businessRate,
+    travelRatePerHour: pricing.travelRatePerHour,
+    minTravelCharge: policy.MIN_TRAVEL_CHARGE,
+    modifiers: pricing.modifiers.map((m) => ({
+      label: m.label,
+      kind: m.kind,
+      effectiveRate: m.effectiveRate,
+    })),
+  };
   const initial: PromoRow[] = promos.map((p) => ({
     id: p.id,
     title: p.title,
@@ -121,7 +138,7 @@ export default async function AdminPromosPage(): Promise<React.ReactElement> {
           <li>A code promo is never advertised, on the banner or anywhere else.</li>
         </ul>
       </details>
-      <PromosView initial={initial} />
+      <PromosView initial={initial} rates={rates} />
     </>
   );
 }

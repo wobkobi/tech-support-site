@@ -15,12 +15,12 @@ import {
   patchBookingEvent,
   SCHEDULE_CALENDAR_TAG,
 } from "@/features/calendar/lib/google-calendar";
+import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 import {
-  cancelHeldBookingEmails,
   sendCustomerBookingConfirmation,
-  sendCustomerReviewRequest,
   sendOwnerBookingNotification,
-} from "@/features/reviews/lib/email";
+} from "@/features/reviews/lib/email-booking";
+import { cancelHeldBookingEmails } from "@/features/reviews/lib/email-core";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { formatDateTimeShort } from "@/shared/lib/date-format";

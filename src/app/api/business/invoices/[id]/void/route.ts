@@ -9,7 +9,7 @@
 import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
 import { parseInvoiceEmailOverrides } from "@/features/business/lib/invoice-email-request";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
-import { sendVoidNotification } from "@/features/reviews/lib/email";
+import { sendVoidNotification } from "@/features/reviews/lib/email-invoice";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";

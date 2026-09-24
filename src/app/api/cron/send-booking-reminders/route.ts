@@ -17,7 +17,7 @@ import {
   combineUnitAndAddress,
 } from "@/features/booking/lib/booking";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
-import { sendBookingReminderEmail } from "@/features/reviews/lib/email";
+import { sendBookingReminderEmail } from "@/features/reviews/lib/email-booking";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorised } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";

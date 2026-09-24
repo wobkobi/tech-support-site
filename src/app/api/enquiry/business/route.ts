@@ -8,7 +8,7 @@ import {
   sendBusinessEnquiryAck,
   sendBusinessEnquiryNotification,
   type BusinessEnquiryData,
-} from "@/features/reviews/lib/email";
+} from "@/features/reviews/lib/email-enquiry";
 import { errorResponse } from "@/shared/lib/api-response";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { validatePhone } from "@/shared/lib/normalise-phone";

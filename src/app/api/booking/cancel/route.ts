@@ -11,10 +11,8 @@ import { releaseBookingRedemptions } from "@/features/business/lib/promo-redempt
 import { parseString } from "@/features/business/lib/validation";
 import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { sendOwnerPush } from "@/features/notifications/lib/push";
-import {
-  cancelHeldBookingEmails,
-  sendOwnerBookingCancellation,
-} from "@/features/reviews/lib/email";
+import { sendOwnerBookingCancellation } from "@/features/reviews/lib/email-booking";
+import { cancelHeldBookingEmails } from "@/features/reviews/lib/email-core";
 import { errorResponse } from "@/shared/lib/api-response";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
