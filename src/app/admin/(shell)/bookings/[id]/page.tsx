@@ -8,6 +8,7 @@
 // instrumented.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { InfoRow } from "@/features/admin/components/ui/InfoRow";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { BookingActions } from "@/features/booking/components/admin/BookingActions";
@@ -44,28 +45,6 @@ const STATUS_TONE: Record<string, StatusTone> = {
 
 const MEETING_LABEL: Record<string, string> = { in_person: "In-person", remote: "Remote" };
 const DURATION_LABEL: Record<string, string> = { short: "Short job", long: "Long job" };
-
-/**
- * A label/value row inside a rail card.
- * @param props - Component props.
- * @param props.label - Left-hand label.
- * @param props.children - Right-hand value.
- * @returns The row element.
- */
-function InfoRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <div className="flex justify-between gap-3">
-      <span className="text-admin-muted">{label}</span>
-      <span className="text-right font-medium text-admin-text">{children}</span>
-    </div>
-  );
-}
 
 /**
  * Small chip used in the page header for meeting type / duration.
@@ -215,6 +194,7 @@ export default async function BookingDetailPage({
               phone={booking.phone}
               address={booking.address}
               notes={booking.notes}
+              accessNotes={booking.accessNotes}
             />
           </Card>
 

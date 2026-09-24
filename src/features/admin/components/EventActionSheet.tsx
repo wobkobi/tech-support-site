@@ -250,7 +250,7 @@ export function EventActionSheet({
           </a>
 
           {isEditLocked && isOpen && (
-            <p className="px-1 text-center text-xs text-admin-faint">
+            <p className="px-1 text-center text-sm text-admin-faint">
               Cancelling locks {lockHours}h after a booking ends. Completing stays open.
             </p>
           )}

@@ -172,7 +172,7 @@ export function MigrateToSubscriptionDialog({
         </div>
 
         {recurring && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Found <strong>{matchList.length}</strong> expenses from {expense.supplier} for &ldquo;
             {expense.description}&rdquo; - this looks recurring, so they migrate as one subscription
             (frequency guessed from their dates). The expense entries stay as history.
@@ -207,7 +207,7 @@ export function MigrateToSubscriptionDialog({
           />
         </label>
 
-        <p className="text-xs text-admin-muted">
+        <p className="text-sm text-admin-muted">
           The expense entry is kept as a historical record (and stays on the Expenses sheet). This
           creates a new site-only subscription - nothing on the sheet moves or is deleted.
         </p>

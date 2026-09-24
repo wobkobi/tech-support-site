@@ -223,9 +223,9 @@ export function EventPickerSection({
   // merge is undone by unticking rather than starting over.
   const pickerList = (
     <div className="mt-3 max-h-64 space-y-1 overflow-y-auto">
-      {events === null && <p className="text-xs text-slate-400">Loading events…</p>}
+      {events === null && <p className="text-sm text-slate-400">Loading events…</p>}
       {events !== null && events.length === 0 && (
-        <p className="text-xs text-slate-400">No booking-calendar events in the last two weeks.</p>
+        <p className="text-sm text-slate-400">No booking-calendar events in the last two weeks.</p>
       )}
       {(events ?? []).map((ev) => {
         const billed = billedIds.includes(ev.id);
@@ -339,7 +339,7 @@ export function EventPickerSection({
       {pickerOpen && pickerList}
 
       {merged && unbilledGap > 0 && (
-        <p className="text-xs text-slate-500">
+        <p className="text-sm text-slate-500">
           {minsToHoursLabel(unbilledGap)} between visits is not billed - each event is its own slot.
         </p>
       )}

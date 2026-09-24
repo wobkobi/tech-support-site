@@ -59,6 +59,8 @@ interface BookingRequestPayload {
   address?: string;
   meetingType: "in-person" | "remote";
   notes: string;
+  /** Optional parking / directions / access notes from the form's second box. */
+  accessNotes?: string;
   /** Honeypot field - real users never fill this; bots usually do. */
   website?: string;
   /**
@@ -101,6 +103,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       address,
       meetingType,
       notes,
+      accessNotes,
       website,
       idempotencyKey,
       estimateId,
@@ -133,7 +136,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const payloadCheck = validateBookingPayloadFields(
-      { name, email, notes, dateKey, timeOfDay, duration, meetingType, address, phone },
+      {
+        name,
+        email,
+        notes,
+        accessNotes,
+        dateKey,
+        timeOfDay,
+        duration,
+        meetingType,
+        address,
+        phone,
+      },
       { requireEmail: true },
     );
     if (!payloadCheck.valid) {
@@ -250,6 +264,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    const cleanAccessNotes = typeof accessNotes === "string" ? accessNotes.trim() || null : null;
+
     // Build notes
     let bookingNotes = `${notes.trim()}\n\n`;
     const timeLabel =
@@ -279,6 +295,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       email: identity.email,
       isRemote: meetingType === "remote",
       userNotes: notes.trim(),
+      accessNotes: cleanAccessNotes,
       manageUrl: `${siteUrl}/booking/edit?token=${encodeURIComponent(cancelToken)}`,
       cancelUrl: `${siteUrl}/booking/cancel?token=${encodeURIComponent(cancelToken)}`,
     });
@@ -376,6 +393,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           email: normalisedEmail,
           phone: phoneE164,
           notes: bookingNotes,
+          accessNotes: cleanAccessNotes,
           startAt,
           endAt,
           status: "confirmed",
@@ -470,6 +488,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           cancelToken: booking.cancelToken,
           address: combineUnitAndAddress(booking.unit ?? "", booking.address ?? ""),
           meetingType: booking.meetingType,
+          accessNotes: booking.accessNotes,
         }),
         ...(comms.pushOnBooking
           ? [
@@ -496,6 +515,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                 address: combineUnitAndAddress(booking.unit ?? "", booking.address ?? ""),
                 meetingType: booking.meetingType,
                 rescheduleCount: booking.rescheduleCount,
+                accessNotes: booking.accessNotes,
               }),
             ]
           : []),

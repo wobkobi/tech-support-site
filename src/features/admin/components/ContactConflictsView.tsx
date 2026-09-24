@@ -84,7 +84,7 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
     return (
       <Card className="text-center">
         <p className="text-sm font-medium text-admin-text">No conflicts to review.</p>
-        <p className="mt-1 text-xs text-admin-faint">
+        <p className="mt-1 text-sm text-admin-faint">
           All contact fields are in sync between the site and Google Contacts.
         </p>
         <div className="mt-4 flex justify-center">{backLink}</div>

@@ -6,6 +6,7 @@
 
 import { ContactDetailActions } from "@/features/admin/components/ContactDetailActions";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { InfoRow } from "@/features/admin/components/ui/InfoRow";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
@@ -14,6 +15,7 @@ import { loadContact360 } from "@/features/contacts/lib/contact-360";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { nzDateKey } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type React from "react";
@@ -42,28 +44,6 @@ const KIND_BADGE: Record<EventKind, { letter: string; className: string }> = {
   payment: { letter: "$", className: "bg-emerald-500/15 text-emerald-600" },
   review: { letter: "R", className: "bg-yellow-500/15 text-yellow-600" },
 };
-
-/**
- * A label/value row in the fields rail, mirroring the invoice detail layout.
- * @param props - Component props.
- * @param props.label - Row label.
- * @param props.children - Row value.
- * @returns Row element.
- */
-function InfoRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <div className="flex justify-between gap-3">
-      <dt className="shrink-0 text-admin-muted">{label}</dt>
-      <dd className="text-right font-medium text-admin-text">{children}</dd>
-    </div>
-  );
-}
 
 const NONE = <span className="text-admin-faint">None</span>;
 
@@ -140,7 +120,7 @@ export default async function ContactDetailPage({
             retainerTier={contact.retainerTier}
             retainerPrice={contact.retainerPrice}
             retainerHours={contact.retainerHours}
-            retainerSince={contact.retainerSince?.toISOString().slice(0, 10) ?? null}
+            retainerSince={contact.retainerSince ? nzDateKey(contact.retainerSince) : null}
             retainerNotes={contact.retainerNotes}
             siteNotes={contact.siteNotes}
           />

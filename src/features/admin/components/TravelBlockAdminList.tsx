@@ -335,7 +335,7 @@ export function TravelBlockAdminList({
                   {!isPast &&
                     (b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
                     b.transportMode !== null && (
-                      <p className="mt-1 text-xs text-amber-700">
+                      <p className="mt-1 text-sm text-amber-700">
                         Mode changed - recalculate to update travel times
                       </p>
                     )}
@@ -412,7 +412,7 @@ export function TravelBlockAdminList({
                   {!isPast &&
                     (b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
                     b.customOrigin !== null && (
-                      <p className="mt-1 text-xs text-amber-700">
+                      <p className="mt-1 text-sm text-amber-700">
                         Origin changed - recalculate to update travel times
                       </p>
                     )}
@@ -451,7 +451,7 @@ export function TravelBlockAdminList({
                         : formatMinutes(b.rawTravelBackMinutes, b.roundedBackMinutes)}
                     </p>
                     {b.travelBackSuppressed ? (
-                      <p className="text-xs text-admin-faint">
+                      <p className="text-sm text-admin-faint">
                         no return trip - suppressed by design
                       </p>
                     ) : !isPast ? (

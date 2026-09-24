@@ -17,6 +17,8 @@ export default function EditInvoiceLoading(): React.ReactElement {
               <div key={i} className="h-16 animate-pulse rounded-lg bg-admin-border" />
             ))}
           </div>
+          {/* "Describe the job" AI box. */}
+          <div className="h-56 animate-pulse rounded-xl bg-admin-border" />
           <div className="h-40 animate-pulse rounded-lg bg-admin-border" />
           <div className="h-24 animate-pulse rounded-lg bg-admin-border" />
         </div>

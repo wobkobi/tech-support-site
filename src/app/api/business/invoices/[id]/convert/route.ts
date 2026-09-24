@@ -4,6 +4,7 @@
 // re-syncs the PDF to Drive under the new number. The row keeps its id, so links and
 // history carry over.
 
+import { completeBilledBookings } from "@/features/booking/lib/complete-billed-bookings.server";
 import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";
 import {
   getNextInvoiceNumber,
@@ -97,6 +98,15 @@ export async function POST(
   }
 
   await writeBackInvoiceCounter(sheetNextCount);
+  // The quote is now billed work, so the booking it priced is done.
+  await completeBilledBookings(
+    {
+      bookingId: converted.bookingId,
+      calendarEventId: converted.calendarEventId,
+      calendarEventIds: converted.calendarEventIds,
+    },
+    "[invoices/convert]",
+  );
   console.log(`[invoices/convert] Quote ${previousNumber} converted to ${converted.number}.`);
 
   // Re-render + re-upload the PDF under the new number (awaited; never throws).

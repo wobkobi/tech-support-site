@@ -7,25 +7,13 @@
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
-import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
-import type { SettingsGroup } from "@/shared/lib/settings/types";
+import { asSettingsGroup } from "@/shared/lib/settings/defaults";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const GROUPS = Object.keys(DEFAULT_SETTINGS) as SettingsGroup[];
-
 /** How many history rows to surface per group. */
 const HISTORY_LIMIT = 20;
-
-/**
- * Narrows a raw route param to a known settings group.
- * @param value - Raw `[group]` path segment.
- * @returns The group when valid, else null.
- */
-function asGroup(value: string): SettingsGroup | null {
-  return (GROUPS as string[]).includes(value) ? (value as SettingsGroup) : null;
-}
 
 /**
  * Lists the top-level keys whose JSON differs between two stored group values.
@@ -63,7 +51,7 @@ export async function GET(
   if (!(await isAdminRequest(request))) {
     return errorResponse("Unauthorized", 401);
   }
-  const group = asGroup((await params).group);
+  const group = asSettingsGroup((await params).group);
   if (!group) return errorResponse("Unknown settings group", 404);
 
   const rows = await prisma.settingAudit.findMany({

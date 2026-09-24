@@ -24,7 +24,7 @@ interface ToastOptions {
 }
 
 /** The value returned by {@link useToast}. */
-export interface ToastApi {
+interface ToastApi {
   /**
    * Shows a toast.
    * @param message - The message text.

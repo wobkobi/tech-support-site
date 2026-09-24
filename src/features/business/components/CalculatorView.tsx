@@ -20,10 +20,14 @@ import { RateConfigPanel } from "@/features/business/components/calculator/RateC
 import { TasksSection } from "@/features/business/components/calculator/TasksSection";
 import { TravelSection } from "@/features/business/components/calculator/TravelSection";
 import {
+  JOB_DESCRIPTION_BOOKED_HINT,
+  JOB_DESCRIPTION_HINT,
+  JOB_DESCRIPTION_PLACEHOLDER,
+} from "@/features/business/lib/ai-input-copy";
+import {
   buildIncomeDescription,
   calcJobTotal,
   collapseToWindow,
-  composeDescription,
   effectiveHourlyRate,
   enforceMinBillable,
   explicitRoundingAllowanceMins,
@@ -37,6 +41,15 @@ import {
 } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import {
+  buildParseInput,
+  describeFit,
+  fitTasksToWindow,
+  hydrateParsedTasks,
+  parsedAutoTravel,
+  parsedCostEntries,
+  parsedWindow,
+} from "@/features/business/lib/parse-hydrate";
+import {
   assessCancellation,
   calcTravelCharge,
   cancellationFeeLabel,
@@ -46,7 +59,6 @@ import {
   type CancelMeetingType,
 } from "@/features/business/lib/pricing-policy";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
-import { extractRanges } from "@/features/business/lib/time-parse";
 import type {
   EventPrefill,
   GoogleContact,
@@ -64,9 +76,9 @@ import { cn } from "@/shared/lib/cn";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import {
-  dateKeyParts,
-  getPacificAucklandOffset,
-  nzDateParts,
+  addDaysToDateKey,
+  nextNzWallClockOnWeekday,
+  nzNowTime,
   timeParts,
 } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
@@ -74,24 +86,14 @@ import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * Returns the YYYY-MM-DD string for today + n days.
+ * Returns the NZ calendar date (YYYY-MM-DD) n days from today.
  * @param n - Number of days to add to today.
  * @returns ISO date string (YYYY-MM-DD).
  */
 function addDaysISO(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return addDaysToDateKey(todayISO(), n);
 }
 
-/**
- * Returns the current local time formatted as HH:MM.
- * @returns The current time string in HH:MM format.
- */
-function nowTime(): string {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
 /**
  * Adds one hour to a time string, wrapping around at midnight.
  * @param t - A time string in HH:MM format.
@@ -102,17 +104,6 @@ function addHour(t: string): string {
   return `${String((h + 1) % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-/**
- * Adds minutes to a time string, clamped within the same day (00:00-23:59).
- * @param t - A time string in HH:MM format.
- * @param mins - Minutes to add (may be negative).
- * @returns The shifted time string in HH:MM format.
- */
-function addMinsToTime(t: string, mins: number): string {
-  const [h, m] = timeParts(t);
-  const total = Math.max(0, Math.min(24 * 60 - 1, h * 60 + m + Math.round(mins)));
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-}
 /**
  * Builds a UTC ISO timestamp for an HH:MM NZ wall-clock start on the next
  * occurrence of the job date's WEEKDAY (today counts while the time is still
@@ -127,23 +118,7 @@ function jobStartIsoFromTime(hhmm: string, anchorDate?: string): string | null {
   if (!/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
   const [h, m] = timeParts(hhmm);
   if (h < 0 || h > 23 || m < 0 || m > 59) return null;
-  const [y, mo, d] = nzDateParts(new Date());
-  // Weekday of a Y-M-D is timezone-independent when computed in UTC.
-  const todayDow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
-  let daysAhead = 0;
-  if (anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate)) {
-    const [ay, am, ad] = dateKeyParts(anchorDate);
-    const targetDow = new Date(Date.UTC(ay, am - 1, ad)).getUTCDay();
-    daysAhead = (targetDow - todayDow + 7) % 7;
-  }
-  const offset = getPacificAucklandOffset(y, mo, d);
-  let utc = new Date(Date.UTC(y, mo - 1, d + daysAhead, h - offset, m, 0));
-  if (utc.getTime() < Date.now()) {
-    // Same-day time already passed: next day without an anchor, next week
-    // with one (keeping the weekday).
-    utc = new Date(utc.getTime() + (daysAhead === 0 && !anchorDate ? 1 : 7) * 24 * 60 * 60 * 1000);
-  }
-  return utc.toISOString();
+  return nextNzWallClockOnWeekday(h, m, anchorDate).toISOString();
 }
 
 /**
@@ -626,7 +601,7 @@ export function CalculatorView({
     setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
   }
 
-  // Mount seeding + contacts fetch. The "now" times must seed in an effect - nowTime() at
+  // Mount seeding + contacts fetch. The "now" times must seed in an effect - nzNowTime() at
   // render would mismatch between server render and hydration. Contacts stay a client
   // fetch: the People API pages through every connection, far too slow to block on.
   useEffect(() => {
@@ -659,7 +634,7 @@ export function CalculatorView({
       setAddressModeState(draft.addressMode ?? "custom");
       /* eslint-enable react-hooks/set-state-in-effect */
     } else if (!eventPrefill) {
-      const now = nowTime();
+      const now = nzNowTime();
       setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
     }
     // The prefill outranks the draft for dates/client/travel, but the description is the
@@ -829,155 +804,32 @@ export function CalculatorView({
    * @param result - The parsed job response returned by the AI.
    */
   function applyParseResult(result: ParseJobResponse): void {
-    const includeTravelDefault = (result.travel?.durationMins ?? 0) > 0;
-
-    // Out-of-session work (a call after the visit) goes into the follow-up
-    // field; the parser includes it inside durationMins, so in-session slot
-    // time is durationMins minus this.
-    const outMins = Math.max(0, Math.round(result.outOfSessionMins ?? 0));
-    setFollowUpMins(outMins);
-
-    // Prefer the per-range list when the parser found segments; otherwise synthesise one
-    // slot from startTime/endTime, or as a last resort anchor the in-session duration to
-    // "now". The billable window is always slot time + follow-up.
-    let parsedWindowMin = outMins;
-    // A merged job's slots come from several corrected calendar windows - exact, and not
-    // reconstructable from free text - so the parse fills everything but the times. On a
-    // single event the description wins, and "Reset to event times" undoes a bad guess.
-    const mergedSlots = eventPrefill && eventPrefill.slots.length > 1 ? eventPrefill.slots : null;
-    if (mergedSlots) {
-      parsedWindowMin += mergedSlots.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
-    } else if (result.ranges && result.ranges.length > 0) {
-      setTimeRanges(result.ranges.map((r) => ({ startTime: r.startTime, endTime: r.endTime })));
-      parsedWindowMin += result.ranges.reduce(
-        (s, r) => s + timeDiffMins(r.startTime, r.endTime),
-        0,
-      );
-    } else if (result.startTime && result.endTime) {
-      setTimeRanges([{ startTime: result.startTime, endTime: result.endTime }]);
-      parsedWindowMin += timeDiffMins(result.startTime, result.endTime);
-    } else if (result.startTime) {
-      // Start stated but no end: close the slot at the event's end when billing
-      // a booked job, else at "now". Anchoring to now would end a past job at
-      // today's wall clock instead of inside its actual window.
-      const end = eventPrefill?.slots[0]?.endTime ?? nowTime();
-      setTimeRanges([{ startTime: result.startTime, endTime: end }]);
-      parsedWindowMin += timeDiffMins(result.startTime, end);
-    } else if (result.durationMins !== null) {
-      // Duration only ("was there about 2 hours"): anchor the slot to the
-      // event's start when billing a booked job, else to now-minus-duration.
-      const inSessionMins = Math.max(0, result.durationMins - outMins);
-      const anchor = eventPrefill?.slots[0] ?? null;
-      let startTime: string;
-      let endTime: string;
-      if (anchor) {
-        startTime = anchor.startTime;
-        endTime = addMinsToTime(anchor.startTime, inSessionMins);
-      } else {
-        endTime = nowTime();
-        startTime = addMinsToTime(endTime, -inSessionMins);
-      }
-      setTimeRanges([{ startTime, endTime }]);
-      parsedWindowMin = outMins + inSessionMins;
-    }
-    // The server's durationMins is the billable figure after its clamps: free work the
-    // description states is already subtracted, and the longest-billable-day ceiling
-    // applied. Fitting the tasks to the raw range sum would grow them back over both.
-    // A merged job keeps its slot sum - its windows are the corrected calendar times.
-    if (
-      !mergedSlots &&
-      result.durationMins !== null &&
-      result.durationMins > 0 &&
-      result.durationMins < parsedWindowMin
-    ) {
-      parsedWindowMin = result.durationMins;
-    }
-
-    // Hydrate task and part lines
-    const parsedTasks: TaskLine[] = result.tasks.map((t) => {
-      const device = t.device ?? null;
-      const action = t.action ?? null;
-      const details = t.details?.trim() ? t.details.trim() : null;
-      // Server already composes the description, but compose locally as a
-      // fallback so descriptions stay correct even if an older route shape
-      // sneaks through.
-      const description = composeDescription(device, action, details) || t.description || "";
-      // If baseRateId is set, this is an hourly task (new rate model) - force
-      // rateConfigId to null so the promo math classifies it correctly even
-      // if the AI emitted a stray ID.
-      const isHourly = t.baseRateId != null;
-      // The route snaps hourly tasks onto the billing grid and returns whole
-      // minutes; carry those as the billed unit with qty unrounded, so the
-      // line quantities still sum to the session. Flat rows keep a 2 dp count.
-      const minutes = isHourly ? (t.minutes ?? Math.round(t.qty * 60)) : undefined;
-      const qty = minutes != null ? minutes / 60 : Math.round(t.qty * 100) / 100;
-      return {
-        rateConfigId: isHourly ? null : (t.rateConfigId ?? null),
-        baseRateId: t.baseRateId ?? null,
-        modifierIds: t.modifierIds ?? [],
-        description,
-        qty,
-        ...(minutes != null && { minutes }),
-        unitPrice: t.unitPrice,
-        lineTotal: Math.round(qty * t.unitPrice * 100) / 100,
-        device,
-        action,
-        details,
-        isShort: t.isShort ?? false,
-        isExplicit: t.isExplicit ?? false,
-        // Per-line halving: an AI-flagged unresolved task bills half its
-        // labour via calcJobTotal; completed tasks in the same job are
-        // unaffected. The chip on the task row is the operator override.
-        unsuccessful: t.unsuccessful ?? false,
-      };
-    });
-    const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
+    const slots = eventPrefill?.slots ?? [];
+    const span = parsedWindow(result, slots, nzNowTime());
+    setFollowUpMins(span.followUpMins);
+    // A merged job's slots are the corrected calendar windows, so the parse fills
+    // everything but the times. On a single event the description wins, and "Reset to
+    // event times" undoes a bad guess.
+    if (span.timeRanges) setTimeRanges(span.timeRanges);
 
     // A reparse is the new truth for the auto travel entry and the parsed out-of-pocket
     // costs (parking, tolls). Operator-typed manual entries survive it, so they don't have
     // to be re-typed after every AI tweak.
     setJobAddress(result.destination ?? "");
-
-    // Parsed disbursements pass through at the stated cost; isParsedCost
-    // lets a reparse replace them while a manual address re-lookup (which
-    // only replaces the isAuto drive entry) leaves them alone.
-    const parsedCostEntries: TravelEntry[] = (result.travelCosts ?? []).map((c) => ({
-      label: c.label,
-      cost: Math.round(c.cost * 100) / 100,
-      isParsedCost: true,
-    }));
-
-    if (result.travel && includeTravelDefault) {
-      const cost = calcTravelCharge(
-        result.travel.durationMins,
-        result.travel.durationMinsBack,
-        pricing.travelRatePerHour,
-        pricing.minTravelCharge,
-      );
-      const label = result.destination?.trim() || `${result.travel.durationMins} min drive`;
-      const destination = result.destination ?? label;
+    const parsedCosts = parsedCostEntries(result);
+    const freshAuto = parsedAutoTravel(result, pricing.travelRatePerHour, pricing.minTravelCharge);
+    if (freshAuto) {
       setTravelEntries((prev) => {
         // Google's live predictions drift between calls (minutes, and even the
         // route), so a reparse of the same destination keeps the existing auto
         // entry rather than silently moving the price. "Look up" is the refresh.
         const existingAuto = prev.find((e) => e.isAuto);
         const sameDestination =
-          existingAuto?.destination?.trim().toLowerCase() === destination.trim().toLowerCase();
-        const autoEntry =
-          existingAuto && sameDestination
-            ? existingAuto
-            : {
-                label,
-                cost,
-                isAuto: true,
-                destination,
-                durationMinsOneWay: result.travel?.durationMins,
-                durationMinsBack: result.travel?.durationMinsBack,
-                distanceKmOneWay: result.travel?.distanceKmOneWay,
-              };
+          existingAuto?.destination?.trim().toLowerCase() ===
+          freshAuto.destination?.trim().toLowerCase();
         return [
-          autoEntry,
-          ...parsedCostEntries,
+          existingAuto && sameDestination ? existingAuto : freshAuto,
+          ...parsedCosts,
           ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
         ];
       });
@@ -993,23 +845,21 @@ export function CalculatorView({
       const keepSeededTravel = eventPrefill !== null && !result.noTravelCharge;
       setTravelEntries((prev) => [
         ...(keepSeededTravel ? prev.filter((e) => e.isAuto) : []),
-        ...parsedCostEntries,
+        ...parsedCosts,
         ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
       ]);
     }
-    // Rebalance parsed tasks proportionally to fit the listed window - over-long tasks
-    // absorb more of the correction, and tasks scaling below the minimum drop - then floor
-    // the whole job so a sub-minimum one bills, and displays, at the minimum.
-    const collapsed = collapseToWindow(parsedTasks, parsedWindowMin, pricing.taskTiming);
-    setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
-    if (collapsed.rescaled || collapsed.dropped > 0) {
-      const parts: string[] = ["Rebalanced tasks"];
-      if (collapsed.dropped > 0) {
-        parts.push(`(dropped ${collapsed.dropped} tiny task${collapsed.dropped === 1 ? "" : "s"})`);
-      }
-      toast(`${parts.join(" ")} to fit the ${parsedWindowMin}-min window.`, { tone: "info" });
-    }
-    setParts(parsedParts);
+
+    const fit = fitTasksToWindow(
+      hydrateParsedTasks(result),
+      span.windowMins,
+      pricing.taskTiming,
+      pricing.minBillableMins,
+    );
+    setTasks(fit.tasks);
+    const fitNote = describeFit(fit, span.windowMins);
+    if (fitNote) toast(fitNote, { tone: "info" });
+    setParts(result.parts.map((p) => ({ description: p.description, cost: p.cost })));
     if (result.notes) setNotes(result.notes);
   }
 
@@ -1025,33 +875,8 @@ export function CalculatorView({
     setParseResult(null);
     setClarifyQuestions([]);
     try {
-      // jobDate quotes travel at the job's weekday traffic pattern, not today's. For a
-      // booked job, prepend the booking's window as a digit-led "HH:MM-HH:MM" line so the
-      // parser bills the real session length instead of falling back to the minimum -
-      // only when the description states no times of its own, so operator times win. A
-      // merged job gets one line per event under a date line per day; extractRanges sums
-      // them server-side excluding the gaps, so tasks are sized to time worked rather
-      // than wall-clock span.
-      // Slots arrive date-ordered; a date line goes in whenever the day changes so the
-      // parser buckets each day on its own. Without it a second day's window sitting
-      // inside the first day's hours merges away and those minutes never bill.
-      const windowLines: string[] = [];
-      let lastSlotDate: string | null = null;
-      for (const slot of eventPrefill?.slots ?? []) {
-        if (!slot.startTime || !slot.endTime) continue;
-        if (slot.date !== lastSlotDate) {
-          windowLines.push(slot.date);
-          lastSlotDate = slot.date;
-        }
-        windowLines.push(`${slot.startTime}-${slot.endTime}`);
-      }
-      const eventWindow = windowLines.length > 0 ? windowLines.join("\n") : null;
-      // The operator's own ranges win, but only actual RANGES count. Testing for any time
-      // at all let an incidental mention ("drove to PB Tech @ 10:30 am") pass as a stated
-      // session, dropping the booked window and leaving nothing to bill. extractRanges is
-      // the same parser the route uses for the pre-computed total, so both sides agree.
-      const statesOwnRanges = extractRanges(aiInput).length > 0;
-      const input = eventWindow && !statesOwnRanges ? `${eventWindow}\n${aiInput}` : aiInput;
+      // jobDate quotes travel at the job's weekday traffic pattern, not today's.
+      const input = buildParseInput(aiInput, eventPrefill?.slots ?? []);
       const body: Record<string, unknown> = { input, jobDate };
       // Typed descriptions rarely repeat the address, so hand the current job address
       // (event prefill or Travel card) to the route as a travel fallback. The AI's own
@@ -1243,7 +1068,7 @@ export function CalculatorView({
    * without the prefill.
    */
   function resetFormState(): void {
-    const now = nowTime();
+    const now = nzNowTime();
     setJobDate(todayISO());
     setSkipPromo(false);
     setPromoCode("");
@@ -2250,7 +2075,12 @@ export function CalculatorView({
           {/* AI input */}
           {!cancelMode && (
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-              <h2 className="mb-3 text-sm font-semibold text-russian-violet">Describe the job</h2>
+              <h2 className="mb-1 text-sm font-semibold text-russian-violet">Describe the job</h2>
+              <p className="mb-3 text-sm text-slate-600">
+                {JOB_DESCRIPTION_HINT}
+                {eventPrefill && ` ${JOB_DESCRIPTION_BOOKED_HINT}`} The AI fills in the time, tasks,
+                travel and parts below for you to check.
+              </p>
               <textarea
                 value={aiInput}
                 onChange={(e) => {
@@ -2261,10 +2091,10 @@ export function CalculatorView({
                   }
                 }}
                 rows={6}
-                placeholder="e.g. Was at Dave's for 2 hours, removed some malware, set up his new router, had to drive out to Papakura"
+                placeholder={JOB_DESCRIPTION_PLACEHOLDER}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
               />
-              {parseError && <p className="mt-1 text-xs text-red-600">{parseError}</p>}
+              {parseError && <p className="mt-1 text-sm text-red-600">{parseError}</p>}
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   onClick={() => void handleParse()}
@@ -2307,7 +2137,7 @@ export function CalculatorView({
               )}
               {clarifyQuestions.length > 0 && (
                 <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <p className="mb-3 text-xs font-medium text-amber-800">
+                  <p className="mb-3 text-sm font-medium text-amber-800">
                     A few quick questions to fill in the gaps:
                   </p>
                   <div className="space-y-3">

@@ -264,7 +264,7 @@ function ContactCard({
             </div>
           );
         })}
-        {edit.error && <p className="text-xs font-medium text-coquelicot-400">{edit.error}</p>}
+        {edit.error && <p className="text-sm font-medium text-coquelicot-400">{edit.error}</p>}
         <div className="flex gap-2">
           <button
             onClick={edit.save}

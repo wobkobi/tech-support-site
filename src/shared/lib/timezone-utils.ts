@@ -80,6 +80,15 @@ export function nzMinuteOfDay(date: Date): number {
 }
 
 /**
+ * Current NZ wall-clock time, whatever timezone the browser or server runs in.
+ * @returns HH:MM (24-hour).
+ */
+export function nzNowTime(): string {
+  const mins = nzMinuteOfDay(new Date());
+  return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+}
+
+/**
  * Formats an instant as its NZ (Pacific/Auckland) calendar date.
  * The server runs in UTC, so reading local Date parts would land 12-13 hours off
  * and attribute an evening booking to the wrong day.
@@ -305,6 +314,54 @@ function nzOffsetHoursAt(instant: Date): number {
 export function addDaysToDateKey(dateKey: string, n: number): string {
   const [y = NaN, m = NaN, d = NaN] = dateKey.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + n, 12, 0, 0)).toISOString().slice(0, 10);
+}
+
+/**
+ * The next future instant at an NZ wall-clock time on the job date's weekday. Google
+ * only quotes traffic for future departures, so a past job is priced at the same weekday
+ * and time as a proxy for that day's traffic. The UTC offset is read on the target date
+ * itself, so a trip landing across a daylight-saving change keeps its wall-clock hour.
+ * @param hour - NZ hour, 0-23.
+ * @param minute - NZ minute, 0-59.
+ * @param anchorDate - YYYY-MM-DD whose weekday to match; missing or malformed means today.
+ * @param now - The current instant.
+ * @returns The departure instant: today while the time is still ahead, else the next
+ * matching day (tomorrow without an anchor, a week on with one).
+ */
+export function nextNzWallClockOnWeekday(
+  hour: number,
+  minute: number,
+  anchorDate?: string,
+  now: Date = new Date(),
+): Date {
+  const todayKey = nzDateKey(now);
+  const hasAnchor = !!anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate);
+  let daysAhead = 0;
+  if (hasAnchor) {
+    /**
+     * Weekday of a date key. Timezone-independent when computed in UTC.
+     * @param key - YYYY-MM-DD.
+     * @returns 0 = Sunday .. 6 = Saturday.
+     */
+    const dow = (key: string): number => {
+      const [y, m, d] = dateKeyParts(key);
+      return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    };
+    daysAhead = (dow(anchorDate) - dow(todayKey) + 7) % 7;
+  }
+  /**
+   * The requested wall-clock time on a given NZ date.
+   * @param key - YYYY-MM-DD.
+   * @returns That instant, with the offset in force on that date.
+   */
+  const at = (key: string): Date => {
+    const [y, m, d] = dateKeyParts(key);
+    return nzWallClockUtc(y, m, d, hour, minute);
+  };
+  const targetKey = addDaysToDateKey(todayKey, daysAhead);
+  const first = at(targetKey);
+  if (first.getTime() >= now.getTime()) return first;
+  return at(addDaysToDateKey(targetKey, hasAnchor ? 7 : 1));
 }
 
 /**

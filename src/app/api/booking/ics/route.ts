@@ -35,6 +35,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         unit: true,
         meetingType: true,
         notes: true,
+        accessNotes: true,
         status: true,
         rescheduleCount: true,
       },
@@ -65,6 +66,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     email: identity.email,
     isRemote: booking.meetingType === "remote",
     userNotes,
+    accessNotes: booking.accessNotes,
     manageUrl,
     cancelUrl: `${site}/booking/cancel?token=${encodeURIComponent(token)}`,
   });

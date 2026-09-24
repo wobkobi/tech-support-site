@@ -203,7 +203,7 @@ export function JobDetailsSection({
           placeholder="0"
           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
         />
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-sm text-slate-400">
           Work done outside the slots - a call after the visit, a remote fix later.
         </p>
         <p className="mt-1 text-xs text-slate-400">

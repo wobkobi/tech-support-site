@@ -1,7 +1,7 @@
 "use client";
 // src/features/booking/components/admin/BookingInfoCard.tsx
 // Editable customer/booking info card on the booking detail page:
-// name, email, phone, address, and notes. View mode shows the values, with a Maps link
+// name, email, phone, address, notes and visit notes. View mode shows the values, with a Maps link
 // on the address; Edit mode swaps in the shared email and phone inputs and the Places
 // autocomplete, checks them before saving via the sparse admin bookings PATCH, then
 // refreshes the page. Only the free text is shown and edited - the notes blob's
@@ -41,6 +41,8 @@ interface BookingInfoCardProps {
   address: string | null;
   /** Raw booking notes blob (nullable): free text plus the metadata mirror. */
   notes: string | null;
+  /** Customer's visit notes: parking, directions, access (nullable). */
+  accessNotes: string | null;
 }
 
 const LABEL_CLS = "text-xs font-semibold text-admin-muted uppercase";
@@ -76,6 +78,7 @@ function Row({
  * @param props.phone - Customer phone (nullable).
  * @param props.address - Address column (nullable).
  * @param props.notes - Booking notes (nullable).
+ * @param props.accessNotes - Visit notes (nullable).
  * @returns The info card element.
  */
 export function BookingInfoCard({
@@ -85,6 +88,7 @@ export function BookingInfoCard({
   phone,
   address,
   notes,
+  accessNotes,
 }: BookingInfoCardProps): React.ReactElement {
   const router = useRouter();
   const { patchBooking } = useBookingActions();
@@ -107,6 +111,7 @@ export function BookingInfoCard({
     phone: phone ?? "",
     address: initialAddress,
     notes: parsed.userNotes,
+    accessNotes: accessNotes ?? "",
   });
 
   /**
@@ -129,6 +134,7 @@ export function BookingInfoCard({
       phone: phone ?? "",
       address: initialAddress,
       notes: parsed.userNotes,
+      accessNotes: accessNotes ?? "",
     });
     setErrors({});
     setEditing(false);
@@ -160,6 +166,7 @@ export function BookingInfoCard({
         email: form.email,
         phone: form.phone || undefined,
         notes: mergedNotes,
+        accessNotes: form.accessNotes,
         address: addressChanged ? nextAddress : undefined,
       },
       "Booking updated.",
@@ -215,6 +222,11 @@ export function BookingInfoCard({
             <span className="text-admin-faint">None</span>
           )}
         </Row>
+        {accessNotes && (
+          <Row label="Visit notes">
+            <span className="whitespace-pre-wrap">{accessNotes}</span>
+          </Row>
+        )}
       </div>
     );
   }
@@ -288,6 +300,19 @@ export function BookingInfoCard({
           className={cn(ADMIN_INPUT_CLS, "min-h-25 resize-y")}
           value={form.notes}
           onChange={(e) => setField("notes", e.target.value)}
+          disabled={saving}
+        />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor={`edit-access-notes-${id}`} className={LABEL_CLS}>
+          Visit notes
+        </label>
+        <textarea
+          id={`edit-access-notes-${id}`}
+          className={cn(ADMIN_INPUT_CLS, "min-h-20 resize-y")}
+          value={form.accessNotes}
+          onChange={(e) => setField("accessNotes", e.target.value)}
+          placeholder="Parking, directions, gate codes, pets"
           disabled={saving}
         />
       </div>

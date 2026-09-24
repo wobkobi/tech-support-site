@@ -97,6 +97,9 @@ model Booking {
   name  String
   email String
   notes String?
+  // Optional second box on the booking form: parking, directions, access, pets. Kept
+  // out of `notes`, which carries the structured metadata block parseBookingNotes reads.
+  accessNotes String?
 
   // When the appointment runs (UTC).
   startAt DateTime

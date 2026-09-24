@@ -8,7 +8,12 @@
 // Identity secrets default from the existing env vars so the panel self-seeds with the
 // current values until the one-shot seed hands them to the DB.
 
-import type { DayWindow, Settings, WeeklySchedule } from "@/shared/lib/settings/types";
+import type {
+  DayWindow,
+  Settings,
+  SettingsGroup,
+  WeeklySchedule,
+} from "@/shared/lib/settings/types";
 
 /** Bank-account placeholder shown when neither the DB nor the env var is set. */
 const BANK_ACCOUNT_PLACEHOLDER = "[BANK ACCOUNT NOT SET - configure in admin settings]";
@@ -241,3 +246,12 @@ export const DEFAULT_SETTINGS: Settings = {
     invoiceReviewCooldownDays: 30,
   },
 };
+
+/**
+ * Narrows a raw `[group]` route segment to a known settings group.
+ * @param value - Raw path segment.
+ * @returns The group when valid, else null.
+ */
+export function asSettingsGroup(value: string): SettingsGroup | null {
+  return Object.hasOwn(DEFAULT_SETTINGS, value) ? (value as SettingsGroup) : null;
+}

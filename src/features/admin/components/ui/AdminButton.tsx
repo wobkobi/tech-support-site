@@ -40,7 +40,7 @@ interface AdminButtonAsButton extends AdminButtonCommon {
   busy?: boolean;
 }
 
-export type AdminButtonProps = AdminButtonAsLink | AdminButtonAsButton;
+type AdminButtonProps = AdminButtonAsLink | AdminButtonAsButton;
 
 /**
  * Variant classes.

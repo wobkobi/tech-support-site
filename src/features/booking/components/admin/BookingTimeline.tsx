@@ -7,13 +7,11 @@
 // stamp) degrades to a muted note rather than vanishing. Server component - no client
 // hooks.
 
+import { dotClass, type StepTone } from "@/features/admin/components/ui/timeline-tone";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import type { CancelledBy } from "@prisma/client";
 import type React from "react";
-
-/** Accent tone for a timeline dot. */
-type StepTone = "neutral" | "info" | "success" | "critical" | "violet";
 
 /** Props for {@link BookingTimeline}. */
 interface BookingTimelineProps {
@@ -52,26 +50,6 @@ interface Step {
    */
   hasDate: boolean;
   tone: StepTone;
-}
-
-/**
- * Dot colour for a step tone.
- * @param tone - Step tone.
- * @returns Background class.
- */
-function dotClass(tone: StepTone): string {
-  switch (tone) {
-    case "neutral":
-      return "bg-admin-faint";
-    case "info":
-      return "bg-blue-500";
-    case "success":
-      return "bg-emerald-500";
-    case "critical":
-      return "bg-coquelicot-600";
-    case "violet":
-      return "bg-russian-violet";
-  }
 }
 
 /**

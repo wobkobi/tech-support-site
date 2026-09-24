@@ -969,7 +969,7 @@ export function InvoiceActions({
                     />
                   ) : null}
                 </div>
-                <p className="mt-3 text-xs text-admin-muted italic">
+                <p className="mt-3 text-sm text-admin-muted italic">
                   The VOIDED-stamped PDF will be attached automatically.
                 </p>
               </>

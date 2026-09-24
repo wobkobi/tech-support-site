@@ -113,6 +113,7 @@ export default async function EditBookingPage({
       email: true,
       phone: true,
       notes: true,
+      accessNotes: true,
       startAt: true,
       endAt: true,
       status: true,
@@ -164,6 +165,7 @@ export default async function EditBookingPage({
     meetingType,
     address,
     notes: userNotes,
+    accessNotes: booking.accessNotes ?? "",
   };
 
   // Load availability for rescheduling

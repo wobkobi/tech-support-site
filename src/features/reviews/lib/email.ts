@@ -485,6 +485,22 @@ export interface BookingNotificationData {
   meetingType?: "in_person" | "remote" | null;
   /** How many times the booking has moved; becomes the calendar SEQUENCE. */
   rescheduleCount?: number;
+  /** Parking, directions and other visit details from the booking form's second box. */
+  accessNotes?: string | null;
+}
+
+/**
+ * Grey "Other notes for the visit" panel for a booking email, or "" when there are none.
+ * @param booking - The booking being emailed about.
+ * @returns HTML fragment.
+ */
+function accessNotesPanel(booking: BookingNotificationData): string {
+  const text = booking.accessNotes?.trim();
+  if (!text) return "";
+  return `<div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:24px">
+      <p style="margin:0 0 4px;font-size:13px;color:#888">Other notes for the visit</p>
+      <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${escapeHtml(text).replace(/\n/g, "<br>")}</p>
+    </div>`;
 }
 
 /**
@@ -549,6 +565,7 @@ async function bookingIcsAttachment(
       email: identity.email,
       isRemote,
       userNotes: parseBookingNotes(booking.notes).userNotes,
+      accessNotes: booking.accessNotes,
       manageUrl: `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`,
       cancelUrl: `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`,
     }),
@@ -615,6 +632,8 @@ export async function sendOwnerBookingNotification(
       <p style="margin:0 0 12px;font-size:14px;color:#444"><a href="mailto:${safeMailto}" style="color:#43bccd">${safeEmail}</a></p>
       <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${notesHtml}</p>
     </div>
+
+    ${accessNotesPanel(booking)}
 
     ${ownerMapHtml(booking)}
 `);
@@ -785,6 +804,8 @@ export async function sendCustomerBookingConfirmation(
         : ""
     }
 
+    ${accessNotesPanel(booking)}
+
     <p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">
       Need to change anything? Use the buttons below, or just reply to this email.
     </p>
@@ -877,6 +898,8 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
     </div>`
         : ""
     }
+
+    ${accessNotesPanel(booking)}
 
     <p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">
       Need to change anything? Use the buttons below, or just reply to this email.

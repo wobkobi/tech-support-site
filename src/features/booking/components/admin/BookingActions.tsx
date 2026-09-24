@@ -313,7 +313,7 @@ export function BookingActions({
               Cancel - for customer
             </AdminButton>
             {isEditLocked && (
-              <p className="text-xs text-admin-muted">
+              <p className="text-sm text-admin-muted">
                 Cancelling locks {lockHours}h after a booking ends. Completing stays open.
               </p>
             )}

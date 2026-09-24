@@ -340,7 +340,7 @@ export function IdentityTab({ initial, defaults, bookableSchedule }: Props): Rea
             )}
           </div>
           {published && (
-            <p className="mt-2 text-xs text-admin-muted">
+            <p className="mt-2 text-sm text-admin-muted">
               Bookings still run {hourLabel(bookableOpen)} to {closeLabel(bookableClose)}, set on
               the Availability tab. Only the advertised listing changes.
             </p>

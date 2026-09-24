@@ -457,7 +457,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
               />
             </div>
             {fieldErrors[`morningGuards.${gi}.protectedDays`] && (
-              <p className="mt-2 text-xs font-medium text-red-600">
+              <p className="mt-2 text-sm font-medium text-red-600">
                 {fieldErrors[`morningGuards.${gi}.protectedDays`]}
               </p>
             )}

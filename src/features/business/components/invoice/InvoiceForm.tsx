@@ -62,6 +62,14 @@ interface InvoiceFormProps {
   onSubmit: (data: InvoiceFormData) => void;
   /** Called on every field change so the parent can mirror a live preview. */
   onChange?: (data: InvoiceFormData) => void;
+  /**
+   * Optional block rendered above the line items (the AI description box). Receives the
+   * current form data and a patcher that goes through the same change path as typing.
+   */
+  renderAssist?: (
+    form: InvoiceFormData,
+    apply: (patch: Partial<InvoiceFormData>) => void,
+  ) => React.ReactNode;
 }
 
 const LABEL_CLS = "mb-1 block text-xs font-semibold text-admin-muted uppercase";
@@ -93,6 +101,7 @@ function addDaysISO(iso: string, days: number): string {
  * @param props.busy - Whether a submit is in flight.
  * @param props.onSubmit - Submit handler receiving the validated data.
  * @param props.onChange - Change handler for mirroring a live preview.
+ * @param props.renderAssist - Optional block rendered above the line items.
  * @returns The form element.
  */
 export function InvoiceForm({
@@ -104,6 +113,7 @@ export function InvoiceForm({
   busy = false,
   onSubmit,
   onChange,
+  renderAssist,
 }: InvoiceFormProps): React.ReactElement {
   const [form, setForm] = useState<InvoiceFormData>(initial);
   const [error, setError] = useState<string | null>(null);
@@ -233,6 +243,11 @@ export function InvoiceForm({
           />
         </label>
       </div>
+
+      {renderAssist?.(form, (patch) => {
+        update(patch);
+        setError(null);
+      })}
 
       <div>
         <span className={LABEL_CLS}>Line items</span>

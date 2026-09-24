@@ -146,7 +146,7 @@ export function BookingTimesCard({
           <span className="text-sm text-admin-text">{formatMins(spanMins)}</span>
         </div>
         {locked && status !== "cancelled" && (
-          <p className="text-xs text-admin-muted">
+          <p className="text-sm text-admin-muted">
             Locked - this ended over {lockHours}h ago. Raise the past-edit window in Settings to
             reopen it.
           </p>
@@ -167,7 +167,7 @@ export function BookingTimesCard({
             label="Email the customer the new time"
           />
         ) : (
-          <p className="text-xs text-admin-muted">
+          <p className="text-sm text-admin-muted">
             This records what actually happened. No email is sent.
           </p>
         )}

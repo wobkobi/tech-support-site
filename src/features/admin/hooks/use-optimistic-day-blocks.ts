@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const REFRESH_DEBOUNCE_MS = 1200;
 
 /** State and actions returned by {@link useOptimisticDayBlocks}. */
-export interface UseOptimisticDayBlocks {
+interface UseOptimisticDayBlocks {
   /** Days with a block/unblock request in flight. */
   pendingDays: ReadonlySet<string>;
   /** Optimistic overrides per day (dateKey > blocked?). */
