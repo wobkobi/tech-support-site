@@ -75,7 +75,9 @@ next-env.d.ts
 !/docs/DEPLOY.md
 google-tokens.txt
 
-# generated ad creatives (regenerate with `npm run build:ads`)
+# Generated marketing creatives, uploaded by hand rather than served by the site
+# (regenerate with `npm run build:ads` and `npm run build:social`). Contrast
+# public/downloads, which is versioned because the site links to it.
 /ad-creatives/
 
 # local reference material

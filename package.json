@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.45.1",
+  "version": "4.46.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,6 +11,7 @@
     "build:icons": "tsx scripts/build-icons/index.ts",
     "build:poster": "npx tsx scripts/export-poster-screenshot.ts",
     "build:sign": "npx tsx scripts/export-sign-screenshot.ts",
+    "build:social": "npx tsx scripts/export-social-screenshot.ts",
     "calibrate": "dotenv -e .env.local -- tsx scripts/calibrate-benchmarks.ts",
     "check:addresses": "tsx scripts/check-address-resolution.ts",
     "check:emails": "dotenv -e .env.local -- tsx --conditions=react-server scripts/check-email-render.ts",
