@@ -6,6 +6,7 @@
 import { formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
 import { nzFinancialYearCode } from "@/features/business/lib/financial-year";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
+import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
 import type { Invoice } from "@/features/business/types/business";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort } from "@/shared/lib/date-format";
@@ -562,9 +563,9 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
 }
 
 /**
- * Draws the tinted "Bank transfer" call-out box with payee, account, reference,
- * and due date. Sized to its fixed 5-line content so callers don't need to know
- * its height up-front.
+ * Draws the tinted "Bank transfer" call-out box with payee, account, the payer's
+ * Particulars and Code, and the due date. Sized to its fixed 6-line content so
+ * callers don't need to know its height up-front.
  * @param ctx - PDF drawing context.
  * @param invoice - Invoice being rendered.
  * @param y - Top of the block.
@@ -575,7 +576,7 @@ function drawPaymentCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
   const BOX_PAD_X = 14;
   const BOX_PAD_Y = 14;
   const lineH = 16;
-  const boxLines = 5; // heading + payee + account + reference + due-by
+  const boxLines = 6; // heading + payee + account + particulars + code + due-by
   const BOX_H = BOX_PAD_Y * 2 + 22 + (boxLines - 1) * lineH; // heading taller than rows
   // Border-only so the diagonal status watermark shows through cleanly.
   ctx.page.drawRectangle({
@@ -612,7 +613,16 @@ function drawPaymentCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
     color: DARK,
   });
   by -= lineH;
-  ctx.page.drawText(`Reference: ${invoice.number}`, {
+  // Particulars then Code, each inside the payer's 12-character field
+  ctx.page.drawText(`Particulars: ${bankParticulars(invoice.clientName)}`, {
+    x: MARGIN + BOX_PAD_X,
+    y: by,
+    size: 12,
+    font: ctx.bold,
+    color: DARK,
+  });
+  by -= lineH;
+  ctx.page.drawText(`Code: ${bankCode(invoice.number)}`, {
     x: MARGIN + BOX_PAD_X,
     y: by,
     size: 12,

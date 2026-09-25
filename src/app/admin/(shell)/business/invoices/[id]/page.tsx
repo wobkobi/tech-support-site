@@ -14,6 +14,7 @@ import { InvoiceTimeline } from "@/features/business/components/invoice/InvoiceT
 import { formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
 import { findRecordedPayment } from "@/features/business/lib/invoice-payment-match";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
+import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
@@ -482,7 +483,10 @@ export default async function InvoiceViewPage({
             <p className="mb-1 text-sm font-bold text-russian-violet">Bank transfer</p>
             <p>Payee: {identity.name}</p>
             <p className="font-semibold text-slate-700">Account: {identity.bankAccount}</p>
-            <p className="font-semibold text-slate-700">Reference: {invoice.number}</p>
+            <p className="font-semibold text-slate-700">
+              Particulars: {bankParticulars(invoice.clientName)}
+            </p>
+            <p className="font-semibold text-slate-700">Code: {bankCode(invoice.number)}</p>
             <p>
               Due within {identity.paymentTermsDays} days of issue (by{" "}
               {formatDateShort(invoice.dueDate)}).
