@@ -7,6 +7,7 @@ import {
   DEFAULT_QUOTE_EMAIL_BODY,
   DEFAULT_VOID_EMAIL_BODY,
 } from "@/features/business/lib/invoice-email-defaults";
+import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
 import {
   brandName,
   buildEmailSignature,
@@ -103,7 +104,8 @@ export async function buildInvoiceEmail({
     <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333">
       Payee: ${escapeHtml(identity.name)}<br />
       Account: <strong>${escapeHtml(identity.bankAccount)}</strong><br />
-      Reference: <strong>${safeNumber}</strong>
+      Particulars: <strong>${escapeHtml(bankParticulars(invoice.clientName))}</strong><br />
+      Code: <strong>${escapeHtml(bankCode(invoice.number))}</strong>
     </p>`;
 
   // Append " Tech" to match the signature and body brand name, so the subject
@@ -268,7 +270,8 @@ export async function sendInvoiceReminderEmail({
     <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333">
       Payee: ${escapeHtml(identity.name)}<br />
       Account: <strong>${escapeHtml(identity.bankAccount)}</strong><br />
-      Reference: <strong>${safeNumber}</strong>
+      Particulars: <strong>${escapeHtml(bankParticulars(invoice.clientName))}</strong><br />
+      Code: <strong>${escapeHtml(bankCode(invoice.number))}</strong>
     </p>
 
     <p style="margin:0;font-size:14px;color:#333">${closing}</p>

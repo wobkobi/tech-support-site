@@ -5,6 +5,7 @@
 // memoised.
 
 import { calcInvoiceTotals, formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
+import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
 import type { LineItem } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
@@ -222,7 +223,12 @@ function InvoicePreviewPanelImpl({
           <p className="text-xs font-bold text-russian-violet">Bank transfer</p>
           <p className="text-slate-500">Payee: {identity.name}</p>
           <p className="font-semibold text-slate-700">Account: {identity.bankAccount}</p>
-          <p className="font-semibold text-slate-700">Reference: {number || "[invoice number]"}</p>
+          <p className="font-semibold text-slate-700">
+            Particulars: {clientName ? bankParticulars(clientName) : "[surname]"}
+          </p>
+          <p className="font-semibold text-slate-700">
+            Code: {number ? bankCode(number) : "[invoice number]"}
+          </p>
           <p className="text-slate-500">
             Due within {identity.paymentTermsDays} days of issue
             {dueDate ? ` (by ${formatDateShort(dueDate)}).` : "."}
