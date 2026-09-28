@@ -238,30 +238,30 @@ export default async function Home(): Promise<React.ReactElement> {
             </div>
           </section>
 
-          {/* Business strip */}
+          {/* About Me down the left, business pitch and approach stacked on the
+              right. About spans both rows so the portrait card anchors the block;
+              below lg the three cards stack in reading order. */}
           <section
-            aria-labelledby="business-strip-heading"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300 text-center")}
+            aria-label="About me, business support and approach"
+            className="grid gap-5 lg:grid-cols-2 lg:grid-rows-[auto_auto] lg:gap-6"
           >
-            <h2
-              id="business-strip-heading"
-              className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl"
+            <article
+              className={cn(
+                CARD,
+                "animate-slide-up animate-fill-both animate-delay-300 lg:row-span-2",
+              )}
             >
-              Run a small business?
-            </h2>
-            <p className="mx-auto mb-4 max-w-2xl text-base text-rich-black/90 sm:text-lg">
-              Call me out when something breaks, or put me on a monthly retainer so it's covered
-              either way. No lock-in, and you can switch between the two whenever it suits.
-            </p>
-            <Button href="/business" variant="tertiary" size="md">
-              Business IT support
-            </Button>
-          </section>
-
-          {/* About & Approach */}
-          <section aria-label="About and approach" className="grid gap-5 md:grid-cols-2 md:gap-6">
-            <article className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}>
-              <h2 className="mb-4 text-2xl font-bold text-russian-violet sm:text-3xl">About Me</h2>
+              <Image
+                src="/source/harrison.jpg"
+                alt="Harrison Raynes"
+                width={320}
+                height={320}
+                sizes="(min-width: 1024px) 160px, (min-width: 640px) 128px, 96px"
+                className="mx-auto mb-5 size-24 rounded-full border-4 border-white object-cover shadow-md sm:size-32 lg:size-40"
+              />
+              <h2 className="mb-4 text-center text-2xl font-bold text-russian-violet sm:text-3xl">
+                About Me
+              </h2>
               <p className="mb-4 text-base text-rich-black sm:text-lg">
                 Hi, I'm Harrison, a computer science graduate based in Auckland. I started To the
                 Point Tech because when something breaks, people want someone who turns up and sorts
@@ -271,13 +271,41 @@ export default async function Home(): Promise<React.ReactElement> {
                 That's what I do. I'll explain what went wrong, what I did about it, and whether
                 it's worth spending money on - including when it isn't.
               </p>
+              <Link
+                href="/about"
+                className="mt-4 inline-block text-base text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800 sm:text-lg"
+              >
+                More about me
+              </Link>
             </article>
 
-            <article className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-400")}>
-              <h2 className="mb-4 text-2xl font-bold text-russian-violet sm:text-3xl">
+            <section
+              aria-labelledby="business-strip-heading"
+              className={cn(
+                CARD,
+                "animate-slide-up animate-fill-both animate-delay-400 text-center",
+              )}
+            >
+              <h2
+                id="business-strip-heading"
+                className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl"
+              >
+                Run a small business?
+              </h2>
+              <p className="mb-4 text-base text-rich-black/90 sm:text-lg">
+                Call me out when something breaks, or put me on a monthly retainer so it's covered
+                either way. No lock-in, and you can switch between the two whenever it suits.
+              </p>
+              <Button href="/business" variant="tertiary" size="md">
+                Business IT support
+              </Button>
+            </section>
+
+            <article className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-500")}>
+              <h2 className="mb-4 text-xl font-bold text-russian-violet sm:text-2xl">
                 My approach
               </h2>
-              <ul className="space-y-3 text-base text-rich-black sm:text-lg">
+              <ul className="grid gap-3 text-base text-rich-black sm:grid-cols-2 sm:text-lg lg:grid-cols-1 xl:grid-cols-2">
                 <li className="flex gap-3">
                   <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-400" aria-hidden />
                   <span>Listen first, understand your needs</span>

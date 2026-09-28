@@ -7,10 +7,14 @@ import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout"
 import { cn } from "@/shared/lib/cn";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import type React from "react";
 
 const siteUrl = getSiteUrl();
+
+/** Portrait, relative to the public directory. */
+const PHOTO_SRC = "/source/harrison.jpg";
 
 export const metadata: Metadata = {
   title: "About Harrison Raynes - Local Tech Support in Auckland",
@@ -44,6 +48,7 @@ export default function AboutPage(): React.ReactElement {
     knowsAbout: ["Computer Repair", "IT Support", "Networking", "Smart Home Setup"],
     workLocation: { "@type": "City", name: "Auckland" },
     url: `${siteUrl}/about`,
+    image: `${siteUrl}${PHOTO_SRC}`,
   };
 
   return (
@@ -61,25 +66,43 @@ export default function AboutPage(): React.ReactElement {
       />
       <FrostedSection>
         <div className="flex flex-col gap-6 sm:gap-8">
-          <section aria-labelledby="about-hero-heading" className={cn(CARD, "animate-fade-in")}>
-            <h1
-              id="about-hero-heading"
-              className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
-            >
-              About To the Point Tech
-            </h1>
+          <section
+            aria-labelledby="about-hero-heading"
+            className={cn(
+              CARD,
+              "animate-fade-in flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:gap-8",
+            )}
+          >
+            <Image
+              src={PHOTO_SRC}
+              alt="Harrison Raynes, founder of To the Point Tech"
+              width={400}
+              height={400}
+              priority
+              sizes="(min-width: 768px) 208px, (min-width: 640px) 176px, 160px"
+              className="size-40 shrink-0 rounded-full border-4 border-white object-cover shadow-lg sm:size-44 md:size-52"
+            />
 
-            <p className="mb-4 text-base text-rich-black sm:text-lg">
-              I'm Harrison Raynes, a computer science graduate based in Auckland. I started To the
-              Point Tech because plenty of people have a computer problem and no one straightforward
-              to call about it.
-            </p>
+            <div>
+              <h1
+                id="about-hero-heading"
+                className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
+              >
+                About To the Point Tech
+              </h1>
 
-            <p className="text-base text-rich-black/80 sm:text-lg">
-              I come to you and fix it on the spot where I can. You'll know what went wrong and what
-              I changed, in words that actually mean something, so next time it happens you might
-              not need to call me at all.
-            </p>
+              <p className="mb-4 text-base text-rich-black sm:text-lg">
+                I'm Harrison Raynes, a computer science graduate based in Auckland. I started To the
+                Point Tech because plenty of people have a computer problem and no one
+                straightforward to call about it.
+              </p>
+
+              <p className="text-base text-rich-black/80 sm:text-lg">
+                I come to you and fix it on the spot where I can. You'll know what went wrong and
+                what I changed, in words that actually mean something, so next time it happens you
+                might not need to call me at all.
+              </p>
+            </div>
           </section>
 
           <section
