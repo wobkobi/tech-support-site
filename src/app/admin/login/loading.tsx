@@ -1,30 +1,14 @@
 // src/app/admin/login/loading.tsx
-// Streaming skeleton for the admin sign-in page. Overrides the admin sidebar skeleton
-// with the centred login card (slate theme), so the login route doesn't flash the
-// operator-panel layout.
+// Full-screen spinner for the sign-in page. Overrides the admin (shell) loading state so
+// the login route doesn't flash the operator panel layout.
 
-import { Bone } from "@/shared/components/Skeleton";
+import { LoadingSpinner } from "@/shared/components/LoadingSpinner";
 import type React from "react";
 
 /**
- * Admin login route-loading skeleton.
- * @returns Skeleton element.
+ * Sign-in page route-loading spinner.
+ * @returns Loading element.
  */
 export default function AdminLoginLoading(): React.ReactElement {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center bg-slate-50 p-6"
-      role="status"
-      aria-live="polite"
-      aria-label="Loading sign-in page"
-    >
-      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <Bone className="mb-2 h-6 w-40 bg-slate-200" />
-        <Bone className="mb-5 h-4 w-full max-w-xs bg-slate-200" />
-        <Bone className="mb-3 h-11 w-full bg-slate-200" />
-        <Bone className="h-11 w-full bg-slate-200" />
-      </div>
-      <span className="sr-only">Loading sign-in page...</span>
-    </div>
-  );
+  return <LoadingSpinner label="sign-in page" className="min-h-screen bg-slate-50" />;
 }
