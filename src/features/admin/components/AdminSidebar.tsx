@@ -23,6 +23,7 @@ import {
   FaFileInvoiceDollar,
   FaGaugeHigh,
   FaGear,
+  FaHandHoldingDollar,
   FaMagnifyingGlassDollar,
   FaReceipt,
   FaRoute,
@@ -44,6 +45,7 @@ type AdminPage =
   | "business-expenses"
   | "business-invoices"
   | "business-calculator"
+  | "business-quick"
   | "promos"
   | "notifications"
   | "settings";
@@ -116,6 +118,12 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
     label: "Calculator",
     icon: <FaCalculator className="shrink-0" />,
     path: "/admin/business/calculator",
+  },
+  {
+    page: "business-quick",
+    label: "Quick price",
+    icon: <FaHandHoldingDollar className="shrink-0" />,
+    path: "/admin/business/quick",
   },
   {
     page: "business-invoices",
