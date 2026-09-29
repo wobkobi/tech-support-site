@@ -4,11 +4,15 @@
 // Contact table (and Google Contacts via the fire-and-forget sync). Triggered after an
 // invoice save succeeds or when the calculator hands off to the invoice builder, but only
 // when the email doesn't already exist in the DB. When the client is a known contact
-// missing that email, it offers to add the email to them instead.
+// missing that email, it offers to add the email to them instead. A new contact's name and
+// company are editable, so an invoice addressed to "68 Ltd" saves Michael Smith at 68 Ltd
+// rather than a contact named after the company.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { looksLikeBusinessName } from "@/features/business/lib/payment-fields";
 import type React from "react";
 import { useState } from "react";
 
@@ -16,8 +20,13 @@ import { useState } from "react";
  * Props for AddToContactsModal.
  */
 interface AddToContactsModalProps {
-  /** Client name to seed the new Contact row with. */
+  /** Client name to seed the new Contact row with (the invoice's addressed-to name). */
   name: string;
+  /**
+   * The picked contact's company, when known. With none, a business-looking `name`
+   * seeds the Company field instead and the person's name is asked for.
+   */
+  company?: string | null;
   /** Client email - dedup key on the server. */
   email: string;
   /** Optional phone number (E.164 or local format). */
@@ -45,6 +54,7 @@ interface AddToContactsModalProps {
  * contact in the second case) and closes once the request settles.
  * @param props - Component props.
  * @param props.name - Client name to seed the new Contact row with.
+ * @param props.company - The picked contact's company, when known.
  * @param props.email - Client email; the dedup key on the server.
  * @param props.phone - Optional phone number (E.164 or local format).
  * @param props.googleContactId - Optional Google People API resource name.
@@ -54,12 +64,18 @@ interface AddToContactsModalProps {
  */
 export function AddToContactsModal({
   name,
+  company,
   email,
   phone,
   googleContactId,
   existingContactName,
   onClose,
 }: AddToContactsModalProps): React.ReactElement {
+  // A business-looking addressed-to name with no known company is the company
+  // itself, so it seeds Company and the person's name starts blank.
+  const nameIsCompany = !company?.trim() && looksLikeBusinessName(name);
+  const [personName, setPersonName] = useState(nameIsCompany ? "" : name);
+  const [companyName, setCompanyName] = useState(company?.trim() || (nameIsCompany ? name : ""));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -77,7 +93,14 @@ export function AddToContactsModal({
       const res = await fetch("/api/admin/contacts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, phone, googleContactId }),
+        body: JSON.stringify({
+          // A blank person falls back to the company so the contact still has a name.
+          name: personName.trim() || companyName.trim() || name,
+          company: companyName.trim() || null,
+          email,
+          phone,
+          googleContactId,
+        }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -123,12 +146,38 @@ export function AddToContactsModal({
             }
           </p>
         ) : (
-          <p>
-            <span className="font-semibold">{name}</span>
-            {
-              " isn't in your contacts yet. Add them so you can send review links and pre-fill future invoices?"
-            }
-          </p>
+          <>
+            <p>
+              <span className="font-semibold">{name}</span>
+              {
+                " isn't in your contacts yet. Add them so you can send review links and pre-fill future invoices?"
+              }
+            </p>
+            <label className="block">
+              <span className="mb-1 block text-xs font-semibold text-admin-muted">Name</span>
+              <input
+                type="text"
+                value={personName}
+                onChange={(e) => setPersonName(e.target.value)}
+                placeholder="The person you deal with"
+                disabled={saving}
+                className={ADMIN_INPUT_CLS}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-semibold text-admin-muted">
+                Company (optional)
+              </span>
+              <input
+                type="text"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Business they invoice under"
+                disabled={saving}
+                className={ADMIN_INPUT_CLS}
+              />
+            </label>
+          </>
         )}
         <p className="text-xs text-admin-muted">{email}</p>
         {error && <p className="text-sm text-coquelicot-500">{error}</p>}

@@ -22,15 +22,42 @@ function toBankField(value: string): string {
 
 /**
  * Marks a client name as a business rather than a person. A business's last word is its legal
- * suffix or a generic trade word ("Acme Plumbing Ltd"), so the first word names it instead.
+ * suffix or a generic trade word ("Acme Plumbing Ltd"), so it's named from the front instead.
  */
 const BUSINESS_NAME =
   /&|\b(ltd|limited|inc|incorporated|co|company|trust|group|holdings|services|solutions|nz)\b/i;
 
 /**
+ * Whether a name reads as a business ("68 Ltd", "Acme & Co") rather than a person.
+ * @param name - Client or contact name.
+ * @returns True when the name carries a legal suffix, generic trade word or ampersand.
+ */
+export function looksLikeBusinessName(name: string): boolean {
+  return BUSINESS_NAME.test(name);
+}
+
+/**
+ * Fits a business name into a bank field as whole words from the front: "68 Ltd" stays whole,
+ * "Acme Plumbing Ltd" becomes "Acme". A bare first word can name nobody on the statement ("68"),
+ * so words keep being added while they fit. A first word longer than the cap is truncated.
+ * @param parts - The name's words, leading article already dropped.
+ * @returns Bank-field value, 12 characters or fewer.
+ */
+function businessBankField(parts: string[]): string {
+  const words = parts.map(toBankField).filter(Boolean);
+  let fitted = "";
+  for (const word of words) {
+    const next = fitted ? `${fitted} ${word}` : word;
+    if (next.length > BANK_FIELD_MAX) break;
+    fitted = next;
+  }
+  return fitted || toBankField(words[0] ?? "");
+}
+
+/**
  * Picks the Particulars value that names the payer on the statement, since the statement itself
- * shows only an account number: a person's surname, or a business's first word. Falls back to the
- * single name given, and to "Payment" when nothing usable is left.
+ * shows only an account number: a person's surname, or as much of a business's name as fits.
+ * Falls back to the single name given, and to "Payment" when nothing usable is left.
  * @param clientName - Client name as it appears on the invoice.
  * @returns Particulars value, 12 characters or fewer.
  */
@@ -40,8 +67,9 @@ export function bankParticulars(clientName: string): string {
   if (parts.length > 1 && /^the$/i.test(parts[0] ?? "")) parts.shift();
   const first = parts[0] ?? "";
   if (parts.length < 2) return toBankField(first) || "Payment";
+  if (BUSINESS_NAME.test(clientName)) return businessBankField(parts) || "Payment";
   const last = parts[parts.length - 1] ?? "";
-  return toBankField(BUSINESS_NAME.test(clientName) ? first : last) || "Payment";
+  return toBankField(last) || "Payment";
 }
 
 /**

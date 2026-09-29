@@ -31,7 +31,7 @@ export interface InvoiceVoidFlow {
   setVoidCustomBody: (value: string) => void;
   voidSendNotification: boolean;
   setVoidSendNotification: (value: boolean) => void;
-  voidPreview: { subject: string; html: string; to: string } | null;
+  voidPreview: { subject: string; html: string; to: string; defaultGreeting?: string } | null;
   voidPreviewLoading: boolean;
   openVoidModal: () => void;
   resendVoidNotification: () => void;
@@ -83,6 +83,7 @@ export function useInvoiceVoid({
     subject: string;
     html: string;
     to: string;
+    defaultGreeting?: string;
   } | null>(null);
   const [voidPreviewLoading, setVoidPreviewLoading] = useState(false);
 
@@ -138,9 +139,15 @@ export function useInvoiceVoid({
         }),
       });
       const d = (await res.json()) as
-        { ok: true; subject: string; html: string; to: string } | { error: string };
+        | { ok: true; subject: string; html: string; to: string; defaultGreeting?: string }
+        | { error: string };
       if ("error" in d) throw new Error(d.error);
-      setVoidPreview({ subject: d.subject, html: d.html, to: d.to });
+      setVoidPreview({
+        subject: d.subject,
+        html: d.html,
+        to: d.to,
+        defaultGreeting: d.defaultGreeting,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load preview");
     } finally {
@@ -374,7 +381,11 @@ export function VoidInvoiceModal({
                 value={voidGreetingName}
                 onChange={(e) => setVoidGreetingName(e.target.value)}
                 onBlur={() => void loadVoidPreview()}
-                placeholder={`${clientName?.trim().split(" ")[0] || "First name"} (leave blank to use the first word of the client name)`}
+                placeholder={
+                  voidPreview?.defaultGreeting
+                    ? `Leave blank to greet ${voidPreview.defaultGreeting}`
+                    : `${clientName?.trim().split(" ")[0] || "First name"} (leave blank to use the first word of the client name)`
+                }
                 disabled={voiding}
                 className={cn(INPUT_CLS, "mb-4")}
               />

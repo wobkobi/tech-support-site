@@ -15,6 +15,7 @@ import {
   writeBackQuoteCounter,
 } from "@/features/business/lib/invoice-numbering";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
+import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import {
   releaseBookingRedemptions,
@@ -39,7 +40,27 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
 
-  const invoices = await prisma.invoice.findMany({ orderBy: { issueDate: "desc" } });
+  const rows = await prisma.invoice.findMany({ orderBy: { issueDate: "desc" } });
+
+  // Attach each linked contact, so the list can search by the person behind a
+  // company invoice and mark who it was for.
+  const contactIds = [...new Set(rows.map((r) => r.contactId).filter((id) => id !== null))];
+  const contacts = contactIds.length
+    ? await prisma.contact.findMany({
+        where: { id: { in: contactIds } },
+        select: { id: true, name: true, company: true },
+      })
+    : [];
+  const contactById = new Map(contacts.map((c) => [c.id, c]));
+  const invoices = rows.map((inv) => {
+    const contact = (inv.contactId && contactById.get(inv.contactId)) || null;
+    return {
+      ...inv,
+      contactName: contact?.name ?? null,
+      contactCompany: contact?.company ?? null,
+      attention: invoiceRecipient(inv.clientName, contact).attention,
+    };
+  });
   return NextResponse.json({ ok: true, invoices });
 }
 

@@ -2,6 +2,7 @@
 // Overdue-reminder send-and-stamp shared by the daily cron and the manual action, plus
 // the apology for a reminder that chased an already-paid invoice.
 
+import { toInvoiceEmailPayload } from "@/features/business/lib/invoice-email-request";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import {
   sendInvoiceReminderEmail,
@@ -38,15 +39,7 @@ export async function sendOverdueReminder(invoice: PrismaInvoice): Promise<Remin
   }
 
   const accepted = await sendInvoiceReminderEmail({
-    invoice: {
-      number: invoice.number,
-      clientName: invoice.clientName,
-      clientEmail: invoice.clientEmail,
-      issueDate: invoice.issueDate,
-      dueDate: invoice.dueDate,
-      total: invoice.total,
-      driveWebUrl: invoice.driveWebUrl,
-    },
+    invoice: await toInvoiceEmailPayload(invoice),
     pdfBytes,
     reminderNumber,
   });
@@ -73,14 +66,7 @@ export async function sendReminderApology(invoice: PrismaInvoice, paidAt: Date):
   if (!invoice.reminderLastSentAt) return false;
 
   const accepted = await sendPaymentApologyEmail({
-    invoice: {
-      number: invoice.number,
-      clientName: invoice.clientName,
-      clientEmail: invoice.clientEmail,
-      issueDate: invoice.issueDate,
-      dueDate: invoice.dueDate,
-      total: invoice.total,
-    },
+    invoice: await toInvoiceEmailPayload(invoice),
     reminderSentAt: invoice.reminderLastSentAt,
     paidAt,
   });

@@ -85,7 +85,7 @@ export async function POST(
 
   // Send the email
   const ok = await sendInvoiceEmail({
-    invoice: toInvoiceEmailPayload(invoice),
+    invoice: await toInvoiceEmailPayload(invoice),
     pdfBytes,
     reviewUrl,
     greetingName,

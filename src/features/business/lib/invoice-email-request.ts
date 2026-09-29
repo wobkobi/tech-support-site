@@ -1,9 +1,11 @@
 // src/features/business/lib/invoice-email-request.ts
-// Shared request-side helpers for the four invoice email routes (preview / send / void /
-// void-preview): operator override parsing, the invoice > email payload projection, and
-// the review-link inclusion rule that preview and send had drifted apart on.
+// Shared request-side helpers for the invoice emails (preview / send / void / void-preview
+// routes and the overdue reminders): operator override parsing, the invoice > email payload
+// projection, and the review-link inclusion rule that preview and send had drifted apart on.
 
 import type { InvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
+import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
+import { prisma } from "@/shared/lib/prisma";
 import type { Invoice } from "@prisma/client";
 import type { NextRequest } from "next/server";
 
@@ -31,7 +33,10 @@ export type InvoiceEmailPayload = Pick<
   | "driveWebUrl"
   | "isQuote"
   | "quoteValidUntil"
->;
+> & {
+  /** Who the email greets by default - the person behind a company invoice. */
+  defaultGreeting: string;
+};
 
 /**
  * Reads the operator overrides from a request body, tolerating a missing or
@@ -59,11 +64,18 @@ export async function parseInvoiceEmailOverrides(
 }
 
 /**
- * Projects an invoice down to the fields the email builders read.
+ * Projects an invoice down to the fields the email builders read. Looks up the
+ * linked contact so an invoice addressed to "68 Ltd" greets Michael, not "68".
  * @param invoice - The full invoice row.
  * @returns The email payload subset.
  */
-export function toInvoiceEmailPayload(invoice: Invoice): InvoiceEmailPayload {
+export async function toInvoiceEmailPayload(invoice: Invoice): Promise<InvoiceEmailPayload> {
+  const contact = invoice.contactId
+    ? await prisma.contact.findUnique({
+        where: { id: invoice.contactId },
+        select: { name: true, company: true },
+      })
+    : null;
   return {
     number: invoice.number,
     clientName: invoice.clientName,
@@ -74,6 +86,7 @@ export function toInvoiceEmailPayload(invoice: Invoice): InvoiceEmailPayload {
     driveWebUrl: invoice.driveWebUrl,
     isQuote: invoice.isQuote,
     quoteValidUntil: invoice.quoteValidUntil,
+    defaultGreeting: invoiceRecipient(invoice.clientName, contact).greetingName,
   };
 }
 

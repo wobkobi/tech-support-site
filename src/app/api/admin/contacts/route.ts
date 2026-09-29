@@ -44,7 +44,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  * Find-or-creates a Contact by email. A contact already linked to
  * `googleContactId` gets the email attached rather than a duplicate row. On
  * create or attach, fires a best-effort sync to Google Contacts.
- * @param request - Incoming request with { name, email, phone?, address?, googleContactId? }.
+ * @param request - Incoming request with { name, email, phone?, address?, company?, googleContactId? }.
  * @returns JSON { ok, created, emailAttached, contact }.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -57,6 +57,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     email?: string;
     phone?: string | null;
     address?: string | null;
+    company?: string | null;
     googleContactId?: string | null;
   } | null;
 
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     address,
     addressUnverified,
     addressCandidates,
+    company: body.company?.trim() || null,
     googleContactId: body.googleContactId?.trim() || null,
   });
 

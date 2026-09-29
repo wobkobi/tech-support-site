@@ -283,6 +283,11 @@ model Contact {
   // and the Google sync stores the union tail (Google keeps the full list).
   altPhones       String[]  @default([])
   address         String?
+  // Business this person invoices under (Google's first organisation name), so
+  // an invoice addressed to "68 Ltd" is recognised as going to Michael Smith.
+  // Google owns it: imports and syncs pull it (never blanking a site value), and
+  // the site only pushes it when creating the Google contact.
+  company         String?
   // Address review state, set at import time when the geocoder could not
   // confidently resolve the stored address. A non-empty candidate list means it
   // matched several Auckland places and the operator picks one; an empty list

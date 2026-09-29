@@ -3,7 +3,10 @@
 // POST builds the subject + HTML body for the void notice, applying optional operator
 // overrides (greetingName, customBody).
 
-import { parseInvoiceEmailOverrides } from "@/features/business/lib/invoice-email-request";
+import {
+  parseInvoiceEmailOverrides,
+  toInvoiceEmailPayload,
+} from "@/features/business/lib/invoice-email-request";
 import { buildVoidEmail } from "@/features/reviews/lib/email-invoice";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -35,16 +38,9 @@ export async function POST(
 
   const { greetingName, customBody } = await parseInvoiceEmailOverrides(request);
 
+  const payload = await toInvoiceEmailPayload(invoice);
   const { subject, html } = await buildVoidEmail({
-    invoice: {
-      number: invoice.number,
-      clientName: invoice.clientName,
-      clientEmail: invoice.clientEmail,
-      issueDate: invoice.issueDate,
-      dueDate: invoice.dueDate,
-      total: invoice.total,
-      driveWebUrl: invoice.driveWebUrl,
-    },
+    invoice: payload,
     greetingName,
     customBody,
   });
@@ -54,5 +50,7 @@ export async function POST(
     subject,
     html,
     to: invoice.clientEmail,
+    // Who a blank greeting field greets, so the modal can say so.
+    defaultGreeting: payload.defaultGreeting,
   });
 }

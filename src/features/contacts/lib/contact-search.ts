@@ -65,3 +65,25 @@ export function filterContacts(contacts: GoogleContact[], query: string): Google
   }
   return scored.sort((a, b) => a.score - b.score).map((s) => s.contact);
 }
+
+/**
+ * Whether a search found this contact through their company alone ("68" finding Michael
+ * Smith at 68 Ltd): every token matches the company, and the tokens don't all match the
+ * name or email. The calculator addresses such a pick to the company, since that is who
+ * the operator was looking for.
+ * @param c - The picked contact.
+ * @param query - Raw search input at the moment of the pick.
+ * @returns True when only the company explains the match.
+ */
+export function matchedByCompanyOnly(c: GoogleContact, query: string): boolean {
+  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0 || !c.company?.trim()) return false;
+  const company = c.company.toLowerCase();
+  const name = c.name?.toLowerCase() ?? "";
+  const email = c.email?.toLowerCase() ?? "";
+  return (
+    tokens.every((t) => company.includes(t)) &&
+    !tokens.every((t) => name.includes(t)) &&
+    !tokens.every((t) => email.includes(t))
+  );
+}

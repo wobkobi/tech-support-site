@@ -62,6 +62,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     phone?: string;
     email?: string;
     address?: string;
+    company?: string;
     reviewToken?: string;
     retainerTier?: string;
     retainerPrice?: number;
@@ -79,6 +80,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!primary.phone && secondary.phone) data.phone = secondary.phone;
   if (!primary.email && secondary.email) data.email = secondary.email;
   if (!primary.address && secondary.address) data.address = secondary.address;
+  if (!primary.company && secondary.company) data.company = secondary.company;
   if (!primary.reviewToken && secondary.reviewToken) data.reviewToken = secondary.reviewToken;
   if (!primary.siteNotes && secondary.siteNotes) data.siteNotes = secondary.siteNotes;
   // Retainer arrangement survives a merge: when only the secondary is the

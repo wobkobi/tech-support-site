@@ -65,6 +65,7 @@ import type {
   TaskTemplate,
   TravelEntry,
 } from "@/features/business/types/business";
+import { matchedByCompanyOnly } from "@/features/contacts/lib/contact-search";
 import { cn } from "@/shared/lib/cn";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
@@ -419,7 +420,22 @@ export function CalculatorView({
     fetch("/api/business/contacts")
       .then((r) => r.json())
       .then((d: { ok: boolean; contacts: GoogleContact[] }) => {
-        if (d.ok) setContacts(d.contacts);
+        if (!d.ok) return;
+        setContacts(d.contacts);
+        // A job billed from the schedule arrives as typed text, with no contact
+        // picked, so the Name/Company switch never showed. Pick the Google contact
+        // whose email the booking used, when the booking's name is theirs too.
+        const email = normaliseEmail(eventPrefill?.clientEmail);
+        const match = email ? d.contacts.find((c) => normaliseEmail(c.email) === email) : undefined;
+        if (
+          match &&
+          match.name.trim().toLowerCase() === eventPrefill?.clientName.trim().toLowerCase()
+        ) {
+          setPickedContactName(match.name);
+          setPickedContactCompany(match.company?.trim() || null);
+          setPickedContactGoogleId(match.id || null);
+          setAddressModeState("name");
+        }
       })
       .catch(() => {
         /* picker stays empty; manual client entry still works */
@@ -689,7 +705,10 @@ export function CalculatorView({
     <>
       {pendingInvoiceId && (
         <AddToContactsModal
-          name={clientName}
+          // The person, not the addressed-to name: a company invoice would
+          // otherwise save a contact named "68 Ltd".
+          name={pickedContactName ?? clientName}
+          company={pickedContactCompany}
           email={clientEmail}
           googleContactId={pickedContactGoogleId}
           existingContactName={pendingExistingName}
@@ -989,7 +1008,10 @@ export function CalculatorView({
             contacts={contacts}
             onSelectContact={(c) => {
               const company = c.company?.trim() || null;
-              setClientName(c.name);
+              // Found by typing the company ("68"), not the person: address it to
+              // the company. clientName still holds the search text at this point.
+              const byCompany = matchedByCompanyOnly(c, clientName);
+              setClientName(byCompany && company ? company : c.name);
               setClientEmail(normaliseEmail(c.email));
               setPickedContactName(c.name);
               setPickedContactCompany(company);
@@ -997,7 +1019,7 @@ export function CalculatorView({
               // Bypass the setAddressMode wrapper - it reads pickedContactName
               // from this same render's closure (still null), which would flip
               // the mode to "custom". The name is already set explicitly above.
-              setAddressModeState("name");
+              setAddressModeState(byCompany ? "company" : "name");
             }}
             onClearContact={() => {
               setPickedContactName(null);
