@@ -1,5 +1,5 @@
 "use client";
-// src/features/admin/components/ContactConflictsView.tsx
+// src/features/contacts/components/ContactConflictsView.tsx
 // Lists pending Google Contacts sync conflicts and lets the admin pick a winner per row.
 // POSTs to /api/admin/contacts/conflicts/[id], which writes the chosen value to the site
 // DB and triggers a fresh push to Google. A resolved row drops out of the list.

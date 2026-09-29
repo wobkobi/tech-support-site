@@ -4,15 +4,15 @@
 // ConflictRows, and renders ContactConflictsView so the operator can pick the winning
 // value.
 
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import {
   ContactAddressReviewList,
   type AddressReviewRow,
-} from "@/features/admin/components/ContactAddressReviewList";
+} from "@/features/contacts/components/ContactAddressReviewList";
 import {
   ContactConflictsView,
   type ConflictRow,
-} from "@/features/admin/components/ContactConflictsView";
-import { PageHeader } from "@/features/admin/components/ui/PageHeader";
+} from "@/features/contacts/components/ContactConflictsView";
 import { UNRESOLVED_CONFLICT_FILTER } from "@/features/contacts/lib/contact-conflicts";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";

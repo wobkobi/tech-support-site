@@ -1,5 +1,5 @@
 "use client";
-// src/features/admin/components/ContactDetailActions.tsx
+// src/features/contacts/components/ContactDetailActions.tsx
 // Header actions for the customer-360 detail page: edit the core fields, sync to Google,
 // send a review link, and soft-delete. The edit modal uses the shared email, phone and
 // address inputs and shows name, email and phone problems under their fields. Edits and

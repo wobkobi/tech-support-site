@@ -1,22 +1,22 @@
 "use client";
-// src/features/admin/components/ContactAdminList.tsx
+// src/features/contacts/components/ContactAdminList.tsx
 // Admin component listing contacts saved from booking submissions, with inline editing
 // and Google Places autocomplete for the address field. Contacts are split into two
 // sections: unsynced (needs attention) and synced (already linked to Google Contacts,
 // shown in a collapsible drawer).
 
-import {
-  ContactCard,
-  type ContactCardProps,
-  type ContactRow,
-  type EditValues,
-} from "@/features/admin/components/ContactCard";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import { validateEmail } from "@/features/booking/lib/booking";
+import {
+  ContactCard,
+  type ContactCardProps,
+  type ContactRow,
+  type EditValues,
+} from "@/features/contacts/components/ContactCard";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useEffect, useState } from "react";
