@@ -85,10 +85,16 @@ export async function buildInvoiceEmail({
   const driveLink = invoice.driveWebUrl
     ? `<p style="margin:0 0 16px;font-size:14px;color:#555">An online copy is also here: <a href="${escapeHtml(invoice.driveWebUrl)}" style="color:#43bccd">view ${isQuote ? "quote" : "invoice"}</a>.</p>`
     : "";
-  // No review ask on a quote - the job hasn't happened yet.
+  // No review ask on a quote - the job hasn't happened yet. The Google option
+  // rides along with every site ask, never on its own, so it can't single out
+  // happy customers (which Google's review policy bans).
+  const googleUrl = (await getSettings()).reviews.googleReviewUrl.trim();
+  const googleOption = googleUrl
+    ? ` Or if you'd rather, you can <a href="${escapeHtml(googleUrl)}" style="color:#43bccd">review me on Google</a>.`
+    : "";
   const reviewLine =
     reviewUrl && !isQuote
-      ? `<p style="margin:24px 0 0;font-size:14px;color:#555">If you've got a moment, I'd love to hear how it went - you can <a href="${escapeHtml(reviewUrl)}" style="color:#43bccd">leave a quick review here</a>. It's anonymous if you'd prefer.</p>`
+      ? `<p style="margin:24px 0 0;font-size:14px;color:#555">If you've got a moment, I'd love to hear how it went - you can <a href="${escapeHtml(reviewUrl)}" style="color:#43bccd">leave a quick review here</a>. It's anonymous if you'd prefer.${googleOption}</p>`
       : "";
 
   // Quote emails swap the due line for validity and drop the bank block -

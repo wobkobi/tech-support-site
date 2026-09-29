@@ -244,6 +244,7 @@ export const DEFAULT_SETTINGS: Settings = {
     // false preserves today's behaviour: every review starts as pending.
     autoApproveVerified: false,
     invoiceReviewCooldownDays: 30,
+    googleReviewUrl: "https://g.page/r/CaI0P_QTKDJaEBM/review",
   },
 };
 

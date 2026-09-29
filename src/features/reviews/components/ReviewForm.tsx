@@ -41,6 +41,8 @@ interface ReviewFormProtectedProps {
   phone?: string;
   /** tel: URI for the same number. */
   phoneTel?: string;
+  /** Google "write a review" link offered after submitting; omitted hides the prompt. */
+  googleReviewUrl?: string;
 }
 
 /**
@@ -55,6 +57,7 @@ interface ReviewFormProtectedProps {
  * @param props.existingReview - Existing review data for editing.
  * @param props.phone - Display phone number, offered when a submission fails.
  * @param props.phoneTel - tel: URI for the same number.
+ * @param props.googleReviewUrl - Google "write a review" link offered after submitting.
  * @returns Review form element.
  */
 export default function ReviewFormProtected({
@@ -67,6 +70,7 @@ export default function ReviewFormProtected({
   existingReview,
   phone,
   phoneTel,
+  googleReviewUrl,
 }: ReviewFormProtectedProps): React.ReactElement {
   // Stable literal ids for fields the error summary links to, so the "#id"
   // anchors are URL-safe fragments (useId tokens are not). Unlinked fields
@@ -265,6 +269,22 @@ export default function ReviewFormProtected({
               ? "It'll reappear on the site soon."
               : "It'll appear on the site soon. Thank you - it genuinely helps."}
         </p>
+        {/* Offered to every reviewer, never filtered by what they wrote: Google
+            bans asking only happy customers for reviews. */}
+        {googleReviewUrl && (
+          <div className="mx-auto max-w-lg space-y-3 rounded-lg border border-moonstone-500/50 bg-moonstone-400/10 p-4 sm:p-5">
+            <p className="text-base text-rich-black sm:text-lg">
+              Could you post it on Google too? That's where most people look for local tech help, so
+              it makes a big difference.
+            </p>
+            <Button href={googleReviewUrl} target="_blank" variant="primary">
+              Post it on Google
+            </Button>
+            <p className="text-base text-rich-black/70">
+              Opens Google in a new tab. Reviews there show the name on your Google account.
+            </p>
+          </div>
+        )}
         <div className="flex flex-wrap justify-center gap-3 pt-2">
           <Button href="/" variant="secondary">
             Back to home

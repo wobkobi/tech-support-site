@@ -5,9 +5,9 @@ import ReviewFormProtected from "@/features/reviews/components/ReviewForm";
 import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { PhoneLink } from "@/shared/components/PhoneLink";
-import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
@@ -32,7 +32,7 @@ export default async function ReviewPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<React.ReactElement> {
-  const [params, identity] = await Promise.all([searchParams, getIdentity()]);
+  const [params, { identity, reviews }] = await Promise.all([searchParams, getSettings()]);
   const tokenValue = params.token;
   const token = Array.isArray(tokenValue) ? tokenValue[0] : tokenValue;
 
@@ -165,6 +165,7 @@ export default async function ReviewPage({
                   existingReview={existingReview ?? undefined}
                   phone={identity.phone}
                   phoneTel={identity.phoneTel}
+                  googleReviewUrl={reviews.googleReviewUrl.trim() || undefined}
                 />
               </section>
             </>

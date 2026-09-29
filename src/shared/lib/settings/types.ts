@@ -312,6 +312,12 @@ export interface ReviewsSettings {
   autoApproveVerified: boolean;
   /** Minimum days between review-request emails to one contact. */
   invoiceReviewCooldownDays: number;
+  /**
+   * Google Business Profile "write a review" link, offered alongside every site
+   * review ask. Shown to everyone regardless of what they wrote - Google bans
+   * asking only happy customers. Empty string hides it.
+   */
+  googleReviewUrl: string;
 }
 
 export interface Settings {
