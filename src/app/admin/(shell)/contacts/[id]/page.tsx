@@ -203,6 +203,7 @@ export default async function ContactDetailPage({
                 <InfoRow label="Also">{contact.altPhones.join(", ")}</InfoRow>
               )}
               <InfoRow label="Address">{contact.address || NONE}</InfoRow>
+              {contact.company && <InfoRow label="Company">{contact.company}</InfoRow>}
               <InfoRow label="Added">{formatDateShort(contact.createdAt.toISOString())}</InfoRow>
             </dl>
           </Card>

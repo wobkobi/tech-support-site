@@ -39,6 +39,23 @@ export interface InvoiceEmailData {
   isQuote?: boolean | null;
   /** Quote validity end; shown in place of the due date. */
   quoteValidUntil?: Date | null;
+  /**
+   * Who the email greets when the operator types no override: the person behind a
+   * company invoice (see invoiceRecipient). Unset falls back to the client name's first word.
+   */
+  defaultGreeting?: string | null;
+}
+
+/**
+ * The name an invoice email greets when no override is given.
+ * @param invoice - Invoice email fields.
+ * @returns The greeting target, unescaped.
+ */
+function defaultGreetingFor(invoice: InvoiceEmailData): string {
+  return (
+    invoice.defaultGreeting?.trim() ||
+    (invoice.clientName.split(" ")[0] || invoice.clientName).trim()
+  );
 }
 
 interface BuildInvoiceEmailArgs {
@@ -72,12 +89,9 @@ export async function buildInvoiceEmail({
   // pre-wrap preserves line breaks the operator typed; escape first so the
   // body can never inject markup, then linkify so a typed URL is clickable.
   const safeBody = linkifyEscaped(escapeHtml(bodyText || defaultBody));
-  // Greeting: caller-supplied override wins; otherwise fall back to the first
-  // word of clientName. The Send modal lets the operator type the right name
-  // per send, so there's no auto-detection of company vs person here.
-  const trimmedOverride = greetingName?.trim();
-  const greetingTarget =
-    trimmedOverride || (invoice.clientName.split(" ")[0] || invoice.clientName).trim();
+  // Greeting: the operator's typed override wins; otherwise the person behind a
+  // company invoice, else the first word of clientName.
+  const greetingTarget = greetingName?.trim() || defaultGreetingFor(invoice);
   const safeGreeting = escapeHtml(greetingTarget);
   const safeNumber = escapeHtml(invoice.number);
   const dueDate = escapeHtml(formatDateShort(invoice.dueDate));
@@ -251,7 +265,7 @@ export async function sendInvoiceReminderEmail({
   const siteUrl = getSiteUrl();
   const identity = await getIdentity();
   const { comms } = await getSettings();
-  const greeting = escapeHtml((invoice.clientName.split(" ")[0] || invoice.clientName).trim());
+  const greeting = escapeHtml(defaultGreetingFor(invoice));
   const safeNumber = escapeHtml(invoice.number);
   const dueDate = escapeHtml(formatDateShort(invoice.dueDate));
   const totalLabel = escapeHtml(formatNZD(invoice.total));
@@ -349,7 +363,7 @@ export async function sendPaymentApologyEmail({
   }
 
   const siteUrl = getSiteUrl();
-  const greeting = escapeHtml((invoice.clientName.split(" ")[0] || invoice.clientName).trim());
+  const greeting = escapeHtml(defaultGreetingFor(invoice));
   const safeNumber = escapeHtml(invoice.number);
   const remindedOn = escapeHtml(formatDateShort(reminderSentAt));
   const paidOn = escapeHtml(formatDateShort(paidAt));
@@ -424,9 +438,7 @@ export async function buildVoidEmail({
   const siteUrl = getSiteUrl();
   const bodyText = (customBody ?? DEFAULT_VOID_EMAIL_BODY).trim();
   const safeBody = linkifyEscaped(escapeHtml(bodyText || DEFAULT_VOID_EMAIL_BODY));
-  const trimmedOverride = greetingName?.trim();
-  const greetingTarget =
-    trimmedOverride || (invoice.clientName.split(" ")[0] || invoice.clientName).trim();
+  const greetingTarget = greetingName?.trim() || defaultGreetingFor(invoice);
   const safeGreeting = escapeHtml(greetingTarget);
   const safeNumber = escapeHtml(invoice.number);
   const issueDate = escapeHtml(formatDateShort(invoice.issueDate));

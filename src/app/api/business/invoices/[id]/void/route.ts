@@ -7,7 +7,10 @@
 // and never rolls back.
 
 import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
-import { parseInvoiceEmailOverrides } from "@/features/business/lib/invoice-email-request";
+import {
+  parseInvoiceEmailOverrides,
+  toInvoiceEmailPayload,
+} from "@/features/business/lib/invoice-email-request";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import { sendVoidNotification } from "@/features/reviews/lib/email-invoice";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -75,15 +78,7 @@ export async function POST(
   let notified = false;
   if (sendNotification && pdfBytes && updated.clientEmail) {
     notified = await sendVoidNotification({
-      invoice: {
-        number: updated.number,
-        clientName: updated.clientName,
-        clientEmail: updated.clientEmail,
-        issueDate: updated.issueDate,
-        dueDate: updated.dueDate,
-        total: updated.total,
-        driveWebUrl: updated.driveWebUrl,
-      },
+      invoice: await toInvoiceEmailPayload(updated),
       pdfBytes,
       greetingName,
       customBody,

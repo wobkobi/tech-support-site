@@ -61,6 +61,7 @@ const MERGE_SELECT = {
   phone: true,
   altPhones: true,
   address: true,
+  company: true,
   googleContactId: true,
   reviewToken: true,
   altReviewTokens: true,
@@ -78,6 +79,7 @@ interface MergeableContact {
   phone: string | null;
   altPhones: string[];
   address: string | null;
+  company: string | null;
   googleContactId: string | null;
   reviewToken: string | null;
   altReviewTokens: string[];
@@ -106,6 +108,7 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
   const fill: Record<string, unknown> = {};
   if (!keeper.phone && dup.phone) fill.phone = dup.phone;
   if (!keeper.address && dup.address) fill.address = dup.address;
+  if (!keeper.company && dup.company) fill.company = dup.company;
   if (!keeper.reviewToken && dup.reviewToken) fill.reviewToken = dup.reviewToken;
   // A phone-only keeper adopts the dup's email rather than throwing it away.
   // The email pass can't reach this line - it buckets on a shared email, so both
@@ -203,6 +206,7 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
 
   if (fill.phone) keeper.phone = fill.phone as string;
   if (fill.address) keeper.address = fill.address as string;
+  if (fill.company) keeper.company = fill.company as string;
   if (fill.reviewToken) keeper.reviewToken = fill.reviewToken as string;
   if (fill.reviewLinkSentAt) {
     keeper.reviewLinkSentAt = fill.reviewLinkSentAt as Date;

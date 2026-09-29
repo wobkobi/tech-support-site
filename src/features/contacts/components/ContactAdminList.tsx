@@ -157,7 +157,8 @@ export function ContactAdminList({
           c.altEmails.some((e) => e.toLowerCase().includes(q)) ||
           c.phone?.includes(q) ||
           c.altPhones.some((p) => p.includes(q)) ||
-          c.address?.toLowerCase().includes(q),
+          c.address?.toLowerCase().includes(q) ||
+          c.company?.toLowerCase().includes(q),
       )
     : contacts;
 

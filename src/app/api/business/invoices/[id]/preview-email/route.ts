@@ -60,8 +60,9 @@ export async function POST(
   // `eligibility` in the response.
   const { reviewUrl } = resolveReviewInclusion(invoice, eligibility, includeReviewOverride);
 
+  const payload = await toInvoiceEmailPayload(invoice);
   const { subject, html } = await buildInvoiceEmail({
-    invoice: toInvoiceEmailPayload(invoice),
+    invoice: payload,
     reviewUrl,
     greetingName,
     customBody,
@@ -73,5 +74,7 @@ export async function POST(
     html,
     to: invoice.clientEmail,
     eligibility,
+    // Who a blank greeting field greets, so the modal can say so.
+    defaultGreeting: payload.defaultGreeting,
   });
 }

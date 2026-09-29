@@ -22,7 +22,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 /** Send-flow state and actions returned by {@link useInvoiceSend}. */
 export interface InvoiceSendFlow {
   previewOpen: boolean;
-  preview: { subject: string; html: string; to: string } | null;
+  /** `defaultGreeting` is who a blank greeting greets - the person behind a company invoice. */
+  preview: { subject: string; html: string; to: string; defaultGreeting?: string } | null;
   loading: boolean;
   sending: boolean;
   error: string | null;
@@ -83,14 +84,17 @@ export function useInvoiceSend({
   const { toast } = useToast();
   // Send-email preview state
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [preview, setPreview] = useState<{ subject: string; html: string; to: string } | null>(
-    null,
-  );
+  const [preview, setPreview] = useState<{
+    subject: string;
+    html: string;
+    to: string;
+    defaultGreeting?: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sentLocal, setSentLocal] = useState<boolean>(sentAt != null);
-  // Operator-typed greeting override. Empty = use the first word of clientName.
+  // Operator-typed greeting override. Empty = the preview's defaultGreeting.
   const [greetingName, setGreetingName] = useState("");
   // Editable email body, pre-populated with the default copy (quote wording
   // when the row is a quote).
@@ -138,10 +142,16 @@ export function useInvoiceSend({
               html: string;
               to: string;
               eligibility: InvoiceReviewEligibility;
+              defaultGreeting?: string;
             }
           | { error: string };
         if ("error" in d) throw new Error(d.error);
-        setPreview({ subject: d.subject, html: d.html, to: d.to });
+        setPreview({
+          subject: d.subject,
+          html: d.html,
+          to: d.to,
+          defaultGreeting: d.defaultGreeting,
+        });
         if (!sendIncludeReview) setIncludeReview(d.eligibility.canSend);
         setEligibility(d.eligibility);
       } catch (err) {
@@ -304,7 +314,11 @@ export function SendInvoiceModal({
               value={greetingName}
               onChange={(e) => setGreetingName(e.target.value)}
               onBlur={() => void openPreview()}
-              placeholder="John (leave blank to use the first word of the client name)"
+              placeholder={
+                preview.defaultGreeting
+                  ? `Leave blank to greet ${preview.defaultGreeting}`
+                  : "John (leave blank to use the first word of the client name)"
+              }
               disabled={sending}
               className={cn(INPUT_CLS, "mb-4")}
             />
@@ -354,7 +368,7 @@ export function SendInvoiceModal({
                               onClick={() => setShowAddContact(true)}
                               className="font-semibold text-russian-violet underline hover:opacity-80"
                             >
-                              add {clientName?.trim().split(" ")[0] || "them"} to contacts
+                              add {clientName?.trim() || "them"} to contacts
                             </button>
                             )
                           </>

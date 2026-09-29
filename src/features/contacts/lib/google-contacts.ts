@@ -129,6 +129,7 @@ export async function importGoogleContactByEmail(
         needle,
       phone: rawPhone ? toE164NZ(rawPhone) || rawPhone : null,
       ...(rawAddress ? await addressFields(rawAddress) : {}),
+      company: person.organizations?.[0]?.name?.trim() || null,
       googleContactId: resourceName,
     });
 
@@ -186,6 +187,7 @@ export async function importFromGoogleContacts(): Promise<number> {
       altEmails: string[];
       phone: string | null;
       address: string | null;
+      company: string | null;
       googleContactId: string | null;
       lastGoogleEtag: string | null;
     }
@@ -203,6 +205,7 @@ export async function importFromGoogleContacts(): Promise<number> {
         phone: true,
         altPhones: true,
         address: true,
+        company: true,
         googleContactId: true,
         lastGoogleEtag: true,
       },
@@ -223,6 +226,7 @@ export async function importFromGoogleContacts(): Promise<number> {
         altEmails: c.altEmails,
         phone: c.phone,
         address: c.address,
+        company: c.company,
         googleContactId: c.googleContactId,
         lastGoogleEtag: c.lastGoogleEtag,
       };
@@ -284,6 +288,7 @@ export async function importFromGoogleContacts(): Promise<number> {
           person.organizations?.[0]?.name?.trim() ??
           null;
         const address = person.addresses?.[0]?.formattedValue?.trim() ?? null;
+        const company = person.organizations?.[0]?.name?.trim() || null;
         const email = emailEntry ?? (normPhone ? (emailByMobileKey.get(normPhone) ?? null) : null);
         const etag = person.etag ?? null;
 
@@ -354,6 +359,7 @@ export async function importFromGoogleContacts(): Promise<number> {
             if (address && address !== existing.address) {
               Object.assign(updates, await addressFields(address));
             }
+            if (company && company !== existing.company) updates.company = company;
             await prisma.contact.update({ where: { id: existing.id }, data: updates });
 
             // Mirror the write onto the indexed row: two Google people can
@@ -365,6 +371,7 @@ export async function importFromGoogleContacts(): Promise<number> {
             if (typeof updates.email === "string") existing.email = updates.email;
             if (typeof updates.phone === "string") existing.phone = updates.phone;
             if (typeof updates.address === "string") existing.address = updates.address;
+            if (typeof updates.company === "string") existing.company = updates.company;
             if (newAlts.length > 0) existing.altEmails = [...existing.altEmails, ...newAlts];
             byGoogleId.set(resourceName, existing);
           } else {
@@ -386,6 +393,7 @@ export async function importFromGoogleContacts(): Promise<number> {
                 altEmails: emailList.filter((e) => e !== email),
                 phone,
                 ...addressData,
+                company,
                 // Explicit null: an omitted optional field has no key in
                 // MongoDB, and `where: { deletedAt: null }` doesn't match a
                 // missing key - the imported contact would be invisible.
@@ -406,6 +414,7 @@ export async function importFromGoogleContacts(): Promise<number> {
               altEmails: emailList.filter((e) => e !== email),
               phone,
               address: created.address,
+              company,
               googleContactId: resourceName,
               lastGoogleEtag: etag,
             };
@@ -495,6 +504,7 @@ function mergePhones(sitePhones: Array<string | null>, googlePhones: string[]): 
  * Bidirectional sync between a site Contact and its Google counterpart.
  * Phones merge as a union; name/email/address use latest-wins via lastSyncedAt
  * + etag, recording a ContactConflict when both sides changed and diverge.
+ * Company only flows Google > site, except on first create.
  * Stamps lastSyncedAt + lastGoogleEtag on success. Never throws.
  * @param contactId - The local DB contact ID to sync.
  */
@@ -530,13 +540,14 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       emailAddresses?: Array<{ value?: string | null }> | null;
       phoneNumbers?: Array<{ value?: string | null }> | null;
       addresses?: Array<{ formattedValue?: string | null }> | null;
+      organizations?: Array<{ name?: string | null }> | null;
     } | null = null;
 
     if (resourceName) {
       try {
         const fetched = await people.people.get({
           resourceName,
-          personFields: "names,emailAddresses,phoneNumbers,addresses",
+          personFields: "names,emailAddresses,phoneNumbers,addresses,organizations",
         });
         googlePerson = fetched.data;
       } catch (err) {
@@ -553,7 +564,7 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       try {
         const searchResult = await people.people.searchContacts({
           query: contact.email,
-          readMask: "names,emailAddresses,phoneNumbers,addresses",
+          readMask: "names,emailAddresses,phoneNumbers,addresses,organizations",
           pageSize: 5,
         });
         const match = searchResult.data.results?.find((r) =>
@@ -580,6 +591,7 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
             emailAddresses: [{ value: contact.email }],
             ...(contact.phone ? { phoneNumbers: [{ value: contact.phone }] } : {}),
             ...(contact.address ? { addresses: [{ formattedValue: contact.address }] } : {}),
+            ...(contact.company ? { organizations: [{ name: contact.company }] } : {}),
           },
         });
         if (created.data.resourceName) {
@@ -615,6 +627,7 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
     // rest are carried alongside rather than discarded.
     const googleEmail = googleEmailList[0] || null;
     const googleAddress = googlePerson.addresses?.[0]?.formattedValue?.trim() || null;
+    const googleCompany = googlePerson.organizations?.[0]?.name?.trim() || null;
     const googlePhoneList = (googlePerson.phoneNumbers ?? [])
       .map((p) => p.value?.trim())
       .filter((v): v is string => !!v);
@@ -726,6 +739,8 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
     ) {
       siteUpdate.altEmails = { set: emailTail };
     }
+    // Company is Google-owned: take Google's value whenever it has one, never blank the site's.
+    if (googleCompany && googleCompany !== contact.company) siteUpdate.company = googleCompany;
     if (addressAction === "pull" && googleAddress) {
       // Canonicalise the hand-typed Google address before it lands on the site,
       // flagging it for review when it doesn't resolve to one confident match.

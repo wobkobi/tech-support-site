@@ -13,6 +13,7 @@ import { InvoiceStatusBadge } from "@/features/business/components/invoice/Invoi
 import { InvoiceTimeline } from "@/features/business/components/invoice/InvoiceTimeline";
 import { formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
 import { findRecordedPayment } from "@/features/business/lib/invoice-payment-match";
+import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
 import { requireAdminAuth } from "@/shared/lib/auth";
@@ -93,7 +94,7 @@ async function InvoiceRail({
         ? prisma.contact
             .findUnique({
               where: { id: invoice.contactId },
-              select: { id: true, name: true, email: true, phone: true },
+              select: { id: true, name: true, email: true, phone: true, company: true },
             })
             .catch(() => null)
         : Promise.resolve(null),
@@ -101,6 +102,7 @@ async function InvoiceRail({
   );
   timer.log("invoice-detail-rail");
 
+  const recipient = invoiceRecipient(invoice.clientName, contact);
   const overdue = isInvoiceOverdue(invoice);
   const isPaid = invoice.status === "PAID";
   const isVoided = invoice.status === "VOIDED";
@@ -191,6 +193,11 @@ async function InvoiceRail({
                 className="text-blue-500 hover:text-blue-700"
               >
                 {contact.name}
+                {contact.company && (
+                  <span className="block text-xs font-normal text-admin-muted">
+                    {contact.company}
+                  </span>
+                )}
                 <span className="block text-xs font-normal text-admin-muted">
                   {contact.email || contact.phone || "no details"}
                 </span>
@@ -199,6 +206,11 @@ async function InvoiceRail({
               <span className="text-admin-faint">Not linked</span>
             )}
           </InfoRow>
+          {contact && (
+            <InfoRow label="Addressed to">
+              {recipient.toCompany ? `Company, attn ${recipient.attention}` : "Person"}
+            </InfoRow>
+          )}
           <InfoRow label="Calendar">
             {invoice.calendarEventId ? (
               // A merged job billed several events at once; calendarEventIds is

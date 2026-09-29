@@ -86,6 +86,12 @@ export interface Invoice {
   driveWebUrl: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Linked contact's name, set by the list endpoint so search finds "68 Ltd" under Michael. */
+  contactName?: string | null;
+  /** Linked contact's company, set by the list endpoint. */
+  contactCompany?: string | null;
+  /** The person a company invoice is for (see invoiceRecipient); null on a person invoice. */
+  attention?: string | null;
 }
 
 export interface IncomeEntry {

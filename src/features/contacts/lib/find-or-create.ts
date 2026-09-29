@@ -27,6 +27,8 @@ export interface ContactSeed {
   /** Auckland candidates offered to the operator; empty when nothing matched. */
   addressCandidates?: string[];
   googleContactId?: string | null;
+  /** Business the person invoices under; stored only when a row is created. */
+  company?: string | null;
 }
 
 export interface FindOrCreateResult {
@@ -117,6 +119,7 @@ export async function findOrCreateContactByEmail(
       address: seed.address ?? null,
       addressUnverified: seed.addressUnverified ?? false,
       addressCandidates: seed.addressCandidates ?? [],
+      company: seed.company?.trim() || null,
       // Explicit null, not omitted: Mongo stores no key for an omitted optional field, and
       // `where: { deletedAt: null }` - the filter every reader uses - won't match an absent
       // key. Omit it and the new contact is invisible to the list, sync and matchers.
@@ -156,6 +159,7 @@ export async function findOrCreateContactByPhone(
       address: seed.address ?? null,
       addressUnverified: seed.addressUnverified ?? false,
       addressCandidates: seed.addressCandidates ?? [],
+      company: seed.company?.trim() || null,
       // Explicit null - see the note in findOrCreateContactByEmail.
       deletedAt: null,
       googleContactId: seed.googleContactId ?? null,

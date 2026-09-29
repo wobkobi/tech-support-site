@@ -22,6 +22,8 @@ export interface ContactRow {
   /** Additional phone numbers (canonical form); matched like the primary. */
   altPhones: string[];
   address: string | null;
+  /** Business the person invoices under (from Google), or null. */
+  company: string | null;
   createdAt: string;
   /** Google People API resource name if synced, or null */
   googleContactId: string | null;
@@ -271,6 +273,9 @@ export function ContactCard({
           className="min-w-0 truncate font-semibold text-russian-violet hover:underline"
         >
           {c.name}
+          {c.company && (
+            <span className="ml-2 text-xs font-normal text-slate-500">{c.company}</span>
+          )}
         </Link>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-xs whitespace-nowrap text-slate-400">

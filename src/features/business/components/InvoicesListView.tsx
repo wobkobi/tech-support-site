@@ -165,7 +165,19 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
       const r = await fetch(`/api/business/invoices/${id}`);
       const d = await r.json();
       if (!d.ok) throw new Error(`refresh failed (${r.status})`);
-      setInvoices((prev) => prev.map((i) => (i.id === id ? d.invoice : i)));
+      // The single-invoice endpoint carries no contact fields; keep the list's.
+      setInvoices((prev) =>
+        prev.map((i) =>
+          i.id === id
+            ? {
+                ...d.invoice,
+                contactName: i.contactName,
+                contactCompany: i.contactCompany,
+                attention: i.attention,
+              }
+            : i,
+        ),
+      );
     } catch {
       // The payment itself saved; only this row is stale.
       setLoadError(true);
@@ -293,7 +305,10 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return invoices.filter((inv) => {
-      if (q && !inv.number.toLowerCase().includes(q) && !inv.clientName.toLowerCase().includes(q)) {
+      // The linked contact's name and company count too, so "michael" finds the
+      // invoices addressed to 68 Ltd and "68" finds the ones addressed to him.
+      const haystack = [inv.number, inv.clientName, inv.contactName, inv.contactCompany];
+      if (q && !haystack.some((field) => field?.toLowerCase().includes(q))) {
         return false;
       }
       if (statusFilter === "OVERDUE") {
@@ -439,7 +454,7 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
               setSearch(e.target.value);
               setPage(1);
             }}
-            placeholder="Number or client name"
+            placeholder="Number, client or contact"
             className={CONTROL_CLS}
           />
         </label>
@@ -550,6 +565,11 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
                 className="mt-1 block truncate text-sm font-medium text-admin-text"
               >
                 {inv.clientName}
+                {inv.attention && (
+                  <span className="ml-2 text-xs font-normal text-admin-muted">
+                    attn {inv.attention}
+                  </span>
+                )}
               </Link>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-admin-muted">
                 <span>Issued {formatDateShort(inv.issueDate)}</span>
@@ -635,7 +655,14 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
                   <td className="px-4 py-3 font-mono text-xs font-semibold text-admin-text">
                     {inv.number}
                   </td>
-                  <td className="px-4 py-3 font-medium text-admin-text">{inv.clientName}</td>
+                  <td className="px-4 py-3 font-medium text-admin-text">
+                    {inv.clientName}
+                    {inv.attention && (
+                      <span className="block text-xs font-normal text-admin-muted">
+                        attn {inv.attention}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-xs whitespace-nowrap text-admin-muted">
                     {formatDateShort(inv.issueDate)}
                   </td>
