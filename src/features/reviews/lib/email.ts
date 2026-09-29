@@ -12,7 +12,20 @@ import {
   sendOutreach,
 } from "@/features/reviews/lib/email-core";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
+
+/**
+ * Secondary line under a review-request button offering Google as an
+ * alternative to the site's own review form. Sent with every request, so it
+ * never singles out happy customers (which Google's review policy bans).
+ * @returns HTML paragraph, or "" when no Google review link is set.
+ */
+async function googleReviewLine(): Promise<string> {
+  const url = (await getSettings()).reviews.googleReviewUrl.trim();
+  if (!url) return "";
+  return `<p style="margin:16px 0 0;color:#444;font-size:14px;line-height:1.6">Prefer Google? You can <a href="${escapeHtml(url)}" style="color:#43bccd">leave your review there</a> instead.</p>`;
+}
 
 /**
  * Review data used for owner notification emails.
@@ -132,6 +145,7 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
     <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, I'd love to hear how it went. A quick review makes a real difference for a small local business like mine, and helps other people find reliable tech support when they need it.</p>
     <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute, and honest feedback is always welcome.</p>
     <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Leave a review</a>
+    ${await googleReviewLine()}
 
     <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">Thanks again for choosing ${escapeHtml(brandName(identity))}. If you ever need a hand with anything else, don't hesitate to get in touch.</p>
 ${await buildEmailSignature(siteUrl)}
@@ -182,6 +196,7 @@ export async function buildPastClientReviewEmailHtml(
     <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, a quick review would mean a lot - it really helps other people find reliable local tech support.</p>
     <p style="margin:0 0 24px;color:#444;line-height:1.6">No pressure at all, but if you're happy to, I'd really appreciate it.</p>
     <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Leave a review</a>
+    ${await googleReviewLine()}
 
     <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">If you ever need a hand with anything else, don't hesitate to get in touch.</p>
 ${await buildEmailSignature(siteUrl)}

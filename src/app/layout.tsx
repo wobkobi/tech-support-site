@@ -183,7 +183,15 @@ export default async function RootLayout({
     slogan: "Clear explanations, no jargon, solutions that actually work.",
     telephone,
     email: identity.email,
-    founder: { "@type": "Person", name: identity.name },
+    // Same @id as the Person entity on /about. The name and url stay inline
+    // because this block renders on every page and Google won't resolve an
+    // @id defined on another page.
+    founder: {
+      "@type": "Person",
+      "@id": `${siteUrl}/about#person`,
+      name: identity.name,
+      url: `${siteUrl}/about`,
+    },
     address: {
       "@type": "PostalAddress",
       addressLocality: identity.baseAddress.locality,
@@ -311,8 +319,10 @@ export default async function RootLayout({
         },
       })),
     },
-    // sameAs deliberately omitted until real profiles exist (Google Business
-    // Profile, Facebook, etc.) - a placeholder URL helps nothing.
+    // Business profiles only; personal ones live on the Person entity on /about.
+    // The Business Profile uses its stable ?cid= URL, not the maps.app.goo.gl
+    // share link, which is a redirect carrying tracking params.
+    sameAs: ["https://maps.google.com/?cid=6499301278416319650"],
   };
 
   const websiteJsonLd = {

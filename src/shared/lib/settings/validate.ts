@@ -368,6 +368,13 @@ function validateReviews(r: ReviewsSettings): FieldError[] {
     errors.push({ field: "autoApproveVerified", message: "Must be on or off." });
   if (!inRange(r.invoiceReviewCooldownDays, 1, 3650))
     errors.push({ field: "invoiceReviewCooldownDays", message: "Must be 1-3650 days." });
+  if (typeof r.googleReviewUrl !== "string")
+    errors.push({ field: "googleReviewUrl", message: "Must be a link or blank." });
+  else if (r.googleReviewUrl.trim() && !/^https:\/\/\S+$/.test(r.googleReviewUrl.trim()))
+    errors.push({
+      field: "googleReviewUrl",
+      message: "Must be a full https:// link, or blank to hide it.",
+    });
   return errors;
 }
 

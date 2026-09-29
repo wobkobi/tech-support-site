@@ -49,6 +49,11 @@ export default function AboutPage(): React.ReactElement {
     workLocation: { "@type": "City", name: "Auckland" },
     url: `${siteUrl}/about`,
     image: `${siteUrl}${PHOTO_SRC}`,
+    // Personal profiles only; business profiles go on the LocalBusiness sameAs.
+    sameAs: [
+      "https://www.linkedin.com/in/harrisonraynes/",
+      "https://www.facebook.com/harrisonraynes/",
+    ],
   };
 
   return (
@@ -88,7 +93,7 @@ export default function AboutPage(): React.ReactElement {
                 id="about-hero-heading"
                 className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
               >
-                About To the Point Tech
+                About Harrison Raynes
               </h1>
 
               <p className="mb-4 text-base text-rich-black sm:text-lg">

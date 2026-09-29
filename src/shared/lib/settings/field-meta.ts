@@ -52,7 +52,7 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
   },
   reviews: {
     title: "Reviews & reputation",
-    blurb: "Homepage review count, auto-approval, and request pacing.",
+    blurb: "Homepage review count, auto-approval, request pacing, and the Google review link.",
   },
 };
 
@@ -225,6 +225,11 @@ export const REVIEWS_FIELD_META = {
     title: "Review-request cooldown",
     description: "Minimum days before the same customer is asked for a review again.",
     unit: "days",
+  },
+  googleReviewUrl: {
+    title: "Google review link",
+    description:
+      'From your Business Profile\'s "Ask for reviews" page. Offered on the review thank-you screen and in review-request and invoice emails. Leave blank to hide it.',
   },
 } satisfies Record<string, FieldMeta>;
 

@@ -1,12 +1,13 @@
 "use client";
 // src/features/admin/components/settings/ReviewsTab.tsx
 // Editor for the reviews & reputation group: how many reviews feature on the home page,
-// whether verified reviews auto-approve, and the review-request cooldown. Saves through
-// the shared settings form hook.
+// whether verified reviews auto-approve, the review-request cooldown, and the Google
+// review link. Saves through the shared settings form hook.
 
 import {
   NumberField,
   SettingsTabBody,
+  TextField,
   ToggleField,
 } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
@@ -68,6 +69,16 @@ export function ReviewsTab({ initial, defaults }: Props): React.ReactElement {
           error={fieldErrors.invoiceReviewCooldownDays}
           customised={draft.invoiceReviewCooldownDays !== defaults.invoiceReviewCooldownDays}
           onChange={(v) => set({ invoiceReviewCooldownDays: v ?? 1 })}
+        />
+        <TextField
+          id="googleReviewUrl"
+          meta={m.googleReviewUrl}
+          type="url"
+          value={draft.googleReviewUrl}
+          placeholder="https://g.page/r/.../review"
+          error={fieldErrors.googleReviewUrl}
+          customised={draft.googleReviewUrl !== defaults.googleReviewUrl}
+          onChange={(v) => set({ googleReviewUrl: v })}
         />
       </div>
 
