@@ -83,6 +83,8 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
   const { toast } = useToast();
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed load shows a Try again banner, not "No subscriptions yet."
+  const [loadError, setLoadError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -96,7 +98,11 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
     try {
       const res = await fetch("/api/business/subscriptions");
       const data = (await res.json()) as { ok: boolean; subscriptions: Subscription[] };
-      if (data.ok) setSubs(data.subscriptions);
+      if (!data.ok) throw new Error(`subscriptions load failed (${res.status})`);
+      setSubs(data.subscriptions);
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -379,6 +385,16 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
 
       {loading ? (
         <p className="text-sm text-slate-500">Loading...</p>
+      ) : loadError ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+        >
+          <span>Couldn&apos;t load your subscriptions. Try again, or come back later.</span>
+          <Button variant="secondary" size="sm" onClick={() => void load()}>
+            Try again
+          </Button>
+        </div>
       ) : subs.length === 0 ? (
         <p className="text-sm text-slate-500">No subscriptions yet.</p>
       ) : (

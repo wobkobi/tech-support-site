@@ -18,7 +18,7 @@ import { MigrateToSubscriptionDialog } from "@/features/business/components/Migr
 import { calcGstFromInclusive, formatNZD, todayISO } from "@/features/business/lib/business";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from "@/features/business/lib/constants";
 import { fyKeyOf, listFinancialYears } from "@/features/business/lib/financial-year";
-import type { ExpenseEntry } from "@/features/business/types/business";
+import type { ExpenseEntry, Subscription } from "@/features/business/types/business";
 import { Field } from "@/shared/components/Field";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
@@ -46,16 +46,42 @@ const MIGRATE_MIN_MATCHES = 3;
 
 /**
  * Recurrence key: normalised supplier + description. Expenses sharing a key are
- * the same repeat cost (a likely subscription).
- * @param e - The expense.
+ * the same repeat cost (a likely subscription), and an active subscription with
+ * the key means that cost has already been migrated.
+ * @param e - The expense or subscription.
+ * @param e.supplier - Who is paid.
+ * @param e.description - What the payment is for.
  * @returns The group key.
  */
-function groupKey(e: ExpenseEntry): string {
+function groupKey(e: { supplier: string; description: string }): string {
   return `${e.supplier.trim().toLowerCase()}||${e.description.trim().toLowerCase()}`;
 }
 
 /**
- * How many expenses share this one's supplier+description (>= 2 = recurring).
+ * Loads every expense entry.
+ * @returns The entries, newest first as the API orders them.
+ */
+async function fetchEntries(): Promise<ExpenseEntry[]> {
+  const r = await fetch("/api/business/expenses");
+  const d = (await r.json()) as { ok: boolean; entries?: ExpenseEntry[] };
+  if (!d.ok || !d.entries) throw new Error(`expenses load failed (${r.status})`);
+  return d.entries;
+}
+
+/**
+ * Loads the {@link groupKey} of every active subscription.
+ * @returns The keys of costs that already have a subscription.
+ */
+async function fetchSubscribedKeys(): Promise<Set<string>> {
+  const r = await fetch("/api/business/subscriptions");
+  const d = (await r.json()) as { ok: boolean; subscriptions?: Subscription[] };
+  if (!d.ok || !d.subscriptions) throw new Error(`subscriptions load failed (${r.status})`);
+  return new Set(d.subscriptions.filter((s) => s.isActive).map(groupKey));
+}
+
+/**
+ * How many expenses share this one's supplier+description; {@link MIGRATE_MIN_MATCHES}
+ * or more marks it recurring and offers Migrate.
  * @param groups - The precomputed group map.
  * @param e - The expense.
  * @returns The match count (1 when unique).
@@ -110,6 +136,15 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [migrateTarget, setMigrateTarget] = useState<ExpenseEntry | null>(null);
+  // Group keys that already have an active subscription, so their rows offer no
+  // second Migrate - the subscription records each payment, and a copy doubles it.
+  // Null until loaded: with no answer, Migrate stays hidden rather than guessing.
+  const [subscribedKeys, setSubscribedKeys] = useState<Set<string> | null>(null);
+  const [subsLoadKey, setSubsLoadKey] = useState(0);
+  // A failed load shows a banner with Try again, never an empty ledger or $0 totals.
+  const [loadError, setLoadError] = useState(false);
+  const [subsError, setSubsError] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
 
   const now = useMemo(() => new Date(), []);
@@ -135,15 +170,54 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
   }, [entries]);
 
   useEffect(() => {
-    fetch("/api/business/expenses")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.ok) setEntries(d.entries);
-        else toast("Couldn't load expense entries.", { tone: "error" });
-      })
-      .catch(() => toast("Couldn't load expense entries. Refresh to try again.", { tone: "error" }))
+    fetchEntries()
+      .then(setEntries)
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
-  }, [toast]);
+  }, []);
+
+  useEffect(() => {
+    fetchSubscribedKeys()
+      .then((keys) => {
+        setSubscribedKeys(keys);
+        setSubsError(false);
+      })
+      .catch(() => setSubsError(true));
+  }, [subsLoadKey]);
+
+  /**
+   * Re-runs both loads from the error banner's Try again button.
+   */
+  async function retryLoad(): Promise<void> {
+    setRetrying(true);
+    const [entriesRes, keysRes] = await Promise.allSettled([fetchEntries(), fetchSubscribedKeys()]);
+    if (entriesRes.status === "fulfilled") {
+      setEntries(entriesRes.value);
+      setLoadError(false);
+    } else {
+      setLoadError(true);
+    }
+    if (keysRes.status === "fulfilled") {
+      setSubscribedKeys(keysRes.value);
+      setSubsError(false);
+    } else {
+      setSubsError(true);
+    }
+    setRetrying(false);
+  }
+
+  /**
+   * Whether a row offers Migrate: a confirmed repeat with no active subscription yet.
+   * @param e - The expense.
+   * @returns True when the Migrate action should show.
+   */
+  function canMigrate(e: ExpenseEntry): boolean {
+    return (
+      subscribedKeys !== null &&
+      matchCount(recurringGroups, e) >= MIGRATE_MIN_MATCHES &&
+      !subscribedKeys.has(groupKey(e))
+    );
+  }
 
   const inclNum = parseFloat(form.amountIncl) || 0;
   const rate = parseFloat(form.gstRate) || 0;
@@ -342,14 +416,40 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
 
   return (
     <div>
-      {/* Summary cards - reflect the active filters; the category card drills in. */}
+      {(loadError || subsError) && (
+        <div
+          role="alert"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+        >
+          <span>
+            {loadError
+              ? "Couldn't load your expenses. Try again, or come back later."
+              : "Couldn't check your subscriptions, so Migrate is hidden until they load."}
+          </span>
+          <AdminButton
+            size="xs"
+            variant="secondary"
+            onClick={() => void retryLoad()}
+            busy={retrying}
+          >
+            Try again
+          </AdminButton>
+        </div>
+      )}
+
+      {/* Summary cards - reflect the active filters; the category card drills in.
+          Unloaded data shows "-", not totals of an empty list. */}
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Expenses (excl. GST)" value={formatNZD(totalExcl)} />
-        <StatCard label="GST claimable" value={formatNZD(totalGst)} tone="success" />
-        <StatCard label="Entries" value={sorted.length} />
+        <StatCard label="Expenses (excl. GST)" value={loadError ? "-" : formatNZD(totalExcl)} />
+        <StatCard
+          label="GST claimable"
+          value={loadError ? "-" : formatNZD(totalGst)}
+          tone="success"
+        />
+        <StatCard label="Entries" value={loadError ? "-" : sorted.length} />
         <StatCard
           label="Categories"
-          value={categoryBreakdown.rows?.length ?? 0}
+          value={loadError ? "-" : (categoryBreakdown.rows?.length ?? 0)}
           sub="View breakdown"
           onClick={() => setBreakdownOpen(true)}
         />
@@ -604,7 +704,11 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
           </p>
         ) : sorted.length === 0 ? (
           <p className="rounded-xl border border-admin-border bg-admin-surface px-5 py-6 text-sm text-admin-faint shadow-sm">
-            {entries.length === 0 ? "No expense entries yet." : "No entries match your filters."}
+            {entries.length > 0
+              ? "No entries match your filters."
+              : loadError
+                ? "Expenses didn't load."
+                : "No expense entries yet."}
           </p>
         ) : (
           pager.visible.map((e) => (
@@ -619,7 +723,9 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
                     {e.category}
                     {matchCount(recurringGroups, e) >= MIGRATE_MIN_MATCHES && (
                       <span className="ml-2 font-medium text-russian-violet">
-                        recurring ×{matchCount(recurringGroups, e)}
+                        {subscribedKeys?.has(groupKey(e))
+                          ? "subscription"
+                          : `recurring ×${matchCount(recurringGroups, e)}`}
                       </span>
                     )}
                     {!e.receipt && <span className="ml-2 text-amber-600">no receipt</span>}
@@ -633,7 +739,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-admin-muted">
                 <span>{formatDateShort(e.date)}</span>
                 <div className="ml-auto flex items-center gap-3">
-                  {matchCount(recurringGroups, e) >= MIGRATE_MIN_MATCHES && (
+                  {canMigrate(e) && (
                     <button
                       onClick={() => setMigrateTarget(e)}
                       className="inline-flex h-8 items-center text-russian-violet hover:opacity-80"
@@ -666,7 +772,11 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
           <p className="px-5 py-6 text-sm text-admin-faint">Loading...</p>
         ) : sorted.length === 0 ? (
           <p className="px-5 py-6 text-sm text-admin-faint">
-            {entries.length === 0 ? "No expense entries yet." : "No entries match your filters."}
+            {entries.length > 0
+              ? "No entries match your filters."
+              : loadError
+                ? "Expenses didn't load."
+                : "No expense entries yet."}
           </p>
         ) : (
           <table className="w-full text-sm">
@@ -733,7 +843,9 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
                     {e.supplier}
                     {matchCount(recurringGroups, e) >= MIGRATE_MIN_MATCHES && (
                       <span className="ml-2 rounded-full bg-russian-violet/10 px-1.5 py-0.5 text-[10px] font-semibold text-russian-violet">
-                        recurring ×{matchCount(recurringGroups, e)}
+                        {subscribedKeys?.has(groupKey(e))
+                          ? "subscription"
+                          : `recurring ×${matchCount(recurringGroups, e)}`}
                       </span>
                     )}
                     {!e.receipt && (
@@ -749,7 +861,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-3">
-                      {matchCount(recurringGroups, e) >= MIGRATE_MIN_MATCHES && (
+                      {canMigrate(e) && (
                         <button
                           onClick={() => setMigrateTarget(e)}
                           className="text-xs text-russian-violet hover:opacity-80"
@@ -803,6 +915,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
             setMigrateTarget(null);
             if (migrated) {
               toast("Subscription created from expense.", { tone: "success" });
+              setSubsLoadKey((k) => k + 1);
               onMigrated?.();
             }
           }}
