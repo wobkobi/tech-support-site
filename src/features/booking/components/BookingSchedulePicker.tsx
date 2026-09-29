@@ -1,4 +1,5 @@
 "use client";
+// src/features/booking/components/BookingSchedulePicker.tsx
 // Schedule section of the booking form: duration, day and start-time pickers.
 
 import type {

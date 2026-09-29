@@ -1,3 +1,4 @@
+// src/features/booking/lib/complete-billed-bookings.server.ts
 // Marks the bookings behind a freshly billed invoice as completed. Raising an invoice for a
 // booked timeslot is the operator saying the job happened, so the booking shouldn't sit
 // on "confirmed" waiting for a separate Complete click.

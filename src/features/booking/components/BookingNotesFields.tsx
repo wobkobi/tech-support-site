@@ -1,4 +1,5 @@
 "use client";
+// src/features/booking/components/BookingNotesFields.tsx
 // Issue description and visit access-notes textareas for the booking form.
 
 import { BOOKING_FIELD_LIMITS } from "@/features/booking/lib/booking";

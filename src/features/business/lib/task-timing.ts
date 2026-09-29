@@ -1,3 +1,4 @@
+// src/features/business/lib/task-timing.ts
 // Task-line minute maths - fitting parsed tasks to the job window, snapping to the billing
 // grid, and the whole-job minimum-billable floor. Re-exported through business.ts.
 

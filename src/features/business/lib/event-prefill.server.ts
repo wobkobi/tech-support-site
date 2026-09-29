@@ -1,3 +1,4 @@
+// src/features/business/lib/event-prefill.server.ts
 // Resolves Google Calendar booking events into a job prefill: corrected on-site times,
 // the booking's client details, and one round trip of frozen drive time. Used by the
 // calculator's "Bill in calculator" deep link and the draft-invoice editor's AI box.

@@ -1,4 +1,5 @@
 "use client";
+// src/features/booking/hooks/use-booking-address.ts
 // Address state for the public booking form: street + unit, the Places
 // verification flags, and the submit-time "did you mean?" candidates.
 

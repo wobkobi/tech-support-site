@@ -1,3 +1,4 @@
+// src/features/business/lib/payment-fields.ts
 // Bank transfer fields for the invoice's payment call-out. NZ internet banking gives the payer
 // three boxes - Particulars, Code, Reference - each capped at 12 characters, so a full invoice
 // number (TTP-2627-0042, 13 characters) is silently truncated when pasted into one of them.

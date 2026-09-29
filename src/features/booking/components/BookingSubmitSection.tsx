@@ -1,4 +1,5 @@
 "use client";
+// src/features/booking/components/BookingSubmitSection.tsx
 // Submit-time alerts and the submit band at the foot of the booking form.
 
 import { FIELD_ANCHORS, focusField } from "@/features/booking/lib/booking-form";

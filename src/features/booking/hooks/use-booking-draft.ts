@@ -1,4 +1,5 @@
 "use client";
+// src/features/booking/hooks/use-booking-draft.ts
 // localStorage draft for the new-booking form: restore once on mount, then save
 // on every change (debounced) so a customer who leaves mid-form comes back to it.
 

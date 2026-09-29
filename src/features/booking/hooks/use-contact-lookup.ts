@@ -1,4 +1,5 @@
 "use client";
+// src/features/booking/hooks/use-contact-lookup.ts
 // Returning-customer lookup for the booking form's email blur, safe against
 // out-of-order responses.
 

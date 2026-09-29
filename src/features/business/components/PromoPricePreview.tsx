@@ -1,4 +1,5 @@
 "use client";
+// src/features/business/components/PromoPricePreview.tsx
 // Before/after rate table for the promo form. Prices through the same promo
 // helpers the pricing page and the invoice engine use, so what the operator
 // previews is what customers are charged.

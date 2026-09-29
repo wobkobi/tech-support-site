@@ -1,4 +1,5 @@
 "use client";
+// src/features/booking/components/BookingAddressFields.tsx
 // In-person address block of the booking form: Places-backed street field,
 // optional Apt/Unit box, and the submit-time "did you mean?" candidate prompt.
 

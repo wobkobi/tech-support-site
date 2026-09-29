@@ -1,4 +1,5 @@
 "use client";
+// src/features/booking/components/BookingEstimatePanel.tsx
 // Inline "get a rough estimate" block under the booking form's description.
 
 import type { JobDuration } from "@/features/booking/lib/booking";

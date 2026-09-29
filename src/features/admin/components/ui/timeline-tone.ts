@@ -1,3 +1,4 @@
+// src/features/admin/components/ui/timeline-tone.ts
 // Step tones shared by the booking and invoice timelines.
 
 /** Colour role of one timeline step. */

@@ -1,3 +1,4 @@
+// src/features/business/lib/invoice-maths.ts
 // GST extraction, invoice totals and line-item validation, invoice numbering, subscription
 // due dates and ledger income descriptions. Re-exported through business.ts.
 

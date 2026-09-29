@@ -1,4 +1,5 @@
 "use client";
+// src/features/booking/hooks/use-submit-attention.ts
 // Moves focus to whatever stopped a booking submit: the error summary, or one of
 // the "did you mean?" prompts that sit up by their fields.
 

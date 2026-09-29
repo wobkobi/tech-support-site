@@ -1,3 +1,4 @@
+// src/features/business/lib/ai-input-copy.ts
 // Shared copy for the "Describe the job" AI box, so the calculator and the invoice editor
 // ask for the same details.
 

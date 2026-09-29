@@ -1,4 +1,5 @@
 "use client";
+// src/features/business/components/PromoAdvancedOptions.tsx
 // Folded "Advanced options" section of the promo form: priority, spend
 // thresholds, usage limits and the weekday/time restriction.
 
