@@ -1,4 +1,5 @@
 "use client";
+// src/app/admin/(shell)/business/invoices/[id]/VoidInvoiceModal.tsx
 // Void flow for the invoice detail page: the state + requests behind voiding (or
 // re-notifying a VOIDED invoice), and the modal that previews the notification and warns
 // when linked income entries would be left behind.

@@ -4,13 +4,13 @@
 // StatCards, and merges the lot into one interaction timeline. The right rail carries the
 // contact fields and sync/review-link state.
 
-import { ContactDetailActions } from "@/features/admin/components/ContactDetailActions";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { InfoRow } from "@/features/admin/components/ui/InfoRow";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { formatNZD } from "@/features/business/lib/business";
+import { ContactDetailActions } from "@/features/contacts/components/ContactDetailActions";
 import { loadContact360 } from "@/features/contacts/lib/contact-360";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";

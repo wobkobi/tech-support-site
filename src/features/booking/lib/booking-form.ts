@@ -175,6 +175,88 @@ export interface BookingDraft {
   startMinute?: StartMinute;
 }
 
+/**
+ * Whether a start slot is still bookable for a job of the given length.
+ * @param day - The day the slot falls on.
+ * @param time - Time window within the day.
+ * @param minute - Start minute within the window.
+ * @param duration - Job length being booked.
+ * @returns True when the sub-slot exists and has room for that duration.
+ */
+export function isSlotAvailable(
+  day: BookableDay,
+  time: TimeOfDay,
+  minute: StartMinute,
+  duration: JobDuration,
+): boolean {
+  const window = day.timeWindows.find((w) => w.value === time);
+  const sub = window?.subSlots.find((s) => s.minute === minute);
+  return duration === "short" ? !!sub?.availableShort : !!sub?.availableLong;
+}
+
+/**
+ * A saved draft after validation. Each field is present only when it should be
+ * applied to the form, so a stale or hand-edited draft never overwrites a field
+ * with junk.
+ */
+export interface RestoredBookingDraft {
+  duration?: JobDuration;
+  name?: string;
+  email?: string;
+  phone?: string;
+  meetingType?: "in-person" | "remote";
+  /** Present even when empty, so a draft saved without a unit clears one. */
+  unit?: string;
+  address?: string;
+  /** Set alongside `address`; true only for a Places pick or fallback mode. */
+  addressVerified?: boolean;
+  notes?: string;
+  accessNotes?: string;
+  /** The saved pick, kept only when it is still bookable for the saved duration. */
+  slot?: { dateKey: string; timeOfDay: TimeOfDay; startMinute: StartMinute };
+}
+
+/**
+ * Validates a raw localStorage draft against the fields' allowed values and
+ * today's availability.
+ * @param raw - JSON as written by {@link saveBookingDraft}.
+ * @param availableDays - Current bookable days; the saved slot is dropped unless it is still free.
+ * @returns The fields worth restoring. Throws on malformed JSON.
+ */
+export function parseBookingDraft(raw: string, availableDays: BookableDay[]): RestoredBookingDraft {
+  const draft = JSON.parse(raw) as Partial<BookingDraft>;
+  const out: RestoredBookingDraft = {};
+  if (draft.duration === "short" || draft.duration === "long") out.duration = draft.duration;
+  if (typeof draft.name === "string" && draft.name) out.name = draft.name;
+  if (typeof draft.email === "string" && draft.email) out.email = draft.email;
+  if (typeof draft.phone === "string" && draft.phone) out.phone = draft.phone;
+  if (draft.meetingType === "in-person" || draft.meetingType === "remote") {
+    out.meetingType = draft.meetingType;
+  }
+  if (typeof draft.unit === "string") out.unit = draft.unit;
+  if (typeof draft.address === "string" && draft.address) {
+    out.address = draft.address;
+    // A raw typed-but-unpicked address must still face the submit-time geocode gate.
+    out.addressVerified = draft.addressVerified === true;
+  }
+  if (typeof draft.notes === "string" && draft.notes) out.notes = draft.notes;
+  if (typeof draft.accessNotes === "string" && draft.accessNotes) {
+    out.accessNotes = draft.accessNotes;
+  }
+
+  // Restore the pick only if it is still bookable, so the customer never sees a
+  // misleading pre-selected slot.
+  if (draft.dateKey && draft.timeOfDay) {
+    const day = availableDays.find((d) => d.dateKey === draft.dateKey);
+    const minute = draft.startMinute ?? 0;
+    const desiredDuration = draft.duration === "long" ? "long" : "short";
+    if (day && isSlotAvailable(day, draft.timeOfDay, minute, desiredDuration)) {
+      out.slot = { dateKey: day.dateKey, timeOfDay: draft.timeOfDay, startMinute: minute };
+    }
+  }
+  return out;
+}
+
 /** Form values checked by {@link validateBookingFields}. */
 export interface BookingFieldValues {
   /** Chosen job duration. */
@@ -241,11 +323,11 @@ export function validateBookingFields(values: BookingFieldValues): Record<string
 /**
  * Writes the new-booking draft to localStorage. Quota / private-mode failures
  * are swallowed: persistence is best-effort.
- * @param draft - Current form values.
+ * @param json - The current form values as a serialised {@link BookingDraft}.
  */
-export function saveBookingDraft(draft: BookingDraft): void {
+export function saveBookingDraft(json: string): void {
   try {
-    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    window.localStorage.setItem(DRAFT_KEY, json);
   } catch {
     // Quota / private-mode: persistence is best-effort.
   }
@@ -285,4 +367,26 @@ export async function lookupBookingContact(
   });
   if (!res.ok) return null;
   return (await res.json()) as BookingContactLookup;
+}
+
+/**
+ * Asks Google for matches to a typed-but-not-picked address before booking.
+ * @param address - Full address, unit included.
+ * @returns Candidate addresses (empty when nothing precise matched), or null
+ *   when verification could not run. Callers submit anyway on null so a Google
+ *   API hiccup never blocks a real booking.
+ */
+export async function verifyBookingAddress(address: string): Promise<string[] | null> {
+  try {
+    const res = await fetch("/api/booking/verify-address", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address }),
+    });
+    if (!res.ok) return null;
+    const { candidates } = (await res.json()) as { candidates: string[] };
+    return candidates;
+  } catch {
+    return null;
+  }
 }

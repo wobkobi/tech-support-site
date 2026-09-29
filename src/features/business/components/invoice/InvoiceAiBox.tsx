@@ -1,4 +1,5 @@
 "use client";
+// src/features/business/components/invoice/InvoiceAiBox.tsx
 // "Describe the job" box for the draft-invoice editor. Sends the description through the
 // same parse-job route and parse helpers as the calculator, then hands back replacement
 // line items. Discounts preserved on the invoice are not recalculated.

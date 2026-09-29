@@ -1,4 +1,5 @@
 "use client";
+// src/app/admin/(shell)/business/invoices/[id]/SendInvoiceModal.tsx
 // Send flow for the invoice detail page: the state + requests behind the send-to-client
 // preview, and the modal with the editable greeting/body, the review-link toggle (driven
 // by server eligibility), and the "add to contacts" hook that unlocks it.

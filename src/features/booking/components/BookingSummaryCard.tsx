@@ -1,4 +1,5 @@
 "use client";
+// src/features/booking/components/BookingSummaryCard.tsx
 // Live recap of the booking form's choices, shown above the submit button.
 
 import { cn } from "@/shared/lib/cn";

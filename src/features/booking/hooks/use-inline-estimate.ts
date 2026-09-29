@@ -1,4 +1,5 @@
 "use client";
+// src/features/booking/hooks/use-inline-estimate.ts
 // Inline "get a rough estimate" state for the public booking form (new
 // bookings only): runs the quick estimate and tracks whether it is out of date.
 

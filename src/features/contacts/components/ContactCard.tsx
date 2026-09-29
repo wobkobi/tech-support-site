@@ -1,4 +1,7 @@
 "use client";
+// src/features/contacts/components/ContactCard.tsx
+// One contact row in the admin contacts list: view mode, inline edit with multiple
+// emails/phones and Places-backed addresses, and its source/target role in a merge.
 
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";

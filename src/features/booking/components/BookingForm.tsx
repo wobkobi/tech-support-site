@@ -22,7 +22,10 @@ import {
 } from "@/features/booking/components/BookingSubmitSection";
 import { BookingSummaryCard } from "@/features/booking/components/BookingSummaryCard";
 import { useBookingAddress } from "@/features/booking/hooks/use-booking-address";
+import { useBookingDraft } from "@/features/booking/hooks/use-booking-draft";
+import { useContactLookup } from "@/features/booking/hooks/use-contact-lookup";
 import { useInlineEstimate } from "@/features/booking/hooks/use-inline-estimate";
+import { useSubmitAttention } from "@/features/booking/hooks/use-submit-attention";
 import {
   combineUnitAndAddress,
   splitUnitFromAddress,
@@ -33,26 +36,24 @@ import {
 } from "@/features/booking/lib/booking";
 import {
   buildDurationOptions,
-  DRAFT_KEY,
-  lookupBookingContact,
+  isSlotAvailable,
   removeBookingDraft,
-  saveBookingDraft,
   subSlotLabel,
   validateBookingFields,
-  type BookingDraft,
+  verifyBookingAddress,
+  type RestoredBookingDraft,
 } from "@/features/booking/lib/booking-form";
 import { PromoCodeField } from "@/features/business/components/PromoCodeField";
 import { normalisePromoCode } from "@/features/business/lib/promos";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { PhoneLink } from "@/shared/components/PhoneLink";
 import { suggestEmailCorrection } from "@/shared/lib/email-typo-suggestion";
-import { focusAndReveal } from "@/shared/lib/focus-and-reveal";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type { EstimatorRange } from "@/shared/lib/settings/types";
 import { dateKeyParts, nzWallClockUtc } from "@/shared/lib/timezone-utils";
 import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 export interface BookingFormInitialValues {
   duration: JobDuration;
@@ -255,49 +256,18 @@ export default function BookingForm({
   const [error, setError] = useState<string | null>(null);
   // Submit-time validation errors. Rendered both in a top summary and inline.
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  // Anchors the error summary so a submit failure can be focused - on a long
-  // mobile form the alerts sit above the scrolled-to submit button.
-  const errorSummaryRef = useRef<HTMLDivElement>(null);
-  // The "did you mean?" prompts sit up by their fields, well away from the
-  // submit button that raised them, so a stopped submit moves focus to them.
-  const emailPromptRef = useRef<HTMLDivElement>(null);
-  const addressPromptRef = useRef<HTMLDivElement>(null);
+  const {
+    attempted,
+    requestAttention,
+    resetAttention,
+    errorSummaryRef,
+    emailPromptRef,
+    addressPromptRef,
+  } = useSubmitAttention();
   // True when the server returned 409 (someone booked the same slot first).
   // Drives a more prominent error with a "Refresh available times" link.
   const [slotStale, setSlotStale] = useState(false);
   const [contactHint, setContactHint] = useState<string | null>(null);
-  // True once a localStorage draft has been restored, so the UI can offer a
-  // "Clear form" affordance. New-booking mode only.
-  const [draftRestored, setDraftRestored] = useState(false);
-
-  // Where a stopped submit sends focus. `seq` bumps on every attempt so a second
-  // click with the same problem still moves focus. Driven by submits only: the
-  // name and notes checks that run on blur must not yank the page away from the
-  // field being typed in. Null until the first attempt, which also keeps those
-  // blur-time errors inline-only until then.
-  const [attention, setAttention] = useState<{
-    target: "summary" | "email" | "address";
-    seq: number;
-  } | null>(null);
-
-  /**
-   * Sends focus to whatever stopped the submit, once it has rendered.
-   * @param target - The error summary, or one of the "did you mean?" prompts.
-   */
-  function requestAttention(target: "summary" | "email" | "address"): void {
-    setAttention((prev) => ({ target, seq: (prev?.seq ?? 0) + 1 }));
-  }
-
-  useEffect(() => {
-    if (!attention) return;
-    const el = {
-      summary: errorSummaryRef,
-      email: emailPromptRef,
-      address: addressPromptRef,
-    }[attention.target].current;
-    // An empty summary is display:none and cannot take focus.
-    if (el?.hasChildNodes()) focusAndReveal(el);
-  }, [attention]);
 
   // `submittingRef` blocks Enter-key spam regardless of React's setState timing.
   // `idempotencyKey` is minted once per mount in the lazy useState initialiser (allowed to
@@ -308,186 +278,96 @@ export default function BookingForm({
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
-  // Aborts the previous /contact-lookup request when the user blurs a new
-  // email; without this, a slow first response could overwrite the second.
-  const contactLookupAbortRef = useRef<AbortController | null>(null);
-  // Latest email being looked up; the response handler drops anything stale.
-  const contactLookupEmailRef = useRef<string>("");
-  // Debounced draft writer.
-  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Suppress the very first save so the just-restored draft isn't immediately
-  // re-persisted.
-  const draftLoadedRef = useRef(false);
+  const lookupContact = useContactLookup();
 
   /**
    * On email blur (new bookings only): look up the email in contacts and
    * pre-fill name / phone / address for any fields the user left empty.
-   * Aborts the prior request and drops the response if the email-in-flight
-   * no longer matches what the user has typed.
    */
   async function handleEmailBlur(): Promise<void> {
     if (isEditMode) return;
-    const trimmed = email.trim().toLowerCase();
-    if (!trimmed || !trimmed.includes("@")) return;
-
-    // Cancel any prior request so a slow earlier response can't overwrite a
-    // faster newer one.
-    contactLookupAbortRef.current?.abort();
-    const controller = new AbortController();
-    contactLookupAbortRef.current = controller;
-    contactLookupEmailRef.current = trimmed;
-
-    try {
-      const data = await lookupBookingContact(trimmed, controller.signal);
-      if (!data?.ok) return;
-      // Drop the response if the user has since blurred a different email.
-      if (contactLookupEmailRef.current !== trimmed) return;
-      const filled: string[] = [];
-      if (data.name && !name.trim()) {
-        setName(data.name);
-        filled.push("name");
-      }
-      if (data.phone && !phone.trim()) {
-        setPhone(data.phone);
-        filled.push("phone");
-      }
-      if (data.address && !address.trim() && !unit.trim()) {
-        const split = splitUnitFromAddress(data.address);
-        if (split.unit) setShowUnit(true);
-        setUnit(split.unit);
-        setAddress(split.rest);
-        filled.push("address");
-      }
-      if (filled.length > 0) {
-        setContactHint(`Pre-filled from your previous booking: ${filled.join(", ")}.`);
-      }
-    } catch (err) {
-      // AbortError on supersede + any network failure are non-fatal; pre-fill
-      // is best-effort.
-      if ((err as { name?: string } | null)?.name === "AbortError") return;
+    const data = await lookupContact(email);
+    if (!data) return;
+    const filled: string[] = [];
+    if (data.name && !name.trim()) {
+      setName(data.name);
+      filled.push("name");
+    }
+    if (data.phone && !phone.trim()) {
+      setPhone(data.phone);
+      filled.push("phone");
+    }
+    if (data.address && !address.trim() && !unit.trim()) {
+      const split = splitUnitFromAddress(data.address);
+      if (split.unit) setShowUnit(true);
+      setUnit(split.unit);
+      setAddress(split.rest);
+      filled.push("address");
+    }
+    if (filled.length > 0) {
+      setContactHint(`Pre-filled from your previous booking: ${filled.join(", ")}.`);
     }
   }
 
   // React's "adjust state when a prop changes" pattern, not a useEffect: drop the
   // selected time during render once it stops being available for the current day +
   // duration. The `!== null` guard breaks the setState loop - the next render sees null.
-  if (selectedTime !== null && selectedDay) {
-    const window = selectedDay.timeWindows.find((w) => w.value === selectedTime);
-    const sub = window?.subSlots.find((s) => s.minute === selectedMinute);
-    const available = duration === "short" ? !!sub?.availableShort : !!sub?.availableLong;
-    if (!available) {
-      setSelectedTime(null);
-      setSelectedMinute(0);
+  if (
+    selectedTime !== null &&
+    selectedDay &&
+    !isSlotAvailable(selectedDay, selectedTime, selectedMinute, duration)
+  ) {
+    setSelectedTime(null);
+    setSelectedMinute(0);
+  }
+
+  /**
+   * Applies a validated saved draft to the form (new-booking mode, on mount).
+   * @param d - The saved fields worth restoring.
+   */
+  function applyRestoredDraft(d: RestoredBookingDraft): void {
+    if (d.duration) setDuration(d.duration);
+    if (d.name) setName(d.name);
+    if (d.email) setEmail(d.email);
+    if (d.phone) setPhone(d.phone);
+    if (d.meetingType) setMeetingType(d.meetingType);
+    if (d.unit !== undefined) {
+      setUnit(d.unit);
+      if (d.unit) setShowUnit(true);
+    }
+    if (d.address) {
+      setAddress(d.address);
+      setAddressVerified(d.addressVerified === true);
+    }
+    if (d.notes) setNotes(d.notes);
+    if (d.accessNotes) setAccessNotes(d.accessNotes);
+    if (d.slot) {
+      setSelectedDateKey(d.slot.dateKey);
+      setSelectedTime(d.slot.timeOfDay);
+      setSelectedMinute(d.slot.startMinute);
     }
   }
 
-  // Restore a localStorage draft on mount (new-booking mode only). The selection is
-  // restored only if it still matches an available slot, so the user never sees a
-  // misleading pre-pick. The setState-in-effect lint is suppressed on purpose:
-  // localStorage is unavailable during SSR, so this cannot be a lazy useState initialiser.
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (isEditMode) return;
-    if (draftLoadedRef.current) return;
-    draftLoadedRef.current = true;
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(DRAFT_KEY);
-      if (!raw) return;
-      const draft = JSON.parse(raw) as Partial<BookingDraft>;
-      if (draft.duration === "short" || draft.duration === "long") setDuration(draft.duration);
-      if (typeof draft.name === "string" && draft.name) setName(draft.name);
-      if (typeof draft.email === "string" && draft.email) setEmail(draft.email);
-      if (typeof draft.phone === "string" && draft.phone) setPhone(draft.phone);
-      if (draft.meetingType === "in-person" || draft.meetingType === "remote") {
-        setMeetingType(draft.meetingType);
-      }
-      if (typeof draft.unit === "string") {
-        setUnit(draft.unit);
-        if (draft.unit) setShowUnit(true);
-      }
-      if (typeof draft.address === "string" && draft.address) {
-        setAddress(draft.address);
-        // Only trust a restored address as verified when the draft recorded it
-        // as such (a Places pick or fallback mode) - a raw typed-but-unpicked
-        // address must still face the submit-time geocode gate.
-        setAddressVerified(draft.addressVerified === true);
-      }
-      if (typeof draft.notes === "string" && draft.notes) setNotes(draft.notes);
-      if (typeof draft.accessNotes === "string" && draft.accessNotes) {
-        setAccessNotes(draft.accessNotes);
-      }
-
-      // Try to restore the time selection if the slot is still bookable.
-      if (draft.dateKey && draft.timeOfDay && availableDays.length > 0) {
-        const day = availableDays.find((d) => d.dateKey === draft.dateKey);
-        const win = day?.timeWindows.find((w) => w.value === draft.timeOfDay);
-        const minute = draft.startMinute ?? 0;
-        const sub = win?.subSlots.find((s) => s.minute === minute);
-        const desiredDuration = draft.duration === "long" ? "long" : "short";
-        const available = desiredDuration === "short" ? sub?.availableShort : sub?.availableLong;
-        if (day && win && available) {
-          setSelectedDateKey(day.dateKey);
-          setSelectedTime(draft.timeOfDay);
-          setSelectedMinute(minute);
-        }
-      }
-
-      setDraftRestored(true);
-    } catch (err) {
-      console.warn("[BookingForm] Failed to restore draft:", err);
-    }
-    // availableDays is a render-stable prop; intentionally run on mount only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditMode]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  // Persist draft on change (debounced). Skipped in edit mode and during the
-  // initial restore tick.
-  useEffect(() => {
-    if (isEditMode) return;
-    if (!draftLoadedRef.current) return;
-    if (typeof window === "undefined") return;
-
-    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
-    draftTimerRef.current = setTimeout(() => {
-      const draft: BookingDraft = {
-        duration,
-        name,
-        email,
-        phone,
-        meetingType,
-        unit,
-        address,
-        addressVerified,
-        notes,
-        accessNotes,
-        dateKey: selectedDay?.dateKey,
-        timeOfDay: selectedTime ?? undefined,
-        startMinute: selectedTime ? selectedMinute : undefined,
-      };
-      saveBookingDraft(draft);
-    }, 300);
-
-    return () => {
-      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
-    };
-  }, [
-    isEditMode,
-    duration,
-    name,
-    email,
-    phone,
-    meetingType,
-    unit,
-    address,
-    addressVerified,
-    notes,
-    accessNotes,
-    selectedDay,
-    selectedTime,
-    selectedMinute,
-  ]);
+  const { draftRestored, forgetDraft } = useBookingDraft({
+    enabled: !isEditMode,
+    availableDays,
+    draft: {
+      duration,
+      name,
+      email,
+      phone,
+      meetingType,
+      unit,
+      address,
+      addressVerified,
+      notes,
+      accessNotes,
+      dateKey: selectedDay?.dateKey,
+      timeOfDay: selectedTime ?? undefined,
+      startMinute: selectedTime ? selectedMinute : undefined,
+    },
+    onRestore: applyRestoredDraft,
+  });
 
   /**
    * Clear the saved draft + reset all form fields the user filled in. Leaves
@@ -495,7 +375,7 @@ export default function BookingForm({
    * available.
    */
   function clearDraft(): void {
-    removeBookingDraft();
+    forgetDraft();
     setName("");
     setEmail("");
     setPhone("");
@@ -510,9 +390,8 @@ export default function BookingForm({
     setAccessNotes("");
     setContactHint(null);
     setFieldErrors({});
-    setAttention(null);
+    resetAttention();
     setError(null);
-    setDraftRestored(false);
   }
 
   /**
@@ -536,14 +415,13 @@ export default function BookingForm({
     setDuration(newDuration);
     clearFieldError("duration");
     // Reset time if current selection + minute not available for new duration
-    if (selectedTime && selectedDay) {
-      const window = selectedDay.timeWindows.find((w) => w.value === selectedTime);
-      const sub = window?.subSlots.find((s) => s.minute === selectedMinute);
-      const available = newDuration === "short" ? sub?.availableShort : sub?.availableLong;
-      if (!available) {
-        setSelectedTime(null);
-        setSelectedMinute(0);
-      }
+    if (
+      selectedTime &&
+      selectedDay &&
+      !isSlotAvailable(selectedDay, selectedTime, selectedMinute, newDuration)
+    ) {
+      setSelectedTime(null);
+      setSelectedMinute(0);
     }
   }
 
@@ -607,41 +485,30 @@ export default function BookingForm({
     // Google-verify a typed-but-not-picked address before booking; more than one match
     // asks the customer which they meant rather than assuming. Skipped in maps-fallback
     // mode, and once they have picked a candidate or chosen their text as-is.
+    // Null means verification could not run - submit anyway.
     if (meetingType === "in-person" && !addressVerified && !addressOverrideAcked && !mapsFallback) {
-      try {
-        const verifyRes = await fetch("/api/booking/verify-address", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: combineUnitAndAddress(unit, address) }),
-        });
-        if (verifyRes.ok) {
-          const { candidates } = (await verifyRes.json()) as { candidates: string[] };
-          if (candidates.length === 0) {
-            // Google found nothing precise - warn, then let a second click submit
-            // the typed text as-is (some new addresses genuinely don't geocode).
-            setError(
-              "We couldn't find that address on the map. Double-check the spelling, or click Submit again to use it as-is.",
-            );
-            setAddressOverrideAcked(true);
-            requestAttention("summary");
-            submittingRef.current = false;
-            setSubmitting(false);
-            return;
-          }
-          const typed = combineUnitAndAddress(unit, address).trim().toLowerCase();
-          const exact = candidates.some((c) => c.trim().toLowerCase() === typed);
-          if (!exact) {
-            // One candidate > "did you mean?"; several > "which did you mean?".
-            setAddressCandidates(candidates);
-            requestAttention("address");
-            submittingRef.current = false;
-            setSubmitting(false);
-            return;
-          }
-        }
-      } catch {
-        // Verification failed (network / API outage) - fall through and submit
-        // anyway. Don't block legit bookings on a Google API hiccup.
+      const typed = combineUnitAndAddress(unit, address);
+      const candidates = await verifyBookingAddress(typed);
+      if (candidates?.length === 0) {
+        // Google found nothing precise - warn, then let a second click submit
+        // the typed text as-is (some new addresses genuinely don't geocode).
+        setError(
+          "We couldn't find that address on the map. Double-check the spelling, or click Submit again to use it as-is.",
+        );
+        setAddressOverrideAcked(true);
+        requestAttention("summary");
+        submittingRef.current = false;
+        setSubmitting(false);
+        return;
+      }
+      const typedKey = typed.trim().toLowerCase();
+      if (candidates && !candidates.some((c) => c.trim().toLowerCase() === typedKey)) {
+        // One candidate > "did you mean?"; several > "which did you mean?".
+        setAddressCandidates(candidates);
+        requestAttention("address");
+        submittingRef.current = false;
+        setSubmitting(false);
+        return;
       }
     }
 
@@ -959,7 +826,7 @@ export default function BookingForm({
           setSlotStale(false);
           router.refresh();
         }}
-        showFieldErrors={attention !== null}
+        showFieldErrors={attempted}
         fieldErrors={fieldErrors}
         error={error}
         phoneLink={phoneLink}
@@ -969,7 +836,7 @@ export default function BookingForm({
         submitting={submitting}
         isEditMode={isEditMode}
         noSlots={!availableDays.some((d) => d.hasAnySlots)}
-        showIssuesLink={attention !== null}
+        showIssuesLink={attempted}
         fieldErrors={fieldErrors}
         cancelToken={cancelToken}
       />

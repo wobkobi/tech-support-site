@@ -1,3 +1,4 @@
+// src/features/business/lib/parse-hydrate.ts
 // Pure helpers that turn a parse-job request/response into billable job pieces. Shared by
 // the calculator and the draft-invoice editor so a description bills the same either way.
 

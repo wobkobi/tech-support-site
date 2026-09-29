@@ -5,10 +5,10 @@
 // dedup/merge/backfill passes run on the sync-contacts cron and the standalone admin
 // routes, not per page load.
 
-import { ContactsAdminView } from "@/features/admin/components/ContactsAdminView";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import type { PageQuery } from "@/features/admin/hooks/use-query-sync";
+import { ContactsAdminView } from "@/features/contacts/components/ContactsAdminView";
 import { UNRESOLVED_CONFLICT_FILTER } from "@/features/contacts/lib/contact-conflicts";
 import { enrichContactsFromBookings } from "@/features/contacts/lib/maintenance";
 import { requireAdminAuth } from "@/shared/lib/auth";

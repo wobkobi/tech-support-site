@@ -1,4 +1,5 @@
 "use client";
+// src/features/booking/components/BookingContactFields.tsx
 // "Your details" inputs for the booking form: name, email (with the typo
 // prompt), phone and meeting type.
 

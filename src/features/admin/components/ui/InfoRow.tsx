@@ -1,3 +1,4 @@
+// src/features/admin/components/ui/InfoRow.tsx
 // Label/value row for the detail pages' fields rail (booking, invoice, contact).
 
 import type React from "react";

@@ -1,3 +1,4 @@
+// src/features/business/lib/business-format.ts
 // Display helpers for money, durations and dates on the calculator, invoice and admin
 // views. Re-exported through business.ts.
 
