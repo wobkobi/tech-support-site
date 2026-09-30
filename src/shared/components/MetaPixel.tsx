@@ -68,7 +68,10 @@ export function MetaPixel(): React.ReactElement | null {
 
   return (
     <>
-      <Script id="meta-pixel" strategy="afterInteractive">
+      {/* lazyOnload: fbevents.js costs ~400ms of main-thread time on a mid-range
+          phone, so it waits for the page to finish loading rather than competing
+          with first paint. The self-fired PageView still lands once it runs. */}
+      <Script id="meta-pixel" strategy="lazyOnload">
         {baseCode}
       </Script>
       <noscript>

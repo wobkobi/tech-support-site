@@ -68,13 +68,16 @@ export function GoogleTag(): React.ReactElement | null {
 
   if (!loaderId || isAdmin) return null;
 
+  // lazyOnload keeps gtag.js (~200ms of main-thread time on mobile) off the
+  // critical path. Load order between the two tags doesn't matter: the init
+  // snippet only queues onto dataLayer, which gtag.js drains when it arrives.
   return (
     <>
       <Script
         src={`https://www.googletagmanager.com/gtag/js?id=${loaderId}`}
-        strategy="afterInteractive"
+        strategy="lazyOnload"
       />
-      <Script id="gtag-init" strategy="afterInteractive">
+      <Script id="gtag-init" strategy="lazyOnload">
         {[
           "window.dataLayer = window.dataLayer || [];",
           "function gtag(){dataLayer.push(arguments);}",
