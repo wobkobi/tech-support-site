@@ -1,7 +1,7 @@
 // src/app/api/business/subscriptions/route.ts
 // Admin subscription collection endpoint. GET lists all subscriptions ordered by nextDue
-// ascending; POST validates required fields, frequency, amount, and GST rate, then
-// creates an active subscription.
+// ascending; POST validates required fields, frequency, amount, and GST rate, refuses a
+// second active subscription for the same supplier+description, then creates it.
 
 import { VALID_FREQUENCIES } from "@/features/business/lib/constants";
 import { parseAmount, parseDate, parseRate } from "@/features/business/lib/validation";
@@ -9,6 +9,27 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+
+/**
+ * Whether a subscription is the same repeat cost as a supplier+description pair,
+ * ignoring case and surrounding spaces.
+ * @param sub - Existing subscription's supplier and description.
+ * @param sub.supplier - Existing supplier.
+ * @param sub.description - Existing description.
+ * @param supplier - Incoming supplier.
+ * @param description - Incoming description.
+ * @returns True when both fields match.
+ */
+function sameKey(
+  sub: { supplier: string; description: string },
+  supplier: unknown,
+  description: unknown,
+): boolean {
+  return (
+    sub.supplier.trim().toLowerCase() === String(supplier).trim().toLowerCase() &&
+    sub.description.trim().toLowerCase() === String(description).trim().toLowerCase()
+  );
+}
 
 /**
  * GET /api/business/subscriptions - Returns all subscriptions ordered by nextDue ascending.
@@ -67,6 +88,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const nextDueValue = parseDate(nextDue);
   if (nextDueValue === null) {
     return errorResponse("Invalid nextDue date", 400);
+  }
+
+  // Refuse only an exact copy: same supplier AND same description (case and spacing
+  // ignored). A supplier can have any number of subscriptions (Google Workspace and
+  // Google One both pass); a copy would book each payment twice, since the cron
+  // records every due subscription.
+  const active = await prisma.subscription.findMany({
+    where: { isActive: true },
+    select: { supplier: true, description: true },
+  });
+  if (active.some((s) => sameKey(s, supplier, description))) {
+    return errorResponse(`${supplier} "${description}" is already an active subscription.`, 409);
   }
 
   const subscription = await prisma.subscription.create({

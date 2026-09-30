@@ -135,12 +135,12 @@ export default async function Home(): Promise<React.ReactElement> {
               id="hero-heading"
               className="mx-auto mb-4 max-w-5xl text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
             >
-              Computer & IT Support in Auckland
+              Computer Repairs & IT Support in Auckland
             </h1>
 
             <p className="mx-auto mb-8 max-w-7xl text-lg font-medium text-rich-black sm:text-xl md:text-2xl">
-              Tech help across Auckland. I fix the problem, explain what went wrong in plain
-              English, and don't leave until it actually works.
+              I come to your home or business anywhere in Auckland, fix the problem, explain what
+              went wrong in plain English, and don't leave until it actually works.
             </p>
 
             <div className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">

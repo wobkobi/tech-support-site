@@ -8,7 +8,8 @@ import { MobileActionBar } from "@/shared/components/MobileActionBar";
 import { NavBar } from "@/shared/components/NavBar";
 import { PromoBanner } from "@/shared/components/PromoBanner";
 import { SiteFooter } from "@/shared/components/SiteFooter";
-import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
+import { FACEBOOK_PAGE_URL, GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
+import { servedSuburbGroups } from "@/shared/lib/served-suburbs";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import { DAY_NAMES, type Weekday } from "@/shared/lib/timezone-utils";
@@ -36,11 +37,11 @@ const legacyRedirectScript = `(function(){try{var allow=false;try{if(window.loca
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "To the Point Tech - Computer & IT Support in Auckland",
+    default: "Computer Repairs & IT Support Auckland | To the Point Tech",
     template: "%s | To the Point Tech",
   },
   description:
-    "Friendly computer and IT support across Auckland. On-site and remote help with PCs, Macs, Wi-Fi, phones, printers and more. Same-day, evening and weekend appointments. No jargon, no upselling, transparent pricing.",
+    "Computer repairs and IT help at your home or business, anywhere in Auckland. PCs, Macs, Wi-Fi, phones and printers. Same-day, evening and weekend visits.",
   applicationName: "To the Point Tech",
   authors: [{ name: "Harrison Raynes" }],
   creator: "Harrison Raynes",
@@ -50,14 +51,14 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_NZ",
     siteName: "To the Point Tech",
-    title: "To the Point Tech - Computer & IT Support in Auckland",
+    title: "Computer Repairs & IT Support Auckland | To the Point Tech",
     description:
       "Friendly computer and IT support across Auckland. On-site and remote help, transparent pricing, no jargon.",
     // og:image is served route-wide by the file-based src/app/opengraph-image.jpg.
   },
   twitter: {
     card: "summary_large_image",
-    title: "To the Point Tech - Computer & IT Support in Auckland",
+    title: "Computer Repairs & IT Support Auckland | To the Point Tech",
     description:
       "Friendly computer and IT support across Auckland. On-site and remote help, transparent pricing, no jargon.",
     images: ["/og-1200x630.jpg"],
@@ -153,13 +154,8 @@ export default async function RootLayout({
       opens: `${String(published?.open ?? availability.schedule[d].open).padStart(2, "0")}:00`,
       closes: `${String(published?.close ?? availability.schedule[d].close).padStart(2, "0")}:00`,
     }));
-  // Fall back to the default suburb list when the stored list is empty - an
-  // identity row seeded before servedSuburbs existed stores [], which would
-  // otherwise blank the areaServed list.
-  const suburbSource = identity.servedSuburbs.length
-    ? identity.servedSuburbs
-    : DEFAULT_SETTINGS.identity.servedSuburbs;
-  const servedSuburbs = suburbSource.map((s) => s.trim()).filter(Boolean);
+  // Region headings are Services-page layout only; areaServed takes the flat list.
+  const servedSuburbs = servedSuburbGroups(identity).flatMap((g) => g.suburbs);
   // One coverage circle centred on the base address; the radius is operator-set.
   const geoMidpoint = {
     "@type": "GeoCoordinates",
@@ -320,9 +316,7 @@ export default async function RootLayout({
       })),
     },
     // Business profiles only; personal ones live on the Person entity on /about.
-    // The Business Profile uses its stable ?cid= URL, not the maps.app.goo.gl
-    // share link, which is a redirect carrying tracking params.
-    sameAs: ["https://maps.google.com/?cid=6499301278416319650"],
+    sameAs: [GOOGLE_BUSINESS_PROFILE_URL, FACEBOOK_PAGE_URL],
   };
 
   const websiteJsonLd = {

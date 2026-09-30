@@ -31,9 +31,9 @@ import {
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Business IT Support - Ad-hoc Help & Monthly Retainers in Auckland",
+  title: "Small Business IT Support in Auckland",
   description:
-    "On-call IT support for Auckland small businesses: workstation and email setup, network fixes, backups, staff device onboarding and office moves. Ad-hoc callouts or a simple monthly retainer - no lock-in.",
+    "On-call IT support for Auckland small businesses: workstations, email, networks, backups and staff devices. Ad-hoc callouts or a monthly retainer, no lock-in.",
   alternates: { canonical: "/business" },
   openGraph: {
     title: "Business IT Support - To the Point Tech",

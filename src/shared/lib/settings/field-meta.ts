@@ -305,7 +305,8 @@ export const IDENTITY_FIELD_META = {
   },
   servedSuburbs: {
     title: "Served suburbs",
-    description: "Suburbs you cover, listed in the site's map data for local SEO.",
+    description:
+      'One suburb per line. A line ending in a colon, like "North Shore:", starts a region: the Services page lists suburbs under their region, and every suburb goes in the site\'s map data for local SEO.',
   },
   publishedHours: {
     title: "Published hours",

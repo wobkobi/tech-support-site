@@ -1,14 +1,18 @@
 "use client";
 // src/shared/components/SiteFooter.tsx
-// Site-wide footer with quick links, the privacy policy link, and copyright. Hidden on
+// Site-wide footer with quick links, the privacy policy link, the business's
+// Facebook and Google profiles, and copyright. Hidden on
 // the admin area and the print artwork routes, matching the NavBar's hidden paths. A
 // direct child of <body>, so it is the page's single contentinfo landmark (the homepage's
 // contact bar lives inside <main>).
 
+import { FACEBOOK_PAGE_URL, GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
 import { isPrintRoute } from "@/shared/lib/print-routes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type React from "react";
+import type { IconType } from "react-icons";
+import { FaFacebook, FaGoogle } from "react-icons/fa6";
 
 /** Path prefixes that hide the footer (admin has its own chrome). */
 const HIDDEN_PREFIXES: ReadonlyArray<string> = ["/admin"];
@@ -23,6 +27,12 @@ const LINKS: ReadonlyArray<{ label: string; href: string }> = [
   { label: "Contact", href: "/contact" },
   { label: "Book", href: "/booking" },
   { label: "Privacy", href: "/privacy" },
+];
+
+/** Off-site profiles; also listed on the LocalBusiness JSON-LD sameAs. */
+const PROFILES: ReadonlyArray<{ label: string; href: string; Icon: IconType }> = [
+  { label: "Facebook", href: FACEBOOK_PAGE_URL, Icon: FaFacebook },
+  { label: "Google", href: GOOGLE_BUSINESS_PROFILE_URL, Icon: FaGoogle },
 ];
 
 /**
@@ -53,6 +63,20 @@ export function SiteFooter(): React.ReactElement | null {
             </Link>
           ))}
         </nav>
+        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          {PROFILES.map(({ label, href, Icon }) => (
+            <a
+              key={href}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-base text-rich-black/80 transition-colors hover:text-coquelicot-500"
+            >
+              <Icon aria-hidden className="size-5" />
+              {label}
+            </a>
+          ))}
+        </div>
         <p className="text-center text-sm text-rich-black/70 sm:text-base">
           {`© ${year} To the Point Tech - friendly computer & IT support across Auckland.`}
         </p>
