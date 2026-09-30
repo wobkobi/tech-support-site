@@ -276,8 +276,8 @@ export function IdentityTab({ initial, defaults, bookableSchedule }: Props): Rea
           <textarea
             id="servedSuburbs"
             value={draft.servedSuburbs.join("\n")}
-            rows={6}
-            placeholder="One suburb per line"
+            rows={12}
+            placeholder={"Central Auckland:\nPonsonby\nGrey Lynn\n\nNorth Shore:\nTakapuna"}
             onChange={(e) => set({ servedSuburbs: e.target.value.split("\n") })}
             className="w-full rounded-lg border border-admin-border-strong px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
           />

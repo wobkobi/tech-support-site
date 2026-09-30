@@ -58,10 +58,11 @@ export async function generateMetadata(): Promise<Metadata> {
     ? `Limited offer: ${summariseForBanner(promo)}.`
     : `$${pricing.baseRate}/hr for every job - no complex-work surcharge.`;
   return {
+    // A promo title drops the brand suffix so the offer fits Google's ~60-char cut.
     title: promo
-      ? `Pricing - ${summariseForBanner(promo)}`
-      : `Pricing - $${pricing.baseRate}/hr Tech Support in Auckland`,
-    description: `Transparent tech support pricing in Auckland. ${rateBlurb} No hidden fees, no upselling. On-site and remote rates available.`,
+      ? { absolute: `Computer Repair Prices Auckland - ${summariseForBanner(promo)}` }
+      : `Computer Repair Prices Auckland - $${pricing.baseRate}/hr`,
+    description: `Computer repair and tech support prices in Auckland. ${rateBlurb} No hidden fees, no upselling.`,
     alternates: { canonical: "/pricing" },
     openGraph: {
       title: "Pricing - To the Point Tech",

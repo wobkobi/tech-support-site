@@ -85,6 +85,11 @@ const nextConfig: NextConfig = {
           { key: "Content-Security-Policy", value: isDev ? cspDev : cspProd },
         ],
       },
+      // Print handouts (poster PDFs) are image-only; keep them out of search as thin content.
+      {
+        source: "/downloads/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex" }],
+      },
       // Cache static assets in /source/ for 30 days (they are not hash-named)
       {
         source: "/source/:path*",

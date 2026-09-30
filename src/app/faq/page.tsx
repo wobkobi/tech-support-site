@@ -33,7 +33,7 @@ import type React from "react";
 export const metadata: Metadata = {
   title: "FAQ - Tech Support Questions Answered",
   description:
-    "Common questions about tech support in Auckland: service areas, remote support, pricing, devices supported, booking, cancellations and what happens if I can't fix it.",
+    "Answers on tech support in Auckland: areas covered, remote help, pricing, devices, booking, cancellations and what happens if I can't fix it.",
   alternates: { canonical: "/faq" },
   openGraph: {
     title: "FAQ - To the Point Tech",

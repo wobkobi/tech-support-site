@@ -12,7 +12,8 @@ import Link from "next/link";
 import type React from "react";
 
 export const metadata: Metadata = {
-  title: "Reviews - What Auckland Clients Say About To the Point Tech",
+  // The layout template appends "| To the Point Tech", so the brand isn't repeated here.
+  title: "Reviews - What Auckland Clients Say",
   description:
     "Real reviews from Auckland clients who have used To the Point Tech for computer repair, Wi-Fi setup, virus removal, smart home, and small-business IT support.",
   alternates: { canonical: "/reviews" },

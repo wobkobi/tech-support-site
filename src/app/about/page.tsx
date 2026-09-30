@@ -17,7 +17,7 @@ const siteUrl = getSiteUrl();
 const PHOTO_SRC = "/source/harrison.jpg";
 
 export const metadata: Metadata = {
-  title: "About Harrison Raynes - Local Tech Support in Auckland",
+  title: "Harrison Raynes - Auckland Tech Support",
   description:
     "Computer science graduate based in Auckland. I help households and small businesses across Auckland with friendly, jargon-free tech support.",
   alternates: { canonical: "/about" },

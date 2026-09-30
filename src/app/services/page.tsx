@@ -8,7 +8,9 @@ import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, NESTED_CARD, PageShell } from "@/shared/components/PageLayout";
 import { PixelEvent } from "@/shared/components/PixelEvent";
 import { cn } from "@/shared/lib/cn";
+import { servedSuburbGroups } from "@/shared/lib/served-suburbs";
 import { SERVICE_AREAS } from "@/shared/lib/service-areas";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
 import type React from "react";
@@ -19,12 +21,12 @@ import { Fragment } from "react";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Tech Support Services - Computers, Wi-Fi, Phones & More",
+  title: "Computer Repairs & Tech Help in Auckland",
   description:
-    "On-site and remote tech support across Auckland: computer and laptop repair, Wi-Fi setup, virus removal, data recovery, smart TVs, printers, email, cloud backup and small business IT.",
+    "Computer and laptop repairs, Wi-Fi, virus removal, data recovery, smart TVs, printers and tech help for seniors, at your home anywhere in Auckland.",
   alternates: { canonical: "/services" },
   openGraph: {
-    title: "Tech Support Services - To the Point Tech",
+    title: "Computer Repairs & Tech Help Services - To the Point Tech",
     description:
       "Computer repair, Wi-Fi setup, data recovery, smart home, printers, email and more across Auckland.",
     url: "/services",
@@ -59,7 +61,9 @@ function breakAfterSlashes(text: string): React.ReactNode {
  * @returns Services page element
  */
 export default async function ServicesPage(): Promise<React.ReactElement> {
-  const pricing = await getPublicPricing();
+  const [pricing, { identity }] = await Promise.all([getPublicPricing(), getSettings()]);
+  // Same list as the JSON-LD areaServed, so the visible areas can't drift from it.
+  const suburbGroups = servedSuburbGroups(identity);
   const servicesJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -110,7 +114,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
               id="services-heading"
               className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
             >
-              Services
+              Computer Repairs & Tech Help Services
             </h1>
 
             <p className="mb-4 text-base text-rich-black sm:text-lg">
@@ -262,6 +266,100 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
               </div>
             </section>
           </div>
+
+          <section
+            id="seniors"
+            aria-labelledby="seniors-heading"
+            className={cn(
+              CARD,
+              "animate-slide-up animate-fill-both animate-delay-300 scroll-mt-24",
+            )}
+          >
+            <h2
+              id="seniors-heading"
+              className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
+            >
+              Tech help for seniors, at home
+            </h2>
+
+            <p className="mb-3 text-base text-rich-black sm:text-lg">
+              If technology isn't your thing, I come to you and go at your pace. I explain each step
+              in plain English, and no question is too basic.
+            </p>
+
+            <ul className="space-y-2 text-base text-rich-black/90 sm:text-lg">
+              <li className="flex gap-2">
+                <Bullet />
+                <span>Setting up a new phone, tablet or computer and moving everything across</span>
+              </li>
+              <li className="flex gap-2">
+                <Bullet />
+                <span>Video calls with family on FaceTime, WhatsApp or Zoom</span>
+              </li>
+              <li className="flex gap-2">
+                <Bullet />
+                <span>Spotting scam emails, texts and calls, and cleaning up after one</span>
+              </li>
+              <li className="flex gap-2">
+                <Bullet />
+                <span>Getting the TV, streaming apps and remote working the way you want</span>
+              </li>
+              <li className="flex gap-2">
+                <Bullet />
+                <span>Written notes if you'd like them, so you can do it again yourself</span>
+              </li>
+            </ul>
+
+            <p className="mt-3 text-base text-rich-black/90 sm:text-lg">
+              Family members are welcome to book on someone else's behalf.
+            </p>
+          </section>
+
+          <section
+            aria-labelledby="coverage-heading"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}
+          >
+            <h2
+              id="coverage-heading"
+              className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
+            >
+              Areas I cover
+            </h2>
+
+            <p className="mb-4 text-base text-rich-black sm:text-lg">
+              I come to homes and businesses right across Auckland, including:
+            </p>
+
+            {/* One full-width row per region: group sizes vary a lot (Central is ~3x the
+                rest), so a card grid leaves ragged heights and empty cells. */}
+            <div className="divide-y divide-seasalt-200/80">
+              {suburbGroups.map(({ region, suburbs }) => (
+                <div
+                  key={region ?? "ungrouped"}
+                  className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[11rem_1fr] sm:gap-6"
+                >
+                  {region && (
+                    <h3 className="text-lg font-semibold text-russian-violet sm:text-xl">
+                      {region}
+                    </h3>
+                  )}
+                  <p
+                    className={cn(
+                      "text-base text-rich-black/80 sm:text-lg",
+                      !region && "sm:col-span-2",
+                    )}
+                  >
+                    {suburbs.join(", ")}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <p className="mt-4 text-base text-rich-black/90 sm:text-lg">
+              These are just some of them - I cover all of Auckland. If your suburb isn't listed,
+              I'm still more than happy to help!
+            </p>
+          </section>
 
           <section
             aria-label="Next steps"
