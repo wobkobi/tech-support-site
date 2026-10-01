@@ -21,6 +21,7 @@ import { Field } from "@/shared/components/Field";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FaPlus } from "react-icons/fa6";
@@ -59,6 +60,14 @@ export function IncomeView(): React.ReactElement {
   // Phones only: the form starts folded so the list isn't pushed a screen down.
   // lg+ always shows it.
   const [formOpen, setFormOpen] = useState(false);
+  // The mobile + button links here with ?new=<stamp>; each fresh stamp opens the form,
+  // including when this page is already showing and only the query changed.
+  const newStamp = useSearchParams().get("new");
+  const [openedFor, setOpenedFor] = useState<string | null>(null);
+  if (newStamp && newStamp !== openedFor) {
+    setOpenedFor(newStamp);
+    setFormOpen(true);
+  }
   const formRef = useRef<HTMLFormElement>(null);
 
   // Filters + sort.

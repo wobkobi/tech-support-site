@@ -291,8 +291,15 @@ aside.app-admin-drawer {
   .app-admin:has([data-phone-bar]) {
     --phone-bar-h: calc(3.6rem + max(0.75rem, env(safe-area-inset-bottom)));
   }
+  /* + 5rem on top of the bar for the quick-actions button that rides above it. */
   .app-admin:has([data-phone-bar="fixed"]) main {
-    padding-bottom: calc(var(--phone-bar-h) + 2rem);
+    padding-bottom: calc(var(--phone-bar-h) + 7rem);
+  }
+  /* Hidden while typing: iOS keeps fixed elements above the on-screen keyboard,
+     where the button would cover the field being typed in. */
+  .app-admin:has(:is(input:not([type="checkbox"], [type="radio"]), textarea, select):focus)
+    .admin-quick-actions {
+    display: none;
   }
 }
 

@@ -136,8 +136,9 @@ export function AdminToastProvider({ children }: AdminToastProviderProps): React
       {/* Two live regions rather than a role per card: a region has to exist
           before its content changes to be announced reliably, and nesting an
           alert inside a polite region reads it twice in some screen readers.
-          --phone-bar-h (globals.css) lifts the stack above a phone action bar. */}
-      <div className="pointer-events-none fixed right-4 bottom-[calc(1rem+var(--phone-bar-h,0px))] z-60 flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2 print:hidden">
+          --phone-bar-h (globals.css) lifts the stack above a phone action bar, and below
+          lg it also clears the + quick-actions button. */}
+      <div className="pointer-events-none fixed right-4 bottom-[calc(1rem+var(--phone-bar-h,0px))] z-60 flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2 max-lg:bottom-[calc(5.5rem+max(env(safe-area-inset-bottom),var(--phone-bar-h,0px)))] print:hidden">
         <div aria-live="assertive" className="flex flex-col gap-2">
           {errors.map((t) => (
             <ToastCard key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
