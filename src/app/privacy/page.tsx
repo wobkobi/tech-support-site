@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 /** Date this policy was last reviewed; shown to visitors in the header. */
-const LAST_UPDATED = "2 July 2026";
+const LAST_UPDATED = "1 October 2026";
 
 const H2 = "mb-3 text-xl font-bold text-russian-violet sm:text-2xl";
 const P = "text-base text-rich-black/90 sm:text-lg";
@@ -111,6 +111,14 @@ export default async function PrivacyPage(): Promise<React.ReactElement> {
                   </li>
                   <li className={LI}>
                     <Bullet />
+                    <span>
+                      To send you the occasional email about offers, holiday hours or scam warnings.
+                      Every one has an unsubscribe link, and unsubscribing doesn&apos;t stop emails
+                      about your own bookings and invoices.
+                    </span>
+                  </li>
+                  <li className={LI}>
+                    <Bullet />
                     <span>To improve the website and measure how well our advertising works</span>
                   </li>
                 </ul>
@@ -194,7 +202,7 @@ export default async function PrivacyPage(): Promise<React.ReactElement> {
                   </li>
                   <li className={LI}>
                     <Bullet />
-                    <span>Our email provider, for booking and review emails</span>
+                    <span>Our email provider, for booking, review and mailing-list emails</span>
                   </li>
                   <li className={LI}>
                     <Bullet />

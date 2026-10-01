@@ -271,6 +271,47 @@ export function sendNow(payload: MailPayload): Promise<MailResult> {
   return getResend().emails.send(payload);
 }
 
+/** One email in a batch. The batch API takes no attachments and no scheduledAt. */
+export type BatchMailPayload = Parameters<Resend["batch"]["send"]>[0][number];
+
+/** Per-email outcome of {@link sendBatch}, in the same order as the payloads. */
+export type BatchMailOutcome = { ok: true; id: string } | { ok: false; error: string };
+
+/**
+ * Sends up to 100 emails in one Resend call, for the mailing list. Permissive
+ * validation lets one bad address fail on its own instead of sinking the batch,
+ * and the idempotency key makes a re-sent batch a no-op on Resend's side.
+ *
+ * Resend answers with the ids of the emails it accepted, in payload order, and a
+ * separate list of the indexes it rejected, so the ids are matched back by
+ * skipping the rejected indexes.
+ * @param payloads - The emails, at most 100.
+ * @param idempotencyKey - Stable key for this exact batch.
+ * @returns One outcome per payload, in payload order.
+ */
+export async function sendBatch(
+  payloads: BatchMailPayload[],
+  idempotencyKey: string,
+): Promise<BatchMailOutcome[]> {
+  const result = await getResend().batch.send(payloads, {
+    batchValidation: "permissive",
+    idempotencyKey,
+  });
+  if (result.error || !result.data) {
+    const message = result.error?.message ?? "Resend returned no response";
+    return payloads.map(() => ({ ok: false, error: message }));
+  }
+  const rejected = new Map(result.data.errors.map((e) => [e.index, e.message]));
+  const ids = result.data.data.map((d) => d.id);
+  let next = 0;
+  return payloads.map((_, index) => {
+    const message = rejected.get(index);
+    if (message !== undefined) return { ok: false, error: message };
+    const id = ids[next++];
+    return id ? { ok: true, id } : { ok: false, error: "Resend returned no id" };
+  });
+}
+
 /**
  * Sends outreach - mail the customer did not just ask for. Inside the quiet-hours
  * window the send is handed to Resend with a `scheduledAt` for the moment the

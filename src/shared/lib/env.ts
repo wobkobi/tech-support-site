@@ -15,7 +15,7 @@ const REQUIRED_ENV = ["MONGODB_URI", "ADMIN_SECRET", "CRON_SECRET"] as const;
 
 /**
  * Feature-specific vars. A missing one disables or degrades the related feature
- * (booking calendar, email, AI estimates, travel distance, sheets sync) but is
+ * (booking calendar, email, AI estimates, travel distance, sheets sync, mailing list) but is
  * never fatal, so these only ever warn.
  */
 const RECOMMENDED_ENV = [
@@ -32,6 +32,8 @@ const RECOMMENDED_ENV = [
   "HOME_ADDRESS",
   "GOOGLE_SHEET_ID",
   "GOOGLE_BUSINESS_SHEETS_FOLDER_ID",
+  "UNSUBSCRIBE_SECRET",
+  "BLOB_READ_WRITE_TOKEN",
 ] as const;
 
 /**

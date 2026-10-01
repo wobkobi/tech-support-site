@@ -199,6 +199,22 @@ export const getActivePromo = unstable_cache(
 );
 
 /**
+ * One automatic promo by id, provided it is switched on and inside its window right
+ * now. Backs the mailing-list "Email this promo" link, which must stop describing a
+ * promo the moment it ends or is switched off. Code promos never come back, for the
+ * same reason {@link getActivePromo} skips them.
+ * @param id - Promo id.
+ * @returns The promo, or null when it is missing, a code promo, off or outside its window.
+ */
+export async function findAdvertisablePromo(id: string): Promise<ActivePromo | null> {
+  const now = new Date();
+  const row = await prisma.promo.findFirst({
+    where: { id, isActive: true, kind: "automatic", startAt: { lte: now }, endAt: { gt: now } },
+  });
+  return row ? toActivePromo(row) : null;
+}
+
+/**
  * Whether any code promo is active right now, so the booking form only offers a code
  * box while a code could work. A weekday or time-of-day window doesn't count against
  * it: the customer may be booking a slot inside that window.
@@ -665,7 +681,7 @@ export function applyPromoToHourlyRate(
  * @param now - Reference time (injected for tests).
  * @returns Short date phrase.
  */
-function formatPromoEnd(endIso: string, now: Date = new Date()): string {
+export function formatPromoEnd(endIso: string, now: Date = new Date()): string {
   const end = new Date(endIso);
   const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 

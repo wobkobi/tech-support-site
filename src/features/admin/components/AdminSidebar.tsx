@@ -20,6 +20,7 @@ import {
   FaCalculator,
   FaCalendarDays,
   FaCalendarWeek,
+  FaEnvelope,
   FaFileInvoiceDollar,
   FaGaugeHigh,
   FaGear,
@@ -47,6 +48,7 @@ type AdminPage =
   | "business-calculator"
   | "business-quick"
   | "promos"
+  | "mailing"
   | "notifications"
   | "settings";
 
@@ -152,6 +154,13 @@ const PROMOS_NAV_ITEM: NavItem = {
   path: "/admin/promos",
 };
 
+const MAILING_NAV_ITEM: NavItem = {
+  page: "mailing",
+  label: "Mailing list",
+  icon: <FaEnvelope className="shrink-0" />,
+  path: "/admin/mailing",
+};
+
 const NOTIFICATIONS_NAV_ITEM: NavItem = {
   page: "notifications",
   label: "Notifications",
@@ -202,6 +211,7 @@ export function AdminSidebar(): React.ReactElement {
       ...NAV_ITEMS,
       ...BUSINESS_NAV_ITEMS,
       PROMOS_NAV_ITEM,
+      MAILING_NAV_ITEM,
       NOTIFICATIONS_NAV_ITEM,
       SETTINGS_NAV_ITEM,
     ].map((i) => i.path),
@@ -328,7 +338,7 @@ export function AdminSidebar(): React.ReactElement {
 
           <div className="my-2 border-t border-white/10" />
 
-          {[PROMOS_NAV_ITEM, NOTIFICATIONS_NAV_ITEM, SETTINGS_NAV_ITEM].map(
+          {[PROMOS_NAV_ITEM, MAILING_NAV_ITEM, NOTIFICATIONS_NAV_ITEM, SETTINGS_NAV_ITEM].map(
             ({ page, label, icon, path }) => (
               <Link
                 key={page}
