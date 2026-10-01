@@ -919,3 +919,102 @@ model PromoRedemption {
   @@index([promoId, redeemedAt])
   @@index([promoId, contactId])
 }
+
+// Lifecycle of a mailing-list email. Presets never leave draft: they are
+// starting points, copied into a fresh draft before anything is sent.
+enum CampaignStatus {
+  draft
+  scheduled
+  sending
+  sent
+  failed
+}
+
+// A mailing-list email the operator writes in /admin/mailing. The body is the
+// operator's own markdown-lite text, rendered per recipient at send time by
+// src/features/mailing/lib/render.ts, so nothing about the wording lives in code.
+model Campaign {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  // Admin-only label; customers never see it.
+  name      String
+  subject   String
+  // Grey preview line an inbox shows after the subject.
+  preheader String?
+  body      String
+
+  // A reusable starting point rather than an email to send.
+  isPreset  Boolean @default(false)
+  // Stable handle for a starter preset the code looks up by role (the promo
+  // preset behind "Email this promo"), so renaming it in the admin is safe.
+  presetKey String?
+
+  status           CampaignStatus @default(draft)
+  scheduledAt      DateTime?
+  sentAt           DateTime?
+  // When the current send run claimed the campaign. A run still "sending" well
+  // past this died mid-way (function timeout), and the cron resumes it.
+  sendingStartedAt DateTime?
+  // Bumped by each "Retry failed" run so its Resend idempotency keys differ
+  // from the run that failed; a resumed run keeps the number, and the keys
+  // that come with it, so Resend drops anything that already went.
+  sendAttempt      Int @default(0)
+
+  // Contacts unticked in the send dialog.
+  excludedContactIds String[] @db.ObjectId
+  // Promo the {promo} placeholders describe. Null falls back to whichever
+  // automatic promo is running when it sends.
+  promoId            String? @db.ObjectId
+
+  sentCount   Int @default(0)
+  failedCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isPreset, status])
+  @@index([status, scheduledAt])
+}
+
+enum CampaignSendStatus {
+  pending
+  sent
+  failed
+}
+
+// One recipient of one campaign. Written before anything goes out, so a
+// resumed or retried run only sends the rows still pending.
+model CampaignSend {
+  id         String             @id @default(auto()) @map("_id") @db.ObjectId
+  campaignId String             @db.ObjectId
+  contactId  String             @db.ObjectId
+  // Lowercased address the email went to.
+  email      String
+  status     CampaignSendStatus @default(pending)
+  resendId   String?
+  error      String?
+  sentAt     DateTime?
+
+  // One row per address per campaign, so nobody can get the same email twice.
+  @@unique([campaignId, email])
+  @@index([campaignId, status])
+}
+
+enum EmailOptOutSource {
+  link
+  one_click
+  manual
+}
+
+// Addresses that asked not to get mailing-list emails. Kept off Contact: a
+// write there bumps updatedAt past lastSyncedAt and re-pushes the contact to
+// Google on the next sync. Transactional mail (bookings, invoices) ignores it.
+model EmailOptOut {
+  id        String            @id @default(auto()) @map("_id") @db.ObjectId
+  // Lowercased.
+  email     String            @unique
+  contactId String?           @db.ObjectId
+  source    EmailOptOutSource
+  createdAt DateTime          @default(now())
+
+  @@index([contactId])
+}

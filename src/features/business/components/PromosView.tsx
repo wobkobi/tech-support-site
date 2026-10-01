@@ -36,8 +36,10 @@ import {
   pickWinningPromo,
   summariseForBanner,
 } from "@/features/business/lib/promos";
+import { callApi } from "@/features/mailing/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import { FaPlus } from "react-icons/fa6";
 
@@ -347,6 +349,8 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
   const { toast } = useToast();
   const [confirmDelete, setConfirmDelete] = useState<PromoRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [emailingId, setEmailingId] = useState<string | null>(null);
+  const router = useRouter();
   // Phones only: the form starts folded so the promo list isn't a long form
   // away. lg+ always shows it.
   const [formOpen, setFormOpen] = useState(false);
@@ -557,6 +561,25 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
     setPromos((prev) => prev.map((x) => (x.id === p.id ? d.promo : x)));
     // `p` is the pre-toggle row, so the new state is the opposite of p.isActive.
     toast(p.isActive ? "Promo disabled." : "Promo enabled.", { tone: "success" });
+  }
+
+  /**
+   * Starts a mailing-list draft from the promo preset, linked to this promo, and
+   * opens it in the email editor.
+   * @param p - Running automatic promo to advertise.
+   */
+  async function emailPromo(p: PromoRow): Promise<void> {
+    setEmailingId(p.id);
+    const res = await callApi<{ campaign: { id: string } }>("/api/admin/mailing", "POST", {
+      source: "promo",
+      promoId: p.id,
+    });
+    if (!res.ok) {
+      setEmailingId(null);
+      toast(res.error, { tone: "error" });
+      return;
+    }
+    router.push(`/admin/mailing/${res.campaign.id}`);
   }
 
   /** Deletes the promo held in the confirm dialog. Past invoices keep their snapshot. */
@@ -883,6 +906,17 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
                       </td>
                       <td className="px-4 py-3 text-right text-xs">
                         <div className="flex justify-end gap-3">
+                          {/* Code promos are never advertised, so only a running
+                              automatic one can be emailed out. */}
+                          {p.kind === "automatic" && status === "active" && (
+                            <button
+                              onClick={() => void emailPromo(p)}
+                              disabled={emailingId !== null}
+                              className="font-semibold text-russian-violet hover:underline disabled:opacity-60"
+                            >
+                              {emailingId === p.id ? "Opening..." : "Email it"}
+                            </button>
+                          )}
                           <button
                             onClick={() => void toggleActive(p)}
                             className="text-admin-muted hover:text-admin-text"
@@ -967,6 +1001,15 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
                   </dl>
 
                   <div className="mt-4 flex flex-wrap gap-2">
+                    {p.kind === "automatic" && status === "active" && (
+                      <AdminButton
+                        busy={emailingId === p.id}
+                        disabled={emailingId !== null}
+                        onClick={() => void emailPromo(p)}
+                      >
+                        Email this promo
+                      </AdminButton>
+                    )}
                     <AdminButton variant="secondary" onClick={() => void toggleActive(p)}>
                       {p.isActive ? "Disable" : "Enable"}
                     </AdminButton>

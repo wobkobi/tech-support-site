@@ -20,8 +20,10 @@ calls the endpoints over HTTPS on a schedule. Every job is a plain `GET` route u
    - `BOOKING_CALENDAR_ID`, `CAR_CALENDAR_ID`, `WORK_CALENDAR_ID`, `PERSONAL_CALENDAR_ID`,
      `HOME_ADDRESS` - calendar cache refresh.
    - `GOOGLE_SHEET_ID`, `GOOGLE_BUSINESS_SHEETS_FOLDER_ID` - sheets sync and subscription recording.
-   - `RESEND_API_KEY`, `EMAIL_FROM`, `ADMIN_EMAIL` - review request, booking reminder and invoice
-     reminder emails.
+   - `RESEND_API_KEY`, `EMAIL_FROM`, `ADMIN_EMAIL` - review request, booking reminder, invoice
+     reminder and scheduled mailing-list emails.
+   - `UNSUBSCRIBE_SECRET` - signs the unsubscribe link in mailing-list emails; scheduled sends
+     refuse to go out without it.
    - `GOOGLE_MAPS_SERVER_KEY` - public holidays refresh. No fallback to `GOOGLE_MAPS_API_KEY`:
      next.config.ts publishes that one to the browser, so falling back would spend a publicly
      readable key on server-side quota. The key's Google Cloud project must have the **Calendar
@@ -57,6 +59,7 @@ All endpoints are **GET**. Create one cron-job.org job per row.
 | Record subscriptions    | `/api/cron/record-subscriptions`    | GET    | daily 08:00 NZ   | Record due subscriptions as expenses + sheet row             |
 | Purge price estimates   | `/api/cron/purge-price-estimates`   | GET    | daily            | Delete price estimate logs past retention                    |
 | Public holidays         | `/api/cron/refresh-public-holidays` | GET    | monthly          | Refresh NZ public holidays (current + next year)             |
+| Scheduled mailing       | `/api/cron/publish-scheduled`       | GET    | every 5 minutes  | Send due scheduled mailing-list emails, resume stuck sends   |
 
 Full URL = the production URL + the path above. cron-job.org lets you pick a timezone per job -
 schedule Record subscriptions in `Pacific/Auckland` so it stays at 8am across DST changes.
@@ -117,6 +120,12 @@ schedule Record subscriptions in `Pacific/Auckland` so it stays at 8am across DS
   matching the customer and the exact total is treated as likely and also stops the chase, since a
   nudge arriving late beats one arriving after payment. Either way the invoice page shows the match
   with a prompt to record it.
+- Scheduled mailing claims each due campaign with an atomic `scheduled > sending` status flip, so
+  overlapping runs can't send one twice, and every recipient has a `CampaignSend` row that is only
+  marked sent once Resend accepts it. A send left in `sending` for over 10 minutes (a timed-out
+  function) is re-claimed and only its pending rows go out, with the same Resend idempotency keys.
+  An idle run is two indexed queries, so the 5-minute cadence costs next to no Active CPU; it is
+  that tight only so a scheduled email goes out close to the time the operator picked.
 - Contacts sync runs local dedup/merge first, then pushes only the dirty set, then pulls Google's
   changes. The manual full sync lives at `/api/admin/contacts/sync`.
 - Sheets sync treats the sheet as source of truth, joining rows on the hidden column-Z Sync ID, and
