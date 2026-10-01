@@ -1,7 +1,7 @@
 // scripts/check-mailing.ts
 // Mailing-list logic that has to be right before anything reaches a customer: the
 // renderer's escaping and formatting rules, placeholder filling, the image allow-list,
-// unsubscribe token signing, recipient selection and batch chunking. Pure logic, no
+// unsubscribe token signing, recipient selection, batch chunking and template switching. Pure logic, no
 // database and no network.
 // Run with: npm run check:mailing
 
@@ -13,6 +13,12 @@ import {
   type RenderContext,
 } from "@/features/mailing/lib/render";
 import { chunk } from "@/features/mailing/lib/send";
+import {
+  BLANK_TEMPLATE,
+  matchTemplate,
+  switchTemplate,
+  type Template,
+} from "@/features/mailing/lib/templates";
 import {
   signUnsubscribeToken,
   verifyUnsubscribeToken,
@@ -270,6 +276,66 @@ function checkChunking(): void {
   expect("nothing makes no chunks", chunk([], 100).length === 0);
 }
 
+/** Switching template keeps edited fields and replaces untouched ones. */
+function checkTemplates(): void {
+  console.log("Templates");
+  const scam: Template = {
+    id: "scam",
+    name: "Scam warning",
+    subject: "Watch out for this scam",
+    preheader: "A quick heads up",
+    body: "Hi {firstName},\n\nScam text.",
+  };
+  const promo: Template = {
+    id: "promo",
+    name: "New promo",
+    subject: "Something for you",
+    preheader: "",
+    body: "Hi {firstName},\n\n{promo}",
+  };
+  const all = [BLANK_TEMPLATE, scam, promo];
+
+  const fromBlank = switchTemplate(BLANK_TEMPLATE, BLANK_TEMPLATE, scam);
+  expect("untouched blank > template copies the body", fromBlank.body === scam.body);
+  expect("untouched blank > template copies the name", fromBlank.name === scam.name);
+
+  const edited = { ...scam, subject: "My own subject" };
+  const switched = switchTemplate(edited, scam, promo);
+  expect("an edited subject is kept", switched.subject === "My own subject");
+  expect("an untouched body follows the new template", switched.body === promo.body);
+  expect("an untouched name follows the new template", switched.name === promo.name);
+  expect("an untouched preview text follows the new template", switched.preheader === "");
+
+  const ownBody = { ...scam, body: "Hi {firstName},\n\nWe're closed 20-27 Dec." };
+  expect("an edited body is kept", switchTemplate(ownBody, scam, promo).body === ownBody.body);
+  expect(
+    "a trailing newline doesn't count as an edit",
+    switchTemplate({ ...scam, body: scam.body + "\n\n" }, scam, promo).body === promo.body,
+  );
+  expect(
+    "with no known template, filled fields are kept and empty ones replaced",
+    (() => {
+      const r = switchTemplate(
+        { ...BLANK_TEMPLATE, subject: "Mine", body: "Mine too" },
+        null,
+        scam,
+      );
+      return r.subject === "Mine" && r.body === "Mine too" && r.preheader === scam.preheader;
+    })(),
+  );
+
+  expect("a fresh blank email matches Blank", matchTemplate(BLANK_TEMPLATE, all) === "blank");
+  expect("a draft with a preset's body matches it", matchTemplate(edited, all) === "scam");
+  expect(
+    "a rewritten body falls back to the subject",
+    matchTemplate({ ...scam, body: "Rewritten" }, all) === "scam",
+  );
+  expect(
+    "nothing in common matches nothing",
+    matchTemplate({ name: "x", subject: "x", preheader: "", body: "x" }, all) === null,
+  );
+}
+
 /** Runs every group and exits non-zero on any failure. */
 function main(): void {
   checkEscaping();
@@ -279,6 +345,7 @@ function main(): void {
   checkTokens();
   checkRecipients();
   checkChunking();
+  checkTemplates();
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);
 }

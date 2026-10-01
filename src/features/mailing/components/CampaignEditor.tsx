@@ -3,7 +3,8 @@
 // Write, preview and send one mailing-list email. Drafts and presets autosave; the
 // preview is rendered by the same server code that builds the real email, so what
 // shows here is exactly what lands. Once an email is scheduled or sent the content
-// locks and the page shows who it went to instead.
+// locks and the page shows who it went to instead. Drafts get a template dropdown
+// beside the preview that swaps presets while keeping any field already edited.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
@@ -14,6 +15,12 @@ import { SendDialog, type SendMode } from "@/features/mailing/components/SendDia
 import { callApi } from "@/features/mailing/lib/api-client";
 import type { CampaignRow } from "@/features/mailing/lib/campaign-row";
 import { shrinkImage } from "@/features/mailing/lib/resize-image";
+import {
+  BLANK_TEMPLATE_ID,
+  matchTemplate,
+  switchTemplate,
+  type Template,
+} from "@/features/mailing/lib/templates";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import type { QuietHours } from "@/shared/lib/quiet-hours";
@@ -81,6 +88,7 @@ const SNIPPETS: { label: string; title: string; before: string; after: string; l
  * @param props.quiet - Live quiet-hours window.
  * @param props.promoTitle - Title of the linked promo, if any.
  * @param props.adminEmail - Inbox test sends go to.
+ * @param props.templates - Templates for the dropdown; empty when the email isn't a draft.
  * @returns Editor element.
  */
 export function CampaignEditor({
@@ -92,6 +100,7 @@ export function CampaignEditor({
   quiet,
   promoTitle,
   adminEmail,
+  templates,
 }: {
   initial: CampaignRow;
   sends: SendRow[];
@@ -101,6 +110,7 @@ export function CampaignEditor({
   quiet: QuietHours;
   promoTitle: string | null;
   adminEmail: string | null;
+  templates: Template[];
 }): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -113,6 +123,7 @@ export function CampaignEditor({
     body: initial.body,
   });
   const [promoId, setPromoId] = useState(initial.promoId);
+  const [templateId, setTemplateId] = useState(() => matchTemplate(content, templates));
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const saved = useRef<Content>(content);
   const saving = useRef<Promise<boolean> | null>(null);
@@ -213,6 +224,18 @@ export function CampaignEditor({
    */
   function setField(key: keyof Content, value: string): void {
     setContent((c) => ({ ...c, [key]: value }));
+  }
+
+  /**
+   * Switches template, keeping any field already made the operator's own.
+   * @param id - Template to apply.
+   */
+  function applyTemplate(id: string): void {
+    const to = templates.find((t) => t.id === id);
+    if (!to) return;
+    const from = templates.find((t) => t.id === templateId) ?? null;
+    setContent((c) => switchTemplate(c, from, to));
+    setTemplateId(id);
   }
 
   /**
@@ -488,6 +511,32 @@ export function CampaignEditor({
               </div>
             }
           />
+          {editable && templates.length > 0 && (
+            <div className="mt-3 flex flex-col gap-1">
+              <label className="flex flex-col gap-1 text-sm font-medium text-admin-text">
+                Template
+                <select
+                  value={templateId ?? ""}
+                  onChange={(e) => applyTemplate(e.target.value)}
+                  className={ADMIN_INPUT_CLS}
+                >
+                  {templateId === null && (
+                    <option value="" disabled>
+                      Pick a template
+                    </option>
+                  )}
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.id === BLANK_TEMPLATE_ID ? "Blank" : t.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="text-sm text-admin-muted">
+                Fields you&apos;ve changed stay as they are; the rest follow the template.
+              </p>
+            </div>
+          )}
           {preview && preview.problems.length > 0 && (
             <ul className="mt-3 list-disc rounded-lg border border-amber-300 bg-amber-50 py-2 pr-3 pl-7 text-sm text-amber-900">
               {preview.problems.map((p) => (

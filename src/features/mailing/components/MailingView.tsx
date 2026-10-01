@@ -1,11 +1,11 @@
 "use client";
 // src/features/mailing/components/MailingView.tsx
 // Mailing list home: emails by stage (drafts, scheduled, sent) plus the editable
-// presets, the New email picker, and the subscribers panel.
+// presets, and the subscribers panel. New email opens a blank draft straight in the
+// editor, where the template dropdown swaps between presets.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
-import { Modal } from "@/features/admin/components/ui/Modal";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { SubscribersPanel } from "@/features/mailing/components/SubscribersPanel";
@@ -80,11 +80,9 @@ export function MailingView({
   const { toast } = useToast();
   const [rows, setRows] = useState(initial);
   const [tab, setTab] = useState<Tab>("drafts");
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<CampaignRow | null>(null);
 
-  const presets = rows.filter((r) => r.isPreset);
   const visible = rows.filter((r) => tabOf(r) === tab);
 
   /**
@@ -173,7 +171,10 @@ export function MailingView({
             <FaPlus className="h-3 w-3" aria-hidden /> New preset
           </AdminButton>
         ) : (
-          <AdminButton onClick={() => setPickerOpen(true)}>
+          <AdminButton
+            busy={busyId === "blank"}
+            onClick={() => void createAndOpen({ source: "blank" }, "blank")}
+          >
             <FaPlus className="h-3 w-3" aria-hidden /> New email
           </AdminButton>
         )}
@@ -261,31 +262,6 @@ export function MailingView({
 
       <SubscribersPanel initialSubscribed={subscribed} initialUnsubscribed={unsubscribed} />
 
-      <Modal
-        open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        title="New email"
-        description="Start blank or from one of your presets. You can change everything after."
-      >
-        <div className="flex flex-col gap-2">
-          <PickerOption
-            title="Blank email"
-            detail="Just a greeting to start from."
-            busy={busyId === "blank"}
-            onClick={() => void createAndOpen({ source: "blank" }, "blank")}
-          />
-          {presets.map((p) => (
-            <PickerOption
-              key={p.id}
-              title={p.name}
-              detail={p.subject}
-              busy={busyId === `use-${p.id}`}
-              onClick={() => void createAndOpen({ source: "copy", sourceId: p.id }, `use-${p.id}`)}
-            />
-          ))}
-        </div>
-      </Modal>
-
       <ConfirmDialog
         open={deleting !== null}
         title={deleting?.isPreset ? "Delete this preset?" : "Delete this email?"}
@@ -301,38 +277,5 @@ export function MailingView({
         onCancel={() => setDeleting(null)}
       />
     </div>
-  );
-}
-
-/**
- * One choice in the New email picker.
- * @param props - Component props.
- * @param props.title - Option name.
- * @param props.detail - Second line (subject or description).
- * @param props.busy - True while this option is being created.
- * @param props.onClick - Picks the option.
- * @returns Picker option element.
- */
-function PickerOption({
-  title,
-  detail,
-  busy,
-  onClick,
-}: {
-  title: string;
-  detail: string;
-  busy: boolean;
-  onClick: () => void;
-}): React.ReactElement {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={busy}
-      className="rounded-lg border border-admin-border bg-admin-surface px-4 py-3 text-left transition-colors hover:border-russian-violet/50 hover:bg-admin-bg disabled:opacity-60"
-    >
-      <span className="block font-semibold text-admin-text">{busy ? "Opening..." : title}</span>
-      {detail && <span className="block truncate text-sm text-admin-text-secondary">{detail}</span>}
-    </button>
   );
 }
