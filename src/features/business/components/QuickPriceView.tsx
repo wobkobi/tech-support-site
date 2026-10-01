@@ -2,12 +2,14 @@
 // On-site quick price: an address and a start/end time priced as one Standard labour line
 // plus auto travel. Runs through calcJobTotal and lookupAutoTravel, the same pair the job
 // calculator uses, so the figure quoted at the door matches what a later invoice would say.
+// Travel can be dropped from the total, and the price can be recorded straight to income.
 
 "use client";
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { Card } from "@/features/admin/components/ui/Card";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import {
@@ -20,6 +22,8 @@ import {
   todayISO,
 } from "@/features/business/lib/business";
 import { lookupAutoTravel } from "@/features/business/lib/calculator-helpers";
+import { INCOME_METHODS } from "@/features/business/lib/constants";
+import { buildIncomeDescription } from "@/features/business/lib/invoice-maths";
 import { bankParticulars } from "@/features/business/lib/payment-fields";
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
@@ -70,6 +74,9 @@ export interface QuickPrefill {
   travel: TravelEntry | null;
 }
 
+/** How a quick-price job can be paid; Mixed is left to the full income form. */
+const PAID_BY = INCOME_METHODS.filter((m) => m !== "Mixed");
+
 interface Props {
   rates: RateConfig[];
   /** Automatic promo live right now, or null. */
@@ -117,6 +124,13 @@ export function QuickPriceView({
   const [travel, setTravel] = useState<TravelEntry | null>(prefill?.travel ?? null);
   const [lookingUp, setLookingUp] = useState(false);
   const [travelNote, setTravelNote] = useState<string | null>(null);
+  // Kept apart from travel so the looked-up drive survives switching the charge back on.
+  const [noTravel, setNoTravel] = useState(false);
+  const { toast } = useToast();
+  const [customer, setCustomer] = useState(prefill?.clientName ?? "");
+  const [paidBy, setPaidBy] = useState<(typeof PAID_BY)[number]>("Bank");
+  const [income, setIncome] = useState<"idle" | "saving" | "added">("idle");
+  const [incomeError, setIncomeError] = useState<string | null>(null);
 
   const standard =
     rates.find((r) => r.ratePerHour !== null && r.isDefault) ??
@@ -154,7 +168,7 @@ export function QuickPriceView({
     durationMins: billedMins,
     tasks,
     parts: [],
-    travelEntries: travel ? [travel] : [],
+    travelEntries: travel && !noTravel ? [travel] : [],
     notes: "",
     clientName: "",
     clientEmail: "",
@@ -193,6 +207,43 @@ export function QuickPriceView({
       setTravelNote("Travel lookup failed. Try again.");
     } finally {
       setLookingUp(false);
+    }
+  }
+
+  /** Records the total on screen as today's income; locks once it has gone in. */
+  async function addToIncome(): Promise<void> {
+    setIncome("saving");
+    setIncomeError(null);
+    try {
+      const res = await fetch("/api/business/income", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          date: todayISO(),
+          customer: customer.trim() || "Walk-in",
+          description: buildIncomeDescription(job) + (noTravel ? " - no travel charged" : ""),
+          amount: totals.total,
+          method: paidBy,
+        }),
+      });
+      const d = (await res.json()) as { ok?: boolean; error?: string; sheetSyncWarning?: boolean };
+      if (!d.ok) {
+        setIncome("idle");
+        setIncomeError(d.error || "Could not add to income.");
+        return;
+      }
+      setIncome("added");
+      // recordIncome keeps the entry even when the Cashbook append fails, so say so.
+      if (d.sheetSyncWarning) {
+        toast("Added to income, but the Cashbook sheet update didn't go through.", {
+          tone: "warning",
+        });
+      } else {
+        toast("Added to income.", { tone: "success" });
+      }
+    } catch {
+      setIncome("idle");
+      setIncomeError("Could not add to income. Please try again.");
     }
   }
 
@@ -358,11 +409,28 @@ export function QuickPriceView({
           <div className="flex justify-between gap-3">
             <dt>
               Travel
-              {driveMins > 0 && (
-                <span className="text-admin-text-secondary"> - {driveMins} min round trip</span>
+              {noTravel ? (
+                <span className="text-admin-text-secondary"> - not charged</span>
+              ) : (
+                driveMins > 0 && (
+                  <span className="text-admin-text-secondary"> - {driveMins} min round trip</span>
+                )
               )}
             </dt>
-            <dd>{travel ? formatNZD(totals.travelTotal) : lookingUp ? "Looking up..." : "-"}</dd>
+            <dd className="flex items-center gap-2">
+              {noTravel
+                ? formatNZD(0)
+                : travel
+                  ? formatNZD(totals.travelTotal)
+                  : lookingUp
+                    ? "Looking up..."
+                    : "-"}
+              {(travel || noTravel) && (
+                <AdminButton size="xs" variant="secondary" onClick={() => setNoTravel((v) => !v)}>
+                  {noTravel ? "Add back" : "No travel"}
+                </AdminButton>
+              )}
+            </dd>
           </div>
           {totals.holidaySurcharge > 0 && (
             <div className="flex justify-between gap-3">
@@ -400,6 +468,58 @@ export function QuickPriceView({
             )}
           </div>
         )}
+      </Card>
+
+      <Card>
+        <h2 className="text-sm font-semibold text-russian-violet">Add to income</h2>
+        <div className="mt-3 flex flex-col gap-3">
+          <div>
+            <label htmlFor="quick-customer" className="mb-1 block text-sm font-medium">
+              Customer
+            </label>
+            <input
+              id="quick-customer"
+              value={customer}
+              onChange={(e) => setCustomer(e.target.value)}
+              placeholder="Walk-in"
+              disabled={income === "added"}
+              className={ADMIN_INPUT_CLS}
+            />
+          </div>
+          <div>
+            <span className="mb-1 block text-sm font-medium">Paid by</span>
+            <div className="flex gap-2">
+              {PAID_BY.map((m) => (
+                <AdminButton
+                  key={m}
+                  aria-label={paidBy === m ? `Paid by ${m} (selected)` : `Paid by ${m}`}
+                  variant={paidBy === m ? "primary" : "secondary"}
+                  disabled={income === "added"}
+                  onClick={() => setPaidBy(m)}
+                >
+                  {m}
+                </AdminButton>
+              ))}
+            </div>
+          </div>
+          {income === "added" ? (
+            <Link
+              href="/admin/business/income"
+              className="text-base font-semibold text-moonstone-700 underline underline-offset-2"
+            >
+              Added to income - view
+            </Link>
+          ) : (
+            <AdminButton
+              onClick={() => void addToIncome()}
+              busy={income === "saving"}
+              disabled={totals.total <= 0}
+            >
+              Add {formatNZD(totals.total)} to income
+            </AdminButton>
+          )}
+          {incomeError && <p className="text-sm text-coquelicot-700">{incomeError}</p>}
+        </div>
       </Card>
     </div>
   );
