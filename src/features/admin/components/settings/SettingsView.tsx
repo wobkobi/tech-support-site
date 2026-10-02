@@ -1,11 +1,12 @@
 "use client";
 // src/features/admin/components/settings/SettingsView.tsx
 // Tabbed shell for the admin settings panel. Renders the group tab bar and the active
-// tab's editor. Tabs are added group by group; ones not yet built show a placeholder
-// noting they're still managed in code.
+// tab's editor. Every settings group has a tab, plus a Rates tab for the RateConfig rows,
+// which live in their own collection rather than a settings group.
 
 import { SettingsSearch } from "@/features/admin/components/settings/SettingsSearch";
 import { SettingsAllContext } from "@/features/admin/components/settings/useSettingsForm";
+import type { RateConfig } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import { GROUP_META } from "@/shared/lib/settings/field-meta";
 import type {
@@ -67,11 +68,25 @@ const TaxTab = dynamic(
   () => import("@/features/admin/components/settings/TaxTab").then((m) => m.TaxTab),
   { loading: TabLoading },
 );
+const RatesTab = dynamic(
+  () => import("@/features/admin/components/settings/RatesTab").then((m) => m.RatesTab),
+  { loading: TabLoading },
+);
+
+/** A settings group, or the Rates tab. */
+export type SettingsTabKey = SettingsGroup | "rates";
+
+/** Title and blurb for the Rates tab, which has no entry in GROUP_META. */
+const RATES_META = {
+  title: "Rates",
+  blurb: "Your hourly rate and the adjustments the calculator and pricing page use.",
+};
 
 /** Tab order shown in the settings bar. */
-const TAB_ORDER: SettingsGroup[] = [
+const TAB_ORDER: SettingsTabKey[] = [
   "availability",
   "pricing",
+  "rates",
   "estimator",
   "identity",
   "tax",
@@ -80,19 +95,10 @@ const TAB_ORDER: SettingsGroup[] = [
   "reviews",
 ];
 
-/** Groups with a working editor; the rest render the placeholder. */
-const IMPLEMENTED: ReadonlySet<SettingsGroup> = new Set<SettingsGroup>([
-  "availability",
-  "pricing",
-  "estimator",
-  "identity",
-  "tax",
-  "comms",
-  "reviews",
-  "scheduling",
-]);
-
 interface Props {
+  /** Tab to open on, e.g. from the calculator's Manage rates link. */
+  initialTab?: SettingsTabKey;
+  rates: RateConfig[];
   availability: AvailabilitySettings;
   availabilityDefaults: AvailabilitySettings;
   pricing: PricingSettings;
@@ -114,6 +120,8 @@ interface Props {
 /**
  * Settings tab bar + active editor.
  * @param props - Component props.
+ * @param props.initialTab - Tab to open on; defaults to availability.
+ * @param props.rates - Rate rows for the Rates tab.
  * @param props.availability - Resolved current availability settings.
  * @param props.availabilityDefaults - Code default availability settings.
  * @param props.pricing - Resolved current pricing settings.
@@ -133,6 +141,8 @@ interface Props {
  * @returns Settings view element.
  */
 export function SettingsView({
+  initialTab,
+  rates,
   availability,
   availabilityDefaults,
   pricing,
@@ -150,9 +160,9 @@ export function SettingsView({
   scheduling,
   schedulingDefaults,
 }: Props): React.ReactElement {
-  const [active, setActive] = useState<SettingsGroup>("availability");
+  const [active, setActive] = useState<SettingsTabKey>(initialTab ?? "availability");
   const [focusTarget, setFocusTarget] = useState<{ id: string; nonce: number } | null>(null);
-  const meta = GROUP_META[active];
+  const meta = active === "rates" ? RATES_META : GROUP_META[active];
 
   /**
    * Jumps to a field from search: switches to its tab and queues a focus.
@@ -199,35 +209,37 @@ export function SettingsView({
       <div>
         <SettingsSearch onJump={handleJump} />
 
-        {/* Tab bar - horizontally scrollable on phones. */}
-        <div className="mb-6 flex gap-1 overflow-x-auto border-b border-admin-border">
-          {TAB_ORDER.map((group) => {
-            const isActive = group === active;
-            const ready = IMPLEMENTED.has(group);
+        {/* Tab bar - scrolls sideways on phones, wraps from md up so every tab shows. */}
+        <div className="mb-3 flex gap-x-1 overflow-x-auto border-b border-admin-border md:flex-wrap md:overflow-visible">
+          {TAB_ORDER.map((tab) => {
+            const isActive = tab === active;
             return (
               <button
-                key={group}
+                key={tab}
                 type="button"
-                onClick={() => setActive(group)}
+                onClick={() => setActive(tab)}
                 className={cn(
-                  "border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+                  "-mb-px border-b-2 px-2.5 py-2 text-sm font-medium whitespace-nowrap transition-colors",
                   isActive
                     ? "border-russian-violet text-russian-violet"
                     : "border-transparent text-admin-muted hover:text-admin-text",
-                  !ready && "text-admin-faint italic",
                 )}
               >
-                {GROUP_META[group].title}
+                {tab === "rates" ? RATES_META.title : GROUP_META[tab].title}
               </button>
             );
           })}
         </div>
 
-        <div className="rounded-xl border border-admin-border bg-admin-surface p-5 shadow-sm sm:p-6">
-          <h2 className="text-lg font-bold text-russian-violet">{meta.title}</h2>
-          <p className="mt-1 text-sm text-admin-muted">{meta.blurb}</p>
-          <div className="mt-4">
-            {active === "availability" ? (
+        {/* The active tab already names the section, so the card leads with its blurb. */}
+        <div className="rounded-xl border border-admin-border bg-admin-surface p-4 shadow-sm sm:px-5">
+          <p className="text-sm text-admin-muted">{meta.blurb}</p>
+          <div className="mt-1">
+            {active === "rates" ? (
+              <div className="mt-3">
+                <RatesTab initialRates={rates} />
+              </div>
+            ) : active === "availability" ? (
               <AvailabilityTab initial={availability} defaults={availabilityDefaults} />
             ) : active === "pricing" ? (
               <PricingTab initial={pricing} defaults={pricingDefaults} />
@@ -247,11 +259,7 @@ export function SettingsView({
               <TaxTab initial={tax} defaults={taxDefaults} />
             ) : active === "scheduling" ? (
               <SchedulingTab initial={scheduling} defaults={schedulingDefaults} />
-            ) : (
-              <p className="py-8 text-center text-sm text-admin-faint">
-                This section is still managed in code - its editor is coming in a later step.
-              </p>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

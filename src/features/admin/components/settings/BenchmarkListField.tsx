@@ -64,7 +64,7 @@ export function BenchmarkListField({
     );
 
   return (
-    <div className="py-4">
+    <div className="py-3">
       <p className="text-sm font-semibold text-russian-violet">{meta.title}</p>
       <p className="mt-0.5 text-sm text-admin-muted">{meta.description}</p>
 

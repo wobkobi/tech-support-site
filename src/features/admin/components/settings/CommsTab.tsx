@@ -90,7 +90,7 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           last-one-off guard exists to stop the customer going dark, and turning
           every push off is a legitimate choice. Devices are enrolled separately
           on /admin/notifications - these only gate what gets sent. */}
-      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Which push notifications you get
       </h3>
       <div className="mt-2 divide-y divide-admin-border">
@@ -117,7 +117,7 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
         />
       </div>
 
-      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Timings
       </h3>
       <div className="mt-2 divide-y divide-admin-border">
@@ -151,7 +151,7 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
         />
       </div>
 
-      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Quiet hours
       </h3>
       <div className="mt-2 divide-y divide-admin-border">
@@ -184,7 +184,7 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
         />
       </div>
 
-      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Overdue invoice reminders
       </h3>
       <div className="mt-2 divide-y divide-admin-border">

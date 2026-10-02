@@ -44,7 +44,7 @@ export function SettingsSaveBar({
     // on long tabs without scrolling to the very bottom.
     <div
       data-phone-bar="sticky"
-      className="sticky bottom-0 z-10 -mx-5 mt-6 flex items-center gap-3 border-t border-admin-border bg-admin-surface/95 px-5 py-3 backdrop-blur sm:-mx-6 sm:px-6"
+      className="sticky bottom-0 z-10 -mx-4 mt-4 flex items-center gap-3 border-t border-admin-border bg-admin-surface/95 px-4 py-2.5 backdrop-blur sm:-mx-5 sm:px-5"
     >
       <AdminButton variant="primary" busy={saving} disabled={!dirty || saving} onClick={onSave}>
         Save changes

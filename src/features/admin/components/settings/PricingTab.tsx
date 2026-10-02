@@ -192,7 +192,7 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
         />
       </div>
 
-      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Cancellation
       </h3>
       <div className="divide-y divide-admin-border">
@@ -292,7 +292,7 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
         />
       </div>
 
-      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Reschedule
       </h3>
       <div className="divide-y divide-admin-border">
