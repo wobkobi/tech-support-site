@@ -1,8 +1,13 @@
 "use client";
 // src/features/business/components/calculator/SaveActions.tsx
-// The calculator's save buttons (invoice, save & send, quote, income entry) and the
-// error banners from the last failed save.
+// The calculator's "Paid in cash" tick, the Already paid box, its save buttons (invoice,
+// save & send, quote, income entry) and the error banners from the last failed save.
 
+import { AlreadyPaidField } from "@/features/business/components/invoice/AlreadyPaidField";
+import {
+  alreadyPaidAmount,
+  type AlreadyPaidState,
+} from "@/features/business/lib/already-paid-input";
 import type React from "react";
 
 interface Props {
@@ -14,6 +19,11 @@ interface Props {
   savingIncome: boolean;
   parsing: boolean;
   subtotal: number;
+  total: number;
+  paidCash: boolean;
+  onPaidCashChange: (paid: boolean) => void;
+  alreadyPaid: AlreadyPaidState;
+  onAlreadyPaidChange: (next: AlreadyPaidState) => void;
   onSaveInvoice: (send: boolean, quote?: boolean) => void;
   onSaveIncome: () => void;
 }
@@ -30,6 +40,11 @@ interface Props {
  * @param props.savingIncome - True while an income save is in flight.
  * @param props.parsing - True while an AI parse is in flight (blocks invoice saves).
  * @param props.subtotal - Job subtotal; zero disables the income save.
+ * @param props.total - Job total after discounts; an Already paid amount covering it saves as paid.
+ * @param props.paidCash - Whether "Paid in cash" is ticked.
+ * @param props.onPaidCashChange - Ticks or unticks "Paid in cash".
+ * @param props.alreadyPaid - Already paid amount and method.
+ * @param props.onAlreadyPaidChange - Updates the Already paid box.
  * @param props.onSaveInvoice - Saves as an invoice (send = open send step, quote = save as quote).
  * @param props.onSaveIncome - Saves the job as an income entry.
  * @returns Save actions element.
@@ -43,9 +58,16 @@ export function SaveActions({
   savingIncome,
   parsing,
   subtotal,
+  total,
+  paidCash,
+  onPaidCashChange,
+  alreadyPaid,
+  onAlreadyPaidChange,
   onSaveInvoice,
   onSaveIncome,
 }: Props): React.ReactElement {
+  // An Already paid amount that covers the total is a full payment, saved like the tick.
+  const paidInFull = paidCash || (total > 0 && alreadyPaidAmount(alreadyPaid) >= total);
   return (
     <div className="space-y-2">
       {incomeError && (
@@ -58,13 +80,42 @@ export function SaveActions({
           {saveInvoiceError}
         </p>
       )}
+      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700">
+        <input
+          type="checkbox"
+          checked={paidCash}
+          onChange={(e) => onPaidCashChange(e.target.checked)}
+          className="h-4 w-4 accent-russian-violet"
+        />
+        Paid in cash
+      </label>
+      {paidCash ? (
+        <p className="text-xs text-slate-500">
+          Saving an invoice marks it paid in cash on the job date and adds it to income. A quote
+          stays unpaid.
+        </p>
+      ) : (
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-slate-700">
+          <AlreadyPaidField
+            value={alreadyPaid}
+            onChange={onAlreadyPaidChange}
+            total={total}
+            inputClassName="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800"
+            coversNote="Covers the total, so the invoice saves as paid."
+          />
+        </div>
+      )}
       <button
         onClick={() => onSaveInvoice(false)}
         disabled={savingInvoice || parsing}
         suppressHydrationWarning
         className="w-full rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
       >
-        {savingInvoice && !saveSendMode ? "Saving..." : "Save invoice"}
+        {savingInvoice && !saveSendMode && !saveQuoteMode
+          ? "Saving..."
+          : paidInFull
+            ? "Save paid invoice"
+            : "Save invoice"}
       </button>
       <button
         onClick={() => onSaveInvoice(true)}
@@ -73,7 +124,11 @@ export function SaveActions({
         title="Save the invoice and jump straight to the send-to-client step."
         className="w-full rounded-lg border border-russian-violet px-4 py-2 text-sm font-semibold text-russian-violet hover:bg-russian-violet/5 disabled:opacity-50"
       >
-        {savingInvoice && saveSendMode ? "Saving..." : "Save & send"}
+        {savingInvoice && saveSendMode
+          ? "Saving..."
+          : paidInFull
+            ? "Save paid & send"
+            : "Save & send"}
       </button>
       <button
         onClick={() => onSaveInvoice(false, true)}
@@ -88,10 +143,14 @@ export function SaveActions({
         onClick={onSaveIncome}
         suppressHydrationWarning
         disabled={savingIncome || subtotal === 0 || savingInvoice}
-        title="For cash jobs handled outside the invoice flow."
+        title="For jobs handled outside the invoice flow."
         className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
       >
-        {savingIncome ? "Saving..." : "Save as income entry"}
+        {savingIncome
+          ? "Saving..."
+          : paidCash
+            ? "Save as cash income entry"
+            : "Save as income entry"}
       </button>
     </div>
   );

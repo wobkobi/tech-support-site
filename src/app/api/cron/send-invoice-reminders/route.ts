@@ -4,6 +4,7 @@
 // invoice whose payment is already sitting in the income ledger is held back
 // rather than chased. See docs/CRON.md.
 
+import { balanceDue } from "@/features/business/lib/invoice-maths";
 import { findRecordedPayment } from "@/features/business/lib/invoice-payment-match";
 import { sendOverdueReminder } from "@/features/business/lib/invoice-reminders";
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
@@ -60,6 +61,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           results.skipped++;
           continue;
         }
+      }
+
+      // Already paid covers the total; the invoice just hasn't been marked paid yet.
+      if (balanceDue(inv) <= 0) {
+        results.paid++;
+        console.warn(
+          `[cron/send-invoice-reminders] ${inv.number} not chased: nothing left owing - mark it paid`,
+        );
+        continue;
       }
 
       // The money may already be in, entered straight into the Cashbook rather than

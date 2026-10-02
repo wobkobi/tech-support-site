@@ -3,6 +3,7 @@
 // base address > destination at the departure time, destination > base address at the
 // return time, both traffic-aware. Used by /api/pricing/travel-time (public estimator +
 // calculator), the parse-job route, the booking snapshot, and the late-cancel invoice.
+// lookupStoreRun times a mid-job client > store > client detour the same way.
 // Never throws - returns a discriminated status so the caller can decide whether to skip
 // the travel charge or surface an error.
 
@@ -169,5 +170,34 @@ export async function lookupDriveRoundTrip(
       there: there.data,
       back: back.status === "ok" ? back.data : there.data,
     },
+  };
+}
+
+/**
+ * Looks up a mid-job store run: the client's place > the store > back. Same leg
+ * lookup and statuses as {@link lookupDriveRoundTrip}, but the trip starts at the
+ * client rather than the business base. Both legs quote "leaving about now"; a store
+ * run is a short local drive, so the time of day barely moves it.
+ * @param from - The client's address.
+ * @param store - The store, by name and branch or by address.
+ * @returns Discriminated result; "there" is client > store, "back" is store > client.
+ */
+export async function lookupStoreRun(from: string, store: string): Promise<DriveRoundTripResult> {
+  const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY;
+  if (!apiKey) return { status: "misconfig" };
+  const origin = from.trim().slice(0, 100);
+  const stop = store.trim().slice(0, 100);
+  if (!origin || !stop) return { status: "no_match" };
+  const fullOrigin = `${origin}, New Zealand`;
+  const fullStop = `${stop}, New Zealand`;
+  const departMs = Date.now() + 60_000;
+  const [there, back] = await Promise.all([
+    lookupLeg(fullOrigin, fullStop, apiKey, departMs),
+    lookupLeg(fullStop, fullOrigin, apiKey, departMs),
+  ]);
+  if (there.status !== "ok") return { status: there.status };
+  return {
+    status: "ok",
+    data: { there: there.data, back: back.status === "ok" ? back.data : there.data },
   };
 }

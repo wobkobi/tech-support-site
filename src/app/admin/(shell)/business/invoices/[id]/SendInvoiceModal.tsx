@@ -14,7 +14,6 @@ import {
   DEFAULT_QUOTE_EMAIL_BODY,
 } from "@/features/business/lib/invoice-email-defaults";
 import { cn } from "@/shared/lib/cn";
-import { formatDateShort } from "@/shared/lib/date-format";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -353,13 +352,18 @@ export function SendInvoiceModal({
                     className="mt-0.5"
                   />
                   <span className={cn(!eligibility.canSend && "text-admin-faint")}>
-                    Include review link in this email
+                    {eligibility.canSend && eligibility.googleOnly
+                      ? "Include Google review link in this email"
+                      : "Include review link in this email"}
+                    {eligibility.canSend && eligibility.googleOnly && (
+                      <span className="ml-1 text-xs italic">
+                        (they&apos;ve already reviewed on the site)
+                      </span>
+                    )}
                     {eligibility.canSend === false && (
                       <span className="ml-1 text-xs italic">
                         {eligibility.reason === "already-reviewed" &&
-                          "(this customer has already left a review)"}
-                        {eligibility.reason === "sent-recently" &&
-                          ` (review request sent ${formatDateShort(eligibility.lastSentAt)} - can re-send from ${formatDateShort(eligibility.nextAllowedAt)})`}
+                          "(already reviewed - set a Google review link in Settings to ask for one)"}
                         {eligibility.reason === "no-contact" && (
                           <>
                             (no contact record -{" "}

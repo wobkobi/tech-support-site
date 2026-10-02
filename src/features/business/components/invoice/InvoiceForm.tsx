@@ -1,6 +1,7 @@
 "use client";
 // src/features/business/components/invoice/InvoiceForm.tsx
-// Presentational edit form for an invoice's client, dates, line items, and notes. It owns
+// Presentational edit form for an invoice's client, dates, line items, notes and any
+// amount already paid. It owns
 // the field state and mirrors every change to the parent via `onChange` (so a live
 // preview can render alongside); the PARENT owns submission. Creation stays in the
 // calculator - this form only edits an existing DRAFT. Totals use calcInvoiceTotals (the
@@ -12,12 +13,22 @@ import { FieldError } from "@/features/admin/components/ui/FieldError";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { useUnsavedChangesWarning } from "@/features/admin/hooks/use-unsaved-changes-warning";
 import {
-  type ContactFieldErrors,
   checkContactFields,
   focusFirstInvalid,
+  type ContactFieldErrors,
 } from "@/features/admin/lib/contact-fields";
+import { AlreadyPaidField } from "@/features/business/components/invoice/AlreadyPaidField";
 import { LineItemsEditor } from "@/features/business/components/invoice/LineItemsEditor";
-import { calcInvoiceTotals, formatNZD, isValidLineItem } from "@/features/business/lib/business";
+import {
+  alreadyPaidAmount,
+  type AlreadyPaidState,
+} from "@/features/business/lib/already-paid-input";
+import {
+  balanceDue,
+  calcInvoiceTotals,
+  formatNZD,
+  isValidLineItem,
+} from "@/features/business/lib/business";
 import type { LineItem } from "@/features/business/types/business";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { cn } from "@/shared/lib/cn";
@@ -35,6 +46,8 @@ export interface InvoiceFormData {
   dueDate: string;
   lineItems: LineItem[];
   notes: string;
+  /** Money handed over before the invoice went out; recorded in income on save. */
+  alreadyPaid: AlreadyPaidState;
 }
 
 /** Read-only discount snapshot preserved from invoice creation, shown in totals. */
@@ -139,6 +152,7 @@ export function InvoiceForm({
     promoDiscount + unsuccessfulDiscount,
     gstRegistered,
   );
+  const paid = alreadyPaidAmount(form.alreadyPaid);
 
   /**
    * Validates the form and hands off to the parent on success.
@@ -163,6 +177,14 @@ export function InvoiceForm({
     }
     if (totals.subtotal <= 0) {
       setError("The invoice total must be greater than zero.");
+      return;
+    }
+    if (form.alreadyPaid.amount.trim() && paid === 0) {
+      setError("Enter the amount already paid as a number, or clear it.");
+      return;
+    }
+    if (paid > totals.total) {
+      setError("The amount already paid is more than the invoice total.");
       return;
     }
     setError(null);
@@ -270,6 +292,15 @@ export function InvoiceForm({
         />
       </label>
 
+      <AlreadyPaidField
+        value={form.alreadyPaid}
+        onChange={(alreadyPaid) => update({ alreadyPaid })}
+        total={totals.total}
+        disabled={busy}
+        inputClassName={ADMIN_INPUT_CLS}
+        coversNote="Nothing left owing. Mark the invoice paid once it's sent."
+      />
+
       {/* Totals - recomputed live; the server recomputes the same way on save. */}
       <div className="ml-auto w-full max-w-xs space-y-1 text-sm sm:w-3/5">
         <div className="flex justify-between gap-3">
@@ -300,6 +331,20 @@ export function InvoiceForm({
           <span className="font-semibold text-admin-text">Total</span>
           <span className="font-extrabold text-russian-violet">{formatNZD(totals.total)}</span>
         </div>
+        {paid > 0 && (
+          <>
+            <div className="flex justify-between gap-3">
+              <span className="text-admin-muted">Already paid</span>
+              <span className="font-medium text-admin-text">-{formatNZD(paid)}</span>
+            </div>
+            <div className="flex justify-between gap-3 border-t border-admin-border pt-1">
+              <span className="font-semibold text-admin-text">Balance due</span>
+              <span className="font-extrabold text-russian-violet">
+                {formatNZD(balanceDue({ total: totals.total, alreadyPaid: paid }))}
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       {error && (

@@ -12,7 +12,7 @@ import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { mapsSearchUrl, meetingTypeFromNotes } from "@/features/booking/lib/booking";
-import { formatNZD } from "@/features/business/lib/business";
+import { balanceDue, formatNZD } from "@/features/business/lib/business";
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
 import { SendReviewLinkForm } from "@/features/reviews/components/admin/SendReviewLinkForm";
 import { requireAdminAuth } from "@/shared/lib/auth";
@@ -220,6 +220,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
         id: true,
         number: true,
         total: true,
+        alreadyPaid: true,
         dueDate: true,
         status: true,
         clientName: true,
@@ -296,7 +297,8 @@ export default async function AdminPage(): Promise<React.ReactElement> {
 
   // --- Derived KPIs for the dashboard sections ---
   const monthRevenue = monthIncome._sum.amount ?? 0;
-  const outstandingTotal = outstandingInvoices.reduce((s, inv) => s + inv.total, 0);
+  // Money handed over on the day is already in, so only the balance is outstanding.
+  const outstandingTotal = outstandingInvoices.reduce((s, inv) => s + balanceDue(inv), 0);
   const overdueInvoices = outstandingInvoices.filter(
     (inv) => inv.status === "SENT" && inv.dueDate < now,
   );

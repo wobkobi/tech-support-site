@@ -16,13 +16,6 @@ import { useCallback, useMemo } from "react";
 interface BookingActionResult {
   /** True when the request succeeded. */
   ok: boolean;
-  /** Set by the complete path when the review-request email actually went out. */
-  reviewSent?: boolean;
-  /**
-   * Set by the complete path when it stamped reviewSentAt (ISO), which it does
-   * for a skipped send too, so the cron never sends the declined email.
-   */
-  reviewSentAt?: string;
   /** Error message when {@link BookingActionResult.ok} is false. */
   error?: string;
 }
@@ -49,10 +42,10 @@ export interface UseBookingActions {
     successMsg?: string,
   ) => Promise<BookingActionResult>;
   /**
-   * Marks the booking completed; toast reflects whether a review email was sent.
-   * `sendReview` false (default true) opts out of that email.
+   * Marks the booking completed. No review email goes with it: the review ask
+   * rides on the invoice email instead.
    */
-  completeBooking: (id: string, sendReview?: boolean) => Promise<BookingActionResult>;
+  completeBooking: (id: string) => Promise<BookingActionResult>;
   /** Cancels the booking; operator = no fee, on-behalf = customer fee rules. */
   cancelBooking: (id: string, mode: CancelMode) => Promise<BookingActionResult>;
   /**
@@ -84,37 +77,20 @@ export function useBookingActions(): UseBookingActions {
 
   const patchBooking = useCallback<UseBookingActions["patchBooking"]>(
     async (id, body, successMsg) => {
-      const res = await apiFetch<{ reviewSent?: boolean; reviewSentAt?: string }>(
-        `/api/admin/bookings/${id}`,
-        { method: "PATCH", json: body },
-      );
+      const res = await apiFetch(`/api/admin/bookings/${id}`, { method: "PATCH", json: body });
       if (!res.ok) {
         toast(res.error, { tone: "error" });
         return { ok: false, error: res.error };
       }
       if (successMsg) toast(successMsg, { tone: "success" });
-      return { ok: true, reviewSent: res.data.reviewSent, reviewSentAt: res.data.reviewSentAt };
+      return { ok: true };
     },
     [toast],
   );
 
   const completeBooking = useCallback<UseBookingActions["completeBooking"]>(
-    async (id, sendReview = true) => {
-      // No successMsg here: the toast depends on the review-send outcome.
-      const result = await patchBooking(id, { status: "completed", sendReview });
-      if (result.ok) {
-        // Three outcomes: sent, skipped on purpose, or nothing to send because
-        // one had already gone out.
-        const message = result.reviewSent
-          ? "Marked completed - review email sent."
-          : sendReview
-            ? "Marked completed."
-            : "Marked completed - review email skipped.";
-        toast(message, { tone: "success" });
-      }
-      return result;
-    },
-    [patchBooking, toast],
+    (id) => patchBooking(id, { status: "completed" }, "Marked completed."),
+    [patchBooking],
   );
 
   const cancelBooking = useCallback<UseBookingActions["cancelBooking"]>(

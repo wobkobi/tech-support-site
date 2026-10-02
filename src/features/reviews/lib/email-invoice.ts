@@ -1,7 +1,7 @@
 // src/features/reviews/lib/email-invoice.ts
 // Invoice, quote, reminder, payment-apology and void emails for the business ledger.
 
-import { formatNZD } from "@/features/business/lib/business";
+import { balanceDue, formatNZD } from "@/features/business/lib/business";
 import {
   DEFAULT_INVOICE_EMAIL_BODY,
   DEFAULT_QUOTE_EMAIL_BODY,
@@ -34,6 +34,8 @@ export interface InvoiceEmailData {
   issueDate: Date;
   dueDate: Date;
   total: number;
+  /** Money handed over before the invoice went out; the email asks for the rest. */
+  alreadyPaid?: number | null;
   driveWebUrl?: string | null;
   /** True when the row is a quote - switches subject/body to quote wording. */
   isQuote?: boolean | null;
@@ -61,6 +63,8 @@ function defaultGreetingFor(invoice: InvoiceEmailData): string {
 interface BuildInvoiceEmailArgs {
   invoice: InvoiceEmailData;
   reviewUrl: string | null;
+  /** The customer has already reviewed on the site, so `reviewUrl` is the Google link. */
+  googleOnly?: boolean;
   greetingName?: string;
   customBody?: string;
 }
@@ -71,6 +75,7 @@ interface BuildInvoiceEmailArgs {
  * @param args - Render inputs.
  * @param args.invoice - Invoice row fields needed for the body.
  * @param args.reviewUrl - Stable per-contact review URL, or null to omit.
+ * @param args.googleOnly - True when `reviewUrl` is the Google link for a customer who has reviewed on the site.
  * @param args.greetingName - Optional greeting target (e.g. person inside a company).
  * @param args.customBody - Optional intro replacement (multi-line via pre-wrap).
  * @returns Subject + escaped HTML body.
@@ -78,6 +83,7 @@ interface BuildInvoiceEmailArgs {
 export async function buildInvoiceEmail({
   invoice,
   reviewUrl,
+  googleOnly = false,
   greetingName,
   customBody,
 }: BuildInvoiceEmailArgs): Promise<{ subject: string; html: string }> {
@@ -96,20 +102,30 @@ export async function buildInvoiceEmail({
   const safeNumber = escapeHtml(invoice.number);
   const dueDate = escapeHtml(formatDateShort(invoice.dueDate));
   const totalLabel = escapeHtml(formatNZD(invoice.total));
+  const prepaidLines =
+    !isQuote && invoice.alreadyPaid && invoice.alreadyPaid > 0
+      ? `<p style="margin:0 0 4px"><strong>Already paid:</strong> -${escapeHtml(formatNZD(invoice.alreadyPaid))}</p>
+      <p style="margin:0 0 4px"><strong>Balance due:</strong> ${escapeHtml(formatNZD(balanceDue(invoice)))}</p>`
+      : "";
   const driveLink = invoice.driveWebUrl
     ? `<p style="margin:0 0 16px;font-size:14px;color:#555">An online copy is also here: <a href="${escapeHtml(invoice.driveWebUrl)}" style="color:#43bccd">view ${isQuote ? "quote" : "invoice"}</a>.</p>`
     : "";
   // No review ask on a quote - the job hasn't happened yet. The Google option
-  // rides along with every site ask, never on its own, so it can't single out
+  // rides along with every site ask, and stands alone only for someone who has
+  // already reviewed on the site, whatever they wrote, so it never singles out
   // happy customers (which Google's review policy bans).
   const googleUrl = (await getSettings()).reviews.googleReviewUrl.trim();
   const googleOption = googleUrl
     ? ` Or if you'd rather, you can <a href="${escapeHtml(googleUrl)}" style="color:#43bccd">review me on Google</a>.`
     : "";
+  // A customer who has already reviewed on the site gets thanked and asked for
+  // Google alone, rather than for a second site review.
   const reviewLine =
-    reviewUrl && !isQuote
-      ? `<p style="margin:24px 0 0;font-size:14px;color:#555">If you've got a moment, I'd love to hear how it went - you can <a href="${escapeHtml(reviewUrl)}" style="color:#43bccd">leave a quick review here</a>. It's anonymous if you'd prefer.${googleOption}</p>`
-      : "";
+    !reviewUrl || isQuote
+      ? ""
+      : googleOnly
+        ? `<p style="margin:24px 0 0;font-size:14px;color:#555">Thanks again for your review on my website. If you haven't already and you've got a moment, a <a href="${escapeHtml(reviewUrl)}" style="color:#43bccd">review on Google</a> would help other people find me too.</p>`
+        : `<p style="margin:24px 0 0;font-size:14px;color:#555">If you've got a moment, I'd love to hear how it went - you can <a href="${escapeHtml(reviewUrl)}" style="color:#43bccd">leave a quick review here</a>. It's anonymous if you'd prefer.${googleOption}</p>`;
 
   // Quote emails swap the due line for validity and drop the bank block -
   // payment details come with the invoice after acceptance.
@@ -141,6 +157,7 @@ export async function buildInvoiceEmail({
     <div style="margin:0 0 16px;padding:12px 16px;background:#f3f4f6;border-radius:8px;font-size:14px;color:#333">
       <p style="margin:0 0 4px"><strong>${isQuote ? "Quote" : "Invoice"}:</strong> ${safeNumber}</p>
       <p style="margin:0 0 4px"><strong>Total:</strong> ${totalLabel}</p>
+      ${prepaidLines}
       ${dateLine}
     </div>
 
@@ -162,6 +179,8 @@ interface SendInvoiceEmailArgs {
   invoice: InvoiceEmailData;
   pdfBytes: Uint8Array;
   reviewUrl: string | null;
+  /** The customer has already reviewed on the site, so `reviewUrl` is the Google link. */
+  googleOnly?: boolean;
   greetingName?: string;
   customBody?: string;
 }
@@ -173,6 +192,7 @@ interface SendInvoiceEmailArgs {
  * @param args.invoice - Invoice row fields needed for the body.
  * @param args.pdfBytes - Raw PDF bytes returned by `generateInvoicePdf`.
  * @param args.reviewUrl - Stable per-contact review URL, or null to omit the review line.
+ * @param args.googleOnly - True when `reviewUrl` is the Google link for a customer who has reviewed on the site.
  * @param args.greetingName - Optional greeting target (forwarded to {@link buildInvoiceEmail}).
  * @param args.customBody - Optional intro replacement.
  * @returns True if the email was accepted by Resend, false on failure or misconfig.
@@ -181,6 +201,7 @@ export async function sendInvoiceEmail({
   invoice,
   pdfBytes,
   reviewUrl,
+  googleOnly,
   greetingName,
   customBody,
 }: SendInvoiceEmailArgs): Promise<boolean> {
@@ -199,6 +220,7 @@ export async function sendInvoiceEmail({
   const { subject, html } = await buildInvoiceEmail({
     invoice,
     reviewUrl,
+    googleOnly,
     greetingName,
     customBody,
   });
@@ -268,7 +290,8 @@ export async function sendInvoiceReminderEmail({
   const greeting = escapeHtml(defaultGreetingFor(invoice));
   const safeNumber = escapeHtml(invoice.number);
   const dueDate = escapeHtml(formatDateShort(invoice.dueDate));
-  const totalLabel = escapeHtml(formatNZD(invoice.total));
+  // A part-paid invoice is chased for the balance, not the full price.
+  const totalLabel = escapeHtml(formatNZD(balanceDue(invoice)));
   const closing =
     reminderNumber >= comms.invoiceReminderMaxCount
       ? "This is the last automatic reminder I'll send. If something's holding payment up, just reply and we'll sort it out."
@@ -367,7 +390,8 @@ export async function sendPaymentApologyEmail({
   const safeNumber = escapeHtml(invoice.number);
   const remindedOn = escapeHtml(formatDateShort(reminderSentAt));
   const paidOn = escapeHtml(formatDateShort(paidAt));
-  const totalLabel = escapeHtml(formatNZD(invoice.total));
+  // The payment that came through, which on a part-paid invoice is the balance.
+  const totalLabel = escapeHtml(formatNZD(balanceDue(invoice)));
 
   const subject = `Sorry - invoice ${invoice.number} was already paid`;
   const html = renderDocumentEmail(`

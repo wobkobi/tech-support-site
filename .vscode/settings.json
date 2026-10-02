@@ -21,6 +21,11 @@
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
+  // The schema uses `prisma format` output; the Prisma extension runs the same
+  // formatter on save.
+  "[prisma]": {
+    "editor.defaultFormatter": "Prisma.prisma"
+  },
   // Optional: don't let ESLint act as a formatter
   "eslint.format.enable": false,
   "js/ts.tsdk.path": "node_modules\\typescript\\lib",

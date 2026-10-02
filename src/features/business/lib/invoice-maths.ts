@@ -68,6 +68,20 @@ export function calcInvoiceTotals(
 }
 
 /**
+ * What the client still owes after money handed over on the day. The invoice total
+ * stays the full price of the job; this is the figure the invoice asks for, the bank
+ * details quote and a payment is matched against.
+ * @param invoice - Invoice total and the amount already paid, if any.
+ * @param invoice.total - Full invoice total.
+ * @param invoice.alreadyPaid - Amount paid before the invoice went out, or null.
+ * @returns The balance, never below 0, rounded to cents.
+ */
+export function balanceDue(invoice: { total: number; alreadyPaid?: number | null }): number {
+  const paid = invoice.alreadyPaid ?? 0;
+  return Math.max(0, Math.round((invoice.total - paid) * 100) / 100);
+}
+
+/**
  * Every key a persisted line item may carry. Must match the Prisma `LineItem`
  * composite type exactly: Prisma rejects a composite field it doesn't declare,
  * and an unguarded extra key turns that into a 500 on invoice create/update.

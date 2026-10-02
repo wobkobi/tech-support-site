@@ -1,6 +1,7 @@
 // src/app/admin/(shell)/mailing/[id]/page.tsx
 // Admin editor for one mailing-list email or preset. Loads the email, who it went
-// to (once sent), the quiet-hours window and which env vars sending still needs.
+// to (once sent), the presets for the template dropdown, the quiet-hours window and
+// which env vars sending still needs.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { parseObjectId } from "@/features/business/lib/validation";
@@ -8,6 +9,7 @@ import { CampaignEditor, type SendRow } from "@/features/mailing/components/Camp
 import { toCampaignRow } from "@/features/mailing/lib/campaign-row";
 import { canUploadImages, missingSendEnv } from "@/features/mailing/lib/context";
 import { PLACEHOLDERS } from "@/features/mailing/lib/render";
+import { BLANK_TEMPLATE, type Template } from "@/features/mailing/lib/templates";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -47,6 +49,20 @@ async function loadSends(campaignId: string): Promise<SendRow[]> {
 }
 
 /**
+ * Templates for the dropdown on a draft: blank first, then the presets oldest first
+ * so the starter set keeps its order.
+ * @returns Blank plus every preset.
+ */
+async function loadTemplates(): Promise<Template[]> {
+  const presets = await prisma.campaign.findMany({
+    where: { isPreset: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true, subject: true, preheader: true, body: true },
+  });
+  return [BLANK_TEMPLATE, ...presets.map((p) => ({ ...p, preheader: p.preheader ?? "" }))];
+}
+
+/**
  * Admin email editor page.
  * @param props - Page props.
  * @param props.params - Route params with the campaign id.
@@ -62,12 +78,14 @@ export default async function AdminMailingEditPage({
   const campaign = id ? await prisma.campaign.findUnique({ where: { id } }) : null;
   if (!campaign) notFound();
 
-  const [sends, { comms }, promo] = await Promise.all([
+  const isDraft = !campaign.isPreset && campaign.status === "draft";
+  const [sends, { comms }, promo, templates] = await Promise.all([
     campaign.status === "draft" ? Promise.resolve([]) : loadSends(campaign.id),
     getSettings(),
     campaign.promoId
       ? prisma.promo.findUnique({ where: { id: campaign.promoId }, select: { title: true } })
       : Promise.resolve(null),
+    isDraft ? loadTemplates() : Promise.resolve([]),
   ]);
   const row = toCampaignRow(campaign);
 
@@ -92,6 +110,7 @@ export default async function AdminMailingEditPage({
           endHour: comms.quietHoursEnd,
         }}
         promoTitle={promo?.title ?? null}
+        templates={templates}
         adminEmail={process.env.ADMIN_EMAIL?.trim() || null}
       />
     </>

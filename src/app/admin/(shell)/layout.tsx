@@ -10,6 +10,7 @@
 // per-page checks are defence-in-depth.
 
 import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
+import { MobileQuickActions } from "@/features/admin/components/MobileQuickActions";
 import { AdminToastProvider } from "@/features/admin/components/ui/Toast";
 import { PushRegistrar } from "@/features/notifications/components/PushRegistrar";
 import type { Metadata } from "next";
@@ -43,11 +44,13 @@ export default function AdminShellLayout({
             overflow-x-clip preserves sticky descendants. Print drops the chrome. */}
         <div className="min-w-0 flex-1 bg-slate-50 lg:ml-56 print:ml-0 print:bg-white">
           {/* The root layout's skip link targets #main. */}
-          <main id="main" className="px-4 pt-16 pb-8 sm:px-6 sm:pt-8 lg:pt-8 print:p-0">
+          {/* pb-28 below lg keeps the end of every page clear of the + button. */}
+          <main id="main" className="px-4 pt-16 pb-28 sm:px-6 sm:pt-8 lg:pt-8 lg:pb-8 print:p-0">
             {children}
           </main>
         </div>
       </div>
+      <MobileQuickActions />
     </AdminToastProvider>
   );
 }

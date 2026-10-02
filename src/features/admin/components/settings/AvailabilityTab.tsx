@@ -152,7 +152,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       </div>
 
       {/* Weekly hours */}
-      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Weekly hours
       </h3>
       <p className="mt-1 text-sm text-admin-muted">
@@ -163,7 +163,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
         {DAY_ORDER.map(({ index, name }) => {
           const d = draft.schedule[index];
           return (
-            <div key={index} className="rounded-lg border border-admin-border p-3">
+            <div key={index} className="rounded-lg border border-admin-border px-3 py-2">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="w-24 text-sm font-semibold text-admin-text">{name}</span>
                 <button
@@ -244,7 +244,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       </div>
 
       {/* Booking rules */}
-      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Booking rules
       </h3>
       <div className="divide-y divide-admin-border">
@@ -312,7 +312,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       </div>
 
       {/* Durations + daily caps */}
-      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Job lengths &amp; daily limits
       </h3>
       <div className="divide-y divide-admin-border">
@@ -366,7 +366,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       <h3
         id="morningGuards"
         tabIndex={-1}
-        className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase"
+        className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase"
       >
         Morning guards
       </h3>
@@ -376,7 +376,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       </p>
       <div className="mt-3 space-y-2">
         {draft.morningGuards.map((g, gi) => (
-          <div key={gi} className="rounded-lg border border-admin-border p-3">
+          <div key={gi} className="rounded-lg border border-admin-border px-3 py-2">
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"

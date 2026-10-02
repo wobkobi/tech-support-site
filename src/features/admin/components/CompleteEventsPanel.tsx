@@ -1,7 +1,7 @@
 "use client";
 // src/features/admin/components/CompleteEventsPanel.tsx
-// Dashboard panel listing past confirmed bookings still to be completed. Completing
-// offers both doors - with the review email or without - so neither needs a dialog.
+// Dashboard panel listing past confirmed bookings still to be completed. Completing only
+// changes the status; the review request goes out with the invoice email.
 
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import { formatDateShort } from "@/shared/lib/date-format";
@@ -52,19 +52,15 @@ export function CompleteEventsPanel({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   /**
-   * Marks a booking completed. Sending the review request is the caller's call:
-   * the row offers a button either way, which is why this list has no confirm
-   * dialog. The send itself is atomically guarded against the cron, so a
-   * completed booking can never be emailed twice.
+   * Marks a booking completed. No confirm dialog: it only changes the status.
    * @param id - Booking ID to complete.
-   * @param sendReview - Whether to send the review-request email with it.
    */
-  async function complete(id: string, sendReview: boolean): Promise<void> {
+  async function complete(id: string): Promise<void> {
     setCompleting(id);
     setErrors((prev) => ({ ...prev, [id]: "" }));
     // Toasts (success and failure alike) come from the shared hook; the inline
     // message is what keeps a failed row explaining itself after one fades.
-    const result = await actions.completeBooking(id, sendReview);
+    const result = await actions.completeBooking(id);
     setCompleting(null);
     if (!result.ok) {
       setErrors((prev) => ({ ...prev, [id]: result.error ?? "Something went wrong." }));
@@ -89,10 +85,9 @@ export function CompleteEventsPanel({
   /**
    * Wraps complete to return void for use as an event handler.
    * @param id - Booking ID.
-   * @param sendReview - Whether to send the review-request email.
    */
-  function handleComplete(id: string, sendReview: boolean): void {
-    void complete(id, sendReview);
+  function handleComplete(id: string): void {
+    void complete(id);
   }
 
   return (
@@ -107,7 +102,7 @@ export function CompleteEventsPanel({
           )}
         </h2>
         <p className="mt-0.5 text-sm text-slate-400">
-          Past confirmed bookings - complete them, with or without the review email
+          Past confirmed bookings waiting to be marked complete
         </p>
       </div>
 
@@ -135,31 +130,14 @@ export function CompleteEventsPanel({
                     <FaCheck className="h-3 w-3" aria-hidden />
                   </span>
                 ) : (
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={isRunning}
-                      onClick={() => handleComplete(b.id, b.email !== null)}
-                      className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50"
-                    >
-                      {isRunning
-                        ? "Working…"
-                        : b.email
-                          ? "Complete + send review"
-                          : "Mark complete"}
-                    </button>
-                    {/* Only worth offering where there is an email to withhold. */}
-                    {b.email && (
-                      <button
-                        type="button"
-                        disabled={isRunning}
-                        onClick={() => handleComplete(b.id, false)}
-                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
-                      >
-                        Complete only
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    disabled={isRunning}
+                    onClick={() => handleComplete(b.id)}
+                    className="shrink-0 rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50"
+                  >
+                    {isRunning ? "Working…" : "Mark complete"}
+                  </button>
                 )}
               </li>
             );

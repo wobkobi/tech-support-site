@@ -256,7 +256,6 @@ export interface TaxSettings {
 export interface CommsSettings {
   notifyConfirmation: boolean;
   notifyReminder: boolean;
-  notifyReviewRequest: boolean;
   /** Push to the operator's devices when a booking is made or rescheduled. */
   pushOnBooking: boolean;
   /** Push to the operator's devices when a customer cancels. */
@@ -265,8 +264,6 @@ export interface CommsSettings {
   pushOnReview: boolean;
   /** Send the booking reminder this many hours before the appointment. */
   reminderLeadHours: number;
-  /** Delay after a job ends before the review-request email fires (minutes). */
-  reviewEmailDelayMins: number;
   /** How long price-estimate logs are kept before auto-purge (days). */
   priceEstimateRetentionDays: number;
   /** Master switch for the overdue-invoice reminder emails. */
@@ -310,11 +307,10 @@ export interface ReviewsSettings {
   homepageFeaturedCount: number;
   /** When true, reviews verified via a booking/contact token auto-approve. */
   autoApproveVerified: boolean;
-  /** Minimum days between review-request emails to one contact. */
-  invoiceReviewCooldownDays: number;
   /**
    * Google Business Profile "write a review" link, offered alongside every site
-   * review ask. Shown to everyone regardless of what they wrote - Google bans
+   * review ask, and on its own to a customer who has already reviewed on the site.
+   * Shown to everyone regardless of what they wrote - Google bans
    * asking only happy customers. Empty string hides it.
    */
   googleReviewUrl: string;

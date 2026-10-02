@@ -217,12 +217,10 @@ export const DEFAULT_SETTINGS: Settings = {
   comms: {
     notifyConfirmation: true,
     notifyReminder: true,
-    notifyReviewRequest: true,
     pushOnBooking: true,
     pushOnCancellation: true,
     pushOnReview: true,
     reminderLeadHours: 24,
-    reviewEmailDelayMins: 30,
     priceEstimateRetentionDays: 30,
     invoiceRemindersEnabled: true,
     invoiceReminderFirstDays: 3,
@@ -249,7 +247,6 @@ export const DEFAULT_SETTINGS: Settings = {
     homepageFeaturedCount: 20,
     // false preserves today's behaviour: every review starts as pending.
     autoApproveVerified: false,
-    invoiceReviewCooldownDays: 30,
     googleReviewUrl: "https://g.page/r/CaI0P_QTKDJaEBM/review",
   },
 };

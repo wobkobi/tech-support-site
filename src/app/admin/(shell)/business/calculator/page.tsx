@@ -58,8 +58,8 @@ export default async function CalculatorPage({
   const [identity, policy, rateRows, templateRows, promo, eventPrefill] = await Promise.all([
     getIdentity(),
     getPolicy(),
-    // Full rows (ids included) - the calculator's rate panel edits by id, so
-    // the trimmed public cache from getRateRows is not enough here.
+    // Full rows (ids included) - tasks pick modifiers by id, so the trimmed
+    // public cache from getRateRows is not enough here.
     prisma.rateConfig.findMany({ orderBy: { label: "asc" } }),
     prisma.taskTemplate.findMany({ orderBy: [{ usageCount: "desc" }, { description: "asc" }] }),
     getActivePromo(),

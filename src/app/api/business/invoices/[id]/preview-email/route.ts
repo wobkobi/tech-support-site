@@ -58,12 +58,17 @@ export async function POST(
 
   // Only the URL is needed here: the client re-derives the checkbox state from
   // `eligibility` in the response.
-  const { reviewUrl } = resolveReviewInclusion(invoice, eligibility, includeReviewOverride);
+  const { reviewUrl, googleOnly } = resolveReviewInclusion(
+    invoice,
+    eligibility,
+    includeReviewOverride,
+  );
 
   const payload = await toInvoiceEmailPayload(invoice);
   const { subject, html } = await buildInvoiceEmail({
     invoice: payload,
     reviewUrl,
+    googleOnly,
     greetingName,
     customBody,
   });

@@ -6,6 +6,7 @@ import { findAdvertisablePromo } from "@/features/business/lib/promos";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { toCampaignRow } from "@/features/mailing/lib/campaign-row";
 import { PROMO_PRESET_KEY, starterPresets } from "@/features/mailing/lib/presets";
+import { BLANK_TEMPLATE } from "@/features/mailing/lib/templates";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -44,9 +45,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (body?.source === "blank") {
       const created = await prisma.campaign.create({
         data: {
-          name: asPreset ? "New preset" : "Untitled email",
-          subject: "",
-          body: "Hi {firstName},\n\n",
+          name: asPreset ? "New preset" : BLANK_TEMPLATE.name,
+          subject: BLANK_TEMPLATE.subject,
+          body: BLANK_TEMPLATE.body,
           isPreset: asPreset,
         },
       });

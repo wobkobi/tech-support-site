@@ -29,8 +29,10 @@ interface InvoiceActionsProps {
   clientName: string;
   clientEmail: string;
   status: string;
-  /** Invoice total - passed to {@link PaymentDialog}. */
-  total: number;
+  /** What the client still owes (total less any already-paid amount), for {@link PaymentDialog}. */
+  balance: number;
+  /** Whether a linked income entry records the balance payment (not the already-paid one). */
+  hasPaymentIncome: boolean;
   /** Current notes; edited in place via the "Edit notes" modal (SENT/PAID). */
   notes: string | null;
   /** First-sent stamp; drives the "Re-send" label. */
@@ -69,7 +71,8 @@ const headers = { "Content-Type": "application/json" };
  * @param props.clientName - Used in the greeting + "add to contacts" hook.
  * @param props.clientEmail - Recipient; "Send" is disabled when empty.
  * @param props.status - Current invoice status (drives which actions show).
- * @param props.total - Invoice total, passed to the payment dialog.
+ * @param props.balance - Balance due, passed to the payment dialog.
+ * @param props.hasPaymentIncome - Whether the balance payment already has an income entry.
  * @param props.notes - Current notes, edited via the notes modal (SENT/PAID).
  * @param props.sentAt - First-sent stamp; drives the Send/Re-send label.
  * @param props.paidAt - Payment stamp, passed to the payment dialog.
@@ -89,7 +92,8 @@ export function InvoiceActions({
   clientName,
   clientEmail,
   status,
-  total,
+  balance,
+  hasPaymentIncome,
   notes,
   sentAt,
   paidAt,
@@ -450,14 +454,14 @@ export function InvoiceActions({
           invoice={{
             id: invoiceId,
             number: invoiceNumber,
-            total,
+            balance,
             clientName,
             status: currentStatus,
             paidAt,
             reminderLastSentAt,
             apologySentAt,
           }}
-          hasLinkedIncome={linkedIncome.count > 0}
+          hasLinkedIncome={hasPaymentIncome}
           onClose={(recorded) => {
             setPayOpen(false);
             if (recorded) {

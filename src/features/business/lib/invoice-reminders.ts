@@ -3,6 +3,7 @@
 // the apology for a reminder that chased an already-paid invoice.
 
 import { toInvoiceEmailPayload } from "@/features/business/lib/invoice-email-request";
+import { balanceDue } from "@/features/business/lib/invoice-maths";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import {
   sendInvoiceReminderEmail,
@@ -27,6 +28,10 @@ export interface ReminderSendResult {
  * @returns Whether the send happened and which reminder number it was.
  */
 export async function sendOverdueReminder(invoice: PrismaInvoice): Promise<ReminderSendResult> {
+  // Already paid can cover the whole total before anyone marks the invoice paid; a
+  // reminder for $0.00 would chase someone who has paid in full.
+  if (balanceDue(invoice) <= 0) return { ok: false, error: "Nothing left owing - mark it paid" };
+
   // Null reads as 0 (Mongo optional-field rule).
   const reminderNumber = (invoice.reminderCount ?? 0) + 1;
 

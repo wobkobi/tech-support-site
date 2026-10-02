@@ -41,74 +41,98 @@ interface InvoiceReviewLookupArgs {
   siteUrl: string;
 }
 
+/** The contact an invoice's review link is minted for. */
+interface InvoiceReviewContact {
+  id: string;
+  token: string;
+  /** Tokens carried over from merged contacts; /api/reviews accepts them too. */
+  altReviewTokens: string[];
+}
+
 /**
- * Resolves a review URL for an invoice. Tries the contactId path first, then
- * falls back to matching the invoice's clientEmail against existing contacts.
- * Pure resolver - no policy decisions. See {@link getInvoiceReviewEligibility} for
- * the "should we actually ask this customer right now" check.
+ * Resolves the contact behind an invoice's review link. Tries the contactId path
+ * first, then falls back to matching the invoice's clientEmail against existing
+ * contacts. Pure resolver - no policy decisions. See
+ * {@link getInvoiceReviewEligibility} for which ask the email carries.
  * @param args - Lookup inputs.
  * @param args.contactId - Optional Contact id from the invoice.
  * @param args.clientEmail - Invoice's clientEmail (case-insensitive match).
- * @param args.siteUrl - Public origin to prefix the review URL with.
- * @returns Full review URL or null when no contact can be resolved.
+ * @returns The contact with its review token, or null when none can be resolved.
  */
-async function resolveInvoiceReviewUrl({
+async function resolveInvoiceReviewContact({
   contactId,
   clientEmail,
-  siteUrl,
-}: InvoiceReviewLookupArgs): Promise<string | null> {
-  if (contactId) {
-    const token = await ensureContactReviewToken(contactId);
-    if (token) return `${siteUrl}/review?token=${token}`;
-  }
+}: Omit<InvoiceReviewLookupArgs, "siteUrl">): Promise<InvoiceReviewContact | null> {
+  const select = { id: true, reviewToken: true, altReviewTokens: true } as const;
+  /**
+   * Fills in the contact's review token, minting one if it has none yet.
+   * @param match - The matched contact row.
+   * @param match.id - Contact id.
+   * @param match.reviewToken - Stored token, or null before the first invoice ask.
+   * @param match.altReviewTokens - Tokens inherited from merged contacts.
+   * @returns The resolved contact, or null if the token couldn't be minted.
+   */
+  const withToken = async (match: {
+    id: string;
+    reviewToken: string | null;
+    altReviewTokens: string[];
+  }): Promise<InvoiceReviewContact | null> => {
+    const token = match.reviewToken ?? (await ensureContactReviewToken(match.id));
+    return token ? { id: match.id, token, altReviewTokens: match.altReviewTokens } : null;
+  };
 
-  const trimmedEmail = clientEmail?.trim();
-  if (trimmedEmail) {
-    try {
-      const lowerEmail = trimmedEmail.toLowerCase();
+  try {
+    if (contactId) {
+      const match = await prisma.contact.findFirst({
+        where: { id: contactId, deletedAt: null },
+        select,
+      });
+      const resolved = match && (await withToken(match));
+      if (resolved) return resolved;
+    }
+
+    const trimmedEmail = clientEmail?.trim();
+    if (trimmedEmail) {
       const match = await prisma.contact.findFirst({
         where: {
           OR: [
             { email: { equals: trimmedEmail, mode: "insensitive" } },
-            { altEmails: { has: lowerEmail } },
+            { altEmails: { has: trimmedEmail.toLowerCase() } },
           ],
           deletedAt: null,
         },
-        select: { id: true, reviewToken: true },
+        select,
       });
-      if (match) {
-        const token = match.reviewToken ?? (await ensureContactReviewToken(match.id));
-        if (token) return `${siteUrl}/review?token=${token}`;
-      }
-    } catch (err) {
-      console.error("[resolveInvoiceReviewUrl] email lookup failed", err);
+      if (match) return await withToken(match);
     }
+  } catch (err) {
+    console.error("[resolveInvoiceReviewContact] contact lookup failed", err);
   }
 
   return null;
 }
-
 /**
  * Result of {@link getInvoiceReviewEligibility}. Drives the "Include review link"
- * checkbox state in the invoice send modal.
+ * checkbox state in the invoice send modal. `googleOnly` marks a customer who has
+ * already reviewed on the site: `reviewUrl` is then the Google link.
  */
 export type InvoiceReviewEligibility =
-  | { canSend: true; reviewUrl: string }
+  | { canSend: true; reviewUrl: string; googleOnly: boolean }
   | { canSend: false; reason: "no-contact" }
-  | { canSend: false; reason: "already-reviewed"; reviewUrl: string }
-  | {
-      canSend: false;
-      reason: "sent-recently";
-      reviewUrl: string;
-      lastSentAt: string;
-      nextAllowedAt: string;
-    };
+  | { canSend: false; reason: "already-reviewed"; reviewUrl: string };
 
 /**
- * Decides whether the invoice email should include the review link.
- * Returns `reviewUrl` even when blocked so the operator can preview it; the
- * UI gates the checkbox and the send route gates actual inclusion.
- * Verdicts: `no-contact` / `already-reviewed` / `sent-recently` / `canSend: true`.
+ * Decides which review ask the invoice email carries. Every invoice asks; only
+ * the wording changes. A customer who hasn't reviewed gets the site link (with
+ * Google offered beside it); one who has reviewed on the site is thanked and
+ * asked for Google instead (`googleOnly`). Every site reviewer gets that ask
+ * whatever they wrote, which keeps it clear of Google's ban on soliciting only
+ * happy customers.
+ *
+ * Blocked only when there is nothing to send: no contact to mint a review link
+ * for (`no-contact`), or a site reviewer with no Google link set
+ * (`already-reviewed`). Returns `reviewUrl` even then so the operator can
+ * preview it; the UI gates the checkbox and the send route gates inclusion.
  * @param args - Lookup inputs.
  * @param args.contactId - Optional Contact id from the invoice.
  * @param args.clientEmail - Invoice's clientEmail (case-insensitive).
@@ -120,103 +144,35 @@ export async function getInvoiceReviewEligibility({
   clientEmail,
   siteUrl,
 }: InvoiceReviewLookupArgs): Promise<InvoiceReviewEligibility> {
-  const reviewUrl = await resolveInvoiceReviewUrl({ contactId, clientEmail, siteUrl });
-  if (!reviewUrl) {
+  const contact = await resolveInvoiceReviewContact({ contactId, clientEmail });
+  if (!contact) {
     return { canSend: false, reason: "no-contact" };
   }
+  const reviewUrl = `${siteUrl}/review?token=${contact.token}`;
 
-  const cooldownDays = (await getSettings()).reviews.invoiceReviewCooldownDays;
-
-  // Pull the token out of the URL for the customerRef cross-check (Review
-  // rows submitted via a magic link store the token in `customerRef`).
-  const tokenFromUrl = (() => {
-    try {
-      return new URL(reviewUrl).searchParams.get("token");
-    } catch {
-      return null;
-    }
-  })();
-
-  const reviewedClauses: Array<{ contactId?: string; customerRef?: string }> = [];
-  if (contactId) reviewedClauses.push({ contactId });
-  if (tokenFromUrl) reviewedClauses.push({ customerRef: tokenFromUrl });
-
-  if (reviewedClauses.length > 0) {
-    try {
-      const existing = await prisma.review.findFirst({
-        where: { OR: reviewedClauses },
+  // A review counts whichever link it came through: linked to the contact (booking
+  // links stamp contactId), or carrying one of the contact's tokens in customerRef
+  // (including tokens inherited from a merge). Uses the resolved contact rather than
+  // the invoice's contactId, so an email-matched invoice still finds a booking review.
+  let reviewed = false;
+  try {
+    reviewed =
+      (await prisma.review.findFirst({
+        where: {
+          OR: [
+            { contactId: contact.id },
+            { customerRef: { in: [contact.token, ...contact.altReviewTokens] } },
+          ],
+        },
         select: { id: true },
-      });
-      if (existing) {
-        return { canSend: false, reason: "already-reviewed", reviewUrl };
-      }
-    } catch (err) {
-      // Soft-fail: a DB hiccup here should not block sending. The cooldown
-      // check below still protects against spam.
-      console.error("[getInvoiceReviewEligibility] reviewed lookup failed", err);
-    }
+      })) !== null;
+  } catch (err) {
+    // Soft-fail to the site ask: a DB hiccup should not drop the review line.
+    console.error("[getInvoiceReviewEligibility] reviewed lookup failed", err);
   }
+  if (!reviewed) return { canSend: true, reviewUrl, googleOnly: false };
 
-  const trimmedEmail = clientEmail?.trim();
-  if (trimmedEmail) {
-    const cooldownStart = new Date(Date.now() - cooldownDays * 24 * 60 * 60 * 1000);
-    try {
-      // Three sources of "was asked recently":
-      // - Booking.reviewSentAt (cron auto-send + admin "mark complete" + manual resend)
-      // - Contact.reviewLinkSentAt (manual "Send a review link" admin sends)
-      // - Invoice.reviewLinkSentAt (prior invoice that included the review line)
-      const [recentBooking, recentContact, recentInvoice] = await Promise.all([
-        prisma.booking.findFirst({
-          where: {
-            email: { equals: trimmedEmail, mode: "insensitive" },
-            reviewSentAt: { gte: cooldownStart },
-          },
-          select: { reviewSentAt: true },
-          orderBy: { reviewSentAt: "desc" },
-        }),
-        prisma.contact.findFirst({
-          where: {
-            OR: [
-              { email: { equals: trimmedEmail, mode: "insensitive" } },
-              { altEmails: { has: trimmedEmail.toLowerCase() } },
-            ],
-            reviewLinkSentAt: { gte: cooldownStart },
-            deletedAt: null,
-          },
-          select: { reviewLinkSentAt: true },
-          orderBy: { reviewLinkSentAt: "desc" },
-        }),
-        prisma.invoice.findFirst({
-          where: {
-            clientEmail: { equals: trimmedEmail, mode: "insensitive" },
-            reviewLinkSentAt: { gte: cooldownStart },
-          },
-          select: { reviewLinkSentAt: true },
-          orderBy: { reviewLinkSentAt: "desc" },
-        }),
-      ]);
-
-      const candidates = [
-        recentBooking?.reviewSentAt,
-        recentContact?.reviewLinkSentAt,
-        recentInvoice?.reviewLinkSentAt,
-      ].filter((d): d is Date => d instanceof Date);
-      const lastSent = candidates.sort((a, b) => b.getTime() - a.getTime())[0];
-
-      if (lastSent) {
-        const nextAllowed = new Date(lastSent.getTime() + cooldownDays * 24 * 60 * 60 * 1000);
-        return {
-          canSend: false,
-          reason: "sent-recently",
-          reviewUrl,
-          lastSentAt: lastSent.toISOString(),
-          nextAllowedAt: nextAllowed.toISOString(),
-        };
-      }
-    } catch (err) {
-      console.error("[getInvoiceReviewEligibility] cooldown lookup failed", err);
-    }
-  }
-
-  return { canSend: true, reviewUrl };
+  const googleUrl = (await getSettings()).reviews.googleReviewUrl.trim();
+  if (!googleUrl) return { canSend: false, reason: "already-reviewed", reviewUrl };
+  return { canSend: true, reviewUrl: googleUrl, googleOnly: true };
 }

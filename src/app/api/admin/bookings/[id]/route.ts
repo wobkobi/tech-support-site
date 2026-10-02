@@ -15,7 +15,6 @@ import {
   patchBookingEvent,
   SCHEDULE_CALENDAR_TAG,
 } from "@/features/calendar/lib/google-calendar";
-import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 import {
   sendCustomerBookingConfirmation,
   sendOwnerBookingNotification,
@@ -55,12 +54,6 @@ interface PatchPayload {
   cancelMode?: "operator" | "on-behalf";
   /** No-show: always charges callout + travel via the draft-invoice flow. */
   markNoShow?: boolean;
-  /**
-   * Completing only. False opts out of the review-request email; the send is
-   * skipped but reviewSentAt is still claimed, so the cron can't send it later.
-   * Defaults to true when absent.
-   */
-  sendReview?: boolean;
   /**
    * Charging paths only. False records the fee on the booking but skips drafting
    * the cancellation invoice, for a no-show the operator isn't chasing.
@@ -474,46 +467,6 @@ export async function PATCH(
     }
   }
 
-  // Atomic claim: updateMany returns count=0 if the send-review-emails cron got there
-  // first, so the two can never double-send. `isSet: false` also covers Mongo docs
-  // written before reviewSentAt existed, which have no such key at all.
-  //
-  // The claim runs even when the operator opts out, matching how the cron marks
-  // its own suppressed bookings: leaving reviewSentAt unset would just hand the
-  // booking back to the cron, which would send the email that was declined.
-  // Sending it later is still one click away on the booking detail page.
-  let reviewSent = false;
-  // Returned so a list can mirror the stamp, which lands on a skipped send too.
-  let reviewSentAt: Date | null = null;
-  if (
-    body.status === "completed" &&
-    booking.status !== "completed" &&
-    booking.email &&
-    booking.reviewToken
-  ) {
-    const stampedAt = new Date();
-    const claim = await prisma.booking.updateMany({
-      where: {
-        id,
-        OR: [{ reviewSentAt: null }, { reviewSentAt: { isSet: false } }],
-      },
-      data: { reviewSentAt: stampedAt },
-    });
-    if (claim.count > 0) reviewSentAt = stampedAt;
-
-    if (claim.count > 0 && body.sendReview !== false) {
-      // Claim won - sendCustomerReviewRequest never throws (catches its own
-      // errors and logs), so the PATCH response stays successful even if
-      // Resend has a hiccup. Trade-off: a single failed send won't auto-retry.
-      reviewSent = await sendCustomerReviewRequest({
-        id,
-        name: booking.name,
-        email: booking.email,
-        reviewToken: booking.reviewToken,
-      });
-    }
-  }
-
   // Sync contact details. Match on the primary OR any alt email, case-insensitively,
   // and skip soft-deleted contacts so an edit lands on the live contact.
   const contactEmailMatch = booking.email
@@ -551,8 +504,6 @@ export async function PATCH(
   revalidateTag(SCHEDULE_CALENDAR_TAG, {});
   return NextResponse.json({
     ok: true,
-    reviewSent,
-    ...(reviewSentAt ? { reviewSentAt: reviewSentAt.toISOString() } : {}),
     ...(timeChange ? { notified: timeChange.notify } : {}),
     ...(calendarWarning ? { calendarWarning } : {}),
   });

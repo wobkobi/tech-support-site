@@ -52,7 +52,9 @@ interface FieldShellProps {
 }
 
 /**
- * Wraps a control with its label, description, off-note, and error message.
+ * Wraps a control with its label, description, off-note, and error message. From lg up
+ * the label and notes sit in a left column beside the control, so each field takes one
+ * row instead of three and more of a tab fits on screen.
  * @param props - Component props.
  * @param props.id - Input id the label points at.
  * @param props.meta - Field metadata (title/description/unit/off).
@@ -70,35 +72,39 @@ export function FieldShell({
 }: FieldShellProps): React.ReactElement {
   const unsaved = useContext(ChangedPathsContext)?.has(id) ?? false;
   return (
-    <div className="py-4">
-      <label htmlFor={id} className="flex items-baseline justify-between gap-3">
-        <span className="text-sm font-semibold text-russian-violet">
-          {meta.title}
-          {/* One slot, escalating: what you are about to save outranks what you
+    <div className="py-3 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-x-6">
+      <div>
+        <label htmlFor={id} className="flex items-baseline justify-between gap-3">
+          <span className="text-sm font-semibold text-russian-violet">
+            {meta.title}
+            {/* One slot, escalating: what you are about to save outranks what you
               changed at some point in the past, so only the louder one shows. */}
-          {unsaved ? (
-            <span
-              className="ml-2 align-middle text-xs font-normal text-amber-600"
-              title="Changed since the last save"
-            >
-              unsaved
-            </span>
-          ) : (
-            customised && (
+            {unsaved ? (
               <span
-                className="ml-2 align-middle text-xs font-normal text-admin-faint"
-                title="Differs from the shipped default"
+                className="ml-2 align-middle text-xs font-normal text-amber-600"
+                title="Changed since the last save"
               >
-                edited
+                unsaved
               </span>
-            )
-          )}
-        </span>
-      </label>
-      <p className="mt-0.5 text-sm text-admin-muted">{meta.description}</p>
-      {meta.off && <p className="mt-0.5 text-sm text-admin-faint italic">{meta.off}</p>}
-      <div className="mt-2">{children}</div>
-      {error && <p className="mt-1 text-sm font-medium text-coquelicot-500">{error}</p>}
+            ) : (
+              customised && (
+                <span
+                  className="ml-2 align-middle text-xs font-normal text-admin-faint"
+                  title="Differs from the shipped default"
+                >
+                  edited
+                </span>
+              )
+            )}
+          </span>
+        </label>
+        <p className="mt-0.5 text-sm text-admin-muted">{meta.description}</p>
+        {meta.off && <p className="mt-0.5 text-sm text-admin-faint italic">{meta.off}</p>}
+      </div>
+      <div className="mt-2 lg:mt-0">
+        {children}
+        {error && <p className="mt-1 text-sm font-medium text-coquelicot-500">{error}</p>}
+      </div>
     </div>
   );
 }
@@ -180,7 +186,7 @@ export function NumberField({
             if (Number.isFinite(n)) onChange(n);
           }}
           className={cn(
-            "w-32 rounded-lg border px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
+            "w-32 rounded-lg border px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
             error ? "border-coquelicot-600" : "border-admin-border-strong",
           )}
         />
@@ -239,7 +245,7 @@ export function TextField({
 }: TextFieldProps): React.ReactElement {
   const [revealed, setRevealed] = useState(false);
   const inputClass = cn(
-    "w-full rounded-lg border px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
+    "w-full rounded-lg border px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
     error ? "border-coquelicot-600" : "border-admin-border-strong",
   );
   return (

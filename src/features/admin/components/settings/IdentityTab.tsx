@@ -43,7 +43,7 @@ interface Props {
  */
 function SectionHeading({ children }: { children: React.ReactNode }): React.ReactElement {
   return (
-    <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+    <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
       {children}
     </h3>
   );

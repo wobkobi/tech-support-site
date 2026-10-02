@@ -4,6 +4,8 @@
 // two), so the row stays SENT and the reminder cron would chase someone who has paid.
 // The cron uses this to hold off; the invoice page uses it to prompt for the record.
 
+import { balanceIncomeWhere } from "@/features/business/lib/invoice-already-paid";
+import { balanceDue } from "@/features/business/lib/invoice-maths";
 import { prisma } from "@/shared/lib/prisma";
 import { nzDayStartUtc } from "@/shared/lib/timezone-utils";
 
@@ -30,6 +32,10 @@ export interface PaymentMatchInput {
   clientName: string;
   total: number;
   issueDate: Date;
+  /** Money handed over before the invoice went out; the payment is the rest. */
+  alreadyPaid?: number | null;
+  /** The already-paid income entry, which is never the payment. */
+  alreadyPaidIncomeId?: string | null;
 }
 
 /**
@@ -51,7 +57,7 @@ function normaliseCustomerName(name: string): string {
  * Looks for a recorded payment against an unpaid invoice.
  *
  * Checks the linked entry first, then falls back to the pair the operator would
- * have typed into the sheet: this invoice's exact total, for the same customer,
+ * have typed into the sheet: this invoice's balance due, for the same customer,
  * dated on or after the issue date. Unlinked entries only, so a match can never
  * be another invoice's payment being counted twice.
  * @param invoice - The invoice being checked.
@@ -60,7 +66,7 @@ function normaliseCustomerName(name: string): string {
 export async function findRecordedPayment(
   invoice: PaymentMatchInput,
 ): Promise<PaymentMatch | null> {
-  const linked = await prisma.incomeEntry.findFirst({ where: { invoiceId: invoice.id } });
+  const linked = await prisma.incomeEntry.findFirst({ where: balanceIncomeWhere(invoice) });
   if (linked) {
     return {
       entryId: linked.id,
@@ -71,6 +77,7 @@ export async function findRecordedPayment(
     };
   }
 
+  const owed = balanceDue(invoice);
   const candidates = await prisma.incomeEntry.findMany({
     where: {
       // Sheet-imported rows have no invoiceId key at all, and Prisma compiles a
@@ -81,7 +88,7 @@ export async function findRecordedPayment(
       // UTC midnight while issueDate carries a time, so an invoice raised at 3pm
       // and paid that evening matched nothing and got chased as overdue.
       date: { gte: nzDayStartUtc(invoice.issueDate) },
-      amount: { gte: invoice.total - AMOUNT_TOLERANCE, lte: invoice.total + AMOUNT_TOLERANCE },
+      amount: { gte: owed - AMOUNT_TOLERANCE, lte: owed + AMOUNT_TOLERANCE },
     },
     orderBy: { date: "asc" },
   });

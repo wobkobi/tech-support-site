@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.52.1",
+  "version": "4.58.4",
   "private": true,
   "type": "module",
   "scripts": {
@@ -48,7 +48,8 @@
       "prettier --write",
       "eslint --fix --max-warnings=0 --no-warn-ignored"
     ],
-    "**/*.{css,html,json,md,mjs,yml,yaml}": "prettier --write"
+    "**/*.{css,html,json,md,mjs,yml,yaml}": "prettier --write",
+    "prisma/schema.prisma": "prisma format --schema"
   },
   "browserslist": [
     "chrome >= 93",

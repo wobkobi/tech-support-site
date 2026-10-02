@@ -1,9 +1,11 @@
 "use client";
 // src/features/business/components/calculator/JobSettingsStrip.tsx
-// Top strip of the calculator: job date, promo code entry, the form tools (clear, manage
-// rates), the holiday chip, and the resolved promo with its per-job skip toggle.
+// Top strip of the calculator: job date, promo code entry, the form tools (clear, a link
+// to the rate editor in Settings), the holiday chip, and the resolved promo with its
+// per-job skip toggle.
 
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
+import Link from "next/link";
 import type React from "react";
 
 interface Props {
@@ -14,8 +16,6 @@ interface Props {
   promoCode: string;
   onApplyPromoCode: () => void;
   onClearForm: () => void;
-  showRates: boolean;
-  onToggleRates: () => void;
   holiday: { name: string | null; uplift: number };
   activePromo: ActivePromo | null;
   skipPromo: boolean;
@@ -34,8 +34,6 @@ interface Props {
  * @param props.promoCode - The applied promo code, or "".
  * @param props.onApplyPromoCode - Applies the box text as the promo code.
  * @param props.onClearForm - Opens the clear-form confirm.
- * @param props.showRates - Whether the rate panel is open.
- * @param props.onToggleRates - Opens or closes the rate panel.
  * @param props.holiday - Holiday name + labour uplift for the job date.
  * @param props.activePromo - Promo resolved for the job date, or null.
  * @param props.skipPromo - Whether the promo is skipped for this job.
@@ -50,8 +48,6 @@ export function JobSettingsStrip({
   promoCode,
   onApplyPromoCode,
   onClearForm,
-  showRates,
-  onToggleRates,
   holiday,
   activePromo,
   skipPromo,
@@ -125,12 +121,12 @@ export function JobSettingsStrip({
           >
             Clear form
           </button>
-          <button
-            onClick={onToggleRates}
+          <Link
+            href="/admin/settings?tab=rates"
             className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
           >
-            {showRates ? "Hide rates" : "Manage rates"}
-          </button>
+            Manage rates
+          </Link>
         </div>
       </div>
 

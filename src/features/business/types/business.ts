@@ -72,6 +72,10 @@ export interface Invoice {
   paymentMethod?: string | null;
   /** Optional operator reference/note recorded with the payment. */
   paymentReference?: string | null;
+  /** Money already handed over before the invoice went out; the invoice asks for total minus this. */
+  alreadyPaid?: number | null;
+  /** How the already-paid money came in (an INCOME_METHODS value); feeds the income entry only. */
+  alreadyPaidMethod?: string | null;
   /** When the most recent overdue reminder was emailed; null = never. */
   reminderLastSentAt?: string | null;
   /** How many overdue reminders have gone out; null reads as 0 (Mongo backfill rule). */
@@ -171,13 +175,20 @@ export interface PartLine {
 }
 
 /**
- * One travel charge in the calculator. The invoice always lumps every entry
- * into a single "Travel" line; the per-entry label only appears in the
- * calculator UI to help the operator track what each amount represents.
+ * One travel charge in the calculator. Every entry except a store run lumps into a
+ * single "Round-trip travel" invoice line, and each store run gets a line of its own.
+ * The per-entry label only appears in the calculator UI to help the operator track
+ * what each amount represents.
  */
 export interface TravelEntry {
-  /** Operator-facing label (e.g. "Parking", "76 Riversdale Rd"). Not shown on the invoice. */
+  /** Operator-facing label (e.g. "Parking", "76 Riversdale Rd"); the store on a store run. Not shown on the invoice. */
   label: string;
+  /**
+   * "storeRun" marks a mid-job drive from the client's place to a store and back. It
+   * bills on its own invoice line with no minimum travel charge, and a free-travel
+   * promo doesn't cover it. Absent on every other entry.
+   */
+  kind?: "storeRun";
   /** Cost in NZD. */
   cost: number;
   /** True when this entry was created by the address lookup; lets re-lookup replace it. */
@@ -199,7 +210,7 @@ export interface JobCalculation {
   durationMins: number;
   tasks: TaskLine[];
   parts: PartLine[];
-  /** Every travel charge for this job; summed into a single "Travel" invoice line. */
+  /** Every travel charge for this job; see {@link TravelEntry} for how they reach the invoice. */
   travelEntries: TravelEntry[];
   notes: string;
   /**
@@ -227,6 +238,14 @@ export interface ParseJobResponse {
   endTime: string | null;
   /** Out-of-pocket travel disbursements stated with a dollar amount (parking, tolls, ferry) - passed through at cost. */
   travelCosts?: { label: string; cost: number }[];
+  /** Stores the operator left the client's place to visit mid-job, as the description names them. */
+  storeRuns?: string[];
+  /** Each store run the route could time, client > store > client. */
+  storeRunTravel?: StoreRunTravel[];
+  /** True when the description says the client paid in cash. */
+  paidCash?: boolean;
+  /** Cash amount the description states, or null when it names cash without one. */
+  cashPaid?: number | null;
   tasks: ParsedTaskLine[];
   parts: ParsedPartLine[];
   notes: string;
@@ -238,6 +257,18 @@ export interface ParseJobResponse {
   travel?: TravelInfo;
   /** Operator-stated time ranges (one per HH:MM-HH:MM segment). Empty when no ranges detected. */
   ranges?: ParsedRange[];
+}
+
+/** A store run timed by the parse route: the client's place > the store > back. */
+export interface StoreRunTravel {
+  /** The store as the description named it. */
+  store: string;
+  /** Drive minutes from the client to the store. */
+  durationMinsThere: number;
+  /** Drive minutes from the store back to the client. */
+  durationMinsBack: number;
+  /** One-way km, client to store. */
+  distanceKm: number;
 }
 
 /** One time range pulled out of the operator's free-text input. */

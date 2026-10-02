@@ -14,7 +14,7 @@ import { useToast } from "@/features/admin/components/ui/Toast";
 import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
 import { InvoiceStatusBadge } from "@/features/business/components/invoice/InvoiceStatusBadge";
 import { PaymentDialog } from "@/features/business/components/invoice/PaymentDialog";
-import { formatNZD } from "@/features/business/lib/business";
+import { balanceDue, formatNZD } from "@/features/business/lib/business";
 import {
   deriveInvoiceDisplayStatus,
   isInvoiceOverdue,
@@ -274,9 +274,10 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
         continue;
       }
       if (inv.status === "SENT") {
-        outstanding += inv.total;
+        // Money handed over on the day is already in, so only the balance is outstanding.
+        outstanding += balanceDue(inv);
         if (isInvoiceOverdue(inv, now)) {
-          overdue += inv.total;
+          overdue += balanceDue(inv);
           overdueCount += 1;
         }
       }
@@ -763,7 +764,7 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
           invoice={{
             id: payTarget.id,
             number: payTarget.number,
-            total: payTarget.total,
+            balance: balanceDue(payTarget),
             clientName: payTarget.clientName,
             status: payTarget.status,
             paidAt: payTarget.paidAt,

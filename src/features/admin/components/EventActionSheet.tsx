@@ -72,9 +72,7 @@ export function EventActionSheet({
   // calling an impure function during render.
   const [renderedAt] = useState(() => Date.now());
   const [pending, setPending] = useState<PendingAction | null>(null);
-  // Both ticked by default: sending the review request is the normal way to
-  // finish a job, and a no-show is normally chased for the call-out fee.
-  const [sendReview, setSendReview] = useState(true);
+  // Ticked by default: a no-show is normally chased for the call-out fee.
   const [draftInvoice, setDraftInvoice] = useState(true);
 
   const panelRef = useRef<HTMLDivElement>(null);
@@ -121,9 +119,8 @@ export function EventActionSheet({
     }
   }
 
-  /** Confirms completing the booking, with the review email as an opt-out. */
+  /** Confirms completing the booking. */
   function handleComplete(): void {
-    setSendReview(true);
     setPending({
       title: "Mark this booking completed?",
       confirmLabel: "Mark completed",
@@ -178,16 +175,10 @@ export function EventActionSheet({
   }
 
   // Rendered from live state rather than stored on `pending`, so a stored
-  // element can't freeze the tick. The sheet has no reviewSentAt to go on, so
-  // the box always shows; a booking already emailed just ignores it server-side.
+  // element can't freeze the tick.
   const confirmBody =
     pending?.target.kind === "complete" ? (
-      <AdminCheckbox
-        checked={sendReview}
-        onChange={setSendReview}
-        disabled={busy}
-        label="Send the review-request email"
-      />
+      "This only changes the status. The review request goes out with the invoice."
     ) : pending?.target.kind === "no-show" ? (
       <div className="flex flex-col gap-2">
         <p>The call-out fee plus round-trip travel is charged for a no-show.</p>
@@ -356,7 +347,7 @@ export function EventActionSheet({
             if (!target) return;
             void act(() => {
               if (target.kind === "complete") {
-                return actions.completeBooking(booking.id, sendReview);
+                return actions.completeBooking(booking.id);
               }
               if (target.kind === "cancel") return actions.cancelBooking(booking.id, target.mode);
               if (target.kind === "no-show") return actions.markNoShow(booking.id, draftInvoice);
