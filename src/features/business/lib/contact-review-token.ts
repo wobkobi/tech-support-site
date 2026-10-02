@@ -41,48 +41,72 @@ interface InvoiceReviewLookupArgs {
   siteUrl: string;
 }
 
+/** The contact an invoice's review link is minted for. */
+interface InvoiceReviewContact {
+  id: string;
+  token: string;
+  /** Tokens carried over from merged contacts; /api/reviews accepts them too. */
+  altReviewTokens: string[];
+}
+
 /**
- * Resolves a review URL for an invoice. Tries the contactId path first, then
- * falls back to matching the invoice's clientEmail against existing contacts.
- * Pure resolver - no policy decisions. See {@link getInvoiceReviewEligibility} for
- * the "should we actually ask this customer right now" check.
+ * Resolves the contact behind an invoice's review link. Tries the contactId path
+ * first, then falls back to matching the invoice's clientEmail against existing
+ * contacts. Pure resolver - no policy decisions. See
+ * {@link getInvoiceReviewEligibility} for which ask the email carries.
  * @param args - Lookup inputs.
  * @param args.contactId - Optional Contact id from the invoice.
  * @param args.clientEmail - Invoice's clientEmail (case-insensitive match).
- * @param args.siteUrl - Public origin to prefix the review URL with.
- * @returns Full review URL or null when no contact can be resolved.
+ * @returns The contact with its review token, or null when none can be resolved.
  */
-async function resolveInvoiceReviewUrl({
+async function resolveInvoiceReviewContact({
   contactId,
   clientEmail,
-  siteUrl,
-}: InvoiceReviewLookupArgs): Promise<string | null> {
-  if (contactId) {
-    const token = await ensureContactReviewToken(contactId);
-    if (token) return `${siteUrl}/review?token=${token}`;
-  }
+}: Omit<InvoiceReviewLookupArgs, "siteUrl">): Promise<InvoiceReviewContact | null> {
+  const select = { id: true, reviewToken: true, altReviewTokens: true } as const;
+  /**
+   * Fills in the contact's review token, minting one if it has none yet.
+   * @param match - The matched contact row.
+   * @param match.id - Contact id.
+   * @param match.reviewToken - Stored token, or null before the first invoice ask.
+   * @param match.altReviewTokens - Tokens inherited from merged contacts.
+   * @returns The resolved contact, or null if the token couldn't be minted.
+   */
+  const withToken = async (match: {
+    id: string;
+    reviewToken: string | null;
+    altReviewTokens: string[];
+  }): Promise<InvoiceReviewContact | null> => {
+    const token = match.reviewToken ?? (await ensureContactReviewToken(match.id));
+    return token ? { id: match.id, token, altReviewTokens: match.altReviewTokens } : null;
+  };
 
-  const trimmedEmail = clientEmail?.trim();
-  if (trimmedEmail) {
-    try {
-      const lowerEmail = trimmedEmail.toLowerCase();
+  try {
+    if (contactId) {
+      const match = await prisma.contact.findFirst({
+        where: { id: contactId, deletedAt: null },
+        select,
+      });
+      const resolved = match && (await withToken(match));
+      if (resolved) return resolved;
+    }
+
+    const trimmedEmail = clientEmail?.trim();
+    if (trimmedEmail) {
       const match = await prisma.contact.findFirst({
         where: {
           OR: [
             { email: { equals: trimmedEmail, mode: "insensitive" } },
-            { altEmails: { has: lowerEmail } },
+            { altEmails: { has: trimmedEmail.toLowerCase() } },
           ],
           deletedAt: null,
         },
-        select: { id: true, reviewToken: true },
+        select,
       });
-      if (match) {
-        const token = match.reviewToken ?? (await ensureContactReviewToken(match.id));
-        if (token) return `${siteUrl}/review?token=${token}`;
-      }
-    } catch (err) {
-      console.error("[resolveInvoiceReviewUrl] email lookup failed", err);
+      if (match) return await withToken(match);
     }
+  } catch (err) {
+    console.error("[resolveInvoiceReviewContact] contact lookup failed", err);
   }
 
   return null;
@@ -120,37 +144,31 @@ export async function getInvoiceReviewEligibility({
   clientEmail,
   siteUrl,
 }: InvoiceReviewLookupArgs): Promise<InvoiceReviewEligibility> {
-  const reviewUrl = await resolveInvoiceReviewUrl({ contactId, clientEmail, siteUrl });
-  if (!reviewUrl) {
+  const contact = await resolveInvoiceReviewContact({ contactId, clientEmail });
+  if (!contact) {
     return { canSend: false, reason: "no-contact" };
   }
+  const reviewUrl = `${siteUrl}/review?token=${contact.token}`;
 
-  // Pull the token out of the URL for the customerRef cross-check (Review
-  // rows submitted via a magic link store the token in `customerRef`).
-  const tokenFromUrl = (() => {
-    try {
-      return new URL(reviewUrl).searchParams.get("token");
-    } catch {
-      return null;
-    }
-  })();
-
-  const reviewedClauses: Array<{ contactId?: string; customerRef?: string }> = [];
-  if (contactId) reviewedClauses.push({ contactId });
-  if (tokenFromUrl) reviewedClauses.push({ customerRef: tokenFromUrl });
-
+  // A review counts whichever link it came through: linked to the contact (booking
+  // links stamp contactId), or carrying one of the contact's tokens in customerRef
+  // (including tokens inherited from a merge). Uses the resolved contact rather than
+  // the invoice's contactId, so an email-matched invoice still finds a booking review.
   let reviewed = false;
-  if (reviewedClauses.length > 0) {
-    try {
-      reviewed =
-        (await prisma.review.findFirst({
-          where: { OR: reviewedClauses },
-          select: { id: true },
-        })) !== null;
-    } catch (err) {
-      // Soft-fail to the site ask: a DB hiccup should not drop the review line.
-      console.error("[getInvoiceReviewEligibility] reviewed lookup failed", err);
-    }
+  try {
+    reviewed =
+      (await prisma.review.findFirst({
+        where: {
+          OR: [
+            { contactId: contact.id },
+            { customerRef: { in: [contact.token, ...contact.altReviewTokens] } },
+          ],
+        },
+        select: { id: true },
+      })) !== null;
+  } catch (err) {
+    // Soft-fail to the site ask: a DB hiccup should not drop the review line.
+    console.error("[getInvoiceReviewEligibility] reviewed lookup failed", err);
   }
   if (!reviewed) return { canSend: true, reviewUrl, googleOnly: false };
 

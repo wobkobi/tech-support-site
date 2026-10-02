@@ -23,7 +23,7 @@ interface Props {
   /** Fired when a Places suggestion is picked (full formatted address). */
   onAddressSelected: (formattedAddress: string) => void;
   travelEntries: TravelEntry[];
-  onTravelEntriesChange: (entries: TravelEntry[]) => void;
+  onTravelEntriesChange: React.Dispatch<React.SetStateAction<TravelEntry[]>>;
   lookingUpTravel: boolean;
   onLookup: () => void;
   /** Travel-rate $/hr from the pricing settings; used for the operator-side breakdown. */
@@ -101,7 +101,15 @@ export function TravelSection({
       toast(result.error, { tone: "error", duration: 8000 });
       return;
     }
-    patchEntry(index, { ...result.entry, isParsedCost: false });
+    // Apply to the latest entries, not this render's snapshot: the operator may have
+    // edited, added or removed rows during the lookup. Drop the result if this row no
+    // longer holds the store that was looked up.
+    const looked = entry.label;
+    onTravelEntriesChange((current) =>
+      current[index]?.kind === "storeRun" && current[index].label === looked
+        ? current.map((e, i) => (i === index ? { ...e, ...result.entry, isParsedCost: false } : e))
+        : current,
+    );
   }
 
   /**

@@ -96,9 +96,8 @@ export async function POST(
     return errorResponse("Email send failed", 502);
   }
 
-  // Stamp reviewLinkSentAt only when the review line actually went out - the review
-  // cron skips customers an invoice has already asked, so a send with the toggle off
-  // must leave the last real timestamp standing. Status only ever moves DRAFT > SENT; a
+  // Stamp reviewLinkSentAt only when the review line actually went out, so a send with
+  // the toggle off leaves the last real timestamp standing. Status only ever moves DRAFT > SENT; a
   // re-sent SENT or PAID invoice (a receipt copy) must not regress.
   const updated = await prisma.invoice.update({
     where: { id },

@@ -521,7 +521,8 @@ model Invoice {
   // on DD MMM" on the detail page. Null on pre-VOIDED-feature rows and on
   // any invoice that was never voided.
   voidedAt             DateTime?
-  // Stamped when send-email included the review link; powers the 30-day cooldown.
+  // Stamped when send-email included the review link. One of the three "asked for a
+  // review" stamps the admin reviews page reads.
   reviewLinkSentAt     DateTime?
   // Stamped when send-email promotes DRAFT>SENT - a real timestamp, unlike the
   // updatedAt proxy the route returned before. Null on legacy SENT rows.
