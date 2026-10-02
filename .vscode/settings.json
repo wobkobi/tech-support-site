@@ -21,10 +21,10 @@
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  // The Prisma formatter aligns a whole model to its widest field, across comment
-  // breaks; the schema keeps each comment-separated group aligned on its own.
+  // The schema uses `prisma format` output; the Prisma extension runs the same
+  // formatter on save.
   "[prisma]": {
-    "editor.formatOnSave": false
+    "editor.defaultFormatter": "Prisma.prisma"
   },
   // Optional: don't let ESLint act as a formatter
   "eslint.format.enable": false,
