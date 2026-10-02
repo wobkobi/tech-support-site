@@ -112,6 +112,36 @@ export function travelEntriesTotal(entries: TravelEntry[]): number {
   return Math.round(entries.reduce((s, e) => s + (e.cost || 0), 0) * 100) / 100;
 }
 
+/** A job's travel split the way the invoice bills it. */
+export interface TravelSplit {
+  /** The trip to the client plus disbursements (parking, tolls), after the minimum charge. */
+  tripTotal: number;
+  /** Store runs with a cost, each billed on its own line. */
+  storeRuns: TravelEntry[];
+  /** tripTotal plus every store run. */
+  total: number;
+}
+
+/**
+ * Splits a job's travel into the trip to the client and any store runs. The minimum
+ * travel charge lifts only the trip, and only when it has a looked-up drive, so
+ * manual-only entries like parking never trigger it. Store runs bill as priced, with no
+ * minimum, so a $0 run adds nothing.
+ * @param entries - Travel entries from the calculator (may be empty).
+ * @param minTravelCharge - Live minimum travel charge.
+ * @returns The trip total, the store runs, and the combined total.
+ */
+export function splitTravel(entries: TravelEntry[], minTravelCharge: number): TravelSplit {
+  const storeRuns = entries.filter((e) => e.kind === "storeRun" && e.cost > 0);
+  const trip = entries.filter((e) => e.kind !== "storeRun");
+  const rawTrip = travelEntriesTotal(trip);
+  const hasAutoEntry = trip.some((e) => e.isAuto && e.cost > 0);
+  const tripTotal =
+    hasAutoEntry && rawTrip > 0 && rawTrip < minTravelCharge ? minTravelCharge : rawTrip;
+  const total = Math.round((tripTotal + travelEntriesTotal(storeRuns)) * 100) / 100;
+  return { tripTotal, storeRuns, total };
+}
+
 /**
  * Delivery-channel modifier labels, lower-cased. A task has exactly one channel
  * - the work happened at the client's place, at the operator's, over a screen
@@ -216,14 +246,8 @@ export function jobToLineItems(
     });
   }
 
-  // Auto entries trigger the floor; manual-only entries (parking, etc.) don't.
-  const rawTravelTotal = travelEntriesTotal(job.travelEntries);
-  const hasAutoEntry = job.travelEntries.some((e) => e.isAuto && e.cost > 0);
-  const travelTotal =
-    hasAutoEntry && rawTravelTotal > 0 && rawTravelTotal < minTravelCharge
-      ? minTravelCharge
-      : rawTravelTotal;
-  if (travelTotal > 0) {
+  const { tripTotal, storeRuns } = splitTravel(job.travelEntries, minTravelCharge);
+  if (tripTotal > 0) {
     // Drive minutes across auto entries (back leg falls back to outbound on
     // legacy drafts) so the line reads "Round-trip travel (46 min drive)".
     const driveMins = job.travelEntries.reduce((sum, e) => {
@@ -234,8 +258,17 @@ export function jobToLineItems(
       description:
         driveMins > 0 ? `Round-trip travel (${driveMins} min drive)` : "Round-trip travel",
       qty: 1,
-      unitPrice: travelTotal,
-      lineTotal: travelTotal,
+      unitPrice: tripTotal,
+      lineTotal: tripTotal,
+    });
+  }
+  for (const run of storeRuns) {
+    const runMins = (run.durationMinsOneWay ?? 0) + (run.durationMinsBack ?? 0);
+    items.push({
+      description: runMins > 0 ? `Store run (${runMins} min drive)` : "Store run",
+      qty: 1,
+      unitPrice: run.cost,
+      lineTotal: run.cost,
     });
   }
 
@@ -425,13 +458,7 @@ export function calcJobTotal(
   // a job whose invoice then read $75.84.
   const tasksTotal = job.tasks.reduce((s, t) => s + Math.round(t.qty * t.unitPrice * 100) / 100, 0);
   const partsTotal = job.parts.reduce((s, p) => s + p.cost, 0);
-  const rawTravelTotal = travelEntriesTotal(job.travelEntries);
-  // Auto entries trigger the floor; manual-only entries (parking, etc.) don't.
-  const hasAutoEntry = job.travelEntries.some((e) => e.isAuto && e.cost > 0);
-  const travelTotal =
-    hasAutoEntry && rawTravelTotal > 0 && rawTravelTotal < pricing.minTravelCharge
-      ? pricing.minTravelCharge
-      : rawTravelTotal;
+  const { tripTotal, total: travelTotal } = splitTravel(job.travelEntries, pricing.minTravelCharge);
   // Public-holiday surcharge uplifts labour only (hourly task lines), never
   // travel or parts. 0 when the job date isn't a holiday.
   const holidayUplift = pricing.holidayUplift ?? 0;
@@ -448,7 +475,8 @@ export function calcJobTotal(
   const promoDiscount = computeJobPromoDiscount(
     job,
     promo,
-    travelTotal,
+    // A free-travel promo covers getting to the client, not a store run.
+    tripTotal,
     pricing.businessModifierId,
     // The subtotal above is exactly the pre-discount total a spend threshold and
     // a tier band are judged against.

@@ -1,7 +1,8 @@
 "use client";
 // src/features/business/hooks/use-calculator-save.ts
 // Save paths for the job calculator: invoice / save & send / quote via the invoices API
-// (with the add-to-contacts gate and contactId backfill), and the cash income entry.
+// (with the add-to-contacts gate and contactId backfill), marking a paid-in-cash invoice
+// paid, and the direct income entry.
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { validateEmail } from "@/features/booking/lib/booking";
@@ -24,6 +25,9 @@ import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
 
+/** The income method a cash job records under. */
+const CASH: (typeof INCOME_METHODS)[number] = "Cash";
+
 /** Calculator state the save paths read. */
 interface UseCalculatorSaveArgs {
   /** The assembled job (tasks, parts, travel, notes, client). */
@@ -42,6 +46,8 @@ interface UseCalculatorSaveArgs {
   pickedContactGoogleId: string | null;
   /** Job date the income entry is recorded against. */
   jobDate: string;
+  /** "Paid in cash" ticked: an invoice saves as paid, an income entry records Cash. */
+  paidCash: boolean;
   setTaskTemplates: React.Dispatch<React.SetStateAction<TaskTemplate[]>>;
   /** Called after a successful income save to reset the form. */
   onIncomeSaved: () => void;
@@ -80,6 +86,7 @@ interface UseCalculatorSave {
  * @param args.eventPrefill - Schedule-event prefill, or null.
  * @param args.pickedContactGoogleId - Google id of the picked contact, or null.
  * @param args.jobDate - Job date for the income entry.
+ * @param args.paidCash - Whether the client paid in cash on the day.
  * @param args.setTaskTemplates - Task template setter, refreshed as templates save.
  * @param args.onIncomeSaved - Resets the form after an income save.
  * @returns Save state plus the save handlers.
@@ -94,6 +101,7 @@ export function useCalculatorSave({
   eventPrefill,
   pickedContactGoogleId,
   jobDate,
+  paidCash,
   setTaskTemplates,
   onIncomeSaved,
 }: UseCalculatorSaveArgs): UseCalculatorSave {
@@ -208,6 +216,38 @@ export function useCalculatorSave({
     router.push(`/admin/business/invoices/${invoiceId}`);
   }
 
+  /**
+   * Marks a just-saved invoice paid in cash on the job date, through the same route as
+   * the Payment dialog, which also records the income. A failure leaves the invoice
+   * saved and unpaid, so the operator is told to finish it from the invoice page.
+   * @param invoiceId - The saved invoice.
+   */
+  async function markPaidInCash(invoiceId: string): Promise<void> {
+    try {
+      const res = await fetch(`/api/business/invoices/${invoiceId}/pay`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          paidAt: jobDate,
+          method: CASH,
+          createIncome: true,
+          sendApology: false,
+        }),
+      });
+      const d = (await res.json()) as { ok?: boolean; sheetWarning?: boolean };
+      if (!res.ok || !d.ok) throw new Error("pay failed");
+      if (d.sheetWarning) {
+        toast("Marked paid, but the Cashbook sheet update didn't go through.", {
+          tone: "warning",
+        });
+      }
+    } catch {
+      toast("Invoice saved, but it couldn't be marked paid. Mark it paid from the invoice page.", {
+        tone: "warning",
+      });
+    }
+  }
+
   /** Clears save errors and in-flight bookkeeping for a fresh form. */
   function resetSaveState(): void {
     // Stale save errors would otherwise sit above the buttons on a blank form.
@@ -319,6 +359,9 @@ export function useCalculatorSave({
         );
       }
       const invoiceId = d.invoice.id;
+      // Before the contacts gate, which can stop here to wait on its modal. A quote
+      // can't be paid.
+      if (paidCash && !quote) await markPaidInCash(invoiceId);
       // Add-to-contacts gate: defer nav until the modal closes so
       // handleAddContactClose can backfill contactId via PATCH. "Save & send"
       // skips this - the detail send flow runs its own add-to-contacts hook-in.
@@ -392,9 +435,9 @@ export function useCalculatorSave({
           customer: clientName || "Walk-in",
           description: buildIncomeDescription(job),
           amount: totals.total,
-          // Not a literal: this is income, and "Business Account" is an expense
+          // Not a bare literal: this is income, and "Business Account" is an expense
           // method that INCOME_METHODS does not contain.
-          method: INCOME_METHODS[0],
+          method: paidCash ? CASH : INCOME_METHODS[0],
         }),
       });
       const d = (await res.json()) as {

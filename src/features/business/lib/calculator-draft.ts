@@ -45,6 +45,8 @@ export interface CalculatorDraft {
   tasks: TaskLine[];
   parts: PartLine[];
   notes: string;
+  /** "Paid in cash" tick. Optional so drafts saved before it existed still load. */
+  paidCash?: boolean;
   clientName: string;
   clientEmail: string;
   pickedContactName: string | null;

@@ -10,6 +10,7 @@ import {
   timeDiffMins,
   type TaskTimingConfig,
 } from "@/features/business/lib/business";
+import { storeRunEntry } from "@/features/business/lib/calculator-helpers";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
 import { extractRanges } from "@/features/business/lib/time-parse";
 import type {
@@ -260,6 +261,29 @@ export function parsedCostEntries(result: ParseJobResponse): TravelEntry[] {
   }));
 }
 
+/**
+ * Store runs from a parse, priced at the travel rate with no minimum charge. Marked
+ * isParsedCost so a reparse replaces them, the same as parsed parking and tolls.
+ * @param result - The parse response.
+ * @param travelRatePerHour - Live travel rate.
+ * @returns One store-run entry per timed run.
+ */
+export function parsedStoreRunEntries(
+  result: ParseJobResponse,
+  travelRatePerHour: number,
+): TravelEntry[] {
+  return (result.storeRunTravel ?? []).map((r) => ({
+    ...storeRunEntry(
+      r.store,
+      r.durationMinsThere,
+      r.durationMinsBack,
+      r.distanceKm,
+      travelRatePerHour,
+    ),
+    isParsedCost: true,
+  }));
+}
+
 /** Pricing inputs {@link parsedJobToLineItems} needs. */
 export interface ParsedJobPricing {
   taskTiming?: TaskTimingConfig;
@@ -339,7 +363,10 @@ export function parsedJobToLineItems(
     pricing.minBillableMins,
   );
   const auto = parsedAutoTravel(result, pricing.travelRatePerHour, pricing.minTravelCharge);
-  const travelEntries: TravelEntry[] = parsedCostEntries(result);
+  const travelEntries: TravelEntry[] = [
+    ...parsedCostEntries(result),
+    ...parsedStoreRunEntries(result, pricing.travelRatePerHour),
+  ];
   const booked = slots.length > 0 && !result.noTravelCharge && existing.line !== null;
   const sameBookedPlace =
     auto !== null &&

@@ -1,6 +1,7 @@
 // src/features/business/lib/calculator-helpers.ts
 // Pure helpers behind the job calculator: date/time arithmetic, task-line edits that
-// recompute prices from the rate table, and the travel-time lookup for the auto entry.
+// recompute prices from the rate table, and the travel lookups for the auto entry and
+// store runs.
 
 import { effectiveHourlyRate, isChannelModifier, todayISO } from "@/features/business/lib/business";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
@@ -267,4 +268,70 @@ export async function lookupAutoTravel(input: AutoTravelLookup): Promise<TravelE
     durationMinsBack: backMins,
     distanceKmOneWay: d.distanceKm,
   };
+}
+
+/**
+ * Builds a store-run travel entry from its two drive legs, priced at the travel rate
+ * and rounded to $5 like the trip to the client, but with no minimum charge, so a short
+ * run can come to $0.
+ * @param store - The store, as named.
+ * @param thereMins - Drive minutes from the client to the store.
+ * @param backMins - Drive minutes from the store back to the client.
+ * @param distanceKm - One-way km, client to store.
+ * @param travelRatePerHour - Live travel rate.
+ * @returns The store-run entry.
+ */
+export function storeRunEntry(
+  store: string,
+  thereMins: number,
+  backMins: number,
+  distanceKm: number | undefined,
+  travelRatePerHour: number,
+): TravelEntry {
+  return {
+    label: store,
+    kind: "storeRun",
+    cost: calcTravelCharge(thereMins, backMins, travelRatePerHour, 0),
+    destination: store,
+    durationMinsOneWay: thereMins,
+    durationMinsBack: backMins,
+    distanceKmOneWay: distanceKm,
+  };
+}
+
+/**
+ * Times a store run through the admin store-run route and prices it.
+ * @param from - The client's address.
+ * @param store - The store, by name and branch or by address.
+ * @param travelRatePerHour - Live travel rate.
+ * @returns The priced entry, or an error message to show the operator.
+ */
+export async function lookupStoreRunEntry(
+  from: string,
+  store: string,
+  travelRatePerHour: number,
+): Promise<{ entry: TravelEntry } | { error: string }> {
+  try {
+    const res = await fetch("/api/business/store-run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ from, store }),
+    });
+    const d = (await res.json()) as {
+      error?: string;
+      distanceKm?: number;
+      durationMinsThere?: number;
+      durationMinsBack?: number;
+    };
+    if (!res.ok) return { error: d.error ?? "Couldn't look up the store run." };
+    if (!d.durationMinsThere || d.durationMinsThere <= 0) {
+      return { error: `Couldn't find a drive to ${store}. Try adding the suburb.` };
+    }
+    const back = d.durationMinsBack || d.durationMinsThere;
+    return {
+      entry: storeRunEntry(store, d.durationMinsThere, back, d.distanceKm, travelRatePerHour),
+    };
+  } catch {
+    return { error: "Couldn't look up the store run." };
+  }
 }

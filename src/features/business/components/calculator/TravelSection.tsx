@@ -1,17 +1,21 @@
 "use client";
 // src/features/business/components/calculator/TravelSection.tsx
 // Travel address input + per-entry cost list. Lookup populates one auto entry; operators
-// can add manual entries (parking, ferry), all lumped into a single "Travel" invoice
-// line. Auto entries show a step-by-step breakdownTravelCharge (there/back > raw >
+// can add manual entries (parking, ferry), all lumped into a single "Round-trip travel"
+// invoice line, and store runs (client > store > back mid-job), each billed on its own
+// line. Looked-up entries show a step-by-step breakdownTravelCharge (there/back > raw >
 // rounded > final).
 
+import { useToast } from "@/features/admin/components/ui/Toast";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
 import { formatNZD, travelEntriesTotal } from "@/features/business/lib/business";
+import { lookupStoreRunEntry } from "@/features/business/lib/calculator-helpers";
 import { breakdownTravelCharge } from "@/features/business/lib/pricing-policy";
 import type { TravelEntry } from "@/features/business/types/business";
 import { parseMoney } from "@/shared/lib/parse-money";
 import type React from "react";
+import { useState } from "react";
 
 interface Props {
   jobAddress: string;
@@ -30,10 +34,11 @@ interface Props {
 
 /**
  * Travel address input + per-entry travel cost list. Lookup populates a single
- * auto entry; operators can add manual entries (parking, ferry). Every entry
- * lumps into one "Travel" invoice line. Auto entries also show a step-by-step
- * breakdown (destination > there/back > raw > rounded > final) so the operator
- * can see exactly how the figure was derived.
+ * auto entry; operators can add manual entries (parking, ferry), which lump into
+ * one "Round-trip travel" invoice line, and store runs, which bill on their own
+ * lines. Looked-up entries also show a step-by-step breakdown (destination >
+ * there/back > raw > rounded > final) so the operator can see exactly how the
+ * figure was derived.
  * @param props - Component props.
  * @param props.jobAddress - Current address text.
  * @param props.onJobAddressChange - Address change handler.
@@ -57,6 +62,9 @@ export function TravelSection({
   travelRatePerHour,
   minTravelCharge,
 }: Props): React.ReactElement {
+  const { toast } = useToast();
+  // Index of the store run being looked up, or null.
+  const [lookingUpRun, setLookingUpRun] = useState<number | null>(null);
   const total = travelEntriesTotal(travelEntries);
 
   /**
@@ -71,6 +79,28 @@ export function TravelSection({
   /** Appends a blank manual entry. */
   function addEntry(): void {
     onTravelEntriesChange([...travelEntries, { label: "", cost: 0 }]);
+  }
+
+  /** Appends a blank store run, ready for the store's name. */
+  function addStoreRun(): void {
+    onTravelEntriesChange([...travelEntries, { label: "", cost: 0, kind: "storeRun" }]);
+  }
+
+  /**
+   * Times and prices the store run at `index` from the client's address.
+   * @param index - Entry index of the store run.
+   */
+  async function lookUpStoreRun(index: number): Promise<void> {
+    const entry = travelEntries[index];
+    if (!entry?.label.trim()) return;
+    setLookingUpRun(index);
+    const result = await lookupStoreRunEntry(jobAddress, entry.label.trim(), travelRatePerHour);
+    setLookingUpRun(null);
+    if ("error" in result) {
+      toast(result.error, { tone: "error" });
+      return;
+    }
+    patchEntry(index, { ...result.entry, isParsedCost: false });
   }
 
   /**
@@ -128,8 +158,9 @@ export function TravelSection({
       {travelEntries.length > 0 && (
         <div className="space-y-2">
           {travelEntries.map((entry, index) => {
+            const isRun = entry.kind === "storeRun";
             const showBreakdown =
-              entry.isAuto &&
+              (entry.isAuto || isRun) &&
               entry.destination !== undefined &&
               entry.durationMinsOneWay !== undefined &&
               entry.durationMinsOneWay > 0;
@@ -137,25 +168,73 @@ export function TravelSection({
             // Legacy drafts predate the return-leg lookup; mirror the outbound figure.
             const backMin = entry.durationMinsBack ?? oneWayMin;
             const roundTripMin = oneWayMin + backMin;
+            // The minimum travel charge covers the trip to the client, never a store run.
             const breakdown = showBreakdown
-              ? breakdownTravelCharge(oneWayMin, backMin, travelRatePerHour, minTravelCharge)
+              ? breakdownTravelCharge(
+                  oneWayMin,
+                  backMin,
+                  travelRatePerHour,
+                  isRun ? 0 : minTravelCharge,
+                )
               : null;
             return (
               <div key={index} className="space-y-1">
+                {isRun && (
+                  <p className="text-xs font-medium text-slate-500">
+                    Store run - from the client&apos;s place and back
+                  </p>
+                )}
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={entry.label}
-                    placeholder={entry.isAuto ? "Lookup" : "e.g. Parking"}
-                    onChange={(e) =>
-                      patchEntry(index, {
-                        label: e.target.value,
-                        isAuto: false,
-                        isParsedCost: false,
-                      })
+                    placeholder={
+                      isRun
+                        ? "Store, e.g. PB Tech St Lukes"
+                        : entry.isAuto
+                          ? "Lookup"
+                          : "e.g. Parking"
                     }
-                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+                    aria-label={isRun ? `Store for travel entry ${index + 1}` : undefined}
+                    onChange={(e) =>
+                      patchEntry(
+                        index,
+                        isRun
+                          ? {
+                              // A renamed store makes the looked-up drive stale.
+                              label: e.target.value,
+                              isParsedCost: false,
+                              destination: undefined,
+                              durationMinsOneWay: undefined,
+                              durationMinsBack: undefined,
+                              distanceKmOneWay: undefined,
+                            }
+                          : { label: e.target.value, isAuto: false, isParsedCost: false },
+                      )
+                    }
+                    onKeyDown={(e) => {
+                      if (isRun && e.key === "Enter") {
+                        e.preventDefault();
+                        void lookUpStoreRun(index);
+                      }
+                    }}
+                    className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
                   />
+                  {isRun && (
+                    <button
+                      type="button"
+                      onClick={() => void lookUpStoreRun(index)}
+                      disabled={lookingUpRun !== null || !entry.label.trim() || !jobAddress.trim()}
+                      title={
+                        jobAddress.trim()
+                          ? "Time the drive from the client's place to the store and back"
+                          : "Add the client's address above first"
+                      }
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      {lookingUpRun === index ? "..." : "Look up"}
+                    </button>
+                  )}
                   <div className="flex items-center">
                     <span className="rounded-l-lg border border-r-0 border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-500">
                       $
@@ -202,17 +281,21 @@ export function TravelSection({
                 {breakdown && (
                   <ul className="ml-1 space-y-0.5 rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
                     <li>
-                      <span className="text-slate-400">Destination:</span>{" "}
+                      <span className="text-slate-400">{isRun ? "Store:" : "Destination:"}</span>{" "}
                       <span className="wrap-break-word text-slate-700">{entry.destination}</span>
                     </li>
                     <li>
-                      <span className="text-slate-400">There:</span> {oneWayMin} min
+                      <span className="text-slate-400">{isRun ? "To the store:" : "There:"}</span>{" "}
+                      {oneWayMin} min
                       {entry.distanceKmOneWay !== undefined && ` (${entry.distanceKmOneWay} km)`}
                     </li>
                     <li>
                       {/* Return leg quoted at its own departure time; km shown only on
                           There - the back-leg distance is not returned by the lookup. */}
-                      <span className="text-slate-400">Back:</span> {backMin} min
+                      <span className="text-slate-400">
+                        {isRun ? "Back to the client:" : "Back:"}
+                      </span>{" "}
+                      {backMin} min
                     </li>
                     <li>
                       <span className="text-slate-400">Raw:</span> {roundTripMin} min round trip @{" "}
@@ -247,14 +330,24 @@ export function TravelSection({
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={addEntry}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-        >
-          + Add travel
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={addEntry}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          >
+            + Add travel
+          </button>
+          <button
+            type="button"
+            onClick={addStoreRun}
+            title="A drive from the client's place to a store and back during the job"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          >
+            + Store run
+          </button>
+        </div>
         {travelEntries.length > 0 && (
           <span className="text-xs text-slate-500">
             Total <span className="font-medium text-slate-700">{formatNZD(total)}</span>

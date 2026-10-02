@@ -1,8 +1,8 @@
 // src/app/api/business/parse-job/route.ts
 // Admin endpoint that turns a plain-English job description into a structured quote:
-// prompts the model, resolves task templates and rates, attaches round-trip travel, caps
-// durationMins to the wall-clock span, and rebalances task quantities. May return
-// clarification questions instead.
+// prompts the model, resolves task templates and rates, attaches round-trip travel and
+// any mid-job store runs, caps durationMins to the wall-clock span, and rebalances task
+// quantities. May return clarification questions instead.
 
 import {
   composeDescription,
@@ -16,7 +16,7 @@ import {
 } from "@/features/business/lib/prompts/parse-job";
 import { canonicalTagMap, canonicaliseTag } from "@/features/business/lib/task-taxonomy";
 import { extractRangeStats } from "@/features/business/lib/time-parse";
-import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
+import { lookupDriveRoundTrip, lookupStoreRun } from "@/features/business/lib/travel-distance";
 import type {
   ParseJobQuestion,
   ParseJobResponse,
@@ -239,6 +239,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: true, clarify: parsed.clarify });
     }
 
+    // Store runs and the cash flag are untrusted model output: short distinct store
+    // names only, and a strict boolean.
+    parsed.paidCash = parsed.paidCash === true;
+    const storeRuns: string[] = [];
+    for (const raw of Array.isArray(parsed.storeRuns) ? parsed.storeRuns : []) {
+      const store = typeof raw === "string" ? raw.trim().slice(0, 80) : "";
+      if (store && !storeRuns.some((s) => s.toLowerCase() === store.toLowerCase())) {
+        storeRuns.push(store);
+      }
+    }
+    parsed.storeRuns = storeRuns.slice(0, 3);
+    // A store run is extra to the trip to the client. A model that also made the store
+    // the destination would bill the round trip to the store instead, so drop it there
+    // and let the client's address stand in.
+    if (
+      parsed.destination &&
+      parsed.storeRuns.some((s) => s.toLowerCase() === parsed.destination?.trim().toLowerCase())
+    ) {
+      parsed.destination = null;
+    }
+
     // Booked-job descriptions rarely restate the address, so fall back to the calculator's
     // when the AI found no destination. From here every branch treats it exactly like an
     // operator-typed address; an explicit no-travel parse still wins.
@@ -296,6 +317,38 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           ...(parsed.warnings ?? []),
           `Couldn't look up the drive to ${parsed.destination}, so no travel was charged. Check the address or add travel by hand.`,
         ];
+      }
+    }
+
+    // Each store run is timed from the client's place, so it needs that address.
+    const clientPlace = parsed.destination;
+    if (parsed.storeRuns.length > 0 && !clientPlace) {
+      parsed.warnings = [
+        ...(parsed.warnings ?? []),
+        `A store run to ${parsed.storeRuns.join(" and ")} was mentioned, but there's no client address to time it from. Add the address, then the store run by hand.`,
+      ];
+    } else if (clientPlace) {
+      const lookups = await Promise.all(
+        parsed.storeRuns.map(async (store) => ({
+          store,
+          lookup: await lookupStoreRun(clientPlace, store),
+        })),
+      );
+      parsed.storeRunTravel = [];
+      for (const { store, lookup } of lookups) {
+        if (lookup.status === "ok" && lookup.data.there.durationMins > 0) {
+          parsed.storeRunTravel.push({
+            store,
+            durationMinsThere: lookup.data.there.durationMins,
+            durationMinsBack: lookup.data.back.durationMins,
+            distanceKm: lookup.data.there.distanceKm,
+          });
+        } else {
+          parsed.warnings = [
+            ...(parsed.warnings ?? []),
+            `Couldn't time the store run to ${store}, so it wasn't charged. Add it by hand with + Store run.`,
+          ];
+        }
       }
     }
 

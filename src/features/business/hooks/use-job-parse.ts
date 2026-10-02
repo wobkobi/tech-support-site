@@ -2,7 +2,7 @@
 // src/features/business/hooks/use-job-parse.ts
 // The calculator's AI parse session: the "Describe the job" text, the parse-job call
 // with its clarifying-question round, and hydration of a parse result into the
-// calculator's time, travel, tasks, parts and notes.
+// calculator's time, travel, tasks, parts, notes and the paid-in-cash tick.
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import type { JobPricing } from "@/features/business/lib/business";
@@ -13,6 +13,7 @@ import {
   hydrateParsedTasks,
   parsedAutoTravel,
   parsedCostEntries,
+  parsedStoreRunEntries,
   parsedWindow,
 } from "@/features/business/lib/parse-hydrate";
 import type {
@@ -45,6 +46,7 @@ interface UseJobParseArgs {
   setTasks: React.Dispatch<React.SetStateAction<TaskLine[]>>;
   setParts: React.Dispatch<React.SetStateAction<PartLine[]>>;
   setNotes: React.Dispatch<React.SetStateAction<string>>;
+  setPaidCash: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 /** Parse session state and handlers returned by {@link useJobParse}. */
@@ -82,6 +84,7 @@ interface UseJobParse {
  * @param args.setTasks - Task lines setter.
  * @param args.setParts - Parts setter.
  * @param args.setNotes - Notes setter.
+ * @param args.setPaidCash - "Paid in cash" setter, ticked when the description says so.
  * @returns Parse session state plus its handlers.
  */
 export function useJobParse({
@@ -96,6 +99,7 @@ export function useJobParse({
   setTasks,
   setParts,
   setNotes,
+  setPaidCash,
 }: UseJobParseArgs): UseJobParse {
   const { toast } = useToast();
   const [aiInput, setAiInput] = useState("");
@@ -122,11 +126,14 @@ export function useJobParse({
     // event times" undoes a bad guess.
     if (span.timeRanges) setTimeRanges(span.timeRanges);
 
-    // A reparse is the new truth for the auto travel entry and the parsed out-of-pocket
-    // costs (parking, tolls). Operator-typed manual entries survive it, so they don't have
-    // to be re-typed after every AI tweak.
+    // A reparse is the new truth for the auto travel entry, the parsed out-of-pocket
+    // costs (parking, tolls) and the parsed store runs. Operator-typed manual entries
+    // survive it, so they don't have to be re-typed after every AI tweak.
     setJobAddress(result.destination ?? "");
-    const parsedCosts = parsedCostEntries(result);
+    const parsedCosts = [
+      ...parsedCostEntries(result),
+      ...parsedStoreRunEntries(result, pricing.travelRatePerHour),
+    ];
     const freshAuto = parsedAutoTravel(result, pricing.travelRatePerHour, pricing.minTravelCharge);
     if (freshAuto) {
       setTravelEntries((prev) => {
@@ -171,6 +178,8 @@ export function useJobParse({
     if (fitNote) toast(fitNote, { tone: "info" });
     setParts(result.parts.map((p) => ({ description: p.description, cost: p.cost })));
     if (result.notes) setNotes(result.notes);
+    // Only ever ticks: a description that doesn't mention payment says nothing either way.
+    if (result.paidCash) setPaidCash(true);
   }
 
   /**

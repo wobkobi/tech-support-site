@@ -15,12 +15,12 @@ import { EventPickerSection } from "@/features/business/components/calculator/Ev
 import { JobDetailsSection } from "@/features/business/components/calculator/JobDetailsSection";
 import { JobSettingsStrip } from "@/features/business/components/calculator/JobSettingsStrip";
 import { PartsSection } from "@/features/business/components/calculator/PartsSection";
-import { RateConfigPanel } from "@/features/business/components/calculator/RateConfigPanel";
+
 import { SaveActions } from "@/features/business/components/calculator/SaveActions";
 import { TaskTimeWarning } from "@/features/business/components/calculator/TaskTimeWarning";
 import { TasksSection } from "@/features/business/components/calculator/TasksSection";
 import { TravelSection } from "@/features/business/components/calculator/TravelSection";
-import { useCalculatorRates } from "@/features/business/hooks/use-calculator-rates";
+
 import { useCalculatorSave } from "@/features/business/hooks/use-calculator-save";
 import { useCancelMode } from "@/features/business/hooks/use-cancel-mode";
 import { useJobContext } from "@/features/business/hooks/use-job-context";
@@ -135,19 +135,8 @@ export function CalculatorView({
   const [mountedAt] = useState(() => Date.now());
   const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null);
 
-  // Server-resolved reference data; the rate list and its panel form live in the hook.
-  const {
-    rates,
-    rateForm,
-    setRateForm,
-    editingRateId,
-    resettingRates,
-    handleStartEdit,
-    handleCancelEdit,
-    handleResetRates,
-    handleSubmitRate,
-    handleDeleteRate,
-  } = useCalculatorRates(initialRates);
+  // Server-resolved; rates are edited on the Settings > Rates tab, so a reload picks up changes.
+  const rates = initialRates;
   const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>(initialTaskTemplates);
   // Multiple time slots all lump into one billable duration. AI parse populates
   // one slot per detected HH:MM-HH:MM segment; operators can add/remove rows
@@ -187,6 +176,8 @@ export function CalculatorView({
   const [showParts, setShowParts] = useState(false);
   const [showTaxonomyModal, setShowTaxonomyModal] = useState(false);
   const [notes, setNotes] = useState("");
+  // Paid in cash on the day: invoices save as paid, income entries record Cash.
+  const [paidCash, setPaidCash] = useState(false);
   // Client, save buttons and preview. The phone total bar stands down while
   // any of it is on screen, since the real buttons and total are showing.
   const finishRef = useRef<HTMLDivElement>(null);
@@ -213,9 +204,7 @@ export function CalculatorView({
   const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(null);
   const [pickedContactGoogleId, setPickedContactGoogleId] = useState<string | null>(null);
   const [addressMode, setAddressModeState] = useState<"name" | "company" | "custom">("custom");
-  // Rate confirm dialogs (replacing window.confirm on reset / delete-rate).
-  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
-  const [confirmDeleteRateId, setConfirmDeleteRateId] = useState<string | null>(null);
+
   // Full-clear confirm: clearing also deletes the saved draft, so it can't be undone.
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
@@ -258,9 +247,6 @@ export function CalculatorView({
 
   // Contacts
   const [contacts, setContacts] = useState<GoogleContact[]>([]);
-
-  // Rate management
-  const [showRates, setShowRates] = useState(false);
 
   // Per-job promo skip flag (not persisted).
   const [skipPromo, setSkipPromo] = useState(false);
@@ -320,6 +306,7 @@ export function CalculatorView({
     setTasks,
     setParts,
     setNotes,
+    setPaidCash,
   });
 
   const {
@@ -392,6 +379,7 @@ export function CalculatorView({
       setTasks(draft.tasks ?? []);
       setParts(draft.parts ?? []);
       setNotes(draft.notes ?? "");
+      setPaidCash(draft.paidCash ?? false);
       setClientName(draft.clientName ?? "");
       setClientEmail(normaliseEmail(draft.clientEmail));
       setPickedContactName(draft.pickedContactName ?? null);
@@ -460,6 +448,7 @@ export function CalculatorView({
         tasks,
         parts,
         notes,
+        paidCash,
         clientName,
         clientEmail,
         pickedContactName,
@@ -480,6 +469,7 @@ export function CalculatorView({
     tasks,
     parts,
     notes,
+    paidCash,
     clientName,
     clientEmail,
     pickedContactName,
@@ -598,6 +588,7 @@ export function CalculatorView({
     eventPrefill,
     pickedContactGoogleId,
     jobDate,
+    paidCash,
     setTaskTemplates,
     onIncomeSaved: resetFormState,
   });
@@ -644,6 +635,7 @@ export function CalculatorView({
     setParts([]);
     setShowParts(false);
     setNotes("");
+    setPaidCash(false);
     setClientName("");
     setClientEmail("");
     setPickedContactName(null);
@@ -658,12 +650,8 @@ export function CalculatorView({
     resetCancelMode();
     // Save errors and in-flight save bookkeeping.
     resetSaveState();
-    // Transient panel/dialog state - a half-typed rate edit survives an
-    // otherwise-blank form without this.
-    setShowRates(false);
-    handleCancelEdit();
+    // Transient dialog state.
     setShowTaxonomyModal(false);
-    setConfirmDeleteRateId(null);
     clearDraft();
     // Billing a booked job: the prefill is a server prop keyed by eventId, so
     // state resets alone can't remove the banner - drop the query param and
@@ -731,32 +719,6 @@ export function CalculatorView({
       )}
 
       <ConfirmDialog
-        open={confirmResetOpen}
-        title="Reset all rates?"
-        body="This wipes every rate and reseeds the defaults (Standard, Business, At home, Remote, Phone, Public Holiday). Any custom rates you've added will be deleted."
-        confirmLabel="Reset rates"
-        tone="danger"
-        onConfirm={() => {
-          setConfirmResetOpen(false);
-          void handleResetRates();
-        }}
-        onCancel={() => setConfirmResetOpen(false)}
-      />
-
-      <ConfirmDialog
-        open={confirmDeleteRateId !== null}
-        title="Delete this rate?"
-        confirmLabel="Delete"
-        tone="danger"
-        onConfirm={() => {
-          const id = confirmDeleteRateId;
-          setConfirmDeleteRateId(null);
-          if (id) void handleDeleteRate(id);
-        }}
-        onCancel={() => setConfirmDeleteRateId(null)}
-      />
-
-      <ConfirmDialog
         open={confirmClearOpen}
         title="Clear the whole form?"
         body="Wipes the job date, times, tasks, parts, travel, client details, and the description, and deletes the saved draft. This can't be undone."
@@ -777,29 +739,12 @@ export function CalculatorView({
         promoCode={promoCode}
         onApplyPromoCode={() => setPromoCode(promoCodeInput.trim())}
         onClearForm={() => setConfirmClearOpen(true)}
-        showRates={showRates}
-        onToggleRates={() => setShowRates((p) => !p)}
+
         holiday={holiday}
         activePromo={activePromo}
         skipPromo={skipPromo}
         onSkipPromoChange={setSkipPromo}
       />
-
-      {/* Rate settings panel */}
-      {showRates && (
-        <RateConfigPanel
-          rates={rates}
-          form={rateForm}
-          onFormChange={setRateForm}
-          editingRateId={editingRateId}
-          resettingRates={resettingRates}
-          onSubmit={handleSubmitRate}
-          onStartEdit={handleStartEdit}
-          onCancelEdit={handleCancelEdit}
-          onDeleteRate={(id) => setConfirmDeleteRateId(id)}
-          onResetRates={() => setConfirmResetOpen(true)}
-        />
-      )}
 
       {/* Draft-restored banner sits above the grid so the Discard action is
           visible without scrolling on mobile, where cached values otherwise
@@ -1041,6 +986,8 @@ export function CalculatorView({
             savingIncome={savingIncome}
             parsing={parsing}
             subtotal={totals.subtotal}
+            paidCash={paidCash}
+            onPaidCashChange={setPaidCash}
             onSaveInvoice={(send, quote) => void handleSaveInvoice(send, quote)}
             onSaveIncome={() => void handleSaveIncome()}
           />
