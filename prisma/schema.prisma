@@ -94,9 +94,9 @@ model Booking {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
   // Person booking the appointment.
-  name        String
-  email       String
-  notes       String?
+  name  String
+  email String
+  notes String?
   // Optional second box on the booking form: parking, directions, access, pets. Kept
   // out of `notes`, which carries the structured metadata block parseBookingNotes reads.
   accessNotes String?
@@ -132,7 +132,7 @@ model Booking {
   activeSlotKey String? @unique
 
   // Google Calendar event ID, used to delete the event on cancellation.
-  calendarEventId        String?
+  calendarEventId String?
   // Set by the reconcile cron when this row still owns an event id that Calendar
   // no longer has: the job was called off there and the row was left behind.
   // While it is set, the reminder and review crons skip the booking rather than
@@ -141,8 +141,8 @@ model Booking {
   calendarEventMissingAt DateTime?
 
   // Review email tracking.
-  reviewSentAt       DateTime? // When the review request email was sent
-  reviewSubmittedAt  DateTime? // When the client submitted a review
+  reviewSentAt      DateTime? // When the review request email was sent
+  reviewSubmittedAt DateTime? // When the client submitted a review
   // Set when a send returned failure (Resend down/rate-limited) after reviewSentAt
   // was optimistically stamped. Lets the cron attempt one capped retry next pass.
   reviewSendFailedAt DateTime?
@@ -161,10 +161,10 @@ model Booking {
   // backwards compat with the admin UI / contacts backfill / auto-maintain
   // code paths that regex "Address: X" out of notes. Future PR migrates
   // those readers to prefer these fields and drops the notes mirror.
-  address                 String?
-  unit                    String?
-  meetingType             MeetingType?
-  duration                JobDuration?
+  address             String?
+  unit                String?
+  meetingType         MeetingType?
+  duration            JobDuration?
   // Drive times from the base address captured at booking creation via
   // lookupDriveRoundTrip - outbound quoted at startAt, return at endAt, both
   // traffic-aware. Required by the late-cancel auto-invoice travel line so
@@ -269,25 +269,25 @@ model Review {
 
 // Contacts built from booking submissions.
 model Contact {
-  id                    String          @id @default(auto()) @map("_id") @db.ObjectId
-  name                  String
-  email                 String?
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  email           String?
   // Additional email addresses this person uses (all lowercased). A booking or
   // review under any of these resolves to this one contact - the fix for people
   // who book under two emails at different times. `email` stays the primary
   // (display + send address); merges fold the other contact's emails in here.
-  altEmails             String[]        @default([])
-  phone                 String?
+  altEmails       String[]  @default([])
+  phone           String?
   // Additional phone numbers (normaliseContactPhone keys). Phone matching
   // checks primary OR alts; merges fold the losing contact's number in here
   // and the Google sync stores the union tail (Google keeps the full list).
-  altPhones             String[]        @default([])
-  address               String?
+  altPhones       String[]  @default([])
+  address         String?
   // Business this person invoices under (Google's first organisation name), so
   // an invoice addressed to "68 Ltd" is recognised as going to Michael Smith.
   // Google owns it: imports and syncs pull it (never blanking a site value), and
   // the site only pushes it when creating the Google contact.
-  company               String?
+  company         String?
   // Address review state, set at import time when the geocoder could not
   // confidently resolve the stored address. A non-empty candidate list means it
   // matched several Auckland places and the operator picks one; an empty list
@@ -295,35 +295,35 @@ model Contact {
   // written inside a call that already stamps lastSyncedAt and updatedAt to the
   // same instant - a standalone write bumps updatedAt past lastSyncedAt,
   // re-dirties the row, and re-pushes it on every sync run.
-  addressUnverified     Boolean         @default(false)
-  addressCandidates     String[]        @default([])
-  googleContactId       String? // Google People API resource name (e.g. "people/c1234567890")
+  addressUnverified Boolean  @default(false)
+  addressCandidates String[] @default([])
+  googleContactId String? // Google People API resource name (e.g. "people/c1234567890")
   // Stable per-contact review URL token. Lazy-filled by ensureContactReviewToken
   // so the same review link appears on every invoice the customer receives.
   // Not @unique because MongoDB's unique index rejects multiple null values
   // during backfill; UUID v4 collisions are vanishingly rare.
-  reviewToken           String?
+  reviewToken     String?
   // Review tokens inherited from contacts merged into this one. Old review
   // links sent under a merged-away contact keep working: the /review page,
   // submission verify, and review matcher all accept primary OR alt tokens.
-  altReviewTokens       String[]        @default([])
+  altReviewTokens String[]  @default([])
   // Bidirectional sync state: site changed iff updatedAt > lastSyncedAt,
   // Google changed iff current etag != lastGoogleEtag.
-  lastSyncedAt          DateTime?
-  lastGoogleEtag        String?
+  lastSyncedAt    DateTime?
+  lastGoogleEtag  String?
   // Review-link send tracking. Stamped by the admin "Send a review link" flow
   // (formerly stored on the per-send ReviewRequest model). The most-recent send
   // wins - we no longer track historical sends.
-  reviewLinkSentAt      DateTime?
-  reviewLinkSentMode    ReviewLinkMode?
-  reviewLinkSubmittedAt DateTime?
+  reviewLinkSentAt       DateTime?
+  reviewLinkSentMode     ReviewLinkMode?
+  reviewLinkSubmittedAt  DateTime?
   // Soft-delete marker. Set by the admin delete action; every reader (list,
   // sync, maintenance matchers, backfill) excludes rows where this is non-null.
   // Soft (not hard) delete because backfillContacts would otherwise re-create
   // the contact from its still-present booking on the next admin page load.
-  deletedAt             DateTime?
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   // Retainer arrangement (null tier = not a retainer client). Marketing tiers
   // live on /business; these fields record the AGREED deal per client. Billing
@@ -439,11 +439,11 @@ model CalendarEventCache {
 // The effective unit price for an hourly task is base.ratePerHour + sum of
 // applied modifier deltas.
 model RateConfig {
-  id           String    @id @default(auto()) @map("_id") @db.ObjectId
-  label        String
-  ratePerHour  Float?
-  flatRate     Float?
-  hourlyDelta  Float?
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  label       String
+  ratePerHour Float?
+  flatRate    Float?
+  hourlyDelta Float?
   // Percentage uplift modifier (e.g. 0.25 for Public Holiday's +25%).
   // Applied after hourlyDelta in effectiveHourlyRate so the percentage
   // acts on the post-modifier base.
@@ -482,98 +482,98 @@ type LineItem {
 }
 
 model Invoice {
-  id                   String        @id @default(auto()) @map("_id") @db.ObjectId
-  number               String        @unique
-  clientName           String
-  clientEmail          String
-  issueDate            DateTime
-  dueDate              DateTime
-  lineItems            LineItem[]
-  gst                  Boolean       @default(false)
-  subtotal             Float
-  gstAmount            Float
-  total                Float
+  id               String        @id @default(auto()) @map("_id") @db.ObjectId
+  number           String        @unique
+  clientName       String
+  clientEmail      String
+  issueDate        DateTime
+  dueDate          DateTime
+  lineItems        LineItem[]
+  gst              Boolean       @default(false)
+  subtotal         Float
+  gstAmount        Float
+  total            Float
   // Promo snapshot at creation time (kept stable if the source promo changes).
-  promoTitle           String?
-  promoDiscount        Float?
+  promoTitle       String?
+  promoDiscount    Float?
   // Half-price labour discount applied when the visit couldn't be fixed AND
   // couldn't be diagnosed (see pricing-policy.ts unsuccessfulWorkCopy).
   // Audit trail: lets the admin dashboard count how often the half-price
   // clause was invoked so a pattern of abuse is spottable.
-  unsuccessful         Boolean       @default(false)
+  unsuccessful     Boolean       @default(false)
   unsuccessfulDiscount Float?
-  status               InvoiceStatus @default(DRAFT)
-  notes                String?
-  contactId            String?       @db.ObjectId
+  status           InvoiceStatus @default(DRAFT)
+  notes            String?
+  contactId        String?       @db.ObjectId
   // Optional match back to the job this invoice bills: the Booking row and
   // the Google Calendar event (whose times the operator corrects to actual
   // on-site time after each job). Set by the calculator's event prefill flow.
-  bookingId            String?       @db.ObjectId
-  calendarEventId      String?
+  bookingId        String?       @db.ObjectId
+  calendarEventId  String?
   // Every event a merged job billed, earliest first. calendarEventId stays the
   // first of these so existing readers keep working; this is what lets the
   // other events find their way back to the invoice. Empty on single-event and
   // pre-merge invoices - readers fall back to calendarEventId.
-  calendarEventIds     String[]
-  driveFileId          String?
-  driveWebUrl          String?
+  calendarEventIds String[]
+  driveFileId      String?
+  driveWebUrl      String?
   // Stamped when status transitions to VOIDED. Audit trail + powers "Voided
   // on DD MMM" on the detail page. Null on pre-VOIDED-feature rows and on
   // any invoice that was never voided.
-  voidedAt             DateTime?
+  voidedAt         DateTime?
   // Stamped when send-email included the review link; powers the 30-day cooldown.
-  reviewLinkSentAt     DateTime?
+  reviewLinkSentAt DateTime?
   // Stamped when send-email promotes DRAFT>SENT - a real timestamp, unlike the
   // updatedAt proxy the route returned before. Null on legacy SENT rows.
-  sentAt               DateTime?
+  sentAt           DateTime?
   // Payment record, stamped by POST /pay when the invoice becomes PAID.
   // paymentMethod is an INCOME_METHODS value; paymentReference is an optional
   // operator note. Null on legacy PAID rows (the timeline degrades gracefully;
   // never approximated from updatedAt).
-  paidAt               DateTime?
-  paymentMethod        String?
-  paymentReference     String?
+  paidAt           DateTime?
+  paymentMethod    String?
+  paymentReference String?
   // Money the client handed over before the invoice went out (e.g. $47 cash on the
   // day). total stays the job's full price; the invoice shows "Already paid" under it
   // and asks for the balance. alreadyPaidMethod is an INCOME_METHODS value, used only
   // for the income entry. Null on rows without a part payment.
-  alreadyPaid          Float?
-  alreadyPaidMethod    String?
+  alreadyPaid       Float?
+  alreadyPaidMethod String?
   // The income entry that records alreadyPaid. Kept apart from the balance payment's
   // entry so the pay route and the payment matcher never mistake one for the other.
-  alreadyPaidIncomeId  String?       @db.ObjectId
+  alreadyPaidIncomeId String? @db.ObjectId
   // Overdue-reminder tracking, stamped only after Resend accepts. Nullable per
   // the Mongo no-backfill rule; readers treat null count as 0.
-  reminderLastSentAt   DateTime?
-  reminderCount        Int?
+  reminderLastSentAt DateTime?
+  reminderCount      Int?
   // Stamped when the "sorry, you'd already paid" note goes out - a reminder
   // chased a payment that had already landed because the invoice hadn't been
   // marked off yet. Set only after Resend accepts, so a failed send stays
   // retryable, and it doubles as the never-apologise-twice guard.
-  apologySentAt        DateTime?
+  apologySentAt      DateTime?
   // Quote mode: true = this row is a QUOTE (Q- number, QUOTE watermark, no
   // payment/income until converted). Convert-to-invoice allocates a real
   // invoice number, clears the flag, and restamps issue/due dates. Nullable
   // per the Mongo no-backfill rule; readers treat null as false.
-  isQuote              Boolean?
+  isQuote          Boolean?
   // Quote validity end (shown on the PDF); past this date the quote renders
   // as expired in the admin UI. Null = no stated expiry.
-  quoteValidUntil      DateTime?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  quoteValidUntil  DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   @@index([clientEmail, reviewLinkSentAt])
 }
 
 model IncomeEntry {
-  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   date        DateTime
   customer    String
   description String
   amount      Float
   method      String
   notes       String?
-  invoiceId   String?   @db.ObjectId
+  invoiceId   String?  @db.ObjectId
   // Stable identifier shared with the corresponding row in the per-FY Google Sheet
   // (Cashbook tab, hidden column Z). Set when the entry is first written to a sheet
   // or backfilled by the import. Used for upsert-by-id sync in both directions.
@@ -590,7 +590,7 @@ model IncomeEntry {
 }
 
 model ExpenseEntry {
-  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   date        DateTime
   supplier    String
   description String
@@ -599,7 +599,7 @@ model ExpenseEntry {
   gstAmount   Float
   amountExcl  Float
   method      String
-  receipt     Boolean   @default(false)
+  receipt     Boolean  @default(false)
   notes       String?
   // Stable identifier shared with the corresponding row in the per-FY Google Sheet
   // (Expenses tab, hidden column Z). See IncomeEntry.sheetRowKey for details.
@@ -711,23 +711,23 @@ type PromoTier {
 }
 
 model Promo {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  title       String
-  description String?
-  startAt     DateTime
-  endAt       DateTime
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  title           String
+  description     String?
+  startAt         DateTime
+  endAt           DateTime
 
-  kind PromoKind @default(automatic)
+  kind            PromoKind @default(automatic)
   // Uppercased on write so lookups are exact. Deliberately NOT @unique:
   // MongoDB's unique index treats a second null as a duplicate, and every
   // automatic promo has a null code, so the second one would P2002 - the same
   // trap documented on Booking.activeSlotKey and Contact.reviewToken.
   // Uniqueness is enforced in promo-validation instead.
-  code String?
+  code            String?
 
   // Which value column below carries this promo's terms. Optional only so
   // existing rows load before the backfill stamps them; treat it as required.
-  discountType PromoDiscountType?
+  discountType    PromoDiscountType?
 
   // Exactly one is set, matching discountType. Separate nullable columns
   // rather than one polymorphic value, so a misconfigured promo is visible in
@@ -738,7 +738,7 @@ model Promo {
   // Fraction of the normal travel charge to bill, 0 for free travel.
   travelPercent   Float?
 
-  isActive Boolean @default(true)
+  isActive        Boolean  @default(true)
 
   // Higher wins when two promos' windows overlap. Replaces the implicit
   // "newest createdAt wins", which could not be overridden. Existing promos
@@ -782,8 +782,8 @@ model Promo {
   activeFromMinute Int?
   activeToMinute   Int?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // getActivePromo() filters by these three; covers most lookups.
   @@index([isActive, startAt, endAt])
@@ -966,13 +966,13 @@ model Campaign {
   // Bumped by each "Retry failed" run so its Resend idempotency keys differ
   // from the run that failed; a resumed run keeps the number, and the keys
   // that come with it, so Resend drops anything that already went.
-  sendAttempt      Int            @default(0)
+  sendAttempt      Int @default(0)
 
   // Contacts unticked in the send dialog.
   excludedContactIds String[] @db.ObjectId
   // Promo the {promo} placeholders describe. Null falls back to whichever
   // automatic promo is running when it sends.
-  promoId            String?  @db.ObjectId
+  promoId            String? @db.ObjectId
 
   sentCount   Int @default(0)
   failedCount Int @default(0)
