@@ -97,7 +97,8 @@ export function TravelSection({
     const result = await lookupStoreRunEntry(jobAddress, entry.label.trim(), travelRatePerHour);
     setLookingUpRun(null);
     if ("error" in result) {
-      toast(result.error, { tone: "error" });
+      // A missed lookup is a retry hint (add the suburb), not a failure to keep on screen.
+      toast(result.error, { tone: "error", duration: 8000 });
       return;
     }
     patchEntry(index, { ...result.entry, isParsedCost: false });

@@ -132,10 +132,6 @@ export const COMMS_FIELD_META = {
     title: "Appointment reminder email",
     description: "Send the customer a reminder the day before their appointment.",
   },
-  notifyReviewRequest: {
-    title: "Review-request email",
-    description: "Email the customer a review request a little after the job finishes.",
-  },
   pushOnBooking: {
     title: "Push on new booking",
     description: "Notify your own devices when a booking is made or rescheduled.",
@@ -152,11 +148,6 @@ export const COMMS_FIELD_META = {
     title: "Reminder lead time",
     description: "Send the reminder once the appointment is within this many hours.",
     unit: "hours",
-  },
-  reviewEmailDelayMins: {
-    title: "Review-request delay",
-    description: "Wait this long after a job ends before sending the review request.",
-    unit: "minutes",
   },
   priceEstimateRetentionDays: {
     title: "Estimate-log retention",
@@ -220,11 +211,6 @@ export const REVIEWS_FIELD_META = {
     title: "Auto-approve verified reviews",
     description:
       "When on, a review left through a genuine booking/contact link is published immediately instead of waiting for your approval. Unverified reviews always wait.",
-  },
-  invoiceReviewCooldownDays: {
-    title: "Review-request cooldown",
-    description: "Minimum days before the same customer is asked for a review again.",
-    unit: "days",
   },
   googleReviewUrl: {
     title: "Google review link",

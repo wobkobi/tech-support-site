@@ -314,7 +314,6 @@ function validateComms(c: CommsSettings): FieldError[] {
   for (const key of [
     "notifyConfirmation",
     "notifyReminder",
-    "notifyReviewRequest",
     "pushOnBooking",
     "pushOnCancellation",
     "pushOnReview",
@@ -323,8 +322,6 @@ function validateComms(c: CommsSettings): FieldError[] {
   }
   if (!inRange(c.reminderLeadHours, 1, 168))
     errors.push({ field: "reminderLeadHours", message: "Must be 1-168 hours." });
-  if (!nonNeg(c.reviewEmailDelayMins))
-    errors.push({ field: "reviewEmailDelayMins", message: "Must be 0 or more minutes." });
   if (!inRange(c.priceEstimateRetentionDays, 1, 3650))
     errors.push({ field: "priceEstimateRetentionDays", message: "Must be 1-3650 days." });
   if (typeof c.invoiceRemindersEnabled !== "boolean")
@@ -366,8 +363,6 @@ function validateReviews(r: ReviewsSettings): FieldError[] {
     errors.push({ field: "homepageFeaturedCount", message: "Must be 0-50 reviews." });
   if (typeof r.autoApproveVerified !== "boolean")
     errors.push({ field: "autoApproveVerified", message: "Must be on or off." });
-  if (!inRange(r.invoiceReviewCooldownDays, 1, 3650))
-    errors.push({ field: "invoiceReviewCooldownDays", message: "Must be 1-3650 days." });
   if (typeof r.googleReviewUrl !== "string")
     errors.push({ field: "googleReviewUrl", message: "Must be a link or blank." });
   else if (r.googleReviewUrl.trim() && !/^https:\/\/\S+$/.test(r.googleReviewUrl.trim()))

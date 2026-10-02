@@ -16,6 +16,7 @@ import {
   type PreservedDiscounts,
 } from "@/features/business/components/invoice/InvoiceForm";
 import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
+import { alreadyPaidAmount } from "@/features/business/lib/already-paid-input";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -86,6 +87,9 @@ export function EditInvoiceView({
           dueDate: data.dueDate,
           lineItems: data.lineItems,
           notes: data.notes || null,
+          // Null clears a part payment and removes its income entry.
+          alreadyPaid: alreadyPaidAmount(data.alreadyPaid) || null,
+          alreadyPaidMethod: data.alreadyPaid.method,
         }),
       });
       const d = await res.json();
@@ -95,6 +99,14 @@ export function EditInvoiceView({
         return;
       }
       toast(`Invoice ${invoiceNumber} updated.`, { tone: "success" });
+      if (d.incomeSheetWarning) {
+        toast(
+          "The already-paid income entry saved, but the Cashbook sheet update didn't go through.",
+          {
+            tone: "warning",
+          },
+        );
+      }
       router.push(`/admin/business/invoices/${invoiceId}`);
     } catch {
       toast("Couldn't save changes. Check your connection.", { tone: "error" });
@@ -119,9 +131,14 @@ export function EditInvoiceView({
               context={aiContext}
               currentItems={form.lineItems}
               disabled={busy}
-              // Parsed notes only fill an empty field, so a hand-written note survives.
-              onApply={(lineItems, notes) =>
-                apply(notes && !form.notes.trim() ? { lineItems, notes } : { lineItems })
+              // Parsed notes only fill an empty field, so a hand-written note survives. A
+              // stated cash amount ("paid $47 in cash") fills Already paid.
+              onApply={(lineItems, notes, cashPaid) =>
+                apply({
+                  lineItems,
+                  ...(notes && !form.notes.trim() && { notes }),
+                  ...(cashPaid && { alreadyPaid: { amount: cashPaid.toFixed(2), method: "Cash" } }),
+                })
               }
             />
           )}
@@ -141,6 +158,7 @@ export function EditInvoiceView({
           promoDiscount={preservedDiscounts.promoDiscount ?? 0}
           unsuccessfulDiscount={preservedDiscounts.unsuccessfulDiscount ?? 0}
           gstRegistered={gstRegistered}
+          alreadyPaid={alreadyPaidAmount(preview.alreadyPaid)}
         />
       </div>
     </div>

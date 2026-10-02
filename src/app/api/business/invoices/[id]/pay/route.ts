@@ -5,8 +5,10 @@
 // chased a payment that already landed. The DB stamp is authoritative; the income, Drive
 // and apology steps are best-effort and never roll back the payment.
 
+import { balanceDue } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import { recordIncome } from "@/features/business/lib/income-recording";
+import { balanceIncomeWhere } from "@/features/business/lib/invoice-already-paid";
 import { reminderChasedPaidInvoice } from "@/features/business/lib/invoice-apology";
 import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";
 import { sendReminderApology } from "@/features/business/lib/invoice-reminders";
@@ -86,7 +88,7 @@ export async function POST(
   });
   if (claim.count !== 1) {
     const current = await prisma.invoice.findUnique({ where: { id } });
-    const existing = await prisma.incomeEntry.findFirst({ where: { invoiceId: id } });
+    const existing = await prisma.incomeEntry.findFirst({ where: balanceIncomeWhere(invoice) });
     return NextResponse.json({
       ok: true,
       invoice: current,
@@ -96,8 +98,12 @@ export async function POST(
     });
   }
 
-  // Income step (only the claim winner reaches here).
-  const existingIncome = await prisma.incomeEntry.findFirst({ where: { invoiceId: id } });
+  // Income step (only the claim winner reaches here). The already-paid entry is not the
+  // payment, so it is never updated here and never stops the balance being recorded.
+  const existingIncome = await prisma.incomeEntry.findFirst({
+    where: balanceIncomeWhere(invoice),
+  });
+  const balance = balanceDue(invoice);
   let incomeEntry = existingIncome;
   let incomeAction: "created" | "updated" | "skipped" = "skipped";
   let sheetWarning = false;
@@ -145,12 +151,12 @@ export async function POST(
       sheetWarning = true;
     }
     incomeAction = "updated";
-  } else if (createIncome) {
+  } else if (createIncome && balance > 0) {
     const result = await recordIncome({
       date: paidAt,
       customer: invoice.clientName,
       description: `Invoice ${invoice.number}`,
-      amount: invoice.total,
+      amount: balance,
       method,
       notes: reference,
       invoiceId: id,

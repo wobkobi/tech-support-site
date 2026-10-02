@@ -48,8 +48,8 @@ interface InvoiceAiBoxProps {
   currentItems: LineItem[];
   /** Whether the parent form is saving. */
   disabled?: boolean;
-  /** Receives the parsed line items and any parsed notes. */
-  onApply: (lineItems: LineItem[], notes: string | null) => void;
+  /** Receives the parsed line items, any parsed notes and any cash amount already paid. */
+  onApply: (lineItems: LineItem[], notes: string | null, cashPaid: number | null) => void;
 }
 
 const PARSE_ERROR = "Couldn't parse that - try being more specific, or edit the line items below.";
@@ -119,7 +119,7 @@ export function InvoiceAiBox({
         } else {
           setResult(parsed);
           setAnswers({});
-          onApply(lineItems, parsed.notes || null);
+          onApply(lineItems, parsed.notes || null, parsed.cashPaid ?? null);
           const fitNote = describeFit(fit, windowMins);
           if (fitNote) toast(fitNote, { tone: "info" });
           // The per-task half-price discount lives in the invoice's preserved

@@ -160,7 +160,9 @@ export function TasksSection({
                                     (updated.action ?? "").toLowerCase(),
                               )
                             : null;
-                        if (tmpl) {
+                        // Hourly lines keep the price their rate tags give; a saved
+                        // template price goes stale whenever the rates change.
+                        if (tmpl && !updated.baseRateId) {
                           updated.unitPrice = tmpl.defaultPrice;
                           updated.lineTotal =
                             Math.round(updated.qty * tmpl.defaultPrice * 100) / 100;
@@ -195,7 +197,7 @@ export function TasksSection({
                                   (t.action ?? "").toLowerCase() === next.toLowerCase(),
                               )
                             : null;
-                        if (tmpl) {
+                        if (tmpl && !updated.baseRateId) {
                           updated.unitPrice = tmpl.defaultPrice;
                           updated.lineTotal =
                             Math.round(updated.qty * tmpl.defaultPrice * 100) / 100;

@@ -6,6 +6,10 @@
 // Field-changing paths re-sync the PDF to Drive.
 
 import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
+import {
+  parseAlreadyPaid,
+  syncAlreadyPaidIncome,
+} from "@/features/business/lib/invoice-already-paid";
 import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { parseDate, parseObjectId } from "@/features/business/lib/validation";
@@ -150,6 +154,7 @@ export async function PATCH(
     body.issueDate !== undefined ||
     body.dueDate !== undefined ||
     body.lineItems !== undefined ||
+    body.alreadyPaid !== undefined ||
     body.notes !== undefined
   ) {
     if (current.status === "VOIDED") {
@@ -166,7 +171,8 @@ export async function PATCH(
       body.clientEmail !== undefined ||
       body.issueDate !== undefined ||
       body.dueDate !== undefined ||
-      body.lineItems !== undefined;
+      body.lineItems !== undefined ||
+      body.alreadyPaid !== undefined;
     if (current.status !== "DRAFT" && editsContent) {
       return NextResponse.json(
         { error: "Only draft invoices can be edited; void and reissue." },
@@ -190,6 +196,14 @@ export async function PATCH(
     if (issueDateValue === null || dueDateValue === null) {
       return errorResponse("Enter a valid issue date and due date", 400);
     }
+    // alreadyPaid and alreadyPaidMethod travel together; a null amount clears both.
+    const prepaid =
+      body.alreadyPaid !== undefined
+        ? current.isQuote
+          ? { ok: true as const, amount: null, method: null }
+          : parseAlreadyPaid(body.alreadyPaid, body.alreadyPaidMethod)
+        : undefined;
+    if (prepaid && !prepaid.ok) return errorResponse(prepaid.error, 400);
     if (status !== undefined) {
       if (!isInvoiceStatus(status)) return errorResponse("Invalid status", 400);
       const err = validateTransition(current.status, status);
@@ -224,12 +238,14 @@ export async function PATCH(
           gst: gstAmount > 0,
         }),
         ...(notes !== undefined && { notes: notes || null }),
+        ...(prepaid && { alreadyPaid: prepaid.amount, alreadyPaidMethod: prepaid.method }),
         ...statusPatch,
       },
     });
+    const incomeSheetWarning = prepaid ? (await syncAlreadyPaidIncome(id)).sheetSyncWarning : false;
     // Any field change should be reflected in the Drive archive copy.
     await syncInvoicePdfToDriveById(id, "[invoice-patch]");
-    return NextResponse.json({ ok: true, invoice });
+    return NextResponse.json({ ok: true, invoice, incomeSheetWarning });
   }
 
   // contactId-only backfill: the calculator links a freshly-saved invoice to a
@@ -298,7 +314,7 @@ export async function DELETE(
   // here too against crafted requests.
   const existing = await prisma.invoice.findUnique({
     where: { id },
-    select: { status: true },
+    select: { status: true, alreadyPaidIncomeId: true },
   });
   if (!existing) {
     return errorResponse("Invoice not found", 404);
@@ -308,6 +324,12 @@ export async function DELETE(
       "Only DRAFT invoices can be deleted. Void the invoice instead to preserve the audit trail.",
       409,
     );
+  }
+  // A deleted draft is usually re-raised, so its already-paid entry goes with it rather
+  // than being counted twice when the replacement records its own.
+  if (existing.alreadyPaidIncomeId) {
+    await prisma.invoice.update({ where: { id }, data: { alreadyPaid: null } });
+    await syncAlreadyPaidIncome(id);
   }
   await prisma.invoice.delete({ where: { id } });
   return NextResponse.json({ ok: true });

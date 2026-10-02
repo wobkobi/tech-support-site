@@ -72,6 +72,10 @@ export interface Invoice {
   paymentMethod?: string | null;
   /** Optional operator reference/note recorded with the payment. */
   paymentReference?: string | null;
+  /** Money already handed over before the invoice went out; the invoice asks for total minus this. */
+  alreadyPaid?: number | null;
+  /** How the already-paid money came in (an INCOME_METHODS value); feeds the income entry only. */
+  alreadyPaidMethod?: string | null;
   /** When the most recent overdue reminder was emailed; null = never. */
   reminderLastSentAt?: string | null;
   /** How many overdue reminders have gone out; null reads as 0 (Mongo backfill rule). */
@@ -240,6 +244,8 @@ export interface ParseJobResponse {
   storeRunTravel?: StoreRunTravel[];
   /** True when the description says the client paid in cash. */
   paidCash?: boolean;
+  /** Cash amount the description states, or null when it names cash without one. */
+  cashPaid?: number | null;
   tasks: ParsedTaskLine[];
   parts: ParsedPartLine[];
   notes: string;

@@ -1,8 +1,8 @@
 "use client";
 // src/features/admin/components/settings/ReviewsTab.tsx
 // Editor for the reviews & reputation group: how many reviews feature on the home page,
-// whether verified reviews auto-approve, the review-request cooldown, and the Google
-// review link. Saves through the shared settings form hook.
+// whether verified reviews auto-approve, and the Google review link. Saves through the
+// shared settings form hook.
 
 import {
   NumberField,
@@ -60,15 +60,6 @@ export function ReviewsTab({ initial, defaults }: Props): React.ReactElement {
           value={draft.autoApproveVerified}
           customised={draft.autoApproveVerified !== defaults.autoApproveVerified}
           onChange={(v) => set({ autoApproveVerified: v })}
-        />
-        <NumberField
-          id="invoiceReviewCooldownDays"
-          meta={m.invoiceReviewCooldownDays}
-          value={draft.invoiceReviewCooldownDays}
-          min={1}
-          error={fieldErrors.invoiceReviewCooldownDays}
-          customised={draft.invoiceReviewCooldownDays !== defaults.invoiceReviewCooldownDays}
-          onChange={(v) => set({ invoiceReviewCooldownDays: v ?? 1 })}
         />
         <TextField
           id="googleReviewUrl"

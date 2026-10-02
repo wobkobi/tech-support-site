@@ -129,9 +129,7 @@ export function BookingActions({
   const actions = useBookingActions();
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
-  // Both ticked by default: sending the review request is the normal way to
-  // finish a job, and a no-show is normally chased for the call-out fee.
-  const [sendReview, setSendReview] = useState(true);
+  // Ticked by default: a no-show is normally chased for the call-out fee.
   const [draftInvoice, setDraftInvoice] = useState(true);
   // Stable "now" so the past-booking check doesn't trip react-hooks/purity.
   const [renderedAt] = useState(() => Date.now());
@@ -159,9 +157,8 @@ export function BookingActions({
   const mapsHref = isOpen && address ? mapsSearchUrl(address) : null;
   const showPhoneBar = phone != null || mapsHref != null || isConfirmed || isCompleted;
 
-  /** Opens the complete dialog with the review email ticked. */
+  /** Opens the complete dialog. */
   function openComplete(): void {
-    setSendReview(true);
     setConfirm("complete");
   }
 
@@ -175,7 +172,7 @@ export function BookingActions({
     const result = await (async () => {
       switch (kind) {
         case "complete":
-          return actions.completeBooking(id, sendReview);
+          return actions.completeBooking(id);
         case "noshow":
           return actions.markNoShow(id, draftInvoice);
         case "cancel-operator":
@@ -200,18 +197,8 @@ export function BookingActions({
 
   const copy = confirm ? CONFIRM_COPY[confirm] : null;
 
-  // Completing offers the review email as an opt-out, unless one already went
-  // out - then there is nothing to decide and the dialog just says so.
-  const completeBody = reviewAlreadySent ? (
-    "The review-request email has already gone out, so this only changes the status."
-  ) : (
-    <AdminCheckbox
-      checked={sendReview}
-      onChange={setSendReview}
-      disabled={busy}
-      label="Send the review-request email"
-    />
-  );
+  const completeBody =
+    "This only changes the status. The review request goes out with the invoice.";
 
   // The fee is recorded on the booking either way; the box only decides whether
   // the invoice for it is drafted now.

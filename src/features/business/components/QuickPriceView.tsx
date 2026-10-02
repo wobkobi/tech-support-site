@@ -180,6 +180,7 @@ export function QuickPriceView({
     holidayUplift: pricing.holidayUplift,
     businessModifierId: businessModifier?.id ?? null,
     standardRate: standard?.ratePerHour ?? null,
+    rates,
   });
 
   /**

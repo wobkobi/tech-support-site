@@ -26,6 +26,11 @@ import { useCancelMode } from "@/features/business/hooks/use-cancel-mode";
 import { useJobContext } from "@/features/business/hooks/use-job-context";
 import { useJobParse } from "@/features/business/hooks/use-job-parse";
 import {
+  alreadyPaidAmount,
+  EMPTY_ALREADY_PAID,
+  type AlreadyPaidState,
+} from "@/features/business/lib/already-paid-input";
+import {
   calcJobTotal,
   collapseToWindow,
   enforceMinBillable,
@@ -48,6 +53,7 @@ import {
   addHour,
   emptyTask,
   lookupAutoTravel,
+  repriceHourlyTasks,
   setTaskBaseLine,
   toggleTaskModifierLine,
   updateTaskField,
@@ -178,6 +184,8 @@ export function CalculatorView({
   const [notes, setNotes] = useState("");
   // Paid in cash on the day: invoices save as paid, income entries record Cash.
   const [paidCash, setPaidCash] = useState(false);
+  // Part of the bill handed over on the day: shown on the invoice, recorded in income.
+  const [alreadyPaid, setAlreadyPaid] = useState<AlreadyPaidState>(EMPTY_ALREADY_PAID);
   // Client, save buttons and preview. The phone total bar stands down while
   // any of it is on screen, since the real buttons and total are showing.
   const finishRef = useRef<HTMLDivElement>(null);
@@ -307,6 +315,7 @@ export function CalculatorView({
     setParts,
     setNotes,
     setPaidCash,
+    setAlreadyPaid,
   });
 
   const {
@@ -376,10 +385,11 @@ export function CalculatorView({
       setFollowUpMins(draft.followUpMins ?? 0);
       setTravelEntries(draft.travelEntries ?? []);
       setJobAddress(draft.jobAddress ?? "");
-      setTasks(draft.tasks ?? []);
+      setTasks(repriceHourlyTasks(draft.tasks ?? [], rates));
       setParts(draft.parts ?? []);
       setNotes(draft.notes ?? "");
       setPaidCash(draft.paidCash ?? false);
+      setAlreadyPaid(draft.alreadyPaid ?? EMPTY_ALREADY_PAID);
       setClientName(draft.clientName ?? "");
       setClientEmail(normaliseEmail(draft.clientEmail));
       setPickedContactName(draft.pickedContactName ?? null);
@@ -449,6 +459,7 @@ export function CalculatorView({
         parts,
         notes,
         paidCash,
+        alreadyPaid,
         clientName,
         clientEmail,
         pickedContactName,
@@ -470,6 +481,7 @@ export function CalculatorView({
     parts,
     notes,
     paidCash,
+    alreadyPaid,
     clientName,
     clientEmail,
     pickedContactName,
@@ -537,6 +549,7 @@ export function CalculatorView({
     holidayUplift: holiday.uplift,
     businessModifierId,
     standardRate,
+    rates,
   };
   const totals = calcJobTotal(job, !skipPromo ? activePromo : null, jobPricing);
   const showTotalBar = !finishInView && totals.total > 0;
@@ -589,6 +602,7 @@ export function CalculatorView({
     pickedContactGoogleId,
     jobDate,
     paidCash,
+    alreadyPaid,
     setTaskTemplates,
     onIncomeSaved: resetFormState,
   });
@@ -636,6 +650,7 @@ export function CalculatorView({
     setShowParts(false);
     setNotes("");
     setPaidCash(false);
+    setAlreadyPaid(EMPTY_ALREADY_PAID);
     setClientName("");
     setClientEmail("");
     setPickedContactName(null);
@@ -986,8 +1001,11 @@ export function CalculatorView({
             savingIncome={savingIncome}
             parsing={parsing}
             subtotal={totals.subtotal}
+            total={totals.total}
             paidCash={paidCash}
             onPaidCashChange={setPaidCash}
+            alreadyPaid={alreadyPaid}
+            onAlreadyPaidChange={setAlreadyPaid}
             onSaveInvoice={(send, quote) => void handleSaveInvoice(send, quote)}
             onSaveIncome={() => void handleSaveIncome()}
           />
@@ -1005,6 +1023,7 @@ export function CalculatorView({
             notes={notes}
             gstRegistered={pricing.gstRegistered}
             unsuccessfulDiscount={totals.unsuccessfulDiscount}
+            alreadyPaid={paidCash ? 0 : alreadyPaidAmount(alreadyPaid)}
             promoTitle={
               activePromo && !skipPromo && totals.promoDiscount > 0 ? activePromo.title : null
             }

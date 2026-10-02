@@ -87,28 +87,28 @@ async function resolveInvoiceReviewUrl({
 
   return null;
 }
-
 /**
  * Result of {@link getInvoiceReviewEligibility}. Drives the "Include review link"
- * checkbox state in the invoice send modal.
+ * checkbox state in the invoice send modal. `googleOnly` marks a customer who has
+ * already reviewed on the site: `reviewUrl` is then the Google link.
  */
 export type InvoiceReviewEligibility =
-  | { canSend: true; reviewUrl: string }
+  | { canSend: true; reviewUrl: string; googleOnly: boolean }
   | { canSend: false; reason: "no-contact" }
-  | { canSend: false; reason: "already-reviewed"; reviewUrl: string }
-  | {
-      canSend: false;
-      reason: "sent-recently";
-      reviewUrl: string;
-      lastSentAt: string;
-      nextAllowedAt: string;
-    };
+  | { canSend: false; reason: "already-reviewed"; reviewUrl: string };
 
 /**
- * Decides whether the invoice email should include the review link.
- * Returns `reviewUrl` even when blocked so the operator can preview it; the
- * UI gates the checkbox and the send route gates actual inclusion.
- * Verdicts: `no-contact` / `already-reviewed` / `sent-recently` / `canSend: true`.
+ * Decides which review ask the invoice email carries. Every invoice asks; only
+ * the wording changes. A customer who hasn't reviewed gets the site link (with
+ * Google offered beside it); one who has reviewed on the site is thanked and
+ * asked for Google instead (`googleOnly`). Every site reviewer gets that ask
+ * whatever they wrote, which keeps it clear of Google's ban on soliciting only
+ * happy customers.
+ *
+ * Blocked only when there is nothing to send: no contact to mint a review link
+ * for (`no-contact`), or a site reviewer with no Google link set
+ * (`already-reviewed`). Returns `reviewUrl` even then so the operator can
+ * preview it; the UI gates the checkbox and the send route gates inclusion.
  * @param args - Lookup inputs.
  * @param args.contactId - Optional Contact id from the invoice.
  * @param args.clientEmail - Invoice's clientEmail (case-insensitive).
@@ -125,8 +125,6 @@ export async function getInvoiceReviewEligibility({
     return { canSend: false, reason: "no-contact" };
   }
 
-  const cooldownDays = (await getSettings()).reviews.invoiceReviewCooldownDays;
-
   // Pull the token out of the URL for the customerRef cross-check (Review
   // rows submitted via a magic link store the token in `customerRef`).
   const tokenFromUrl = (() => {
@@ -141,82 +139,22 @@ export async function getInvoiceReviewEligibility({
   if (contactId) reviewedClauses.push({ contactId });
   if (tokenFromUrl) reviewedClauses.push({ customerRef: tokenFromUrl });
 
+  let reviewed = false;
   if (reviewedClauses.length > 0) {
     try {
-      const existing = await prisma.review.findFirst({
-        where: { OR: reviewedClauses },
-        select: { id: true },
-      });
-      if (existing) {
-        return { canSend: false, reason: "already-reviewed", reviewUrl };
-      }
+      reviewed =
+        (await prisma.review.findFirst({
+          where: { OR: reviewedClauses },
+          select: { id: true },
+        })) !== null;
     } catch (err) {
-      // Soft-fail: a DB hiccup here should not block sending. The cooldown
-      // check below still protects against spam.
+      // Soft-fail to the site ask: a DB hiccup should not drop the review line.
       console.error("[getInvoiceReviewEligibility] reviewed lookup failed", err);
     }
   }
+  if (!reviewed) return { canSend: true, reviewUrl, googleOnly: false };
 
-  const trimmedEmail = clientEmail?.trim();
-  if (trimmedEmail) {
-    const cooldownStart = new Date(Date.now() - cooldownDays * 24 * 60 * 60 * 1000);
-    try {
-      // Three sources of "was asked recently":
-      // - Booking.reviewSentAt (cron auto-send + admin "mark complete" + manual resend)
-      // - Contact.reviewLinkSentAt (manual "Send a review link" admin sends)
-      // - Invoice.reviewLinkSentAt (prior invoice that included the review line)
-      const [recentBooking, recentContact, recentInvoice] = await Promise.all([
-        prisma.booking.findFirst({
-          where: {
-            email: { equals: trimmedEmail, mode: "insensitive" },
-            reviewSentAt: { gte: cooldownStart },
-          },
-          select: { reviewSentAt: true },
-          orderBy: { reviewSentAt: "desc" },
-        }),
-        prisma.contact.findFirst({
-          where: {
-            OR: [
-              { email: { equals: trimmedEmail, mode: "insensitive" } },
-              { altEmails: { has: trimmedEmail.toLowerCase() } },
-            ],
-            reviewLinkSentAt: { gte: cooldownStart },
-            deletedAt: null,
-          },
-          select: { reviewLinkSentAt: true },
-          orderBy: { reviewLinkSentAt: "desc" },
-        }),
-        prisma.invoice.findFirst({
-          where: {
-            clientEmail: { equals: trimmedEmail, mode: "insensitive" },
-            reviewLinkSentAt: { gte: cooldownStart },
-          },
-          select: { reviewLinkSentAt: true },
-          orderBy: { reviewLinkSentAt: "desc" },
-        }),
-      ]);
-
-      const candidates = [
-        recentBooking?.reviewSentAt,
-        recentContact?.reviewLinkSentAt,
-        recentInvoice?.reviewLinkSentAt,
-      ].filter((d): d is Date => d instanceof Date);
-      const lastSent = candidates.sort((a, b) => b.getTime() - a.getTime())[0];
-
-      if (lastSent) {
-        const nextAllowed = new Date(lastSent.getTime() + cooldownDays * 24 * 60 * 60 * 1000);
-        return {
-          canSend: false,
-          reason: "sent-recently",
-          reviewUrl,
-          lastSentAt: lastSent.toISOString(),
-          nextAllowedAt: nextAllowed.toISOString(),
-        };
-      }
-    } catch (err) {
-      console.error("[getInvoiceReviewEligibility] cooldown lookup failed", err);
-    }
-  }
-
-  return { canSend: true, reviewUrl };
+  const googleUrl = (await getSettings()).reviews.googleReviewUrl.trim();
+  if (!googleUrl) return { canSend: false, reason: "already-reviewed", reviewUrl };
+  return { canSend: true, reviewUrl: googleUrl, googleOnly: true };
 }

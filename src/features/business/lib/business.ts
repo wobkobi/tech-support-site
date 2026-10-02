@@ -42,6 +42,7 @@ export {
 } from "@/features/business/lib/business-format";
 export {
   advanceNextDue,
+  balanceDue,
   buildIncomeDescription,
   calcGstFromInclusive,
   calcInvoiceTotals,
@@ -312,6 +313,12 @@ export interface JobPricing {
    */
   standardRate?: number | null;
   /**
+   * Live rate list. Lets a flat promo floor each line at the promo price for its
+   * rate tags, so a line priced below the live rate (an old price, a stale
+   * draft) is not cut by the full (Standard - flat) and billed under the promo.
+   */
+  rates?: RateConfig[];
+  /**
    * Live task-timing settings for {@link collapseToWindow} and
    * {@link explicitRoundingAllowanceMins}. Not a {@link calcJobTotal} input -
    * it rides along so the calculator's apportionment reads the same settings
@@ -331,6 +338,7 @@ export interface JobPricing {
  * @param businessModifierId - Modifier marking business labour, which promos skip.
  * @param preDiscountSubtotal - The job's subtotal before any discount, which selects a tier.
  * @param standardRate - Undiscounted Standard $/hr, which a flat promo's per-hour cut is taken from.
+ * @param rates - Live rate list, which floors each line at the promo price for its rate tags.
  * @returns Discount in dollars.
  */
 export function computeJobPromoDiscount(
@@ -340,6 +348,7 @@ export function computeJobPromoDiscount(
   businessModifierId?: string | null,
   preDiscountSubtotal?: number,
   standardRate?: number | null,
+  rates?: RateConfig[],
 ): number {
   // Narrowed to the band this job actually earns, through the same function the
   // public estimate uses. Judged on the pre-discount subtotal the caller has
@@ -395,7 +404,16 @@ export function computeJobPromoDiscount(
     // a line above would cancel the saving the pricing page promises there.
     const discount = hourlyTasks.reduce((s, t) => {
       const line = Math.round(t.qty * t.unitPrice * 100) / 100;
-      return s + (cut != null ? Math.min(line, t.qty * cut) : Math.max(0, line - t.qty * flat));
+      if (cut == null) return s + Math.max(0, line - t.qty * flat);
+      // Floor the hour at the promo price for the line's tags (live rate less
+      // the cut). A line typed or saved under the live rate only comes down to
+      // that floor: at an old $75 Standard the full $35 cut would bill $40/hr,
+      // under the $65 the promo promises.
+      const live =
+        rates && t.baseRateId ? effectiveHourlyRate(rates, t.baseRateId, t.modifierIds) : 0;
+      const hourCut =
+        live > 0 ? Math.min(cut, Math.max(0, t.unitPrice - Math.max(0, live - cut))) : cut;
+      return s + Math.min(line, t.qty * hourCut);
     }, 0);
     return Math.round(discount * 100) / 100;
   }
@@ -482,6 +500,7 @@ export function calcJobTotal(
     // a tier band are judged against.
     subtotal,
     pricing.standardRate,
+    pricing.rates,
   );
   // Fraction removed from an unsuccessful line: 1 - the charged share.
   const unsuccessfulCut = 1 - (pricing.unsuccessfulFactor ?? 0.5);

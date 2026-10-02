@@ -21,7 +21,8 @@ import { useState } from "react";
 interface PaymentDialogInvoice {
   id: string;
   number: string;
-  total: number;
+  /** What the client still owes: the total less any amount already paid. */
+  balance: number;
   clientName: string;
   status: string;
   paidAt?: string | null;
@@ -145,7 +146,7 @@ export function PaymentDialog({
       <div className="flex flex-col gap-4 text-sm">
         <p className="text-admin-text-secondary">
           {invoice.clientName} -{" "}
-          <span className="font-semibold text-admin-text">{formatNZD(invoice.total)}</span>
+          <span className="font-semibold text-admin-text">{formatNZD(invoice.balance)}</span>
         </p>
 
         <label className="flex flex-col gap-1">

@@ -30,6 +30,7 @@ export type InvoiceEmailPayload = Pick<
   | "issueDate"
   | "dueDate"
   | "total"
+  | "alreadyPaid"
   | "driveWebUrl"
   | "isQuote"
   | "quoteValidUntil"
@@ -83,6 +84,7 @@ export async function toInvoiceEmailPayload(invoice: Invoice): Promise<InvoiceEm
     issueDate: invoice.issueDate,
     dueDate: invoice.dueDate,
     total: invoice.total,
+    alreadyPaid: invoice.alreadyPaid,
     driveWebUrl: invoice.driveWebUrl,
     isQuote: invoice.isQuote,
     quoteValidUntil: invoice.quoteValidUntil,
@@ -101,16 +103,17 @@ export async function toInvoiceEmailPayload(invoice: Invoice): Promise<InvoiceEm
  * @param invoice - Invoice, narrowed to the quote flag.
  * @param eligibility - Result of the review-eligibility check.
  * @param override - The operator's explicit choice, when they made one.
- * @returns Whether to include the review ask, and the URL when included.
+ * @returns Whether to include the review ask, the URL when included, and whether that URL is the Google-only ask.
  */
 export function resolveReviewInclusion(
   invoice: Pick<Invoice, "isQuote">,
   eligibility: InvoiceReviewEligibility,
   override: boolean | undefined,
-): { includeReview: boolean; reviewUrl: string | null } {
+): { includeReview: boolean; reviewUrl: string | null; googleOnly: boolean } {
   const includeReview =
     !invoice.isQuote && (override ?? eligibility.canSend) && eligibility.canSend;
   const reviewUrl =
     includeReview && "reviewUrl" in eligibility ? (eligibility.reviewUrl ?? null) : null;
-  return { includeReview, reviewUrl };
+  const googleOnly = includeReview && eligibility.canSend && eligibility.googleOnly;
+  return { includeReview, reviewUrl, googleOnly };
 }

@@ -7,6 +7,10 @@
 
 import { completeBilledBookings } from "@/features/booking/lib/complete-billed-bookings.server";
 import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
+import {
+  parseAlreadyPaid,
+  syncAlreadyPaidIncome,
+} from "@/features/business/lib/invoice-already-paid";
 import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
 import {
   getNextInvoiceNumber,
@@ -21,7 +25,7 @@ import {
   releaseBookingRedemptions,
   settlePromoRedemption,
 } from "@/features/business/lib/promo-redemption";
-import { parseAmount, parseObjectId } from "@/features/business/lib/validation";
+import { parseAmount, parseDate, parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -99,6 +103,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // until converted to a real invoice.
     isQuote,
     quoteValidUntil,
+    // Money handed over before the invoice went out, and the date its income entry
+    // records against (the calculator's job date; defaults to the issue date).
+    alreadyPaid,
+    alreadyPaidMethod,
+    alreadyPaidDate,
   } = body as {
     clientName?: string;
     clientEmail?: string;
@@ -117,6 +126,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     calendarEventIds?: string[];
     isQuote?: boolean;
     quoteValidUntil?: string | null;
+    alreadyPaid?: number | null;
+    alreadyPaidMethod?: string | null;
+    alreadyPaidDate?: string | null;
   };
 
   if (!clientName || !clientEmail || !Array.isArray(lineItems)) {
@@ -169,6 +181,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     unsuccessfulDiscountValue = parsed;
   }
 
+  // A quote bills nothing yet, so it never carries a part payment.
+  const prepaid = isQuote
+    ? { ok: true as const, amount: null, method: null }
+    : parseAlreadyPaid(alreadyPaid, alreadyPaidMethod);
+  if (!prepaid.ok) return errorResponse(prepaid.error, 400);
+  const prepaidDate = alreadyPaidDate ? parseDate(alreadyPaidDate) : undefined;
+  if (prepaidDate === null) return errorResponse("Invalid already-paid date", 400);
+
   // De-duplicated so a repeated id cannot make a single-event job look merged.
   const mergedEventIds = Array.from(
     new Set(
@@ -217,6 +237,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           unsuccessful: unsuccessful === true,
           unsuccessfulDiscount: unsuccessfulDiscountValue > 0 ? unsuccessfulDiscountValue : null,
           notes: notes ?? null,
+          alreadyPaid: prepaid.amount,
+          alreadyPaidMethod: prepaid.method,
           // Prisma throws on a malformed ObjectId, so check the shape here rather than
           // 500 the create; calendarEventId is a free-form Google id, not an ObjectId.
           contactId: parseObjectId(contactId),
@@ -282,6 +304,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // Record the part payment in income now, so marking the invoice paid later only
+  // records the balance.
+  let incomeSheetWarning = false;
+  if (prepaid.amount) {
+    incomeSheetWarning = (await syncAlreadyPaidIncome(invoice.id, prepaidDate)).sheetSyncWarning;
+  }
+
   // Keep the Sheets counter in sync; the helper swallows + logs failures so the
   // just-saved invoice isn't compromised by a transient Sheets hiccup. Quotes
   // write back their own counter (SETTINGS!B12), invoices B19.
@@ -301,5 +330,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     console.error("[invoices] Drive PDF upload failed:", err);
   }
 
-  return NextResponse.json({ ok: true, invoice, sheetSyncWarning }, { status: 201 });
+  return NextResponse.json(
+    { ok: true, invoice, sheetSyncWarning, incomeSheetWarning },
+    { status: 201 },
+  );
 }

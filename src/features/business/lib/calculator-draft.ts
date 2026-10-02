@@ -2,6 +2,7 @@
 // localStorage draft persistence for the job calculator: the persisted shape, the
 // read/write/clear helpers, and the "Draft restored" age label.
 
+import type { AlreadyPaidState } from "@/features/business/lib/already-paid-input";
 import type {
   ParsedRange,
   PartLine,
@@ -47,6 +48,8 @@ export interface CalculatorDraft {
   notes: string;
   /** "Paid in cash" tick. Optional so drafts saved before it existed still load. */
   paidCash?: boolean;
+  /** Already paid box. Optional so drafts saved before it existed still load. */
+  alreadyPaid?: AlreadyPaidState;
   clientName: string;
   clientEmail: string;
   pickedContactName: string | null;
@@ -68,6 +71,7 @@ export function isMeaningfulDraft(d: CalculatorDraft): boolean {
     d.parts.length > 0 ||
     d.travelEntries.length > 0 ||
     d.notes.trim().length > 0 ||
+    (d.alreadyPaid?.amount.trim().length ?? 0) > 0 ||
     d.clientName.trim().length > 0 ||
     d.clientEmail.trim().length > 0 ||
     d.jobAddress.trim().length > 0 ||

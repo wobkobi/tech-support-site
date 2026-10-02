@@ -4,7 +4,12 @@
 // the operator sees the same invoice the customer receives. Pure presentational;
 // memoised.
 
-import { calcInvoiceTotals, formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
+import {
+  balanceDue,
+  calcInvoiceTotals,
+  formatNZD,
+  lineItemQtyLabel,
+} from "@/features/business/lib/business";
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
 import type { LineItem } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
@@ -34,6 +39,8 @@ interface Props {
   unsuccessfulDiscount?: number;
   /** Live GST-registration flag; controls the "Includes GST" line so the preview matches the saved invoice. */
   gstRegistered?: boolean;
+  /** Money handed over before the invoice went out; adds Already paid and Balance due when > 0. */
+  alreadyPaid?: number;
 }
 
 /**
@@ -52,6 +59,7 @@ interface Props {
  * @param props.promoDiscount - Promo discount in dollars; renders the line when > 0.
  * @param props.unsuccessfulDiscount - Half-price labour discount; renders the line when > 0.
  * @param props.gstRegistered - Live GST-registration flag; controls the "Includes GST" line.
+ * @param props.alreadyPaid - Amount already paid; renders Already paid and Balance due when > 0.
  * @returns Invoice preview element.
  */
 function InvoicePreviewPanelImpl({
@@ -67,6 +75,7 @@ function InvoicePreviewPanelImpl({
   promoDiscount,
   unsuccessfulDiscount = 0,
   gstRegistered,
+  alreadyPaid = 0,
 }: Props): React.ReactElement {
   const totals = calcInvoiceTotals(lineItems, promoDiscount + unsuccessfulDiscount, gstRegistered);
   const showPromoLine = promoDiscount > 0;
@@ -216,6 +225,21 @@ function InvoicePreviewPanelImpl({
             <span>Total</span>
             <span className="whitespace-nowrap">{formatNZD(totals.total)}</span>
           </div>
+          {alreadyPaid > 0 && (
+            <>
+              <div className="flex justify-between gap-3">
+                <span className="text-slate-500">Already paid</span>
+                <span className="whitespace-nowrap text-slate-700">-{formatNZD(alreadyPaid)}</span>
+              </div>
+              <div className="h-px bg-slate-300" />
+              <div className="flex justify-between gap-3 text-sm font-extrabold text-russian-violet">
+                <span>Balance due</span>
+                <span className="whitespace-nowrap">
+                  {formatNZD(balanceDue({ total: totals.total, alreadyPaid }))}
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Bank transfer call-out. */}

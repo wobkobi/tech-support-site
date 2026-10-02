@@ -9,6 +9,10 @@ import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { EditInvoiceView } from "@/features/business/components/invoice/EditInvoiceView";
 import type { InvoiceAiContext } from "@/features/business/components/invoice/InvoiceAiBox";
 import type { InvoiceFormData } from "@/features/business/components/invoice/InvoiceForm";
+import {
+  EMPTY_ALREADY_PAID,
+  toAlreadyPaidMethod,
+} from "@/features/business/lib/already-paid-input";
 import { buildEventPrefill } from "@/features/business/lib/event-prefill.server";
 import { getPolicy, lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { requireAdminAuth } from "@/shared/lib/auth";
@@ -88,6 +92,12 @@ export default async function EditInvoicePage({
     dueDate: nzDateKey(invoice.dueDate),
     lineItems: invoice.lineItems,
     notes: invoice.notes ?? "",
+    alreadyPaid: invoice.alreadyPaid
+      ? {
+          amount: invoice.alreadyPaid.toFixed(2),
+          method: toAlreadyPaidMethod(invoice.alreadyPaidMethod),
+        }
+      : EMPTY_ALREADY_PAID,
   };
 
   return (

@@ -11,7 +11,7 @@ import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { InvoiceStatusBadge } from "@/features/business/components/invoice/InvoiceStatusBadge";
 import { InvoiceTimeline } from "@/features/business/components/invoice/InvoiceTimeline";
-import { formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
+import { balanceDue, formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
 import { findRecordedPayment } from "@/features/business/lib/invoice-payment-match";
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
@@ -141,12 +141,24 @@ async function InvoiceRail({
             {invoice.paymentReference && (
               <InfoRow label="Reference">{invoice.paymentReference}</InfoRow>
             )}
+            {invoice.alreadyPaid != null && invoice.alreadyPaid > 0 && (
+              <InfoRow label="Already paid">
+                {formatNZD(invoice.alreadyPaid)}
+                {invoice.alreadyPaidMethod ? ` (${invoice.alreadyPaidMethod})` : ""}
+              </InfoRow>
+            )}
           </dl>
         ) : isVoided ? (
           <p className="text-sm text-admin-muted">Voided - no payment due.</p>
         ) : (
           <dl className="space-y-1 text-sm">
-            <InfoRow label="Amount due">{formatNZD(invoice.total)}</InfoRow>
+            {invoice.alreadyPaid != null && invoice.alreadyPaid > 0 && (
+              <InfoRow label="Already paid">
+                {formatNZD(invoice.alreadyPaid)}
+                {invoice.alreadyPaidMethod ? ` (${invoice.alreadyPaidMethod})` : ""}
+              </InfoRow>
+            )}
+            <InfoRow label="Amount due">{formatNZD(balanceDue(invoice))}</InfoRow>
             <InfoRow label="Due">{formatDateShort(invoice.dueDate)}</InfoRow>
             {overdue && (
               <div className="pt-1">
@@ -328,7 +340,8 @@ export default async function InvoiceViewPage({
             clientName={invoice.clientName}
             clientEmail={invoice.clientEmail}
             status={invoice.status}
-            total={invoice.total}
+            balance={balanceDue(invoice)}
+            hasPaymentIncome={incomeEntries.some((e) => e.id !== invoice.alreadyPaidIncomeId)}
             notes={invoice.notes}
             sentAt={invoice.sentAt?.toISOString() ?? null}
             paidAt={invoice.paidAt?.toISOString() ?? null}
@@ -489,6 +502,22 @@ export default async function InvoiceViewPage({
                 {formatNZD(invoice.total)}
               </span>
             </div>
+            {invoice.alreadyPaid != null && invoice.alreadyPaid > 0 && (
+              <>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-500">Already paid</span>
+                  <span className="font-medium whitespace-nowrap text-slate-700">
+                    -{formatNZD(invoice.alreadyPaid)}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3 border-t border-slate-200 pt-1">
+                  <span className="font-semibold text-slate-800">Balance due</span>
+                  <span className="font-extrabold whitespace-nowrap text-russian-violet">
+                    {formatNZD(balanceDue(invoice))}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">

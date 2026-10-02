@@ -5,6 +5,7 @@
 // calculator's time, travel, tasks, parts, notes and the paid-in-cash tick.
 
 import { useToast } from "@/features/admin/components/ui/Toast";
+import type { AlreadyPaidState } from "@/features/business/lib/already-paid-input";
 import type { JobPricing } from "@/features/business/lib/business";
 import {
   buildParseInput,
@@ -47,6 +48,7 @@ interface UseJobParseArgs {
   setParts: React.Dispatch<React.SetStateAction<PartLine[]>>;
   setNotes: React.Dispatch<React.SetStateAction<string>>;
   setPaidCash: React.Dispatch<React.SetStateAction<boolean>>;
+  setAlreadyPaid: React.Dispatch<React.SetStateAction<AlreadyPaidState>>;
 }
 
 /** Parse session state and handlers returned by {@link useJobParse}. */
@@ -85,6 +87,7 @@ interface UseJobParse {
  * @param args.setParts - Parts setter.
  * @param args.setNotes - Notes setter.
  * @param args.setPaidCash - "Paid in cash" setter, ticked when the description says so.
+ * @param args.setAlreadyPaid - Already paid setter, filled when the description names a cash amount.
  * @returns Parse session state plus its handlers.
  */
 export function useJobParse({
@@ -100,6 +103,7 @@ export function useJobParse({
   setParts,
   setNotes,
   setPaidCash,
+  setAlreadyPaid,
 }: UseJobParseArgs): UseJobParse {
   const { toast } = useToast();
   const [aiInput, setAiInput] = useState("");
@@ -178,8 +182,11 @@ export function useJobParse({
     if (fitNote) toast(fitNote, { tone: "info" });
     setParts(result.parts.map((p) => ({ description: p.description, cost: p.cost })));
     if (result.notes) setNotes(result.notes);
-    // Only ever ticks: a description that doesn't mention payment says nothing either way.
-    if (result.paidCash) setPaidCash(true);
+    // Only ever fills: a description that doesn't mention payment says nothing either way.
+    // A stated amount may cover only part of the bill, so it goes in Already paid and the
+    // rest stays owing; cash with no amount means the whole bill.
+    if (result.cashPaid) setAlreadyPaid({ amount: result.cashPaid.toFixed(2), method: "Cash" });
+    else if (result.paidCash) setPaidCash(true);
   }
 
   /**

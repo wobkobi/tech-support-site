@@ -189,6 +189,23 @@ export function setTaskBaseLine(
   return arr;
 }
 
+/**
+ * Re-prices every hourly line from the live rates for its base and modifiers.
+ * A restored draft keeps the prices it was saved with, so a rate change since
+ * would otherwise bill the old rate, and a flat promo would then cut the full
+ * (Standard - flat) from it.
+ * @param tasks - Task lines, e.g. from a saved draft.
+ * @param rates - Live rate configs.
+ * @returns The lines with hourly prices brought up to date; flat and untagged lines unchanged.
+ */
+export function repriceHourlyTasks(tasks: TaskLine[], rates: RateConfig[]): TaskLine[] {
+  return tasks.map((t) => {
+    const live = effectiveHourlyRate(rates, t.baseRateId, t.modifierIds);
+    if (live <= 0 || live === t.unitPrice) return t;
+    return { ...t, unitPrice: live, lineTotal: Math.round(t.qty * live * 100) / 100 };
+  });
+}
+
 /** Inputs for {@link lookupAutoTravel}. */
 interface AutoTravelLookup {
   /** Job address as typed or picked. */

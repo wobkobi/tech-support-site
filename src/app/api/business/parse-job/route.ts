@@ -239,9 +239,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: true, clarify: parsed.clarify });
     }
 
-    // Store runs and the cash flag are untrusted model output: short distinct store
-    // names only, and a strict boolean.
+    // Store runs and the cash fields are untrusted model output: short distinct store
+    // names only, a strict boolean, and a positive amount rounded to cents.
     parsed.paidCash = parsed.paidCash === true;
+    const cash = Number(parsed.cashPaid);
+    parsed.cashPaid =
+      parsed.paidCash && Number.isFinite(cash) && cash > 0 ? Math.round(cash * 100) / 100 : null;
     const storeRuns: string[] = [];
     for (const raw of Array.isArray(parsed.storeRuns) ? parsed.storeRuns : []) {
       const store = typeof raw === "string" ? raw.trim().slice(0, 80) : "";

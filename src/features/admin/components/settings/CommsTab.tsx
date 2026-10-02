@@ -1,7 +1,8 @@
 "use client";
 // src/features/admin/components/settings/CommsTab.tsx
-// Editor for the comms & automation group: which emails send (confirmation, reminder,
-// review request) and their timings. Saves through the shared settings form hook.
+// Editor for the comms & automation group: which emails send (confirmation, reminder)
+// and their timings. Saves through the shared settings form hook. Review requests aren't
+// here: they go out with the invoice email.
 
 import {
   NumberField,
@@ -45,14 +46,14 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
   /**
    * Applies an email-toggle change, then confirms if it has just turned the LAST
    * remaining customer email off. The switch flips right away so the dialog
-   * reflects what was done; Cancel restores all three emails to their saved
+   * reflects what was done; Cancel restores both emails to their saved
    * state (see the dialog's onCancel).
    * @param patch - The single email-toggle change.
    */
   const setNotify = (patch: Partial<CommsSettings>): void => {
     const next = { ...draft, ...patch };
     set(patch);
-    if (!next.notifyConfirmation && !next.notifyReminder && !next.notifyReviewRequest) {
+    if (!next.notifyConfirmation && !next.notifyReminder) {
       setConfirmAllOff(true);
     }
   };
@@ -76,13 +77,6 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           value={draft.notifyReminder}
           customised={draft.notifyReminder !== defaults.notifyReminder}
           onChange={(v) => setNotify({ notifyReminder: v })}
-        />
-        <ToggleField
-          id="notifyReviewRequest"
-          meta={m.notifyReviewRequest}
-          value={draft.notifyReviewRequest}
-          customised={draft.notifyReviewRequest !== defaults.notifyReviewRequest}
-          onChange={(v) => setNotify({ notifyReviewRequest: v })}
         />
       </div>
 
@@ -130,16 +124,7 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           customised={draft.reminderLeadHours !== defaults.reminderLeadHours}
           onChange={(v) => set({ reminderLeadHours: v ?? 1 })}
         />
-        <NumberField
-          id="reviewEmailDelayMins"
-          meta={m.reviewEmailDelayMins}
-          value={draft.reviewEmailDelayMins}
-          min={0}
-          minutesHint
-          error={fieldErrors.reviewEmailDelayMins}
-          customised={draft.reviewEmailDelayMins !== defaults.reviewEmailDelayMins}
-          onChange={(v) => set({ reviewEmailDelayMins: v ?? 0 })}
-        />
+
         <NumberField
           id="priceEstimateRetentionDays"
           meta={m.priceEstimateRetentionDays}
@@ -239,19 +224,18 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
       <ConfirmDialog
         open={confirmAllOff}
         title="Turn off all customer emails?"
-        body="Customers won't get booking confirmations, reminders, or review requests."
+        body="Customers won't get booking confirmations or reminders."
         confirmLabel="Turn all off"
         cancelLabel="Keep emails on"
         tone="danger"
         onConfirm={() => setConfirmAllOff(false)}
         onCancel={() => {
-          // Restore all three email switches to their last-SAVED state (baseline,
+          // Restore both email switches to their last-SAVED state (baseline,
           // not the page-load value), so a mid-session save of one as off is kept.
           setConfirmAllOff(false);
           set({
             notifyConfirmation: baseline.notifyConfirmation,
             notifyReminder: baseline.notifyReminder,
-            notifyReviewRequest: baseline.notifyReviewRequest,
           });
         }}
       />

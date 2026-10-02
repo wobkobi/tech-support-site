@@ -280,9 +280,12 @@ OTHER RULES:
 - noTravelCharge: set by the destination decision above - true only in its two no-charge outcomes (no visit and nothing bought, or every trip on foot or by bicycle). Never decide it separately from destination, and never set it true just because travel went unmentioned.
 - travelCosts[]: out-of-pocket travel disbursements the operator states with a dollar amount - parking, road tolls, ferry fares ("Parking cost me $4" → { "label": "Parking", "cost": 4 }; "$2.30 toll each way" → { "label": "Tolls", "cost": 4.6 }). Pass the stated amount through at cost; these are NOT tasks, NOT parts, and never affect drive time. Empty array when none are stated.
 - paidCash: did the description say the client paid in CASH?
-  - YES, it names cash as how they paid: "paid cash", "paid in cash", "cash job", "gave me cash", "$80 cash". Set true.
+  - YES, it names cash as how they paid: "paid cash", "paid in cash", "cash job", "gave me cash", "paid $47 in cash", "$80 cash". Set true.
   - NO: bank transfer, card, "paid on the spot" with no method named, "will pay later", or no mention of payment at all. Set false. Never guess cash from a small amount or a walk-in.
-  INVARIANT - payment wording is never a task, never a part, and never goes in notes or details.
+- cashPaid: the dollar amount paid in cash, ONLY when the description states one.
+  - Amount stated with the cash: "paid $47 in cash" → 47, "$80 cash" → 80, "gave me $20 cash towards it" → 20. Set the number.
+  - Cash named with no amount ("paid cash", "cash job"), or no cash at all: set null. Never work an amount out from the job's price.
+  INVARIANT - payment wording is never a task, never a part, and never goes in notes or details. The cash amount goes ONLY in cashPaid.
 - Ignore dates and client names.
 
 CLARIFICATION MODE:
@@ -344,7 +347,8 @@ Return this exact JSON shape (when not asking for clarification):
     { "label": string, "cost": number }
   ],
   "storeRuns": string[],
-  "paidCash": boolean
+  "paidCash": boolean,
+  "cashPaid": number | null
 }`;
 }
 

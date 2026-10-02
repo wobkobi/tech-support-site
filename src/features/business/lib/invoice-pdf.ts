@@ -3,7 +3,7 @@
 // the PDF reads as the same document as the on-screen InvoicePreviewPanel; keep the two
 // layouts in sync.
 
-import { formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
+import { balanceDue, formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
 import { nzFinancialYearCode } from "@/features/business/lib/financial-year";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
@@ -140,6 +140,8 @@ export function serialiseInvoice(inv: PrismaInvoice): Invoice {
     paidAt: inv.paidAt?.toISOString() ?? null,
     paymentMethod: inv.paymentMethod,
     paymentReference: inv.paymentReference,
+    alreadyPaid: inv.alreadyPaid,
+    alreadyPaidMethod: inv.alreadyPaidMethod,
     isQuote: inv.isQuote,
     quoteValidUntil: inv.quoteValidUntil?.toISOString() ?? null,
     driveFileId: inv.driveFileId,
@@ -481,7 +483,7 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
  * @param ctx - PDF drawing context.
  * @param invoice - Invoice being rendered.
  * @param y - Top of the block.
- * @returns Y coordinate below the Total row.
+ * @returns Y coordinate below the Total row, or the Balance due row on a part-paid invoice.
  */
 function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
   // Label area widened (0.4 > 0.6 of CONTENT_W) so long promo titles fit.
@@ -558,6 +560,19 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
   // Push Total below the divider so 14pt bold doesn't overlap the line.
   y -= 12;
   drawRow("Total", formatNZD(invoice.total), { isBold: true });
+  // Part payment: the total stays the job's price and the balance is what's asked for.
+  if (invoice.alreadyPaid && invoice.alreadyPaid > 0) {
+    y += 6;
+    drawRow("Already paid", `-${formatNZD(invoice.alreadyPaid)}`);
+    ctx.page.drawLine({
+      start: { x: totalsLabelX, y: y + 6 },
+      end: { x: totalsValueX, y: y + 6 },
+      thickness: 0.5,
+      color: LIGHT,
+    });
+    y -= 12;
+    drawRow("Balance due", formatNZD(balanceDue(invoice)), { isBold: true });
+  }
 
   return y - 12;
 }

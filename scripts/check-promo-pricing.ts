@@ -28,6 +28,7 @@ import {
   type ActivePromo,
   type QuoteParts,
 } from "@/features/business/lib/promos";
+import type { RateConfig } from "@/features/business/types/business";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 
 let failures = 0;
@@ -810,6 +811,59 @@ function main(): void {
     ),
     0,
   );
+  // ---- A line priced under the live rate ----
+  //
+  // With the live rates known, each hour floors at the promo price for its rate
+  // tags. The bug this pins: a line still at an old, lower Standard took the
+  // full cut and billed under the flat rate the promo advertises.
+
+  const LIVE_RATES = [
+    { id: "base", ratePerHour: STANDARD, hourlyDelta: null, percentDelta: null },
+    { id: "phone", ratePerHour: null, hourlyDelta: PHONE_DELTA, percentDelta: null },
+  ] as unknown as RateConfig[];
+  const STALE = FLAT + CUT / 2;
+  expectEqual(
+    "a stale line under the live rate only comes down to the flat rate",
+    computeJobPromoDiscount(
+      job(STALE, false),
+      promo("flat_hourly", FLAT),
+      0,
+      BIZ,
+      undefined,
+      STANDARD,
+      LIVE_RATES,
+    ),
+    STALE - FLAT,
+  );
+  const livePhone = job(phoneRate, false);
+  livePhone.tasks[0]!.modifierIds = ["phone"];
+  expectEqual(
+    "a live modified line still takes the full cut",
+    computeJobPromoDiscount(
+      livePhone,
+      promo("flat_hourly", FLAT),
+      0,
+      BIZ,
+      undefined,
+      STANDARD,
+      LIVE_RATES,
+    ),
+    CUT,
+  );
+  expectEqual(
+    "a line above the live rate takes the cut, no more",
+    computeJobPromoDiscount(
+      job(STANDARD + 20, false),
+      promo("flat_hourly", FLAT),
+      0,
+      BIZ,
+      undefined,
+      STANDARD,
+      LIVE_RATES,
+    ),
+    CUT,
+  );
+
   expectEqual(
     "the rate helper cuts a modified rate the same way",
     applyPromoToHourlyRate(phoneRate, promo("flat_hourly", FLAT), STANDARD),

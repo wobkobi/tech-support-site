@@ -1,11 +1,15 @@
 "use client";
 // src/features/business/hooks/use-calculator-save.ts
 // Save paths for the job calculator: invoice / save & send / quote via the invoices API
-// (with the add-to-contacts gate and contactId backfill), marking a paid-in-cash invoice
-// paid, and the direct income entry.
+// (with the add-to-contacts gate and contactId backfill), marking a paid-in-full invoice
+// paid, sending any already-paid amount, and the direct income entry.
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { validateEmail } from "@/features/booking/lib/booking";
+import {
+  alreadyPaidAmount,
+  type AlreadyPaidState,
+} from "@/features/business/lib/already-paid-input";
 import {
   buildIncomeDescription,
   jobToLineItems,
@@ -48,6 +52,8 @@ interface UseCalculatorSaveArgs {
   jobDate: string;
   /** "Paid in cash" ticked: an invoice saves as paid, an income entry records Cash. */
   paidCash: boolean;
+  /** Already paid box: part of the bill handed over on the day. */
+  alreadyPaid: AlreadyPaidState;
   setTaskTemplates: React.Dispatch<React.SetStateAction<TaskTemplate[]>>;
   /** Called after a successful income save to reset the form. */
   onIncomeSaved: () => void;
@@ -87,6 +93,7 @@ interface UseCalculatorSave {
  * @param args.pickedContactGoogleId - Google id of the picked contact, or null.
  * @param args.jobDate - Job date for the income entry.
  * @param args.paidCash - Whether the client paid in cash on the day.
+ * @param args.alreadyPaid - Amount and method handed over on the day, if any.
  * @param args.setTaskTemplates - Task template setter, refreshed as templates save.
  * @param args.onIncomeSaved - Resets the form after an income save.
  * @returns Save state plus the save handlers.
@@ -102,6 +109,7 @@ export function useCalculatorSave({
   pickedContactGoogleId,
   jobDate,
   paidCash,
+  alreadyPaid,
   setTaskTemplates,
   onIncomeSaved,
 }: UseCalculatorSaveArgs): UseCalculatorSave {
@@ -216,20 +224,25 @@ export function useCalculatorSave({
     router.push(`/admin/business/invoices/${invoiceId}`);
   }
 
+  // Paid in cash wins over the box; an amount covering the total is a full payment.
+  const prepaid = paidCash ? 0 : alreadyPaidAmount(alreadyPaid);
+  const prepaidCovers = prepaid > 0 && prepaid >= totals.total;
+
   /**
-   * Marks a just-saved invoice paid in cash on the job date, through the same route as
-   * the Payment dialog, which also records the income. A failure leaves the invoice
-   * saved and unpaid, so the operator is told to finish it from the invoice page.
+   * Marks a just-saved invoice paid on the job date, through the same route as the
+   * Payment dialog, which also records the income. A failure leaves the invoice saved
+   * and unpaid, so the operator is told to finish it from the invoice page.
    * @param invoiceId - The saved invoice.
+   * @param method - How the money came in (an INCOME_METHODS value).
    */
-  async function markPaidInCash(invoiceId: string): Promise<void> {
+  async function markPaid(invoiceId: string, method: string): Promise<void> {
     try {
       const res = await fetch(`/api/business/invoices/${invoiceId}/pay`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           paidAt: jobDate,
-          method: CASH,
+          method,
           createIncome: true,
           sendApology: false,
         }),
@@ -339,6 +352,15 @@ export function useCalculatorSave({
           calendarEventIds: eventPrefill?.slots.map((slot) => slot.calendarEventId) ?? [],
           // Quote mode: server allocates a Q- number + 30-day validity.
           isQuote: quote || undefined,
+          // Part payment: the invoice asks for the balance and the server records this
+          // amount in income on the job date. A full payment goes through markPaid instead.
+          ...(!quote &&
+            prepaid > 0 &&
+            !prepaidCovers && {
+              alreadyPaid: prepaid,
+              alreadyPaidMethod: alreadyPaid.method,
+              alreadyPaidDate: jobDate,
+            }),
           // issueDate, dueDate, number all defaulted server-side.
         }),
       });
@@ -347,6 +369,7 @@ export function useCalculatorSave({
             ok: true;
             invoice: { id: string };
             sheetSyncWarning?: boolean;
+            incomeSheetWarning?: boolean;
           }
         | { error: string };
       if ("error" in d) throw new Error(d.error);
@@ -358,10 +381,17 @@ export function useCalculatorSave({
           { tone: "warning" },
         );
       }
+      if (d.incomeSheetWarning) {
+        toast("Already paid added to income, but the Cashbook sheet update didn't go through.", {
+          tone: "warning",
+        });
+      }
       const invoiceId = d.invoice.id;
       // Before the contacts gate, which can stop here to wait on its modal. A quote
       // can't be paid.
-      if (paidCash && !quote) await markPaidInCash(invoiceId);
+      if (!quote && (paidCash || prepaidCovers)) {
+        await markPaid(invoiceId, paidCash ? CASH : alreadyPaid.method);
+      }
       // Add-to-contacts gate: defer nav until the modal closes so
       // handleAddContactClose can backfill contactId via PATCH. "Save & send"
       // skips this - the detail send flow runs its own add-to-contacts hook-in.
@@ -437,7 +467,7 @@ export function useCalculatorSave({
           amount: totals.total,
           // Not a bare literal: this is income, and "Business Account" is an expense
           // method that INCOME_METHODS does not contain.
-          method: paidCash ? CASH : INCOME_METHODS[0],
+          method: paidCash ? CASH : prepaidCovers ? alreadyPaid.method : INCOME_METHODS[0],
         }),
       });
       const d = (await res.json()) as {

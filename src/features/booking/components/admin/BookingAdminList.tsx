@@ -8,7 +8,6 @@
 // The status, search and date range live in the URL (?status=held&q=...), so Back from
 // a booking and the dashboard's deep links land on the same view.
 
-import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
@@ -123,8 +122,7 @@ export function BookingAdminList({
   const [sortDir, setSortDir] = useState<SortDir>(() => startDirFor(filter));
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
-  // Ticked by default: sending the review request is the normal way to finish a job.
-  const [sendReview, setSendReview] = useState(true);
+
   // Stable "now" so the upcoming/this-month checks don't trip react-hooks/purity.
   const [renderedAt] = useState(() => Date.now());
 
@@ -234,7 +232,6 @@ export function BookingAdminList({
         {b.status === "confirmed" && (
           <button
             onClick={() => {
-              setSendReview(true);
               setPending({
                 id: b.id,
                 kind: "complete",
@@ -283,7 +280,7 @@ export function BookingAdminList({
     return (
       <span
         className="mt-1 block text-xs font-medium text-coquelicot-700"
-        title="The Google Calendar event was deleted. Reminder and review emails are paused until this booking is cancelled or re-booked."
+        title="The Google Calendar event was deleted. Reminder emails are paused until this booking is cancelled or re-booked."
       >
         no calendar event
       </span>
@@ -300,7 +297,7 @@ export function BookingAdminList({
     setBusyId(id);
     const result =
       kind === "complete"
-        ? await actions.completeBooking(id, sendReview)
+        ? await actions.completeBooking(id)
         : await actions.resendReview(id, alreadySent);
     setBusyId(null);
     setPending(null);
@@ -308,15 +305,7 @@ export function BookingAdminList({
     setBookings((prev) =>
       prev.map((b) => {
         if (b.id !== id) return b;
-        if (kind === "complete") {
-          return {
-            ...b,
-            status: "completed",
-            // The server's stamp, not reviewSent: a skipped send is stamped
-            // too, and the row should match what a reload shows.
-            reviewSentAt: result.reviewSentAt ?? b.reviewSentAt,
-          };
-        }
+        if (kind === "complete") return { ...b, status: "completed" };
         return { ...b, reviewSentAt: new Date().toISOString() };
       }),
     );
@@ -534,18 +523,9 @@ export function BookingAdminList({
               : "Send the review email?"
         }
         body={
-          pending?.kind !== "complete" ? (
-            "Emails the customer a link to leave a review for this booking."
-          ) : pending.alreadySent ? (
-            "The review-request email has already gone out, so this only changes the status."
-          ) : (
-            <AdminCheckbox
-              checked={sendReview}
-              onChange={setSendReview}
-              disabled={busyId !== null}
-              label="Send the review-request email"
-            />
-          )
+          pending?.kind !== "complete"
+            ? "Emails the customer a link to leave a review for this booking."
+            : "This only changes the status. The review request goes out with the invoice."
         }
         confirmLabel={pending?.kind === "complete" ? "Mark completed" : "Send email"}
         busy={busyId !== null}
