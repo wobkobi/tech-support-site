@@ -51,18 +51,14 @@ All endpoints are **GET**. Create one cron-job.org job per row.
 | Calendar cache refresh  | `/api/cron/refresh-calendar-cache`  | GET    | every 30 minutes | Fetch Google Calendar events into the DB cache               |
 | Release holds           | `/api/cron/release-holds`           | GET    | every 15 minutes | Cancel expired booking holds                                 |
 | Reconcile booking times | `/api/cron/reconcile-booking-times` | GET    | every 30 minutes | Pull corrected times back from Calendar, flag deleted events |
-
-| Booking reminders | `/api/cron/send-booking-reminders` | GET | every 30 minutes | Email a 24h-out
-reminder for confirmed bookings | | Invoice reminders | `/api/cron/send-invoice-reminders` | GET |
-daily | Chase overdue SENT invoices (max 2 nudges each) | | Sheets sync | `/api/cron/sync-sheets` |
-GET | hourly | Reconcile Cashbook/Expenses sheets with MongoDB | | Contacts sync |
-`/api/cron/sync-contacts` | GET | every 3 hours | Two-way incremental Google Contacts sync | |
-Record subscriptions | `/api/cron/record-subscriptions` | GET | daily 08:00 NZ | Record due
-subscriptions as expenses + sheet row | | Purge price estimates | `/api/cron/purge-price-estimates`
-| GET | daily | Delete price estimate logs past retention | | Public holidays |
-`/api/cron/refresh-public-holidays` | GET | monthly | Refresh NZ public holidays (current + next
-year) | | Scheduled mailing | `/api/cron/publish-scheduled` | GET | every 5 minutes | Send due
-scheduled mailing-list emails, resume stuck sends |
+| Booking reminders       | `/api/cron/send-booking-reminders`  | GET    | every 30 minutes | Email a 24h-out reminder for confirmed bookings              |
+| Invoice reminders       | `/api/cron/send-invoice-reminders`  | GET    | daily            | Chase overdue SENT invoices (max 2 nudges each)              |
+| Sheets sync             | `/api/cron/sync-sheets`             | GET    | hourly           | Reconcile Cashbook/Expenses sheets with MongoDB              |
+| Contacts sync           | `/api/cron/sync-contacts`           | GET    | every 3 hours    | Two-way incremental Google Contacts sync                     |
+| Record subscriptions    | `/api/cron/record-subscriptions`    | GET    | daily 08:00 NZ   | Record due subscriptions as expenses + sheet row             |
+| Purge price estimates   | `/api/cron/purge-price-estimates`   | GET    | daily            | Delete price estimate logs past retention                    |
+| Public holidays         | `/api/cron/refresh-public-holidays` | GET    | monthly          | Refresh NZ public holidays (current + next year)             |
+| Scheduled mailing       | `/api/cron/publish-scheduled`       | GET    | every 5 minutes  | Send due scheduled mailing-list emails, resume stuck sends   |
 
 Full URL = the production URL + the path above. cron-job.org lets you pick a timezone per job -
 schedule Record subscriptions in `Pacific/Auckland` so it stays at 8am across DST changes.
