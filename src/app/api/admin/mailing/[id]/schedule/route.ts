@@ -1,10 +1,12 @@
 // src/app/api/admin/mailing/[id]/schedule/route.ts
 // Schedules a draft to send later (the publish-scheduled cron sends it), or cancels the
-// schedule, which turns it back into an editable draft.
+// schedule, which turns it back into an editable draft. A time inside quiet hours moves
+// to the end of them.
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import { missingSendEnv } from "@/features/mailing/lib/context";
 import { listProblems } from "@/features/mailing/lib/render";
+import { quietHoldUntil } from "@/features/mailing/lib/send";
 import { parseExcludedIds } from "@/features/mailing/lib/validate";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -22,7 +24,7 @@ interface Ctx {
  * @param request - Incoming request.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the campaign id.
- * @returns JSON `{ scheduledAt }`.
+ * @returns JSON `{ scheduledAt }`: the time it will go, after any quiet-hours move.
  */
 export async function POST(request: NextRequest, { params }: Ctx): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
@@ -33,8 +35,9 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
     excludedContactIds?: unknown;
   } | null;
 
-  const when = typeof body?.scheduledAt === "string" ? new Date(body.scheduledAt) : null;
-  if (!when || Number.isNaN(when.getTime())) return errorResponse("Pick a date and time.", 400);
+  const picked = typeof body?.scheduledAt === "string" ? new Date(body.scheduledAt) : null;
+  if (!picked || Number.isNaN(picked.getTime())) return errorResponse("Pick a date and time.", 400);
+  const when = (await quietHoldUntil(picked)) ?? picked;
   if (when.getTime() < Date.now() + 60_000) {
     return errorResponse("Pick a time at least a minute from now.", 400);
   }

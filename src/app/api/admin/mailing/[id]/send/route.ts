@@ -1,5 +1,6 @@
 // src/app/api/admin/mailing/[id]/send/route.ts
-// Sends an email to the list now, or re-sends only the copies that failed.
+// Sends an email to the list now, or re-sends only the copies that failed. Both are
+// refused inside quiet hours unless the operator chose "Send now anyway".
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import { retryFailedSends, startCampaignSend } from "@/features/mailing/lib/send";
@@ -10,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/admin/mailing/[id]/send
- * Body: `{ mode: "now", excludedContactIds }` or `{ mode: "retry" }`.
+ * Body: `{ mode: "now", excludedContactIds, sendDuringQuietHours? }` or `{ mode: "retry" }`.
  * @param request - Incoming request.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the campaign id.
@@ -26,6 +27,7 @@ export async function POST(
   const body = (await request.json().catch(() => null)) as {
     mode?: string;
     excludedContactIds?: unknown;
+    sendDuringQuietHours?: unknown;
   } | null;
 
   try {
@@ -36,7 +38,7 @@ export async function POST(
     if (body?.mode === "now") {
       const excluded = parseExcludedIds(body.excludedContactIds);
       if (!excluded) return errorResponse("excludedContactIds must be a list of ids.", 400);
-      const result = await startCampaignSend(id, excluded);
+      const result = await startCampaignSend(id, excluded, body.sendDuringQuietHours === true);
       return result.ok ? okResponse(result) : errorResponse(result.error, result.status);
     }
     return errorResponse('mode must be "now" or "retry".', 400);
