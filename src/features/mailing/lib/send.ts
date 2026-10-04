@@ -315,6 +315,8 @@ export async function retryFailedSends(id: string): Promise<SendResult> {
  * part-way. Does nothing inside quiet hours: the schedule route already keeps new times
  * out of them, so this catches a window changed after scheduling and a stalled run that
  * would otherwise resume overnight. Both go on the first run after quiet hours end.
+ * A stalled run whose linked promo has since ended is closed, not resumed, so nobody
+ * gets an email with the promo wording blanked out.
  * @returns When quiet hours end (null outside them), and one line per campaign touched.
  */
 export async function runScheduledSends(): Promise<{
@@ -349,8 +351,17 @@ export async function runScheduledSends(): Promise<{
     });
     if (claimed.count === 0) continue;
     const parts = await loadSharedRenderParts(campaign.promoId);
-    await ensureSendRows(campaign);
-    await deliverPending(campaign, parts);
+    if (parts.linkedPromoLive) {
+      await ensureSendRows(campaign);
+      await deliverPending(campaign, parts);
+    } else {
+      // Part of the list may already have it, so close the run rather than release to
+      // draft: the rest fail with a reason, and Retry stays blocked while the promo is off.
+      await prisma.campaignSend.updateMany({
+        where: { campaignId: campaign.id, status: "pending" },
+        data: { status: "failed", error: "The promo ended before this went out." },
+      });
+    }
     const counts = await finishRun(campaign);
     results.push({ id: campaign.id, name: campaign.name, result: { ok: true, ...counts } });
   }
