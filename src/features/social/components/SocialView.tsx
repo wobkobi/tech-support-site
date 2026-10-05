@@ -2,8 +2,8 @@
 // src/features/social/components/SocialView.tsx
 // The whole Social page. Starting a post comes first: a blank post or any preset, and
 // drafts and scheduled posts to pick back up. The open post is written right below in
-// the composer. What has already gone out folds away under Posted, and connection
-// checks sit at the bottom.
+// the composer. What has already gone out folds away under Posted, and the connection
+// check sits at the bottom, run once when the page opens.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
@@ -114,6 +114,8 @@ export function SocialView({
   const [deleting, setDeleting] = useState<SocialPostRow | null>(null);
   const [alsoTakeDown, setAlsoTakeDown] = useState(true);
   const [connections, setConnections] = useState<Connection[] | null>(null);
+  // Why the check on opening the page couldn't run, shown in the strip instead of a toast.
+  const [connectionsError, setConnectionsError] = useState<string | null>(null);
   const saveOpen = useRef<(() => Promise<boolean>) | null>(null);
   const composerRef = useRef<HTMLElement>(null);
   const composerHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -244,7 +246,22 @@ export function SocialView({
     toast(`Saved "${res.post.name}" to your presets.`, { tone: "success" });
   }
 
-  /** Checks every platform's credentials. */
+  // Check the connections once when the page opens, so a revoked or expired token shows
+  // before a post fails on it. Opening other posts keeps this component mounted, so it
+  // doesn't re-check on every click.
+  useEffect(() => {
+    let live = true;
+    void callApi<{ connections: Connection[] }>("/api/admin/social/connections").then((res) => {
+      if (!live) return;
+      if (res.ok) setConnections(res.connections);
+      else setConnectionsError(res.error);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  /** Checks every platform's credentials again, from the Check button. */
   async function checkConnections(): Promise<void> {
     setBusyId("connections");
     const res = await callApi<{ connections: Connection[] }>("/api/admin/social/connections");
@@ -254,6 +271,7 @@ export function SocialView({
       return;
     }
     setConnections(res.connections);
+    setConnectionsError(null);
   }
 
   /**
@@ -565,7 +583,9 @@ export function SocialView({
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="font-semibold text-admin-text">Connections</span>
           {connections === null ? (
-            <span className="text-admin-muted">Not checked yet.</span>
+            <span className="text-admin-muted">
+              {connectionsError ? `Couldn't check: ${connectionsError}` : "Checking..."}
+            </span>
           ) : (
             connections.map((c) => (
               <span key={c.platform} title={c.ok ? c.label : c.error}>
