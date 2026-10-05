@@ -1,8 +1,9 @@
 // scripts/check-mailing.ts
 // Mailing-list logic that has to be right before anything reaches a customer: the
 // renderer's escaping and formatting rules, placeholder filling, the image allow-list,
-// unsubscribe token signing, recipient selection, batch chunking and template switching. Pure logic, no
-// database and no network.
+// unsubscribe token signing, recipient selection, batch chunking, template switching and
+// the quiet-hours window that holds list sends until morning. Pure logic, no database and
+// no network.
 // Run with: npm run check:mailing
 
 import { selectRecipients, type PoolContact } from "@/features/mailing/lib/recipients";
@@ -23,6 +24,8 @@ import {
   signUnsubscribeToken,
   verifyUnsubscribeToken,
 } from "@/features/mailing/lib/unsubscribe-token";
+import { nextSendTime, type QuietHours } from "@/shared/lib/quiet-hours";
+import { nzWallClockUtc } from "@/shared/lib/timezone-utils";
 
 // The token helpers read the secret on each call, so setting it here still takes
 // effect despite import hoisting.
@@ -276,6 +279,64 @@ function checkChunking(): void {
   expect("nothing makes no chunks", chunk([], 100).length === 0);
 }
 
+/**
+ * Whether two optional instants are the same moment (both null counts as the same).
+ * @param a - First instant.
+ * @param b - Second instant.
+ * @returns True when they match.
+ */
+function sameInstant(a: Date | null, b: Date | null): boolean {
+  return a?.getTime() === b?.getTime();
+}
+
+/**
+ * Quiet hours: a send inside the window waits for its closing hour, the right day,
+ * including across the April daylight-saving change.
+ */
+function checkQuietHours(): void {
+  console.log("Quiet hours");
+  const night: QuietHours = { enabled: true, startHour: 21, endHour: 7 };
+
+  expect(
+    "10:30pm waits for 7am tomorrow",
+    sameInstant(
+      nextSendTime(night, nzWallClockUtc(2026, 10, 10, 22, 30)),
+      nzWallClockUtc(2026, 10, 11, 7),
+    ),
+  );
+  expect(
+    "3am waits for 7am the same day",
+    sameInstant(
+      nextSendTime(night, nzWallClockUtc(2026, 10, 11, 3)),
+      nzWallClockUtc(2026, 10, 11, 7),
+    ),
+  );
+  expect(
+    "9pm on the dot is already quiet",
+    nextSendTime(night, nzWallClockUtc(2026, 10, 10, 21)) !== null,
+  );
+  expect("7am on the dot can go", nextSendTime(night, nzWallClockUtc(2026, 10, 11, 7)) === null);
+  expect("midday can go", nextSendTime(night, nzWallClockUtc(2026, 10, 11, 12)) === null);
+  expect(
+    "switched off never holds",
+    nextSendTime({ ...night, enabled: false }, nzWallClockUtc(2026, 10, 10, 23)) === null,
+  );
+  expect(
+    "a window inside one day (1am to 5am) holds 2am until 5am",
+    sameInstant(
+      nextSendTime({ enabled: true, startHour: 1, endHour: 5 }, nzWallClockUtc(2026, 10, 11, 2)),
+      nzWallClockUtc(2026, 10, 11, 5),
+    ),
+  );
+  // NZDT ends at 3am on 4 April 2027, so the 7am release is NZST (UTC+12).
+  const overDst = nextSendTime(night, nzWallClockUtc(2027, 4, 3, 22));
+  expect(
+    "the night daylight saving ends still releases at 7am NZST",
+    overDst?.toISOString() === "2027-04-03T19:00:00.000Z",
+    overDst?.toISOString() ?? "null",
+  );
+}
+
 /** Switching template keeps edited fields and replaces untouched ones. */
 function checkTemplates(): void {
   console.log("Templates");
@@ -346,6 +407,7 @@ function main(): void {
   checkRecipients();
   checkChunking();
   checkTemplates();
+  checkQuietHours();
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);
 }

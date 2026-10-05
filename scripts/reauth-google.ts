@@ -5,12 +5,11 @@
 //
 // Run:  npx tsx scripts/reauth-google.ts
 
-import * as dotenv from "dotenv";
 import * as fs from "fs";
 import { OAuth2Client } from "google-auth-library";
 import * as readline from "readline";
 
-dotenv.config({ path: ".env.local" });
+process.loadEnvFile(".env.local");
 
 const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
 const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;

@@ -22,6 +22,7 @@ interface AdminButtonCommon {
   className?: string;
   children: React.ReactNode;
   "aria-label"?: string;
+  "aria-current"?: "true" | "page";
 }
 
 /** Props when rendering as a link (href present). */
@@ -131,6 +132,7 @@ export function AdminButton(props: AdminButtonProps): React.ReactElement {
       disabled={isDisabled}
       aria-busy={busy}
       aria-label={ariaLabel}
+      aria-current={props["aria-current"]}
       className={cn(base, isDisabled && "cursor-not-allowed opacity-60")}
     >
       {busy && <Spinner />}

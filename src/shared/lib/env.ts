@@ -15,8 +15,8 @@ const REQUIRED_ENV = ["MONGODB_URI", "ADMIN_SECRET", "CRON_SECRET"] as const;
 
 /**
  * Feature-specific vars. A missing one disables or degrades the related feature
- * (booking calendar, email, AI estimates, travel distance, sheets sync, mailing list) but is
- * never fatal, so these only ever warn.
+ * (booking calendar, email, AI estimates, travel distance, sheets sync, mailing list, social
+ * posting) but is never fatal, so these only ever warn.
  */
 const RECOMMENDED_ENV = [
   "GOOGLE_OAUTH_CLIENT_ID",
@@ -34,6 +34,9 @@ const RECOMMENDED_ENV = [
   "GOOGLE_BUSINESS_SHEETS_FOLDER_ID",
   "UNSUBSCRIBE_SECRET",
   "BLOB_READ_WRITE_TOKEN",
+  "META_PAGE_ID",
+  "META_PAGE_ACCESS_TOKEN",
+  "INSTAGRAM_ACCOUNT_ID",
 ] as const;
 
 /**

@@ -3,6 +3,8 @@
 // a CampaignSend row per recipient, then sends the pending rows in batches of 100. Rows
 // are the record of truth: a resumed run only sends what is still pending, a retry only
 // what failed, and Resend idempotency keys cover a crash between sending and recording.
+// Quiet hours hold every list send: the cron waits for morning, and a manual send or
+// retry inside them is refused unless the operator chose to send anyway.
 
 import {
   loadSharedRenderParts,
@@ -16,7 +18,10 @@ import { listProblems, renderCampaign, type CampaignContent } from "@/features/m
 import { signUnsubscribeToken } from "@/features/mailing/lib/unsubscribe-token";
 import { sendBatch, sendNow, type BatchMailPayload } from "@/features/reviews/lib/email-core";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
+import { nextSendTime, quietHoursOf } from "@/shared/lib/quiet-hours";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Campaign } from "@prisma/client";
 
 /** Resend's batch limit. */
@@ -31,6 +36,16 @@ const MAX_CHUNKS = 50;
 /** Outcome of a send, retry or test. */
 export type SendResult =
   { ok: true; sent: number; failed: number } | { ok: false; error: string; status: number };
+
+/**
+ * When a list send triggered at `at` must wait until, under the live quiet-hours window.
+ * @param at - The moment to check (defaults to now).
+ * @returns The end of quiet hours, or null when it may go straight away.
+ */
+export async function quietHoldUntil(at: Date = new Date()): Promise<Date | null> {
+  const { comms } = await getSettings();
+  return nextSendTime(quietHoursOf(comms), at);
+}
 
 /**
  * Splits a list into chunks.
@@ -189,12 +204,25 @@ async function finishRun(campaign: Campaign): Promise<{ sent: number; failed: nu
  * double-click, or the cron racing a manual send, from sending it twice.
  * @param id - Campaign id.
  * @param excludedIds - Contacts unticked in the send dialog; omitted to keep the stored list.
+ * @param sendDuringQuietHours - The operator chose "Send now anyway" inside quiet hours.
  * @returns Counts, or the reason it didn't send.
  */
-export async function startCampaignSend(id: string, excludedIds?: string[]): Promise<SendResult> {
+export async function startCampaignSend(
+  id: string,
+  excludedIds?: string[],
+  sendDuringQuietHours = false,
+): Promise<SendResult> {
   const missing = missingSendEnv();
   if (missing.length > 0) {
     return { ok: false, error: `Sending is off until ${missing.join(", ")} is set.`, status: 503 };
+  }
+  const hold = sendDuringQuietHours ? null : await quietHoldUntil();
+  if (hold) {
+    return {
+      ok: false,
+      error: `It's quiet hours until ${formatDateTimeShort(hold)}. Schedule it for then, or send now anyway.`,
+      status: 409,
+    };
   }
 
   const claimed = await prisma.campaign.updateMany({
@@ -237,7 +265,7 @@ export async function startCampaignSend(id: string, excludedIds?: string[]): Pro
 }
 
 /**
- * Re-sends only the rows that failed last time.
+ * Re-sends only the rows that failed last time. Waits out quiet hours like a first send.
  * @param id - Campaign id.
  * @returns Counts, or the reason it didn't run.
  */
@@ -245,6 +273,14 @@ export async function retryFailedSends(id: string): Promise<SendResult> {
   const missing = missingSendEnv();
   if (missing.length > 0) {
     return { ok: false, error: `Sending is off until ${missing.join(", ")} is set.`, status: 503 };
+  }
+  const hold = await quietHoldUntil();
+  if (hold) {
+    return {
+      ok: false,
+      error: `It's quiet hours until ${formatDateTimeShort(hold)}, so retry them then.`,
+      status: 409,
+    };
   }
   const before = await prisma.campaign.findUnique({ where: { id } });
   if (!before) return { ok: false, error: "Email not found.", status: 404 };
@@ -276,14 +312,21 @@ export async function retryFailedSends(id: string): Promise<SendResult> {
 
 /**
  * Cron: sends scheduled campaigns that are due, then resumes any run that died
- * part-way.
- * @returns One line per campaign touched, for the cron response.
+ * part-way. Does nothing inside quiet hours: the schedule route already keeps new times
+ * out of them, so this catches a window changed after scheduling and a stalled run that
+ * would otherwise resume overnight. Both go on the first run after quiet hours end.
+ * A stalled run whose linked promo has since ended is closed, not resumed, so nobody
+ * gets an email with the promo wording blanked out.
+ * @returns When quiet hours end (null outside them), and one line per campaign touched.
  */
-export async function runScheduledSends(): Promise<
-  { id: string; name: string; result: SendResult }[]
-> {
+export async function runScheduledSends(): Promise<{
+  heldUntil: Date | null;
+  results: { id: string; name: string; result: SendResult }[];
+}> {
   const now = new Date();
   const results: { id: string; name: string; result: SendResult }[] = [];
+  const heldUntil = await quietHoldUntil(now);
+  if (heldUntil) return { heldUntil, results };
 
   const due = await prisma.campaign.findMany({
     where: { isPreset: false, status: "scheduled", scheduledAt: { lte: now } },
@@ -308,12 +351,21 @@ export async function runScheduledSends(): Promise<
     });
     if (claimed.count === 0) continue;
     const parts = await loadSharedRenderParts(campaign.promoId);
-    await ensureSendRows(campaign);
-    await deliverPending(campaign, parts);
+    if (parts.linkedPromoLive) {
+      await ensureSendRows(campaign);
+      await deliverPending(campaign, parts);
+    } else {
+      // Part of the list may already have it, so close the run rather than release to
+      // draft: the rest fail with a reason, and Retry stays blocked while the promo is off.
+      await prisma.campaignSend.updateMany({
+        where: { campaignId: campaign.id, status: "pending" },
+        data: { status: "failed", error: "The promo ended before this went out." },
+      });
+    }
     const counts = await finishRun(campaign);
     results.push({ id: campaign.id, name: campaign.name, result: { ok: true, ...counts } });
   }
-  return results;
+  return { heldUntil: null, results };
 }
 
 /**

@@ -1028,3 +1028,112 @@ model EmailOptOut {
 
   @@index([contactId])
 }
+
+// Lifecycle of a social post. "partial" is a run where some platforms posted and
+// others failed; Retry re-runs only the failed ones. Presets never leave draft.
+// removing and removed: the operator pressed Take down. removed means nothing of the
+// post is left up on any platform.
+enum SocialPostStatus {
+  draft
+  scheduled
+  posting
+  posted
+  partial
+  failed
+  removing
+  removed
+}
+
+enum SocialPlatform {
+  facebook
+  instagram
+  google
+}
+
+enum SocialTargetStatus {
+  pending
+  posted
+  failed
+  skipped
+  removed
+}
+
+// Google Business Profile post kind. OFFER needs a title and start/end dates.
+enum GooglePostType {
+  STANDARD
+  OFFER
+  EVENT
+}
+
+// Google post button. CALL dials the profile's phone number, so it takes no URL.
+enum GooglePostCta {
+  BOOK
+  CALL
+  LEARN_MORE
+}
+
+// One platform's copy of a social post and how publishing it went.
+type SocialTarget {
+  platform     SocialPlatform
+  enabled      Boolean            @default(true)
+  // Replaces the shared body on this platform only.
+  textOverride String?
+  status       SocialTargetStatus @default(pending)
+  externalId   String?
+  permalink    String?
+  error        String?
+  postedAt     DateTime?
+  removedAt    DateTime?
+}
+
+// A post the operator writes once in /admin/social and publishes to Facebook,
+// Instagram and Google Business Profile. Publishing lives in
+// src/features/social/lib/publish.ts.
+model SocialPost {
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  // Admin-only label; followers never see it.
+  name String
+  body String
+
+  imageUrl    String?
+  imageAlt    String?
+  // Pixel size of the stored image, for Instagram's aspect-ratio and width rules.
+  imageWidth  Int?
+  imageHeight Int?
+  linkUrl     String?
+
+  isPreset  Boolean @default(false)
+  // Stable handle for a starter preset the code looks up by role.
+  presetKey String?
+
+  status           SocialPostStatus @default(draft)
+  scheduledAt      DateTime?
+  postedAt         DateTime?
+  // When the current publish or take-down run claimed the post. A run still
+  // "posting" well past this died mid-way, and the cron resumes its pending targets;
+  // one still "removing" can be claimed again by pressing Take down.
+  postingStartedAt DateTime?
+
+  // Promo the post advertises; publishing is blocked once it ends.
+  promoId    String? @db.ObjectId
+  // Mailing-list email the post was shared from.
+  campaignId String? @db.ObjectId
+
+  // One per platform, always all three; written as a whole array because Prisma
+  // rejects composite writes with undeclared fields.
+  targets SocialTarget[]
+
+  googleType  GooglePostType @default(STANDARD)
+  googleCta   GooglePostCta?
+  // Title and dates for OFFER and EVENT posts.
+  googleTitle String?
+  offerStart  DateTime?
+  offerEnd    DateTime?
+  couponCode  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isPreset, status])
+  @@index([status, scheduledAt])
+}

@@ -16,6 +16,26 @@ export interface QuietHours {
 }
 
 /**
+ * Builds the window from the three comms settings fields.
+ * @param comms - The comms settings group (or any object carrying its quiet-hours fields).
+ * @param comms.quietHoursEnabled - Master switch.
+ * @param comms.quietHoursStart - NZ hour the window opens.
+ * @param comms.quietHoursEnd - NZ hour it closes.
+ * @returns The quiet-hours window.
+ */
+export function quietHoursOf(comms: {
+  quietHoursEnabled: boolean;
+  quietHoursStart: number;
+  quietHoursEnd: number;
+}): QuietHours {
+  return {
+    enabled: comms.quietHoursEnabled,
+    startHour: comms.quietHoursStart,
+    endHour: comms.quietHoursEnd,
+  };
+}
+
+/**
  * Works out when an email triggered now is allowed to go out.
  * @param quiet - The live quiet-hours window.
  * @param now - When the send was triggered (defaults to the current instant).

@@ -30,7 +30,7 @@ export interface SharedRenderParts {
  * @param promoId - Linked promo id, or null.
  * @returns Wording plus whether a linked promo is still live.
  */
-async function promoWording(
+export async function promoWording(
   promoId: string | null,
 ): Promise<{ promo: PromoWording | null; linkedPromoLive: boolean }> {
   const promo = promoId ? await findAdvertisablePromo(promoId) : await getActivePromo();
@@ -69,14 +69,6 @@ export function missingSendEnv(): string[] {
   if (!process.env.EMAIL_FROM?.trim()) missing.push("EMAIL_FROM");
   if (!unsubscribeSecret()) missing.push("UNSUBSCRIBE_SECRET");
   return missing;
-}
-
-/**
- * Whether image uploads are available.
- * @returns True when the Blob token is set.
- */
-export function canUploadImages(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
 }
 
 /**

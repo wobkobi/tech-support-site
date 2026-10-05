@@ -1,20 +1,27 @@
-// src/features/mailing/lib/resize-image.ts
-// Browser-side image shrink before upload. Phone photos are 3-8 MB; an email shows
-// them at 560px wide at most, so 1200px (crisp on high-DPI screens) as JPEG brings
-// them to a few hundred KB, keeping the upload under the function body limit and the
-// email fast to open on mobile data.
+// src/shared/lib/resize-image.ts
+// Browser-side image shrink before upload, shared by the mailing and social editors.
+// Phone photos are 3-8 MB; an email shows them at 560px wide at most and Instagram
+// takes 320-1440px, so 1200px (crisp on high-DPI screens) as JPEG brings them to a few
+// hundred KB, keeping the upload under the function body limit.
 
 const MAX_EDGE = 1200;
 const JPEG_QUALITY = 0.85;
+
+/** A shrunk image with the pixel size it came out at. */
+export interface ShrunkImage {
+  file: File;
+  width: number;
+  height: number;
+}
 
 /**
  * Scales an image so its longest edge is at most 1200px and re-encodes it as JPEG.
  * Smaller images are re-encoded without scaling, which also strips camera metadata
  * like GPS location.
  * @param file - Image the operator picked.
- * @returns A JPEG file ready to upload.
+ * @returns A JPEG file ready to upload, with its width and height in pixels.
  */
-export async function shrinkImage(file: File): Promise<File> {
+export async function shrinkImage(file: File): Promise<ShrunkImage> {
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
   const width = Math.round(bitmap.width * scale);
@@ -36,5 +43,5 @@ export async function shrinkImage(file: File): Promise<File> {
   );
   if (!blob) throw new Error("Couldn't convert the image.");
   const base = file.name.replace(/\.[^.]+$/, "") || "image";
-  return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+  return { file: new File([blob], `${base}.jpg`, { type: "image/jpeg" }), width, height };
 }

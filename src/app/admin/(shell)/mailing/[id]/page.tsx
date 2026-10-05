@@ -7,11 +7,13 @@ import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { CampaignEditor, type SendRow } from "@/features/mailing/components/CampaignEditor";
 import { toCampaignRow } from "@/features/mailing/lib/campaign-row";
-import { canUploadImages, missingSendEnv } from "@/features/mailing/lib/context";
+import { missingSendEnv } from "@/features/mailing/lib/context";
 import { PLACEHOLDERS } from "@/features/mailing/lib/render";
 import { BLANK_TEMPLATE, type Template } from "@/features/mailing/lib/templates";
 import { requireAdminAuth } from "@/shared/lib/auth";
+import { canUploadImages } from "@/shared/lib/image-upload";
 import { prisma } from "@/shared/lib/prisma";
+import { quietHoursOf } from "@/shared/lib/quiet-hours";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -104,11 +106,7 @@ export default async function AdminMailingEditPage({
         placeholders={PLACEHOLDERS.map((p) => ({ key: p.key, help: p.help }))}
         missingEnv={missingSendEnv()}
         canUpload={canUploadImages()}
-        quiet={{
-          enabled: comms.quietHoursEnabled,
-          startHour: comms.quietHoursStart,
-          endHour: comms.quietHoursEnd,
-        }}
+        quiet={quietHoursOf(comms)}
         promoTitle={promo?.title ?? null}
         templates={templates}
         adminEmail={process.env.ADMIN_EMAIL?.trim() || null}

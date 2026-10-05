@@ -58,7 +58,7 @@ All endpoints are **GET**. Create one cron-job.org job per row.
 | Record subscriptions    | `/api/cron/record-subscriptions`    | GET    | daily 08:00 NZ   | Record due subscriptions as expenses + sheet row             |
 | Purge price estimates   | `/api/cron/purge-price-estimates`   | GET    | daily            | Delete price estimate logs past retention                    |
 | Public holidays         | `/api/cron/refresh-public-holidays` | GET    | monthly          | Refresh NZ public holidays (current + next year)             |
-| Scheduled mailing       | `/api/cron/publish-scheduled`       | GET    | every 5 minutes  | Send due scheduled mailing-list emails, resume stuck sends   |
+| Scheduled publishing    | `/api/cron/publish-scheduled`       | GET    | every 5 minutes  | Post due social posts, send due emails, resume stuck runs    |
 
 Full URL = the production URL + the path above. cron-job.org lets you pick a timezone per job -
 schedule Record subscriptions in `Pacific/Auckland` so it stays at 8am across DST changes.
@@ -125,8 +125,12 @@ schedule Record subscriptions in `Pacific/Auckland` so it stays at 8am across DS
   overlapping runs can't send one twice, and every recipient has a `CampaignSend` row that is only
   marked sent once Resend accepts it. A send left in `sending` for over 10 minutes (a timed-out
   function) is re-claimed and only its pending rows go out, with the same Resend idempotency keys.
-  An idle run is two indexed queries, so the 5-minute cadence costs next to no Active CPU; it is
-  that tight only so a scheduled email goes out close to the time the operator picked.
+  An idle run is four indexed queries, so the 5-minute cadence costs next to no Active CPU; it is
+  that tight only so a scheduled email or post goes out close to the time the operator picked.
+- Scheduled social posts use the same claim (`scheduled > posting`) and run before the quiet-hours
+  check, so they go out at the time picked at any hour. Each platform's outcome is stored on the
+  post, so a resumed run (including one waiting on Instagram's picture processing) only posts to the
+  platforms still pending.
 - Contacts sync runs local dedup/merge first, then pushes only the dirty set, then pulls Google's
   changes. The manual full sync lives at `/api/admin/contacts/sync`.
 - Sheets sync treats the sheet as source of truth, joining rows on the hidden column-Z Sync ID, and
