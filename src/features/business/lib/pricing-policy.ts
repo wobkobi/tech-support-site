@@ -417,6 +417,40 @@ function minutes(n: number): string {
 }
 
 /**
+ * The three in-person cancellation tiers as a short inline list, for the FAQ
+ * line that tells people the cancel page shows which tier they are in.
+ * @param p - Cancellation policy (defaults to the module constant).
+ * @returns e.g. "free / $35 cancellation fee / $65 call-out + travel".
+ */
+export function cancellationTiersCopy(p: CancellationPolicy = CANCELLATION): string {
+  return `free / $${p.callOutFee} cancellation fee / $${p.fullCallOutFee} call-out + travel`;
+}
+
+/**
+ * FAQ answer for a missed appointment. A no-show bills the same tier as a
+ * cancel inside travelChargeHours, so the notice line must not promise that
+ * any warning at all avoids travel - only notice beyond that window does.
+ * @param p - Cancellation policy (defaults to the module constant).
+ * @returns The charge sentence and the how-to-avoid-it sentence.
+ */
+export function noShowCopy(p: CancellationPolicy = CANCELLATION): {
+  charge: string;
+  notice: string;
+} {
+  return {
+    charge:
+      `A missed in-person appointment is billed like a cancellation inside ` +
+      `${hours(p.travelChargeHours)}: the $${p.fullCallOutFee} call-out plus the round-trip ` +
+      `travel I would have made to your address. A missed remote session is the $${p.remoteFee} ` +
+      `remote fee.`,
+    notice:
+      `If you realise you can't make it, let me know as soon as you can. With more than ` +
+      `${hours(p.travelChargeHours)} notice it drops to the $${p.callOutFee} cancellation fee ` +
+      `with no travel, and with ${hours(p.freeNoticeHours)} or more there's no fee at all.`,
+  };
+}
+
+/**
  * Cancellation policy text (pricing accordion + booking emails + cancel page).
  * @param p - Cancellation policy (defaults to the module constant).
  * @param opts - Optional narrowing for a context that knows the meeting type.

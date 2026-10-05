@@ -8,7 +8,9 @@
 import { formatMoneyCompact } from "@/features/business/lib/business";
 import {
   cancellationCopy,
+  cancellationTiersCopy,
   gstCopy,
+  noShowCopy,
   partsCopy,
   unsuccessfulWorkCopy,
   workmanshipCopy,
@@ -88,6 +90,8 @@ export default async function FaqPage(): Promise<React.ReactElement> {
   const travelDiscounted = travelFactor < 1;
   const paymentTermsDays = settings.identity.paymentTermsDays;
   const cancellationText = cancellationCopy(policy.CANCELLATION);
+  const cancellationTiers = cancellationTiersCopy(policy.CANCELLATION);
+  const noShow = noShowCopy(policy.CANCELLATION);
   const unsuccessfulText = unsuccessfulWorkCopy(
     policy.UNSUCCESSFUL_WORK_FACTOR,
     policy.NO_FIX_FREE_MINS,
@@ -294,26 +298,19 @@ export default async function FaqPage(): Promise<React.ReactElement> {
         <>
           <p>{renderEmphasised(cancellationText)}</p>
           <p className="mt-2 text-rich-black/80">
-            The cancel page itself shows you which window you're in (free / $30 call-out / $30 +
-            travel) before you confirm, so there's no surprise.
+            The cancel page itself shows you which window you're in ({cancellationTiers}) before you
+            confirm, so there's no surprise.
           </p>
         </>
       ),
     },
     {
       question: "What happens if I miss my appointment?",
-      plainAnswer:
-        "No-shows are billed as late cancellations - the call-out fee plus the round-trip travel I would have made to your address. If you realise you can't make it, let me know any time before the appointment to avoid the travel charge; if you give 12+ hours notice there's no fee at all.",
+      plainAnswer: `${noShow.charge} ${noShow.notice}`,
       answer: (
         <>
-          <p>
-            No-shows are billed as late cancellations - the call-out fee plus the round-trip travel
-            I would have made to your address.
-          </p>
-          <p className="mt-2 text-rich-black/80">
-            If you realise you can't make it, let me know any time before the appointment to skip
-            the travel charge; with 12+ hours notice there's no fee at all.
-          </p>
+          <p>{noShow.charge}</p>
+          <p className="mt-2 text-rich-black/80">{noShow.notice}</p>
         </>
       ),
     },
