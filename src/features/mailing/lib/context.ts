@@ -72,14 +72,6 @@ export function missingSendEnv(): string[] {
 }
 
 /**
- * Whether image uploads are available.
- * @returns True when the Blob token is set.
- */
-export function canUploadImages(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
-}
-
-/**
  * Public unsubscribe page for a token. Test emails use the "preview" token,
  * which the page recognises and explains instead of acting on.
  * @param token - Signed token, or "preview".

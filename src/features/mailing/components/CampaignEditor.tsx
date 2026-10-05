@@ -14,7 +14,6 @@ import { useToast } from "@/features/admin/components/ui/Toast";
 import { SendDialog, type SendMode } from "@/features/mailing/components/SendDialog";
 import { callApi } from "@/features/mailing/lib/api-client";
 import type { CampaignRow } from "@/features/mailing/lib/campaign-row";
-import { shrinkImage } from "@/features/mailing/lib/resize-image";
 import {
   BLANK_TEMPLATE_ID,
   matchTemplate,
@@ -24,6 +23,7 @@ import {
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import type { QuietHours } from "@/shared/lib/quiet-hours";
+import { shrinkImage } from "@/shared/lib/resize-image";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
@@ -268,7 +268,7 @@ export function CampaignEditor({
   async function addImage(file: File): Promise<void> {
     setBusy("image");
     try {
-      const small = await shrinkImage(file);
+      const { file: small } = await shrinkImage(file);
       const form = new FormData();
       form.append("file", small);
       const res = await callApi<{ url: string }>("/api/admin/mailing/upload", "POST", form);
