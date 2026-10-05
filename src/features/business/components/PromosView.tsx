@@ -350,6 +350,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
   const [confirmDelete, setConfirmDelete] = useState<PromoRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [emailingId, setEmailingId] = useState<string | null>(null);
+  const [postingId, setPostingId] = useState<string | null>(null);
   const router = useRouter();
   // Phones only: the form starts folded so the promo list isn't a long form
   // away. lg+ always shows it.
@@ -580,6 +581,25 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
       return;
     }
     router.push(`/admin/mailing/${res.campaign.id}`);
+  }
+
+  /**
+   * Starts a social post draft from the promo preset, linked to this promo, and
+   * opens it in the composer.
+   * @param p - Running automatic promo to advertise.
+   */
+  async function postPromo(p: PromoRow): Promise<void> {
+    setPostingId(p.id);
+    const res = await callApi<{ post: { id: string } }>("/api/admin/social", "POST", {
+      source: "promo",
+      promoId: p.id,
+    });
+    if (!res.ok) {
+      setPostingId(null);
+      toast(res.error, { tone: "error" });
+      return;
+    }
+    router.push(`/admin/social?post=${res.post.id}`);
   }
 
   /** Deletes the promo held in the confirm dialog. Past invoices keep their snapshot. */
@@ -907,7 +927,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
                       <td className="px-4 py-3 text-right text-xs">
                         <div className="flex justify-end gap-3">
                           {/* Code promos are never advertised, so only a running
-                              automatic one can be emailed out. */}
+                              automatic one can be emailed or posted. */}
                           {p.kind === "automatic" && status === "active" && (
                             <button
                               onClick={() => void emailPromo(p)}
@@ -915,6 +935,15 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
                               className="font-semibold text-russian-violet hover:underline disabled:opacity-60"
                             >
                               {emailingId === p.id ? "Opening..." : "Email it"}
+                            </button>
+                          )}
+                          {p.kind === "automatic" && status === "active" && (
+                            <button
+                              onClick={() => void postPromo(p)}
+                              disabled={postingId !== null}
+                              className="font-semibold text-russian-violet hover:underline disabled:opacity-60"
+                            >
+                              {postingId === p.id ? "Opening..." : "Post it"}
                             </button>
                           )}
                           <button
@@ -1008,6 +1037,16 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
                         onClick={() => void emailPromo(p)}
                       >
                         Email this promo
+                      </AdminButton>
+                    )}
+                    {p.kind === "automatic" && status === "active" && (
+                      <AdminButton
+                        variant="secondary"
+                        busy={postingId === p.id}
+                        disabled={postingId !== null}
+                        onClick={() => void postPromo(p)}
+                      >
+                        Post this promo
                       </AdminButton>
                     )}
                     <AdminButton variant="secondary" onClick={() => void toggleActive(p)}>

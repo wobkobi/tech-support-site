@@ -28,6 +28,7 @@ import {
   FaMagnifyingGlassDollar,
   FaReceipt,
   FaRoute,
+  FaShareNodes,
   FaStar,
   FaTags,
   FaXmark,
@@ -49,6 +50,7 @@ type AdminPage =
   | "business-quick"
   | "promos"
   | "mailing"
+  | "social"
   | "notifications"
   | "settings";
 
@@ -161,6 +163,13 @@ const MAILING_NAV_ITEM: NavItem = {
   path: "/admin/mailing",
 };
 
+const SOCIAL_NAV_ITEM: NavItem = {
+  page: "social",
+  label: "Social posts",
+  icon: <FaShareNodes className="shrink-0" />,
+  path: "/admin/social",
+};
+
 const NOTIFICATIONS_NAV_ITEM: NavItem = {
   page: "notifications",
   label: "Notifications",
@@ -212,6 +221,7 @@ export function AdminSidebar(): React.ReactElement {
       ...BUSINESS_NAV_ITEMS,
       PROMOS_NAV_ITEM,
       MAILING_NAV_ITEM,
+      SOCIAL_NAV_ITEM,
       NOTIFICATIONS_NAV_ITEM,
       SETTINGS_NAV_ITEM,
     ].map((i) => i.path),
@@ -338,24 +348,28 @@ export function AdminSidebar(): React.ReactElement {
 
           <div className="my-2 border-t border-white/10" />
 
-          {[PROMOS_NAV_ITEM, MAILING_NAV_ITEM, NOTIFICATIONS_NAV_ITEM, SETTINGS_NAV_ITEM].map(
-            ({ page, label, icon, path }) => (
-              <Link
-                key={page}
-                href={path}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors select-none",
-                  active === path
-                    ? "bg-white/15 text-white"
-                    : "text-white/60 hover:bg-white/10 hover:text-white/90",
-                )}
-              >
-                {icon}
-                {label}
-              </Link>
-            ),
-          )}
+          {[
+            PROMOS_NAV_ITEM,
+            MAILING_NAV_ITEM,
+            SOCIAL_NAV_ITEM,
+            NOTIFICATIONS_NAV_ITEM,
+            SETTINGS_NAV_ITEM,
+          ].map(({ page, label, icon, path }) => (
+            <Link
+              key={page}
+              href={path}
+              onClick={() => setOpen(false)}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors select-none",
+                active === path
+                  ? "bg-white/15 text-white"
+                  : "text-white/60 hover:bg-white/10 hover:text-white/90",
+              )}
+            >
+              {icon}
+              {label}
+            </Link>
+          ))}
         </nav>
 
         {/* Footer - link back to the public site + sign-out trigger. */}

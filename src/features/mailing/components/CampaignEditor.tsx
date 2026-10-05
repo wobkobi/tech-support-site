@@ -318,6 +318,22 @@ export function CampaignEditor({
     else setPromoId(null);
   }
 
+  /** Starts a social post from this email's text, button link and first picture. */
+  async function shareToSocial(): Promise<void> {
+    if (editable && !(await save())) return;
+    setBusy("share");
+    const res = await callApi<{ post: { id: string } }>("/api/admin/social", "POST", {
+      source: "campaign",
+      campaignId: initial.id,
+    });
+    if (!res.ok) {
+      setBusy(null);
+      toast(res.error, { tone: "error" });
+      return;
+    }
+    router.push(`/admin/social?post=${res.post.id}`);
+  }
+
   /** Turns a scheduled email back into an editable draft. */
   async function cancelSchedule(): Promise<void> {
     setBusy("unschedule");
@@ -359,6 +375,19 @@ export function CampaignEditor({
         onCancelSchedule={() => void cancelSchedule()}
         onRefresh={() => router.refresh()}
       />
+
+      {!initial.isPreset && (
+        <div className="flex justify-end">
+          <AdminButton
+            size="sm"
+            variant="secondary"
+            busy={busy === "share"}
+            onClick={() => void shareToSocial()}
+          >
+            Share to social
+          </AdminButton>
+        </div>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>

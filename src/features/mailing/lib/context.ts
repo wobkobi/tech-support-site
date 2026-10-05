@@ -30,7 +30,7 @@ export interface SharedRenderParts {
  * @param promoId - Linked promo id, or null.
  * @returns Wording plus whether a linked promo is still live.
  */
-async function promoWording(
+export async function promoWording(
   promoId: string | null,
 ): Promise<{ promo: PromoWording | null; linkedPromoLive: boolean }> {
   const promo = promoId ? await findAdvertisablePromo(promoId) : await getActivePromo();
