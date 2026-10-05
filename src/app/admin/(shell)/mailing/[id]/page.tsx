@@ -1,20 +1,22 @@
 // src/app/admin/(shell)/mailing/[id]/page.tsx
 // Admin editor for one mailing-list email or preset. Loads the email, who it went
-// to (once sent), the presets for the template dropdown, the quiet-hours window and
-// which env vars sending still needs.
+// to (once sent), the presets for the template dropdown, the quiet-hours window, the
+// Add menu's contents and which env vars sending still needs.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
+import { insertDetailsOf } from "@/features/admin/lib/insertables";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { CampaignEditor, type SendRow } from "@/features/mailing/components/CampaignEditor";
 import { toCampaignRow } from "@/features/mailing/lib/campaign-row";
-import { missingSendEnv } from "@/features/mailing/lib/context";
-import { PLACEHOLDERS } from "@/features/mailing/lib/render";
+import { missingSendEnv, promoWording } from "@/features/mailing/lib/context";
+import { emailInsertGroups } from "@/features/mailing/lib/insertables";
 import { BLANK_TEMPLATE, type Template } from "@/features/mailing/lib/templates";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { canUploadImages } from "@/shared/lib/image-upload";
 import { prisma } from "@/shared/lib/prisma";
 import { quietHoursOf } from "@/shared/lib/quiet-hours";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type React from "react";
@@ -81,13 +83,14 @@ export default async function AdminMailingEditPage({
   if (!campaign) notFound();
 
   const isDraft = !campaign.isPreset && campaign.status === "draft";
-  const [sends, { comms }, promo, templates] = await Promise.all([
+  const [sends, { comms, identity }, promo, templates, wording] = await Promise.all([
     campaign.status === "draft" ? Promise.resolve([]) : loadSends(campaign.id),
     getSettings(),
     campaign.promoId
       ? prisma.promo.findUnique({ where: { id: campaign.promoId }, select: { title: true } })
       : Promise.resolve(null),
     isDraft ? loadTemplates() : Promise.resolve([]),
+    promoWording(campaign.promoId),
   ]);
   const row = toCampaignRow(campaign);
 
@@ -103,7 +106,7 @@ export default async function AdminMailingEditPage({
         key={`${row.status}-${row.updatedAt}`}
         initial={row}
         sends={sends}
-        placeholders={PLACEHOLDERS.map((p) => ({ key: p.key, help: p.help }))}
+        insertGroups={emailInsertGroups(insertDetailsOf(identity, getSiteUrl()), wording.promo)}
         missingEnv={missingSendEnv()}
         canUpload={canUploadImages()}
         quiet={quietHoursOf(comms)}

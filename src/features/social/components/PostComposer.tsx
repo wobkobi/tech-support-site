@@ -12,6 +12,7 @@ import { InsertMenu } from "@/features/admin/components/ui/InsertMenu";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import type { InsertDetails } from "@/features/admin/lib/insertables";
 import { callApi } from "@/features/mailing/lib/api-client";
 import type { PromoWording } from "@/features/mailing/lib/render";
 import {
@@ -19,7 +20,7 @@ import {
   InstagramPreview,
   type PreviewPost,
 } from "@/features/social/components/PlatformPreview";
-import { insertableGroups, type InsertDetails } from "@/features/social/lib/insertables";
+import { insertableGroups } from "@/features/social/lib/insertables";
 import { POST_STATUS_PILL, liveOn, type Connection } from "@/features/social/lib/post-display";
 import type { SocialPostRow, SocialTargetRow } from "@/features/social/lib/post-row";
 import {

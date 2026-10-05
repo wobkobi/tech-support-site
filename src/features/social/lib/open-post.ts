@@ -3,9 +3,9 @@
 // promo wording its placeholders fill with, which env vars each platform still needs,
 // and the site address and contact details the Add menu inserts.
 
+import { insertDetailsOf, type InsertDetails } from "@/features/admin/lib/insertables";
 import { promoWording } from "@/features/mailing/lib/context";
 import type { PromoWording } from "@/features/mailing/lib/render";
-import type { InsertDetails } from "@/features/social/lib/insertables";
 import { PLATFORMS } from "@/features/social/lib/platforms";
 import { toPostRow, type SocialPostRow } from "@/features/social/lib/post-row";
 import { SOCIAL_PLATFORMS, type SocialPlatformKey } from "@/features/social/lib/validate";
@@ -46,11 +46,6 @@ export async function loadOpenPost(post: SocialPost): Promise<OpenPost> {
     missingEnv: Object.fromEntries(
       SOCIAL_PLATFORMS.map((p) => [p, PLATFORMS[p].missingEnv()]),
     ) as Record<SocialPlatformKey, string[]>,
-    details: {
-      siteUrl: getSiteUrl(),
-      website: identity.website,
-      phone: identity.phone,
-      email: identity.email,
-    },
+    details: insertDetailsOf(identity, getSiteUrl()),
   };
 }

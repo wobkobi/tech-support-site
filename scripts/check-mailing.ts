@@ -1,11 +1,12 @@
 // scripts/check-mailing.ts
 // Mailing-list logic that has to be right before anything reaches a customer: the
 // renderer's escaping and formatting rules, placeholder filling, the image allow-list,
-// unsubscribe token signing, recipient selection, batch chunking, template switching and
-// the quiet-hours window that holds list sends until morning. Pure logic, no database and
-// no network.
+// unsubscribe token signing, recipient selection, batch chunking, template switching, the
+// editor's Add menu and the quiet-hours window that holds list sends until morning. Pure
+// logic, no database and no network.
 // Run with: npm run check:mailing
 
+import { emailInsertGroups } from "@/features/mailing/lib/insertables";
 import { selectRecipients, type PoolContact } from "@/features/mailing/lib/recipients";
 import {
   listProblems,
@@ -397,6 +398,61 @@ function checkTemplates(): void {
   );
 }
 
+/** The editor's Add menu: every item has to come out of the renderer as intended. */
+function checkInsertables(): void {
+  console.log("Add menu");
+  const details = {
+    siteUrl: "https://example.co.nz",
+    website: "example.co.nz",
+    phone: "021 000 0000",
+    email: "me@example.co.nz",
+  };
+  const items = emailInsertGroups(details, CTX.promo).flatMap((g) => g.items);
+  const byLabel = new Map(items.map((i) => [i.label, i]));
+  expect("labels are unique (they key the menu buttons)", byLabel.size === items.length);
+
+  const placeholders = items.filter((i) => i.text.startsWith("{"));
+  expect(
+    "offers both name placeholders and the three promo ones",
+    placeholders.map((i) => i.text).join(" ") ===
+      "{firstName} {name} {promo} {promoOffer} {promoEnds}",
+  );
+  expect(
+    "every offered placeholder is one the renderer knows",
+    placeholders.every(
+      (i) => listProblems({ subject: "Hi", preheader: null, body: i.text }, true).length === 0,
+    ),
+  );
+  expect(
+    "a running promo shows its wording as the hint",
+    byLabel.get("When it ends")?.hint === "Friday 3 October",
+  );
+
+  const button = byLabel.get("Book a time");
+  expect(
+    "a button item renders as a button to the booking page",
+    button?.line === true &&
+      renderBody(button.text, VALUES).includes(
+        '<a href="https://example.co.nz/booking" style="display:inline-block',
+      ),
+    button?.text,
+  );
+  const link = renderBody(`See our ${byLabel.get("Prices page")?.text} for more.`, VALUES);
+  expect(
+    "a link item renders inline, inside the sentence",
+    link.includes('See our <a href="https://example.co.nz/pricing"') &&
+      link.includes(">prices page</a> for more."),
+    link,
+  );
+  const website = renderBody(byLabel.get("Website")?.text ?? "", VALUES);
+  expect(
+    "the website links its address once",
+    website.split("<a ").length === 2 && website.includes(">example.co.nz</a>"),
+    website,
+  );
+  expect("phone comes from the details", byLabel.get("Phone number")?.text === "021 000 0000");
+}
+
 /** Runs every group and exits non-zero on any failure. */
 function main(): void {
   checkEscaping();
@@ -407,6 +463,7 @@ function main(): void {
   checkRecipients();
   checkChunking();
   checkTemplates();
+  checkInsertables();
   checkQuietHours();
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);
