@@ -4,11 +4,13 @@
 // preview is rendered by the same server code that builds the real email, so what
 // shows here is exactly what lands. Once an email is scheduled or sent the content
 // locks and the page shows who it went to instead. Drafts get a template dropdown
-// beside the preview that swaps presets while keeping any field already edited.
+// beside the preview that swaps presets while keeping any field already edited, and
+// the body has an Add menu for placeholders, links, buttons and contact details.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { InsertMenu, type InsertGroup } from "@/features/admin/components/ui/InsertMenu";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { SendDialog, type SendMode } from "@/features/mailing/components/SendDialog";
@@ -34,12 +36,6 @@ export interface SendRow {
   email: string;
   status: "pending" | "sent" | "failed";
   error: string | null;
-}
-
-/** A placeholder the operator can insert. */
-export interface PlaceholderHelp {
-  key: string;
-  help: string;
 }
 
 /** Editable fields, as last saved. */
@@ -82,7 +78,7 @@ const SNIPPETS: { label: string; title: string; before: string; after: string; l
  * @param props - Component props.
  * @param props.initial - The email as saved.
  * @param props.sends - Per-recipient results, for an email that has gone out.
- * @param props.placeholders - Placeholders the renderer understands.
+ * @param props.insertGroups - What the Add menu offers.
  * @param props.missingEnv - Env vars sending needs that aren't set.
  * @param props.canUpload - Whether image uploads are configured.
  * @param props.quiet - Live quiet-hours window.
@@ -94,7 +90,7 @@ const SNIPPETS: { label: string; title: string; before: string; after: string; l
 export function CampaignEditor({
   initial,
   sends,
-  placeholders,
+  insertGroups,
   missingEnv,
   canUpload,
   quiet,
@@ -104,7 +100,7 @@ export function CampaignEditor({
 }: {
   initial: CampaignRow;
   sends: SendRow[];
-  placeholders: PlaceholderHelp[];
+  insertGroups: InsertGroup[];
   missingEnv: string[];
   canUpload: boolean;
   quiet: QuietHours;
@@ -242,7 +238,8 @@ export function CampaignEditor({
    * Inserts text at the cursor in the body, wrapping any selected text.
    * @param before - Text before the selection.
    * @param after - Text after the selection.
-   * @param line - Start on a fresh line.
+   * @param line - Give it a line of its own. A button only renders as one when nothing
+   * else shares its line, so text after the cursor moves down too.
    */
   function insert(before: string, after = "", line = false): void {
     const el = bodyRef.current;
@@ -251,7 +248,8 @@ export function CampaignEditor({
     const end = el?.selectionEnd ?? body.length;
     const selected = body.slice(start, end);
     const lead = line && start > 0 && body[start - 1] !== "\n" ? "\n" : "";
-    const next = body.slice(0, start) + lead + before + selected + after + body.slice(end);
+    const trail = line && end < body.length && body[end] !== "\n" ? "\n" : "";
+    const next = body.slice(0, start) + lead + before + selected + after + trail + body.slice(end);
     setField("body", next);
     // Put the cursor inside the inserted markers once React has re-rendered.
     const cursor = start + lead.length + before.length + selected.length;
@@ -474,6 +472,13 @@ export function CampaignEditor({
                       if (file) void addImage(file);
                     }}
                   />
+                  <div className="ml-auto">
+                    <InsertMenu
+                      groups={insertGroups}
+                      onInsert={(text, line) => insert(text, "", line)}
+                      align="right"
+                    />
+                  </div>
                 </div>
               )}
               <textarea
@@ -487,25 +492,15 @@ export function CampaignEditor({
               {editable && (
                 <details className="text-sm text-admin-text-secondary">
                   <summary className="cursor-pointer font-semibold text-russian-violet">
-                    Placeholders and formatting
+                    Formatting help
                   </summary>
-                  <ul className="mt-2 flex flex-col gap-1">
-                    {placeholders.map((p) => (
-                      <li key={p.key}>
-                        <button
-                          type="button"
-                          onClick={() => insert(`{${p.key}}`)}
-                          className="font-mono text-russian-violet hover:underline"
-                        >
-                          {`{${p.key}}`}
-                        </button>{" "}
-                        - {p.help}
-                      </li>
-                    ))}
-                  </ul>
                   <p className="mt-2">
                     A blank line starts a new paragraph. A line that is only{" "}
                     <code>[Text](https://...)</code> becomes a big button.
+                  </p>
+                  <p className="mt-2">
+                    Words in curly brackets, like <code>{"{firstName}"}</code>, fill in for each
+                    person. Add lists them all, with links, buttons and contact details.
                   </p>
                 </details>
               )}
