@@ -1,6 +1,6 @@
 "use client";
 // src/shared/components/PromoBannerClient.tsx
-// Banner with 24h dismissal, first-load delay, and navbar offset coordination.
+// Banner with 24h dismissal. Renders on first paint and sits in normal flow above the sticky header.
 
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";
@@ -8,33 +8,19 @@ import { isPrintRoute } from "@/shared/lib/print-routes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { FaBolt, FaXmark } from "react-icons/fa6";
 
 const PROMO_DISMISSED_KEY = "promo-banner-dismissed-at";
-const PROMO_SEEN_KEY = "promo-banner-seen-at";
 /** How long a dismissal sticks before the banner returns. */
 const DISMISS_TTL_MS = 24 * 60 * 60 * 1000;
-/** Settle delay on a first-ever visit before the banner slides in. */
-const FIRST_LOAD_DELAY_MS = 500;
-/** Extra breathing room added below the banner before the navbar starts. */
-const BANNER_GAP_PX = 8;
 
 interface Props {
   promo: ActivePromo;
 }
 
 /**
- * Writes the navbar offset CSS variable in px (always with units so calc() works).
- * @param px - Total offset (banner height + breathing gap), or 0 to clear.
- */
-function setNavOffset(px: number): void {
-  if (typeof document === "undefined") return;
-  document.documentElement.style.setProperty("--promo-h", `${Math.max(0, px)}px`);
-}
-
-/**
- * Site-wide promo banner with dismissal + first-load animation.
+ * Site-wide promo banner with 24h dismissal.
  * @param props - Component props.
  * @param props.promo - Active promo from the server wrapper.
  * @returns Banner element.
@@ -54,86 +40,42 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
     pathname === "/business" ||
     pathname.startsWith("/business/");
 
-  // Both states start false on the server AND first client render so
-  // hydration matches; the effect below syncs from localStorage on mount.
-  const [visible, setVisible] = useState(false);
+  // Shown by default so the server HTML includes the banner and the page never
+  // shifts down after hydration; the effect hides it when a dismissal is still fresh.
   const [dismissed, setDismissed] = useState(false);
-  const bannerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const dismissedAtRaw = window.localStorage.getItem(PROMO_DISMISSED_KEY);
-    const dismissedAt = dismissedAtRaw ? Number(dismissedAtRaw) : 0;
-    if (dismissedAt && Date.now() - dismissedAt < DISMISS_TTL_MS) {
-      // queueMicrotask defers the setState past the effect body, satisfying
-      // the React lint while still firing before the next paint.
-      queueMicrotask(() => setDismissed(true));
-      return;
+    try {
+      const dismissedAt = Number(window.localStorage.getItem(PROMO_DISMISSED_KEY) ?? 0);
+      if (dismissedAt && Date.now() - dismissedAt < DISMISS_TTL_MS) {
+        // queueMicrotask defers the setState past the effect body, satisfying
+        // the React lint while still firing before the next paint.
+        queueMicrotask(() => setDismissed(true));
+      }
+    } catch {
+      // Storage blocked: keep the banner showing.
     }
-
-    // Returning visitor: reveal immediately after hydration.
-    if (window.localStorage.getItem(PROMO_SEEN_KEY)) {
-      queueMicrotask(() => setVisible(true));
-      return;
-    }
-
-    // First-ever visit: mark as seen and reveal after a brief settle delay.
-    window.localStorage.setItem(PROMO_SEEN_KEY, String(Date.now()));
-    const timer = window.setTimeout(() => setVisible(true), FIRST_LOAD_DELAY_MS);
-    return () => window.clearTimeout(timer);
   }, []);
 
-  // Measure the live banner height (which can change if copy wraps to two
-  // lines on a narrow viewport) and write banner + gap into --promo-h so the
-  // navbar's `top` always lines up. Reset when banner is hidden.
-  useEffect(() => {
-    if (hidden) {
-      setNavOffset(0);
-      return;
-    }
-    if (!visible || !bannerRef.current || typeof window === "undefined") return;
-    const el = bannerRef.current;
-    /**
-     * Writes the banner's current height (plus the breathing gap) into the
-     * shared CSS variable so the navbar slides to match.
-     * @returns void
-     */
-    const update = (): void => setNavOffset(el.offsetHeight + BANNER_GAP_PX);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    window.addEventListener("resize", update);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", update);
-    };
-  }, [visible, hidden]);
-
-  /** Records a dismissal and animates the banner away. */
+  /** Records a dismissal and hides the banner. */
   function handleDismiss(): void {
-    if (typeof window !== "undefined") {
+    try {
       window.localStorage.setItem(PROMO_DISMISSED_KEY, String(Date.now()));
+    } catch {
+      // Storage blocked: the dismissal lasts for this page view only.
     }
-    setVisible(false);
-    setNavOffset(0);
+    setDismissed(true);
   }
 
-  // Dismissed users + admin routes render nothing.
   if (dismissed || hidden) return <></>;
 
   return (
     <div
-      ref={bannerRef}
       className={cn(
-        "fixed inset-x-0 top-0 z-60",
-        // Matches the mustard strap on /pricing so both promo surfaces look the same.
-        "bg-mustard-300 text-russian-violet-900",
-
+        "relative bg-mustard-300 text-russian-violet-900",
         // Right padding leaves room for the absolute-positioned dismiss button.
-        "px-4 py-2.5 pr-12 text-center text-base font-semibold sm:px-12 sm:text-lg",
-        "transition-[translate] duration-500 ease-out",
-        visible ? "translate-y-0" : "pointer-events-none -translate-y-full",
+        "px-4 py-2 pr-12 text-center text-[0.9375rem] font-bold sm:px-12",
+        "print:hidden",
       )}
     >
       {/* No aria-label: the visible offer is the link's name, so what a

@@ -1,45 +1,69 @@
 "use client";
 // src/shared/components/SiteFooter.tsx
-// Site-wide footer with quick links, the privacy policy link, the business's
-// Facebook and Google profiles, and copyright. Hidden on
-// the admin area and the print artwork routes, matching the NavBar's hidden paths. A
-// direct child of <body>, so it is the page's single contentinfo landmark (the homepage's
-// contact bar lives inside <main>).
+// Dark site footer: brand line, Services and Company links, contact details and social
+// profiles. Hidden on admin and print routes, matching the header. A direct child of
+// <body>, so it is the page's single contentinfo landmark.
 
-import { FACEBOOK_PAGE_URL, GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
+import { CONTAINER } from "@/shared/components/Section";
+import {
+  FACEBOOK_PAGE_URL,
+  GOOGLE_BUSINESS_PROFILE_URL,
+  INSTAGRAM_URL,
+} from "@/shared/lib/business-profiles";
+import { cn } from "@/shared/lib/cn";
 import { isPrintRoute } from "@/shared/lib/print-routes";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type React from "react";
-import type { IconType } from "react-icons";
-import { FaFacebook, FaGoogle } from "react-icons/fa6";
 
 /** Path prefixes that hide the footer (admin has its own chrome). */
 const HIDDEN_PREFIXES: ReadonlyArray<string> = ["/admin"];
 
-const LINKS: ReadonlyArray<{ label: string; href: string }> = [
-  { label: "Services", href: "/services" },
-  { label: "Business", href: "/business" },
-  { label: "Pricing", href: "/pricing" },
+const SERVICE_LINKS: ReadonlyArray<{ label: string; href: string }> = [
+  { label: "Computers & laptops", href: "/services#computers-laptops" },
+  { label: "Wi-Fi & internet", href: "/services#wifi-internet" },
+  { label: "Phones & tablets", href: "/services#phones-tablets" },
+  { label: "Business IT support", href: "/business" },
+  { label: "All services", href: "/services" },
+];
+
+const COMPANY_LINKS: ReadonlyArray<{ label: string; href: string }> = [
   { label: "About", href: "/about" },
-  { label: "FAQ", href: "/faq" },
+  { label: "Pricing", href: "/pricing" },
   { label: "Reviews", href: "/reviews" },
-  { label: "Contact", href: "/contact" },
-  { label: "Book", href: "/booking" },
+  { label: "FAQ", href: "/faq" },
   { label: "Privacy", href: "/privacy" },
 ];
 
-/** Off-site profiles; also listed on the LocalBusiness JSON-LD sameAs. */
-const PROFILES: ReadonlyArray<{ label: string; href: string; Icon: IconType }> = [
-  { label: "Facebook", href: FACEBOOK_PAGE_URL, Icon: FaFacebook },
-  { label: "Google", href: GOOGLE_BUSINESS_PROFILE_URL, Icon: FaGoogle },
+/** Off-site profiles; the same URLs feed the LocalBusiness JSON-LD sameAs. */
+const PROFILES: ReadonlyArray<{ label: string; href: string }> = [
+  { label: "Facebook", href: FACEBOOK_PAGE_URL },
+  { label: "Instagram", href: INSTAGRAM_URL },
+  { label: "Google", href: GOOGLE_BUSINESS_PROFILE_URL },
 ];
+
+const LINK = "hover:text-white hover:underline";
+
+/** Props for {@link SiteFooter}. */
+export interface SiteFooterProps {
+  /** Display phone number from identity settings. */
+  phone: string;
+  /** tel: URI from identity settings. */
+  phoneTel: string;
+  /** Business email from identity settings. */
+  email: string;
+}
 
 /**
  * Footer shown at the bottom of every public page.
+ * @param props - Component props.
+ * @param props.phone - Display phone number.
+ * @param props.phoneTel - tel: URI.
+ * @param props.email - Business email.
  * @returns The footer element, or null on hidden paths.
  */
-export function SiteFooter(): React.ReactElement | null {
+export function SiteFooter({ phone, phoneTel, email }: SiteFooterProps): React.ReactElement | null {
   const pathname = usePathname();
   if (isPrintRoute(pathname)) return null;
   if (HIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
@@ -47,39 +71,82 @@ export function SiteFooter(): React.ReactElement | null {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="mx-auto mt-8 mb-6 w-full max-w-[min(100vw-1rem,clamp(90rem,75vw,140rem))] px-2 sm:max-w-[min(100vw-2rem,clamp(90rem,75vw,140rem))] sm:px-4">
-      <div className="flex flex-col items-center gap-4 rounded-2xl border border-seasalt-200/40 bg-white/70 p-6 shadow-lg backdrop-blur-md sm:p-8">
-        <nav
-          aria-label="Footer"
-          className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2"
-        >
-          {LINKS.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className="text-base font-semibold text-rich-black transition-colors hover:text-coquelicot-500"
-            >
-              {l.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-          {PROFILES.map(({ label, href, Icon }) => (
-            <a
-              key={href}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-base text-rich-black/80 transition-colors hover:text-coquelicot-500"
-            >
-              <Icon aria-hidden className="size-5" />
-              {label}
-            </a>
-          ))}
+    <footer className="bg-rich-black pt-13 pb-6 text-base text-seasalt-200 print:hidden">
+      <div className={CONTAINER}>
+        <div className="grid gap-9 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
+          <div>
+            <Image
+              src="/source/logo-full.svg"
+              alt="To the Point Tech"
+              width={2000}
+              height={674}
+              className="mb-3.5 h-14 w-auto brightness-0 invert"
+            />
+            <p>Friendly computer &amp; IT support across Auckland, at your home or business.</p>
+          </div>
+          <nav aria-labelledby="footer-services">
+            <h2 id="footer-services" className="mb-3 text-base font-bold text-white">
+              Services
+            </h2>
+            <ul className="grid gap-2">
+              {SERVICE_LINKS.map((l) => (
+                <li key={l.href}>
+                  <Link href={l.href} className={LINK}>
+                    {l.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <nav aria-labelledby="footer-company">
+            <h2 id="footer-company" className="mb-3 text-base font-bold text-white">
+              Company
+            </h2>
+            <ul className="grid gap-2">
+              {COMPANY_LINKS.map((l) => (
+                <li key={l.href}>
+                  <Link href={l.href} className={LINK}>
+                    {l.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <div>
+            <h2 className="mb-3 text-base font-bold text-white">Get in touch</h2>
+            <ul className="grid gap-2">
+              <li>
+                <a href={phoneTel} className={cn(LINK, "font-bold text-white")}>
+                  {phone}
+                </a>
+              </li>
+              <li>
+                <a href={`mailto:${email}`} className={cn(LINK, "break-all")}>
+                  {email}
+                </a>
+              </li>
+              <li>
+                <Link href="/booking" className={LINK}>
+                  Book online
+                </Link>
+              </li>
+              <li className="flex flex-wrap gap-x-2">
+                {PROFILES.map((p, i) => (
+                  <span key={p.href} className="flex gap-x-2">
+                    {i > 0 && <span aria-hidden="true">&middot;</span>}
+                    <a href={p.href} target="_blank" rel="noopener noreferrer" className={LINK}>
+                      {p.label}
+                    </a>
+                  </span>
+                ))}
+              </li>
+            </ul>
+          </div>
         </div>
-        <p className="text-center text-sm text-rich-black/70 sm:text-base">
-          {`© ${year} To the Point Tech - friendly computer & IT support across Auckland.`}
-        </p>
+        <div className="mt-10 flex flex-wrap justify-between gap-3 border-t border-seasalt-800 pt-5 text-sm">
+          <span>&copy; {year} To the Point Tech</span>
+          <span>Serving all of Auckland</span>
+        </div>
       </div>
     </footer>
   );

@@ -8,7 +8,11 @@ import { MobileActionBar } from "@/shared/components/MobileActionBar";
 import { NavBar } from "@/shared/components/NavBar";
 import { PromoBanner } from "@/shared/components/PromoBanner";
 import { SiteFooter } from "@/shared/components/SiteFooter";
-import { FACEBOOK_PAGE_URL, GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
+import {
+  FACEBOOK_PAGE_URL,
+  GOOGLE_BUSINESS_PROFILE_URL,
+  INSTAGRAM_URL,
+} from "@/shared/lib/business-profiles";
 import { servedSuburbGroups } from "@/shared/lib/served-suburbs";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
@@ -316,7 +320,7 @@ export default async function RootLayout({
       })),
     },
     // Business profiles only; personal ones live on the Person entity on /about.
-    sameAs: [GOOGLE_BUSINESS_PROFILE_URL, FACEBOOK_PAGE_URL],
+    sameAs: [GOOGLE_BUSINESS_PROFILE_URL, FACEBOOK_PAGE_URL, INSTAGRAM_URL],
   };
 
   const websiteJsonLd = {
@@ -344,9 +348,9 @@ export default async function RootLayout({
           Skip to content
         </a>
         <PromoBanner />
-        <NavBar />
+        <NavBar phone={identity.phone} phoneTel={identity.phoneTel} />
         {children}
-        <SiteFooter />
+        <SiteFooter phone={identity.phone} phoneTel={identity.phoneTel} email={identity.email} />
         <MobileActionBar phoneTel={identity.phoneTel} />
 
         <Analytics />
