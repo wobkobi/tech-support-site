@@ -161,6 +161,12 @@ const EXTRA_PAGES: ReadonlyArray<PageSpec> = [
     expectStatus: 404,
     mustContain: ["Well, this is awkward", "Take me home"],
   },
+  // The review-ask stop page is a [token] route; "preview" is its no-op token.
+  {
+    path: "/review-asks/stop/preview",
+    name: "Review asks stop (preview)",
+    mustContain: ["Review requests", "link from a preview email"],
+  },
 ];
 
 /**
