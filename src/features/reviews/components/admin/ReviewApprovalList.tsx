@@ -27,6 +27,8 @@ interface ReviewApprovalListProps {
   contacts: ContactPickerEntry[];
   /** Whether to show the {@link SendReviewLinkForm} at the top. Defaults to true. */
   showSendForm?: boolean;
+  /** Which status chip starts selected. Defaults to "all". */
+  initialStatus?: StatusFilter;
 }
 
 type StatusFilter = "all" | "pending" | "approved";
@@ -57,6 +59,7 @@ function chipClass(active: boolean): string {
  * @param props.approved - Already-approved reviews.
  * @param props.contacts - Contacts available for linking.
  * @param props.showSendForm - Whether to show the {@link SendReviewLinkForm} at the top. Defaults to true.
+ * @param props.initialStatus - Which status chip starts selected. Defaults to "all".
  * @returns Review approval list element.
  */
 export function ReviewApprovalList({
@@ -64,12 +67,13 @@ export function ReviewApprovalList({
   approved: initialApproved,
   contacts,
   showSendForm = true,
+  initialStatus = "all",
 }: ReviewApprovalListProps): React.ReactElement {
   const { toast } = useToast();
   const [pending, setPending] = useState<ReviewRow[]>(initialPending);
   const [approved, setApproved] = useState<ReviewRow[]>(initialApproved);
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatus);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [unlinkedOnly, setUnlinkedOnly] = useState(false);
   const [sort, setSort] = useState<Sort>("newest");

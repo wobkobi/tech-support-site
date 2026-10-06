@@ -1,14 +1,18 @@
 // src/app/admin/(shell)/reviews/page.tsx
-// Admin reviews page. Loads reviews plus every channel a review link goes out on -
-// booking sends, manual contact sends, and the automatic invoice review ask (soft-capped
-// at 1000 each) - joins them into a unified link history, summarises the pipeline as
-// StatCards, and renders the ReviewApprovalList, the upcoming review asks,
-// SendReviewLinkForm, and ReviewLinkHistoryTable.
+// Admin reviews page, built around asking for Google reviews. Loads reviews plus every
+// channel a review link goes out on - booking sends, manual contact sends, and the
+// automatic invoice review ask (soft-capped at 1000 each). The main column holds the
+// automatic asks, "Who you can ask" (every contact with their ask status), the send form
+// and the link history; reviews left on the site sit in the side column for approval.
 
 import { Card } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewApprovalList";
+import {
+  ReviewAskPeople,
+  type AskPerson,
+} from "@/features/reviews/components/admin/ReviewAskPeople";
 import {
   ReviewAskQueue,
   type RecentReviewAsk,
@@ -24,7 +28,7 @@ import {
   loadRecentReviewAskOutcomes,
   loadReviewAskCandidates,
 } from "@/features/reviews/lib/review-ask-queue.server";
-import { reviewAskNoteLabel } from "@/features/reviews/lib/review-ask-rules";
+import { askPersonStatus, reviewAskNoteLabel } from "@/features/reviews/lib/review-ask-rules";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
@@ -120,12 +124,12 @@ export default async function AdminReviewsPage({
           reviewLinkSubmittedAt: true,
         },
       }),
-      // Anyone who has asked not to get review asks, or unsubscribed from email, is left
-      // out of the suggestions.
+      // Anyone who has asked not to get review asks, or unsubscribed from email, shows
+      // in "Who you can ask" without a send button.
       Promise.all([
         prisma.reviewAskOptOut.findMany({ select: { email: true, contactId: true } }),
         prisma.emailOptOut.findMany({ select: { email: true, contactId: true } }),
-      ]).then(([a, b]) => [...a, ...b]),
+      ]),
       reviewSettings.reviewAskEnabled
         ? loadReviewAskCandidates(now, {
             delayDays: reviewSettings.reviewAskDelayDays,
@@ -245,55 +249,73 @@ export default async function AdminReviewsPage({
     return !!c.reviewLinkSubmittedAt || (reviewCountByContact.get(c.id) ?? 0) > 0;
   }
 
-  // Two reasons to keep someone out of the picker, with two lifetimes: a review already
-  // left is permanent (nothing left to ask for), while a recent send is just a nudge
-  // already made, so it lapses after the window rather than hiding them for good.
-  // Both match on email and phone as well as by id, so a duplicate pair that has not
-  // been merged yet still counts as the one person it is.
+  // "Who you can ask": every contact with their latest ask and whether they've reviewed.
+  // Reviews and booking sends match on email and phone as well as by id, so a duplicate
+  // pair that hasn't been merged yet still counts as the one person it is.
   const reviewedEmails = new Set<string>();
   const reviewedPhones = new Set<string>();
-  const recentlySentEmails = new Set<string>();
-  const recentlySentPhones = new Set<string>();
+  const bookingAskByEmail = new Map<string, Date>();
   for (const b of sentBookings) {
-    if (b.reviewSubmittedAt && b.email) reviewedEmails.add(b.email.toLowerCase());
-    if (b.reviewSentAt && b.reviewSentAt >= thirtyDaysAgo && b.email) {
-      recentlySentEmails.add(b.email.toLowerCase());
-    }
+    if (!b.email) continue;
+    const key = b.email.toLowerCase();
+    if (b.reviewSubmittedAt) reviewedEmails.add(key);
+    const prev = bookingAskByEmail.get(key);
+    if (b.reviewSentAt && (!prev || b.reviewSentAt > prev))
+      bookingAskByEmail.set(key, b.reviewSentAt);
   }
   for (const c of allContacts) {
     if (!hasReviewed(c)) continue;
     if (c.email) reviewedEmails.add(c.email.toLowerCase());
     if (c.phone) reviewedPhones.add(toE164NZ(c.phone));
   }
-  for (const ask of askByContact.values()) {
-    if (ask.sentAt < thirtyDaysAgo) continue;
-    if (ask.contact.email) recentlySentEmails.add(ask.contact.email.toLowerCase());
-    if (ask.contact.phone) recentlySentPhones.add(toE164NZ(ask.contact.phone));
+
+  const [reviewOptOuts, mailingOptOuts] = optOuts;
+  /**
+   * Whether an opt-out list covers a contact, by id or by any of their addresses.
+   * @param rows - Opt-out rows.
+   * @param c - Contact to test.
+   * @returns True when one of the rows is theirs.
+   */
+  function optedOut(rows: { email: string; contactId: string | null }[], c: ContactRow): boolean {
+    const emails = new Set([c.email, ...c.altEmails].flatMap((e) => (e ? [e.toLowerCase()] : [])));
+    return rows.some((o) => o.contactId === c.id || emails.has(o.email.toLowerCase()));
   }
 
-  const optedOutIds = new Set(optOuts.flatMap((o) => (o.contactId ? [o.contactId] : [])));
-  const optedOutEmails = new Set(optOuts.map((o) => o.email.toLowerCase()));
-
-  const contactSuggestions = allContacts
-    .filter((c) => {
-      if (optedOutIds.has(c.id)) return false;
-      if ([c.email, ...c.altEmails].some((e) => e && optedOutEmails.has(e.toLowerCase()))) {
-        return false;
-      }
-      // Already reviewed - by their own contact link, or matched on email/phone
-      // from a booking send.
-      if (hasReviewed(c)) return false;
-      if (c.email && reviewedEmails.has(c.email.toLowerCase())) return false;
-      if (c.phone && reviewedPhones.has(toE164NZ(c.phone))) return false;
-      // Asked inside the window - let it pass before asking again. The id check
-      // carries contacts with neither an email nor a phone on file.
-      const ask = askByContact.get(c.id);
-      if (ask && ask.sentAt >= thirtyDaysAgo) return false;
-      if (c.email && recentlySentEmails.has(c.email.toLowerCase())) return false;
-      if (c.phone && recentlySentPhones.has(toE164NZ(c.phone))) return false;
-      return true;
-    })
-    .map((c) => ({ id: c.id, name: c.name, email: c.email, phone: c.phone, address: c.address }));
+  const askPeople: AskPerson[] = allContacts.map((c) => {
+    const emails = [c.email, ...c.altEmails].flatMap((e) => (e ? [e.toLowerCase()] : []));
+    const stamps = [
+      askByContact.get(c.id)?.sentAt,
+      ...emails.map((e) => bookingAskByEmail.get(e)),
+    ].filter((d): d is Date => !!d);
+    const lastAskedAt = stamps.length
+      ? new Date(Math.max(...stamps.map((d) => d.getTime())))
+      : null;
+    const reviewed =
+      hasReviewed(c) ||
+      emails.some((e) => reviewedEmails.has(e)) ||
+      (!!c.phone && reviewedPhones.has(toE164NZ(c.phone)));
+    return {
+      id: c.id,
+      name: c.name,
+      email: c.email,
+      phone: c.phone,
+      address: c.address,
+      lastAskedAt: lastAskedAt?.toISOString() ?? null,
+      status: askPersonStatus(
+        {
+          hasEmail: !!c.email,
+          hasPhone: !!c.phone,
+          lastAskedAt,
+          reviewed,
+          reviewOptOut: optedOut(reviewOptOuts, c),
+          mailingOptOut: optedOut(mailingOptOuts, c),
+        },
+        reviewSettings.reviewAskGapDays,
+        now,
+      ),
+    };
+  });
+  const readyCount = askPeople.filter((p) => p.status === "ready").length;
 
   const siteUrl = getSiteUrl();
 
@@ -406,14 +428,18 @@ export default async function AdminReviewsPage({
             : null,
     };
   });
-  const recentAskRows: RecentReviewAsk[] = recentAsks.map((r) => ({
-    invoiceId: r.invoiceId,
-    number: r.number,
-    name: r.clientName,
-    outcome: r.outcome,
-    detail: reviewAskNoteLabel(r.note),
-    date: formatDateShort(r.decidedAt),
-  }));
+  // Invoices the rollout backfill marked as sent before automatic asks began are
+  // bookkeeping, not asks the job decided on, so they stay out of "Last 14 days".
+  const recentAskRows: RecentReviewAsk[] = recentAsks
+    .filter((r) => r.note !== "before_auto")
+    .map((r) => ({
+      invoiceId: r.invoiceId,
+      number: r.number,
+      name: r.clientName,
+      outcome: r.outcome,
+      detail: reviewAskNoteLabel(r.note),
+      date: formatDateShort(r.decidedAt),
+    }));
 
   const prefillContact = contactId
     ? await prisma.contact.findFirst({
@@ -426,17 +452,11 @@ export default async function AdminReviewsPage({
     <>
       <PageHeader
         title="Reviews"
-        description="Approve what goes public, and ask past clients for one."
+        description="Ask past clients for a Google review. Approve anything left on your site."
       />
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label="Pending"
-          value={pending.length}
-          sub={pending.length > 0 ? "waiting on you" : "all caught up"}
-          tone={pending.length > 0 ? "warning" : "default"}
-        />
-        <StatCard label="Approved" value={approved.length} sub="live on the site" tone="success" />
+        <StatCard label="Ready to ask" value={readyCount} sub="not asked lately" />
         <StatCard label="Links sent" value={sentLast30.length} sub="last 30 days" />
         <StatCard
           label="Turned into reviews"
@@ -448,23 +468,18 @@ export default async function AdminReviewsPage({
           }
           tone={conversion !== null && conversion >= 50 ? "success" : "default"}
         />
+        <StatCard
+          label="Site reviews to approve"
+          value={pending.length}
+          sub={pending.length > 0 ? "waiting on you" : "all caught up"}
+          tone={pending.length > 0 ? "warning" : "default"}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
-          <Card flushOnPhone>
-            <ReviewApprovalList
-              pending={pending}
-              approved={approved}
-              contacts={contacts}
-              showSendForm={false}
-            />
-          </Card>
-        </div>
-
-        <div className="flex flex-col gap-6">
           <Card>
-            <h2 className="mb-4 text-sm font-semibold text-russian-violet">Review asks</h2>
+            <h2 className="mb-4 text-sm font-semibold text-russian-violet">Automatic asks</h2>
             <ReviewAskQueue
               enabled={reviewSettings.reviewAskEnabled}
               upcoming={upcomingAsks}
@@ -473,9 +488,16 @@ export default async function AdminReviewsPage({
           </Card>
 
           <Card>
-            <h2 className="mb-4 text-sm font-semibold text-russian-violet">Send a review link</h2>
+            <h2 className="mb-1 text-sm font-semibold text-russian-violet">Who you can ask</h2>
+            <p className="mb-4 text-xs text-admin-muted">
+              Everyone in your contacts. The ask leads with your Google review link.
+            </p>
+            <ReviewAskPeople people={askPeople} gapDays={reviewSettings.reviewAskGapDays} />
+          </Card>
+
+          <Card>
+            <h2 className="mb-4 text-sm font-semibold text-russian-violet">Send to someone new</h2>
             <SendReviewLinkForm
-              contactSuggestions={contactSuggestions}
               prefill={prefillContact ?? undefined}
               defaultOpen={prefillContact !== null}
             />
@@ -487,6 +509,22 @@ export default async function AdminReviewsPage({
               <ReviewLinkHistoryTable entries={linkHistory} />
             </Card>
           )}
+        </div>
+
+        <div className="flex flex-col gap-6">
+          <Card flushOnPhone>
+            <h2 className="mb-1 text-sm font-semibold text-russian-violet">Reviews on your site</h2>
+            <p className="mb-4 text-xs text-admin-muted">
+              {approved.length} approved and showing on the site.
+            </p>
+            <ReviewApprovalList
+              pending={pending}
+              approved={approved}
+              contacts={contacts}
+              showSendForm={false}
+              initialStatus="pending"
+            />
+          </Card>
         </div>
       </div>
     </>

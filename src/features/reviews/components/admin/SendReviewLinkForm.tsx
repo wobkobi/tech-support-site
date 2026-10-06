@@ -8,6 +8,7 @@ import { useToast } from "@/features/admin/components/ui/Toast";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
+import { formatDateShort } from "@/shared/lib/date-format";
 import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useRef, useState } from "react";
@@ -69,7 +70,8 @@ export function SendReviewLinkForm({
   const [phoneInput, setPhoneInput] = useState(prefill?.phone ? formatNZPhone(prefill.phone) : "");
   const [loading, setLoading] = useState(false);
   const [smsText, setSmsText] = useState<string | null>(null);
-  const [existingUrl, setExistingUrl] = useState<string | null>(null);
+  /** Set when they were asked before: their link and when, so Send again can follow. */
+  const [existing, setExisting] = useState<{ url: string; askedAt: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
   /** Rendered HTML preview returned from the preview API (email mode only). */
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
@@ -77,7 +79,7 @@ export function SendReviewLinkForm({
   /** Resets transient results (preview, SMS text, existing-link). Does NOT clear form fields. */
   function resetState(): void {
     setSmsText(null);
-    setExistingUrl(null);
+    setExisting(null);
     setPreviewHtml(null);
   }
 
@@ -113,31 +115,35 @@ export function SendReviewLinkForm({
   }
 
   /**
-   * Sends the review link email (called after the admin confirms the preview).
+   * Sends the review link email (called after the admin confirms the preview, or from
+   * Send again once they've been told the person was asked before).
+   * @param resend - Send even though they were asked before.
    * @returns Promise resolving when the send completes.
    */
-  async function handleSend(): Promise<void> {
+  async function handleSend(resend = false): Promise<void> {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/send-review-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, mode: "email" }),
+        body: JSON.stringify({ name, email, mode: "email", resend }),
       });
       const data = (await res.json()) as {
         ok?: boolean;
         error?: string;
         reviewUrl?: string;
         existing?: boolean;
+        askedAt?: string | null;
       };
       if (!res.ok) throw new Error(data.error ?? "Request failed");
 
       setPreviewHtml(null);
       if (data.existing && data.reviewUrl) {
-        // Already sent one: surface the existing link to copy rather than send
-        // a second. Stays inline - it is a result to act on, not a notification.
-        setExistingUrl(data.reviewUrl);
+        // Asked before: say when, and offer Send again or the link to copy.
+        // Stays inline - it is a result to act on, not a notification.
+        setExisting({ url: data.reviewUrl, askedAt: data.askedAt ?? null });
       } else {
+        setExisting(null);
         toast("Review link sent.", { tone: "success" });
         clearFields();
       }
@@ -149,20 +155,19 @@ export function SendReviewLinkForm({
   }
 
   /**
-   * Handles SMS form submission to generate the SMS copy text.
-   * @param e - Form submit event.
-   * @returns Promise resolving when the submit completes.
+   * Generates the SMS copy text.
+   * @param resend - Write it even though they were asked before.
+   * @returns Promise resolving when the text is ready.
    */
-  async function handleSmsSubmit(e: React.SyntheticEvent): Promise<void> {
-    e.preventDefault();
+  async function generateSms(resend: boolean): Promise<void> {
     setLoading(true);
     setSmsText(null);
-    setExistingUrl(null);
+    setExisting(null);
     try {
       const res = await fetch("/api/admin/send-review-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone: phoneInput, mode: "sms" }),
+        body: JSON.stringify({ name, phone: phoneInput, mode: "sms", resend }),
       });
       const data = (await res.json()) as {
         ok?: boolean;
@@ -170,11 +175,12 @@ export function SendReviewLinkForm({
         reviewUrl?: string;
         smsText?: string;
         existing?: boolean;
+        askedAt?: string | null;
       };
       if (!res.ok) throw new Error(data.error ?? "Request failed");
 
       if (data.existing && data.reviewUrl) {
-        setExistingUrl(data.reviewUrl);
+        setExisting({ url: data.reviewUrl, askedAt: data.askedAt ?? null });
       } else if (data.smsText) {
         // Composed server-side so the operator + business name come from the
         // live identity settings.
@@ -186,6 +192,16 @@ export function SendReviewLinkForm({
     } finally {
       setLoading(false);
     }
+  }
+
+  /**
+   * Handles SMS form submission.
+   * @param e - Form submit event.
+   * @returns Promise resolving when the text is ready.
+   */
+  async function handleSmsSubmit(e: React.SyntheticEvent): Promise<void> {
+    e.preventDefault();
+    await generateSms(false);
   }
 
   /**
@@ -431,14 +447,25 @@ export function SendReviewLinkForm({
             </form>
           )}
 
-          {/* Existing link - already sent to this client before */}
-          {existingUrl && (
+          {/* Asked before - say when, and let the operator send it again anyway */}
+          {existing && (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="mb-2 text-xs font-semibold tracking-wide text-coquelicot-500 uppercase">
-                Already sent - here is their existing link
+              <p className="mb-2 text-sm font-semibold text-slate-700">
+                {existing.askedAt
+                  ? `Already asked on ${formatDateShort(existing.askedAt)}.`
+                  : "Already asked before."}
               </p>
-              <p className="mb-3 text-xs break-all text-slate-500">{existingUrl}</p>
-              <CopyLinkButton url={existingUrl} />
+              <p className="mb-3 text-xs break-all text-slate-500">{existing.url}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <AdminButton
+                  size="sm"
+                  busy={loading}
+                  onClick={() => void (mode === "email" ? handleSend(true) : generateSms(true))}
+                >
+                  {mode === "email" ? "Send again" : "Write the text again"}
+                </AdminButton>
+                <CopyLinkButton url={existing.url} />
+              </div>
             </div>
           )}
 
