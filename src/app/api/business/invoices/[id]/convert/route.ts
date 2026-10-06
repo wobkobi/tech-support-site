@@ -78,6 +78,12 @@ export async function POST(
           // operator reviews and sends the real invoice as its own step.
           status: "DRAFT",
           sentAt: null,
+          // A quote never gets a review ask, but clear any stamp so the real invoice's
+          // ask starts fresh when it's sent.
+          reviewAskOutcome: null,
+          reviewAskNote: null,
+          reviewAskDecidedAt: null,
+          reviewAskAttempts: null,
         },
       });
       break;

@@ -171,6 +171,11 @@ export async function createDraftCancellationInvoice(
           // Link the auto-draft to the booking it bills so the booking detail page
           // (Phase 9) can surface it. Legacy cancellation invoices stay unlinked.
           bookingId: booking.id,
+          // Born decided, so a fee invoice the operator later sends by hand never
+          // triggers a review ask.
+          reviewAskOutcome: "skipped",
+          reviewAskNote: "cancellation_fee",
+          reviewAskDecidedAt: now,
         },
       });
       break;
@@ -205,8 +210,8 @@ export async function createDraftCancellationInvoice(
 
 /**
  * Emails a freshly-drafted cancellation invoice and flips it to SENT. Mirrors
- * the operator send path (PDF > email > status > Drive sync) but omits the
- * review-link ask - a fee invoice is not the moment to request a review.
+ * the operator send path (PDF > email > status > Drive sync). The invoice was created
+ * with its review ask already skipped - a fee invoice is not the moment to ask.
  * Swallows all errors: the booking is already cancelled and the draft stands.
  * @param invoice - The DRAFT cancellation invoice row just created.
  * @param reason - Drives the email body wording.
@@ -239,7 +244,6 @@ async function sendCancellationInvoice(
         driveWebUrl: invoice.driveWebUrl,
       },
       pdfBytes,
-      reviewUrl: null,
       customBody,
     });
     if (!ok) {
@@ -249,7 +253,10 @@ async function sendCancellationInvoice(
       return;
     }
 
-    await prisma.invoice.update({ where: { id: invoice.id }, data: { status: "SENT" } });
+    await prisma.invoice.update({
+      where: { id: invoice.id },
+      data: { status: "SENT", sentAt: new Date() },
+    });
     console.log(`[cancellation-invoice] Auto-sent ${invoice.number}.`);
 
     // Sync the sent PDF to Drive so the archive matches what the client got.

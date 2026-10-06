@@ -213,7 +213,7 @@ export const DEFAULT_SETTINGS: Settings = {
     kiwiSaver: 0.12,
   },
 
-  // Source: cron route literals + contact-review-token.ts.
+  // Source: cron route literals.
   comms: {
     notifyConfirmation: true,
     notifyReminder: true,

@@ -1,11 +1,13 @@
 {
   "name": "tech-support-site",
-  "version": "4.64.0",
+  "version": "4.65.0",
   "private": true,
   "type": "module",
   "scripts": {
     "backfill:company:apply": "dotenv -e .env.local -- tsx scripts/backfill-contact-company.ts --apply",
     "backfill:company:dry": "dotenv -e .env.local -- tsx scripts/backfill-contact-company.ts",
+    "backfill:review-asks:apply": "dotenv -e .env.local -- tsx scripts/backfill-review-ask-outcomes.ts --apply",
+    "backfill:review-asks:dry": "dotenv -e .env.local -- tsx scripts/backfill-review-ask-outcomes.ts",
     "build": "next build",
     "build:ads": "tsx scripts/build-ads.ts",
     "build:all": "npm run build:icons && npm run build",

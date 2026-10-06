@@ -3,8 +3,8 @@
 // Action buttons + modals for the invoice detail page: save PDF, open Drive PDF, record
 // payment (via PaymentDialog), send-to-client, void, and delete-draft. Below lg, an
 // invoice still awaiting payment pins Mark as paid and Send to the screen bottom. The
-// send flow opens a preview modal with an editable email body/greeting plus an optional
-// review link based on eligibility; the void flow previews the notification and warns
+// send flow opens a preview modal with an editable email body/greeting plus the automatic
+// review ask checkbox; the void flow previews the notification and warns
 // when linked income entries would be left behind. Housed beside the page so it ships in
 // the PageHeader actions slot. Built on the shared admin primitives (Modal /
 // ConfirmDialog / AdminButton / Toast). The send and void flows live in

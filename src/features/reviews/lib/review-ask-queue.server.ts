@@ -85,7 +85,8 @@ function insensitiveAny<F extends string>(
  * @param now - Current instant.
  * @param timing - Delay and gap from settings.
  * @param opts - Options.
- * @param opts.onlyInvoiceId - Restrict to one invoice (local testing, Send now).
+ * @param opts.onlyInvoiceId - Restrict to one invoice (local testing, Send now). A
+ *   failed ask is then included whatever its attempt count, so Send now can retry it.
  * @returns Candidates with their decisions.
  */
 export async function loadReviewAskCandidates(
@@ -104,7 +105,9 @@ export async function loadReviewAskCandidates(
           OR: [
             { reviewAskOutcome: null },
             { reviewAskOutcome: { isSet: false } },
-            { reviewAskOutcome: "failed", reviewAskAttempts: { lt: REVIEW_ASK_MAX_ATTEMPTS } },
+            opts.onlyInvoiceId
+              ? { reviewAskOutcome: "failed" }
+              : { reviewAskOutcome: "failed", reviewAskAttempts: { lt: REVIEW_ASK_MAX_ATTEMPTS } },
           ],
         },
         { OR: [{ sentAt: { not: null } }, { paidAt: { not: null } }] },

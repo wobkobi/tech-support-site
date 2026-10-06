@@ -1,18 +1,18 @@
 "use client";
 // src/app/admin/(shell)/business/invoices/[id]/SendInvoiceModal.tsx
 // Send flow for the invoice detail page: the state + requests behind the send-to-client
-// preview, and the modal with the editable greeting/body, the review-link toggle (driven
-// by server eligibility), and the "add to contacts" hook that unlocks it.
+// preview, and the modal with the editable greeting/body, the automatic review ask
+// checkbox, and the "add to contacts" prompt when the ask would otherwise be skipped.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
-import type { InvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
 import {
   DEFAULT_INVOICE_EMAIL_BODY,
   DEFAULT_QUOTE_EMAIL_BODY,
 } from "@/features/business/lib/invoice-email-defaults";
+import type { InvoiceReviewAskInfo } from "@/features/reviews/lib/review-ask-rules";
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -31,12 +31,13 @@ export interface InvoiceSendFlow {
   setGreetingName: (value: string) => void;
   customBody: string;
   setCustomBody: (value: string) => void;
-  includeReview: boolean;
-  setIncludeReview: (value: boolean) => void;
-  eligibility: InvoiceReviewEligibility | null;
+  reviewAsk: boolean;
+  setReviewAsk: (value: boolean) => void;
+  /** Null when the invoice gets no automatic ask (quote, already decided, or asks off). */
+  reviewAskInfo: InvoiceReviewAskInfo | null;
   showAddContact: boolean;
   setShowAddContact: (value: boolean) => void;
-  openPreview: (forceAdopt?: boolean, includeReviewOverride?: boolean) => Promise<void>;
+  openPreview: () => Promise<void>;
   confirmSend: () => Promise<void>;
   closePreview: () => void;
 }
@@ -100,39 +101,25 @@ export function useInvoiceSend({
   const [customBody, setCustomBody] = useState(
     isQuote ? DEFAULT_QUOTE_EMAIL_BODY : DEFAULT_INVOICE_EMAIL_BODY,
   );
-  // Review-link inclusion. Defaults to whatever eligibility says when the modal opens.
-  const [includeReview, setIncludeReview] = useState(true);
-  const [eligibility, setEligibility] = useState<InvoiceReviewEligibility | null>(null);
+  // The automatic review ask goes out unless the operator unticks it.
+  const [reviewAsk, setReviewAsk] = useState(true);
+  const [reviewAskInfo, setReviewAskInfo] = useState<InvoiceReviewAskInfo | null>(null);
   const [showAddContact, setShowAddContact] = useState(false);
 
   /**
    * Opens the send modal and fetches the rendered email preview. Only spins on
    * the FIRST load so edit re-fetches keep the preview visible.
-   * @param forceAdopt - Re-adopt the server's fresh eligibility verdict (and sync
-   * the review checkbox) instead of keeping the operator's toggle; used after
-   * "add to contacts" so the checkbox unlocks.
-   * @param includeReviewOverride - Review value to preview instead of component
-   * state; pass the just-toggled value so the re-fetch isn't stale.
    */
   const openPreview = useCallback(
-    async function openPreviewImpl(
-      forceAdopt = false,
-      includeReviewOverride?: boolean,
-    ): Promise<void> {
+    async function openPreviewImpl(): Promise<void> {
       setError(null);
       if (!preview) setLoading(true);
       setPreviewOpen(true);
       try {
-        const sendIncludeReview = !forceAdopt && eligibility !== null;
-        const effectiveIncludeReview = includeReviewOverride ?? includeReview;
         const res = await fetch(`/api/business/invoices/${invoiceId}/preview-email`, {
           method: "POST",
           headers,
-          body: JSON.stringify({
-            greetingName,
-            customBody,
-            ...(sendIncludeReview ? { includeReview: effectiveIncludeReview } : {}),
-          }),
+          body: JSON.stringify({ greetingName, customBody }),
         });
         const d = (await res.json()) as
           | {
@@ -140,7 +127,7 @@ export function useInvoiceSend({
               subject: string;
               html: string;
               to: string;
-              eligibility: InvoiceReviewEligibility;
+              reviewAsk: InvoiceReviewAskInfo | null;
               defaultGreeting?: string;
             }
           | { error: string };
@@ -151,17 +138,16 @@ export function useInvoiceSend({
           to: d.to,
           defaultGreeting: d.defaultGreeting,
         });
-        if (!sendIncludeReview) setIncludeReview(d.eligibility.canSend);
-        setEligibility(d.eligibility);
+        setReviewAskInfo(d.reviewAsk);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not load preview");
       } finally {
         setLoading(false);
       }
     },
-    // eligibility/includeReview/greetingName/customBody/preview are read fresh
-    // each call so the preview matches the operator's current edits.
-    [invoiceId, eligibility, includeReview, greetingName, customBody, preview],
+    // greetingName/customBody/preview are read fresh each call so the preview
+    // matches the operator's current edits.
+    [invoiceId, greetingName, customBody, preview],
   );
 
   /** Confirms the send action: POSTs to send-email, refreshes on success. */
@@ -172,7 +158,11 @@ export function useInvoiceSend({
       const res = await fetch(`/api/business/invoices/${invoiceId}/send-email`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ greetingName, customBody, includeReview }),
+        body: JSON.stringify({
+          greetingName,
+          customBody,
+          ...(reviewAskInfo ? { reviewAsk } : {}),
+        }),
       });
       const d = (await res.json()) as { ok: true; sentAt: string } | { error: string };
       if ("error" in d) throw new Error(d.error);
@@ -194,8 +184,7 @@ export function useInvoiceSend({
     setPreviewOpen(false);
     setPreview(null);
     setError(null);
-    // Drop eligibility so the next open re-fetches it and re-syncs the toggle.
-    setEligibility(null);
+    setReviewAsk(true);
   }, [sending]);
 
   // Calculator "Save & send": open the send preview once on mount.
@@ -218,9 +207,9 @@ export function useInvoiceSend({
     setGreetingName,
     customBody,
     setCustomBody,
-    includeReview,
-    setIncludeReview,
-    eligibility,
+    reviewAsk,
+    setReviewAsk,
+    reviewAskInfo,
     showAddContact,
     setShowAddContact,
     openPreview,
@@ -259,9 +248,9 @@ export function SendInvoiceModal({
     setGreetingName,
     customBody,
     setCustomBody,
-    includeReview,
-    setIncludeReview,
-    eligibility,
+    reviewAsk,
+    setReviewAsk,
+    reviewAskInfo,
     showAddContact,
     setShowAddContact,
     openPreview,
@@ -333,54 +322,37 @@ export function SendInvoiceModal({
               disabled={sending}
               className={cn(INPUT_CLS, "mb-4 resize-y")}
             />
-            {eligibility && (
+            {reviewAskInfo && (
               <div className="mb-4">
-                <label
-                  className={cn(
-                    "flex items-start gap-2 text-sm",
-                    !eligibility.canSend && "cursor-not-allowed",
-                  )}
-                >
+                <label className="flex items-start gap-2 text-sm">
                   <input
                     type="checkbox"
-                    checked={includeReview && eligibility.canSend}
-                    disabled={!eligibility.canSend || sending}
-                    onChange={(e) => {
-                      setIncludeReview(e.target.checked);
-                      void openPreview(false, e.target.checked);
-                    }}
+                    checked={reviewAsk}
+                    disabled={sending}
+                    onChange={(e) => setReviewAsk(e.target.checked)}
                     className="mt-0.5"
                   />
-                  <span className={cn(!eligibility.canSend && "text-admin-faint")}>
-                    {eligibility.canSend && eligibility.googleOnly
-                      ? "Include Google review link in this email"
-                      : "Include review link in this email"}
-                    {eligibility.canSend && eligibility.googleOnly && (
-                      <span className="ml-1 text-xs italic">
-                        (they&apos;ve already reviewed on the site)
-                      </span>
-                    )}
-                    {eligibility.canSend === false && (
-                      <span className="ml-1 text-xs italic">
-                        {eligibility.reason === "already-reviewed" &&
-                          "(already reviewed - set a Google review link in Settings to ask for one)"}
-                        {eligibility.reason === "no-contact" && (
-                          <>
-                            (no contact record -{" "}
-                            <button
-                              type="button"
-                              onClick={() => setShowAddContact(true)}
-                              className="font-semibold text-russian-violet underline hover:opacity-80"
-                            >
-                              add {clientName?.trim() || "them"} to contacts
-                            </button>
-                            )
-                          </>
-                        )}
-                      </span>
-                    )}
+                  <span>
+                    Ask for a Google review in {reviewAskInfo.delayDays}{" "}
+                    {reviewAskInfo.delayDays === 1 ? "day" : "days"}
+                    <span className="ml-1 text-xs text-admin-muted">
+                      (a separate email on {reviewAskInfo.dueLabel})
+                    </span>
                   </span>
                 </label>
+                {reviewAsk && !reviewAskInfo.hasContact && (
+                  <p className="mt-1 ml-6 text-xs text-admin-muted italic">
+                    Not in your contacts yet -{" "}
+                    <button
+                      type="button"
+                      onClick={() => setShowAddContact(true)}
+                      className="font-semibold text-russian-violet not-italic underline hover:opacity-80"
+                    >
+                      add {clientName?.trim() || "them"} to contacts
+                    </button>{" "}
+                    before {reviewAskInfo.dueLabel} or no review ask will go out.
+                  </p>
+                )}
               </div>
             )}
             <p className={FIELD_LABEL_CLS}>Subject</p>
@@ -414,9 +386,8 @@ export function SendInvoiceModal({
                 body: JSON.stringify({ contactId: newContactId }),
               }).catch(() => undefined);
             }
-            // Force a fresh eligibility adopt so the review-link checkbox
-            // re-enables and auto-ticks.
-            void openPreview(Boolean(newContactId));
+            // Re-fetch so the "not in your contacts" note clears.
+            void openPreview();
           }}
         />
       )}

@@ -55,6 +55,16 @@ export function reviewAskNoteLabel(note: string | null | undefined): string | nu
     : note;
 }
 
+/** What the invoice send modal shows about the invoice's automatic review ask. */
+export interface InvoiceReviewAskInfo {
+  /** Days after sending the ask goes out. */
+  delayDays: number;
+  /** The date it's due if the invoice is sent now, e.g. "8 Oct 2026". */
+  dueLabel: string;
+  /** False when no contact matches - the ask would be skipped. */
+  hasContact: boolean;
+}
+
 /** The invoice fields the clock reads. */
 export interface ReviewAskClockFields {
   status: string;

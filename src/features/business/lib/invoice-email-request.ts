@@ -1,9 +1,8 @@
 // src/features/business/lib/invoice-email-request.ts
 // Shared request-side helpers for the invoice emails (preview / send / void / void-preview
-// routes and the overdue reminders): operator override parsing, the invoice > email payload
-// projection, and the review-link inclusion rule that preview and send had drifted apart on.
+// routes and the overdue reminders): operator override parsing and the invoice > email
+// payload projection.
 
-import type { InvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
 import { prisma } from "@/shared/lib/prisma";
 import type { Invoice } from "@prisma/client";
@@ -15,8 +14,11 @@ export interface InvoiceEmailOverrides {
   greetingName?: string;
   /** Replaces the intro paragraph. */
   customBody?: string;
-  /** Forces the review link on/off; undefined defers to eligibility. */
-  includeReview?: boolean;
+  /**
+   * Send route only: false cancels this invoice's automatic review ask (the operator
+   * unticked it). Undefined or true leaves the ask to go out on schedule.
+   */
+  reviewAsk?: boolean;
   /** Void route only: whether to email the customer about the void. */
   sendNotification: boolean;
 }
@@ -53,13 +55,13 @@ export async function parseInvoiceEmailOverrides(
   const body = (await request.json().catch(() => ({}))) as {
     greetingName?: unknown;
     customBody?: unknown;
-    includeReview?: unknown;
+    reviewAsk?: unknown;
     sendNotification?: unknown;
   };
   return {
     greetingName: typeof body.greetingName === "string" ? body.greetingName : undefined,
     customBody: typeof body.customBody === "string" ? body.customBody : undefined,
-    includeReview: typeof body.includeReview === "boolean" ? body.includeReview : undefined,
+    reviewAsk: typeof body.reviewAsk === "boolean" ? body.reviewAsk : undefined,
     sendNotification: body.sendNotification === true,
   };
 }
@@ -90,30 +92,4 @@ export async function toInvoiceEmailPayload(invoice: Invoice): Promise<InvoiceEm
     quoteValidUntil: invoice.quoteValidUntil,
     defaultGreeting: invoiceRecipient(invoice.clientName, contact).greetingName,
   };
-}
-
-/**
- * Decides whether an invoice email carries a review ask, and with which URL.
- *
- * Unticking the box drops the link, but ticking it cannot force one on: an
- * explicit `true` from a stale client is ignored when eligibility says no. The
- * preview and send routes must apply this identically or the operator previews
- * a link the delivered email strips. Quotes never carry a review ask - the job
- * has not happened yet.
- * @param invoice - Invoice, narrowed to the quote flag.
- * @param eligibility - Result of the review-eligibility check.
- * @param override - The operator's explicit choice, when they made one.
- * @returns Whether to include the review ask, the URL when included, and whether that URL is the Google-only ask.
- */
-export function resolveReviewInclusion(
-  invoice: Pick<Invoice, "isQuote">,
-  eligibility: InvoiceReviewEligibility,
-  override: boolean | undefined,
-): { includeReview: boolean; reviewUrl: string | null; googleOnly: boolean } {
-  const includeReview =
-    !invoice.isQuote && (override ?? eligibility.canSend) && eligibility.canSend;
-  const reviewUrl =
-    includeReview && "reviewUrl" in eligibility ? (eligibility.reviewUrl ?? null) : null;
-  const googleOnly = includeReview && eligibility.canSend && eligibility.googleOnly;
-  return { includeReview, reviewUrl, googleOnly };
 }
