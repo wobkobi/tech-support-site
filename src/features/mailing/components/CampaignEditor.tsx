@@ -15,6 +15,7 @@ import { StatusPill, type StatusTone } from "@/features/admin/components/ui/Stat
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { SendDialog, type SendMode } from "@/features/mailing/components/SendDialog";
 import { callApi } from "@/features/mailing/lib/api-client";
+import { AUDIENCE_OPTIONS, type CampaignAudience } from "@/features/mailing/lib/audience";
 import type { CampaignRow } from "@/features/mailing/lib/campaign-row";
 import {
   BLANK_TEMPLATE_ID,
@@ -119,6 +120,7 @@ export function CampaignEditor({
     body: initial.body,
   });
   const [promoId, setPromoId] = useState(initial.promoId);
+  const [audience, setAudience] = useState<CampaignAudience>(initial.audience);
   const [templateId, setTemplateId] = useState(() => matchTemplate(content, templates));
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const saved = useRef<Content>(content);
@@ -204,6 +206,7 @@ export function CampaignEditor({
           preheader: content.preheader || null,
           body: content.body,
           promoId,
+          audience,
         },
       ).then((res) => {
         if (seq !== previewSeq.current) return;
@@ -211,7 +214,7 @@ export function CampaignEditor({
       });
     }, PREVIEW_MS);
     return () => clearTimeout(timer);
-  }, [content.subject, content.preheader, content.body, promoId]);
+  }, [content.subject, content.preheader, content.body, promoId, audience]);
 
   /**
    * Updates one field.
@@ -305,6 +308,21 @@ export function CampaignEditor({
    */
   async function openDialog(mode: SendMode): Promise<void> {
     if (await save()) setDialog(mode);
+  }
+
+  /**
+   * Saves who the email goes to straight away, like the promo link, rather than through
+   * the text autosave.
+   * @param next - The picked audience.
+   */
+  async function changeAudience(next: CampaignAudience): Promise<void> {
+    const before = audience;
+    setAudience(next);
+    const res = await callApi(`/api/admin/mailing/${initial.id}`, "PATCH", { audience: next });
+    if (!res.ok) {
+      setAudience(before);
+      toast(res.error, { tone: "error" });
+    }
   }
 
   /** Detaches the email from its promo, so it describes whatever promo is running. */
@@ -416,6 +434,21 @@ export function CampaignEditor({
                 maxLength={200}
                 className={ADMIN_INPUT_CLS}
               />
+            </Field>
+
+            <Field label="Who it goes to">
+              <select
+                value={audience}
+                onChange={(e) => void changeAudience(e.target.value as CampaignAudience)}
+                disabled={!editable}
+                className={ADMIN_INPUT_CLS}
+              >
+                {AUDIENCE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             </Field>
 
             {promoId && (
@@ -652,7 +685,7 @@ export function CampaignEditor({
         <SendDialog
           open
           initialMode={dialog}
-          campaign={initial}
+          campaign={{ ...initial, audience }}
           quiet={quiet}
           onClose={() => setDialog(null)}
           onDone={() => {

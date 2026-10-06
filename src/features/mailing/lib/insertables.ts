@@ -50,10 +50,11 @@ export function emailInsertGroups(
   const help = new Map<string, string>(PLACEHOLDERS.map((p) => [p.key, p.help]));
   return [
     {
-      label: "Their name",
+      label: "About them",
       items: [
         { label: "First name", hint: help.get("firstName"), text: "{firstName}" },
         { label: "Full name", hint: help.get("name"), text: "{name}" },
+        { label: "Their review", hint: help.get("reviewText"), text: "{reviewText}" },
       ],
     },
     promoGroup(promo),

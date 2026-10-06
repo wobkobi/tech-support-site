@@ -960,6 +960,13 @@ enum CampaignStatus {
   failed
 }
 
+// Who a mailing-list email goes to. Null on Campaign means everyone.
+enum CampaignAudience {
+  everyone
+  // Contacts who left a review on the site; the {reviewText} placeholder only works here.
+  site_reviewers
+}
+
 // A mailing-list email the operator writes in /admin/mailing. The body is the
 // operator's own markdown-lite text, rendered per recipient at send time by
 // src/features/mailing/lib/render.ts, so nothing about the wording lives in code.
@@ -990,10 +997,12 @@ model Campaign {
   sendAttempt      Int            @default(0)
 
   // Contacts unticked in the send dialog.
-  excludedContactIds String[] @db.ObjectId
+  excludedContactIds String[]          @db.ObjectId
   // Promo the {promo} placeholders describe. Null falls back to whichever
   // automatic promo is running when it sends.
-  promoId            String?  @db.ObjectId
+  promoId            String?           @db.ObjectId
+  // Optional so existing rows read as everyone without a backfill.
+  audience           CampaignAudience?
 
   sentCount   Int @default(0)
   failedCount Int @default(0)

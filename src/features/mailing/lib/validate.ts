@@ -3,6 +3,7 @@
 // returned, so a PATCH writes exactly what the editor changed.
 
 import { parseObjectId } from "@/features/business/lib/validation";
+import { parseAudience, type CampaignAudience } from "@/features/mailing/lib/audience";
 
 const MAX_NAME = 120;
 const MAX_SUBJECT = 200;
@@ -16,6 +17,7 @@ export interface CampaignPatch {
   preheader?: string | null;
   body?: string;
   promoId?: string | null;
+  audience?: CampaignAudience;
 }
 
 /**
@@ -71,6 +73,11 @@ export function parseCampaignPatch(raw: unknown): { patch: CampaignPatch } | { e
       if (!id) return { error: "promoId isn't a valid id." };
       patch.promoId = id;
     }
+  }
+  if (body.audience !== undefined) {
+    const audience = parseAudience(body.audience);
+    if (!audience) return { error: 'audience must be "everyone" or "site_reviewers".' };
+    patch.audience = audience;
   }
   return { patch };
 }

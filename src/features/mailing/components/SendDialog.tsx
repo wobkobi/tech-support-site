@@ -101,7 +101,7 @@ export function SendDialog({
     if (!open) return;
     let cancelled = false;
     void callApi<{ subscribed: Recipient[]; unsubscribed: Recipient[] }>(
-      "/api/admin/mailing/recipients",
+      `/api/admin/mailing/recipients?audience=${campaign.audience}`,
     ).then((res) => {
       if (cancelled) return;
       if (!res.ok) {
@@ -115,7 +115,7 @@ export function SendDialog({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, campaign.audience]);
 
   const q = query.trim().toLowerCase();
   const shown = useMemo(
@@ -306,6 +306,12 @@ export function SendDialog({
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-semibold text-admin-text">
               Who gets it{subscribed !== null && ` - ${count} of ${subscribed.length}`}
+              {campaign.audience === "site_reviewers" && (
+                <span className="block text-xs font-normal text-admin-muted">
+                  Only people who left a review on the site. Anyone who stopped review asks is left
+                  off.
+                </span>
+              )}
             </p>
             <div className="flex gap-2">
               <AdminButton size="xs" variant="ghost" onClick={() => setAllShown(true)}>
@@ -342,7 +348,8 @@ export function SendDialog({
               {!q &&
                 unsubscribed.map((r) => (
                   <li key={r.contactId} className="px-3 py-2 text-sm text-admin-faint">
-                    {r.name} - {r.email} (unsubscribed)
+                    {r.name} - {r.email} (
+                    {campaign.audience === "site_reviewers" ? "opted out" : "unsubscribed"})
                   </li>
                 ))}
             </ul>

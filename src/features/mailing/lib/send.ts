@@ -6,6 +6,7 @@
 // Quiet hours hold every list send: the cron waits for morning, and a manual send or
 // retry inside them is refused unless the operator chose to send anyway.
 
+import { audienceOf } from "@/features/mailing/lib/audience";
 import {
   loadSharedRenderParts,
   missingSendEnv,
@@ -13,8 +14,13 @@ import {
   unsubscribePageUrl,
   type SharedRenderParts,
 } from "@/features/mailing/lib/context";
-import { loadRecipients } from "@/features/mailing/lib/recipients";
-import { listProblems, renderCampaign, type CampaignContent } from "@/features/mailing/lib/render";
+import { loadRecipients, loadReviewTexts } from "@/features/mailing/lib/recipients";
+import {
+  listProblems,
+  renderCampaign,
+  SAMPLE_REVIEW_TEXT,
+  type CampaignContent,
+} from "@/features/mailing/lib/render";
 import { signUnsubscribeToken } from "@/features/mailing/lib/unsubscribe-token";
 import { sendBatch, sendNow, type BatchMailPayload } from "@/features/reviews/lib/email-core";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -88,7 +94,10 @@ async function releaseToDraft(id: string): Promise<void> {
 async function ensureSendRows(campaign: Campaign): Promise<number> {
   const existing = await prisma.campaignSend.count({ where: { campaignId: campaign.id } });
   if (existing > 0) return existing;
-  const { recipients } = await loadRecipients(campaign.excludedContactIds);
+  const { recipients } = await loadRecipients(
+    campaign.excludedContactIds,
+    audienceOf(campaign.audience),
+  );
   if (recipients.length === 0) return 0;
   await prisma.campaignSend.createMany({
     data: recipients.map((r) => ({
@@ -124,12 +133,20 @@ async function deliverPending(campaign: Campaign, parts: SharedRenderParts): Pro
       select: { id: true, name: true },
     });
     const names = new Map(contacts.map((c) => [c.id, c.name]));
+    // Only a reviewers email can use {reviewText} (listProblems blocks it elsewhere).
+    const reviewTexts =
+      audienceOf(campaign.audience) === "site_reviewers"
+        ? await loadReviewTexts(rows.map((r) => r.contactId))
+        : null;
 
     const payloads: BatchMailPayload[] = rows.map((row) => {
       const token = signUnsubscribeToken(row.contactId);
       const email = renderCampaign(
         content,
-        { name: names.get(row.contactId) ?? null },
+        {
+          name: names.get(row.contactId) ?? null,
+          reviewText: reviewTexts?.get(row.contactId) ?? null,
+        },
         { ...parts, unsubscribeUrl: unsubscribePageUrl(token) },
       );
       return {
@@ -247,7 +264,11 @@ export async function startCampaignSend(
       status: 409,
     };
   }
-  const problems = listProblems(contentOf(campaign), parts.promo !== null);
+  const problems = listProblems(
+    contentOf(campaign),
+    parts.promo !== null,
+    audienceOf(campaign.audience),
+  );
   if (problems.length > 0) {
     await releaseToDraft(id);
     return { ok: false, error: problems.join(" "), status: 400 };
@@ -369,9 +390,9 @@ export async function runScheduledSends(): Promise<{
 }
 
 /**
- * Sends one copy to the operator's own inbox, filled in as if it were for them.
- * Not recorded anywhere, and its unsubscribe link goes to a page that explains
- * it came from a test.
+ * Sends one copy to the operator's own inbox, filled in as if it were for them, with a
+ * sample review for {reviewText}. Not recorded anywhere, and its unsubscribe link goes
+ * to a page that explains it came from a test.
  * @param content - Subject, preheader and body to test.
  * @param promoId - Linked promo id, or null.
  * @returns Success, or the reason it didn't send.
@@ -392,7 +413,7 @@ export async function sendTestEmail(
   const [parts, identity] = await Promise.all([loadSharedRenderParts(promoId), getIdentity()]);
   const email = renderCampaign(
     content,
-    { name: identity.name },
+    { name: identity.name, reviewText: SAMPLE_REVIEW_TEXT },
     { ...parts, unsubscribeUrl: unsubscribePageUrl("preview") },
   );
   const result = await sendNow({

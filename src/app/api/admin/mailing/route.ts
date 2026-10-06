@@ -68,6 +68,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           preheader: source.preheader,
           body: source.body,
           promoId: source.promoId,
+          audience: source.audience,
           isPreset: asPreset,
         },
       });

@@ -1,6 +1,7 @@
 // src/features/mailing/lib/campaign-row.ts
 // Plain-data campaign shape for the server > client boundary and the mailing API.
 
+import { audienceOf, type CampaignAudience } from "@/features/mailing/lib/audience";
 import type { Campaign } from "@prisma/client";
 
 /** Campaign lifecycle, mirroring the CampaignStatus enum. */
@@ -19,6 +20,7 @@ export interface CampaignRow {
   sentAt: string | null;
   excludedContactIds: string[];
   promoId: string | null;
+  audience: CampaignAudience;
   sentCount: number;
   failedCount: number;
   createdAt: string;
@@ -43,6 +45,7 @@ export function toCampaignRow(c: Campaign): CampaignRow {
     sentAt: c.sentAt?.toISOString() ?? null,
     excludedContactIds: c.excludedContactIds,
     promoId: c.promoId,
+    audience: audienceOf(c.audience),
     sentCount: c.sentCount,
     failedCount: c.failedCount,
     createdAt: c.createdAt.toISOString(),
