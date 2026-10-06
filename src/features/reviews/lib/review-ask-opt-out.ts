@@ -113,3 +113,50 @@ export function optOutRepointOps(
     prisma.reviewAskOptOut.updateMany({ where: { contactId: fromId }, data: { contactId: toId } }),
   ];
 }
+
+/** A contact's review-ask state, for their admin page. */
+export interface ContactReviewAskState {
+  /** Latest ask by any route: manual link, invoice ask or booking request. */
+  lastAskedAt: Date | null;
+  blockedBy: "review_opt_out" | "mailing_opt_out" | null;
+}
+
+/**
+ * The latest review ask to a contact across all three places one is stamped, and
+ * whether an opt-out now blocks them.
+ * @param contactId - Contact id.
+ * @returns Last ask and blocking opt-out; nulls when the contact doesn't exist.
+ */
+export async function contactReviewAskState(contactId: string): Promise<ContactReviewAskState> {
+  const contact = await prisma.contact.findUnique({
+    where: { id: contactId },
+    select: { email: true, altEmails: true, reviewLinkSentAt: true },
+  });
+  if (!contact) return { lastAskedAt: null, blockedBy: null };
+  const emails = contactAddresses(contact);
+  const invoiceByEmail = emails.map((e) => ({
+    clientEmail: { equals: e, mode: "insensitive" as const },
+  }));
+  const bookingByEmail = emails.map((e) => ({
+    email: { equals: e, mode: "insensitive" as const },
+  }));
+  const [invoice, booking, blockedBy] = await Promise.all([
+    prisma.invoice.findFirst({
+      where: { reviewLinkSentAt: { not: null }, OR: [{ contactId }, ...invoiceByEmail] },
+      orderBy: { reviewLinkSentAt: "desc" },
+      select: { reviewLinkSentAt: true },
+    }),
+    emails.length
+      ? prisma.booking.findFirst({
+          where: { reviewSentAt: { not: null }, OR: bookingByEmail },
+          orderBy: { reviewSentAt: "desc" },
+          select: { reviewSentAt: true },
+        })
+      : null,
+    reviewAskBlockedBy(contactId),
+  ]);
+  const stamps = [contact.reviewLinkSentAt, invoice?.reviewLinkSentAt, booking?.reviewSentAt]
+    .filter((d): d is Date => !!d)
+    .map((d) => d.getTime());
+  return { lastAskedAt: stamps.length ? new Date(Math.max(...stamps)) : null, blockedBy };
+}

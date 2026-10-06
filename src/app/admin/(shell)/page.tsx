@@ -125,6 +125,8 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     recentInvoices,
     latestCacheEntry,
     retainerContacts,
+    invoicesWithReviewSent,
+    reviewAskOptOuts,
   ] = await Promise.all([
     prisma.review.count({ where: { status: "pending" } }),
     prisma.review.count({ where: { status: "approved" } }),
@@ -252,6 +254,16 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       orderBy: { name: "asc" },
       select: { id: true, name: true, retainerTier: true, retainerPrice: true },
     }),
+    // Review asks sent from an invoice (automatic or Send now) count as asked too.
+    prisma.invoice.findMany({
+      where: { reviewLinkSentAt: { not: null } },
+      select: { contactId: true, clientEmail: true },
+    }),
+    // Anyone who stopped review asks, or unsubscribed from email, isn't suggested.
+    Promise.all([
+      prisma.reviewAskOptOut.findMany({ select: { email: true, contactId: true } }),
+      prisma.emailOptOut.findMany({ select: { email: true, contactId: true } }),
+    ]).then(([a, b]) => [...a, ...b]),
   ]);
 
   // --- Retainers due this month ---
@@ -282,14 +294,22 @@ export default async function AdminPage(): Promise<React.ReactElement> {
   const sentEmails = new Set<string>([
     ...contactsWithReviewSent.flatMap((c) => (c.email ? [c.email.toLowerCase()] : [])),
     ...bookingsWithReviewSent.flatMap((b) => (b.email ? [b.email.toLowerCase()] : [])),
+    ...invoicesWithReviewSent.flatMap((i) => (i.clientEmail ? [i.clientEmail.toLowerCase()] : [])),
+    ...reviewAskOptOuts.map((o) => o.email.toLowerCase()),
+  ]);
+  const skipIds = new Set<string>([
+    ...invoicesWithReviewSent.flatMap((i) => (i.contactId ? [i.contactId] : [])),
+    ...reviewAskOptOuts.flatMap((o) => (o.contactId ? [o.contactId] : [])),
   ]);
   const sentPhones = new Set<string>([
     ...contactsWithReviewSent.flatMap((c) => (c.phone ? [toE164NZ(c.phone)] : [])),
     ...bookingsWithReviewSent.flatMap((b) => (b.phone ? [toE164NZ(b.phone)] : [])),
   ]);
   // The set diff still matters for cross-record coverage: an unsent contact
-  // sharing an email/phone with a sent contact or booking is already covered.
+  // sharing an email/phone with a sent contact, booking or invoice is already
+  // covered, and opted-out addresses ride in the same sets.
   const contactsWithoutReviewLinks = unsentContacts.filter((c) => {
+    if (skipIds.has(c.id)) return false;
     if (c.email && sentEmails.has(c.email.toLowerCase())) return false;
     if (c.phone && sentPhones.has(toE164NZ(c.phone))) return false;
     return true;

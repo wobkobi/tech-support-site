@@ -1,23 +1,35 @@
 // src/app/admin/(shell)/reviews/page.tsx
 // Admin reviews page. Loads reviews plus every channel a review link goes out on -
-// booking auto-sends, manual contact sends, and the invoice review line (soft-capped
+// booking sends, manual contact sends, and the automatic invoice review ask (soft-capped
 // at 1000 each) - joins them into a unified link history, summarises the pipeline as
-// StatCards, and renders the ReviewApprovalList, SendReviewLinkForm, and
-// ReviewLinkHistoryTable.
+// StatCards, and renders the ReviewApprovalList, the upcoming review asks,
+// SendReviewLinkForm, and ReviewLinkHistoryTable.
 
 import { Card } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewApprovalList";
 import {
+  ReviewAskQueue,
+  type RecentReviewAsk,
+  type UpcomingReviewAsk,
+} from "@/features/reviews/components/admin/ReviewAskQueue";
+import {
   ReviewLinkHistoryTable,
   type LinkHistoryEntry,
   type LinkSource,
 } from "@/features/reviews/components/admin/ReviewLinkHistoryTable";
 import { SendReviewLinkForm } from "@/features/reviews/components/admin/SendReviewLinkForm";
+import {
+  loadRecentReviewAskOutcomes,
+  loadReviewAskCandidates,
+} from "@/features/reviews/lib/review-ask-queue.server";
+import { reviewAskNoteLabel } from "@/features/reviews/lib/review-ask-rules";
 import { requireAdminAuth } from "@/shared/lib/auth";
+import { formatDateShort } from "@/shared/lib/date-format";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
 import type React from "react";
@@ -46,66 +58,82 @@ export default async function AdminReviewsPage({
   // Soft caps to prevent unbounded scans as data grows. The page joins these
   // sets to build a unified link history; if the most recent 1000 ever stops
   // being enough, swap in cursor pagination per section.
-  const [reviews, sentBookings, sentInvoices, allContacts] = await Promise.all([
-    prisma.review.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 1000,
-      select: {
-        id: true,
-        text: true,
-        firstName: true,
-        lastName: true,
-        isAnonymous: true,
-        status: true,
-        customerRef: true,
-        bookingId: true,
-        contactId: true,
-        createdAt: true,
-      },
-    }),
-    prisma.booking.findMany({
-      where: { reviewSentAt: { not: null } },
-      orderBy: { reviewSentAt: "desc" },
-      take: 1000,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        reviewSentAt: true,
-        reviewSubmittedAt: true,
-        reviewToken: true,
-      },
-    }),
-    // Invoices whose email carried the review line. That send is stamped on the
-    // invoice and never on the contact, so a contact-only read cannot see it -
-    // which is what used to drop these reviewers into "Legacy".
-    prisma.invoice.findMany({
-      where: { reviewLinkSentAt: { not: null } },
-      orderBy: { reviewLinkSentAt: "desc" },
-      take: 1000,
-      select: { id: true, contactId: true, clientEmail: true, reviewLinkSentAt: true },
-    }),
-    // One read of the contact book serves the picker, the suppression sets and
-    // the link history, so all three describe the same 1000 rows.
-    prisma.contact.findMany({
-      where: { deletedAt: null },
-      orderBy: { createdAt: "desc" },
-      take: 1000,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        altEmails: true,
-        phone: true,
-        address: true,
-        reviewToken: true,
-        altReviewTokens: true,
-        reviewLinkSentAt: true,
-        reviewLinkSentMode: true,
-        reviewLinkSubmittedAt: true,
-      },
-    }),
-  ]);
+  const now = new Date();
+  const { reviews: reviewSettings } = await getSettings();
+  const [reviews, sentBookings, sentInvoices, allContacts, optOuts, candidates, recentAsks] =
+    await Promise.all([
+      prisma.review.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 1000,
+        select: {
+          id: true,
+          text: true,
+          firstName: true,
+          lastName: true,
+          isAnonymous: true,
+          status: true,
+          customerRef: true,
+          bookingId: true,
+          contactId: true,
+          createdAt: true,
+        },
+      }),
+      prisma.booking.findMany({
+        where: { reviewSentAt: { not: null } },
+        orderBy: { reviewSentAt: "desc" },
+        take: 1000,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          reviewSentAt: true,
+          reviewSubmittedAt: true,
+          reviewToken: true,
+        },
+      }),
+      // Invoices whose email carried the review line. That send is stamped on the
+      // invoice and never on the contact, so a contact-only read cannot see it -
+      // which is what used to drop these reviewers into "Legacy".
+      prisma.invoice.findMany({
+        where: { reviewLinkSentAt: { not: null } },
+        orderBy: { reviewLinkSentAt: "desc" },
+        take: 1000,
+        select: { id: true, contactId: true, clientEmail: true, reviewLinkSentAt: true },
+      }),
+      // One read of the contact book serves the picker, the suppression sets and
+      // the link history, so all three describe the same 1000 rows.
+      prisma.contact.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 1000,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          altEmails: true,
+          phone: true,
+          address: true,
+          reviewToken: true,
+          altReviewTokens: true,
+          reviewLinkSentAt: true,
+          reviewLinkSentMode: true,
+          reviewLinkSubmittedAt: true,
+        },
+      }),
+      // Anyone who has asked not to get review asks, or unsubscribed from email, is left
+      // out of the suggestions.
+      Promise.all([
+        prisma.reviewAskOptOut.findMany({ select: { email: true, contactId: true } }),
+        prisma.emailOptOut.findMany({ select: { email: true, contactId: true } }),
+      ]).then(([a, b]) => [...a, ...b]),
+      reviewSettings.reviewAskEnabled
+        ? loadReviewAskCandidates(now, {
+            delayDays: reviewSettings.reviewAskDelayDays,
+            gapDays: reviewSettings.reviewAskGapDays,
+          })
+        : Promise.resolve([]),
+      loadRecentReviewAskOutcomes(now, 14),
+    ]);
 
   type ContactRow = (typeof allContacts)[number];
 
@@ -243,8 +271,15 @@ export default async function AdminReviewsPage({
     if (ask.contact.phone) recentlySentPhones.add(toE164NZ(ask.contact.phone));
   }
 
+  const optedOutIds = new Set(optOuts.flatMap((o) => (o.contactId ? [o.contactId] : [])));
+  const optedOutEmails = new Set(optOuts.map((o) => o.email.toLowerCase()));
+
   const contactSuggestions = allContacts
     .filter((c) => {
+      if (optedOutIds.has(c.id)) return false;
+      if ([c.email, ...c.altEmails].some((e) => e && optedOutEmails.has(e.toLowerCase()))) {
+        return false;
+      }
       // Already reviewed - by their own contact link, or matched on email/phone
       // from a booking send.
       if (hasReviewed(c)) return false;
@@ -355,6 +390,31 @@ export default async function AdminReviewsPage({
 
   // Arriving from a contact's "Send review link" - load that person to prefill
   // the send form and open it. Soft-deleted or missing ids fall through to null.
+  // Review asks: what's coming and what happened lately
+  const upcomingAsks: UpcomingReviewAsk[] = candidates.map((c) => {
+    const d = c.decision;
+    return {
+      invoiceId: c.invoice.id,
+      number: c.invoice.number,
+      name: c.contact?.name || c.invoice.clientName,
+      when: d.action === "wait" ? `Due ${formatDateShort(d.dueAt)}` : "Goes out at the next run",
+      warning:
+        d.action === "wait"
+          ? reviewAskNoteLabel(d.forecast)
+          : d.action === "skip"
+            ? reviewAskNoteLabel(d.reason)
+            : null,
+    };
+  });
+  const recentAskRows: RecentReviewAsk[] = recentAsks.map((r) => ({
+    invoiceId: r.invoiceId,
+    number: r.number,
+    name: r.clientName,
+    outcome: r.outcome,
+    detail: reviewAskNoteLabel(r.note),
+    date: formatDateShort(r.decidedAt),
+  }));
+
   const prefillContact = contactId
     ? await prisma.contact.findFirst({
         where: { id: contactId, deletedAt: null },
@@ -403,6 +463,15 @@ export default async function AdminReviewsPage({
         </div>
 
         <div className="flex flex-col gap-6">
+          <Card>
+            <h2 className="mb-4 text-sm font-semibold text-russian-violet">Review asks</h2>
+            <ReviewAskQueue
+              enabled={reviewSettings.reviewAskEnabled}
+              upcoming={upcomingAsks}
+              recent={recentAskRows}
+            />
+          </Card>
+
           <Card>
             <h2 className="mb-4 text-sm font-semibold text-russian-violet">Send a review link</h2>
             <SendReviewLinkForm
