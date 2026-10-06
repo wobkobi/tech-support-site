@@ -259,16 +259,19 @@ function getResend(): Resend {
 export type MailPayload = Parameters<Resend["emails"]["send"]>[0];
 /** What Resend answers a send with - `{ data, error }`, never a throw. */
 type MailResult = Awaited<ReturnType<Resend["emails"]["send"]>>;
+/** Per-send request options: an idempotency key makes a repeated send a no-op on Resend. */
+export type MailOptions = Parameters<Resend["emails"]["send"]>[1];
 
 /**
  * Sends immediately. For mail to the operator, and for the replies a customer is
  * sitting waiting on - their own booking confirmation, manage-booking links, an
  * enquiry acknowledgement. Holding those would read as the site being broken.
  * @param payload - The Resend send payload.
+ * @param options - Optional request options (idempotency key).
  * @returns Resend's send response.
  */
-export function sendNow(payload: MailPayload): Promise<MailResult> {
-  return getResend().emails.send(payload);
+export function sendNow(payload: MailPayload, options?: MailOptions): Promise<MailResult> {
+  return getResend().emails.send(payload, options);
 }
 
 /** One email in a batch. The batch API takes no attachments and no scheduledAt. */
@@ -324,9 +327,15 @@ export async function sendBatch(
  * @param bookingId - The booking the email is about, when a later cancel or
  *   reschedule would make it wrong. A held send is recorded on the booking so
  *   {@link cancelHeldBookingEmails} can recall it.
+ * @param options - Optional request options (idempotency key), passed through on both
+ *   the immediate and the held path.
  * @returns Resend's send response.
  */
-export async function sendOutreach(payload: MailPayload, bookingId?: string): Promise<MailResult> {
+export async function sendOutreach(
+  payload: MailPayload,
+  bookingId?: string,
+  options?: MailOptions,
+): Promise<MailResult> {
   let holdUntil: Date | null = null;
   try {
     const { comms } = await getSettings();
@@ -340,12 +349,15 @@ export async function sendOutreach(payload: MailPayload, bookingId?: string): Pr
     // lose the mail - being early is a smaller fault than being missing.
     console.warn("[email] Couldn't read quiet hours, sending immediately:", err);
   }
-  if (!holdUntil) return sendNow(payload);
+  if (!holdUntil) return sendNow(payload, options);
   console.log(`[email] Quiet hours - holding until ${holdUntil.toISOString()}`);
-  const result = await getResend().emails.send({
-    ...payload,
-    scheduledAt: holdUntil.toISOString(),
-  });
+  const result = await getResend().emails.send(
+    {
+      ...payload,
+      scheduledAt: holdUntil.toISOString(),
+    },
+    options,
+  );
   const heldId = result.data?.id;
   if (bookingId && heldId) {
     // Best-effort: the email is already queued, and failing to record it only

@@ -1,9 +1,16 @@
 // scripts/check-review-asks.ts
 // When an invoice's automatic review ask goes out, and why it doesn't: every skip reason,
 // waiting before skipping, the paid-without-emailing clock, due dates across the NZ
-// daylight-saving changes, the gap boundary and which address the ask goes to.
+// daylight-saving changes, the gap boundary, which address the ask goes to, and that a
+// "stop asking me" link and a mailing unsubscribe link can't stand in for each other.
 // Run with: npm run check:review-asks
 
+import {
+  signReviewAskStopToken,
+  signUnsubscribeToken,
+  verifyReviewAskStopToken,
+  verifyUnsubscribeToken,
+} from "@/features/mailing/lib/unsubscribe-token";
 import {
   decideReviewAsk,
   pickReviewAskAddress,
@@ -11,6 +18,8 @@ import {
   reviewAskDueAt,
   type ReviewAskInput,
 } from "@/features/reviews/lib/review-ask-rules";
+
+process.env.UNSUBSCRIBE_SECRET = "check-review-asks-fixture-secret";
 
 let failures = 0;
 
@@ -227,6 +236,16 @@ function main(): void {
     pickReviewAskAddress("x@y.z", { email: null, altEmails: [] }),
     null,
   );
+
+  // Stop tokens: same secret as unsubscribe links, different purpose prefix
+  const contactId = "64b7f0c2a1b2c3d4e5f60718";
+  const stopToken = signReviewAskStopToken(contactId);
+  const unsubToken = signUnsubscribeToken(contactId);
+  expectEqual("stop token round-trips", verifyReviewAskStopToken(stopToken), contactId);
+  expectEqual("unsubscribe token round-trips", verifyUnsubscribeToken(unsubToken), contactId);
+  expectEqual("stop token is not an unsubscribe", verifyUnsubscribeToken(stopToken), null);
+  expectEqual("unsubscribe token is not a stop", verifyReviewAskStopToken(unsubToken), null);
+  expectEqual("tampered stop token", verifyReviewAskStopToken(`${stopToken}x`), null);
 
   if (failures > 0) {
     console.error(`\n${failures} check(s) failed.`);

@@ -5,6 +5,7 @@
 // page all call these, and every merge folds through one helper, so no path can drift in
 // what it preserves off the deleted row. Every reader excludes soft-deleted contacts.
 
+import { optOutRepointOps } from "@/features/reviews/lib/review-ask-opt-out";
 import { isNZMobileKey, normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import type { ReviewLinkMode } from "@prisma/client";
@@ -194,6 +195,7 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
         where: { contactId: dup.id },
         data: { contactId: keeper.id },
       }),
+      ...optOutRepointOps(dup.id, keeper.id),
       ...(Object.keys(fill).length > 0
         ? [prisma.contact.update({ where: { id: keeper.id }, data: fill })]
         : []),

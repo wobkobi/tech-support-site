@@ -6,6 +6,7 @@
 // nothing merges automatically.
 
 import { deleteContactFromGoogle } from "@/features/contacts/lib/google-contacts";
+import { optOutRepointOps } from "@/features/reviews/lib/review-ask-opt-out";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { normaliseEmailOrNull } from "@/shared/lib/normalise-email";
@@ -153,6 +154,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         where: { contactId: secondaryId },
         data: { contactId: primaryId },
       }),
+      ...optOutRepointOps(secondaryId, primaryId),
       prisma.contact.update({ where: { id: primaryId }, data }),
       prisma.contact.update({ where: { id: secondaryId }, data: { deletedAt: new Date() } }),
     ]);
