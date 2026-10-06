@@ -8,6 +8,7 @@ import { MobileActionBar } from "@/shared/components/MobileActionBar";
 import { NavBar } from "@/shared/components/NavBar";
 import { PromoBanner } from "@/shared/components/PromoBanner";
 import { SiteFooter } from "@/shared/components/SiteFooter";
+import { ThryvTag } from "@/shared/components/ThryvTag";
 import { FACEBOOK_PAGE_URL, GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
 import { servedSuburbGroups } from "@/shared/lib/served-suburbs";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -353,6 +354,7 @@ export default async function RootLayout({
         <SpeedInsights />
         <GoogleTag />
         <MetaPixel />
+        <ThryvTag />
         <script
           id="ld-business"
           type="application/ld+json"
