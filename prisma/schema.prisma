@@ -459,6 +459,15 @@ model RateConfig {
   updatedAt    DateTime? @updatedAt
 }
 
+// Where an invoice's automatic review ask stands. Null on the invoice = not decided.
+enum ReviewAskOutcome {
+  sending
+  sent
+  skipped
+  cancelled
+  failed
+}
+
 enum InvoiceStatus {
   DRAFT
   SENT
@@ -482,14 +491,14 @@ type LineItem {
 }
 
 model Invoice {
-  id                   String        @id @default(auto()) @map("_id") @db.ObjectId
-  number               String        @unique
+  id                   String            @id @default(auto()) @map("_id") @db.ObjectId
+  number               String            @unique
   clientName           String
   clientEmail          String
   issueDate            DateTime
   dueDate              DateTime
   lineItems            LineItem[]
-  gst                  Boolean       @default(false)
+  gst                  Boolean           @default(false)
   subtotal             Float
   gstAmount            Float
   total                Float
@@ -500,15 +509,15 @@ model Invoice {
   // couldn't be diagnosed (see pricing-policy.ts unsuccessfulWorkCopy).
   // Audit trail: lets the admin dashboard count how often the half-price
   // clause was invoked so a pattern of abuse is spottable.
-  unsuccessful         Boolean       @default(false)
+  unsuccessful         Boolean           @default(false)
   unsuccessfulDiscount Float?
-  status               InvoiceStatus @default(DRAFT)
+  status               InvoiceStatus     @default(DRAFT)
   notes                String?
-  contactId            String?       @db.ObjectId
+  contactId            String?           @db.ObjectId
   // Optional match back to the job this invoice bills: the Booking row and
   // the Google Calendar event (whose times the operator corrects to actual
   // on-site time after each job). Set by the calculator's event prefill flow.
-  bookingId            String?       @db.ObjectId
+  bookingId            String?           @db.ObjectId
   calendarEventId      String?
   // Every event a merged job billed, earliest first. calendarEventId stays the
   // first of these so existing readers keep working; this is what lets the
@@ -521,9 +530,19 @@ model Invoice {
   // on DD MMM" on the detail page. Null on pre-VOIDED-feature rows and on
   // any invoice that was never voided.
   voidedAt             DateTime?
-  // Stamped when send-email included the review link. One of the three "asked for a
-  // review" stamps the admin reviews page reads.
+  // Stamped when the review ask for this invoice went out (the daily review-ask job or
+  // Send now; legacy rows: the review line in the invoice email). One of the three
+  // "asked for a review" stamps the admin reviews page reads.
   reviewLinkSentAt     DateTime?
+  // Automatic review-ask state, owned by review-ask-run.server.ts. Null/unset = not
+  // decided yet (the job is still waiting for the due date). "sending" is the claim a
+  // run holds while the email is in flight; reviewAskDecidedAt doubles as its claim
+  // time so an interrupted run can be spotted and released. reviewAskNote holds the
+  // skip reason code (see REVIEW_ASK_SKIP_LABELS) or the failure message.
+  reviewAskOutcome     ReviewAskOutcome?
+  reviewAskNote        String?
+  reviewAskDecidedAt   DateTime?
+  reviewAskAttempts    Int?
   // Stamped when send-email promotes DRAFT>SENT - a real timestamp, unlike the
   // updatedAt proxy the route returned before. Null on legacy SENT rows.
   sentAt               DateTime?
@@ -542,7 +561,7 @@ model Invoice {
   alreadyPaidMethod    String?
   // The income entry that records alreadyPaid. Kept apart from the balance payment's
   // entry so the pay route and the payment matcher never mistake one for the other.
-  alreadyPaidIncomeId  String?       @db.ObjectId
+  alreadyPaidIncomeId  String?           @db.ObjectId
   // Overdue-reminder tracking, stamped only after Resend accepts. Nullable per
   // the Mongo no-backfill rule; readers treat null count as 0.
   reminderLastSentAt   DateTime?
@@ -560,10 +579,11 @@ model Invoice {
   // Quote validity end (shown on the PDF); past this date the quote renders
   // as expired in the admin UI. Null = no stated expiry.
   quoteValidUntil      DateTime?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   @@index([clientEmail, reviewLinkSentAt])
+  @@index([reviewAskOutcome, sentAt])
 }
 
 model IncomeEntry {
@@ -1019,6 +1039,21 @@ enum EmailOptOutSource {
 // write there bumps updatedAt past lastSyncedAt and re-pushes the contact to
 // Google on the next sync. Transactional mail (bookings, invoices) ignores it.
 model EmailOptOut {
+  id        String            @id @default(auto()) @map("_id") @db.ObjectId
+  // Lowercased.
+  email     String            @unique
+  contactId String?           @db.ObjectId
+  source    EmailOptOutSource
+  createdAt DateTime          @default(now())
+
+  @@index([contactId])
+}
+
+// Addresses that asked not to get review asks ("Stop asking me for reviews" in the
+// review-ask email). Separate from EmailOptOut so someone can keep the newsletter but
+// drop review asks; the review-ask job honours both. Kept off Contact for the same
+// Google re-sync reason as EmailOptOut.
+model ReviewAskOptOut {
   id        String            @id @default(auto()) @map("_id") @db.ObjectId
   // Lowercased.
   email     String            @unique
