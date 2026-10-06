@@ -3,19 +3,19 @@
 //
 // The operator corrects event times in Calendar - usually on a phone, after the job - and
 // the billing path already reads those live. The Booking row doesn't follow, so reminder
-// timing, review timing and the cancellation-fee windows go on working off a stale start.
+// timing and the cancellation-fee windows go on working off a stale start.
 // This walks the bookings that own an event, compares the row against the live event, and
 // reports or applies the difference. The calendar wins: it is where the correction was
 // made.
 //
 // It also carries the other half of that drift: an event deleted in Calendar because the
 // job was called off, on a row nobody cancelled. Those get calendarEventMissingAt stamped
-// so the reminder and review crons stop emailing about a job that isn't happening.
+// so the reminder cron stops emailing about a job that isn't happening.
 //
-// Correcting a time is not enough on its own. emailReminderSentAt and reviewSentAt are
-// one-way stamps, so a row moved to a new date still carries the marks of emails sent
-// against the old one, and both crons skip it forever. A correction clears the stamps its
-// move invalidated.
+// Correcting a time is not enough on its own. emailReminderSentAt is a one-way stamp, so
+// a row moved to a new date still carries the mark of a reminder sent for the old one,
+// and the reminder cron skips it forever. A correction clears a stamp its move
+// invalidated.
 
 import { lookupBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { prisma } from "@/shared/lib/prisma";
@@ -37,7 +37,7 @@ const DEFAULT_SINCE_DAYS = 60;
 const MAX_REMINDER_LEAD_MS = 168 * 3_600_000;
 
 /** A send stamp cleared so its email can go out against the row's real times. */
-export type RearmedStamp = "reminder" | "review";
+export type RearmedStamp = "reminder";
 
 /** One booking whose row and calendar event disagree. */
 export interface BookingTimeDrift {
@@ -94,26 +94,18 @@ export interface ReconcileResult {
  * Judged against the times themselves rather than against "did this pass move
  * it", because a row corrected by an earlier run, or by either edit route, has
  * matching times and stale stamps - and a drift-only check would never repair
- * it. Both tests are one-directional and conservative: they only fire on a job
- * that is still ahead, where an email already sent was necessarily about times
- * the booking no longer has.
+ * it. The test is one-directional and conservative: it only fires on a job that
+ * is still ahead, where a reminder already sent was necessarily about times the
+ * booking no longer has.
  * @param booking - The row's current stamps.
  * @param booking.emailReminderSentAt - When the 24h reminder went out.
- * @param booking.reviewSentAt - When the review request went out.
- * @param booking.reviewSubmittedAt - When the customer actually reviewed.
  * @param startAt - The start the row holds after this pass.
- * @param endAt - The finish the row holds after this pass.
  * @param now - Reference instant.
  * @returns The stamps worth clearing, in report order.
  */
 function staleSendStamps(
-  booking: {
-    emailReminderSentAt: Date | null;
-    reviewSentAt: Date | null;
-    reviewSubmittedAt: Date | null;
-  },
+  booking: { emailReminderSentAt: Date | null },
   startAt: Date,
-  endAt: Date,
   now: Date,
 ): RearmedStamp[] {
   const stale: RearmedStamp[] = [];
@@ -127,18 +119,6 @@ function staleSendStamps(
     startAt.getTime() - booking.emailReminderSentAt.getTime() > MAX_REMINDER_LEAD_MS
   ) {
     stale.push("reminder");
-  }
-
-  // A review request that predates the finish was asking about a visit that had
-  // not happened. Never re-armed for a customer who has actually reviewed, and
-  // never for a finish already in the past, which is a real completed job.
-  if (
-    booking.reviewSentAt &&
-    !booking.reviewSubmittedAt &&
-    endAt > now &&
-    booking.reviewSentAt < endAt
-  ) {
-    stale.push("review");
   }
 
   return stale;
@@ -177,8 +157,6 @@ export async function reconcileBookingTimes(options: {
       activeSlotKey: true,
       calendarEventMissingAt: true,
       emailReminderSentAt: true,
-      reviewSentAt: true,
-      reviewSubmittedAt: true,
     },
     orderBy: { startAt: "asc" },
   });
@@ -241,18 +219,13 @@ export async function reconcileBookingTimes(options: {
       const startAt = new Date(lookup.event.start);
       const endAt = new Date(lookup.event.end);
 
-      // Both send stamps are one-way, so a booking whose times moved carries stamps for a
-      // date it no longer has and is skipped by both crons forever. Checked against the
-      // times, not against whether this pass moved anything - a row an earlier run already
-      // corrected has matching times and stale stamps, which a drift gate would miss.
-      const stamps = staleSendStamps(booking, startAt, endAt, now);
-      const clearStamps = {
-        ...(stamps.includes("reminder") ? { emailReminderSentAt: null } : {}),
-        // reviewSendFailedAt goes with it: it drives a one-shot retry that would
-        // otherwise fire the request straight back out, ahead of the job it is
-        // asking about.
-        ...(stamps.includes("review") ? { reviewSentAt: null, reviewSendFailedAt: null } : {}),
-      };
+      // The reminder stamp is one-way, so a booking whose times moved carries a stamp for
+      // a date it no longer has and is skipped by the reminder cron forever. Checked
+      // against the times, not against whether this pass moved anything - a row an earlier
+      // run already corrected has matching times and a stale stamp, which a drift gate
+      // would miss.
+      const stamps = staleSendStamps(booking, startAt, now);
+      const clearStamps = stamps.includes("reminder") ? { emailReminderSentAt: null } : {};
 
       const drifted =
         startAt.getTime() !== booking.startAt.getTime() ||

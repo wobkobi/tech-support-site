@@ -20,8 +20,8 @@ export interface BilledBookingRefs {
  * their calendar event ids. Held, cancelled and future bookings are left alone: a hold
  * is not a job, and releasing a future slot would let someone else book over it.
  *
- * No review email goes out here, unlike the booking page's Complete action - the invoice
- * email carries its own review link, and the review cron still covers the booking.
+ * No review email goes out here: the review ask follows the invoice on its own, a few
+ * days after it is sent.
  * Never throws; a failure is logged and the invoice stands.
  * @param refs - Booking id and calendar event ids from the invoice.
  * @param logTag - Log prefix of the calling route.

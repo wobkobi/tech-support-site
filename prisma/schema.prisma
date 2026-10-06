@@ -135,17 +135,15 @@ model Booking {
   calendarEventId        String?
   // Set by the reconcile cron when this row still owns an event id that Calendar
   // no longer has: the job was called off there and the row was left behind.
-  // While it is set, the reminder and review crons skip the booking rather than
-  // email about a job that isn't happening, and the admin flags it for cleanup.
+  // While it is set, the reminder cron skips the booking rather than email
+  // about a job that isn't happening, and the admin flags it for cleanup.
   // Cleared as soon as the event reads back, so a restored event resumes mail.
   calendarEventMissingAt DateTime?
 
-  // Review email tracking.
-  reviewSentAt       DateTime? // When the review request email was sent
-  reviewSubmittedAt  DateTime? // When the client submitted a review
-  // Set when a send returned failure (Resend down/rate-limited) after reviewSentAt
-  // was optimistically stamped. Lets the cron attempt one capped retry next pass.
-  reviewSendFailedAt DateTime?
+  // Review tracking. Automatic review asks hang off invoices; this is the
+  // booking page's manual "Send review link".
+  reviewSentAt      DateTime? // When the review ask email was sent
+  reviewSubmittedAt DateTime? // When the client submitted a review
 
   // Reminder tracking. Stamped by /api/cron/send-booking-reminders so the
   // 24h-out email reminder fires at most once per booking.
@@ -228,10 +226,8 @@ model Booking {
   @@index([status, holdExpiresAt])
   // Slot availability (slots, days, request, booking page): WHERE status IN [held,confirmed] AND endAt >= now
   @@index([status, endAt])
-  // Review email cron and admin page: filter/sort on reviewSentAt
+  // Admin reviews page and review-ask lookups: filter/sort on reviewSentAt
   @@index([reviewSentAt])
-  // Review email cron: WHERE status="confirmed" AND reviewSentAt=null AND endAt<=threshold
-  @@index([status, reviewSentAt, endAt])
   // Email reminder cron: WHERE status="confirmed" AND startAt in window AND emailReminderSentAt=null
   @@index([status, startAt, emailReminderSentAt])
   // Contact/admin lookup by phone
