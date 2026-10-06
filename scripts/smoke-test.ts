@@ -146,8 +146,11 @@ const IGNORE_404_URLS = ["/_vercel/insights/", "/_vercel/speed-insights/"];
  * - vercel.live: Vercel injects its toolbar (vercel.live/_next-live/feedback/feedback.js)
  *   into preview deployments and the production CSP doesn't allow that host, so every
  *   preview page logs it. Production never carries the script.
+ * - tags.tiqcdn.com/dle/: Thryv's tag fetches a per-business settings file there, which
+ *   Thryv serves without CORS headers until they set up reporting for the account, so
+ *   the browser blocks the read. Thryv's side, not a page defect.
  */
-const IGNORE_CONSOLE_GLOBAL = ["connect.facebook.net", "vercel.live"];
+const IGNORE_CONSOLE_GLOBAL = ["connect.facebook.net", "vercel.live", "tags.tiqcdn.com/dle/"];
 
 /**
  * Pages auto-discovery can't produce. A path that matches no route must answer a real

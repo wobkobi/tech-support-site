@@ -210,3 +210,65 @@ export function decideReviewAsk(
   const reason = personSkip(input, timing.gapDays, now);
   return reason ? { action: "skip", reason } : { action: "send", dueAt };
 }
+
+/**
+ * Where a contact stands for a hand-sent review ask, for the admin "Who you can ask"
+ * list. The opt-outs block; everything else only changes how the row reads.
+ * - `ready` - has an email, hasn't reviewed on the site, not asked inside the gap.
+ * - `recent` - asked inside the gap; Send again still works.
+ * - `reviewed` - already reviewed on the site; the ask leads with Google, so it's
+ *   the "post it on Google too" nudge.
+ * - `text_only` - no email but a phone, so the ask goes as a copied text.
+ * - `review_opt_out` / `mailing_opt_out` - can't be emailed an ask.
+ * - `no_details` - neither an email nor a phone on file.
+ */
+export type AskPersonStatus =
+  | "ready"
+  | "recent"
+  | "reviewed"
+  | "text_only"
+  | "review_opt_out"
+  | "mailing_opt_out"
+  | "no_details";
+
+/** What {@link askPersonStatus} reads about one contact. */
+export interface AskPersonInput {
+  hasEmail: boolean;
+  hasPhone: boolean;
+  /** Latest ask by any route: manual link, invoice, booking. */
+  lastAskedAt: Date | null;
+  /** A review on the site is already tied to them. */
+  reviewed: boolean;
+  reviewOptOut: boolean;
+  mailingOptOut: boolean;
+}
+
+/**
+ * Classifies one contact for the hand-sent review ask list. Opt-outs come first
+ * because they block outright. A mailing unsubscribe only blocks email, so a contact
+ * with a phone falls through to `text_only`.
+ * @param input - The contact's ask state.
+ * @param gapDays - Minimum days between asks from settings; 0 turns `recent` off.
+ * @param now - Current instant.
+ * @returns The contact's status.
+ */
+export function askPersonStatus(
+  input: AskPersonInput,
+  gapDays: number,
+  now: Date,
+): AskPersonStatus {
+  if (input.reviewOptOut) return "review_opt_out";
+  if (!input.hasEmail || input.mailingOptOut) {
+    if (input.hasPhone) return "text_only";
+    return input.mailingOptOut ? "mailing_opt_out" : "no_details";
+  }
+  if (input.reviewed) return "reviewed";
+  if (
+    gapDays > 0 &&
+    input.lastAskedAt &&
+    now.getTime() - input.lastAskedAt.getTime() < gapDays * DAY_MS
+  ) {
+    return "recent";
+  }
+  return "ready";
+}

@@ -15,6 +15,7 @@ import {
   renderNotificationEmail,
   sendOutreach,
 } from "@/features/reviews/lib/email-core";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
 
@@ -49,17 +50,24 @@ export async function buildReviewAskEmail(
   firstName: string,
   links: ReviewAskLinks,
 ): Promise<ReviewAskEmail> {
-  const name = firstName.trim() || "there";
+  // Contacts saved with only an email address have it as their name; "Hi there" reads
+  // better than greeting the address.
+  const first = firstName.trim();
+  const name = first && !first.includes("@") ? first : "there";
   const google = links.googleUrl.trim();
+  const identity = await getIdentity();
+  // Say who's writing up front: someone from a one-off visit months ago may not
+  // place the email from the signature alone.
+  const sender = `${identity.name.split(" ")[0]} here from ${identity.company} Tech`;
   const mainButton = google
     ? `<a href="${escapeHtml(google)}" style="${BUTTON_STYLE}">Leave a review on Google</a>
     <p style="margin:16px 0 0;color:#444;font-size:15px;line-height:1.6">No Google account? <a href="${escapeHtml(links.siteFormUrl)}" style="color:#1f7f8c">Leave it on my website instead</a>.</p>`
     : `<a href="${escapeHtml(links.siteFormUrl)}" style="${BUTTON_STYLE}">Leave a review</a>`;
 
   const html = renderNotificationEmail(`
-    <h2 style="margin:0 0 14px;color:#0c0a3e;font-size:22px">Hi ${escapeHtml(name)}, thanks for having me</h2>
-    <p style="${BODY_STYLE}">I hope everything is still working well.</p>
-    <p style="margin:0 0 24px;color:#444;font-size:16px;line-height:1.6">If you've got a minute, a short review would really help. Most people look on Google when they need tech help, and a few words from you help them find someone they can trust.</p>
+    <h2 style="margin:0 0 14px;color:#0c0a3e;font-size:22px">Hi ${escapeHtml(name)},</h2>
+    <p style="${BODY_STYLE}">${escapeHtml(sender)}. Thanks for having me out, I hope everything's still working well.</p>
+    <p style="margin:0 0 24px;color:#444;font-size:16px;line-height:1.6">If you've got a minute, a quick ${google ? "Google " : ""}review would really help other people find me.</p>
     ${mainButton}
     <p style="margin:28px 0 20px;color:#444;font-size:16px;line-height:1.6">If anything still isn't right, just reply to this email.</p>
 ${await buildEmailSignature(getSiteUrl())}
@@ -67,7 +75,7 @@ ${await buildEmailSignature(getSiteUrl())}
 `);
 
   return {
-    subject: `Thanks for having me, ${name} - would you leave a quick review?`,
+    subject: `Thanks for having me${name === "there" ? "" : `, ${name}`} - would you leave a quick review?`,
     html,
     text: htmlToText(html),
   };

@@ -1,7 +1,8 @@
 "use client";
 // src/features/reviews/components/admin/ReviewLinkHistoryTable.tsx
-// Table of review link history with inline editing of a contact's email/phone, and revoke
-// for links not yet used. Rows that resolve to no contact at all (Legacy) are read-only.
+// Table of review link history with inline editing of a contact's email/phone, Send again
+// for anyone with an email on file, and revoke for links not yet used. Rows that resolve
+// to no contact at all (Legacy) are read-only.
 
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
@@ -12,6 +13,7 @@ import { formatNZPhone, isValidPhone, toE164NZ } from "@/shared/lib/normalise-ph
 import type React from "react";
 import { useState } from "react";
 import { CopyLinkButton } from "./CopyLinkButton";
+import { useSendReviewAsk } from "./use-send-review-ask";
 
 /**
  * Which channel the review link went out on. The first four are tracked sends
@@ -94,6 +96,17 @@ export function ReviewLinkHistoryTable({
   const [saving, setSaving] = useState(false);
   const [confirmRevokeKey, setConfirmRevokeKey] = useState<string | null>(null);
   const [revoking, setRevoking] = useState(false);
+  // A resend lands as this person's newest manual email ask.
+  const ask = useSendReviewAsk((target) => {
+    const at = new Date().toISOString();
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.id !== null && e.email === target.email
+          ? { ...e, sentAt: at, source: "Manual email" as const }
+          : e,
+      ),
+    );
+  });
 
   /**
    * Returns the edit key for a given entry.
@@ -350,6 +363,28 @@ export function ReviewLinkHistoryTable({
                       <StatusPill tone="neutral">Not reviewed</StatusPill>
                     )}
                     {entry.reviewUrl !== "" && <CopyLinkButton url={entry.reviewUrl} />}
+                    {entry.id && entry.email && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          ask.start(
+                            {
+                              name: entry.name,
+                              email: entry.email,
+                              phone: entry.phone,
+                              lastAskedAt:
+                                entry.source === "Linked" || entry.source === "Legacy"
+                                  ? null
+                                  : entry.sentAt,
+                            },
+                            "email",
+                          )
+                        }
+                        className="text-xs font-semibold text-russian-violet transition-colors hover:underline"
+                      >
+                        Send again
+                      </button>
+                    )}
                     {entry.id && !entry.reviewed && (
                       <button
                         type="button"
@@ -382,6 +417,7 @@ export function ReviewLinkHistoryTable({
         }}
         onCancel={() => setConfirmRevokeKey(null)}
       />
+      {ask.dialog}
     </div>
   );
 }

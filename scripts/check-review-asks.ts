@@ -12,10 +12,12 @@ import {
   verifyUnsubscribeToken,
 } from "@/features/mailing/lib/unsubscribe-token";
 import {
+  askPersonStatus,
   decideReviewAsk,
   pickReviewAskAddress,
   reviewAskClockStart,
   reviewAskDueAt,
+  type AskPersonInput,
   type ReviewAskInput,
 } from "@/features/reviews/lib/review-ask-rules";
 
@@ -235,6 +237,79 @@ function main(): void {
     "contact with no email",
     pickReviewAskAddress("x@y.z", { email: null, altEmails: [] }),
     null,
+  );
+
+  // Hand-sent ask list: opt-outs block, a mailing unsubscribe falls back to a text
+  const listNow = new Date("2026-10-07T00:00:00Z");
+  /**
+   * A contact with an email and nothing else going on, plus overrides.
+   * @param over - Fields to change.
+   * @returns Status input.
+   */
+  function person(over: Partial<AskPersonInput> = {}): AskPersonInput {
+    return {
+      hasEmail: true,
+      hasPhone: false,
+      lastAskedAt: null,
+      reviewed: false,
+      reviewOptOut: false,
+      mailingOptOut: false,
+      ...over,
+    };
+  }
+  /**
+   * The instant a whole number of days before the list's "now".
+   * @param n - Days back.
+   * @returns That instant.
+   */
+  function daysBefore(n: number): Date {
+    return new Date(listNow.getTime() - n * 86_400_000);
+  }
+  expectEqual("never asked is ready", askPersonStatus(person(), 30, listNow), "ready");
+  expectEqual(
+    "asked 29 days ago is recent",
+    askPersonStatus(person({ lastAskedAt: daysBefore(29) }), 30, listNow),
+    "recent",
+  );
+  expectEqual(
+    "asked exactly 30 days ago is ready",
+    askPersonStatus(person({ lastAskedAt: daysBefore(30) }), 30, listNow),
+    "ready",
+  );
+  expectEqual(
+    "gap 0 never marks recent",
+    askPersonStatus(person({ lastAskedAt: daysBefore(1) }), 0, listNow),
+    "ready",
+  );
+  expectEqual(
+    "reviewed beats recent",
+    askPersonStatus(person({ reviewed: true, lastAskedAt: daysBefore(1) }), 30, listNow),
+    "reviewed",
+  );
+  expectEqual(
+    "review opt-out blocks even with a phone",
+    askPersonStatus(person({ reviewOptOut: true, hasPhone: true }), 30, listNow),
+    "review_opt_out",
+  );
+  expectEqual(
+    "mailing opt-out with a phone is text only",
+    askPersonStatus(person({ mailingOptOut: true, hasPhone: true }), 30, listNow),
+    "text_only",
+  );
+  expectEqual(
+    "mailing opt-out without a phone blocks",
+    askPersonStatus(person({ mailingOptOut: true }), 30, listNow),
+    "mailing_opt_out",
+  );
+  expectEqual(
+    "phone only is text only",
+    askPersonStatus(person({ hasEmail: false, hasPhone: true }), 30, listNow),
+    "text_only",
+  );
+  expectEqual(
+    "no email or phone",
+    askPersonStatus(person({ hasEmail: false }), 30, listNow),
+    "no_details",
   );
 
   // Stop tokens: same secret as unsubscribe links, different purpose prefix
