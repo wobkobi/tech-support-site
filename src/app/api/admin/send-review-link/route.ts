@@ -134,16 +134,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
       const [identity, { reviews }] = await Promise.all([getIdentity(), getSettings()]);
       const greeting =
-        `Hi ${name.trim().split(" ")[0]}, it's ${identity.name.split(" ")[0]} from ` +
-        `${identity.company} Tech. Thanks for letting me help you out!`;
+        `Hi ${name.trim().split(" ")[0]}, ${identity.name.split(" ")[0]} here from ` +
+        `${identity.company} Tech. Thanks for having me out, I hope everything's still working well.`;
       // Google first, same as the email: one tap from the text straight to the review
       // box. Their own /review link stays as the fallback for anyone without Google.
       const googleUrl = reviews.googleReviewUrl.trim();
       const smsText = googleUrl
-        ? `${greeting} A quick Google review would be greatly appreciated - it really ` +
-          `helps: ${googleUrl}\n\nNo Google account? You can leave one here instead: ` +
-          reviewFormUrl(reviewToken)
-        : `${greeting} A quick review would be greatly appreciated - it really helps: ` + reviewUrl;
+        ? `${greeting} If you've got a minute, a quick Google review would really help ` +
+          `other people find me: ${googleUrl}\n\nNo Google account? You can leave one here ` +
+          `instead: ${reviewFormUrl(reviewToken)}`
+        : `${greeting} If you've got a minute, a quick review would really help other ` +
+          `people find me: ${reviewUrl}`;
       return NextResponse.json({ ok: true, reviewUrl, smsText, copyOnly: true });
     }
 
