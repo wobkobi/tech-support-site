@@ -50,7 +50,10 @@ export async function buildReviewAskEmail(
   firstName: string,
   links: ReviewAskLinks,
 ): Promise<ReviewAskEmail> {
-  const name = firstName.trim() || "there";
+  // Contacts saved with only an email address have it as their name; "Hi there" reads
+  // better than greeting the address.
+  const first = firstName.trim();
+  const name = first && !first.includes("@") ? first : "there";
   const google = links.googleUrl.trim();
   const identity = await getIdentity();
   // Say who's writing up front: someone from a one-off visit months ago may not
@@ -72,7 +75,7 @@ ${await buildEmailSignature(getSiteUrl())}
 `);
 
   return {
-    subject: `Thanks for having me, ${name} - would you leave a quick review?`,
+    subject: `Thanks for having me${name === "there" ? "" : `, ${name}`} - would you leave a quick review?`,
     html,
     text: htmlToText(html),
   };

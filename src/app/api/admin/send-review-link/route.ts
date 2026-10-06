@@ -133,8 +133,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         await prisma.contact.update({ where: { id: contact.id }, data: { reviewToken } });
       }
       const [identity, { reviews }] = await Promise.all([getIdentity(), getSettings()]);
+      // A contact saved with only an email address has it as their name.
+      const first = name.trim().split(" ")[0] ?? "";
       const greeting =
-        `Hi ${name.trim().split(" ")[0]}, ${identity.name.split(" ")[0]} here from ` +
+        `Hi ${first.includes("@") ? "there" : first}, ${identity.name.split(" ")[0]} here from ` +
         `${identity.company} Tech. Thanks for having me out, I hope everything's still working well.`;
       // Google first, same as the email: one tap from the text straight to the review
       // box. Their own /review link stays as the fallback for anyone without Google.
