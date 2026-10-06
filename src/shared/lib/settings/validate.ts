@@ -370,6 +370,12 @@ function validateReviews(r: ReviewsSettings): FieldError[] {
       field: "googleReviewUrl",
       message: "Must be a full https:// link, or blank to hide it.",
     });
+  if (typeof r.reviewAskEnabled !== "boolean")
+    errors.push({ field: "reviewAskEnabled", message: "Must be on or off." });
+  if (!inRange(r.reviewAskDelayDays, 1, 30) || !Number.isInteger(r.reviewAskDelayDays))
+    errors.push({ field: "reviewAskDelayDays", message: "Must be 1-30 whole days." });
+  if (!inRange(r.reviewAskGapDays, 0, 365) || !Number.isInteger(r.reviewAskGapDays))
+    errors.push({ field: "reviewAskGapDays", message: "Must be 0-365 whole days." });
   return errors;
 }
 

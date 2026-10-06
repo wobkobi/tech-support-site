@@ -1,14 +1,11 @@
 // src/app/api/business/invoices/[id]/send-email/route.ts
 // Admin endpoint that emails an invoice to the client. POST re-generates the PDF, sends
-// it (with the review link when the customer is eligible and the operator left it on),
-// flips the invoice status to SENT, stamps reviewLinkSentAt when the review line was
-// included, and re-syncs the PDF to Drive.
+// it, flips a draft to SENT, stamps sentAt (which starts the review-ask clock), cancels
+// the review ask when the operator unticked it, and re-syncs the PDF to Drive.
 
-import { getInvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
 import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
 import {
   parseInvoiceEmailOverrides,
-  resolveReviewInclusion,
   toInvoiceEmailPayload,
 } from "@/features/business/lib/invoice-email-request";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
@@ -16,13 +13,11 @@ import { sendInvoiceEmail } from "@/features/reviews/lib/email-invoice";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
-import { getSiteUrl } from "@/shared/lib/site-url";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/business/invoices/[id]/send-email
- * Re-generates the invoice PDF, emails it to the client (with the friendly
- * review link in the body), and flips the invoice status to SENT.
+ * Re-generates the invoice PDF, emails it to the client, and flips a draft to SENT.
  * @param request - Next.js request (admin-auth gated).
  * @param ctx - Route ctx with the invoice id.
  * @param ctx.params - Resolved Next.js dynamic route params.
@@ -53,26 +48,8 @@ export async function POST(
 
   // Optional operator overrides (match the preview): greetingName targets a
   // person inside a company invoice, customBody replaces the intro paragraph,
-  // includeReview forces the review link on/off (defaults to eligibility).
-  const {
-    greetingName,
-    customBody,
-    includeReview: includeReviewOverride,
-  } = await parseInvoiceEmailOverrides(request);
-
-  // Check review-link eligibility
-  const siteUrl = getSiteUrl();
-  const eligibility = await getInvoiceReviewEligibility({
-    contactId: invoice.contactId,
-    clientEmail: invoice.clientEmail,
-    siteUrl,
-  });
-
-  const { includeReview, reviewUrl, googleOnly } = resolveReviewInclusion(
-    invoice,
-    eligibility,
-    includeReviewOverride,
-  );
+  // reviewAsk false cancels the automatic review ask.
+  const { greetingName, customBody, reviewAsk } = await parseInvoiceEmailOverrides(request);
 
   // Generate the invoice PDF
   let pdfBytes: Buffer;
@@ -87,8 +64,6 @@ export async function POST(
   const ok = await sendInvoiceEmail({
     invoice: await toInvoiceEmailPayload(invoice),
     pdfBytes,
-    reviewUrl,
-    googleOnly,
     greetingName,
     customBody,
   });
@@ -96,16 +71,20 @@ export async function POST(
     return errorResponse("Email send failed", 502);
   }
 
-  // Stamp reviewLinkSentAt only when the review line actually went out, so a send with
-  // the toggle off leaves the last real timestamp standing. Status only ever moves DRAFT > SENT; a
-  // re-sent SENT or PAID invoice (a receipt copy) must not regress.
+  // Status only ever moves DRAFT > SENT; a re-sent SENT or PAID invoice (a receipt copy)
+  // must not regress. sentAt is stamped on the first email whatever the status, so a
+  // receipt for an invoice paid on the day still starts the review-ask clock. The
+  // unticked box only cancels an ask that is still open on a real invoice.
+  const now = new Date();
+  const cancelAsk = reviewAsk === false && !invoice.isQuote && !invoice.reviewAskOutcome;
   const updated = await prisma.invoice.update({
     where: { id },
     data: {
-      // First send stamps a real sentAt (DRAFT>SENT); re-sends of SENT/PAID
-      // leave status + sentAt alone (a receipt copy must not regress).
-      ...(invoice.status === "DRAFT" ? { status: "SENT", sentAt: new Date() } : {}),
-      ...(includeReview ? { reviewLinkSentAt: new Date() } : {}),
+      ...(invoice.status === "DRAFT" ? { status: "SENT" } : {}),
+      ...(invoice.sentAt ? {} : { sentAt: now }),
+      ...(cancelAsk
+        ? { reviewAskOutcome: "cancelled", reviewAskNote: "unticked", reviewAskDecidedAt: now }
+        : {}),
     },
     select: { updatedAt: true, sentAt: true },
   });

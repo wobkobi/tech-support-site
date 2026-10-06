@@ -20,10 +20,10 @@ calls the endpoints over HTTPS on a schedule. Every job is a plain `GET` route u
    - `BOOKING_CALENDAR_ID`, `CAR_CALENDAR_ID`, `WORK_CALENDAR_ID`, `PERSONAL_CALENDAR_ID`,
      `HOME_ADDRESS` - calendar cache refresh.
    - `GOOGLE_SHEET_ID`, `GOOGLE_BUSINESS_SHEETS_FOLDER_ID` - sheets sync and subscription recording.
-   - `RESEND_API_KEY`, `EMAIL_FROM`, `ADMIN_EMAIL` - booking reminder, invoice reminder and
-     scheduled mailing-list emails.
-   - `UNSUBSCRIBE_SECRET` - signs the unsubscribe link in mailing-list emails; scheduled sends
-     refuse to go out without it.
+   - `RESEND_API_KEY`, `EMAIL_FROM`, `ADMIN_EMAIL` - booking reminder, invoice reminder, review ask
+     and scheduled mailing-list emails.
+   - `UNSUBSCRIBE_SECRET` - signs the unsubscribe link in mailing-list emails and the "stop asking
+     me" link in review asks; neither goes out without it.
    - `GOOGLE_MAPS_SERVER_KEY` - public holidays refresh. No fallback to `GOOGLE_MAPS_API_KEY`:
      next.config.ts publishes that one to the browser, so falling back would spend a publicly
      readable key on server-side quota. The key's Google Cloud project must have the **Calendar
@@ -53,6 +53,7 @@ All endpoints are **GET**. Create one cron-job.org job per row.
 | Reconcile booking times | `/api/cron/reconcile-booking-times` | GET    | every 30 minutes | Pull corrected times back from Calendar, flag deleted events |
 | Booking reminders       | `/api/cron/send-booking-reminders`  | GET    | every 30 minutes | Email a 24h-out reminder for confirmed bookings              |
 | Invoice reminders       | `/api/cron/send-invoice-reminders`  | GET    | daily            | Chase overdue SENT invoices (max 2 nudges each)              |
+| Review asks             | `/api/cron/send-review-asks`        | GET    | daily 10:00 NZ   | Email the Google review ask N days after an invoice is sent  |
 | Sheets sync             | `/api/cron/sync-sheets`             | GET    | hourly           | Reconcile Cashbook/Expenses sheets with MongoDB              |
 | Contacts sync           | `/api/cron/sync-contacts`           | GET    | every 3 hours    | Two-way incremental Google Contacts sync                     |
 | Record subscriptions    | `/api/cron/record-subscriptions`    | GET    | daily 08:00 NZ   | Record due subscriptions as expenses + sheet row             |
@@ -61,7 +62,8 @@ All endpoints are **GET**. Create one cron-job.org job per row.
 | Scheduled publishing    | `/api/cron/publish-scheduled`       | GET    | every 5 minutes  | Post due social posts, send due emails, resume stuck runs    |
 
 Full URL = the production URL + the path above. cron-job.org lets you pick a timezone per job -
-schedule Record subscriptions in `Pacific/Auckland` so it stays at 8am across DST changes.
+schedule Record subscriptions and Review asks in `Pacific/Auckland` so they keep their local time
+across DST changes.
 
 ## Notes
 
@@ -76,15 +78,20 @@ schedule Record subscriptions in `Pacific/Auckland` so it stays at 8am across DS
 - Overlapping or retried runs are safe by design: release-holds guards each update on status +
   expiry, booking reminders stamp `emailReminderSentAt` only after Resend accepts the send, invoice
   reminders stamp `reminderLastSentAt`/`reminderCount` the same way (max 2 per invoice, offsets live
-  in the comms settings), record-subscriptions advances `nextDue` with a CAS guard, and the holidays
-  refresh is a pure upsert.
+  in the comms settings), record-subscriptions advances `nextDue` with a CAS guard, review asks
+  claim each invoice (`reviewAskOutcome` > `sending`) before sending with a per-invoice Resend
+  idempotency key, and the holidays refresh is a pure upsert.
 - Booking reminders send inside a window from `CANCELLATION.freeNoticeHours + 1` up to
   `comms.reminderLeadHours` before the start, so the reminder always lands while the customer can
   still cancel free.
 - Tunable values (retention days, reminder lead hours, notification toggles) are read live from
   settings on every run; the reminder job no-ops cleanly when its toggle is off.
-- There is no review-request job. The review ask goes out with the invoice email only, so a customer
-  is never asked before they have been billed.
+- Review asks go out `reviewAskDelayDays` after the invoice is emailed (or after it is marked paid,
+  for one that was never emailed), at most one per person per `reviewAskGapDays`. Every invoice ends
+  with a stamped outcome (`sent`, `skipped` with the reason, `cancelled`, or `failed`, retried once
+  by the next run), and the job does nothing while Settings > Reviews > Automatic review asks is
+  off. A claim left in `sending` for over an hour (a timed-out function) is set to `failed`. Pass
+  `?invoiceId=` to run it for one invoice when testing locally.
 - Cadences are set against each job's query shape, not picked for freshness alone - every run costs
   Vercel Fluid Active CPU, and the free tier only includes 4 CPU-hours a month. Catch-up jobs
   (invoice reminders, purge, subscriptions) query "everything not yet done" with no upper bound, so
@@ -102,19 +109,15 @@ schedule Record subscriptions in `Pacific/Auckland` so it stays at 8am across DS
   gone, so a quota or auth blip never pauses mail. It uses a 7-day lookback, and the query has no
   upper bound, so every future booking is covered; `npm run reconcile:times:dry` and
   `npm run reconcile:times:apply` are the same pass by hand, with the wider 60-day default.
-- It also re-arms send stamps that cannot belong to a booking's current times. `emailReminderSentAt`
-  and `reviewSentAt` are one-way - nothing else in the codebase clears them - so a row that has been
-  moved carries the marks of emails sent against its old date: the reminder job would skip it
-  forever, and the booking page would show its review request as already sent. The test is on the
-  times themselves, not on whether this pass moved anything, because a row corrected by an earlier
-  run or by either edit route has matching times and stale stamps. A reminder counts as stale when
-  it predates the start by more than 168 hours, the widest lead the settings validator allows, so it
-  cannot have been sent for these times whatever the setting is; that also keeps the check free of a
-  settings read, which the CLI script could not do anyway. A review request counts as stale when it
-  predates a finish that is still in the future and the customer has not reviewed, which is exactly
-  the case where it was asking about a visit that had not happened. `reviewSendFailedAt` clears with
-  it, since its one-shot retry would fire the request straight back out. A finish already in the
-  past is a real completed job and is left alone.
+- It also re-arms a reminder stamp that cannot belong to a booking's current times.
+  `emailReminderSentAt` is one-way - nothing else in the codebase clears it - so a row that has been
+  moved carries the mark of a reminder sent for its old date, and the reminder job would skip it
+  forever. The test is on the times themselves, not on whether this pass moved anything, because a
+  row corrected by an earlier run or by either edit route has matching times and a stale stamp. A
+  reminder counts as stale when it predates a start still in the future by more than 168 hours, the
+  widest lead the settings validator allows, so it cannot have been sent for these times whatever
+  the setting is; that also keeps the check free of a settings read, which the CLI script could not
+  do anyway. Review asks hang off invoices, not booking times, so nothing here touches them.
 - Invoice reminders hold off on an invoice whose payment is already in the income ledger. Money
   entered straight into the Cashbook sheet never reaches the invoice (only `POST /pay` links the
   two), so a paid invoice can still read as SENT. A linked entry is proof; an unlinked entry

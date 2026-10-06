@@ -688,6 +688,7 @@ export default function BookingForm({
             }}
             onBlur={handleEmailBlur}
             error={fieldErrors.email}
+            locked={isEditMode}
             contactHint={contactHint}
             suggestion={emailSuggestion}
             promptRef={emailPromptRef}

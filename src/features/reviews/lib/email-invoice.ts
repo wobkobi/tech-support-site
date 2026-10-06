@@ -62,28 +62,22 @@ function defaultGreetingFor(invoice: InvoiceEmailData): string {
 
 interface BuildInvoiceEmailArgs {
   invoice: InvoiceEmailData;
-  reviewUrl: string | null;
-  /** The customer has already reviewed on the site, so `reviewUrl` is the Google link. */
-  googleOnly?: boolean;
   greetingName?: string;
   customBody?: string;
 }
 
 /**
- * Renders the invoice email subject + HTML body without sending. Shared by
+ * Renders the invoice email subject + HTML body without sending. Carries no review ask:
+ * that goes out on its own a few days later (review-ask-run.server.ts). Shared by
  * the preview modal and the send route so the preview matches what's sent.
  * @param args - Render inputs.
  * @param args.invoice - Invoice row fields needed for the body.
- * @param args.reviewUrl - Stable per-contact review URL, or null to omit.
- * @param args.googleOnly - True when `reviewUrl` is the Google link for a customer who has reviewed on the site.
  * @param args.greetingName - Optional greeting target (e.g. person inside a company).
  * @param args.customBody - Optional intro replacement (multi-line via pre-wrap).
  * @returns Subject + escaped HTML body.
  */
 export async function buildInvoiceEmail({
   invoice,
-  reviewUrl,
-  googleOnly = false,
   greetingName,
   customBody,
 }: BuildInvoiceEmailArgs): Promise<{ subject: string; html: string }> {
@@ -110,22 +104,6 @@ export async function buildInvoiceEmail({
   const driveLink = invoice.driveWebUrl
     ? `<p style="margin:0 0 16px;font-size:14px;color:#555">An online copy is also here: <a href="${escapeHtml(invoice.driveWebUrl)}" style="color:#43bccd">view ${isQuote ? "quote" : "invoice"}</a>.</p>`
     : "";
-  // No review ask on a quote - the job hasn't happened yet. The Google option
-  // rides along with every site ask, and stands alone only for someone who has
-  // already reviewed on the site, whatever they wrote, so it never singles out
-  // happy customers (which Google's review policy bans).
-  const googleUrl = (await getSettings()).reviews.googleReviewUrl.trim();
-  const googleOption = googleUrl
-    ? ` Or if you'd rather, you can <a href="${escapeHtml(googleUrl)}" style="color:#43bccd">review me on Google</a>.`
-    : "";
-  // A customer who has already reviewed on the site gets thanked and asked for
-  // Google alone, rather than for a second site review.
-  const reviewLine =
-    !reviewUrl || isQuote
-      ? ""
-      : googleOnly
-        ? `<p style="margin:24px 0 0;font-size:14px;color:#555">Thanks again for your review on my website. If you haven't already and you've got a moment, a <a href="${escapeHtml(reviewUrl)}" style="color:#43bccd">review on Google</a> would help other people find me too.</p>`
-        : `<p style="margin:24px 0 0;font-size:14px;color:#555">If you've got a moment, I'd love to hear how it went - you can <a href="${escapeHtml(reviewUrl)}" style="color:#43bccd">leave a quick review here</a>. It's anonymous if you'd prefer.${googleOption}</p>`;
 
   // Quote emails swap the due line for validity and drop the bank block -
   // payment details come with the invoice after acceptance.
@@ -167,8 +145,6 @@ export async function buildInvoiceEmail({
 
     <p style="margin:0;font-size:14px;color:#333">Any questions, just reply.</p>
 
-    ${reviewLine}
-
     ${await buildEmailSignature(siteUrl)}
 `);
 
@@ -178,9 +154,6 @@ export async function buildInvoiceEmail({
 interface SendInvoiceEmailArgs {
   invoice: InvoiceEmailData;
   pdfBytes: Uint8Array;
-  reviewUrl: string | null;
-  /** The customer has already reviewed on the site, so `reviewUrl` is the Google link. */
-  googleOnly?: boolean;
   greetingName?: string;
   customBody?: string;
 }
@@ -191,8 +164,6 @@ interface SendInvoiceEmailArgs {
  * @param args - Send inputs.
  * @param args.invoice - Invoice row fields needed for the body.
  * @param args.pdfBytes - Raw PDF bytes returned by `generateInvoicePdf`.
- * @param args.reviewUrl - Stable per-contact review URL, or null to omit the review line.
- * @param args.googleOnly - True when `reviewUrl` is the Google link for a customer who has reviewed on the site.
  * @param args.greetingName - Optional greeting target (forwarded to {@link buildInvoiceEmail}).
  * @param args.customBody - Optional intro replacement.
  * @returns True if the email was accepted by Resend, false on failure or misconfig.
@@ -200,8 +171,6 @@ interface SendInvoiceEmailArgs {
 export async function sendInvoiceEmail({
   invoice,
   pdfBytes,
-  reviewUrl,
-  googleOnly,
   greetingName,
   customBody,
 }: SendInvoiceEmailArgs): Promise<boolean> {
@@ -219,8 +188,6 @@ export async function sendInvoiceEmail({
 
   const { subject, html } = await buildInvoiceEmail({
     invoice,
-    reviewUrl,
-    googleOnly,
     greetingName,
     customBody,
   });
@@ -443,8 +410,8 @@ interface BuildVoidEmailArgs {
 
 /**
  * Renders the "your invoice has been voided" email subject + body. Mirrors
- * {@link buildInvoiceEmail} but drops the bank-transfer block and review line - voided
- * invoices never request payment or a review.
+ * {@link buildInvoiceEmail} but drops the bank-transfer block - voided invoices never
+ * request payment.
  * @param args - Render inputs.
  * @param args.invoice - Invoice row fields needed for the body.
  * @param args.greetingName - Optional operator-typed greeting target.

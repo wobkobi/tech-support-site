@@ -1,11 +1,12 @@
 // src/features/business/components/invoice/InvoiceTimeline.tsx
-// Vertical lifecycle timeline for an invoice: Created > Sent > Review link sent >
-// Reminder sent > Paid > Apology sent > Voided. Steps render only once reached; a reached
-// step with a null timestamp (legacy rows) degrades to a muted "date not recorded" rather
-// than vanishing. Server component.
+// Vertical lifecycle timeline for an invoice: Created > Sent > Review link sent (or the
+// review ask's due date or why it didn't go) > Reminder sent > Paid > Apology sent >
+// Voided. Steps render only once reached; a reached step with a null timestamp (legacy
+// rows) degrades to a muted "date not recorded" rather than vanishing. Server component.
 
 import { dotClass, type StepTone } from "@/features/admin/components/ui/timeline-tone";
 import type { InvoiceStatus } from "@/features/business/types/business";
+import { reviewAskNoteLabel } from "@/features/reviews/lib/review-ask-rules";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
@@ -20,6 +21,14 @@ interface InvoiceTimelineProps {
   sentAt?: Date | string | null;
   /** When the review-request link was emailed; null when never sent. */
   reviewLinkSentAt?: Date | string | null;
+  /** The automatic review ask's stamped outcome; null while undecided. */
+  reviewAskOutcome?: "sending" | "sent" | "skipped" | "cancelled" | "failed" | null;
+  /** Skip reason code or failure message. */
+  reviewAskNote?: string | null;
+  /** When the outcome was stamped. */
+  reviewAskDecidedAt?: Date | string | null;
+  /** When an undecided ask is due; null when no ask is coming. */
+  reviewAskDueAt?: Date | string | null;
   /** Payment stamp; null on legacy PAID rows. */
   paidAt?: Date | string | null;
   /** Payment method recorded at pay time. */
@@ -51,6 +60,10 @@ interface Step {
  * @param props.createdAt - Record creation timestamp.
  * @param props.sentAt - First-sent timestamp (nullable).
  * @param props.reviewLinkSentAt - Review-link send timestamp (nullable).
+ * @param props.reviewAskOutcome - Automatic review ask outcome (nullable).
+ * @param props.reviewAskNote - Reason or failure note for that outcome (nullable).
+ * @param props.reviewAskDecidedAt - When the outcome was stamped (nullable).
+ * @param props.reviewAskDueAt - Due date of an undecided ask (nullable).
  * @param props.paidAt - Payment timestamp (nullable).
  * @param props.paymentMethod - Payment method (nullable).
  * @param props.paymentReference - Payment reference (nullable).
@@ -65,6 +78,10 @@ export function InvoiceTimeline({
   createdAt,
   sentAt,
   reviewLinkSentAt,
+  reviewAskOutcome,
+  reviewAskNote,
+  reviewAskDecidedAt,
+  reviewAskDueAt,
   paidAt,
   paymentMethod,
   paymentReference,
@@ -82,6 +99,35 @@ export function InvoiceTimeline({
 
   if (reviewLinkSentAt) {
     steps.push({ label: "Review link sent", date: reviewLinkSentAt, tone: "violet" });
+  }
+  // The automatic ask when it hasn't (yet) sent. Launch-backfill skips stay quiet: every
+  // older invoice carries one and it says nothing about this job.
+  const askDetail = reviewAskNoteLabel(reviewAskNote);
+  if (!reviewAskOutcome && reviewAskDueAt) {
+    steps.push({ label: "Review ask due", date: reviewAskDueAt, tone: "neutral" });
+  } else if (reviewAskOutcome === "sending") {
+    steps.push({ label: "Review ask sending", date: reviewAskDecidedAt ?? null, tone: "neutral" });
+  } else if (reviewAskOutcome === "skipped" && reviewAskNote !== "before_auto") {
+    steps.push({
+      label: "Review ask skipped",
+      date: reviewAskDecidedAt ?? null,
+      detail: askDetail,
+      tone: "neutral",
+    });
+  } else if (reviewAskOutcome === "cancelled") {
+    steps.push({
+      label: "Review ask cancelled",
+      date: reviewAskDecidedAt ?? null,
+      detail: askDetail,
+      tone: "neutral",
+    });
+  } else if (reviewAskOutcome === "failed") {
+    steps.push({
+      label: "Review ask failed",
+      date: reviewAskDecidedAt ?? null,
+      detail: askDetail,
+      tone: "critical",
+    });
   }
 
   // Overdue chasing: one step summarising all reminders, dated by the latest.

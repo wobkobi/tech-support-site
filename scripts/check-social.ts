@@ -285,6 +285,12 @@ function checkFromEmail(): void {
   );
   const bare = postFromEmail("Just text");
   expect("no button or picture leaves them null", bare.linkUrl === null && bare.imageUrl === null);
+  const reviewer = postFromEmail("Thanks again.\nYou wrote: {reviewText}\nSee you soon.");
+  expect(
+    "a line with someone's own review is dropped",
+    reviewer.body === "Thanks again.\nSee you soon.",
+    JSON.stringify(reviewer.body),
+  );
 }
 
 /** JPEG header size reader. */

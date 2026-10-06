@@ -1,8 +1,8 @@
 "use client";
 // src/features/admin/components/settings/ReviewsTab.tsx
 // Editor for the reviews & reputation group: how many reviews feature on the home page,
-// whether verified reviews auto-approve, and the Google review link. Saves through the
-// shared settings form hook.
+// whether verified reviews auto-approve, the Google review link, and the automatic
+// review ask's timing. Saves through the shared settings form hook.
 
 import {
   NumberField,
@@ -70,6 +70,33 @@ export function ReviewsTab({ initial, defaults }: Props): React.ReactElement {
           error={fieldErrors.googleReviewUrl}
           customised={draft.googleReviewUrl !== defaults.googleReviewUrl}
           onChange={(v) => set({ googleReviewUrl: v })}
+        />
+        <ToggleField
+          id="reviewAskEnabled"
+          meta={m.reviewAskEnabled}
+          value={draft.reviewAskEnabled}
+          customised={draft.reviewAskEnabled !== defaults.reviewAskEnabled}
+          onChange={(v) => set({ reviewAskEnabled: v })}
+        />
+        <NumberField
+          id="reviewAskDelayDays"
+          meta={m.reviewAskDelayDays}
+          value={draft.reviewAskDelayDays}
+          min={1}
+          max={30}
+          error={fieldErrors.reviewAskDelayDays}
+          customised={draft.reviewAskDelayDays !== defaults.reviewAskDelayDays}
+          onChange={(v) => set({ reviewAskDelayDays: v ?? 1 })}
+        />
+        <NumberField
+          id="reviewAskGapDays"
+          meta={m.reviewAskGapDays}
+          value={draft.reviewAskGapDays}
+          min={0}
+          max={365}
+          error={fieldErrors.reviewAskGapDays}
+          customised={draft.reviewAskGapDays !== defaults.reviewAskGapDays}
+          onChange={(v) => set({ reviewAskGapDays: v ?? 0 })}
         />
       </div>
 

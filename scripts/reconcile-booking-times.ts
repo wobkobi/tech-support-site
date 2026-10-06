@@ -57,9 +57,7 @@ if (result.rearmed.length > 0) {
     `\n${result.rearmed.length} booking(s) carry send stamps from times they no longer have, so the email never fires again:`,
   );
   for (const r of result.rearmed) {
-    const labels = r.stamps
-      .map((s) => (s === "reminder" ? "24h reminder" : "review request"))
-      .join(" + ");
+    const labels = r.stamps.map(() => "24h reminder").join(" + ");
     console.log(
       `  ${r.name}  (${r.bookingId})  booked ${formatDateTimeShort(r.startAt)}  >  ${labels}`,
     );
@@ -82,8 +80,8 @@ if (result.missing.length > 0) {
   }
   console.log(
     apply
-      ? "  flagged - reminder and review emails are paused until each row is cancelled properly"
-      : "  re-run with --apply to pause their reminder and review emails",
+      ? "  flagged - reminder emails are paused until each row is cancelled properly"
+      : "  re-run with --apply to pause their reminder emails",
   );
 }
 

@@ -8,7 +8,8 @@ import {
   findOrCreateContactByEmail,
   findOrCreateContactByPhone,
 } from "@/features/contacts/lib/find-or-create";
-import { sendPastClientReviewRequest } from "@/features/reviews/lib/email";
+import { sendReviewAsk } from "@/features/reviews/lib/email-review-ask";
+import { reviewAskBlockedBy } from "@/features/reviews/lib/review-ask-opt-out";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -116,23 +117,35 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: true, reviewUrl, smsText, copyOnly: true });
     }
 
+    const blockedBy = await reviewAskBlockedBy(contact.id);
+    if (blockedBy) {
+      return errorResponse(
+        blockedBy === "review_opt_out"
+          ? "They've asked not to get review requests."
+          : "They've unsubscribed from your emails, so no review request was sent.",
+        409,
+      );
+    }
+
     // Stamp the send-state only after a successful send: stamping first would mark the
     // customer "review requested" even on a Resend failure, so every retry would
     // short-circuit at the dedup guard above without re-sending.
-    const sent = await sendPastClientReviewRequest({
-      id: contact.id,
-      name: name.trim(),
-      email: normalisedEmail!,
+    const result = await sendReviewAsk({
+      to: normalisedEmail!,
+      firstName: name.trim().split(" ")[0] ?? "",
+      contactId: contact.id,
       reviewToken,
     });
 
-    if (!sent) {
+    if (result !== "sent") {
       // Persist the token so a retry reuses the same link, but leave the
       // send-state unstamped so the retry actually re-sends.
       if (!contact.reviewToken) {
         await prisma.contact.update({ where: { id: contact.id }, data: { reviewToken } });
       }
-      return errorResponse("Failed to send review link.", 502);
+      return result === "not_configured"
+        ? errorResponse("Email isn't set up, so nothing was sent.", 503)
+        : errorResponse("Failed to send review link.", 502);
     }
 
     await prisma.contact.update({

@@ -3,12 +3,12 @@
 // flags rows whose event has been deleted. Called externally via cron-job.org
 // every 30 minutes. See docs/CRON.md.
 //
-// Runs ahead of the reminder and review crons on purpose: both decide when to email from
-// Booking.startAt/endAt, and both skip a booking flagged here, so a time corrected in
-// Calendar or a job called off there has to land in the row first or the emails go out on
-// stale state. It also clears send stamps that cannot belong to a booking's current
-// times, so a row that has been moved is emailed against the times it actually holds
-// rather than skipped on the strength of the ones it used to.
+// Runs ahead of the reminder cron on purpose: it decides when to email from
+// Booking.startAt and skips a booking flagged here, so a time corrected in Calendar or a
+// job called off there has to land in the row first or the reminder goes out on stale
+// state. It also clears a reminder stamp that cannot belong to a booking's current times,
+// so a row that has been moved is reminded about the times it actually holds rather than
+// skipped on the strength of the ones it used to.
 
 import { reconcileBookingTimes } from "@/features/calendar/lib/reconcile-booking-times";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -16,7 +16,7 @@ import { isCronAuthorised } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 // Short lookback: the query has no upper bound, so every future booking is covered
-// anyway, and a week back reaches everything the review cron can still act on. The 60-day
+// anyway, and a week back catches times corrected after the job. The 60-day
 // default belongs to the manual sweep, which isn't paying an event lookup twice an hour.
 const CRON_SINCE_DAYS = 7;
 

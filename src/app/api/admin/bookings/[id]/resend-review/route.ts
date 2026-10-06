@@ -1,17 +1,21 @@
 // src/app/api/admin/bookings/[id]/resend-review/route.ts
-// Admin API to manually (re)send a review request email for a booking.
+// Admin API to manually (re)send the review ask for a booking.
 
-import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
+import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
+import { sendReviewAsk } from "@/features/reviews/lib/email-review-ask";
+import { reviewAskBlockedBy } from "@/features/reviews/lib/review-ask-opt-out";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/admin/bookings/[id]/resend-review
- * Sends (or resends) the review request email for a booking, bypassing the
- * reviewSentAt guard used by the cron. Stamps reviewSentAt only when the send
- * succeeds; a booking with no email is rejected with 400.
+ * Sends (or resends) the review ask for a booking. Lands a Contact for the booking's
+ * email first, since the ask's stop link is signed per contact. Refuses with 409 when
+ * the person has opted out of review asks or unsubscribed. Stamps reviewSentAt only
+ * when the send succeeds; a booking with no email is rejected with 400.
  * Requires X-Admin-Secret header.
  * @param request - Incoming request.
  * @param params - Route params.
@@ -40,11 +44,31 @@ export async function POST(
     return errorResponse("Booking has no email to send a review request to.", 400);
   }
 
-  // sendCustomerReviewRequest returns false on a Resend failure rather than
-  // throwing; only stamp reviewSentAt when the send actually went out so a failed
-  // send stays retryable.
-  const sent = await sendCustomerReviewRequest(booking);
-  if (!sent) {
+  const email = normaliseEmail(booking.email);
+  const { contact } = await findOrCreateContactByEmail(email, { name: booking.name });
+
+  const blockedBy = await reviewAskBlockedBy(contact.id);
+  if (blockedBy) {
+    return errorResponse(
+      blockedBy === "review_opt_out"
+        ? "They've asked not to get review requests."
+        : "They've unsubscribed from your emails, so no review request was sent.",
+      409,
+    );
+  }
+
+  // The booking's own token, so a review left through this link stays tied to the
+  // booking. Only a real send stamps reviewSentAt, so a failure stays retryable.
+  const result = await sendReviewAsk({
+    to: email,
+    firstName: booking.name.split(" ")[0] ?? "",
+    contactId: contact.id,
+    reviewToken: booking.reviewToken,
+  });
+  if (result === "not_configured") {
+    return errorResponse("Email isn't set up, so nothing was sent.", 503);
+  }
+  if (result === "failed") {
     return errorResponse("Failed to send review request.", 502);
   }
 

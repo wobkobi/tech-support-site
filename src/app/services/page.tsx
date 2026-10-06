@@ -203,7 +203,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
                 </li>
                 <li className="flex gap-2">
                   <Bullet />
-                  <span>Helping parents or grandparents get comfortable with devices</span>
+                  <span>Helping you get comfortable with devices</span>
                 </li>
                 <li className="flex gap-2">
                   <Bullet />
@@ -311,7 +311,8 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
             </ul>
 
             <p className="mt-3 text-base text-rich-black/90 sm:text-lg">
-              Family members are welcome to book on someone else's behalf.
+              Booking for a parent or relative? Put their address, and mention who I'll be meeting
+              in the notes.
             </p>
           </section>
 

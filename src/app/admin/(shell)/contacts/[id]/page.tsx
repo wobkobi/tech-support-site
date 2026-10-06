@@ -2,7 +2,7 @@
 // Customer-360 contact detail. Loads everything the contact touches through the shared
 // loadContact360 matcher - bookings, invoices, income, reviews - summarises it as
 // StatCards, and merges the lot into one interaction timeline. The right rail carries the
-// contact fields and sync/review-link state.
+// contact fields, sync state and review-ask state.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { InfoRow } from "@/features/admin/components/ui/InfoRow";
@@ -12,6 +12,8 @@ import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { formatNZD } from "@/features/business/lib/business";
 import { ContactDetailActions } from "@/features/contacts/components/ContactDetailActions";
 import { loadContact360 } from "@/features/contacts/lib/contact-360";
+import { AllowReviewAsksButton } from "@/features/reviews/components/admin/AllowReviewAsksButton";
+import { contactReviewAskState } from "@/features/reviews/lib/review-ask-opt-out";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
@@ -61,7 +63,7 @@ export default async function ContactDetailPage({
   await requireAdminAuth();
   const { id } = await params;
 
-  const data = await loadContact360(id);
+  const [data, askState] = await Promise.all([loadContact360(id), contactReviewAskState(id)]);
   if (!data) notFound();
 
   const { contact, bookings, invoices, income, reviews, totals } = data;
@@ -248,18 +250,23 @@ export default async function ContactDetailPage({
           )}
 
           <Card>
-            <CardHeader title="Review link" />
+            <CardHeader title="Review asks" />
             <dl className="space-y-2 text-sm">
-              <InfoRow label="Sent">
-                {contact.reviewLinkSentAt ? (
-                  <>
-                    {formatDateShort(contact.reviewLinkSentAt.toISOString())}
-                    {contact.reviewLinkSentMode ? ` · ${contact.reviewLinkSentMode}` : ""}
-                  </>
-                ) : (
-                  NONE
-                )}
+              <InfoRow label="Last asked">
+                {askState.lastAskedAt ? formatDateShort(askState.lastAskedAt.toISOString()) : NONE}
               </InfoRow>
+              {askState.blockedBy && (
+                <InfoRow label="Asks">
+                  {askState.blockedBy === "review_opt_out" ? (
+                    <span className="flex flex-wrap items-center gap-2">
+                      No review asks (they opted out)
+                      <AllowReviewAsksButton contactId={contact.id} />
+                    </span>
+                  ) : (
+                    "None - they unsubscribed from your emails"
+                  )}
+                </InfoRow>
+              )}
               <InfoRow label="Reviewed">
                 {contact.reviewLinkSubmittedAt ? (
                   <StatusPill tone="success">Yes</StatusPill>

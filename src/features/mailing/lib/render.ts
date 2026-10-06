@@ -3,6 +3,7 @@
 // One renderer backs the editor preview, the test send and the real send, so all three
 // always match. Pure: everything it needs from the database arrives in the context.
 
+import type { CampaignAudience } from "@/features/mailing/lib/audience";
 import {
   escapeHtml,
   htmlToText,
@@ -21,7 +22,13 @@ export interface CampaignContent {
 export interface CampaignRecipient {
   /** Contact name as stored, or null when unknown. */
   name: string | null;
+  /** Their latest review from the site, for {reviewText}; null or omitted when none. */
+  reviewText?: string | null;
 }
+
+/** Stand-in review for the preview and test send, so {reviewText} reads naturally. */
+export const SAMPLE_REVIEW_TEXT =
+  "Sorted my printer and showed me how to back up my photos. Patient and easy to understand.";
 
 /** Promo wording the {promo} placeholders expand to. */
 export interface PromoWording {
@@ -52,6 +59,7 @@ export const PLACEHOLDERS = [
   { key: "promo", help: "The promo in one line, with its end date" },
   { key: "promoOffer", help: 'Just the offer, like "$10 off"' },
   { key: "promoEnds", help: "When the promo ends" },
+  { key: "reviewText", help: "Their own review from your site (reviewers only)" },
 ] as const;
 
 type PlaceholderKey = (typeof PLACEHOLDERS)[number]["key"];
@@ -130,6 +138,7 @@ function placeholderValues(
     promo: promo?.summary ?? "",
     promoOffer: promo?.offer ?? "",
     promoEnds: promo?.ends ?? "",
+    reviewText: recipient.reviewText?.trim() ?? "",
   };
 }
 
@@ -289,12 +298,19 @@ ${footer}
 
 /**
  * Problems worth stopping for before a send: empty fields, unknown or
- * promo-less placeholders, and images from outside the Blob store.
+ * promo-less placeholders, {reviewText} on an email that isn't going to
+ * reviewers (it would be blank for everyone else), and images from outside
+ * the Blob store.
  * @param content - Subject, preheader and body.
  * @param hasPromo - Whether promo wording is available.
+ * @param audience - Who the email goes to.
  * @returns Plain-English problems, empty when the email is good to go.
  */
-export function listProblems(content: CampaignContent, hasPromo: boolean): string[] {
+export function listProblems(
+  content: CampaignContent,
+  hasPromo: boolean,
+  audience: CampaignAudience = "everyone",
+): string[] {
   const problems: string[] = [];
   if (!content.subject.trim()) problems.push("The subject is empty.");
   if (!content.body.trim()) problems.push("The email has no body text.");
@@ -302,10 +318,12 @@ export function listProblems(content: CampaignContent, hasPromo: boolean): strin
   const all = `${content.subject}\n${content.preheader ?? ""}\n${content.body}`;
   const unknown = new Set<string>();
   let usesPromo = false;
+  let usesReview = false;
   for (const match of all.matchAll(PLACEHOLDER_RE)) {
     const key = match[1]!;
     if (!KNOWN_KEYS.has(key)) unknown.add(key);
     else if (PROMO_KEYS.has(key)) usesPromo = true;
+    else if (key === "reviewText") usesReview = true;
   }
   for (const key of unknown) {
     problems.push(`{${key}} isn't a placeholder, so it will show exactly as typed.`);
@@ -313,6 +331,11 @@ export function listProblems(content: CampaignContent, hasPromo: boolean): strin
   if (usesPromo && !hasPromo) {
     problems.push(
       "The email uses a promo placeholder but there's no promo running, so it would be blank.",
+    );
+  }
+  if (usesReview && audience !== "site_reviewers") {
+    problems.push(
+      '{reviewText} only works when the email goes to "People who left a review on the site". Change who it goes to, or take it out.',
     );
   }
 

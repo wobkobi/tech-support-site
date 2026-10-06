@@ -52,7 +52,8 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
   },
   reviews: {
     title: "Reviews & reputation",
-    blurb: "Homepage review count, auto-approval, request pacing, and the Google review link.",
+    blurb:
+      "Homepage review count, auto-approval, the Google review link, and when the automatic review ask goes out.",
   },
 };
 
@@ -215,7 +216,26 @@ export const REVIEWS_FIELD_META = {
   googleReviewUrl: {
     title: "Google review link",
     description:
-      'From your Business Profile\'s "Ask for reviews" page. Offered on the review thank-you screen and in review-request and invoice emails. Leave blank to hide it.',
+      'From your Business Profile\'s "Ask for reviews" page. The main button in review-ask emails and on the review page, with your own review form as the fallback. Leave blank to use only your own form.',
+  },
+  reviewAskEnabled: {
+    title: "Automatic review asks",
+    description:
+      "Email each customer a short review ask a few days after their invoice goes out, with a link to stop them.",
+    off: "When off, no review asks go out on their own - Send now and the manual review link still work.",
+  },
+  reviewAskDelayDays: {
+    title: "Days after the invoice",
+    description:
+      "How long after the invoice is sent before the review ask goes out (at the 10am run).",
+    unit: "days",
+  },
+  reviewAskGapDays: {
+    title: "Days between asks",
+    description:
+      "Don't ask the same person again within this many days, even if they get another invoice.",
+    unit: "days",
+    off: "Set 0 to ask after every invoice.",
   },
 } satisfies Record<string, FieldMeta>;
 

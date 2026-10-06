@@ -3,6 +3,7 @@
 // the client-safe module stays importable everywhere without dragging Prisma into the
 // browser bundle.
 
+import { formatMoneyCompact } from "@/features/business/lib/business-format";
 import {
   FALLBACK_BASE_RATE,
   FALLBACK_BUSINESS_DELTA,
@@ -102,7 +103,7 @@ interface PublicModifier {
   kind: "delta" | "uplift";
   /** Effective $/hr after applying the modifier to the base hourly rate. */
   effectiveRate: number;
-  /** Customer-facing delta description (e.g. "+$20", "-$10", "+25%"). */
+  /** Customer-facing delta description (e.g. "+$20", "-$10", "+$25"). */
   deltaDescription: string;
   /** Brief context line shown beneath the rate (e.g. "data recovery, hardware repair"). */
   description: string;
@@ -178,13 +179,16 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
       // The uplift shown comes from the pricing settings (what getPolicy charges), NOT the
       // RateConfig percentDelta, so the displayed % can't drift from the charged one. The
       // row only has to exist to surface the modifier on the accordion.
+      // Described in dollars of FULL labour, not as a percent: under a promo the
+      // billed rate is the discounted headline + this amount, so "+$25 = $90"
+      // adds up next to a $65 headline where "+25%" would read as 25% of $65.
       const uplift = pricing.publicHolidayUplift;
-      const pct = Math.round(uplift * 100);
+      const upliftPerHour = Math.round(baseRate * uplift * 100) / 100;
       modifiers.push({
         label: row.label,
         kind: "uplift",
-        effectiveRate: Math.round(baseRate * (1 + uplift) * 100) / 100,
-        deltaDescription: `+${pct}%`,
+        effectiveRate: Math.round((baseRate + upliftPerHour) * 100) / 100,
+        deltaDescription: `+${formatMoneyCompact(upliftPerHour)}`,
         description: MODIFIER_DESCRIPTIONS[row.label] ?? "",
       });
     }

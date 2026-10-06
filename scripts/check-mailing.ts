@@ -50,7 +50,14 @@ function expect(label: string, ok: boolean, detail = ""): void {
 }
 
 const BLOB_IMAGE = "https://abc123.public.blob.vercel-storage.com/mailing/image-x1.jpg";
-const VALUES = { firstName: "Sam", name: "Sam Taylor", promo: "", promoOffer: "", promoEnds: "" };
+const VALUES = {
+  firstName: "Sam",
+  name: "Sam Taylor",
+  promo: "",
+  promoOffer: "",
+  promoEnds: "",
+  reviewText: "",
+};
 
 const CTX: RenderContext = {
   brand: "To the Point Tech",
@@ -202,6 +209,32 @@ function checkPlaceholders(): void {
     "an empty subject and body are problems",
     listProblems({ subject: " ", preheader: null, body: "" }, true).length === 2,
   );
+
+  const review = renderCampaign(
+    { subject: "Hi", preheader: null, body: "You said:\n{reviewText}" },
+    { name: "Sam", reviewText: "Fixed my <b>laptop</b> **fast**" },
+    CTX,
+  );
+  expect(
+    "{reviewText} fills in escaped, never as formatting",
+    review.html.includes("Fixed my &lt;b&gt;laptop&lt;/b&gt; **fast**"),
+    review.html,
+  );
+  const noReview = renderCampaign(
+    { subject: "Hi", preheader: null, body: "You said: [{reviewText}]" },
+    { name: "Sam" },
+    CTX,
+  );
+  expect("{reviewText} is blank without a review", noReview.html.includes("You said: []"));
+  const reviewContent = { subject: "Hi", preheader: null, body: "{reviewText}" };
+  expect(
+    "{reviewText} on an everyone email is a problem",
+    listProblems(reviewContent, true).some((p) => p.includes("{reviewText}")),
+  );
+  expect(
+    "{reviewText} on a reviewers email is fine",
+    listProblems(reviewContent, true, "site_reviewers").length === 0,
+  );
 }
 
 /** Unsubscribe tokens: forgeries and mangled links are refused. */
@@ -267,6 +300,20 @@ function checkRecipients(): void {
   expect("an unticked contact is excluded", ids(result.excluded) === "d", ids(result.excluded));
   const all = [...result.recipients, ...result.excluded, ...result.optedOut];
   expect("a contact with no email is left out", !all.some((r) => r.contactId === "f"));
+
+  const narrowed = selectRecipients(
+    pool,
+    [{ email: "cat@example.com", contactId: null }],
+    new Set(["d"]),
+    new Set(["c", "d", "e"]),
+  );
+  expect(
+    "an audience keeps only its contacts, in every group",
+    ids(narrowed.recipients) === "e" &&
+      ids(narrowed.excluded) === "d" &&
+      ids(narrowed.optedOut) === "c",
+    `${ids(narrowed.recipients)} / ${ids(narrowed.excluded)} / ${ids(narrowed.optedOut)}`,
+  );
 }
 
 /** Batches of up to 100 for Resend. */
@@ -413,14 +460,17 @@ function checkInsertables(): void {
 
   const placeholders = items.filter((i) => i.text.startsWith("{"));
   expect(
-    "offers both name placeholders and the three promo ones",
+    "offers the name and review placeholders and the three promo ones",
     placeholders.map((i) => i.text).join(" ") ===
-      "{firstName} {name} {promo} {promoOffer} {promoEnds}",
+      "{firstName} {name} {reviewText} {promo} {promoOffer} {promoEnds}",
   );
+  // Reviewers audience, so {reviewText} counts as known rather than misplaced.
   expect(
     "every offered placeholder is one the renderer knows",
     placeholders.every(
-      (i) => listProblems({ subject: "Hi", preheader: null, body: i.text }, true).length === 0,
+      (i) =>
+        listProblems({ subject: "Hi", preheader: null, body: i.text }, true, "site_reviewers")
+          .length === 0,
     ),
   );
   expect(

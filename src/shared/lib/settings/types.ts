@@ -308,12 +308,18 @@ export interface ReviewsSettings {
   /** When true, reviews verified via a booking/contact token auto-approve. */
   autoApproveVerified: boolean;
   /**
-   * Google Business Profile "write a review" link, offered alongside every site
-   * review ask, and on its own to a customer who has already reviewed on the site.
-   * Shown to everyone regardless of what they wrote - Google bans
-   * asking only happy customers. Empty string hides it.
+   * Google Business Profile "write a review" link: the main button of every review
+   * ask and of the /review page, with the site form as the fallback. Shown to
+   * everyone regardless of what they wrote - Google bans asking only happy
+   * customers. Empty string falls back to the site form alone.
    */
   googleReviewUrl: string;
+  /** When true, the daily job emails a review ask a few days after each invoice. */
+  reviewAskEnabled: boolean;
+  /** Whole days after the invoice is sent before its review ask goes out. */
+  reviewAskDelayDays: number;
+  /** Minimum days between two review asks to the same person. */
+  reviewAskGapDays: number;
 }
 
 export interface Settings {

@@ -135,17 +135,15 @@ model Booking {
   calendarEventId        String?
   // Set by the reconcile cron when this row still owns an event id that Calendar
   // no longer has: the job was called off there and the row was left behind.
-  // While it is set, the reminder and review crons skip the booking rather than
-  // email about a job that isn't happening, and the admin flags it for cleanup.
+  // While it is set, the reminder cron skips the booking rather than email
+  // about a job that isn't happening, and the admin flags it for cleanup.
   // Cleared as soon as the event reads back, so a restored event resumes mail.
   calendarEventMissingAt DateTime?
 
-  // Review email tracking.
-  reviewSentAt       DateTime? // When the review request email was sent
-  reviewSubmittedAt  DateTime? // When the client submitted a review
-  // Set when a send returned failure (Resend down/rate-limited) after reviewSentAt
-  // was optimistically stamped. Lets the cron attempt one capped retry next pass.
-  reviewSendFailedAt DateTime?
+  // Review tracking. Automatic review asks hang off invoices; this is the
+  // booking page's manual "Send review link".
+  reviewSentAt      DateTime? // When the review ask email was sent
+  reviewSubmittedAt DateTime? // When the client submitted a review
 
   // Reminder tracking. Stamped by /api/cron/send-booking-reminders so the
   // 24h-out email reminder fires at most once per booking.
@@ -228,10 +226,8 @@ model Booking {
   @@index([status, holdExpiresAt])
   // Slot availability (slots, days, request, booking page): WHERE status IN [held,confirmed] AND endAt >= now
   @@index([status, endAt])
-  // Review email cron and admin page: filter/sort on reviewSentAt
+  // Admin reviews page and review-ask lookups: filter/sort on reviewSentAt
   @@index([reviewSentAt])
-  // Review email cron: WHERE status="confirmed" AND reviewSentAt=null AND endAt<=threshold
-  @@index([status, reviewSentAt, endAt])
   // Email reminder cron: WHERE status="confirmed" AND startAt in window AND emailReminderSentAt=null
   @@index([status, startAt, emailReminderSentAt])
   // Contact/admin lookup by phone
@@ -459,6 +455,15 @@ model RateConfig {
   updatedAt    DateTime? @updatedAt
 }
 
+// Where an invoice's automatic review ask stands. Null on the invoice = not decided.
+enum ReviewAskOutcome {
+  sending
+  sent
+  skipped
+  cancelled
+  failed
+}
+
 enum InvoiceStatus {
   DRAFT
   SENT
@@ -482,14 +487,14 @@ type LineItem {
 }
 
 model Invoice {
-  id                   String        @id @default(auto()) @map("_id") @db.ObjectId
-  number               String        @unique
+  id                   String            @id @default(auto()) @map("_id") @db.ObjectId
+  number               String            @unique
   clientName           String
   clientEmail          String
   issueDate            DateTime
   dueDate              DateTime
   lineItems            LineItem[]
-  gst                  Boolean       @default(false)
+  gst                  Boolean           @default(false)
   subtotal             Float
   gstAmount            Float
   total                Float
@@ -500,15 +505,15 @@ model Invoice {
   // couldn't be diagnosed (see pricing-policy.ts unsuccessfulWorkCopy).
   // Audit trail: lets the admin dashboard count how often the half-price
   // clause was invoked so a pattern of abuse is spottable.
-  unsuccessful         Boolean       @default(false)
+  unsuccessful         Boolean           @default(false)
   unsuccessfulDiscount Float?
-  status               InvoiceStatus @default(DRAFT)
+  status               InvoiceStatus     @default(DRAFT)
   notes                String?
-  contactId            String?       @db.ObjectId
+  contactId            String?           @db.ObjectId
   // Optional match back to the job this invoice bills: the Booking row and
   // the Google Calendar event (whose times the operator corrects to actual
   // on-site time after each job). Set by the calculator's event prefill flow.
-  bookingId            String?       @db.ObjectId
+  bookingId            String?           @db.ObjectId
   calendarEventId      String?
   // Every event a merged job billed, earliest first. calendarEventId stays the
   // first of these so existing readers keep working; this is what lets the
@@ -521,9 +526,19 @@ model Invoice {
   // on DD MMM" on the detail page. Null on pre-VOIDED-feature rows and on
   // any invoice that was never voided.
   voidedAt             DateTime?
-  // Stamped when send-email included the review link. One of the three "asked for a
-  // review" stamps the admin reviews page reads.
+  // Stamped when the review ask for this invoice went out (the daily review-ask job or
+  // Send now; legacy rows: the review line in the invoice email). One of the three
+  // "asked for a review" stamps the admin reviews page reads.
   reviewLinkSentAt     DateTime?
+  // Automatic review-ask state, owned by review-ask-run.server.ts. Null/unset = not
+  // decided yet (the job is still waiting for the due date). "sending" is the claim a
+  // run holds while the email is in flight; reviewAskDecidedAt doubles as its claim
+  // time so an interrupted run can be spotted and released. reviewAskNote holds the
+  // skip reason code (see REVIEW_ASK_SKIP_LABELS) or the failure message.
+  reviewAskOutcome     ReviewAskOutcome?
+  reviewAskNote        String?
+  reviewAskDecidedAt   DateTime?
+  reviewAskAttempts    Int?
   // Stamped when send-email promotes DRAFT>SENT - a real timestamp, unlike the
   // updatedAt proxy the route returned before. Null on legacy SENT rows.
   sentAt               DateTime?
@@ -542,7 +557,7 @@ model Invoice {
   alreadyPaidMethod    String?
   // The income entry that records alreadyPaid. Kept apart from the balance payment's
   // entry so the pay route and the payment matcher never mistake one for the other.
-  alreadyPaidIncomeId  String?       @db.ObjectId
+  alreadyPaidIncomeId  String?           @db.ObjectId
   // Overdue-reminder tracking, stamped only after Resend accepts. Nullable per
   // the Mongo no-backfill rule; readers treat null count as 0.
   reminderLastSentAt   DateTime?
@@ -560,10 +575,11 @@ model Invoice {
   // Quote validity end (shown on the PDF); past this date the quote renders
   // as expired in the admin UI. Null = no stated expiry.
   quoteValidUntil      DateTime?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   @@index([clientEmail, reviewLinkSentAt])
+  @@index([reviewAskOutcome, sentAt])
 }
 
 model IncomeEntry {
@@ -940,6 +956,13 @@ enum CampaignStatus {
   failed
 }
 
+// Who a mailing-list email goes to. Null on Campaign means everyone.
+enum CampaignAudience {
+  everyone
+  // Contacts who left a review on the site; the {reviewText} placeholder only works here.
+  site_reviewers
+}
+
 // A mailing-list email the operator writes in /admin/mailing. The body is the
 // operator's own markdown-lite text, rendered per recipient at send time by
 // src/features/mailing/lib/render.ts, so nothing about the wording lives in code.
@@ -970,10 +993,12 @@ model Campaign {
   sendAttempt      Int            @default(0)
 
   // Contacts unticked in the send dialog.
-  excludedContactIds String[] @db.ObjectId
+  excludedContactIds String[]          @db.ObjectId
   // Promo the {promo} placeholders describe. Null falls back to whichever
   // automatic promo is running when it sends.
-  promoId            String?  @db.ObjectId
+  promoId            String?           @db.ObjectId
+  // Optional so existing rows read as everyone without a backfill.
+  audience           CampaignAudience?
 
   sentCount   Int @default(0)
   failedCount Int @default(0)
@@ -1019,6 +1044,21 @@ enum EmailOptOutSource {
 // write there bumps updatedAt past lastSyncedAt and re-pushes the contact to
 // Google on the next sync. Transactional mail (bookings, invoices) ignores it.
 model EmailOptOut {
+  id        String            @id @default(auto()) @map("_id") @db.ObjectId
+  // Lowercased.
+  email     String            @unique
+  contactId String?           @db.ObjectId
+  source    EmailOptOutSource
+  createdAt DateTime          @default(now())
+
+  @@index([contactId])
+}
+
+// Addresses that asked not to get review asks ("Stop asking me for reviews" in the
+// review-ask email). Separate from EmailOptOut so someone can keep the newsletter but
+// drop review asks; the review-ask job honours both. Kept off Contact for the same
+// Google re-sync reason as EmailOptOut.
+model ReviewAskOptOut {
   id        String            @id @default(auto()) @map("_id") @db.ObjectId
   // Lowercased.
   email     String            @unique

@@ -16,12 +16,14 @@ import { findRecordedPayment } from "@/features/business/lib/invoice-payment-mat
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
+import { reviewAskClockStart, reviewAskDueAt } from "@/features/reviews/lib/review-ask-rules";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
 import { ServerTimer } from "@/shared/lib/server-timing";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Invoice as PrismaInvoice } from "@prisma/client";
 import type { Metadata } from "next";
 import Image from "next/image";
@@ -104,6 +106,17 @@ async function InvoiceRail({
 
   const recipient = invoiceRecipient(invoice.clientName, contact);
   const overdue = isInvoiceOverdue(invoice);
+  // Due date of a review ask still to come; none for quotes or with automatic asks off.
+  const { reviews } = await getSettings();
+  const askClock = reviewAskClockStart(invoice);
+  const askDueAt =
+    reviews.reviewAskEnabled &&
+    !invoice.isQuote &&
+    invoice.status !== "VOIDED" &&
+    !invoice.reviewAskOutcome &&
+    askClock
+      ? reviewAskDueAt(askClock, reviews.reviewAskDelayDays)
+      : null;
   const isPaid = invoice.status === "PAID";
   const isVoided = invoice.status === "VOIDED";
 
@@ -116,6 +129,10 @@ async function InvoiceRail({
           createdAt={invoice.createdAt}
           sentAt={invoice.sentAt}
           reviewLinkSentAt={invoice.reviewLinkSentAt}
+          reviewAskOutcome={invoice.reviewAskOutcome}
+          reviewAskNote={invoice.reviewAskNote}
+          reviewAskDecidedAt={invoice.reviewAskDecidedAt}
+          reviewAskDueAt={askDueAt}
           paidAt={invoice.paidAt}
           paymentMethod={invoice.paymentMethod}
           paymentReference={invoice.paymentReference}

@@ -1,7 +1,7 @@
 "use client";
 // src/features/admin/components/CompleteEventsPanel.tsx
 // Dashboard panel listing past confirmed bookings still to be completed. Completing only
-// changes the status; the review request goes out with the invoice email.
+// changes the status; the review ask goes out on its own a few days after the invoice.
 
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import { formatDateShort } from "@/shared/lib/date-format";
@@ -35,8 +35,7 @@ interface CompleteEventsPanelProps {
 }
 
 /**
- * Past confirmed bookings, each with buttons to complete it with or without the
- * review email.
+ * Past confirmed bookings, each with a button to mark it complete.
  * @param props - Component props.
  * @param props.pastConfirmedBookings - Past confirmed bookings awaiting completion.
  * @returns The panel element.

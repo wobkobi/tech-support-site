@@ -99,6 +99,8 @@ export interface BookingEmailFieldProps {
   onAcceptSuggestion: () => void;
   /** Keeps the email as typed. */
   onDismissSuggestion: () => void;
+  /** Lock the field (edit mode: the edit route never writes a changed email). */
+  locked?: boolean;
 }
 
 /**
@@ -114,6 +116,7 @@ export interface BookingEmailFieldProps {
  * @param props.promptRef - Focus target for the "did you mean?" prompt.
  * @param props.onAcceptSuggestion - Accepts the suggested correction.
  * @param props.onDismissSuggestion - Keeps the email as typed.
+ * @param props.locked - Lock the field and explain how to get it changed.
  * @returns The email field.
  */
 export function BookingEmailField({
@@ -126,6 +129,7 @@ export function BookingEmailField({
   promptRef,
   onAcceptSuggestion,
   onDismissSuggestion,
+  locked = false,
 }: BookingEmailFieldProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-1.5">
@@ -140,13 +144,21 @@ export function BookingEmailField({
         error={error}
         errorId="booking-email-error"
         required
+        disabled={locked}
         maxLength={BOOKING_FIELD_LIMITS.email}
         errorMessages={{ invalid: "Please enter a valid email address." }}
         className={cn(
           "border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
           "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30",
+          "disabled:cursor-not-allowed disabled:text-rich-black/70",
         )}
       />
+      {locked && (
+        <p className="text-base text-rich-black/70">
+          Your email can&apos;t be changed here. If it&apos;s wrong, call or text me and I&apos;ll
+          update it.
+        </p>
+      )}
       {contactHint && <p className="text-sm text-rich-black/70">{contactHint}</p>}
       {emailSuggestion && (
         <div

@@ -4,6 +4,7 @@
 // to the end of them.
 
 import { parseObjectId } from "@/features/business/lib/validation";
+import { audienceOf } from "@/features/mailing/lib/audience";
 import { missingSendEnv } from "@/features/mailing/lib/context";
 import { listProblems } from "@/features/mailing/lib/render";
 import { quietHoldUntil } from "@/features/mailing/lib/send";
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
   if (!campaign || campaign.isPreset) return errorResponse("Email not found.", 404);
   // A promo can start after the schedule is set, so promo placeholders are only
   // checked when it actually sends.
-  const problems = listProblems(campaign, true);
+  const problems = listProblems(campaign, true, audienceOf(campaign.audience));
   if (problems.length > 0) return errorResponse(problems.join(" "), 400);
 
   const updated = await prisma.campaign.updateMany({

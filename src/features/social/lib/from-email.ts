@@ -9,6 +9,8 @@ const IMAGE_LINE_RE = /^!\[([^\]\n]*)\]\((https:\/\/[^)\s]+)\)$/i;
 const INLINE_LINK_RE = /\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/gi;
 // "Hi {firstName}," and friends: an email greeting reads oddly at the top of a post.
 const GREETING_RE = /^(hi|hello|hey|kia ora|dear)\s+\{(firstName|name)\},?$/i;
+// One person's own review: meaningless, and private, in a public post.
+const REVIEW_TEXT_RE = /\{reviewText\}/;
 
 /** What an email body becomes as a post. */
 export interface PostFromEmail {
@@ -45,6 +47,7 @@ export function postFromEmail(emailBody: string): PostFromEmail {
       continue;
     }
     if (lines.length === 0 && (line === "" || GREETING_RE.test(line))) continue;
+    if (REVIEW_TEXT_RE.test(line)) continue;
     lines.push(
       line
         .replace(/^#{1,3}\s+/, "")
