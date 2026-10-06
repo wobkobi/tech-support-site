@@ -10,6 +10,3 @@ export const GOOGLE_BUSINESS_PROFILE_URL = "https://maps.google.com/?cid=6499301
 
 /** Business Facebook page (Harrison's personal profile lives on the About page's Person sameAs). */
 export const FACEBOOK_PAGE_URL = "https://www.facebook.com/profile.php?id=61587338675655";
-
-/** Business Instagram profile, without the ?hl= language parameter so it opens in the visitor's language. */
-export const INSTAGRAM_URL = "https://www.instagram.com/tothepoint.tech/";

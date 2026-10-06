@@ -5,8 +5,8 @@
 // apart. The Call button is a plain tel: anchor, so GoogleTag's delegated tel: listener
 // records it as a phone-call conversion with no wiring here.
 
+import { Button } from "@/shared/components/Button";
 import { isPrintRoute } from "@/shared/lib/print-routes";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type React from "react";
 import { FaCalendarCheck, FaPhone } from "react-icons/fa6";
@@ -28,7 +28,7 @@ function isHiddenOn(pathname: string): boolean {
 }
 
 /**
- * Phone-only Call and Book bar pinned to the bottom of the screen.
+ * Sticky phone-only action bar with Call and Book buttons.
  *
  * Also renders an in-flow spacer the height of the bar, so the end of the page
  * (the footer links) can always scroll clear of it. The bar hides while the nav
@@ -44,25 +44,21 @@ export function MobileActionBar({ phoneTel }: { phoneTel: string }): React.React
 
   return (
     <>
-      <div aria-hidden="true" className="h-[calc(3.75rem+env(safe-area-inset-bottom))] sm:hidden" />
+      <div aria-hidden="true" className="h-[calc(4.5rem+env(safe-area-inset-bottom))] sm:hidden" />
       <nav
         aria-label="Call or book"
-        className="mobile-action-bar fixed inset-x-0 bottom-0 z-30 grid grid-cols-2 border-t border-seasalt-100 bg-white sm:hidden print:hidden"
+        className="mobile-action-bar fixed inset-x-0 bottom-0 z-30 border-t border-seasalt-200/60 bg-white/95 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgb(0_0_0/0.08)] backdrop-blur-md sm:hidden print:hidden"
       >
-        <a
-          href={phoneTel}
-          className="flex items-center justify-center gap-2 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-lg font-extrabold text-russian-violet"
-        >
-          <FaPhone className="h-4 w-4" aria-hidden />
-          Call
-        </a>
-        <Link
-          href="/booking"
-          className="flex items-center justify-center gap-2 bg-coquelicot-600 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-lg font-extrabold text-white"
-        >
-          <FaCalendarCheck className="h-5 w-5" aria-hidden />
-          Book now
-        </Link>
+        <div className="grid grid-cols-2 gap-3">
+          <Button href={phoneTel} variant="secondary" size="md" fullWidth>
+            <FaPhone className="h-4 w-4" aria-hidden />
+            Call
+          </Button>
+          <Button href="/booking" variant="primary" size="md" fullWidth>
+            <FaCalendarCheck className="h-5 w-5" aria-hidden />
+            Book now
+          </Button>
+        </div>
       </nav>
     </>
   );

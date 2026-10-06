@@ -1,59 +1,208 @@
 // src/features/reviews/components/Reviews.tsx
-// Home page review quotes: a static grid of bordered panels, each linking to its full review.
+// Reviews module with responsive rows (1-3 items) or marquee scroll (4+ items; phones
+// get a still list of the newest three instead).
 
+import { PausableMarquee } from "@/features/reviews/components/PausableMarquee";
+import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
-import type React from "react";
+import React from "react";
 
-/** Character limit before a review is cut at a word boundary. */
+/** Character limit for truncating long reviews before CSS line-clamp takes over. */
 const REVIEW_CHAR_LIMIT = 280;
 
-/** One review as the home page passes it in. */
+/**
+ * Normalises whitespace: trims edges and collapses internal newlines/spaces to single spaces.
+ * @param text - Text to normalise.
+ * @returns Normalised text.
+ */
+function normaliseText(text: string): string {
+  return text.trim().replace(/\s+/g, " ");
+}
+
+/**
+ * Returns true when a review exceeds the truncation limit.
+ * @param text - Review text to check.
+ * @returns Whether the text is long enough to truncate.
+ */
+function isLongReview(text: string): boolean {
+  return text.length > REVIEW_CHAR_LIMIT;
+}
+
+/**
+ * ReviewText component: displays truncated text with ellipsis for long reviews.
+ * @param props - Component props.
+ * @param props.text - The review text to display.
+ * @returns A span element with the review text.
+ */
+function ReviewText({ text }: { text: string }): React.ReactElement {
+  const normalisedText = normaliseText(text);
+
+  if (!isLongReview(normalisedText)) {
+    return <span className="inline wrap-break-word whitespace-normal">{normalisedText}</span>;
+  }
+
+  const preview = normalisedText.slice(0, REVIEW_CHAR_LIMIT);
+  const wordSafe = preview.replace(/\s+\S*$/, "");
+  const base = (wordSafe.trim().length > 0 ? wordSafe : preview).trim();
+
+  return <span className="inline wrap-break-word whitespace-normal">{base + "…"}</span>;
+}
+
+/**
+ * ReviewCard component: renders a single review card that links to the reviews page.
+ * @param props - Component props.
+ * @param props.r - The review item.
+ * @param props.className - Additional class names for the card.
+ * @param props.style - Optional inline styles for the card.
+ * @param [props.decorative] - True for the duplicated marquee copy: hidden from
+ * assistive tech and removed from the tab order so each review is announced once.
+ * @returns A list item card linking to the reviews page.
+ */
+function ReviewCard({
+  r,
+  className,
+  style,
+  decorative = false,
+}: {
+  r: ReviewItem;
+  className: string;
+  style?: React.CSSProperties;
+  decorative?: boolean;
+}): React.ReactElement {
+  return (
+    <li
+      className={cn("cursor-pointer", className)}
+      style={style}
+      aria-hidden={decorative || undefined}
+    >
+      <Link
+        href={`/reviews#review-${r.id}`}
+        scroll={false}
+        tabIndex={decorative ? -1 : undefined}
+        className="flex h-full flex-col p-4 text-inherit no-underline sm:p-5"
+      >
+        <p className="line-clamp-4">
+          <ReviewText text={r.text} />
+        </p>
+        {/* mt-auto pins the name to the bottom of the card. Without it the name
+            trails the text, so cards in a row (equal height, unequal text)
+            end up with their names at different heights. */}
+        <p className="mt-auto pt-3 text-right text-sm font-semibold text-russian-violet sm:text-base">
+          - {r.name}
+        </p>
+      </Link>
+    </li>
+  );
+}
+
 export interface ReviewItem {
   id: string;
   text: string;
   name: string;
 }
 
-/**
- * Trim a long review at the last whole word under the limit and add an ellipsis.
- * @param text - Whitespace-normalised review text.
- * @returns The text, shortened when over the limit.
- */
-function preview(text: string): string {
-  if (text.length <= REVIEW_CHAR_LIMIT) return text;
-  const cut = text.slice(0, REVIEW_CHAR_LIMIT);
-  const wordSafe = cut.replace(/\s+\S*$/, "").trim();
-  return `${wordSafe || cut.trim()}…`;
+export interface ReviewsProps {
+  /** List of reviews to display. */
+  items?: ReviewItem[];
 }
 
 /**
- * Grid of review quotes: three across from md, stacked on phones.
+ * Reviews section content. No outer frosted wrapper.
+ * 1-3 items render as centred wrapped cards. 4+ items use marquee.
  * @param props - Component props.
- * @param props.items - Reviews to show, newest first.
- * @returns The list element.
+ * @param [props.items] - Reviews to render.
+ * @returns The reviews section, or null if empty.
  */
-export default function Reviews({ items }: { items: ReviewItem[] }): React.ReactElement {
+export default function Reviews({ items = [] }: ReviewsProps): React.ReactElement | null {
+  if (!items.length) return null;
+
+  const cardBase = cn(
+    "flex flex-col rounded-lg border-2 bg-white/80",
+    "border-seasalt-200/60 transition-colors hover:border-coquelicot-500/60",
+  );
+
+  const readAll = (
+    <p className="mt-3 text-center sm:hidden">
+      <Link
+        href="/reviews"
+        className="inline-flex min-h-11 items-center text-base font-semibold text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800"
+      >
+        Read all reviews
+      </Link>
+    </p>
+  );
+
+  // Marquee when more than three reviews
+  if (items.length > 3) {
+    const track = [...items, ...items];
+    return (
+      // Full-width (no max-w cap) so the carousel edges line up with the
+      // full-width content column above rather than sitting in a narrower box.
+      <section aria-labelledby="reviews-section" className="w-full">
+        <h2
+          id="reviews-section"
+          className="mb-2 text-center text-xl font-bold text-russian-violet sm:text-2xl"
+        >
+          What People Say
+        </h2>
+
+        {/* Phones get the newest three as a still list. A marquee card is nearly
+            screen-wide there, so it showed one card at a time with its
+            neighbours clipped, and scrolled past before it could be read. */}
+        <ul className="grid grid-cols-1 gap-3 sm:hidden">
+          {items.slice(0, 3).map((r) => (
+            <ReviewCard key={r.id} r={r} className={cn(cardBase, "w-full shadow-sm")} />
+          ))}
+        </ul>
+        {readAll}
+
+        <PausableMarquee className="hidden sm:block">
+          <div
+            className={cn(
+              // Sit within the FrostedSection padding so the carousel's edges line up
+              // with the content column above (hero, cards) instead of bleeding wider.
+              "relative w-full overflow-hidden rounded-xl",
+              // Dissolve cards near the left/right edges instead of hard-clipping them.
+              "marquee-fade",
+            )}
+          >
+            <ul className="marquee-track animate-marquee flex w-max gap-3">
+              {track.map((r, i) => (
+                <ReviewCard
+                  key={`${r.name}-${i}`}
+                  r={r}
+                  decorative={i >= items.length}
+                  className={cn(
+                    cardBase,
+                    "w-md shrink-0",
+                    i < items.length && "animate-fade-in animate-fill-both",
+                  )}
+                  style={i < items.length ? { animationDelay: `${i * 150}ms` } : undefined}
+                />
+              ))}
+            </ul>
+          </div>
+        </PausableMarquee>
+      </section>
+    );
+  }
+
+  // 1-3 items: grid layout
   return (
-    <ul className="grid gap-6 md:grid-cols-3">
-      {items.map((r) => (
-        <li key={r.id}>
-          <figure className="flex h-full flex-col justify-between gap-4 rounded-lg border border-seasalt-100 p-6">
-            <blockquote className="text-[1.0625rem]">&ldquo;{preview(r.text)}&rdquo;</blockquote>
-            <figcaption className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="font-bold">{r.name}</span>
-              {r.text.length > REVIEW_CHAR_LIMIT && (
-                <Link
-                  href={`/reviews#review-${r.id}`}
-                  scroll={false}
-                  className="text-base font-bold text-coquelicot-700 underline underline-offset-4"
-                >
-                  Read more
-                </Link>
-              )}
-            </figcaption>
-          </figure>
-        </li>
-      ))}
-    </ul>
+    <section aria-labelledby="reviews-section" className="mx-auto w-full max-w-6xl">
+      <h2
+        id="reviews-section"
+        className="mb-2 text-center text-xl font-bold text-russian-violet sm:text-2xl"
+      >
+        What People Say
+      </h2>
+
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+        {items.map((r, i) => (
+          <ReviewCard key={`${r.name}-${i}`} r={r} className={cn(cardBase, "w-full shadow-sm")} />
+        ))}
+      </ul>
+      {readAll}
+    </section>
   );
 }
