@@ -6,6 +6,7 @@
 
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { BOOKING_FIELD_LIMITS } from "@/features/booking/lib/booking";
+import { FIELD_INPUT } from "@/features/booking/lib/form-styles";
 import { PromoCodeField } from "@/features/business/components/PromoCodeField";
 import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
 import { calcTravelCharge, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
@@ -20,14 +21,15 @@ import {
   type ActivePromo,
 } from "@/features/business/lib/promos";
 import type { PriceRange, PublicRate } from "@/features/business/types/pricing";
+import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
 import type { EstimateConfidence, EstimatorRange } from "@/shared/lib/settings/types";
-import Link from "next/link";
 import type React from "react";
 import { useEffect, useState } from "react";
 
-const SOFT_CARD =
-  "border-seasalt-200/80 bg-white/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg";
+// Step headings and their one-line helper text.
+const STEP_TITLE = "mb-1 text-lg font-bold text-russian-violet";
+const STEP_HELP = "mb-4 text-base text-seasalt-700";
 
 type Step = "issue" | "meeting" | "address" | "results";
 type MeetingMode = "on-site" | "remote";
@@ -39,6 +41,18 @@ type MeetingMode = "on-site" | "remote";
  */
 function formatPriceRound(amount: number): string {
   return `${amount < 0 ? "-" : ""}$${Math.abs(amount).toFixed(0)}`;
+}
+
+/**
+ * Price range text, collapsing to one figure when both ends match.
+ * @param low - Low end in dollars.
+ * @param high - High end in dollars.
+ * @returns e.g. "$65 - $130", or "$40" for a fixed line.
+ */
+function priceRangeText(low: number, high: number): string {
+  return low === high
+    ? formatPriceRound(low)
+    : `${formatPriceRound(low)} - ${formatPriceRound(high)}`;
 }
 
 /**
@@ -620,7 +634,7 @@ export function PricingWizard({
 
   if (loading) {
     return (
-      <div role="status" className="py-8 text-center text-base text-slate-600">
+      <div role="status" className="py-8 text-center text-base text-seasalt-700">
         Loading calculator...
       </div>
     );
@@ -636,6 +650,12 @@ export function PricingWizard({
     if (!when) return null;
     return `${describePromoDiscount(resolved)} is available ${when}. Pick one of those times when you book and it comes off this estimate.`;
   })();
+
+  // All-in range: labour plus the one round trip, the same figures logEstimate records.
+  const travelCharge = result?.travelCharge ?? 0;
+  const totalRange = result
+    ? priceRangeText(result.low + travelCharge, result.high + travelCharge)
+    : "";
 
   // The next spend threshold this estimate has not reached. Naming it is the
   // whole point of a tiered offer - without it the customer cannot know that
@@ -684,11 +704,11 @@ export function PricingWizard({
                   ? "bg-moonstone-400"
                   : i === stepIndex
                     ? "bg-russian-violet"
-                    : "bg-slate-200",
+                    : "bg-seasalt-200",
               )}
             />
           ))}
-          <span className="ml-2 text-base whitespace-nowrap text-slate-600">
+          <span className="ml-2 text-base whitespace-nowrap text-seasalt-700">
             <span className="sr-only">Step </span>
             {stepIndex + 1} / {totalSteps}
           </span>
@@ -697,10 +717,8 @@ export function PricingWizard({
 
       {step === "issue" && (
         <div>
-          <h3 className="mb-1 text-lg font-bold text-russian-violet">
-            What do you need help with?
-          </h3>
-          <p className="mb-4 text-base text-slate-600">
+          <h3 className={STEP_TITLE}>What do you need help with?</h3>
+          <p className={STEP_HELP}>
             Describe the issue or job - the more detail, the better the estimate.
           </p>
           <textarea
@@ -710,15 +728,11 @@ export function PricingWizard({
             maxLength={BOOKING_FIELD_LIMITS.notes}
             aria-label="Describe the issue or job you need help with"
             placeholder="e.g. My laptop is running really slow and I think it has a virus. Also want to set up my new phone."
-            className={cn(
-              "w-full resize-none rounded-xl border px-4 py-3 text-base text-slate-700 transition-colors",
-              "border-slate-300 bg-white",
-              "focus:border-russian-violet focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-            )}
+            className={cn(FIELD_INPUT, "resize-none placeholder:text-seasalt-500")}
           />
           {issueDescription.trim().length > 0 &&
             issueDescription.trim().length < BOOKING_FIELD_LIMITS.notesMin && (
-              <p className="mt-2 text-base text-slate-600">
+              <p className="mt-2 text-base text-seasalt-700">
                 Add a bit more detail for a better estimate.
               </p>
             )}
@@ -727,10 +741,8 @@ export function PricingWizard({
 
       {step === "meeting" && (
         <div>
-          <h3 className="mb-1 text-lg font-bold text-russian-violet">
-            How would you like the work done?
-          </h3>
-          <p className="mb-4 text-base text-slate-600">
+          <h3 className={STEP_TITLE}>How would you like the work done?</h3>
+          <p className={STEP_HELP}>
             On-site visits include travel; remote sessions get a small rate reduction and no travel
             charge.
           </p>
@@ -757,14 +769,15 @@ export function PricingWizard({
                   aria-pressed={selected}
                   onClick={() => setMeeting(option.value)}
                   className={cn(
-                    "rounded-xl border p-4 text-left transition-[color,background-color,border-color,box-shadow]",
+                    "rounded-lg border-2 bg-white p-4 text-left transition-colors",
+                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet",
                     selected
-                      ? "border-russian-violet bg-russian-violet/5 ring-2 ring-russian-violet/30"
-                      : "border-slate-200 bg-white hover:border-slate-300",
+                      ? "border-russian-violet bg-seasalt"
+                      : "border-seasalt-200 hover:border-seasalt-500",
                   )}
                 >
                   <p className="text-base font-bold text-russian-violet">{option.title}</p>
-                  <p className="mt-1 text-base text-slate-700">{option.body}</p>
+                  <p className="mt-1 text-base text-rich-black">{option.body}</p>
                 </button>
               );
             })}
@@ -774,8 +787,8 @@ export function PricingWizard({
 
       {step === "address" && (
         <div>
-          <h3 className="mb-1 text-lg font-bold text-russian-violet">Where are you located?</h3>
-          <p className="mb-4 text-base text-slate-600">
+          <h3 className={STEP_TITLE}>Where are you located?</h3>
+          <p className={STEP_HELP}>
             Enter your address so drive time can be included, or skip for an estimate without
             travel.
           </p>
@@ -792,7 +805,7 @@ export function PricingWizard({
         <div>
           <div
             role="status"
-            className="mb-4 rounded-2xl border border-russian-violet/20 bg-russian-violet/5 p-6 text-center"
+            className="mb-4 rounded-lg border-2 border-russian-violet bg-white p-6 text-center"
           >
             {aiFailed ? (
               <p className="mb-3 text-base font-medium text-rich-black">
@@ -807,9 +820,9 @@ export function PricingWizard({
                 </p>
               )
             )}
-            <p className="mb-1 text-base font-medium text-slate-600">Estimated cost</p>
+            <p className="mb-1 text-base font-medium text-seasalt-700">Estimated cost</p>
             {result.originalLow !== undefined && result.originalHigh !== undefined && (
-              <p className="text-base text-slate-500 line-through sm:text-lg">
+              <p className="text-base text-seasalt-700 line-through sm:text-lg">
                 {formatPriceRound(result.originalLow)} - {formatPriceRound(result.originalHigh)}
               </p>
             )}
@@ -817,18 +830,25 @@ export function PricingWizard({
               {formatPriceRound(result.low)} - {formatPriceRound(result.high)}
             </p>
             {meeting !== "remote" && result.includesTravel && (result.travelCharge ?? 0) > 0 && (
-              <p className="mt-1 text-lg font-semibold text-slate-600">
-                + {formatPriceRound(result.travelCharge ?? 0)} round-trip travel
-              </p>
+              <>
+                <p className="mt-1 text-lg font-semibold text-seasalt-700">
+                  + {formatPriceRound(result.travelCharge ?? 0)} round-trip travel
+                </p>
+                <p className="mt-3 text-xl font-bold text-rich-black sm:text-2xl">
+                  Total: {totalRange}
+                </p>
+              </>
             )}
             {result.promoLabel && (
-              <p className="mt-2 text-base font-semibold text-amber-700">⚡ {result.promoLabel}</p>
+              <p className="mt-3 inline-block rounded bg-mustard-300 px-3 py-1 text-base font-bold text-russian-violet">
+                ⚡ {result.promoLabel}
+              </p>
             )}
-            <p className="mt-4 rounded-lg border border-coquelicot/30 bg-coquelicot/5 px-3 py-2 text-base font-bold text-coquelicot-700">
+            <p className="mt-4 border-l-4 border-coquelicot-600 bg-seasalt px-4 py-3 text-left text-base font-bold text-coquelicot-700">
               You're charged for the actual time worked at the agreed hourly rate. Jobs that turn
               out more involved than described will cost more than this estimate.
             </p>
-            <p className="mt-2 text-base text-slate-600">
+            <p className="mt-3 text-base text-seasalt-700">
               {meeting === "remote"
                 ? "Remote session - no travel charge. "
                 : result.includesTravel
@@ -852,13 +872,13 @@ export function PricingWizard({
           </div>
 
           {spendNudge && (
-            <p className="mb-4 rounded-xl border border-mustard-400 bg-mustard-50 px-4 py-3 text-base font-medium text-russian-violet-900">
+            <p className="mb-4 rounded-lg border-2 border-mustard-300 bg-mustard-50 px-4 py-3 text-base font-medium text-russian-violet-900">
               {spendNudge}
             </p>
           )}
 
           {restrictedOffer && (
-            <p className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base font-medium text-amber-800">
+            <p className="mb-4 rounded-lg border-2 border-mustard-300 bg-mustard-50 px-4 py-3 text-base font-medium text-russian-violet-900">
               {restrictedOffer}
             </p>
           )}
@@ -870,52 +890,48 @@ export function PricingWizard({
             className="mb-4 max-w-sm"
           />
 
-          {aiExplanation && <p className="mb-4 text-base text-slate-600">{aiExplanation}</p>}
+          {aiExplanation && <p className="mb-4 text-base text-seasalt-700">{aiExplanation}</p>}
 
+          {/* A plain ruled list, not a box: the result panel above is the only boxed element. */}
           {result.breakdown.length > 0 && (
-            <div className={cn(SOFT_CARD, "mb-4")}>
-              <p className="mb-2 text-sm font-semibold tracking-wide text-slate-600 uppercase">
+            <div className="mb-5">
+              <p className="mb-1 text-sm font-bold tracking-[0.06em] text-moonstone-700 uppercase">
                 Breakdown
               </p>
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-seasalt-100 border-y border-seasalt-100 text-base sm:text-lg">
                 {result.breakdown.map((line, i) => (
-                  <div key={i} className="flex items-baseline justify-between py-1.5">
-                    <span className="text-slate-700">{line.label}</span>
-                    <span className="ml-4 font-medium whitespace-nowrap text-slate-700">
-                      {line.low === line.high
-                        ? formatPriceRound(line.low)
-                        : `${formatPriceRound(line.low)} - ${formatPriceRound(line.high)}`}
+                  <div key={i} className="flex items-baseline justify-between py-2">
+                    <span className="text-rich-black">{line.label}</span>
+                    <span className="ml-4 font-bold whitespace-nowrap text-rich-black">
+                      {priceRangeText(line.low, line.high)}
                     </span>
                   </div>
                 ))}
+                {result.breakdown.length > 1 && (
+                  <div className="flex items-baseline justify-between border-t-2 border-russian-violet py-2">
+                    <span className="font-bold text-rich-black">Total</span>
+                    <span className="ml-4 font-extrabold whitespace-nowrap text-russian-violet">
+                      {totalRange}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          <p className="mb-5 text-base text-slate-600">
+          <p className="mb-5 text-base text-seasalt-700">
             This is a rough estimate only. The actual cost depends on the complexity of the job and
             will be confirmed before work begins. No GST is charged.
           </p>
 
           <div className="flex flex-wrap gap-3">
-            <Link
-              href={bookingHref}
-              className="rounded-xl bg-russian-violet px-5 py-2.5 text-base font-semibold text-white select-none hover:bg-russian-violet/90"
-            >
-              Book now
-            </Link>
-            <Link
-              href="/contact"
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-700 select-none hover:bg-slate-50"
-            >
+            <Button href={bookingHref}>Book now</Button>
+            <Button href="/contact" variant="outline">
               Ask a question
-            </Link>
-            <button
-              onClick={reset}
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-600 hover:bg-slate-50"
-            >
+            </Button>
+            <Button type="button" variant="outline" onClick={reset}>
               Start over
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -923,29 +939,22 @@ export function PricingWizard({
       {step !== "results" && (
         <div className="mt-6 flex gap-3">
           {(step === "meeting" || step === "address") && (
-            <button
-              onClick={prevStep}
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-700 select-none hover:bg-slate-50"
-            >
+            <Button type="button" variant="outline" onClick={prevStep}>
               Back
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            type="button"
+            variant="secondary"
             onClick={() => void nextStep()}
             disabled={!canAdvance() || isCalculating}
-            className={cn(
-              "rounded-xl px-5 py-2.5 text-base font-semibold text-white transition-opacity",
-              canAdvance() && !isCalculating
-                ? "bg-russian-violet hover:bg-russian-violet/90"
-                : "cursor-not-allowed bg-slate-300",
-            )}
           >
             {isCalculating
               ? "Estimating..."
               : step === "address" || (step === "meeting" && meeting === "remote")
                 ? "Get a rough estimate"
                 : "Next"}
-          </button>
+          </Button>
         </div>
       )}
     </div>

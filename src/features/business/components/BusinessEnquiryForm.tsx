@@ -6,6 +6,13 @@
 "use client";
 
 import { validateEmail } from "@/features/booking/lib/booking";
+import {
+  CHOICE_BASE,
+  CHOICE_IDLE,
+  CHOICE_ON,
+  FIELD_INPUT,
+  FIELD_LABEL,
+} from "@/features/booking/lib/form-styles";
 import { Button } from "@/shared/components/Button";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
@@ -17,11 +24,6 @@ import { FaCircleCheck } from "react-icons/fa6";
 
 const INTEREST_OPTIONS = ["One-off job", "Monthly retainer", "Not sure yet"] as const;
 const URGENCY_OPTIONS = ["This week", "This month", "Just exploring"] as const;
-
-const INPUT_CLASS = cn(
-  "rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-  "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-);
 
 /**
  * Business enquiry form: company + contact details, what they need, and two
@@ -101,11 +103,11 @@ export function BusinessEnquiryForm(): React.ReactElement {
     return (
       <div
         role="status"
-        className="flex flex-col items-center gap-3 rounded-lg border border-moonstone-500/40 bg-moonstone-400/10 p-6 text-center"
+        className="flex flex-col items-center gap-3 rounded-lg border-2 border-moonstone-600 bg-white p-6 text-center"
       >
-        <FaCircleCheck className="h-10 w-10 text-moonstone-400" aria-hidden />
-        <p className="text-lg font-semibold text-rich-black sm:text-xl">Enquiry sent - thanks!</p>
-        <p className="max-w-xl text-base text-rich-black/80 sm:text-lg">
+        <FaCircleCheck className="h-10 w-10 text-moonstone-700" aria-hidden />
+        <p className="text-lg font-bold text-rich-black sm:text-xl">Enquiry sent - thanks!</p>
+        <p className="max-w-xl text-base text-rich-black sm:text-lg">
           I'll come back to you within one business day, usually sooner. A confirmation is on its
           way to your inbox.
         </p>
@@ -136,7 +138,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
 
       {/* Business vs personal: gates whether the company field shows. */}
       <div className="flex flex-col gap-2">
-        <span className="text-base font-semibold text-rich-black">
+        <span className={FIELD_LABEL}>
           Who's this for? <span className="text-error">*</span>
         </span>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-2">
@@ -145,10 +147,9 @@ export function BusinessEnquiryForm(): React.ReactElement {
             aria-pressed={enquiryFor === "business"}
             onClick={() => setEnquiryFor("business")}
             className={cn(
-              "rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
-              enquiryFor === "business"
-                ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                : "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
+              CHOICE_BASE,
+              "px-5 py-2.5 text-base whitespace-nowrap",
+              enquiryFor === "business" ? CHOICE_ON : CHOICE_IDLE,
             )}
           >
             A business
@@ -158,10 +159,9 @@ export function BusinessEnquiryForm(): React.ReactElement {
             aria-pressed={enquiryFor === "personal"}
             onClick={() => setEnquiryFor("personal")}
             className={cn(
-              "rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
-              enquiryFor === "personal"
-                ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                : "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
+              CHOICE_BASE,
+              "px-5 py-2.5 text-base whitespace-nowrap",
+              enquiryFor === "personal" ? CHOICE_ON : CHOICE_IDLE,
             )}
           >
             Me personally
@@ -172,7 +172,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
       <div className="grid gap-4 sm:grid-cols-2">
         {enquiryFor === "business" && (
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="enquiry-company" className="text-base font-semibold text-rich-black">
+            <label htmlFor="enquiry-company" className={FIELD_LABEL}>
               Company <span className="text-error">*</span>
             </label>
             <input
@@ -184,13 +184,13 @@ export function BusinessEnquiryForm(): React.ReactElement {
               maxLength={200}
               value={company}
               onChange={(e) => setCompany(e.target.value)}
-              className={INPUT_CLASS}
+              className={FIELD_INPUT}
             />
           </div>
         )}
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="enquiry-name" className="text-base font-semibold text-rich-black">
+          <label htmlFor="enquiry-name" className={FIELD_LABEL}>
             Your name <span className="text-error">*</span>
           </label>
           <input
@@ -202,14 +202,14 @@ export function BusinessEnquiryForm(): React.ReactElement {
             maxLength={200}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className={INPUT_CLASS}
+            className={FIELD_INPUT}
           />
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="enquiry-email" className="text-base font-semibold text-rich-black">
+          <label htmlFor="enquiry-email" className={FIELD_LABEL}>
             Email <span className="text-error">*</span>
           </label>
           <EmailInput
@@ -218,32 +218,26 @@ export function BusinessEnquiryForm(): React.ReactElement {
             onChange={setEmail}
             required
             errorMessages={{ invalid: "Please enter a valid email address." }}
-            className={cn(
-              "border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-              "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30",
-            )}
+            className={FIELD_INPUT}
           />
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="enquiry-phone" className="text-base font-semibold text-rich-black">
-            Phone <span className="text-base text-rich-black/70">(optional)</span>
+          <label htmlFor="enquiry-phone" className={FIELD_LABEL}>
+            Phone <span className="font-normal text-seasalt-700">(optional)</span>
           </label>
           <PhoneInput
             id="enquiry-phone"
             value={phone}
             onChange={setPhone}
             errorMessages={{ invalid: "Please enter a valid phone number." }}
-            className={cn(
-              "border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-              "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30",
-            )}
+            className={FIELD_INPUT}
           />
         </div>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="enquiry-needs" className="text-base font-semibold text-rich-black">
+        <label htmlFor="enquiry-needs" className={FIELD_LABEL}>
           What do you need help with? <span className="text-error">*</span>
         </label>
         <textarea
@@ -255,20 +249,20 @@ export function BusinessEnquiryForm(): React.ReactElement {
           value={needs}
           onChange={(e) => setNeeds(e.target.value)}
           placeholder="e.g. Two new staff laptops to set up, and our Wi-Fi drops out in the back office."
-          className={cn(INPUT_CLASS, "resize-y")}
+          className={cn(FIELD_INPUT, "resize-y")}
         />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="enquiry-interest" className="text-base font-semibold text-rich-black">
-            What are you after? <span className="text-base text-rich-black/70">(optional)</span>
+          <label htmlFor="enquiry-interest" className={FIELD_LABEL}>
+            What are you after? <span className="font-normal text-seasalt-700">(optional)</span>
           </label>
           <select
             id="enquiry-interest"
             value={interest}
             onChange={(e) => setInterest(e.target.value)}
-            className={INPUT_CLASS}
+            className={FIELD_INPUT}
           >
             <option value="">Choose one...</option>
             {INTEREST_OPTIONS.map((opt) => (
@@ -280,14 +274,14 @@ export function BusinessEnquiryForm(): React.ReactElement {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="enquiry-urgency" className="text-base font-semibold text-rich-black">
-            How urgent? <span className="text-base text-rich-black/70">(optional)</span>
+          <label htmlFor="enquiry-urgency" className={FIELD_LABEL}>
+            How urgent? <span className="font-normal text-seasalt-700">(optional)</span>
           </label>
           <select
             id="enquiry-urgency"
             value={urgency}
             onChange={(e) => setUrgency(e.target.value)}
-            className={INPUT_CLASS}
+            className={FIELD_INPUT}
           >
             <option value="">Choose one...</option>
             {URGENCY_OPTIONS.map((opt) => (

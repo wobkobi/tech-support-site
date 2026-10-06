@@ -1,10 +1,12 @@
 // src/app/about/page.tsx
 // About page: background, approach, and who the service helps.
 
-import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
-import { Bullet } from "@/shared/components/Bullet";
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
-import { cn } from "@/shared/lib/cn";
+import { ClosingCta } from "@/shared/components/ClosingCta";
+import { PageHead } from "@/shared/components/PageHead";
+import { PageShell } from "@/shared/components/PageLayout";
+import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
+import { TickItem, TickList } from "@/shared/components/TickList";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
 import Image from "next/image";
@@ -29,13 +31,13 @@ export const metadata: Metadata = {
   },
 };
 
-const linkStyle = "text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800";
-
 /**
  * About page component.
  * @returns About page element.
  */
-export default function AboutPage(): React.ReactElement {
+export default async function AboutPage(): Promise<React.ReactElement> {
+  const identity = await getIdentity();
+
   // Tie the person entity to the business `@id` so a "Harrison Raynes"
   // search resolves to the business and vice versa.
   const personJsonLd = {
@@ -43,7 +45,7 @@ export default function AboutPage(): React.ReactElement {
     "@type": "Person",
     "@id": `${siteUrl}/about#person`,
     name: "Harrison Raynes",
-    jobTitle: "Founder & Technician",
+    jobTitle: "Owner and Technician",
     worksFor: { "@id": `${siteUrl}#business` },
     knowsAbout: ["Computer Repair", "IT Support", "Networking", "Smart Home Setup"],
     workLocation: { "@type": "City", name: "Auckland" },
@@ -63,150 +65,101 @@ export default function AboutPage(): React.ReactElement {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
       />
-      <BreadcrumbJsonLd
+      <PageHead
         crumbs={[
           { name: "Home", path: "/" },
           { name: "About", path: "/about" },
         ]}
+        title="About Harrison Raynes"
+        intro="I'm Harrison Raynes, a computer science graduate based in Auckland. I started To the Point Tech because plenty of people have a computer problem and no one straightforward to call about it."
+        note="I come to you and fix it on the spot where I can. You'll know what went wrong and what I changed, in words that actually mean something, so next time it happens you might not need to call me at all."
+        action={null}
       />
-      <FrostedSection>
-        <div className="flex flex-col gap-6 sm:gap-8">
-          <section
-            aria-labelledby="about-hero-heading"
-            className={cn(
-              CARD,
-              "animate-fade-in flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:gap-8",
-            )}
-          >
-            <Image
-              src={PHOTO_SRC}
-              alt="Harrison Raynes, founder of To the Point Tech"
-              width={400}
-              height={400}
-              priority
-              sizes="(min-width: 768px) 208px, (min-width: 640px) 176px, 160px"
-              className="size-40 shrink-0 rounded-full border-4 border-white object-cover shadow-lg sm:size-44 md:size-52"
-            />
 
-            <div>
-              <h1
-                id="about-hero-heading"
-                className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
-              >
-                About Harrison Raynes
-              </h1>
-
-              <p className="mb-4 text-base text-rich-black sm:text-lg">
-                I'm Harrison Raynes, a computer science graduate based in Auckland. I started To the
-                Point Tech because plenty of people have a computer problem and no one
-                straightforward to call about it.
-              </p>
-
-              <p className="text-base text-rich-black/80 sm:text-lg">
-                I come to you and fix it on the spot where I can. You'll know what went wrong and
-                what I changed, in words that actually mean something, so next time it happens you
-                might not need to call me at all.
-              </p>
-            </div>
-          </section>
-
-          <section
-            aria-labelledby="about-approach-heading"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
-          >
-            <h2
-              id="about-approach-heading"
-              className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
-            >
-              My approach
-            </h2>
-
-            <ul className="mb-4 space-y-2.5 text-base text-rich-black sm:text-lg">
-              <li className="flex gap-3">
-                <Bullet />
-                <span>
-                  <strong>Listen first.</strong> I start with a quick chat to understand what's
-                  happening and what you want to achieve.
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <Bullet />
-                <span>
-                  <strong>Explain before acting.</strong> You'll know what I'm planning to do and
-                  roughly how long it should take before I touch anything.
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <Bullet />
-                <span>
-                  <strong>Work transparently.</strong> I make changes in small steps so you can see
-                  what's happening and ask questions.
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <Bullet />
-                <span>
-                  <strong>Leave clear notes.</strong> After every visit, you get a simple summary of
-                  what changed and any tips for next time.
-                </span>
-              </li>
-            </ul>
-
-            <p className="text-base text-rich-black/80 sm:text-lg">
-              I'm happy to work with you directly, alongside family members, or with a small
-              business owner. If you prefer, we can start with email and move to a visit once you're
-              comfortable.
-            </p>
-          </section>
-
-          <section
-            aria-labelledby="about-who-heading"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
-          >
-            <h2
-              id="about-who-heading"
-              className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
-            >
-              Who I help
-            </h2>
-
-            <p className="mb-4 text-base text-rich-black sm:text-lg">
-              I mainly work with households and small businesses across Auckland who want their tech
-              to just work, without wading through jargon or sales pitches.
-            </p>
-
-            <ul className="mb-4 space-y-2.5 text-base text-rich-black sm:text-lg">
-              <li className="flex gap-3">
-                <Bullet />
-                <span>Home users wanting reliable Wi-Fi, secure accounts, and proper backups.</span>
-              </li>
-              <li className="flex gap-3">
-                <Bullet />
-                <span>Families helping parents or grandparents get comfortable with devices.</span>
-              </li>
-              <li className="flex gap-3">
-                <Bullet />
-                <span>
-                  Sole traders and small teams who need occasional IT help, or ongoing cover with a
-                  simple monthly retainer.
-                </span>
-              </li>
-            </ul>
-
-            <p className="text-base text-rich-black/80 sm:text-lg">
-              See the{" "}
-              <Link href="/services" className={linkStyle}>
-                services page
-              </Link>{" "}
-              for specifics, or{" "}
-              <Link href="/contact" className={linkStyle}>
-                get in touch
-              </Link>{" "}
-              to chat about what you need.
-            </p>
-          </section>
+      {/* Portrait and role */}
+      <Section containerClassName="grid items-center gap-8 md:grid-cols-[18rem_1fr] md:gap-12">
+        <Image
+          src={PHOTO_SRC}
+          alt="Harrison Raynes"
+          width={400}
+          height={400}
+          priority
+          className="w-full max-w-[18rem] rounded-lg object-cover"
+        />
+        <div>
+          <p className="text-sm font-bold tracking-[0.06em] text-moonstone-700 uppercase">
+            Owner and Technician
+          </p>
+          <p className="mt-2 text-xl font-extrabold">Harrison Raynes</p>
+          <p className="mt-3 text-seasalt-700">
+            Computer science graduate, Auckland born and raised.
+          </p>
         </div>
-      </FrostedSection>
+      </Section>
+
+      <Section tone="grey" aria-labelledby="about-approach-heading">
+        <SectionHeading id="about-approach-heading" title="My approach" />
+        <TickList className="mb-4">
+          <TickItem>
+            <strong>Listen first.</strong> I start with a quick chat to understand what's happening
+            and what you want to achieve.
+          </TickItem>
+          <TickItem>
+            <strong>Explain before acting.</strong> You'll know what I'm planning to do and roughly
+            how long it should take before I touch anything.
+          </TickItem>
+          <TickItem>
+            <strong>Work transparently.</strong> I make changes in small steps so you can see what's
+            happening and ask questions.
+          </TickItem>
+          <TickItem>
+            <strong>Leave clear notes.</strong> After every visit, you get a simple summary of what
+            changed and any tips for next time.
+          </TickItem>
+        </TickList>
+        <p className="text-seasalt-700">
+          I'm happy to work with you directly, alongside family members, or with a small business
+          owner. If you prefer, we can start with email and move to a visit once you're comfortable.
+        </p>
+      </Section>
+
+      <Section aria-labelledby="about-who-heading">
+        <SectionHeading id="about-who-heading" title="Who I help" />
+        <p className="mb-4">
+          I mainly work with households and small businesses across Auckland who want their tech to
+          just work, without wading through jargon or sales pitches.
+        </p>
+        <TickList className="mb-4">
+          <TickItem variant="dot">
+            Home users wanting reliable Wi-Fi, secure accounts, and proper backups.
+          </TickItem>
+          <TickItem variant="dot">
+            Families helping parents or grandparents get comfortable with devices.
+          </TickItem>
+          <TickItem variant="dot">
+            Sole traders and small teams who need occasional IT help, or ongoing cover with a simple
+            monthly retainer.
+          </TickItem>
+        </TickList>
+        <p className="text-seasalt-700">
+          See the{" "}
+          <Link href="/services" className={TEXT_LINK}>
+            services page
+          </Link>{" "}
+          for specifics, or{" "}
+          <Link href="/contact" className={TEXT_LINK}>
+            get in touch
+          </Link>{" "}
+          to chat about what you need.
+        </p>
+      </Section>
+
+      <ClosingCta
+        title="Something not working?"
+        line="Book online in a couple of minutes, or give me a call."
+        phone={identity.phone}
+        phoneTel={identity.phoneTel}
+      />
     </PageShell>
   );
 }
