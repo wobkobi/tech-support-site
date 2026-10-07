@@ -9,6 +9,7 @@ import {
   calcInvoiceTotals,
   formatNZD,
   lineItemQtyLabel,
+  promoLineLabel,
 } from "@/features/business/lib/business";
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
 import type { LineItem } from "@/features/business/types/business";
@@ -202,7 +203,7 @@ function InvoicePreviewPanelImpl({
           </div>
           {showPromoLine && (
             <div className="flex justify-between gap-3 text-amber-700">
-              <span>Promo (labour only){promoTitle ? `: ${promoTitle}` : ""}</span>
+              <span>{promoLineLabel(promoTitle)}</span>
               <span className="whitespace-nowrap">-{formatNZD(promoDiscount)}</span>
             </div>
           )}

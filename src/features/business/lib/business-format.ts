@@ -108,3 +108,14 @@ export function composeDescription(
   const trimmed = details?.trim();
   return trimmed ? `${base} - ${trimmed}` : base;
 }
+
+/**
+ * Totals-block label for an invoice's promo line. No "labour only" suffix: a Free travel
+ * promo comes off travel, and the invoice keeps only the promo's title, not its type.
+ * Shared by the PDF, the calculator preview and the invoice page so all three agree.
+ * @param title - The promo's title, when the invoice kept one.
+ * @returns The label text.
+ */
+export function promoLineLabel(title: string | null | undefined): string {
+  return title ? `Promo: ${title}` : "Promo discount";
+}

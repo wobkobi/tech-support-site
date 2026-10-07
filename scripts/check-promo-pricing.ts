@@ -10,7 +10,11 @@
 // if that ever stops being true.
 // Run with: npm run check:promo-pricing
 
-import { computeJobPromoDiscount, formatMoneyCompact } from "@/features/business/lib/business";
+import {
+  calcJobTotal,
+  computeJobPromoDiscount,
+  formatMoneyCompact,
+} from "@/features/business/lib/business";
 import { DEFAULT_RATE_ROWS, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
 import { validateDiscount, validateKind } from "@/features/business/lib/promo-validation";
 import {
@@ -911,6 +915,99 @@ function main(): void {
     "the offer line names the floor",
     describePromoOffer({ ...promo("percent", 0.2), minSpend: 100 }),
     "20% off on jobs over $100",
+  );
+
+  // --- Unsuccessful visit during a promo ---
+  //
+  // "Half price" on a failed visit is half of what the customer was due to pay,
+  // so it comes off each line after the promo. Taken off the full line instead,
+  // a $35/hr cut plus half price would bill $22.50 of $150 labour, not $48.75.
+
+  /**
+   * Builds a job of hourly lines for the unsuccessful cases.
+   * @param lines - Each line's hours, rate and per-task unsuccessful flag.
+   * @param unsuccessful - The whole-job unsuccessful flag.
+   * @returns A job shaped like the calculator's.
+   */
+  function failedJob(
+    lines: { qty: number; unitPrice: number; unsuccessful?: boolean }[],
+    unsuccessful: boolean,
+  ): Parameters<typeof calcJobTotal>[0] {
+    return {
+      durationMins: 60,
+      unsuccessful,
+      tasks: lines.map((l) => ({
+        rateConfigId: null,
+        baseRateId: "base",
+        modifierIds: [],
+        description: "Task",
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+        lineTotal: l.qty * l.unitPrice,
+        unsuccessful: l.unsuccessful,
+      })),
+      parts: [],
+      travelEntries: [],
+      notes: "",
+    } as unknown as Parameters<typeof calcJobTotal>[0];
+  }
+  const NO_FLOOR = {
+    gstRegistered: false,
+    minTravelCharge: 0,
+    minBillableMins: 0,
+    standardRate: 100,
+  };
+
+  const flatFailed = calcJobTotal(
+    failedJob([{ qty: 1.5, unitPrice: 100 }], true),
+    promo("flat_hourly", 65),
+    NO_FLOOR,
+  );
+  expectEqual("a failed visit still gets the promo", flatFailed.promoDiscount, 52.5);
+  expectEqual(
+    "then half of the promo price comes off, not half of the full price",
+    flatFailed.unsuccessfulDiscount,
+    48.75,
+  );
+  expectEqual("so the labour bills at half the promo price", flatFailed.total, 48.75);
+
+  expectEqual(
+    "with no promo, a failed visit is half the full price",
+    calcJobTotal(failedJob([{ qty: 1.5, unitPrice: 100 }], true), null, NO_FLOOR)
+      .unsuccessfulDiscount,
+    75,
+  );
+  expectEqual(
+    "a flagged task is halved after its own promo share",
+    calcJobTotal(
+      failedJob(
+        [
+          { qty: 1, unitPrice: 100, unsuccessful: true },
+          { qty: 1, unitPrice: 100 },
+        ],
+        false,
+      ),
+      promo("percent", 0.2),
+      NO_FLOOR,
+    ).unsuccessfulDiscount,
+    40,
+  );
+  const fixedLines = [
+    { qty: 1, unitPrice: 100, unsuccessful: true },
+    { qty: 2, unitPrice: 100, unsuccessful: true },
+  ];
+  expectEqual(
+    "flagging every task matches the whole-job flag under a fixed-amount promo",
+    calcJobTotal(failedJob(fixedLines, false), promo("fixed_amount", 30), NO_FLOOR)
+      .unsuccessfulDiscount,
+    calcJobTotal(failedJob(fixedLines, true), promo("fixed_amount", 30), NO_FLOOR)
+      .unsuccessfulDiscount,
+  );
+  expectEqual(
+    "a fixed amount is spread before halving: (300 - 30) / 2",
+    calcJobTotal(failedJob(fixedLines, true), promo("fixed_amount", 30), NO_FLOOR)
+      .unsuccessfulDiscount,
+    135,
   );
 
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);

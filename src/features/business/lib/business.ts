@@ -38,6 +38,7 @@ export {
   formatNZD,
   lineItemQtyLabel,
   minsToHoursLabel,
+  promoLineLabel,
   todayISO,
 } from "@/features/business/lib/business-format";
 export {
@@ -350,12 +351,48 @@ export function computeJobPromoDiscount(
   standardRate?: number | null,
   rates?: RateConfig[],
 ): number {
+  return jobPromoBreakdown(
+    job,
+    resolvedPromo,
+    travelTotal,
+    businessModifierId,
+    preDiscountSubtotal,
+    standardRate,
+    rates,
+  ).total;
+}
+
+/**
+ * {@link computeJobPromoDiscount}'s total plus each task line's share of it, so
+ * {@link calcJobTotal} can take the unsuccessful-work discount off what the line
+ * costs after the promo. Shares are unrounded, in `job.tasks` order, and 0 for
+ * lines the promo skips (all 0 for a travel promo). A fixed amount is spread
+ * across the discounted lines in proportion to their totals.
+ * @param job - Job calculation.
+ * @param resolvedPromo - Active promo or null, before spend narrows it.
+ * @param travelTotal - The job's travel charge, which a free-travel promo discounts.
+ * @param businessModifierId - Modifier marking business labour, which promos skip.
+ * @param preDiscountSubtotal - The job's subtotal before any discount, which selects a tier.
+ * @param standardRate - Undiscounted Standard $/hr, which a flat promo's per-hour cut is taken from.
+ * @param rates - Live rate list, which floors each line at the promo price for its rate tags.
+ * @returns The rounded discount and each task line's unrounded share of it.
+ */
+function jobPromoBreakdown(
+  job: JobCalculation,
+  resolvedPromo: JobPromo | null,
+  travelTotal: number,
+  businessModifierId?: string | null,
+  preDiscountSubtotal?: number,
+  standardRate?: number | null,
+  rates?: RateConfig[],
+): { total: number; byTask: number[] } {
+  const none = { total: 0, byTask: job.tasks.map(() => 0) };
   // Narrowed to the band this job actually earns, through the same function the
   // public estimate uses. Judged on the pre-discount subtotal the caller has
   // already computed; without one there is nothing to judge, so an untiered
   // promo passes through and a tiered one cannot apply.
   const promo = promoForSpend(resolvedPromo, preDiscountSubtotal ?? 0);
-  if (!promo) return 0;
+  if (!promo) return none;
 
   /**
    * Whether a task carries the Business modifier.
@@ -371,26 +408,39 @@ export function computeJobPromoDiscount(
     // A visit that did any business work is a business visit, so its drive is
     // not discounted either. Erring toward charging in full: promos are a home
     // offer, and the alternative silently under-bills a business customer.
-    if (job.tasks.some(isBusinessTask)) return 0;
+    if (job.tasks.some(isBusinessTask)) return none;
     const charged = Math.min(1, Math.max(0, promo.travelPercent));
-    return Math.round(travelTotal * (1 - charged) * 100) / 100;
+    return { ...none, total: Math.round(travelTotal * (1 - charged) * 100) / 100 };
   }
 
-  // A task is hourly if either: it has a baseRateId set (new rate model),
-  // OR no flat rateConfigId. The double check survives stale AI output that
-  // forgets to clear rateConfigId.
-  const hourlyTasks = job.tasks
-    .filter((t) => t.baseRateId != null || t.rateConfigId == null)
-    // Business labour is out of scope for a promo. Checked per task rather than
-    // per job so a mixed job discounts only its home-rate lines.
-    .filter((t) => !isBusinessTask(t));
-  // Round each line before summing, as jobToLineItems and calcJobTotal do. A raw sum
-  // discounts a base the invoice never prints, landing the promo a cent off its lines.
-  const labourSubtotal = hourlyTasks.reduce(
-    (s, t) => s + Math.round(t.qty * t.unitPrice * 100) / 100,
-    0,
-  );
-  if (labourSubtotal <= 0) return 0;
+  /**
+   * Whether the promo discounts a task. A task is hourly if either: it has a
+   * baseRateId set (new rate model), OR no flat rateConfigId. The double check
+   * survives stale AI output that forgets to clear rateConfigId. Business labour
+   * is out of scope for a promo, checked per task rather than per job so a mixed
+   * job discounts only its home-rate lines.
+   * @param t - The task line to classify.
+   * @returns True when the promo applies to the line.
+   */
+  const isDiscounted = (t: (typeof job.tasks)[number]): boolean =>
+    (t.baseRateId != null || t.rateConfigId == null) && !isBusinessTask(t);
+  /**
+   * A task's line total, rounded as jobToLineItems and calcJobTotal round it. A raw
+   * sum discounts a base the invoice never prints, landing the promo a cent off.
+   * @param t - The task line.
+   * @returns The line total in dollars.
+   */
+  const lineOf = (t: (typeof job.tasks)[number]): number =>
+    Math.round(t.qty * t.unitPrice * 100) / 100;
+  /**
+   * Each task's share from a per-line rule, 0 for lines the promo skips.
+   * @param rule - The discount on one discounted line, given the task and its line total.
+   * @returns Shares in `job.tasks` order.
+   */
+  const shares = (rule: (t: (typeof job.tasks)[number], line: number) => number): number[] =>
+    job.tasks.map((t) => (isDiscounted(t) ? rule(t, lineOf(t)) : 0));
+  const labourSubtotal = job.tasks.filter(isDiscounted).reduce((s, t) => s + lineOf(t), 0);
+  if (labourSubtotal <= 0) return none;
 
   if (promo.flatHourlyRate !== null) {
     const flat = promo.flatHourlyRate;
@@ -402,9 +452,8 @@ export function computeJobPromoDiscount(
     // Per line, never netted across the job. Without the Standard rate, a line
     // already under the flat rate stays as it is; netting its shortfall against
     // a line above would cancel the saving the pricing page promises there.
-    const discount = hourlyTasks.reduce((s, t) => {
-      const line = Math.round(t.qty * t.unitPrice * 100) / 100;
-      if (cut == null) return s + Math.max(0, line - t.qty * flat);
+    const byTask = shares((t, line) => {
+      if (cut == null) return Math.max(0, line - t.qty * flat);
       // Floor the hour at the promo price for the line's tags (live rate less
       // the cut). A line typed or saved under the live rate only comes down to
       // that floor: at an old $75 Standard the full $35 cut would bill $40/hr,
@@ -413,21 +462,28 @@ export function computeJobPromoDiscount(
         rates && t.baseRateId ? effectiveHourlyRate(rates, t.baseRateId, t.modifierIds) : 0;
       const hourCut =
         live > 0 ? Math.min(cut, Math.max(0, t.unitPrice - Math.max(0, live - cut))) : cut;
-      return s + Math.min(line, t.qty * hourCut);
-    }, 0);
-    return Math.round(discount * 100) / 100;
+      return Math.min(line, t.qty * hourCut);
+    });
+    return { total: Math.round(byTask.reduce((s, d) => s + d, 0) * 100) / 100, byTask };
   }
   if (promo.percentDiscount !== null) {
     const pct = Math.max(0, Math.min(1, promo.percentDiscount));
-    return Math.round(labourSubtotal * pct * 100) / 100;
+    return {
+      total: Math.round(labourSubtotal * pct * 100) / 100,
+      byTask: shares((_, line) => line * pct),
+    };
   }
   if (promo.discountType === "fixed_amount" && promo.fixedAmount != null) {
     // Capped at the labour subtotal, matching applyPromoToQuote: travel is the
     // operator's driving time rather than margin, so a discount larger than the
     // labour is capped instead of eating into it.
-    return Math.round(Math.min(Math.max(0, promo.fixedAmount), labourSubtotal) * 100) / 100;
+    const amount = Math.min(Math.max(0, promo.fixedAmount), labourSubtotal);
+    return {
+      total: Math.round(amount * 100) / 100,
+      byTask: shares((_, line) => (amount * line) / labourSubtotal),
+    };
   }
-  return 0;
+  return none;
 }
 
 /**
@@ -490,7 +546,7 @@ export function calcJobTotal(
     holidayUplift > 0 ? Math.round(hourlyTasksTotal * holidayUplift * 100) / 100 : 0;
   const subtotal =
     Math.round((tasksTotal + partsTotal + travelTotal + holidaySurcharge) * 100) / 100;
-  const promoDiscount = computeJobPromoDiscount(
+  const { total: promoDiscount, byTask: promoByTask } = jobPromoBreakdown(
     job,
     promo,
     // A free-travel promo covers getting to the client, not a store run.
@@ -504,20 +560,23 @@ export function calcJobTotal(
   );
   // Fraction removed from an unsuccessful line: 1 - the charged share.
   const unsuccessfulCut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
-  let unsuccessfulDiscount = 0;
-  if (job.unsuccessful) {
-    // Whole-job flag discounts every hourly task; per-task flags are subsumed
-    // here so a task can't be discounted twice.
-    unsuccessfulDiscount = Math.round(hourlyTasksTotal * unsuccessfulCut * 100) / 100;
-  } else {
-    // Per-task flags discount only the flagged hourly lines. Rounded per line like the
-    // whole-job branch above, so flagging every task gives the same discount as the
-    // whole-job flag rather than drifting a cent off it.
-    const flaggedTasksTotal = job.tasks
-      .filter((t) => t.unsuccessful && isHourlyTask(t))
-      .reduce((s, t) => s + Math.round(t.qty * t.unitPrice * 100) / 100, 0);
-    unsuccessfulDiscount = Math.round(flaggedTasksTotal * unsuccessfulCut * 100) / 100;
-  }
+  // "Half price" is half of what the customer was due to pay, so each unsuccessful
+  // line is cut after its promo share comes off. Taking both off the full line would
+  // stack them: a 35%-off promo plus half price would bill 15% of the labour, not
+  // 32.5%. The whole-job flag covers every hourly task and subsumes per-task flags,
+  // so a task can't be discounted twice; lines are rounded the same way in both
+  // cases, so flagging every task matches the whole-job flag to the cent.
+  const unsuccessfulBase = job.tasks.reduce(
+    (s, t, i) =>
+      isHourlyTask(t) && (job.unsuccessful || t.unsuccessful)
+        ? s + Math.round(t.qty * t.unitPrice * 100) / 100 - (promoByTask[i] ?? 0)
+        : s,
+    0,
+  );
+  const unsuccessfulDiscount = Math.max(
+    0,
+    Math.round(unsuccessfulBase * unsuccessfulCut * 100) / 100,
+  );
   // GST applies to the discounted amount, per IRD price-reduction treatment. Clamped at 0
   // like calcInvoiceTotals, so stacked promo + unsuccessful discounts can't drive the
   // total negative and disagree with the persisted invoice.
