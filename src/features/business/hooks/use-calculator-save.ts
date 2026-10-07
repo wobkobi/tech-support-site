@@ -12,6 +12,7 @@ import {
 } from "@/features/business/lib/already-paid-input";
 import {
   buildIncomeDescription,
+  formatNZD,
   jobToLineItems,
   type calcJobTotal,
   type JobPricing,
@@ -135,6 +136,9 @@ export function useCalculatorSave({
   const [pendingExistingId, setPendingExistingId] = useState<string | null>(null);
   const [savingIncome, setSavingIncome] = useState(false);
   const [incomeError, setIncomeError] = useState<string | null>(null);
+  // Income rows already in ("part" / "rest" / "whole"), so a retry after a half-saved
+  // split posts only the missing one.
+  const [savedIncomeRows, setSavedIncomeRows] = useState<string[]>([]);
 
   /**
    * Saves custom task descriptions to the template library for future reuse.
@@ -266,6 +270,7 @@ export function useCalculatorSave({
     // Stale save errors would otherwise sit above the buttons on a blank form.
     setIncomeError(null);
     setSaveInvoiceError(null);
+    setSavedIncomeRows([]);
     // In-flight save bookkeeping. saveSendMode/saveQuoteMode are only ever set
     // when a save starts, so a failed Save & send leaves them true and puts the
     // next save's "Saving..." label on the wrong button.
@@ -292,6 +297,11 @@ export function useCalculatorSave({
     setSaveQuoteMode(quote);
     if (!clientName.trim()) {
       setSaveInvoiceError("Client name is required.");
+      return;
+    }
+    // Same rule as the invoice edit form; the buttons are disabled too, this is the backstop.
+    if (!quote && Math.round((prepaid - totals.total) * 100) > 0) {
+      setSaveInvoiceError("The amount already paid is more than the invoice total.");
       return;
     }
     // Validate the email format before the POST so a malformed address blocks
@@ -447,49 +457,79 @@ export function useCalculatorSave({
   }
 
   /**
-   * Posts the current job to the income API to record it as an income entry, then resets the
-   * calculator state and shows a confirmation toast on success.
+   * Posts the current job to the income API, then resets the calculator and toasts on
+   * success. A part Already paid by Cash becomes its own Cash row with the rest by Bank,
+   * the same split an invoice's already-paid part and its balance get. Rows already in
+   * are skipped, so a retry after a partial failure never doubles one.
    */
   async function handleSaveIncome(): Promise<void> {
     setSavingIncome(true);
     setIncomeError(null);
+    // Not a bare literal: this is income, and "Business Account" is an expense method
+    // that INCOME_METHODS does not contain.
+    const bank = INCOME_METHODS[0];
+    const split = prepaid > 0 && !prepaidCovers && alreadyPaid.method !== bank;
+    const rows: { key: string; method: string; amount: number }[] = split
+      ? [
+          { key: "part", method: alreadyPaid.method, amount: prepaid },
+          { key: "rest", method: bank, amount: Math.round((totals.total - prepaid) * 100) / 100 },
+        ]
+      : [
+          {
+            key: "whole",
+            method: paidCash ? CASH : prepaidCovers ? alreadyPaid.method : bank,
+            amount: totals.total,
+          },
+        ];
+    const description =
+      buildIncomeDescription(job) + (split ? ` (split, total ${formatNZD(totals.total)})` : "");
+    let sheetWarning = false;
     try {
       await saveTaskTemplates(tasks);
-      const res = await fetch("/api/business/income", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          // Record against the selected job date (NZ-local), not UTC "now",
-          // and store the discounted total the customer actually pays.
-          date: jobDate,
-          customer: clientName || "Walk-in",
-          description: buildIncomeDescription(job),
-          amount: totals.total,
-          // Not a bare literal: this is income, and "Business Account" is an expense
-          // method that INCOME_METHODS does not contain.
-          method: paidCash ? CASH : prepaidCovers ? alreadyPaid.method : INCOME_METHODS[0],
-        }),
-      });
-      const d = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        sheetSyncWarning?: boolean;
-      };
-      if (d.ok) {
-        // Surface a failed Cashbook append, as IncomeView and ExpensesView do.
-        // recordIncome swallows the sheet error so the entry still saves, so a
-        // plain success toast here hid money that never reached the sheet.
-        if (d.sheetSyncWarning) {
-          toast("Income saved, but the Cashbook sheet update didn't go through.", {
-            tone: "warning",
-          });
-        } else {
-          toast("Income entry saved.", { tone: "success" });
+      for (const row of rows.filter((r) => !savedIncomeRows.includes(r.key))) {
+        const res = await fetch("/api/business/income", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            // Record against the selected job date (NZ-local), not UTC "now",
+            // and store the discounted total the customer actually pays.
+            date: jobDate,
+            customer: clientName || "Walk-in",
+            description,
+            amount: row.amount,
+            method: row.method,
+          }),
+        });
+        const d = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          sheetSyncWarning?: boolean;
+        };
+        if (!d.ok) {
+          setIncomeError(
+            d.error ||
+              (split
+                ? `Could not save the ${row.method} income entry.`
+                : "Could not save income entry."),
+          );
+          return;
         }
-        onIncomeSaved();
-      } else {
-        setIncomeError(d.error || "Could not save income entry.");
+        // recordIncome swallows the sheet error so the entry still saves, so a
+        // plain success toast would hide money that never reached the sheet.
+        if (d.sheetSyncWarning) sheetWarning = true;
+        setSavedIncomeRows((prev) => [...prev, row.key]);
       }
+      if (sheetWarning) {
+        toast("Income saved, but the Cashbook sheet update didn't go through.", {
+          tone: "warning",
+        });
+      } else {
+        toast(split ? "Income saved as a Cash and a Bank entry." : "Income entry saved.", {
+          tone: "success",
+        });
+      }
+      setSavedIncomeRows([]);
+      onIncomeSaved();
     } catch {
       setIncomeError("Could not save income entry. Please try again.");
     } finally {

@@ -81,17 +81,20 @@ function main(): void {
   // The event end is the actual finish, so a shortfall is real time on the job
   // that a rounded description did not capture. It is billed, not written off.
 
-  // The case this was built for: 14:00-15:50 is 110 minutes, and "an hour and a
-  // half" plus a quick iCloud job parses to 105. Both lines are pinned, so the
-  // largest one takes the difference.
-  const lisa = collapseToWindow(
-    [task("Laptop data transfer", 90, "explicit"), task("iCloud configuration", 15, "short")],
+  // Every line is pinned and one has a stated duration, so the largest line takes
+  // the difference.
+  const pinned = collapseToWindow(
+    [task("stated", 90, "explicit"), task("quick", 15, "short")],
     110,
     timing,
   );
-  expectEqual("a 110 min job billed as 105 is filled to 110", minutesOf(lisa.tasks), [95, 15]);
-  expectEqual("filling counts as a rebalance, so the operator is told", lisa.rescaled, true);
-  expectEqual("nothing is dropped when growing", lisa.dropped, 0);
+  expectEqual(
+    "all-pinned lines short of the window are filled to it",
+    minutesOf(pinned.tasks),
+    [95, 15],
+  );
+  expectEqual("filling counts as a rebalance, so the operator is told", pinned.rescaled, true);
+  expectEqual("nothing is dropped when growing", pinned.dropped, 0);
 
   // A floating task has no stated duration, so it absorbs the difference before
   // any pinned line is touched.
@@ -107,6 +110,24 @@ function main(): void {
     "two floating tasks grow in proportion",
     minutesOf(collapseToWindow([task("a", 60), task("b", 30)], 120, timing).tasks),
     [80, 40],
+  );
+
+  // Only quick-task guesses and no stated time: none of them is the main job, so
+  // they share the window rather than one line taking all the slack.
+  expectEqual(
+    "quick-task guesses with no stated time share the window evenly",
+    minutesOf(collapseToWindow([task("a", 15, "short"), task("b", 15, "short")], 70, timing).tasks),
+    [35, 35],
+  );
+
+  // A floating line at 0 min has no proportion to scale by; it must not turn the
+  // totals into NaN.
+  expectEqual(
+    "floating lines at 0 min split what the pinned lines leave",
+    minutesOf(
+      collapseToWindow([task("quick", 15, "short"), task("a", 0), task("b", 0)], 75, timing).tasks,
+    ),
+    [15, 30, 30],
   );
 
   expectEqual(

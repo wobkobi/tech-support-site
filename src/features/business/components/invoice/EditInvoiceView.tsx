@@ -100,11 +100,10 @@ export function EditInvoiceView({
       }
       toast(`Invoice ${invoiceNumber} updated.`, { tone: "success" });
       if (d.incomeSheetWarning) {
+        // The sheet wins on the next import, so the row there has to be fixed by hand.
         toast(
-          "The already-paid income entry saved, but the Cashbook sheet update didn't go through.",
-          {
-            tone: "warning",
-          },
+          "Saved, but the Cashbook sheet didn't update for the already-paid amount. Fix that row in the sheet, or the next import puts the old one back.",
+          { tone: "warning" },
         );
       }
       router.push(`/admin/business/invoices/${invoiceId}`);

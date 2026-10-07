@@ -29,6 +29,8 @@ interface Props {
   label?: string;
   /** Words before the remaining amount; defaults to "Balance due". */
   balanceLabel?: string;
+  /** What `total` is called in the over-the-amount warning; defaults to "the total". */
+  totalName?: string;
 }
 
 /**
@@ -42,6 +44,7 @@ interface Props {
  * @param props.coversNote - Hint shown when the amount covers the whole total.
  * @param props.label - Field label; defaults to "Already paid".
  * @param props.balanceLabel - Words before the remaining amount; defaults to "Balance due".
+ * @param props.totalName - What `total` is called in the over-the-amount warning.
  * @returns The field element.
  */
 export function AlreadyPaidField({
@@ -53,10 +56,12 @@ export function AlreadyPaidField({
   coversNote,
   label = "Already paid",
   balanceLabel = "Balance due",
+  totalName = "the total",
 }: Props): React.ReactElement {
   const id = useId();
   const amount = alreadyPaidAmount(value);
   const balance = Math.max(0, Math.round((total - amount) * 100) / 100);
+  const over = Math.round((amount - total) * 100) / 100;
 
   return (
     <div className="space-y-1.5">
@@ -89,11 +94,16 @@ export function AlreadyPaidField({
           ))}
         </div>
       </div>
-      {amount > 0 && (
-        <p className="text-sm opacity-75">
-          {balance > 0 ? `${balanceLabel} ${formatNZD(balance)}` : coversNote}
-        </p>
-      )}
+      {amount > 0 &&
+        (over > 0 ? (
+          <p className="text-sm font-medium text-coquelicot-700" role="alert">
+            That&apos;s {formatNZD(over)} more than {totalName}.
+          </p>
+        ) : (
+          <p className="text-sm opacity-75">
+            {balance > 0 ? `${balanceLabel} ${formatNZD(balance)}` : coversNote}
+          </p>
+        ))}
     </div>
   );
 }

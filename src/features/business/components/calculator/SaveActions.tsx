@@ -67,7 +67,11 @@ export function SaveActions({
   onSaveIncome,
 }: Props): React.ReactElement {
   // An Already paid amount that covers the total is a full payment, saved like the tick.
-  const paidInFull = paidCash || (total > 0 && alreadyPaidAmount(alreadyPaid) >= total);
+  const prepaid = paidCash ? 0 : alreadyPaidAmount(alreadyPaid);
+  const paidInFull = paidCash || (total > 0 && prepaid >= total);
+  // More than the total means the job or the amount is wrong, and saving would book the
+  // extra as paid against nothing. A quote ignores Already paid, so it can still save.
+  const overpaid = Math.round((prepaid - total) * 100) > 0;
   return (
     <div className="space-y-2">
       {incomeError && (
@@ -105,9 +109,14 @@ export function SaveActions({
           />
         </div>
       )}
+      {overpaid && (
+        <p className="text-sm text-coquelicot-700">
+          Fix the job or the Already paid amount to save an invoice.
+        </p>
+      )}
       <button
         onClick={() => onSaveInvoice(false)}
-        disabled={savingInvoice || parsing}
+        disabled={savingInvoice || parsing || overpaid}
         suppressHydrationWarning
         className="w-full rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
       >
@@ -119,7 +128,7 @@ export function SaveActions({
       </button>
       <button
         onClick={() => onSaveInvoice(true)}
-        disabled={savingInvoice || parsing}
+        disabled={savingInvoice || parsing || overpaid}
         suppressHydrationWarning
         title="Save the invoice and jump straight to the send-to-client step."
         className="w-full rounded-lg border border-russian-violet px-4 py-2 text-sm font-semibold text-russian-violet hover:bg-russian-violet/5 disabled:opacity-50"
@@ -142,7 +151,7 @@ export function SaveActions({
       <button
         onClick={onSaveIncome}
         suppressHydrationWarning
-        disabled={savingIncome || subtotal === 0 || savingInvoice}
+        disabled={savingIncome || subtotal === 0 || savingInvoice || overpaid}
         title="For jobs handled outside the invoice flow."
         className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
       >

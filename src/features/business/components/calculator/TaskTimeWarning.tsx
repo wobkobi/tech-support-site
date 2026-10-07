@@ -25,7 +25,7 @@ interface TaskTimeWarningProps {
  * @param props.windowMin - Job window in minutes (`durationMins`).
  * @param props.minBillableMins - Minimum billable labour minutes; below this the floor banner shows.
  * @param props.snapMins - Live billing increment sizing the pinned-task overshoot allowance.
- * @param props.onFix - Handler that collapses tasks to the window and floors to the minimum.
+ * @param props.onFix - Handler that fits tasks to the window, either way, and floors to the minimum.
  * @returns Warning element, or null when totals already match.
  */
 export function TaskTimeWarning({
@@ -88,17 +88,21 @@ export function TaskTimeWarning({
     >
       <span>
         Tasks total {Math.round(taskMin)} min - listed window is {windowMin} min.
-        {!over && " Bump the end time if you actually worked the extra."}
       </span>
-      {over && (
-        <button
-          type="button"
-          onClick={onFix}
-          className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
-        >
-          Fix - rebalance tasks
-        </button>
-      )}
+      {/* Short of the window bills less than the job ran, since the end time is the
+          actual finish, so Fix grows the tasks to fill it. */}
+      <button
+        type="button"
+        onClick={onFix}
+        className={cn(
+          "rounded-lg border bg-white px-3 py-1.5 text-xs font-medium",
+          over
+            ? "border-amber-300 text-amber-900 hover:bg-amber-100"
+            : "border-sky-300 text-sky-900 hover:bg-sky-100",
+        )}
+      >
+        {over ? "Fix - rebalance tasks" : "Fix - spread tasks over the window"}
+      </button>
     </div>
   );
 }
