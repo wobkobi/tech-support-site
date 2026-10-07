@@ -9,6 +9,7 @@ import {
   BACKDROP,
   BACKDROP_VARIANTS,
   FAVICON_SPECS,
+  LEGACY_IMAGES,
   LOGO_FULL,
   LOGO_MARK,
   LOGO_PROFILE,
@@ -20,6 +21,7 @@ import {
   buildBackdropVariants,
   buildFavicons,
   buildFaviconSvg,
+  buildLegacyImages,
   buildManifest,
   buildQRCodes,
   buildSocialImages,
@@ -71,6 +73,10 @@ function printSummary(): void {
   );
   console.log("");
 
+  console.log("Old-browser page images (public/source/):");
+  LEGACY_IMAGES.forEach((i) => console.log(`  • ${i.name}.jpg (${i.width}px @ q${i.quality})`));
+  console.log("");
+
   console.log("Additional Assets (public/assets/):");
   ADDITIONAL_ASSETS.forEach((a) =>
     console.log(`  • ${a.name}.${a.format} (${a.width}x${a.height})`),
@@ -105,6 +111,7 @@ async function main(): Promise<void> {
   await buildFaviconSvg();
   await buildSocialImages();
   await buildBackdropVariants();
+  await buildLegacyImages();
   await buildAdditionalAssets();
   await buildQRCodes();
   await buildManifest();

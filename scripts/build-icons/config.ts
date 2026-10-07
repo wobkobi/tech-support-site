@@ -294,7 +294,7 @@ export interface BackdropVariant {
   /** Compression quality (1-100). */
   quality: number;
   /** Output format. */
-  format: "webp" | "avif" | "jpeg";
+  format: "webp" | "avif";
 }
 
 export const BACKDROP_VARIANTS: BackdropVariant[] = [
@@ -305,10 +305,30 @@ export const BACKDROP_VARIANTS: BackdropVariant[] = [
   // WebP fallback for iOS 15 / older Safari (iPhone 7 etc.) - no AVIF support
   // there. Higher quality since the audience that hits this is small.
   { name: "backdrop-blur", width: 1440, quality: 90, format: "webp" },
-  // JPEG fallback for the static old-browser page (public/legacy.html): High Sierra
-  // Safari and friends decode neither AVIF nor WebP. Smaller and lower quality, since it
-  // is heavily blurred and serves low-spec devices.
-  { name: "backdrop-blur", width: 1280, quality: 80, format: "jpeg" },
+];
+
+/* ---------- Old-Browser Page Images ---------- */
+
+/** A plain resized JPEG for the static old-browser page. */
+export interface LegacyImage {
+  /** Source image under public/source/. */
+  source: string;
+  /** Output filename without extension (written to public/source/). */
+  name: string;
+  /** Target width in pixels (height derived from aspect ratio). */
+  width: number;
+  /** JPEG quality (1-100). */
+  quality: number;
+}
+
+/**
+ * public/legacy.html is served as a static file, so it can't use the Next image
+ * optimiser and the browsers it serves decode neither AVIF nor WebP. These JPEGs
+ * stand in for the full-size originals (1.1 MB and 700 KB).
+ */
+export const LEGACY_IMAGES: LegacyImage[] = [
+  { source: BACKDROP, name: "legacy-hero", width: 1600, quality: 72 },
+  { source: "public/source/harrison-2026.jpg", name: "legacy-harrison", width: 640, quality: 78 },
 ];
 
 /* ---------- QR Code Specs ---------- */
