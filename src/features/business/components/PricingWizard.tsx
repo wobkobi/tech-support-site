@@ -292,6 +292,8 @@ interface Props {
   estimatorRange: EstimatorRange;
   /** Low-end floor fraction (live estimator setting). */
   lowEndFloorFactor: number;
+  /** Offer the promo code box; false while no code promo is running. */
+  showPromoCode: boolean;
 }
 
 /**
@@ -303,6 +305,7 @@ interface Props {
  * @param props.travelRatePerHour - Travel $/hr pricing the round trip.
  * @param props.estimatorRange - Confidence-scaled price-range widths (live estimator setting).
  * @param props.lowEndFloorFactor - Low-end floor fraction (live estimator setting).
+ * @param props.showPromoCode - Whether to offer the promo code box.
  * @returns The rendered wizard.
  */
 export function PricingWizard({
@@ -311,6 +314,7 @@ export function PricingWizard({
   travelRatePerHour,
   estimatorRange,
   lowEndFloorFactor,
+  showPromoCode,
 }: Props): React.ReactElement {
   const [rates, setRates] = useState<PublicRate[]>([]);
   const [activePromo, setActivePromo] = useState<ActivePromo | null>(null);
@@ -883,12 +887,14 @@ export function PricingWizard({
             </p>
           )}
 
-          <PromoCodeField
-            value={promoCode}
-            onChange={setPromoCode}
-            onApplied={repriceForCode}
-            className="mb-4 max-w-sm"
-          />
+          {showPromoCode && (
+            <PromoCodeField
+              value={promoCode}
+              onChange={setPromoCode}
+              onApplied={repriceForCode}
+              className="mb-4 max-w-sm"
+            />
+          )}
 
           {aiExplanation && <p className="mb-4 text-base text-seasalt-700">{aiExplanation}</p>}
 

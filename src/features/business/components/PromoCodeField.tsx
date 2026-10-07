@@ -187,7 +187,7 @@ export function PromoCodeField({
           className={cn(
             FIELD_INPUT,
             "min-h-11 min-w-0 flex-1 py-2 tracking-wider uppercase",
-            isValid && "border-emerald-600 bg-emerald-50",
+            isValid && "border-2 border-green-700",
           )}
         />
         <Button
@@ -208,7 +208,7 @@ export function PromoCodeField({
         aria-live="polite"
         className={cn(
           "mt-1.5 min-h-6 font-medium",
-          status.kind === "valid" ? "text-emerald-700" : "text-error",
+          status.kind === "valid" ? "text-green-700" : "text-error",
         )}
       >
         {status.kind === "valid" &&

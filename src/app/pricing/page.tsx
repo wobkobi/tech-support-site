@@ -21,6 +21,7 @@ import {
   describePromoOffer,
   describeRecurringWindow,
   getActivePromo,
+  hasActivePromoCode,
   promoDisplayRate,
   promoForRateCard,
   promoModifierRate,
@@ -89,11 +90,13 @@ const CHEVRON = "h-4 w-4 shrink-0 text-moonstone-700 transition-[rotate] group-o
  * @returns Pricing page element.
  */
 export default async function PricingPage(): Promise<React.ReactElement> {
-  const [promo, pricing, policy, settings] = await Promise.all([
+  // A failed promo lookup shows the code box rather than hiding a code that works.
+  const [promo, pricing, policy, settings, showPromoCode] = await Promise.all([
     getActivePromo(),
     getPublicPricing(),
     getPolicy(),
     getSettings(),
+    hasActivePromoCode().catch(() => true),
   ]);
   const baseRate = pricing.baseRate;
   // Words and numbers part company here. `promo` still announces the offer and
@@ -150,7 +153,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     what that figure means. A travel promo leaves it alone and
                     crosses out the travel charge below instead. */}
                 {ratePair && (
-                  <p className="mb-1 text-lg text-rich-black/60 line-through sm:text-xl">
+                  <p className="mb-1 text-lg text-seasalt-700 line-through sm:text-xl">
                     {formatMoneyCompact(ratePair.before)}/hr
                   </p>
                 )}
@@ -160,13 +163,13 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 {travelPair && (
                   <p className="mb-2 text-lg font-semibold text-russian-violet sm:text-xl">
                     Travel{" "}
-                    <span className="text-rich-black/60 line-through">
+                    <span className="text-seasalt-700 line-through">
                       {formatMoneyCompact(travelPair.before)}/hr
                     </span>{" "}
                     {formatMoneyCompact(travelPair.after)}/hr
                   </p>
                 )}
-                <p className="text-base text-rich-black/80 sm:text-lg">
+                <p className="text-base text-rich-black sm:text-lg">
                   One rate for every home job - troubleshooting, setup, software, tune-ups, Wi-Fi,
                   backups, data recovery, hardware repairs, and more.
                 </p>
@@ -201,7 +204,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               <p className="mb-2 text-3xl font-bold text-russian-violet sm:text-4xl">
                 ${baseRate}/hr
               </p>
-              <p className="text-base text-rich-black/80 sm:text-lg">
+              <p className="text-base text-rich-black sm:text-lg">
                 One rate for every home job - troubleshooting, setup, software, tune-ups, Wi-Fi,
                 backups, data recovery, hardware repairs, and more.
               </p>
@@ -434,6 +437,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
           travelRatePerHour={policy.TRAVEL_RATE_PER_HOUR}
           estimatorRange={settings.estimator.range}
           lowEndFloorFactor={settings.estimator.lowEndFloorFactor}
+          showPromoCode={showPromoCode}
         />
         {pricing.ratesUpdatedAt && (
           <p className="mt-6 text-sm text-seasalt-700">
