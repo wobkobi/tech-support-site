@@ -462,14 +462,14 @@ export function DayAgendaView({
     >
       {/* Sticky header band - mini week strip + day-picker bar pinned to the
           top of the viewport while the events list scrolls under them. The
-          band sits at `top-14` to clear the mobile hamburger button (the admin
-          shell layout uses pt-16 / 64px), and `-mx-4` / `-mx-6` so the page background
+          band sits at `top-14` below lg, just under the shell's 56px mobile top
+          bar, and `-mx-4` / `-mx-6` so the page background
           covers the page edges as content scrolls behind. */}
       <div
         data-no-swipe
         onPointerDown={stopPointer}
         onPointerUp={stopPointer}
-        className="sticky top-14 z-10 -mx-4 mb-4 bg-admin-bg px-4 pt-1 pb-2 sm:top-8 sm:-mx-6 sm:px-6"
+        className="sticky top-14 z-10 -mx-4 mb-4 bg-admin-bg px-4 pt-1 pb-2 sm:-mx-6 sm:px-6 lg:top-8"
       >
         {/* Mini 7-day strip - visible week containing the selected day. Dots
             indicate booking count per day (capped at 4). Compact so it

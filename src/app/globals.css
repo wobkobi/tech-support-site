@@ -196,77 +196,6 @@ input[type="number"] {
   appearance: textfield;
 }
 
-/* ============================================
-   Promo-aware navbar offset
-   --------------------------------------------
-   The site-wide promo banner sets `--promo-h` on <html> when it's visible
-   (~36px). NavBar's spacer + fixed `top` read this so the nav slides down
-   smoothly when the banner appears and back up when it's dismissed.
-
-   Wrapped in `@layer utilities` so the rules sit in the same cascade layer
-   as Tailwind utilities and reliably win against any conflicting class on
-   the same element.
-   ============================================ */
-/* Outside @layer so the rules win against any Tailwind utility on the same
-   element. `!important` makes the cascade unambiguous and protects against
-   `tailwind-merge` accidentally stripping the class via the `cn()` helper. */
-div.app-nav-spacer {
-  height: calc(6rem + var(--promo-h, 0px)) !important;
-  transition: height 500ms ease-out !important;
-}
-@media (min-width: 640px) {
-  div.app-nav-spacer {
-    height: calc(7rem + var(--promo-h, 0px)) !important;
-  }
-}
-
-/* Position offset uses `translate` (GPU-composited) instead of `top` so the
-   promo-banner-driven offset animation doesn't trigger layout/paint each
-   frame. The inline `transform: translateY(...)` set by NavBar.tsx for
-   hide-on-scroll composes independently with `translate` (separate CSS
-   properties), so both can coexist. `top: 0` keeps the fixed-position
-   anchor at the top of the viewport. */
-header.app-nav-header {
-  top: 0 !important;
-  translate: 0 calc(0.75rem + var(--promo-h, 0px)) !important;
-  transition:
-    transform 400ms ease-in-out,
-    opacity 400ms ease-in-out,
-    translate 500ms ease-out !important;
-}
-@media (min-width: 640px) {
-  header.app-nav-header {
-    translate: 0 calc(1rem + var(--promo-h, 0px)) !important;
-  }
-}
-
-/* Mobile slide-in drawer. Owns its own `top` (tracks --promo-h) and the
-   slide-in transition. Tailwind v4 compiles translate-x-* to the modern
-   CSS `translate` property, so the transition target must be `translate`
-   (not `transform`). Plain CSS here avoids tailwind-merge stripping the
-   arbitrary `transition-[translate]` utility. */
-nav.app-mobile-drawer {
-  top: calc(6.75rem + var(--promo-h, 0px)) !important;
-  transition:
-    translate 300ms ease-out,
-    top 500ms ease-out !important;
-}
-/* Closing (the drawer turns inert), visibility holds until the slide-out ends,
-   so the hidden drawer's shadow never shows at the edge. Opening skips it: a
-   visibility transition starts at hidden, and the focus trap's first focus()
-   would land on a still-hidden link and silently fail. */
-nav.app-mobile-drawer[inert] {
-  transition:
-    translate 300ms ease-out,
-    visibility 300ms,
-    top 500ms ease-out !important;
-}
-@media (min-width: 640px) {
-  nav.app-mobile-drawer {
-    top: calc(7.5rem + var(--promo-h, 0px)) !important;
-  }
-}
-
 /* Admin sidebar drawer - same Tailwind v4 caveat applies. */
 aside.app-admin-drawer {
   transition: translate 200ms ease-out !important;
@@ -339,14 +268,6 @@ body:has(:is(input:not([type="checkbox"], [type="radio"]), textarea, select):foc
     transition-duration: 0.01ms !important;
   }
 
-  /* The nav/drawer transitions declare !important on higher-specificity
-     selectors, so among equally-important declarations the universal override
-     above loses on specificity and they keep animating. Repeat the override
-     with matching selectors so reduced-motion actually stops them. */
-  div.app-nav-spacer,
-  header.app-nav-header,
-  nav.app-mobile-drawer,
-  nav.app-mobile-drawer[inert],
   aside.app-admin-drawer {
     transition-duration: 0.01ms !important;
   }

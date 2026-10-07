@@ -116,6 +116,10 @@ const nextConfig: NextConfig = {
 
   experimental: {
     optimizePackageImports: ["react-icons"],
+    // Ship Tailwind's CSS inside the HTML instead of a render-blocking stylesheet. Most
+    // public visitors land once from search or an ad, so a cached stylesheet buys little,
+    // while the extra request cost ~0.5s of first paint on throttled mobile.
+    inlineCss: true,
   },
 
   serverExternalPackages: ["nodemailer"],

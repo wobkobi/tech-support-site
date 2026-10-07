@@ -78,7 +78,7 @@ export default async function PosterPage({
           src="/source/backdrop.jpg"
           alt=""
           fill
-          priority
+          preload
           sizes="1748px"
           className="scale-110 object-cover blur-xl"
         />
@@ -101,7 +101,7 @@ export default async function PosterPage({
                   alt="To the Point Tech"
                   width={1376}
                   height={313}
-                  priority
+                  preload
                   className="h-auto w-344"
                 />
               </div>

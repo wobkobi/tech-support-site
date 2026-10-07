@@ -98,7 +98,7 @@ function InvoicePreviewPanelImpl({
             width={2000}
             height={674}
             className="h-12 w-auto sm:h-20"
-            priority
+            preload
           />
           <div className="text-right">
             <p className="text-xl leading-none font-extrabold text-russian-violet sm:text-2xl">

@@ -176,14 +176,14 @@ export function EmailInput({
         </p>
       )}
       {!activeError && suggestion && (
-        <p className="mt-1 text-sm text-rich-black/80" role="status">
+        <p className="mt-1 text-sm text-seasalt-700" role="status">
           Did you mean{" "}
           <button
             type="button"
             onClick={acceptSuggestion}
             className={cn(
               "font-semibold text-russian-violet underline underline-offset-2",
-              "rounded hover:text-russian-violet/80 focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
+              "rounded hover:text-russian-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet",
             )}
           >
             {suggestion}

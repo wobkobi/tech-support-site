@@ -38,7 +38,7 @@ const VIEWPORT = { width: 1080, height: 1350 } as const;
 const SCALE = 2;
 
 /** Portrait the photo variant needs, relative to the repo root. */
-const PORTRAIT_FILE = "public/source/harrison.jpg";
+const PORTRAIT_FILE = "public/source/harrison-2026.jpg";
 
 const SPECS: SocialSpec[] = [
   { name: "community-4x5-type.jpg", variant: "type", requiresPortrait: false },

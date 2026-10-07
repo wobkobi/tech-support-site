@@ -1,9 +1,11 @@
 // src/shared/components/NavBar.tsx
-// Navigation bar with mobile-first scroll reveal behaviour.
+// Sticky site header: logo, primary links, phone number and Book now. Below xl the links
+// fold into a Menu panel under the header.
 
 "use client";
 
 import { Button } from "@/shared/components/Button";
+import { CONTAINER } from "@/shared/components/Section";
 import { cn } from "@/shared/lib/cn";
 import { isPrintRoute } from "@/shared/lib/print-routes";
 import Image from "next/image";
@@ -15,222 +17,92 @@ import { useCallback, useEffect, useRef, useState } from "react";
 interface NavItem {
   label: string;
   href: string;
-  activePrefix: string;
 }
 
-/** Path prefixes that hide the public nav entirely (e.g. admin has its own sidebar). */
+/** Path prefixes that hide the public header (admin has its own sidebar). */
 const HIDDEN_PREFIXES: ReadonlyArray<string> = ["/admin"];
+
 const NAV_ITEMS: ReadonlyArray<NavItem> = [
-  { label: "Services", href: "/services", activePrefix: "/services" },
-  { label: "Business", href: "/business", activePrefix: "/business" },
-  { label: "Pricing", href: "/pricing", activePrefix: "/pricing" },
-  { label: "About", href: "/about", activePrefix: "/about" },
-  { label: "FAQ", href: "/faq", activePrefix: "/faq" },
-  { label: "Reviews", href: "/reviews", activePrefix: "/reviews" },
+  { label: "Services", href: "/services" },
+  { label: "Business", href: "/business" },
+  { label: "Pricing", href: "/pricing" },
+  { label: "About", href: "/about" },
+  { label: "FAQ", href: "/faq" },
+  { label: "Reviews", href: "/reviews" },
+  { label: "Contact", href: "/contact" },
 ];
 
-const SCROLL_THRESHOLD = 90;
-const TOP_SCROLL_ZONE_MAX = 260; // Near top: hide faster even on gentle scrolling
-const DEEP_SCROLL_ZONE_MIN = 560; // Deeper scroll: require more intent to hide
-const TOP_MIN_SCROLL_DELTA = 1;
-const DEEP_MIN_SCROLL_DELTA = 1;
-const TOP_HIDE_SCROLL_DISTANCE = 72;
-const MID_HIDE_SCROLL_DISTANCE = 120;
-const DEEP_HIDE_SCROLL_DISTANCE = 170;
-const FULL_HIDE_TRANSLATE = "120%";
-const TOP_IDLE_HIDE_DELAY_MS = 900;
-const MID_IDLE_HIDE_DELAY_MS = 1200;
-const DEEP_IDLE_HIDE_DELAY_MS = 2300;
-const HOVER_REVEAL_ZONE = 100; // Reveal hidden navbar when cursor is near top
+const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * Determine whether a path is active for a given prefix route.
- * @param pathname - The current path.
- * @param prefix - The prefix to match against.
- * @returns Whether the path matches the prefix.
+ * Whether the path sits at or under a nav item's route.
+ * @param pathname - Current path.
+ * @param prefix - The item's href.
+ * @returns True when the item is the current section.
  */
 function isActivePrefix(pathname: string, prefix: string): boolean {
-  if (prefix === "/") {
-    return pathname === "/";
-  }
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
-/**
- * Get scroll-based hide tuning values.
- * @param scrollY - Current vertical scroll position.
- * @returns Thresholds for hide distance, idle delay, and minimum delta.
- */
-function getHideTuning(scrollY: number): {
-  hideDistance: number;
-  idleDelayMs: number;
-  minScrollDelta: number;
-} {
-  if (scrollY <= TOP_SCROLL_ZONE_MAX) {
-    return {
-      hideDistance: TOP_HIDE_SCROLL_DISTANCE,
-      idleDelayMs: TOP_IDLE_HIDE_DELAY_MS,
-      minScrollDelta: TOP_MIN_SCROLL_DELTA,
-    };
-  }
-
-  if (scrollY >= DEEP_SCROLL_ZONE_MIN) {
-    return {
-      hideDistance: DEEP_HIDE_SCROLL_DISTANCE,
-      idleDelayMs: DEEP_IDLE_HIDE_DELAY_MS,
-      minScrollDelta: DEEP_MIN_SCROLL_DELTA,
-    };
-  }
-
-  return {
-    hideDistance: MID_HIDE_SCROLL_DISTANCE,
-    idleDelayMs: MID_IDLE_HIDE_DELAY_MS,
-    minScrollDelta: TOP_MIN_SCROLL_DELTA,
-  };
+/** Props for {@link NavBar}. */
+export interface NavBarProps {
+  /** Display phone number from identity settings. */
+  phone: string;
+  /** tel: URI from identity settings. */
+  phoneTel: string;
 }
 
 /**
- * NavBar component.
- * @returns The NavBar element, or null on hidden paths.
+ * Site header.
+ * @param props - Component props.
+ * @param props.phone - Display phone number.
+ * @param props.phoneTel - tel: URI for the phone link.
+ * @returns The header, or null on admin and print routes.
  */
-export function NavBar(): React.ReactElement | null {
+export function NavBar({ phone, phoneTel }: NavBarProps): React.ReactElement | null {
   const pathname = usePathname();
-
-  const [mobileMenuState, setMobileMenuState] = useState<{ open: boolean; pathname: string }>({
+  // Keyed to the pathname so a route change closes the menu without an effect.
+  const [menuState, setMenuState] = useState<{ open: boolean; pathname: string }>({
     open: false,
     pathname,
   });
-  const mobileMenuOpen = mobileMenuState.open && mobileMenuState.pathname === pathname;
+  const menuOpen = menuState.open && menuState.pathname === pathname;
 
-  // Scroll reveal state
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isHidden, setIsHidden] = useState(false);
-  const [scrollOffset, setScrollOffset] = useState(0);
-  const [isHoveringTop, setIsHoveringTop] = useState(false);
-
-  // Scroll and focus refs
+  const panelRef = useRef<HTMLElement | null>(null);
+  const focusBeforeMenuRef = useRef<HTMLElement | null>(null);
   const scrollLockRef = useRef(0);
   const bodyLockedRef = useRef(false);
-  const lastScrollYRef = useRef(0);
-  const scrollDownDistanceRef = useRef(0);
-  const isScrolledRef = useRef(false);
-  const idleHideTimerRef = useRef<number | null>(null);
-  const headerRef = useRef<HTMLElement | null>(null);
-  const mobileDrawerRef = useRef<HTMLElement | null>(null);
-  const focusBeforeMenuRef = useRef<HTMLElement | null>(null);
 
-  /**
-   * Set hidden state only when it changes (avoids redundant renders).
-   * @param nextHidden - Target hidden state.
-   */
-  const setHiddenSafely = useCallback((nextHidden: boolean): void => {
-    setIsHidden((previous) => (previous === nextHidden ? previous : nextHidden));
-  }, []);
-
-  /**
-   * Clear scheduled idle hide timer.
-   */
-  const clearIdleHideTimer = useCallback((): void => {
-    if (idleHideTimerRef.current !== null) {
-      window.clearTimeout(idleHideTimerRef.current);
-      idleHideTimerRef.current = null;
-    }
-  }, []);
-
-  /**
-   * Schedule idle hide only when user is scrolled away from page top.
-   */
-  const scheduleIdleHide = useCallback((): void => {
-    if (typeof window === "undefined" || mobileMenuOpen) {
-      return;
-    }
-
-    clearIdleHideTimer();
-
-    const { hideDistance, idleDelayMs } = getHideTuning(Math.max(window.scrollY, 0));
-
-    idleHideTimerRef.current = window.setTimeout(() => {
-      if (!isScrolledRef.current || mobileMenuOpen) {
-        return;
-      }
-
-      setHiddenSafely(true);
-      setScrollOffset(hideDistance);
-    }, idleDelayMs);
-  }, [clearIdleHideTimer, mobileMenuOpen, setHiddenSafely]);
-
-  /**
-   * Keep navbar visible while it is being interacted with.
-   */
-  const handleNavInteractionStart = useCallback((): void => {
-    clearIdleHideTimer();
-    setHiddenSafely(false);
-    setScrollOffset(0);
-    scrollDownDistanceRef.current = 0;
-  }, [clearIdleHideTimer, setHiddenSafely]);
-
-  /**
-   * Restart inactivity countdown when interaction stops.
-   */
-  const handleNavInteractionEnd = useCallback((): void => {
-    scheduleIdleHide();
-  }, [scheduleIdleHide]);
-
-  /**
-   * Open the mobile menu.
-   */
-  const openMobileMenu = useCallback((): void => {
-    setMobileMenuState({ open: true, pathname });
+  const closeMenu = useCallback((): void => {
+    setMenuState({ open: false, pathname });
   }, [pathname]);
 
-  /**
-   * Close the mobile menu.
-   */
-  const closeMobileMenu = useCallback((): void => {
-    setMobileMenuState({ open: false, pathname });
-  }, [pathname]);
+  const toggleMenu = useCallback((): void => {
+    setMenuState({ open: !menuOpen, pathname });
+  }, [menuOpen, pathname]);
 
-  /**
-   * Toggle the mobile menu.
-   */
-  const toggleMobileMenu = useCallback((): void => {
-    if (mobileMenuOpen) {
-      closeMobileMenu();
-      return;
-    }
-
-    openMobileMenu();
-  }, [mobileMenuOpen, openMobileMenu, closeMobileMenu]);
-
-  // Focus trap + Escape + focus restore for the mobile drawer.
+  // Focus trap, Escape to close, and focus restore for the open panel.
   useEffect(() => {
-    if (!mobileMenuOpen) return;
-
+    if (!menuOpen) return;
     focusBeforeMenuRef.current = document.activeElement as HTMLElement | null;
-    const drawer = mobileDrawerRef.current;
-    if (!drawer) return;
-
-    const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
-    const focusables = drawer.querySelectorAll<HTMLElement>(FOCUSABLE);
-    focusables[0]?.focus();
+    const panel = panelRef.current;
+    if (!panel) return;
+    panel.querySelectorAll<HTMLElement>(FOCUSABLE)[0]?.focus();
 
     /**
-     * Drawer-scoped key handler: Escape closes, Tab cycles within focusables.
-     * @param e - The keyboard event from the document listener.
+     * Panel-scoped key handler: Escape closes, Tab cycles within the panel.
+     * @param e - Keyboard event from the document listener.
      */
     const handleKey = (e: KeyboardEvent): void => {
       if (e.key === "Escape") {
-        closeMobileMenu();
+        closeMenu();
         return;
       }
       if (e.key !== "Tab") return;
-
-      const items = drawer.querySelectorAll<HTMLElement>(FOCUSABLE);
-      if (items.length === 0) return;
+      const items = panel.querySelectorAll<HTMLElement>(FOCUSABLE);
       const first = items[0];
       const last = items[items.length - 1];
       if (!first || !last) return;
-
       if (e.shiftKey && document.activeElement === first) {
         e.preventDefault();
         last.focus();
@@ -245,20 +117,15 @@ export function NavBar(): React.ReactElement | null {
       document.removeEventListener("keydown", handleKey);
       focusBeforeMenuRef.current?.focus();
     };
-  }, [mobileMenuOpen, closeMobileMenu]);
+  }, [menuOpen, closeMenu]);
 
-  // Lock body scroll while mobile menu is open.
+  // Lock body scroll while the panel is open, and flag it on <body> so the
+  // phone bar (globals.css) hides instead of stacking under the panel.
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
     const body = document.body;
+    body.toggleAttribute("data-nav-open", menuOpen);
 
-    // Also flags the open drawer on <body>, which MobileActionBar hides on.
-    body.toggleAttribute("data-nav-open", mobileMenuOpen);
-
-    if (mobileMenuOpen) {
+    if (menuOpen) {
       scrollLockRef.current = window.scrollY;
       body.style.overflow = "hidden";
       body.style.position = "fixed";
@@ -281,363 +148,103 @@ export function NavBar(): React.ReactElement | null {
       body.style.width = "";
       body.style.top = "";
     };
-  }, [mobileMenuOpen]);
+  }, [menuOpen]);
 
-  // Scroll behaviour: hide on downward scroll, show immediately on upward scroll.
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    /**
-     * Process latest scroll position.
-     */
-    const processScroll = (): void => {
-      const currentY = Math.max(window.scrollY, 0);
-      const previousY = lastScrollYRef.current;
-      const delta = currentY - previousY;
-      const { hideDistance, minScrollDelta } = getHideTuning(currentY);
-      lastScrollYRef.current = currentY;
-
-      const scrolledPastThreshold = currentY > SCROLL_THRESHOLD;
-      isScrolledRef.current = scrolledPastThreshold;
-      setIsScrolled(scrolledPastThreshold);
-
-      if (!scrolledPastThreshold || mobileMenuOpen) {
-        clearIdleHideTimer();
-        setHiddenSafely(false);
-        setScrollOffset(0);
-        scrollDownDistanceRef.current = 0;
-        return;
-      }
-
-      scheduleIdleHide();
-
-      if (Math.abs(delta) < minScrollDelta) {
-        return;
-      }
-
-      if (delta < 0) {
-        // Scrolling up - reset and show immediately
-        setHiddenSafely(false);
-        setScrollOffset(0);
-        scrollDownDistanceRef.current = 0;
-        return;
-      }
-
-      if (delta > 0) {
-        // Scrolling down - accumulate distance and gradually translate (like sticky that scrolls away)
-        scrollDownDistanceRef.current += delta;
-
-        if (scrollDownDistanceRef.current >= hideDistance) {
-          // Fully hide after threshold (unless hovering at top)
-          setHiddenSafely(true);
-          setScrollOffset(hideDistance);
-        } else {
-          // Gradually translate up with scroll
-          setHiddenSafely(false);
-          setScrollOffset(scrollDownDistanceRef.current);
-        }
-      }
-    };
-
-    lastScrollYRef.current = Math.max(window.scrollY, 0);
-    processScroll();
-
-    window.addEventListener("scroll", processScroll, { passive: true });
-
-    return () => {
-      clearIdleHideTimer();
-      window.removeEventListener("scroll", processScroll);
-    };
-  }, [mobileMenuOpen, clearIdleHideTimer, scheduleIdleHide, setHiddenSafely]);
-
-  // Hovering near the top edge should reveal a hidden navbar on pointer devices.
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    let hoverTimeout: number | null = null;
-
-    /**
-     * Track whether the cursor is near the top viewport edge.
-     * @param event - The latest mouse move event.
-     */
-    const handleMouseMove = (event: MouseEvent): void => {
-      if (event.clientY <= HOVER_REVEAL_ZONE) {
-        if (hoverTimeout) {
-          window.clearTimeout(hoverTimeout);
-          hoverTimeout = null;
-        }
-        setIsHoveringTop(true);
-      } else if (isHoveringTop) {
-        // Start a short timeout before hiding
-        if (!hoverTimeout) {
-          hoverTimeout = window.setTimeout(() => {
-            setIsHoveringTop(false);
-            hoverTimeout = null;
-          }, 350); // 350ms linger, animation unchanged
-        }
-      }
-    };
-
-    /**
-     * Reset top-hover state when pointer leaves the document.
-     */
-    const handleMouseLeave = (): void => {
-      setIsHoveringTop(false);
-      if (hoverTimeout) {
-        window.clearTimeout(hoverTimeout);
-        hoverTimeout = null;
-      }
-    };
-
-    window.addEventListener("mousemove", handleMouseMove, { passive: true });
-    document.addEventListener("mouseleave", handleMouseLeave);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseleave", handleMouseLeave);
-      if (hoverTimeout) {
-        window.clearTimeout(hoverTimeout);
-      }
-    };
-  }, [isHoveringTop]);
-
-  if (isPrintRoute(pathname)) {
-    return null;
-  }
-  if (HIDDEN_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
-    return null;
-  }
+  if (isPrintRoute(pathname)) return null;
+  if (HIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
 
   const bookingActive = isActivePrefix(pathname, "/booking");
-  const contactActive = isActivePrefix(pathname, "/contact");
-
-  /**
-   * Calculate the transform value based on current scroll state
-   * @returns The translateY transform string
-   */
-  const getTransform = (): string => {
-    if (!isHidden && scrollOffset > 0) {
-      return `translateY(-${scrollOffset}px)`;
-    }
-    if (isHidden && !isHoveringTop) {
-      return `translateY(-${FULL_HIDE_TRANSLATE})`;
-    }
-    return "translateY(0)";
-  };
 
   return (
-    <>
-      {/* Spacer for fixed nav - grows via --promo-h when banner is shown. */}
-      <div aria-hidden="true" className="app-nav-spacer" />
+    <header className="sticky top-0 z-50 border-b border-seasalt-100 bg-white print:hidden">
+      <div className={cn(CONTAINER, "flex items-center justify-between gap-6 py-3")}>
+        <Link href="/" className="shrink-0">
+          <Image
+            src="/source/logo-full.svg"
+            alt="To the Point Tech - home"
+            width={2000}
+            height={674}
+            preload
+            className="h-12 w-auto sm:h-17"
+          />
+        </Link>
 
-      <header
-        ref={headerRef}
-        className={cn(
-          "fixed inset-x-0 z-50 mx-auto w-full px-2 will-change-transform sm:px-4",
-          // `.app-nav-header` (globals.css) - top driven by --promo-h.
-          "app-nav-header",
-          // Narrower gutters on phones, in step with FrostedSection's.
-          "max-w-[min(100vw-1rem,clamp(90rem,75vw,140rem))] sm:max-w-[min(100vw-2rem,clamp(90rem,75vw,140rem))]",
-          isHidden && !isHoveringTop && "pointer-events-none opacity-0",
-        )}
-        onMouseEnter={handleNavInteractionStart}
-        onMouseLeave={handleNavInteractionEnd}
-        onTouchStart={handleNavInteractionStart}
-        onTouchEnd={handleNavInteractionEnd}
-        onFocusCapture={handleNavInteractionStart}
-        onBlurCapture={(event) => {
-          const nextFocused = event.relatedTarget;
-          if (nextFocused instanceof Node && headerRef.current?.contains(nextFocused)) {
-            return;
-          }
-          handleNavInteractionEnd();
-        }}
-        style={{
-          transform: getTransform(),
-        }}
-      >
-        <div
-          className={cn(
-            "flex h-20 w-full flex-nowrap items-center justify-between rounded-2xl border border-seasalt-200/40 bg-white/90 px-5 shadow-lg backdrop-blur-lg transition-[border-color,box-shadow] duration-300",
-            isScrolled && "border-opacity-70 shadow-2xl",
-          )}
-        >
-          <Link
-            href="/"
-            className="flex min-w-0 shrink-0 items-center gap-2.5 transition-[scale] hover:scale-105"
-          >
-            <Image
-              src="/source/logo.svg"
-              // Decorative: the adjacent "To the Point Tech" text already names the
-              // link, so an alt here would just add "Logo" noise for screen readers.
-              alt=""
-              width={40}
-              height={40}
-              priority
-              // Rem-sized so it scales with the root font-size on bigger screens.
-              className="h-10 w-10 shrink-0 select-none"
-            />
-            <span className="text-lg font-bold whitespace-nowrap text-russian-violet sm:text-xl">
-              To the Point Tech
-            </span>
-          </Link>
-
-          <nav className="hidden items-center gap-1 lg:flex" aria-label="Primary navigation">
-            {NAV_ITEMS.map((item) => {
-              const active = isActivePrefix(pathname, item.activePrefix);
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "shrink-0 rounded-lg px-4 py-2.5 text-lg font-semibold whitespace-nowrap transition-[scale,background-color,color,box-shadow] duration-200 select-none xl:text-xl",
-                    active
-                      ? "bg-moonstone-400/20 text-russian-violet shadow-sm"
-                      : "text-rich-black hover:scale-105 hover:bg-moonstone-400/15 hover:text-russian-violet hover:shadow-md",
-                  )}
-                  aria-current={active ? "page" : undefined}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className="flex shrink-0 items-center gap-2">
-            <Button
-              href="/booking"
-              variant="primary"
-              size="lg"
-              className="hidden shrink-0 lg:inline-flex xl:text-xl"
-              aria-current={bookingActive ? "page" : undefined}
-            >
-              Book now
-            </Button>
-
-            <Button
-              href="/contact"
-              variant="ghost"
-              size="lg"
-              className="hidden shrink-0 lg:inline-flex xl:text-xl"
-              aria-current={contactActive ? "page" : undefined}
-            >
-              Contact
-            </Button>
-
-            <button
-              onClick={toggleMobileMenu}
-              className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/20 transition-colors hover:bg-white/30 lg:hidden"
-              aria-label="Toggle mobile menu"
-              aria-expanded={mobileMenuOpen}
-              aria-controls="mobile-nav"
-            >
-              <div className="flex h-5 w-5 flex-col justify-center gap-1">
-                <span
-                  className={cn(
-                    "h-0.5 w-full rounded-full bg-russian-violet transition-[translate,rotate]",
-                    mobileMenuOpen && "translate-y-1.5 rotate-45",
-                  )}
-                />
-                <span
-                  className={cn(
-                    "h-0.5 w-full rounded-full bg-russian-violet transition-opacity",
-                    mobileMenuOpen && "opacity-0",
-                  )}
-                />
-                <span
-                  className={cn(
-                    "h-0.5 w-full rounded-full bg-russian-violet transition-[translate,rotate]",
-                    mobileMenuOpen && "-translate-y-1.5 -rotate-45",
-                  )}
-                />
-              </div>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {mobileMenuOpen && (
-        <div
-          className={cn(
-            "fixed inset-0 z-40 bg-rich-black/50 backdrop-blur-sm lg:hidden",
-            "animate-in fade-in duration-200",
-          )}
-          onClick={closeMobileMenu}
-          aria-hidden="true"
-        />
-      )}
-
-      <nav
-        ref={mobileDrawerRef}
-        className={cn(
-          "fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto overscroll-contain rounded-2xl border border-seasalt-200/40 bg-white/95 shadow-2xl backdrop-blur-xl lg:hidden",
-          // `.app-mobile-drawer` (globals.css) owns top + translate transition.
-          "app-mobile-drawer",
-          // Closed, it has to clear its own right-4 inset as well as its width, or
-          // a 16px strip of it peeks in at the edge of every page. Hidden too, so
-          // the shadow's tail does not show; globals.css holds it visible until
-          // the slide-out finishes.
-          mobileMenuOpen ? "translate-x-0" : "invisible translate-x-[calc(100%+2rem)]",
-        )}
-        id="mobile-nav"
-        aria-label="Mobile navigation"
-        role={mobileMenuOpen ? "dialog" : undefined}
-        aria-modal={mobileMenuOpen ? true : undefined}
-        // `inert` takes the closed drawer and its links out of the tab order and the
-        // accessibility tree. It supersedes aria-hidden, which alone would leave the
-        // inner links focusable - the audit flags aria-hidden containing focusables.
-        inert={!mobileMenuOpen}
-      >
-        <div className="flex h-full flex-col gap-2 p-4">
+        <nav aria-label="Primary navigation" className="hidden items-center gap-6 xl:flex">
           {NAV_ITEMS.map((item) => {
-            const active = isActivePrefix(pathname, item.activePrefix);
-
+            const active = isActivePrefix(pathname, item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={cn(
-                  "rounded-lg px-4 py-3 text-base font-semibold transition-[scale,background-color,color,box-shadow] duration-200 select-none",
-                  active
-                    ? "bg-moonstone-400/20 text-russian-violet shadow-sm"
-                    : "text-rich-black hover:scale-[1.02] hover:bg-moonstone-400/15 hover:text-russian-violet hover:shadow-md",
-                )}
                 aria-current={active ? "page" : undefined}
-                onClick={closeMobileMenu}
+                className={cn(
+                  "text-base font-semibold whitespace-nowrap hover:text-coquelicot-700",
+                  active && "text-coquelicot-700 underline decoration-[3px] underline-offset-8",
+                )}
               >
                 {item.label}
               </Link>
             );
           })}
+        </nav>
 
-          <div className="mt-4 flex flex-col gap-2 border-t border-seasalt-200/40 pt-4">
-            <Button
-              href="/booking"
-              variant="primary"
-              size="lg"
-              fullWidth
-              aria-current={bookingActive ? "page" : undefined}
-            >
-              Book now
-            </Button>
-
-            <Button
-              href="/contact"
-              variant="ghost"
-              size="lg"
-              fullWidth
-              aria-current={contactActive ? "page" : undefined}
-            >
-              Contact
-            </Button>
-          </div>
+        <div className="flex shrink-0 items-center gap-4">
+          {/* Plain tel: anchor so GoogleTag's delegated listener records the call. */}
+          <a
+            href={phoneTel}
+            className="hidden text-right leading-tight font-extrabold whitespace-nowrap sm:block sm:text-lg"
+          >
+            <span className="block text-sm font-semibold text-seasalt-700">Call or text</span>
+            {phone}
+          </a>
+          <Button
+            href="/booking"
+            variant="primary"
+            className="hidden sm:inline-flex"
+            aria-current={bookingActive ? "page" : undefined}
+          >
+            Book now
+          </Button>
+          <button
+            type="button"
+            onClick={toggleMenu}
+            aria-expanded={menuOpen}
+            aria-controls="site-menu"
+            className="min-h-11 rounded-md border-2 border-russian-violet px-3 font-bold text-russian-violet xl:hidden"
+          >
+            {menuOpen ? "Close" : "Menu"}
+          </button>
         </div>
+      </div>
+
+      <nav
+        id="site-menu"
+        ref={panelRef}
+        aria-label="Site menu"
+        hidden={!menuOpen}
+        className="max-h-[calc(100dvh-5rem)] overflow-y-auto border-t border-seasalt-100 bg-white xl:hidden"
+      >
+        <ul className={cn(CONTAINER, "py-2")}>
+          {NAV_ITEMS.map((item) => {
+            const active = isActivePrefix(pathname, item.href);
+            return (
+              <li key={item.href} className="border-b border-seasalt-100">
+                <Link
+                  href={item.href}
+                  onClick={closeMenu}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "block py-3.5 text-lg font-semibold",
+                    active && "text-coquelicot-700",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </nav>
-    </>
+    </header>
   );
 }

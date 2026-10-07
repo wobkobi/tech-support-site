@@ -4,7 +4,12 @@
 import Reviews, { type ReviewItem } from "@/features/reviews/components/Reviews";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import { Button } from "@/shared/components/Button";
-import { FrostedSection, PageShell, CARD as SHARED_CARD } from "@/shared/components/PageLayout";
+import { ClosingCta } from "@/shared/components/ClosingCta";
+import { PageShell } from "@/shared/components/PageLayout";
+import { RuledBlock, RuledGrid } from "@/shared/components/RuledGrid";
+import { CONTAINER, Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
+import { TickItem, TickList } from "@/shared/components/TickList";
+import { GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { SERVICE_AREAS } from "@/shared/lib/service-areas";
@@ -14,16 +19,7 @@ import { unstable_cache } from "next/cache";
 import Image from "next/image";
 import Link from "next/link";
 import type React from "react";
-import type { IconType } from "react-icons";
-import {
-  FaCalendarCheck,
-  FaCircleCheck,
-  FaDownload,
-  FaEnvelope,
-  FaHandshake,
-  FaMapLocationDot,
-  FaPhone,
-} from "react-icons/fa6";
+import { FaCalendarCheck, FaCheck, FaDownload, FaPhone } from "react-icons/fa6";
 
 export const metadata: Metadata = {
   // Self-canonical only. A lone en-NZ hreflang with no x-default and no sibling
@@ -56,38 +52,39 @@ const getApprovedReviews = unstable_cache(
   { tags: ["reviews"], revalidate: 86400 },
 );
 
-interface TrustPoint {
-  title: string;
-  body: string;
-  icon: IconType;
-  /** Stagger class, written out whole so Tailwind picks it up. */
-  delay: string;
-}
+/** The home page shows at most this many quotes; the full list lives on /reviews. */
+const HOME_REVIEW_LIMIT = 3;
 
-const trustPoints: ReadonlyArray<TrustPoint> = [
-  {
-    title: "Computer Science Graduate",
-    body: "A computer science degree behind the advice, plus years of hands-on experience",
-    icon: FaCircleCheck,
-    delay: "animate-delay-100",
-  },
-  {
-    title: "Proudly Local",
-    body: "Auckland born and raised, and I come to you anywhere in the city",
-    icon: FaMapLocationDot,
-    delay: "animate-delay-200",
-  },
-  {
-    title: "No Upselling",
-    body: "If you don't need something, I'll say so - you won't be sold anything extra",
-    icon: FaHandshake,
-    delay: "animate-delay-300",
-  },
+/** Short ticked points under the hero buttons. */
+const HERO_POINTS: ReadonlyArray<string> = [
+  "Same-day appointments",
+  "Evenings & weekends",
+  "Remote support",
 ];
 
-// Home cards are the shared CARD with a touch more padding on md+. Deriving
-// from SHARED_CARD keeps the border/background in sync instead of drifting.
-const CARD = cn(SHARED_CARD, "md:p-7");
+/** Lines in the "How I work" panel. */
+const APPROACH: ReadonlyArray<string> = [
+  "Listen first, understand your needs",
+  "Explain everything as clearly as possible",
+  "Leave clear notes you can refer back to",
+  "Transparent pricing, no hidden fees",
+];
+
+/** Three blocks in the violet "Why people call me" band. */
+const TRUST_POINTS: ReadonlyArray<{ title: string; body: string }> = [
+  {
+    title: "Computer science graduate",
+    body: "A computer science degree behind the advice, plus years of hands-on experience.",
+  },
+  {
+    title: "Proudly local",
+    body: "Auckland born and raised, and I come to you anywhere in the city.",
+  },
+  {
+    title: "No upselling",
+    body: "If you don't need something, I'll say so - you won't be sold anything extra.",
+  },
+];
 
 /**
  * Home page component
@@ -98,7 +95,12 @@ export default async function Home(): Promise<React.ReactElement> {
     getApprovedReviews().catch(() => []),
     getSettings(),
   ]);
-  const rows = allRows.slice(0, settings.reviews.homepageFeaturedCount);
+  // The featured-count setting still gates the section (0 hides it); the grid caps at three.
+  const rows = allRows.slice(
+    0,
+    Math.min(settings.reviews.homepageFeaturedCount, HOME_REVIEW_LIMIT),
+  );
+  const { phone, phoneTel } = settings.identity;
 
   const items: ReviewItem[] = rows.map((r) => ({
     id: r.id,
@@ -109,288 +111,240 @@ export default async function Home(): Promise<React.ReactElement> {
       isAnonymous: r.isAnonymous,
     }),
   }));
-
   const hasReviews = items.length > 0;
 
   return (
     <PageShell>
-      <FrostedSection>
-        <div className="flex flex-col gap-6 sm:gap-8">
-          {/* Hero Section */}
-          <section aria-labelledby="hero-heading" className="text-center">
-            <div className="mb-6 grid place-items-center">
-              <Image
-                src="/source/logo-full.svg"
-                alt="To the Point Tech - computer and IT support in Auckland"
-                width={2000}
-                height={674}
-                priority
-                fetchPriority="high"
-                draggable={false}
-                className="h-auto w-70 sm:w-95 md:w-120 lg:w-140"
-              />
-            </div>
-
+      {/* Hero: the one place the sunset photo appears. The overlay is darkest
+          behind the text so white copy holds 4.5:1 at the photo's brightest. */}
+      <section
+        aria-labelledby="hero-heading"
+        className="relative isolate overflow-hidden bg-russian-violet text-white"
+      >
+        <Image
+          src="/source/backdrop.jpg"
+          alt=""
+          fill
+          // The mobile LCP element. Eager + high priority rather than preload: Next 16's
+          // preload link carries no fetchpriority hint, which the LCP audit flags.
+          loading="eager"
+          fetchPriority="high"
+          sizes="100vw"
+          className="-z-20 object-cover object-[50%_60%] md:object-[70%_58%]"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(6,5,31,.78),rgba(6,5,31,.45))] md:bg-[linear-gradient(90deg,rgba(6,5,31,.82)_0%,rgba(6,5,31,.5)_42%,rgba(6,5,31,.05)_75%)]"
+        />
+        <div
+          className={cn(
+            CONTAINER,
+            "grid items-center gap-8 pt-8 pb-10 sm:py-14 md:grid-cols-[1.25fr_1fr] md:gap-12 md:py-22",
+          )}
+        >
+          <div>
             <h1
               id="hero-heading"
-              className="mx-auto mb-4 max-w-5xl text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
+              className="mb-4 text-[2rem] leading-[1.1] font-extrabold sm:text-[2.875rem]"
             >
-              Computer Repairs & IT Support in Auckland
+              Computer Repairs &amp; IT Support in Auckland
             </h1>
-
-            <p className="mx-auto mb-8 max-w-7xl text-lg font-medium text-rich-black sm:text-xl md:text-2xl">
+            <p className="mb-6 max-w-170 text-lg sm:text-[1.1875rem]">
               I come to your home or business anywhere in Auckland, fix the problem, explain what
-              went wrong in plain English, and don't leave until it actually works.
+              went wrong in plain English, and don&apos;t leave until it actually works.
             </p>
-
-            <div className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">
-              <Button href="/booking" variant="primary" size="md" className="w-full sm:w-auto">
+            <div className="flex flex-wrap gap-3">
+              <Button href="/booking" variant="primary" className="w-full sm:w-auto">
                 <FaCalendarCheck className="h-5 w-5" aria-hidden />
                 Book appointment
               </Button>
-              <Button
-                href={settings.identity.phoneTel}
-                variant="secondary"
-                size="md"
-                className="w-full sm:w-auto"
-              >
+              <Button href={phoneTel} variant="outline-white" className="w-full sm:w-auto">
                 <FaPhone className="h-4 w-4" aria-hidden />
-                {settings.identity.phone}
+                Call {phone}
               </Button>
             </div>
-
-            <p className="mt-6 text-base text-rich-black/70 sm:text-lg">
-              Same day appointments available • Evening & weekend hours • Remote support options
-            </p>
-          </section>
-
-          {/* Trust Indicators */}
-          <section aria-labelledby="trust-heading" className="grid gap-4 sm:grid-cols-3 sm:gap-5">
-            {/* Visually hidden: gives the card h3s an h2 parent so heading order
-                does not skip from the hero h1 straight to h3. */}
-            <h2 id="trust-heading" className="sr-only">
-              Why choose us
-            </h2>
-            {/* A compact row on phones (icon beside the text) instead of three
-                tall centred cards, each of which filled most of a screen. */}
-            {trustPoints.map(({ title, body, icon: Icon, delay }) => (
-              <div
-                key={title}
-                className={cn(
-                  CARD,
-                  "animate-slide-up animate-fill-both flex items-start gap-4 sm:block sm:text-center",
-                  delay,
-                )}
-              >
-                <div className="grid size-12 shrink-0 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-400/30 sm:mx-auto sm:mb-3 sm:size-16">
-                  <Icon className="h-6 w-6 text-moonstone-400 sm:h-8 sm:w-8" aria-hidden />
-                </div>
-                <div>
-                  <h3 className="mb-1 text-lg font-bold text-russian-violet sm:mb-2 sm:text-2xl">
-                    {title}
-                  </h3>
-                  <p className="text-base text-rich-black/80 sm:text-lg">{body}</p>
-                </div>
-              </div>
-            ))}
-          </section>
-
-          {/* Services Grid */}
-          <section
-            aria-labelledby="services-heading"
-            className="animate-slide-up animate-fill-both animate-delay-200 text-center"
-          >
-            <h2
-              id="services-heading"
-              className="mb-8 text-3xl font-bold text-rich-black sm:text-4xl md:text-5xl"
-            >
-              What I can help with
-            </h2>
-
-            {/* Two tiles a row on phones, with a smaller icon so a two-line label
-                still fits beside it. Each tile opens its card on /services.
-                The label's flex basis is its longest word (basis-0 floored by
-                min-w-min), so on a narrow phone or a large text setting a word
-                that can't fit wraps the label under the icon instead of being
-                clipped. */}
-            <ul className="mx-auto grid max-w-6xl grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-              {SERVICE_AREAS.map(({ slug, homeLabel, icon: Icon }) => (
-                <li key={slug}>
-                  <Link
-                    href={`/services#${slug}`}
-                    className="flex h-full flex-wrap items-center gap-2 rounded-xl border border-seasalt-200/60 bg-white p-2.5 text-left shadow-sm transition-[border-color,box-shadow] hover:border-moonstone-500/60 hover:shadow-md sm:gap-3 sm:p-3"
-                  >
-                    <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-moonstone-500/50 bg-moonstone-400/30 sm:size-14">
-                      <Icon className="h-6 w-6 text-moonstone-400 sm:h-8 sm:w-8" aria-hidden />
-                    </span>
-                    <span className="min-w-min grow basis-0 text-base leading-tight font-medium text-rich-black sm:text-lg">
-                      {homeLabel}
-                    </span>
-                  </Link>
+            <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-base font-semibold">
+              {HERO_POINTS.map((point) => (
+                <li key={point} className="flex items-center gap-2">
+                  <FaCheck className="h-4 w-4 text-moonstone-500" aria-hidden />
+                  {point}
                 </li>
               ))}
             </ul>
+          </div>
+          <figure className="relative m-0 max-w-104 md:max-w-none">
+            <Image
+              src="/source/harrison-2026.jpg"
+              alt="Harrison Raynes"
+              width={2160}
+              height={2160}
+              sizes="(min-width: 768px) 40vw, 100vw"
+              className="aspect-4/3 w-full rounded-lg object-cover object-[center_25%] shadow-[0_10px_30px_rgba(0,0,0,0.35)] sm:aspect-square"
+            />
+            <figcaption className="absolute bottom-4 left-4 rounded-md bg-white px-3.5 py-2.5 text-[0.9375rem] text-rich-black shadow-[0_4px_14px_rgba(0,0,0,0.12)]">
+              <b className="block text-base">Harrison Raynes</b>
+              Owner and Technician
+            </figcaption>
+          </figure>
+        </div>
+      </section>
 
-            <div className="mt-8 text-center">
-              <Button href="/services" variant="tertiary" size="md">
-                View all services
-              </Button>
-            </div>
-          </section>
+      <Section
+        aria-labelledby="about-heading"
+        containerClassName="grid items-start gap-8 lg:grid-cols-[1.2fr_1fr] lg:gap-14"
+      >
+        <div>
+          <SectionHeading
+            eyebrow="About me"
+            title="Hi, I'm Harrison"
+            id="about-heading"
+            className="mb-4"
+          />
+          <p>
+            I&apos;m a computer science graduate based in Auckland. I started To the Point Tech
+            because when something breaks, people want someone who turns up and sorts it out
+            properly.
+          </p>
+          <p className="mt-3.5">
+            That&apos;s what I do. I&apos;ll explain what went wrong, what I did about it, and
+            whether it&apos;s worth spending money on - including when it isn&apos;t.
+          </p>
+          <p className="mt-5">
+            <Link href="/about" className={TEXT_LINK}>
+              More about me
+            </Link>
+          </p>
+        </div>
+        <div className="rounded-lg bg-seasalt p-7">
+          <h3 className="mb-3.5 text-[1.3125rem] font-extrabold">How I work</h3>
+          <TickList>
+            {APPROACH.map((line) => (
+              <TickItem key={line}>{line}</TickItem>
+            ))}
+          </TickList>
+        </div>
+      </Section>
 
-          {/* About Me down the left, business pitch and approach stacked on the
-              right. About spans both rows so the portrait card anchors the block;
-              below lg the three cards stack in reading order. */}
-          <section
-            aria-label="About me, business support and approach"
-            className="grid gap-5 lg:grid-cols-2 lg:grid-rows-[auto_auto] lg:gap-6"
-          >
-            <article
-              className={cn(
-                CARD,
-                "animate-slide-up animate-fill-both animate-delay-300 lg:row-span-2",
-              )}
-            >
-              <Image
-                src="/source/harrison.jpg"
-                alt="Harrison Raynes"
-                width={320}
-                height={320}
-                sizes="(min-width: 1024px) 160px, (min-width: 640px) 128px, 96px"
-                className="mx-auto mb-5 size-24 rounded-full border-4 border-white object-cover shadow-md sm:size-32 lg:size-40"
-              />
-              <h2 className="mb-4 text-center text-2xl font-bold text-russian-violet sm:text-3xl">
-                About Me
-              </h2>
-              <p className="mb-4 text-base text-rich-black sm:text-lg">
-                Hi, I'm Harrison, a computer science graduate based in Auckland. I started To the
-                Point Tech because when something breaks, people want someone who turns up and sorts
-                it out properly.
-              </p>
-              <p className="text-base text-rich-black/90 sm:text-lg">
-                That's what I do. I'll explain what went wrong, what I did about it, and whether
-                it's worth spending money on - including when it isn't.
-              </p>
-              <Link
-                href="/about"
-                className="mt-4 inline-block text-base text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800 sm:text-lg"
-              >
-                More about me
+      <Section tone="grey" aria-labelledby="services-heading">
+        <SectionHeading
+          eyebrow="Services"
+          title="What I can help with"
+          id="services-heading"
+          lead="Home and small business, Windows and Mac, phones and tablets. If it plugs in or connects to Wi-Fi, ask."
+          className="mb-0"
+        />
+        <ul className="mt-8 grid border-t border-seasalt-200 sm:grid-cols-2 lg:grid-cols-4">
+          {SERVICE_AREAS.map(({ slug, label, blurb }) => (
+            <li key={slug} className="border-b border-seasalt-200">
+              <Link href={`/services#${slug}`} className="group block py-3.5 sm:py-4.5 sm:pr-4.5">
+                <b className="block text-lg group-hover:text-coquelicot-700">{label}</b>
+                <span className="text-base text-seasalt-700">{blurb}</span>
               </Link>
-            </article>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-7">
+          <Link href="/services" className={TEXT_LINK}>
+            See all services and what&apos;s included
+          </Link>
+        </p>
+      </Section>
 
-            <section
-              aria-labelledby="business-strip-heading"
-              className={cn(
-                CARD,
-                "animate-slide-up animate-fill-both animate-delay-400 text-center",
-              )}
-            >
-              <h2
-                id="business-strip-heading"
-                className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl"
-              >
-                Run a small business?
-              </h2>
-              <p className="mb-4 text-base text-rich-black/90 sm:text-lg">
-                Call me out when something breaks, or put me on a monthly retainer so it's covered
-                either way. No lock-in, and you can switch between the two whenever it suits.
-              </p>
-              <Button href="/business" variant="tertiary" size="md">
-                Business IT support
-              </Button>
-            </section>
+      <Section tone="violet" aria-labelledby="why-heading">
+        <SectionHeading
+          onDark
+          eyebrow="Why people call me"
+          title="Someone local who explains it properly"
+          id="why-heading"
+          className="mb-7"
+        />
+        <RuledGrid cols={3}>
+          {TRUST_POINTS.map((p) => (
+            <RuledBlock key={p.title} title={p.title}>
+              <p className="text-russian-violet-100">{p.body}</p>
+            </RuledBlock>
+          ))}
+        </RuledGrid>
+      </Section>
 
-            <article className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-500")}>
-              <h2 className="mb-4 text-xl font-bold text-russian-violet sm:text-2xl">
-                My approach
-              </h2>
-              <ul className="grid gap-3 text-base text-rich-black sm:grid-cols-2 sm:text-lg lg:grid-cols-1 xl:grid-cols-2">
-                <li className="flex gap-3">
-                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-400" aria-hidden />
-                  <span>Listen first, understand your needs</span>
-                </li>
-                <li className="flex gap-3">
-                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-400" aria-hidden />
-                  <span>Explain everything as clearly as possible</span>
-                </li>
-                <li className="flex gap-3">
-                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-400" aria-hidden />
-                  <span>Leave clear notes you can refer back to</span>
-                </li>
-                <li className="flex gap-3">
-                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-400" aria-hidden />
-                  <span>Transparent pricing, no hidden fees</span>
-                </li>
-              </ul>
-            </article>
-          </section>
-
-          {/* Reviews come before the flyer: proof first, then the referral ask. */}
-          {hasReviews && (
-            <div className="animate-fade-in animate-fill-both animate-delay-400">
-              <Reviews items={items} />
-            </div>
-          )}
-
-          {/* Download Flyer */}
-          <section
-            aria-labelledby="flyer-heading"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-500")}
-          >
-            <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:text-left">
-              <div className="grid size-16 shrink-0 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-400/30">
-                <FaDownload className="h-8 w-8 -translate-y-0.5 text-moonstone-400" aria-hidden />
-              </div>
-
-              <div className="flex-1">
-                <h2
-                  id="flyer-heading"
-                  className="mb-1 text-xl font-bold text-russian-violet sm:text-2xl"
-                >
-                  Know someone who needs tech help?
-                </h2>
-                <p className="text-base text-rich-black/80 sm:text-lg">
-                  Download this flyer to share with neighbours or pin to a noticeboard.
-                </p>
-              </div>
-
-              <Button
-                href="/downloads/poster-a5.pdf"
-                download="to-the-point-tech-flyer.pdf"
-                variant="tertiary"
-                size="md"
-                className="shrink-0"
-              >
-                Download flyer
-              </Button>
-            </div>
-          </section>
+      <Section
+        tone="grey"
+        aria-labelledby="business-heading"
+        containerClassName="flex flex-wrap items-center justify-between gap-8"
+      >
+        <div className="max-w-160">
+          <SectionHeading
+            eyebrow="For businesses"
+            title="Run a small business?"
+            id="business-heading"
+            className="mb-3"
+          />
+          <p className="text-seasalt-700">
+            Call me out when something breaks, or put me on a monthly retainer so it&apos;s covered
+            either way. No lock-in, and you can switch between the two whenever it suits.
+          </p>
         </div>
-      </FrostedSection>
+        <Button href="/business" variant="outline">
+          Business IT support
+        </Button>
+      </Section>
 
-      {/* Contact Footer */}
-      <footer className="mx-auto mb-6 w-fit max-w-[calc(100vw-2rem)] sm:mb-8">
-        <div className="flex flex-col items-center gap-1 rounded-xl border border-seasalt-200/40 bg-white/70 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:gap-8 sm:px-6 sm:py-4">
-          <a
-            href={settings.identity.phoneTel}
-            className="flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold text-russian-violet transition-colors hover:text-coquelicot-500 sm:text-lg"
+      {hasReviews && (
+        <Section aria-labelledby="reviews-heading">
+          <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
+            <SectionHeading
+              eyebrow="Reviews"
+              title="What people say"
+              id="reviews-heading"
+              className="mb-0"
+            />
+            {/* Google first: reviews are moving there, site reviews stay until that switch. */}
+            <span className="flex flex-wrap gap-x-6 gap-y-2">
+              <a
+                href={GOOGLE_BUSINESS_PROFILE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={TEXT_LINK}
+              >
+                See my reviews on Google
+              </a>
+              <Link href="/reviews" className={TEXT_LINK}>
+                Read all reviews
+              </Link>
+            </span>
+          </div>
+          <Reviews items={items} />
+        </Section>
+      )}
+
+      {/* With reviews above, the flyer strip shares their white band, so it drops its top padding. */}
+      <Section aria-labelledby="flyer-heading" className={hasReviews ? "pt-0 sm:pt-0" : undefined}>
+        <div className="flex flex-wrap items-center justify-between gap-5 rounded-lg border-2 border-dashed border-seasalt-200 px-6 py-5">
+          <div>
+            <h2 id="flyer-heading" className="text-xl font-extrabold">
+              Know someone who needs tech help?
+            </h2>
+            <p className="text-base text-seasalt-700">
+              Download the flyer to share with neighbours or pin to a noticeboard.
+            </p>
+          </div>
+          <Button
+            href="/downloads/poster-a5.pdf"
+            download="to-the-point-tech-flyer.pdf"
+            variant="outline"
           >
-            <FaPhone className="h-4 w-4 shrink-0 sm:h-6 sm:w-6" aria-hidden />
-            <span>{settings.identity.phone}</span>
-          </a>
-
-          <div className="hidden h-6 w-px bg-seasalt-200/50 sm:block" />
-
-          <a
-            href={`mailto:${settings.identity.email}`}
-            className="flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold text-russian-violet transition-colors hover:text-coquelicot-500 sm:text-lg"
-          >
-            <FaEnvelope className="h-6 w-6 shrink-0 sm:h-7 sm:w-7" aria-hidden />
-            <span>{settings.identity.email}</span>
-          </a>
+            <FaDownload className="h-4 w-4" aria-hidden />
+            Download flyer (PDF)
+          </Button>
         </div>
-      </footer>
+      </Section>
+
+      <ClosingCta
+        title="Something not working?"
+        line="Book online in a couple of minutes, or give me a call."
+        phone={phone}
+        phoneTel={phoneTel}
+      />
     </PageShell>
   );
 }

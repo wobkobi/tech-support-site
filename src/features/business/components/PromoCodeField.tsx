@@ -4,8 +4,10 @@
 // One control rather than three, because the surfaces have to agree on what "applied"
 // means and on the wording of a rejection.
 
+import { FIELD_INPUT, FIELD_LABEL } from "@/features/booking/lib/form-styles";
 import type { ActivePromo } from "@/features/business/lib/promos";
 import { normalisePromoCode } from "@/features/business/lib/promos";
+import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -157,7 +159,7 @@ export function PromoCodeField({
 
   return (
     <div className={cn("text-base", className)}>
-      <label htmlFor={fieldId} className="block font-medium text-slate-700">
+      <label htmlFor={fieldId} className={cn("block", FIELD_LABEL)}>
         {label}
       </label>
       <div className="mt-1.5 flex gap-2">
@@ -183,23 +185,20 @@ export function PromoCodeField({
           placeholder="Enter code"
           aria-describedby={statusId}
           className={cn(
-            "min-h-11 min-w-0 flex-1 rounded-xl border px-3 py-2 tracking-wider uppercase",
-            isValid ? "border-emerald-400 bg-emerald-50" : "border-slate-300 bg-white",
+            FIELD_INPUT,
+            "min-h-11 min-w-0 flex-1 py-2 tracking-wider uppercase",
+            isValid && "border-2 border-green-700",
           )}
         />
-        <button
+        <Button
           type="button"
+          variant="secondary"
           onClick={() => void apply()}
           disabled={status.kind === "checking" || !value.trim()}
-          className={cn(
-            "min-h-11 rounded-xl px-4 py-2 font-semibold text-white",
-            status.kind === "checking" || !value.trim()
-              ? "cursor-not-allowed bg-slate-300"
-              : "bg-russian-violet hover:bg-russian-violet/90",
-          )}
+          className="h-auto min-h-11"
         >
           {status.kind === "checking" ? "Checking..." : "Apply"}
-        </button>
+        </Button>
       </div>
       {/* Always rendered so a verdict is announced rather than appearing as a
           new region a screen reader never visits. */}
@@ -209,7 +208,7 @@ export function PromoCodeField({
         aria-live="polite"
         className={cn(
           "mt-1.5 min-h-6 font-medium",
-          status.kind === "valid" ? "text-emerald-700" : "text-error",
+          status.kind === "valid" ? "text-green-700" : "text-error",
         )}
       >
         {status.kind === "valid" &&

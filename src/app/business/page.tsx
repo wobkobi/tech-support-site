@@ -6,25 +6,19 @@
 import { BusinessEnquiryForm } from "@/features/business/components/BusinessEnquiryForm";
 import { formatMoneyCompact } from "@/features/business/lib/business";
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
-import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
-import { Bullet } from "@/shared/components/Bullet";
 import { Button } from "@/shared/components/Button";
-import { CARD, FrostedSection, NESTED_CARD, PageShell } from "@/shared/components/PageLayout";
+import { ClosingCta } from "@/shared/components/ClosingCta";
+import { PageHead } from "@/shared/components/PageHead";
+import { PageShell } from "@/shared/components/PageLayout";
 import { PixelEvent } from "@/shared/components/PixelEvent";
+import { RuledBlock, RuledGrid } from "@/shared/components/RuledGrid";
+import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
+import { TickItem, TickList } from "@/shared/components/TickList";
 import { getIdentity } from "@/shared/lib/business-identity.server";
-import { cn } from "@/shared/lib/cn";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
 import type React from "react";
-import {
-  FaLaptop,
-  FaPhone,
-  FaPrint,
-  FaShieldHalved,
-  FaTruck,
-  FaUserPlus,
-  FaWifi,
-} from "react-icons/fa6";
+import { FaCaretDown, FaPhone } from "react-icons/fa6";
 
 // ISR so rate edits propagate via the rate-config tag purge instead of
 // requiring a redeploy.
@@ -44,39 +38,32 @@ export const metadata: Metadata = {
 };
 
 interface BusinessService {
-  icon: React.ReactElement;
   label: string;
   examples: string[];
 }
 
 const businessServices: ReadonlyArray<BusinessService> = [
   {
-    icon: <FaLaptop />,
     label: "Workstations & Email",
     examples: ["New PC and laptop setup", "Email and Microsoft 365", "Shared files and printers"],
   },
   {
-    icon: <FaWifi />,
     label: "Network & Wi-Fi",
     examples: ["Fixing dropouts", "Coverage through the office", "Router and switch setup"],
   },
   {
-    icon: <FaShieldHalved />,
     label: "Backups & Security",
     examples: ["Backup checks and setup", "Password managers", "Basic security reviews"],
   },
   {
-    icon: <FaUserPlus />,
     label: "Staff On/Offboarding",
     examples: ["New staff device setup", "Account creation", "Departing-staff lockdown"],
   },
   {
-    icon: <FaPrint />,
     label: "Printers & Peripherals",
     examples: ["Network printing", "Scanners and EFTPOS-adjacent kit", "Driver issues"],
   },
   {
-    icon: <FaTruck />,
     label: "Office Moves & Projects",
     examples: ["Packing up and reconnecting IT", "Cable tidying", "One-off projects"],
   },
@@ -161,6 +148,11 @@ const businessFaq: ReadonlyArray<{ q: string; a: string }> = [
   },
 ];
 
+// Accordion row and summary classes. Keep in step with the FAQ page rows.
+const FAQ_ROW = "group border-b border-seasalt-100 first:border-t";
+const FAQ_SUMMARY =
+  "flex cursor-pointer list-none items-start justify-between gap-4 rounded py-4 text-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet [&::-webkit-details-marker]:hidden";
+
 const siteUrl = getSiteUrl();
 
 /**
@@ -203,265 +195,150 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }}
       />
-      <BreadcrumbJsonLd
+      <PageHead
         crumbs={[
           { name: "Home", path: "/" },
           { name: "Business", path: "/business" },
         ]}
+        title="IT support for Auckland small businesses"
+        intro="Your on-call IT person, without hiring one. I handle the tech jobs you keep putting off - setups, migrations, network gremlins, new staff devices - so you can get back to running the business."
+        note="Call me out when you need help, or set up a monthly retainer for ongoing cover. No lock-in either way."
+        action={
+          <div className="flex flex-wrap gap-3">
+            <Button href="#enquire" variant="primary">
+              Send an enquiry
+            </Button>
+            <Button href={identity.phoneTel} variant="outline">
+              <FaPhone className="h-4 w-4" aria-hidden />
+              {identity.phone}
+            </Button>
+          </div>
+        }
       />
-      <FrostedSection>
-        <div className="flex flex-col gap-6 sm:gap-8">
-          {/* Hero */}
-          <section
-            aria-labelledby="business-heading"
-            className={cn(CARD, "animate-fade-in text-center")}
-          >
-            <h1
-              id="business-heading"
-              className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
-            >
-              IT support for Auckland small businesses
-            </h1>
 
-            <p className="mx-auto mb-4 max-w-2xl text-base text-rich-black sm:text-lg">
-              Your on-call IT person, without hiring one. I handle the tech jobs you keep putting
-              off - setups, migrations, network gremlins, new staff devices - so you can get back to
-              running the business.
-            </p>
+      {/* Ad-hoc services */}
+      <Section aria-labelledby="adhoc-heading">
+        <SectionHeading
+          id="adhoc-heading"
+          title="The stuff you don't want to do"
+          lead="One-off jobs, sorted properly and explained in plain English:"
+        />
+        <RuledGrid cols={3}>
+          {businessServices.map((area) => (
+            <RuledBlock key={area.label} title={area.label}>
+              <TickList className="gap-1.5">
+                {area.examples.map((example) => (
+                  <TickItem key={example} variant="dot">
+                    {example}
+                  </TickItem>
+                ))}
+              </TickList>
+            </RuledBlock>
+          ))}
+        </RuledGrid>
+      </Section>
 
-            <p className="mx-auto mb-8 max-w-2xl text-base text-rich-black/80 sm:text-lg">
-              Call me out when you need help, or set up a monthly retainer for ongoing cover. No
-              lock-in either way.
-            </p>
+      {/* Rates */}
+      <Section tone="grey" aria-labelledby="rates-heading">
+        <SectionHeading id="rates-heading" title="Business rates" />
+        <p className="mb-4">
+          Business work bills at <span className="font-bold">${pricing.businessRate}/hr</span>, on
+          site or remote. You only pay for the time the job takes.
+        </p>
+        <TickList>
+          <TickItem>
+            Travel billed at {formatMoneyCompact(displayTravelRate)}/hr for one round trip per visit
+          </TickItem>
+          <TickItem>Quick phone questions are usually free</TickItem>
+          <TickItem>Itemised invoice after every job</TickItem>
+        </TickList>
+      </Section>
 
-            <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              <Button href="#enquire" variant="primary" size="lg" className="w-full sm:w-auto">
-                Send an enquiry
+      {/* Retainers */}
+      <Section aria-labelledby="retainers-heading">
+        <SectionHeading
+          id="retainers-heading"
+          title="Monthly retainers"
+          lead="Prefer someone already across your setup? A retainer makes me your IT person on an ongoing basis. No lock-in, cancel any time, billed by invoice each month."
+        />
+        <RuledGrid cols={3}>
+          {retainerTiers.map((tier) => (
+            <RuledBlock key={tier.name} title={tier.name} className="flex flex-col">
+              <p className="mb-1 text-2xl font-extrabold">{tier.fromPrice}</p>
+              <p className="mb-3 text-seasalt-700">{tier.tagline}</p>
+              <TickList className="flex-1 content-start">
+                {tier.inclusions.map((inc) => (
+                  <TickItem key={inc}>{inc}</TickItem>
+                ))}
+              </TickList>
+              <Button href="#enquire" variant="outline" fullWidth className="mt-5">
+                Ask about {tier.name}
               </Button>
-              <Button
-                href={identity.phoneTel}
-                variant="secondary"
-                size="lg"
-                className="w-full sm:w-auto"
-              >
-                <FaPhone className="h-6 w-6" aria-hidden />
-                {identity.phone}
-              </Button>
-            </div>
-          </section>
+            </RuledBlock>
+          ))}
+        </RuledGrid>
+      </Section>
 
-          {/* Ad-hoc services */}
-          <section
-            aria-labelledby="adhoc-heading"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
-          >
-            <h2
-              id="adhoc-heading"
-              className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
-            >
-              The stuff you don't want to do
-            </h2>
+      {/* How it works: the page's one violet band */}
+      <Section tone="violet" aria-labelledby="how-heading">
+        <SectionHeading onDark id="how-heading" title="How it works" />
+        <RuledGrid cols={3}>
+          {howItWorks.map((item, i) => (
+            <RuledBlock key={item.step} title={`${i + 1}. ${item.title}`}>
+              <p className="text-russian-violet-100">{item.body}</p>
+            </RuledBlock>
+          ))}
+        </RuledGrid>
+      </Section>
 
-            <p className="mb-4 text-base text-rich-black sm:text-lg">
-              One-off jobs, sorted properly and explained in plain English:
-            </p>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3 md:grid-cols-3">
-              {businessServices.map((area) => (
-                <div key={area.label} className={NESTED_CARD}>
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-moonstone-500/40 bg-moonstone-400/20">
-                      <span className="text-2xl text-moonstone-400" aria-hidden>
-                        {area.icon}
-                      </span>
-                    </span>
-                    <h3 className="text-lg font-semibold text-rich-black sm:text-xl">
-                      {area.label}
-                    </h3>
-                  </div>
-                  <ul className="space-y-1 text-base text-rich-black/80 sm:text-lg">
-                    {area.examples.map((example) => (
-                      <li key={example} className="flex gap-2">
-                        <Bullet />
-                        <span>{example}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Rates */}
-          <section
-            aria-labelledby="rates-heading"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
-          >
-            <h2
-              id="rates-heading"
-              className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
-            >
-              Business rates
-            </h2>
-
-            <p className="mb-3 text-base text-rich-black sm:text-lg">
-              Business work bills at{" "}
-              <span className="font-bold text-russian-violet">${pricing.businessRate}/hr</span>, on
-              site or remote. You only pay for the time the job takes.
-            </p>
-
-            <ul className="space-y-2 text-base text-rich-black/90 sm:text-lg">
-              <li className="flex gap-2">
-                <Bullet />
-                <span>
-                  Travel billed at {formatMoneyCompact(displayTravelRate)}/hr for one round trip per
-                  visit
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <Bullet />
-                <span>Quick phone questions are usually free</span>
-              </li>
-              <li className="flex gap-2">
-                <Bullet />
-                <span>Itemised invoice after every job</span>
-              </li>
-            </ul>
-          </section>
-
-          {/* Retainers */}
-          <section
-            aria-labelledby="retainers-heading"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}
-          >
-            <h2
-              id="retainers-heading"
-              className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
-            >
-              Monthly retainers
-            </h2>
-
-            <p className="mb-4 text-base text-rich-black sm:text-lg">
-              Prefer someone already across your setup? A retainer makes me your IT person on an
-              ongoing basis. No lock-in, cancel any time, billed by invoice each month.
-            </p>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
-              {retainerTiers.map((tier) => (
-                <div key={tier.name} className={cn(NESTED_CARD, "flex flex-col")}>
-                  <h3 className="text-lg font-semibold text-rich-black sm:text-xl">{tier.name}</h3>
-                  <p className="mb-1 text-lg font-bold text-russian-violet sm:text-xl">
-                    {tier.fromPrice}
-                  </p>
-                  <p className="mb-3 text-base text-rich-black/70">{tier.tagline}</p>
-                  <ul className="mb-4 flex-1 space-y-1 text-base text-rich-black/80 sm:text-lg">
-                    {tier.inclusions.map((inc) => (
-                      <li key={inc} className="flex gap-2">
-                        <Bullet />
-                        <span>{inc}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button href="#enquire" variant="tertiary" size="md" fullWidth>
-                    Ask about {tier.name}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* How it works */}
-          <section
-            aria-labelledby="how-heading"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-400")}
-          >
-            <h2 id="how-heading" className="mb-4 text-xl font-bold text-russian-violet sm:text-2xl">
-              How it works
-            </h2>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {howItWorks.map((item) => (
-                <div key={item.step} className="flex gap-3">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-full border border-moonstone-500/40 bg-moonstone-400/20 text-lg font-bold text-moonstone-700">
-                    {item.step}
-                  </span>
-                  <div>
-                    <h3 className="mb-1 text-lg font-semibold text-rich-black sm:text-xl">
-                      {item.title}
-                    </h3>
-                    <p className="text-base text-rich-black/80 sm:text-lg">{item.body}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Business FAQ */}
-          <section
-            aria-labelledby="bfaq-heading"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-500")}
-          >
-            <h2
-              id="bfaq-heading"
-              className="mb-4 text-xl font-bold text-russian-violet sm:text-2xl"
-            >
-              Common questions
-            </h2>
-
-            <div className="space-y-4">
-              {businessFaq.map((item) => (
-                <div key={item.q}>
-                  <h3 className="mb-1 text-lg font-semibold text-rich-black sm:text-xl">
-                    {item.q}
-                  </h3>
-                  <p className="text-base text-rich-black/80 sm:text-lg">{item.a}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Enquiry */}
-          <section
-            id="enquire"
-            aria-labelledby="enquire-heading"
-            className={cn(
-              CARD,
-              "animate-slide-up animate-fill-both animate-delay-500 scroll-mt-24",
-            )}
-          >
-            <h2
-              id="enquire-heading"
-              className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
-            >
-              Tell me what you need
-            </h2>
-
-            <p className="mb-4 text-base text-rich-black sm:text-lg">
-              A couple of sentences is plenty - I'll come back to you within one business day.
-            </p>
-
-            <BusinessEnquiryForm />
-
-            <p className="mt-6 text-base text-rich-black/80 sm:text-lg">
-              Prefer to talk? Ring{" "}
-              <a
-                href={identity.phoneTel}
-                className="font-semibold text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
-              >
-                {identity.phone}
-              </a>{" "}
-              or email{" "}
-              <a
-                href={`mailto:${identity.email}`}
-                className="font-semibold text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
-              >
-                {identity.email}
-              </a>
-              .
-            </p>
-          </section>
+      {/* Business FAQ */}
+      <Section tone="grey" aria-labelledby="bfaq-heading">
+        <SectionHeading id="bfaq-heading" title="Common questions" />
+        <div className="max-w-180">
+          {businessFaq.map((item) => (
+            <details key={item.q} className={FAQ_ROW}>
+              <summary className={FAQ_SUMMARY}>
+                <h3 className="text-lg font-bold">{item.q}</h3>
+                <FaCaretDown
+                  className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-700 transition-[rotate] group-open:rotate-180"
+                  aria-hidden
+                />
+              </summary>
+              <p className="pb-4 text-seasalt-700">{item.a}</p>
+            </details>
+          ))}
         </div>
-      </FrostedSection>
+      </Section>
+
+      {/* Enquiry */}
+      <Section id="enquire" aria-labelledby="enquire-heading">
+        <SectionHeading
+          id="enquire-heading"
+          title="Tell me what you need"
+          lead="A couple of sentences is plenty - I'll come back to you within one business day."
+        />
+        <div className="max-w-180 rounded-lg bg-seasalt p-7">
+          <BusinessEnquiryForm />
+        </div>
+        <p className="mt-6">
+          Prefer to talk? Ring{" "}
+          <a href={identity.phoneTel} className={TEXT_LINK}>
+            {identity.phone}
+          </a>{" "}
+          or email{" "}
+          <a href={`mailto:${identity.email}`} className={TEXT_LINK}>
+            {identity.email}
+          </a>
+          .
+        </p>
+      </Section>
+
+      <ClosingCta
+        title="Rather talk it through?"
+        line="Ring or text me, or book a visit online."
+        phone={identity.phone}
+        phoneTel={identity.phoneTel}
+      />
     </PageShell>
   );
 }

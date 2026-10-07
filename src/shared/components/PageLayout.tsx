@@ -1,5 +1,5 @@
 // src/shared/components/PageLayout.tsx
-// Reusable layout components with frosted glass effect.
+// Page wrapper plus the legacy card class strings, still used by pages awaiting the redesign.
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -29,29 +29,18 @@ export interface PageShellProps {
 }
 
 /**
- * Main page shell with fixed backdrop image.
+ * Page wrapper: the main landmark on a white ground, with the site's body text
+ * size (17px on phones, 18px from sm).
  * @param props - Component props.
  * @param props.children - Page content.
  * @returns Page shell element.
  */
 export function PageShell({ children }: PageShellProps): React.ReactElement {
   return (
-    <main id="main" className="relative min-h-[calc(100dvh-4rem)] overflow-hidden">
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        {/* Vanilla <picture> not <Image>: the AVIF + WebP variants are pre-built
-            by build:icons; Next's re-transcode reintroduced gradient blocking.
-            WebP source carries iOS 15 / older Safari users who lack AVIF. */}
-        <picture>
-          <source type="image/avif" srcSet="/source/backdrop-blur.avif" />
-          <img
-            src="/source/backdrop-blur.webp"
-            alt=""
-            fetchPriority="high"
-            decoding="async"
-            className="absolute inset-0 h-full w-full scale-110 transform-gpu object-cover"
-          />
-        </picture>
-      </div>
+    <main
+      id="main"
+      className="min-h-[calc(100dvh-5rem)] bg-white text-[1.0625rem] text-rich-black sm:text-lg"
+    >
       {children}
     </main>
   );

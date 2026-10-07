@@ -25,6 +25,10 @@ interface Props {
   inputClassName: string;
   /** Hint shown when the amount covers the whole total. */
   coversNote: string;
+  /** Field label; defaults to "Already paid". */
+  label?: string;
+  /** Words before the remaining amount; defaults to "Balance due". */
+  balanceLabel?: string;
 }
 
 /**
@@ -36,6 +40,8 @@ interface Props {
  * @param props.disabled - Disables the input and method buttons.
  * @param props.inputClassName - Classes for the amount input.
  * @param props.coversNote - Hint shown when the amount covers the whole total.
+ * @param props.label - Field label; defaults to "Already paid".
+ * @param props.balanceLabel - Words before the remaining amount; defaults to "Balance due".
  * @returns The field element.
  */
 export function AlreadyPaidField({
@@ -45,6 +51,8 @@ export function AlreadyPaidField({
   disabled = false,
   inputClassName,
   coversNote,
+  label = "Already paid",
+  balanceLabel = "Balance due",
 }: Props): React.ReactElement {
   const id = useId();
   const amount = alreadyPaidAmount(value);
@@ -53,7 +61,7 @@ export function AlreadyPaidField({
   return (
     <div className="space-y-1.5">
       <label htmlFor={id} className="block text-sm font-medium">
-        Already paid
+        {label}
       </label>
       <div className="flex flex-wrap items-center gap-2">
         <input
@@ -83,7 +91,7 @@ export function AlreadyPaidField({
       </div>
       {amount > 0 && (
         <p className="text-sm opacity-75">
-          {balance > 0 ? `Balance due ${formatNZD(balance)}` : coversNote}
+          {balance > 0 ? `${balanceLabel} ${formatNZD(balance)}` : coversNote}
         </p>
       )}
     </div>

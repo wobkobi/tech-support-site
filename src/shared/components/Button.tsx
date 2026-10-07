@@ -7,7 +7,8 @@ import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import type React from "react";
 
-type ButtonVariant = "primary" | "secondary" | "tertiary" | "ghost";
+type ButtonVariant =
+  "primary" | "secondary" | "tertiary" | "ghost" | "outline" | "white" | "outline-white";
 type ButtonSize = "sm" | "md" | "lg";
 
 /**
@@ -93,6 +94,24 @@ function getVariantClasses(variant: ButtonVariant): string {
         "hover:border-russian-violet/70 hover:bg-russian-violet/10",
         "transition-colors",
       );
+    case "outline":
+      // Public pages' secondary action: a solid 2px border reads as a button to
+      // older visitors where the ghost's faint border does not.
+      return cn(
+        "border-2 border-russian-violet bg-white text-russian-violet",
+        "hover:bg-russian-violet hover:text-white",
+        "transition-colors",
+      );
+    case "white":
+      // On the coquelicot band: coquelicot-700 text on white clears 7:1.
+      return cn("bg-white text-coquelicot-700", "hover:bg-seasalt-100", "transition-colors");
+    case "outline-white":
+      // On the hero photo and the coquelicot band.
+      return cn(
+        "border-2 border-white bg-transparent text-white",
+        "hover:bg-white hover:text-russian-violet",
+        "transition-colors",
+      );
   }
 }
 
@@ -116,7 +135,7 @@ function getSizeClasses(size: ButtonSize): string {
  * Polymorphic Button component
  *
  * Renders as Next.js Link when `href` is provided, otherwise as a native button.
- * Supports 4 variants (primary, secondary, tertiary, ghost) and 3 sizes (sm, md, lg).
+ * Supports 7 variants (primary, secondary, tertiary, ghost, outline, white, outline-white) and 3 sizes (sm, md, lg).
  * @param props - Button props (discriminated by presence of href)
  * @returns Button or Link element
  */
