@@ -11,7 +11,12 @@ import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { InvoiceStatusBadge } from "@/features/business/components/invoice/InvoiceStatusBadge";
 import { InvoiceTimeline } from "@/features/business/components/invoice/InvoiceTimeline";
-import { balanceDue, formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
+import {
+  balanceDue,
+  formatNZD,
+  lineItemQtyLabel,
+  promoLineLabel,
+} from "@/features/business/lib/business";
 import { findRecordedPayment } from "@/features/business/lib/invoice-payment-match";
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
@@ -333,7 +338,9 @@ export default async function InvoiceViewPage({
               : "An income entry matches this invoice's customer and total, but nothing is recorded against the invoice."}{" "}
             {formatNZD(recordedPayment.amount)} on {formatDateShort(recordedPayment.date)} via{" "}
             {recordedPayment.method}. Reminders are paused until it&apos;s recorded - use Record
-            payment above, or ignore this if it&apos;s a different job.
+            payment above
+            {recordedPayment.strength === "likely" && " (it links that entry, no second one)"}, or
+            ignore this if it&apos;s a different job.
           </p>
         </div>
       )}
@@ -368,6 +375,16 @@ export default async function InvoiceViewPage({
             reminderCount={invoice.reminderCount}
             reminderLastSentAt={invoice.reminderLastSentAt?.toISOString() ?? null}
             apologySentAt={invoice.apologySentAt?.toISOString() ?? null}
+            likelyIncome={
+              recordedPayment?.strength === "likely"
+                ? {
+                    id: recordedPayment.entryId,
+                    amount: recordedPayment.amount,
+                    date: recordedPayment.date.toISOString(),
+                    method: recordedPayment.method,
+                  }
+                : null
+            }
             isQuote={invoice.isQuote === true}
           />
         }
@@ -491,9 +508,7 @@ export default async function InvoiceViewPage({
             </div>
             {invoice.promoDiscount && invoice.promoDiscount > 0 && (
               <div className="flex justify-between gap-3 text-amber-700">
-                <span>
-                  Promo (labour only){invoice.promoTitle ? `: ${invoice.promoTitle}` : ""}
-                </span>
+                <span>{promoLineLabel(invoice.promoTitle)}</span>
                 <span className="whitespace-nowrap">-{formatNZD(invoice.promoDiscount)}</span>
               </div>
             )}

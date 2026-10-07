@@ -100,6 +100,10 @@ export function updateTaskField(
     if (item.baseRateId != null) {
       item.minutes = mins;
       item.qty = mins / 60;
+      // A typed time is the operator's own measurement, no longer the parser's
+      // quick-task guess, so window fitting must keep it rather than reset it.
+      item.isShort = false;
+      item.isExplicit = true;
     } else {
       // Flat rows (Travel etc.) count units, not time.
       item.minutes = undefined;

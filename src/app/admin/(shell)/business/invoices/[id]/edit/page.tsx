@@ -80,7 +80,9 @@ export default async function EditInvoicePage({
       travelRatePerHour: policy.TRAVEL_RATE_PER_HOUR,
       minTravelCharge: policy.MIN_TRAVEL_CHARGE,
       holidayUplift: holiday ? policy.PUBLIC_HOLIDAY_UPLIFT : 0,
+      unsuccessfulFactor: policy.UNSUCCESSFUL_WORK_FACTOR,
     },
+    promoDiscount: invoice.promoDiscount ?? 0,
   };
 
   const initial: InvoiceFormData = {

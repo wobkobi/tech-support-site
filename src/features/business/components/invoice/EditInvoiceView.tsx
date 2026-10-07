@@ -3,7 +3,7 @@
 // DRAFT-invoice editor: InvoiceForm on the left, a live InvoicePreviewPanel (real invoice
 // number, sticky on lg+) on the right. Submitting PATCHes the full-update branch of
 // /api/business/invoices/[id] (which re-validates line items, recomputes totals with the
-// preserved discounts, and re-syncs the Drive PDF), then routes back to the detail page.
+// discounts, and re-syncs the Drive PDF), then routes back to the detail page.
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import {
@@ -29,7 +29,10 @@ interface EditInvoiceViewProps {
   invoiceNumber: string;
   /** Initial form values (dates already ISO YYYY-MM-DD). */
   initial: InvoiceFormData;
-  /** Discounts preserved from creation - shown in totals/preview, not editable. */
+  /**
+   * Discounts from creation, shown in totals and the preview. The promo is kept as is; the
+   * unsuccessful-work discount changes only when the AI box rebuilds the lines.
+   */
   preservedDiscounts: PreservedDiscounts;
   /** Live business identity for the preview. */
   identity: IdentitySettings;
@@ -69,6 +72,10 @@ export function EditInvoiceView({
   const [busy, setBusy] = useState(false);
   // Mirror of the form data so the preview updates as the operator types.
   const [preview, setPreview] = useState<InvoiceFormData>(initial);
+  const [discounts, setDiscounts] = useState<PreservedDiscounts>(preservedDiscounts);
+  // Only sent when the AI box re-priced it, so a hand edit never rewrites the stored one.
+  const unsuccessfulChanged =
+    (discounts.unsuccessfulDiscount ?? 0) !== (preservedDiscounts.unsuccessfulDiscount ?? 0);
 
   /**
    * PATCHes the full-update branch, then routes back to the detail page.
@@ -90,6 +97,7 @@ export function EditInvoiceView({
           // Null clears a part payment and removes its income entry.
           alreadyPaid: alreadyPaidAmount(data.alreadyPaid) || null,
           alreadyPaidMethod: data.alreadyPaid.method,
+          ...(unsuccessfulChanged && { unsuccessfulDiscount: discounts.unsuccessfulDiscount ?? 0 }),
         }),
       });
       const d = await res.json();
@@ -100,11 +108,10 @@ export function EditInvoiceView({
       }
       toast(`Invoice ${invoiceNumber} updated.`, { tone: "success" });
       if (d.incomeSheetWarning) {
+        // The sheet wins on the next import, so the row there has to be fixed by hand.
         toast(
-          "The already-paid income entry saved, but the Cashbook sheet update didn't go through.",
-          {
-            tone: "warning",
-          },
+          "Saved, but the Cashbook sheet didn't update for the already-paid amount. Fix that row in the sheet, or the next import puts the old one back.",
+          { tone: "warning" },
         );
       }
       router.push(`/admin/business/invoices/${invoiceId}`);
@@ -119,7 +126,7 @@ export function EditInvoiceView({
       <div className="min-w-0">
         <InvoiceForm
           initial={initial}
-          preservedDiscounts={preservedDiscounts}
+          preservedDiscounts={discounts}
           gstRegistered={gstRegistered}
           paymentTermsDays={paymentTermsDays}
           submitLabel="Save changes"
@@ -133,13 +140,14 @@ export function EditInvoiceView({
               disabled={busy}
               // Parsed notes only fill an empty field, so a hand-written note survives. A
               // stated cash amount ("paid $47 in cash") fills Already paid.
-              onApply={(lineItems, notes, cashPaid) =>
+              onApply={(lineItems, notes, cashPaid, unsuccessfulDiscount) => {
+                setDiscounts((d) => ({ ...d, unsuccessfulDiscount }));
                 apply({
                   lineItems,
                   ...(notes && !form.notes.trim() && { notes }),
                   ...(cashPaid && { alreadyPaid: { amount: cashPaid.toFixed(2), method: "Cash" } }),
-                })
-              }
+                });
+              }}
             />
           )}
         />
@@ -156,7 +164,7 @@ export function EditInvoiceView({
           notes={preview.notes}
           promoTitle={preservedDiscounts.promoTitle ?? null}
           promoDiscount={preservedDiscounts.promoDiscount ?? 0}
-          unsuccessfulDiscount={preservedDiscounts.unsuccessfulDiscount ?? 0}
+          unsuccessfulDiscount={discounts.unsuccessfulDiscount ?? 0}
           gstRegistered={gstRegistered}
           alreadyPaid={alreadyPaidAmount(preview.alreadyPaid)}
         />

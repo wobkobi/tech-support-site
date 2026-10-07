@@ -1,8 +1,9 @@
 "use client";
 // src/features/business/components/invoice/PaymentDialog.tsx
 // Records a payment against an invoice via POST /pay. Collects the date, method
-// (INCOME_METHODS), an optional reference, whether to write an income-ledger entry, and -
-// when a reminder went out after the payment date - whether to apologise for the chase.
+// (INCOME_METHODS), an optional reference, whether to write an income-ledger entry (or link
+// a matching one typed into the sheet), and - when a reminder went out after the payment
+// date - whether to apologise for the chase.
 // Shared by the invoices list and the invoice detail page. Mount it fresh per payment
 // (conditional render or key by invoice id) so the form resets - it holds no reset
 // effect.
@@ -32,6 +33,15 @@ interface PaymentDialogInvoice {
   apologySentAt?: string | null;
 }
 
+/** A matched income row the dialog can link instead of adding a new one. */
+export interface LikelyIncome {
+  id: string;
+  amount: number;
+  /** ISO date of the row. */
+  date: string;
+  method: string;
+}
+
 /** Props for {@link PaymentDialog}. */
 interface PaymentDialogProps {
   /** Whether the dialog is shown. */
@@ -40,6 +50,11 @@ interface PaymentDialogProps {
   invoice: PaymentDialogInvoice;
   /** Whether the invoice already has a linked income entry (affects the copy). */
   hasLinkedIncome?: boolean;
+  /**
+   * An unlinked income row (usually typed into the Cashbook sheet) that matches this
+   * invoice's customer and balance. Offered for linking so the payment isn't booked twice.
+   */
+  likelyIncome?: LikelyIncome | null;
   /** Called on close; `recorded` is true when a payment was recorded. */
   onClose: (recorded: boolean) => void;
 }
@@ -53,6 +68,7 @@ const INPUT_CLS =
  * @param props.open - Whether the dialog is shown.
  * @param props.invoice - The invoice being paid.
  * @param props.hasLinkedIncome - Whether a linked income entry already exists.
+ * @param props.likelyIncome - Unlinked income row matching this invoice, offered for linking.
  * @param props.onClose - Close handler; receives whether a payment was recorded.
  * @returns The dialog element.
  */
@@ -60,12 +76,20 @@ export function PaymentDialog({
   open,
   invoice,
   hasLinkedIncome,
+  likelyIncome = null,
   onClose,
 }: PaymentDialogProps): React.ReactElement {
   const { toast } = useToast();
   const alreadyPaid = invoice.status === "PAID";
-  const [date, setDate] = useState(todayISO());
-  const [method, setMethod] = useState<string>(INCOME_METHODS[0]);
+  // A matched row is the payment the operator is recording, so its date and method
+  // are the starting point. Ledger rows sit at UTC midnight, so the ISO day is the NZ day.
+  const [date, setDate] = useState(likelyIncome ? likelyIncome.date.slice(0, 10) : todayISO());
+  const [method, setMethod] = useState<string>(
+    likelyIncome && (INCOME_METHODS as readonly string[]).includes(likelyIncome.method)
+      ? likelyIncome.method
+      : INCOME_METHODS[0],
+  );
+  const [adoptLikely, setAdoptLikely] = useState(likelyIncome != null);
   const [reference, setReference] = useState("");
   // Default ON, but OFF when already PAID - a legacy backfill must not create a
   // second ledger row for a payment that was entered by hand.
@@ -84,6 +108,7 @@ export function PaymentDialog({
       apologySentAt: invoice.apologySentAt,
     });
   const apologyRequested = wronglyChased && sendApology;
+  const adopting = likelyIncome != null && adoptLikely;
 
   /**
    * Submits the payment to the /pay route, toasts the result, and closes.
@@ -98,8 +123,9 @@ export function PaymentDialog({
           paidAt: date,
           method,
           reference: reference.trim() || undefined,
-          createIncome,
+          createIncome: adopting ? false : createIncome,
           sendApology: apologyRequested,
+          adoptIncomeId: adopting ? likelyIncome?.id : undefined,
         }),
       });
       const d = await res.json();
@@ -181,24 +207,47 @@ export function PaymentDialog({
           />
         </label>
 
-        <label className="flex items-start gap-2">
-          <input
-            type="checkbox"
-            checked={createIncome}
-            onChange={(e) => setCreateIncome(e.target.checked)}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="font-medium text-admin-text">Record income entry</span>
-            {alreadyPaid && (
-              <span className="mt-0.5 block text-xs text-admin-muted">
-                {hasLinkedIncome
-                  ? "Already linked to a ledger entry; leave unticked to just refresh its date/method."
-                  : "Already marked paid; leave unticked unless the income was never recorded, to avoid a duplicate row."}
+        {likelyIncome && (
+          <label className="flex items-start gap-2 rounded-lg border border-admin-border bg-admin-bg p-3">
+            <input
+              type="checkbox"
+              checked={adoptLikely}
+              onChange={(e) => setAdoptLikely(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium text-admin-text">
+                Use the income entry already there
               </span>
-            )}
-          </span>
-        </label>
+              <span className="mt-0.5 block text-sm text-admin-muted">
+                {formatNZD(likelyIncome.amount)} by {likelyIncome.method} on{" "}
+                {formatDateShort(likelyIncome.date)}. Links it to this invoice instead of adding a
+                second one. Untick if that was a different job.
+              </span>
+            </span>
+          </label>
+        )}
+
+        {!adopting && (
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={createIncome}
+              onChange={(e) => setCreateIncome(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium text-admin-text">Record income entry</span>
+              {alreadyPaid && (
+                <span className="mt-0.5 block text-xs text-admin-muted">
+                  {hasLinkedIncome
+                    ? "Already linked to a ledger entry; leave unticked to just refresh its date/method."
+                    : "Already marked paid; leave unticked unless the income was never recorded, to avoid a duplicate row."}
+                </span>
+              )}
+            </span>
+          </label>
+        )}
 
         {wronglyChased && invoice.reminderLastSentAt && (
           <label className="flex items-start gap-2 rounded-lg border border-admin-border bg-admin-bg p-3">

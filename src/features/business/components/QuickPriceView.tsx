@@ -41,6 +41,10 @@ import type {
   TaskLine,
   TravelEntry,
 } from "@/features/business/types/business";
+import {
+  ContactNameInput,
+  useGoogleContacts,
+} from "@/features/contacts/components/ContactNameInput";
 import { cn } from "@/shared/lib/cn";
 import { nzNowTime } from "@/shared/lib/timezone-utils";
 import Link from "next/link";
@@ -152,6 +156,7 @@ export function QuickPriceView({
   const [noTravel, setNoTravel] = useState(false);
   const { toast } = useToast();
   const [customer, setCustomer] = useState(prefill?.clientName ?? "");
+  const contacts = useGoogleContacts();
   const [paidBy, setPaidBy] = useState<(typeof PAID_BY)[number]>("Bank");
   // Null follows the total; text once the operator types a different amount.
   const [received, setReceived] = useState<string | null>(null);
@@ -558,10 +563,11 @@ export function QuickPriceView({
             <label htmlFor="quick-customer" className="mb-1 block text-sm font-medium">
               Customer
             </label>
-            <input
+            <ContactNameInput
               id="quick-customer"
               value={customer}
-              onChange={(e) => setCustomer(e.target.value)}
+              onChange={setCustomer}
+              contacts={contacts}
               placeholder="Walk-in"
               disabled={locked}
               className={ADMIN_INPUT_CLS}
@@ -624,6 +630,7 @@ export function QuickPriceView({
               inputClassName={ADMIN_INPUT_CLS}
               label="Part paid"
               balanceLabel={`Rest by ${restMethod}:`}
+              totalName="the amount received"
               coversNote="That's all of it - pick Cash or Bank above instead."
             />
           )}

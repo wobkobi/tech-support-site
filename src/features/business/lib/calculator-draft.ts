@@ -3,6 +3,7 @@
 // read/write/clear helpers, and the "Draft restored" age label.
 
 import type { AlreadyPaidState } from "@/features/business/lib/already-paid-input";
+import { timeDiffMins } from "@/features/business/lib/business";
 import type {
   ParsedRange,
   PartLine,
@@ -39,6 +40,11 @@ export interface CalculatorDraft {
   /** Applied promo code, uppercase, or "" for none. */
   promoCode: string;
   timeRanges: ParsedRange[];
+  /**
+   * False while `timeRanges` is still the blank form's placeholder hour. Optional so
+   * drafts saved before it existed still load (read as true).
+   */
+  timesSet?: boolean;
   /** Out-of-session minutes added to the slot sum (0 = none). */
   followUpMins: number;
   travelEntries: TravelEntry[];
@@ -79,6 +85,19 @@ export function isMeaningfulDraft(d: CalculatorDraft): boolean {
     d.pickedContactCompany !== null ||
     d.followUpMins > 0
   );
+}
+
+/**
+ * Whether a draft's Time card is the lone one-hour row a blank form seeds. Used only for
+ * drafts saved before they recorded whether their times were real.
+ * @param ranges - The draft's time ranges, if any.
+ * @returns True when the ranges look like the seeded placeholder hour.
+ */
+export function isPlaceholderHour(ranges: ParsedRange[] | undefined): boolean {
+  if (!ranges || ranges.length > 1) return !ranges;
+  const [only] = ranges;
+  if (!only?.startTime || !only.endTime) return true;
+  return timeDiffMins(only.startTime, only.endTime) === 60;
 }
 
 /**

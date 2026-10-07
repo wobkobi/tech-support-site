@@ -92,13 +92,14 @@ function normaliseTimeLine(line: string): string {
  * Picks the meridiem for a bare fragment from the hours a support job actually
  * runs: 1-6 is afternoon, 7-11 is morning, 12 is noon. Compact fragments are
  * left alone because writing "0415" is a deliberate 24-hour reading, and so is
- * anything from 13 up - handing {@link parseTimeMins} a "pm" above 12 would
- * make it reject the fragment outright.
+ * a zero-padded hour ("06:00", "00:30" - the form the calculator itself sends
+ * its windows in) and anything from 13 up - handing {@link parseTimeMins} a "pm"
+ * above 12 would make it reject the fragment outright.
  * @param fragment - Digits-only time fragment ("4", "4:15", "0415").
  * @returns Inferred meridiem, or null to keep the fragment's literal reading.
  */
 function inferBareMeridiem(fragment: string): Meridiem {
-  if (isCompact(fragment)) return null;
+  if (isCompact(fragment) || fragment.startsWith("0")) return null;
   const h = parseInt(fragment.includes(":") ? (fragment.split(":")[0] ?? "") : fragment, 10);
   if (Number.isNaN(h) || h < 1 || h > 12) return null;
   return h <= 6 || h === 12 ? "pm" : "am";
@@ -180,7 +181,7 @@ export function extractRangeStats(input: string): RangeStats {
       const startMer = (startMerRaw?.toLowerCase() ?? null) as Meridiem;
       const endMer = (endMerRaw?.toLowerCase() ?? null) as Meridiem;
       // A meridiem stated on either end covers both; only a wholly bare pair is inferred.
-      const start = parseTimeMins(startRaw, startMer ?? endMer ?? inferBareMeridiem(startRaw));
+      let start = parseTimeMins(startRaw, startMer ?? endMer ?? inferBareMeridiem(startRaw));
       const end = parseTimeMins(endRaw, endMer ?? startMer ?? inferBareMeridiem(endRaw));
       if (start === null || end === null) continue;
       // Zero-length states no duration - never invent a 12h or 24h roll.
@@ -192,7 +193,10 @@ export function extractRangeStats(input: string): RangeStats {
           // Both meridiems stated ("2pm-9am"): genuinely overnight.
           dur += 24 * 60;
         } else if (withNoon > 0 && withNoon <= 16 * 60) {
-          // Assumed meridiem: retry as an am/pm pair ("11-1pm" > 11am-1pm).
+          // Assumed meridiem: retry as an am/pm pair. When the start borrowed the end's,
+          // the start is the half that flips: "11-1pm" (read 23:00-13:00) is 11:00-13:00,
+          // and "11-1am" (read 11:00-01:00) is 23:00-01:00.
+          if (startMer === null && endMer !== null) start += endMer === "pm" ? -12 * 60 : 12 * 60;
           dur = withNoon;
         } else {
           dur += 24 * 60;
@@ -228,6 +232,44 @@ export function extractRangeStats(input: string): RangeStats {
   }
   const spanMins = [...spanByDay.values()].reduce((sum, d) => sum + (d.end - d.start), 0);
   return { ranges, statedMins, billableMins, discardedMins: statedMins - billableMins, spanMins };
+}
+
+/**
+ * Whether a bare fragment can only be a clock time: "4:30" or "0900", not "2" or "50".
+ * @param fragment - Digits-only time fragment.
+ * @returns True for a colon or four-digit fragment.
+ */
+function isClockShaped(fragment: string): boolean {
+  return fragment.includes(":") || fragment.length === 4;
+}
+
+/**
+ * Whether the description states a time range anywhere, including mid-sentence ("TV setup
+ * 4:30-5:40") where {@link extractRangeStats} doesn't look. Only a dashed or "to" pair
+ * counts, and one side must be clock-shaped (a colon, a meridiem, or four digits), so a
+ * count ("2-3 hours"), a price ("$50-60") or a dashed date is not read as times.
+ * @param input - Raw job description text.
+ * @returns True when the text names a time range of its own.
+ */
+export function statesTimeRange(input: string): boolean {
+  if (extractRangeStats(input).ranges.length > 0) return true;
+  for (const rawLine of input.split("\n")) {
+    const line = normaliseTimeLine(rawLine.trim());
+    for (const match of line.matchAll(TIME_RANGE_RE)) {
+      const [, startRaw = "", startMer, sep = "", endRaw = "", endMer] = match;
+      if (!/[-–—]|to/.test(sep)) continue;
+      /**
+       *
+       * @param f
+       */
+      if (!startMer && !endMer && !isClockShaped(startRaw) && !isClockShaped(endRaw)) continue;
+      const before = line.slice(0, match.index ?? 0);
+      const after = line.slice((match.index ?? 0) + match[0].length);
+      if (/[$\d]\s*[-–—]?\s*$/.test(before) || /^\s*[-–—]\s*\d/.test(after)) continue;
+      return true;
+    }
+  }
+  return false;
 }
 
 /**

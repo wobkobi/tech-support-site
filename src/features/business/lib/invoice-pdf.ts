@@ -3,7 +3,12 @@
 // the PDF reads as the same document as the on-screen InvoicePreviewPanel; keep the two
 // layouts in sync.
 
-import { balanceDue, formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
+import {
+  balanceDue,
+  formatNZD,
+  lineItemQtyLabel,
+  promoLineLabel,
+} from "@/features/business/lib/business";
 import { nzFinancialYearCode } from "@/features/business/lib/financial-year";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
@@ -527,11 +532,9 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
 
   drawRow("Subtotal", formatNZD(invoice.subtotal));
   if (invoice.promoDiscount && invoice.promoDiscount > 0) {
-    // Suffix clarifies the discount only applies to labour lines.
-    const label = invoice.promoTitle
-      ? `Promo (labour only): ${invoice.promoTitle}`
-      : "Promo discount (labour only)";
-    drawRow(label, `-${formatNZD(invoice.promoDiscount)}`, { isPromo: true });
+    drawRow(promoLineLabel(invoice.promoTitle), `-${formatNZD(invoice.promoDiscount)}`, {
+      isPromo: true,
+    });
   }
   if (invoice.unsuccessfulDiscount && invoice.unsuccessfulDiscount > 0) {
     drawRow(

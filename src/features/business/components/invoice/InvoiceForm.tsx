@@ -30,6 +30,10 @@ import {
   isValidLineItem,
 } from "@/features/business/lib/business";
 import type { LineItem } from "@/features/business/types/business";
+import {
+  ContactNameInput,
+  useGoogleContacts,
+} from "@/features/contacts/components/ContactNameInput";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { cn } from "@/shared/lib/cn";
 import { addDaysToDateKey } from "@/shared/lib/timezone-utils";
@@ -131,6 +135,7 @@ export function InvoiceForm({
   const [form, setForm] = useState<InvoiceFormData>(initial);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<ContactFieldErrors>({});
+  const contacts = useGoogleContacts();
   // Saving routes away client-side, which never fires beforeunload, so the
   // prompt only ever guards edits that haven't gone in.
   useUnsavedChangesWarning(JSON.stringify(form) !== JSON.stringify(initial));
@@ -204,17 +209,31 @@ export function InvoiceForm({
           <label htmlFor={FIELD_IDS.name} className={LABEL_CLS}>
             Client name
           </label>
-          <input
+          <ContactNameInput
             id={FIELD_IDS.name}
-            type="text"
             value={form.clientName}
-            onChange={(e) => {
-              update({ clientName: e.target.value });
+            onChange={(clientName) => {
+              update({ clientName });
               setFieldErrors((prev) => ({ ...prev, name: undefined }));
             }}
+            contacts={contacts}
+            // A picked contact brings their email too, unless one is already typed.
+            // One update: update() spreads the render's form, so two in a row lose the first.
+            onPick={(c) => {
+              const fillEmail = !!c.email && !form.clientEmail.trim();
+              update({
+                clientName: c.name || c.email,
+                ...(fillEmail && { clientEmail: c.email }),
+              });
+              setFieldErrors((prev) => ({
+                ...prev,
+                name: undefined,
+                ...(fillEmail && { email: undefined }),
+              }));
+            }}
             disabled={busy}
-            aria-invalid={fieldErrors.name ? true : undefined}
-            aria-describedby={fieldErrors.name ? `${FIELD_IDS.name}-error` : undefined}
+            invalid={fieldErrors.name ? true : undefined}
+            describedBy={fieldErrors.name ? `${FIELD_IDS.name}-error` : undefined}
             className={cn(ADMIN_INPUT_CLS, fieldErrors.name && "border-coquelicot-500/60")}
           />
           <FieldError id={`${FIELD_IDS.name}-error`} message={fieldErrors.name} />

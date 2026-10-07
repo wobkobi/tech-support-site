@@ -17,6 +17,10 @@ import { formatNZD, todayISO } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import { fyKeyOf, listFinancialYears } from "@/features/business/lib/financial-year";
 import type { IncomeEntry } from "@/features/business/types/business";
+import {
+  ContactNameInput,
+  useGoogleContacts,
+} from "@/features/contacts/components/ContactNameInput";
 import { Field } from "@/shared/components/Field";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
@@ -55,6 +59,7 @@ export function IncomeView(): React.ReactElement {
   };
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const contacts = useGoogleContacts();
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   // Phones only: the form starts folded so the list isn't pushed a screen down.
@@ -288,12 +293,12 @@ export function IncomeView(): React.ReactElement {
             />
           </Field>
           <Field label="Customer" htmlFor="inc-customer" required>
-            <input
+            <ContactNameInput
               id="inc-customer"
-              type="text"
               required
               value={form.customer}
-              onChange={(e) => setForm((p) => ({ ...p, customer: e.target.value }))}
+              onChange={(customer) => setForm((p) => ({ ...p, customer }))}
+              contacts={contacts}
               className={ADMIN_INPUT_CLS}
             />
           </Field>

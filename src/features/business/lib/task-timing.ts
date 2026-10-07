@@ -128,17 +128,35 @@ export function collapseToWindow(
       // first and pinned ones keep the operator's own measurement.
       const pinned = hourlyIn.filter((t) => t.isShort || t.isExplicit);
       const target = windowMin - sumTaskMinutes(pinned);
-      const multiplier = target / sumTaskMinutes(floatingUp);
+      const floatingMin = sumTaskMinutes(floatingUp);
+      // All floating lines at 0 min have no proportions to scale (and would
+      // divide by zero), so they split the target evenly instead.
       grown = [
         ...pinned,
         ...floatingUp.map((t) =>
-          derive(t, snapMinutes(taskMinutes(t) * multiplier, timing.snapMins)),
+          derive(
+            t,
+            snapMinutes(
+              floatingMin > 0
+                ? taskMinutes(t) * (target / floatingMin)
+                : target / floatingUp.length,
+              timing.snapMins,
+            ),
+          ),
         ),
       ];
+    } else if (hourlyIn.every((t) => t.isShort && !t.isExplicit)) {
+      // Every task is a quick-task guess - the description gave no times - so none
+      // of them is the main job and they share the window evenly. The snap
+      // remainder still lands on the largest line below.
+      grown = hourlyIn.map((t) =>
+        derive(t, snapMinutes(windowMin / hourlyIn.length, timing.snapMins)),
+      );
     } else {
-      // Every task is pinned. The largest line takes the remainder, which is the
-      // one case where a stated duration is overridden - preferred to billing
-      // under the window, since the window is what the job actually ran.
+      // Every task is pinned and at least one duration was stated. The largest line
+      // takes the remainder, which is the one case where a stated duration is
+      // overridden - preferred to billing under the window, since the window is
+      // what the job actually ran.
       grown = [...hourlyIn];
     }
     // Park what the snap grid left over on the largest adjustable line, so the
