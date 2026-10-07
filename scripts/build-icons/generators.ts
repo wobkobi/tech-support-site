@@ -12,6 +12,7 @@ import {
   BACKDROP,
   BACKDROP_VARIANTS,
   FAVICON_SPECS,
+  LEGACY_IMAGES,
   LOGO_FULL,
   LOGO_MARK,
   LOGO_PROFILE,
@@ -232,13 +233,34 @@ export async function buildBackdropVariants(): Promise<void> {
     if (format === "avif") {
       // effort=9 is the AVIF encoder's max; CPU-heavy but one-shot at build.
       await pipeline.avif({ quality, effort: 9 }).toFile(outputPath);
-    } else if (format === "jpeg") {
-      await pipeline.jpeg({ quality, mozjpeg: true }).toFile(outputPath);
     } else {
       await pipeline.webp({ quality, effort: 6, smartSubsample: true }).toFile(outputPath);
     }
 
     console.log(`  ✓ ${name}.${format} (${width}px @ q${quality}, pre-blurred σ=20)`);
+  }
+}
+
+/* ---------- Old-Browser Page Images ---------- */
+
+/**
+ * Build the resized JPEGs public/legacy.html uses, per {@link LEGACY_IMAGES}.
+ * @returns Promise that resolves when all images are written.
+ */
+export async function buildLegacyImages(): Promise<void> {
+  console.log("🕰️ Building old-browser page images...");
+  await ensureDir("public/source");
+
+  for (const { source, name, width, quality } of LEGACY_IMAGES) {
+    const outputPath = `public/source/${name}.jpg`;
+    await sharp(source)
+      // Apply the EXIF orientation before the metadata is dropped, so a phone photo stays upright.
+      .rotate()
+      .resize(width, null, { withoutEnlargement: true })
+      .toColorspace("srgb")
+      .jpeg({ quality, mozjpeg: true })
+      .toFile(outputPath);
+    console.log(`  ✓ ${name}.jpg (${width}px @ q${quality})`);
   }
 }
 

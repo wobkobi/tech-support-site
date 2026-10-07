@@ -9,8 +9,8 @@
       content="Friendly computer and IT support across Auckland. Call or email for on-site and remote help with PCs, Macs, Wi-Fi, phones, printers and more."
     />
     <meta name="robots" content="noindex, follow" />
-    <link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+    <link rel="icon" href="favicon-32x32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -19,15 +19,23 @@
     />
     <style>
       /*
-       * Deliberately plain CSS only - no Tailwind, color-mix(), oklch(),
-       * @property or cascade layers - so this page renders on very old browsers
-       * (macOS High Sierra Safari, Windows 7 Chrome/Firefox, old Android/iOS)
-       * where the modern app cannot. Colours and shapes mirror the live site's
-       * design tokens so it still feels like To the Point Tech.
+       * Deliberately plain CSS - no Tailwind, CSS variables, color-mix(), oklch(),
+       * CSS grid or flex gap - so this page renders on very old browsers (IE11,
+       * macOS High Sierra Safari, Windows 7 Chrome/Firefox, old Android/iOS) where
+       * the modern app cannot. Columns use display:table and inline-block for the
+       * same reason. The look mirrors the live site: white header, violet photo
+       * hero, white and seasalt sections, moonstone rules and ticks, a coquelicot
+       * closing band and a rich-black footer.
        *
-       * Tokens used:
-       *   rich-black #001514  seasalt #f6f7f8  russian-violet #0c0a3e
-       *   coquelicot #f34213  moonstone #43bccd / #5ec6d4 / #2b93a1  mustard #fed766
+       * Hexes copied from src/app/globals.css:
+       *   rich-black #001514  seasalt #f6f7f8 / -100 #e2e6e9 / -200 #c6ccd2 / -700 #434c56
+       *   russian-violet #0c0a3e / -100 #d4d3f8  coquelicot-600 #c2320a / -700 #912508
+       *   moonstone #43bccd / -700 #206f79
+       *
+       * Photos are plain resized JPEGs (legacy-*.jpg, made by `npm run build:icons`), so
+       * they load from any static server and decode on browsers without WebP/AVIF.
+       * Image paths have no leading slash: the page sits at the site root, so they
+       * resolve the same on the site and when the file is opened straight from disk.
        */
       * {
         box-sizing: border-box;
@@ -35,25 +43,10 @@
       html,
       body {
         margin: 0;
-        min-height: 100%;
       }
       body {
         color: #001514;
-        background-color: #f6f7f8;
-        /* The real site backdrop as a JPEG (decodable on every browser, unlike
-           the WebP/AVIF the live site serves), layered over a soft brand
-           gradient. The gradient shows through if the JPEG is missing or fails
-           to load, so the page always looks on-brand. Generate the JPEG with
-           `npm run build:icons`. */
-        background-image:
-          url("/source/backdrop-blur.jpeg"),
-          linear-gradient(150deg, #d7f1f4 0%, #f6f7f8 40%, #f6f7f8 62%, #e8e7fb 100%);
-        background-repeat: no-repeat, no-repeat;
-        background-position:
-          center center,
-          center center;
-        background-size: cover, auto;
-        background-attachment: fixed, fixed;
+        background: #ffffff;
         font-family:
           "Exo",
           ui-sans-serif,
@@ -64,389 +57,834 @@
           "Noto Sans",
           Arial,
           sans-serif;
-        font-size: 18px;
+        font-size: 17px;
         font-weight: 500;
         line-height: 1.55;
         -webkit-font-smoothing: antialiased;
         -webkit-text-size-adjust: 100%;
       }
-      .wrap {
-        max-width: 760px;
+      p {
+        margin: 0;
+      }
+      img {
+        border: 0;
+      }
+      a:focus {
+        outline: 3px solid #43bccd;
+        outline-offset: 2px;
+      }
+      .container {
+        max-width: 1200px;
         margin: 0 auto;
-        padding: 28px 18px 56px;
+        padding: 0 18px;
+      }
+      .section {
+        padding: 44px 0;
+      }
+      .grey {
+        background: #f6f7f8;
       }
 
-      /* Frosted content card, echoing FrostedSection on the live site. */
-      .frost {
-        background: rgba(252, 252, 252, 0.72);
-        -webkit-backdrop-filter: blur(10px);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(191, 198, 205, 0.5);
-        border-radius: 18px;
-        box-shadow: 0 12px 30px rgba(12, 10, 62, 0.12);
-        padding: 26px 22px;
-      }
-
-      header {
-        text-align: center;
-      }
-      .logo {
-        width: 280px;
-        max-width: 86%;
-        height: auto;
-        margin: 4px auto 18px;
-        display: block;
-      }
-      h1 {
-        font-size: 30px;
-        line-height: 1.2;
-        font-weight: 800;
-        margin: 0 0 10px;
-        color: #0c0a3e;
-      }
-      .tagline {
-        font-size: 19px;
-        color: #001514;
-        margin: 0 auto 4px;
-        max-width: 36em;
-      }
-
-      .notice {
+      /* Header */
+      .site-header {
         background: #ffffff;
-        border: 1px solid #d8dbe0;
-        border-left: 6px solid #43bccd;
-        border-radius: 12px;
-        padding: 15px 17px;
-        margin: 22px 0;
-        font-size: 17px;
+        border-bottom: 1px solid #e2e6e9;
+      }
+      .bar {
+        display: table;
+        width: 100%;
+        height: 72px;
+      }
+      .bar-logo,
+      .bar-phone {
+        display: table-cell;
+        vertical-align: middle;
+      }
+      .bar-logo img {
+        display: block;
+        height: 44px;
+        width: auto;
+      }
+      .bar-phone {
+        text-align: right;
+        white-space: nowrap;
+      }
+      .bar-phone a {
+        color: #001514;
+        text-decoration: none;
+        font-size: 18px;
+        font-weight: 800;
+      }
+      .bar-phone a:hover {
+        color: #912508;
+      }
+      .bar-phone span {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.2;
+        color: #434c56;
       }
 
-      .actions {
-        margin: 22px 0 8px;
+      /* Old-browser notice: grey panel with a 4px left border, like Notice on the live site */
+      .notice-strip {
+        padding: 16px 0;
       }
+      .notice {
+        background: #f6f7f8;
+        border-left: 4px solid #206f79;
+        padding: 16px 20px;
+        font-size: 16px;
+      }
+      .notice a {
+        color: #912508;
+        font-weight: 700;
+      }
+
+      /* Hero: violet over the sunset photo. The gradient is darkest behind the text so
+         white copy stays readable at the photo's brightest. Prefixed gradients first for
+         old WebKit; the violet colour shows if the photo fails to load. */
+      .hero {
+        color: #ffffff;
+        background-color: #0c0a3e;
+        background-image:
+          -webkit-linear-gradient(top, rgba(6, 5, 31, 0.78), rgba(6, 5, 31, 0.45)),
+          url("source/legacy-hero.jpg");
+        background-image:
+          linear-gradient(180deg, rgba(6, 5, 31, 0.78), rgba(6, 5, 31, 0.45)),
+          url("source/legacy-hero.jpg");
+        background-size: cover;
+        background-position: 50% 60%;
+        background-repeat: no-repeat;
+        padding: 32px 0 40px;
+      }
+      .hero h1 {
+        font-size: 32px;
+        line-height: 1.1;
+        font-weight: 800;
+        margin: 0 0 16px;
+      }
+      .hero .lead {
+        font-size: 18px;
+        max-width: 680px;
+        margin-bottom: 24px;
+      }
+      .hero-photo {
+        position: relative;
+        max-width: 416px;
+        margin-top: 32px;
+      }
+      .hero-photo img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+      .hero-photo .caption {
+        position: absolute;
+        left: 16px;
+        bottom: 16px;
+        background: #ffffff;
+        color: #001514;
+        border-radius: 6px;
+        padding: 10px 14px;
+        font-size: 15px;
+        line-height: 1.35;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+      }
+      .hero-photo .caption b {
+        display: block;
+        font-size: 16px;
+      }
+      ul.hero-points {
+        list-style: none;
+        margin: 24px 0 0;
+        padding: 0;
+        font-size: 16px;
+        font-weight: 600;
+      }
+      ul.hero-points li {
+        display: inline-block;
+        margin: 0 20px 8px 0;
+      }
+      ul.hero-points svg {
+        width: 16px;
+        height: 16px;
+        fill: #43bccd;
+        vertical-align: -2px;
+        margin-right: 8px;
+      }
+
+      /* Buttons: 6px radius, filled coquelicot for the main action */
       a.btn {
         display: block;
         text-align: center;
         text-decoration: none;
-        font-size: 20px;
+        font-size: 17px;
         font-weight: 700;
-        padding: 16px 20px;
-        border-radius: 10px;
-        margin: 12px 0;
-        border: 0;
+        line-height: 1.3;
+        padding: 15px 24px;
+        border-radius: 6px;
+        margin: 0 0 12px;
+        border: 2px solid transparent;
       }
       a.btn svg {
-        width: 22px;
-        height: 22px;
-        vertical-align: middle;
-        margin: -3px 10px 0 0;
+        width: 18px;
+        height: 18px;
+        vertical-align: -3px;
+        margin-right: 10px;
       }
-      a.btn-book {
-        background: #f34213; /* coquelicot - primary "Book appointment" CTA */
-        color: #f6f7f8;
+      a.btn-primary {
+        background: #c2320a;
+        border-color: #c2320a;
+        color: #ffffff;
       }
-      a.btn-book:hover {
-        background: #f5653d;
+      a.btn-primary:hover {
+        background: #912508;
+        border-color: #912508;
       }
-      a.btn-call {
-        background: #0c0a3e; /* russian-violet - secondary CTA */
-        color: #f6f7f8;
+      a.btn-outline-white {
+        background: transparent;
+        border-color: #ffffff;
+        color: #ffffff;
       }
-      a.btn-call:hover {
-        background: #110e58;
+      a.btn-outline-white:hover {
+        background: #ffffff;
+        color: #0c0a3e;
       }
-      a.btn:focus {
-        outline: 3px solid #5ec6d4;
-        outline-offset: 2px;
+      a.btn-white {
+        background: #ffffff;
+        border-color: #ffffff;
+        color: #912508;
+      }
+      a.btn-white:hover {
+        background: #e2e6e9;
+        border-color: #e2e6e9;
       }
 
-      .grid {
-        margin: 18px 0 0;
-      }
-      .card {
-        background: #fcfcfc;
-        border: 1px solid rgba(191, 198, 205, 0.8);
-        border-radius: 12px;
-        padding: 16px 18px;
-        margin: 14px 0;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      /* Section headings: eyebrow, h2 and lead */
+      .eyebrow {
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #206f79;
+        margin-bottom: 8px;
       }
       h2 {
-        font-size: 22px;
-        font-weight: 700;
-        margin: 0 0 10px;
-        color: #0c0a3e;
+        font-size: 27px;
+        line-height: 1.2;
+        font-weight: 800;
+        margin: 0;
       }
-      .meta {
-        margin: 6px 0;
+      .section-lead {
+        font-size: 18px;
+        color: #434c56;
+        max-width: 680px;
+        margin-top: 16px;
       }
-      .meta strong {
-        display: inline-block;
-        min-width: 128px;
-        color: #0c0a3e;
+      h3 {
+        font-size: 19px;
+        font-weight: 800;
+        line-height: 1.3;
+        margin: 0 0 8px;
       }
 
-      /* Services list - bordered chips with a moonstone tick square, echoing the
-         "What I can help with" grid on the home page. */
-      ul.services {
+      /* About: text beside a grey "How I work" panel */
+      .about-text p + p {
+        margin-top: 14px;
+      }
+      .panel {
+        background: #f6f7f8;
+        border-radius: 8px;
+        padding: 28px;
+        margin-top: 32px;
+      }
+      ul.ticks {
         list-style: none;
         margin: 0;
         padding: 0;
-        display: block;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 28px;
+        margin-top: 12px;
+      }
+      ul.ticks li:first-child {
+        margin-top: 0;
+      }
+      ul.ticks svg {
+        position: absolute;
+        left: 0;
+        top: 0.3em;
+        width: 16px;
+        height: 16px;
+        fill: #206f79;
+      }
+
+      /* Services: ruled rows, 1 column on phones, 2 from 600px, 4 from 900px.
+         inline-block columns with font-size 0 on the list to kill the gaps. */
+      ul.services {
+        list-style: none;
+        margin: 32px 0 0;
+        padding: 0;
+        border-top: 1px solid #c6ccd2;
+        font-size: 0;
       }
       ul.services li {
-        display: block;
-        background: #fcfcfc;
-        border: 1px solid rgba(191, 198, 205, 0.7);
-        border-radius: 12px;
-        padding: 10px 12px;
-        margin: 10px 0;
+        display: inline-block;
+        vertical-align: top;
+        width: 100%;
         font-size: 17px;
-        font-weight: 500;
+        border-bottom: 1px solid #c6ccd2;
+        padding: 14px 0;
       }
-      .tick {
-        display: inline-block;
-        width: 30px;
-        height: 30px;
-        vertical-align: middle;
-        margin-right: 12px;
-        border-radius: 8px;
-        border: 1px solid rgba(67, 188, 205, 0.5);
-        background: rgba(104, 202, 215, 0.3);
-        text-align: center;
+      ul.services b {
+        display: block;
+        font-size: 18px;
       }
-      .tick svg {
-        width: 18px;
-        height: 18px;
-        margin-top: 5px;
-        fill: #2b93a1;
+      ul.services span {
+        font-size: 16px;
+        color: #434c56;
       }
 
-      .contact {
-        text-align: center;
-        margin-top: 22px;
+      /* Ruled blocks: a 3px moonstone rule on top instead of a boxed card */
+      .ruled-row {
+        font-size: 0;
+        margin: 0 -14px;
       }
-      .contact a {
-        color: #0c0a3e;
-        font-weight: 700;
-        text-decoration: none;
-        font-size: 19px;
+      .ruled-col {
         display: inline-block;
-        padding: 6px 10px;
+        vertical-align: top;
+        width: 100%;
+        padding: 0 14px;
+        margin-bottom: 36px;
+        font-size: 17px;
       }
-      .contact a:hover {
-        color: #f34213;
+      .ruled {
+        border-top: 3px solid #43bccd;
+        padding-top: 12px;
       }
 
+      /* Closing band */
+      .closing {
+        background: #c2320a;
+        color: #ffffff;
+        padding: 48px 0;
+      }
+      .closing h2 {
+        margin-bottom: 4px;
+      }
+      .closing p {
+        font-size: 18px;
+        margin-bottom: 24px;
+      }
+
+      /* Footer */
       footer {
-        text-align: center;
-        margin-top: 26px;
-        font-size: 15px;
-        color: #5a6672;
+        background: #001514;
+        color: #c6ccd2;
+        padding: 52px 0 24px;
+        font-size: 16px;
       }
       footer a {
-        color: #0c0a3e;
+        color: #c6ccd2;
+        text-decoration: none;
+      }
+      footer a:hover {
+        color: #ffffff;
+        text-decoration: underline;
+      }
+      .footer-name {
+        color: #ffffff;
+        font-size: 24px;
+        font-weight: 800;
+        margin-bottom: 10px;
+      }
+      footer h2 {
+        color: #ffffff;
+        font-size: 16px;
+        font-weight: 700;
+        margin-bottom: 12px;
+      }
+      footer ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      footer li {
+        margin-bottom: 8px;
+      }
+      footer .strong {
+        color: #ffffff;
+        font-weight: 700;
+      }
+      .footer-cols {
+        font-size: 0;
+        margin: 0 -18px;
+      }
+      .footer-col {
+        display: inline-block;
+        vertical-align: top;
+        width: 100%;
+        padding: 0 18px;
+        margin-bottom: 36px;
+        font-size: 16px;
+      }
+      .footer-bottom {
+        border-top: 1px solid #2d3339;
+        padding-top: 20px;
+        margin-top: 4px;
+        font-size: 14px;
+      }
+      .footer-bottom span {
+        display: block;
       }
 
-      @media (min-width: 560px) {
-        ul.services {
-          display: -webkit-box;
-          display: -webkit-flex;
-          display: flex;
-          -webkit-flex-wrap: wrap;
-          flex-wrap: wrap;
+      @media (min-width: 600px) {
+        body {
+          font-size: 18px;
         }
-        ul.services li {
-          width: 48%;
-          margin: 1%;
+        .container {
+          padding: 0 24px;
+        }
+        .section {
+          padding: 64px 0;
+        }
+        .bar {
+          height: 84px;
+        }
+        .bar-logo img {
+          height: 56px;
+        }
+        .hero {
+          padding: 56px 0;
+        }
+        .hero h1 {
+          font-size: 46px;
+        }
+        .hero .lead,
+        .section-lead {
+          font-size: 19px;
         }
         a.btn {
           display: inline-block;
-          margin: 8px 6px;
-          min-width: 280px;
+          margin: 0 12px 12px 0;
         }
-        .actions {
-          text-align: center;
+        h2 {
+          font-size: 34px;
+        }
+        h3 {
+          font-size: 20px;
+        }
+        ul.services li {
+          width: 50%;
+          padding: 18px 18px 18px 0;
+          font-size: 18px;
+        }
+        .ruled-col {
+          width: 50%;
+          font-size: 18px;
+        }
+        .closing h2 {
+          font-size: 30px;
+        }
+        .footer-col {
+          width: 50%;
+        }
+        .footer-bottom span {
+          display: inline;
+        }
+        .footer-bottom .right {
+          float: right;
+        }
+      }
+
+      @media (min-width: 900px) {
+        .hero {
+          background-image:
+            -webkit-linear-gradient(
+              left,
+              rgba(6, 5, 31, 0.82) 0%,
+              rgba(6, 5, 31, 0.5) 42%,
+              rgba(6, 5, 31, 0.05) 75%
+            ),
+            url("source/legacy-hero.jpg");
+          background-image:
+            linear-gradient(
+              90deg,
+              rgba(6, 5, 31, 0.82) 0%,
+              rgba(6, 5, 31, 0.5) 42%,
+              rgba(6, 5, 31, 0.05) 75%
+            ),
+            url("source/legacy-hero.jpg");
+          background-position: 70% 58%;
+          padding: 88px 0;
+        }
+        .split {
+          display: table;
+          width: 100%;
+          table-layout: fixed;
+        }
+        .split-main,
+        .split-side {
+          display: table-cell;
+          vertical-align: middle;
+        }
+        .split-main {
+          width: 56%;
+          padding-right: 48px;
+        }
+        .about .split-main,
+        .about .split-side {
+          vertical-align: top;
+        }
+        .hero-photo {
+          max-width: none;
+          margin-top: 0;
+        }
+        .panel {
+          margin-top: 0;
+        }
+        ul.services li {
+          width: 25%;
+        }
+        .ruled-col {
+          width: 33.333%;
+          margin-bottom: 0;
+        }
+        .closing .split-main {
+          width: 50%;
+        }
+        .closing .split-side {
+          text-align: right;
+        }
+        .closing p {
+          margin-bottom: 0;
+        }
+        .closing a.btn {
+          margin: 6px 0 6px 12px;
+        }
+        .footer-col {
+          width: 33.333%;
+          margin-bottom: 40px;
         }
       }
     </style>
   </head>
   <body>
-    <div class="wrap">
-      <div class="frost">
-        <header>
-          <img
-            class="logo"
-            src="/source/logo-full.svg"
-            alt="To the Point Tech - computer and IT support in Auckland"
-          />
-          <h1>Computer &amp; IT Support in Auckland</h1>
-          <p class="tagline">
-            Friendly tech help across Auckland. Clear explanations, no jargon, and solutions that
-            actually work.
-          </p>
-        </header>
+    <header class="site-header">
+      <div class="container">
+        <div class="bar">
+          <div class="bar-logo">
+            <img
+              src="source/logo-wordmark.svg"
+              alt="To the Point Tech - computer and IT support in Auckland"
+            />
+          </div>
+          <div class="bar-phone">
+            <span>Call or text</span>
+            <a href="tel:+64212971237">021 297 1237</a>
+          </div>
+        </div>
+      </div>
+    </header>
 
+    <div class="notice-strip">
+      <div class="container">
         <div class="notice">
           It looks like your browser is a little out of date, so I'm showing you a simple version of
           my site. Everything you need to get in touch is right here, and I'm always happy to help
-          over the phone.
-        </div>
-
-        <div class="actions">
-          <a
-            class="btn btn-book"
-            href="mailto:harrison@tothepoint.co.nz?subject=Booking%20request%20-%20To%20The%20Point%20Tech&amp;body=Hi%20Harrison%2C%0D%0A%0D%0AI%20would%20like%20to%20book%20a%20tech%20support%20appointment.%0D%0A%0D%0AName%3A%0D%0APhone%3A%0D%0ASuburb%3A%0D%0ADevice%20or%20problem%3A%0D%0APreferred%20day%20and%20time%3A%0D%0A%0D%0AThanks!"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <rect x="3" y="4" width="18" height="18" rx="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-              <path d="M9 16l2 2 4-4" />
-            </svg>
-            Book appointment
-          </a>
-          <a class="btn btn-call" href="tel:+64212971237">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path
-                d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.81.36 1.6.7 2.34a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.74.34 1.53.57 2.34.7A2 2 0 0 1 22 16.92z"
-              />
-            </svg>
-            021 297 1237
-          </a>
-        </div>
-
-        <div class="card">
-          <h2>Hours</h2>
-          <p class="meta">
-            Same-day appointments and flexible times available, including evenings and weekends -
-            just get in touch and I'll find a time that suits.
-          </p>
-        </div>
-
-        <div class="card">
-          <h2>Where I work</h2>
-          <p class="meta">
-            On-site across Auckland (based in Point Chevalier) and remote help anywhere in New
-            Zealand.
-          </p>
-          <p class="meta">
-            Clear, honest pricing with no upselling - I'll always tell you the cost before any work
-            begins.
-          </p>
-        </div>
-
-        <h2 style="text-align: center; margin: 26px 0 4px">What I can help with</h2>
-        <ul class="services">
-          <li>
-            <span class="tick"
-              ><svg viewBox="0 0 20 20" aria-hidden="true">
-                <path
-                  d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
-                /></svg></span
-            >Computers &amp; laptops
-          </li>
-          <li>
-            <span class="tick"
-              ><svg viewBox="0 0 20 20" aria-hidden="true">
-                <path
-                  d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
-                /></svg></span
-            >Phones &amp; tablets
-          </li>
-          <li>
-            <span class="tick"
-              ><svg viewBox="0 0 20 20" aria-hidden="true">
-                <path
-                  d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
-                /></svg></span
-            >Wi-Fi &amp; networks
-          </li>
-          <li>
-            <span class="tick"
-              ><svg viewBox="0 0 20 20" aria-hidden="true">
-                <path
-                  d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
-                /></svg></span
-            >Smart TVs &amp; smart home
-          </li>
-          <li>
-            <span class="tick"
-              ><svg viewBox="0 0 20 20" aria-hidden="true">
-                <path
-                  d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
-                /></svg></span
-            >Printers
-          </li>
-          <li>
-            <span class="tick"
-              ><svg viewBox="0 0 20 20" aria-hidden="true">
-                <path
-                  d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
-                /></svg></span
-            >Email &amp; account setup
-          </li>
-          <li>
-            <span class="tick"
-              ><svg viewBox="0 0 20 20" aria-hidden="true">
-                <path
-                  d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
-                /></svg></span
-            >Cloud &amp; photo backups
-          </li>
-          <li>
-            <span class="tick"
-              ><svg viewBox="0 0 20 20" aria-hidden="true">
-                <path
-                  d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
-                /></svg></span
-            >Virus removal &amp; security
-          </li>
-          <li>
-            <span class="tick"
-              ><svg viewBox="0 0 20 20" aria-hidden="true">
-                <path
-                  d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
-                /></svg></span
-            >Data recovery &amp; transfer
-          </li>
-          <li>
-            <span class="tick"
-              ><svg viewBox="0 0 20 20" aria-hidden="true">
-                <path
-                  d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
-                /></svg></span
-            >Repairs &amp; remote support
-          </li>
-        </ul>
-
-        <div class="contact">
-          <a href="tel:+64212971237">021 297 1237</a>
-          <a href="mailto:harrison@tothepoint.co.nz">harrison@tothepoint.co.nz</a>
+          over the phone. Using an up-to-date browser?
+          <a href="/?full=1">Try the full website</a>.
         </div>
       </div>
-
-      <footer>
-        <p>Using an up-to-date browser? You can <a href="/?full=1">try the full website</a>.</p>
-        <p>To the Point Tech, Auckland, New Zealand</p>
-      </footer>
     </div>
+
+    <section class="hero" aria-labelledby="hero-heading">
+      <div class="container">
+        <div class="split">
+          <div class="split-main">
+            <h1 id="hero-heading">Computer Repairs &amp; IT Support in Auckland</h1>
+            <p class="lead">
+              I come to your home or business anywhere in Auckland, fix the problem, explain what
+              went wrong in plain English, and don't leave until it actually works.
+            </p>
+            <a
+              class="btn btn-primary"
+              href="mailto:harrison@tothepoint.co.nz?subject=Booking%20request%20-%20To%20The%20Point%20Tech&amp;body=Hi%20Harrison%2C%0D%0A%0D%0AI%20would%20like%20to%20book%20a%20tech%20support%20appointment.%0D%0A%0D%0AName%3A%0D%0APhone%3A%0D%0ASuburb%3A%0D%0ADevice%20or%20problem%3A%0D%0APreferred%20day%20and%20time%3A%0D%0A%0D%0AThanks!"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+                <path d="M9 16l2 2 4-4" />
+              </svg>
+              Book appointment
+            </a>
+            <a class="btn btn-outline-white" href="tel:+64212971237">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path
+                  d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.81.36 1.6.7 2.34a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.74.34 1.53.57 2.34.7A2 2 0 0 1 22 16.92z"
+                />
+              </svg>
+              Call 021 297 1237
+            </a>
+            <ul class="hero-points">
+              <li>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path
+                    d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
+                  /></svg
+                >Same-day appointments
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path
+                    d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
+                  /></svg
+                >Evenings &amp; weekends
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path
+                    d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
+                  /></svg
+                >Remote support
+              </li>
+            </ul>
+          </div>
+          <div class="split-side">
+            <div class="hero-photo">
+              <img
+                src="source/legacy-harrison.jpg"
+                width="640"
+                height="640"
+                alt="Harrison Raynes"
+              />
+              <div class="caption"><b>Harrison Raynes</b>Owner and Technician</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section about" aria-labelledby="about-heading">
+      <div class="container">
+        <div class="split">
+          <div class="split-main about-text">
+            <p class="eyebrow">About me</p>
+            <h2 id="about-heading" style="margin-bottom: 16px">Hi, I'm Harrison</h2>
+            <p>
+              I'm a computer science graduate based in Auckland. I started To the Point Tech because
+              when something breaks, people want someone who turns up and sorts it out properly.
+            </p>
+            <p>
+              That's what I do. I'll explain what went wrong, what I did about it, and whether it's
+              worth spending money on - including when it isn't.
+            </p>
+          </div>
+          <div class="split-side">
+            <div class="panel">
+              <h3 style="font-size: 21px; margin-bottom: 14px">How I work</h3>
+              <ul class="ticks">
+                <li>
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path
+                      d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
+                    /></svg
+                  >Listen first, understand your needs
+                </li>
+                <li>
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path
+                      d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
+                    /></svg
+                  >Explain everything as clearly as possible
+                </li>
+                <li>
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path
+                      d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
+                    /></svg
+                  >Leave clear notes you can refer back to
+                </li>
+                <li>
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path
+                      d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.3 6.3-6.3a1 1 0 011.4 0z"
+                    /></svg
+                  >Transparent pricing, no hidden fees
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section grey" aria-labelledby="services-heading">
+      <div class="container">
+        <p class="eyebrow">Services</p>
+        <h2 id="services-heading">What I can help with</h2>
+        <p class="section-lead">
+          Home and small business, Windows and Mac, phones and tablets. If it plugs in or connects
+          to Wi-Fi, ask.
+        </p>
+        <ul class="services">
+          <li><b>Computers &amp; Laptops</b><span>Slow, broken or won't start</span></li>
+          <li><b>Phones &amp; Tablets</b><span>Setup, fixes, moving to a new one</span></li>
+          <li><b>Wi-Fi &amp; Internet</b><span>Dead spots, dropouts, new routers</span></li>
+          <li><b>TV &amp; Streaming</b><span>Smart TVs, apps, casting</span></li>
+          <li><b>Smart Home</b><span>Speakers, cameras, doorbells</span></li>
+          <li><b>Printers &amp; Scanners</b><span>Won't print, won't connect</span></li>
+          <li><b>Cloud &amp; Backups</b><span>So nothing gets lost</span></li>
+          <li><b>Photos &amp; Storage</b><span>Sorting, saving, freeing up space</span></li>
+          <li><b>Setup &amp; Transfer</b><span>New computer, old files moved over</span></li>
+          <li><b>Tune-ups &amp; Repairs</b><span>Speed-ups, parts, clean-ups</span></li>
+          <li><b>Security</b><span>Scams, viruses, passwords</span></li>
+          <li><b>Email &amp; Accounts</b><span>Setup, recovery, moving over</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="details-heading">
+      <div class="container">
+        <p class="eyebrow">Good to know</p>
+        <h2 id="details-heading" style="margin-bottom: 32px">Times, areas and pricing</h2>
+        <div class="ruled-row">
+          <div class="ruled-col">
+            <div class="ruled">
+              <h3>When I'm available</h3>
+              <p>
+                Same-day appointments and flexible times, including evenings and weekends. Get in
+                touch and I'll find a time that suits.
+              </p>
+            </div>
+          </div>
+          <div class="ruled-col">
+            <div class="ruled">
+              <h3>Where I work</h3>
+              <p>
+                On-site across Auckland (based in Point Chevalier), and remote help anywhere in New
+                Zealand.
+              </p>
+            </div>
+          </div>
+          <div class="ruled-col">
+            <div class="ruled">
+              <h3>Pricing</h3>
+              <p>
+                Clear, honest pricing with no upselling. I'll always tell you the cost before any
+                work begins.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing" aria-labelledby="closing-heading">
+      <div class="container">
+        <div class="split">
+          <div class="split-main">
+            <h2 id="closing-heading">Something not working?</h2>
+            <p>Email me to book, or give me a call.</p>
+          </div>
+          <div class="split-side">
+            <a
+              class="btn btn-white"
+              href="mailto:harrison@tothepoint.co.nz?subject=Booking%20request%20-%20To%20The%20Point%20Tech&amp;body=Hi%20Harrison%2C%0D%0A%0D%0AI%20would%20like%20to%20book%20a%20tech%20support%20appointment.%0D%0A%0D%0AName%3A%0D%0APhone%3A%0D%0ASuburb%3A%0D%0ADevice%20or%20problem%3A%0D%0APreferred%20day%20and%20time%3A%0D%0A%0D%0AThanks!"
+              >Book appointment</a
+            >
+            <a class="btn btn-outline-white" href="tel:+64212971237">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path
+                  d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.81.36 1.6.7 2.34a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.74.34 1.53.57 2.34.7A2 2 0 0 1 22 16.92z"
+                />
+              </svg>
+              021 297 1237
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="container">
+        <div class="footer-cols">
+          <div class="footer-col">
+            <p class="footer-name">To the Point Tech</p>
+            <p>Friendly computer &amp; IT support across Auckland, at your home or business.</p>
+          </div>
+          <div class="footer-col">
+            <h2>Get in touch</h2>
+            <ul>
+              <li><a class="strong" href="tel:+64212971237">021 297 1237</a></li>
+              <li><a href="mailto:harrison@tothepoint.co.nz">harrison@tothepoint.co.nz</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h2>Find me online</h2>
+            <ul>
+              <li>
+                <a
+                  href="https://www.facebook.com/profile.php?id=61587338675655"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Facebook</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://www.instagram.com/tothepoint.tech/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Instagram</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://maps.google.com/?cid=6499301278416319650"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Google</a
+                >
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>To the Point Tech, Auckland, New Zealand</span>
+          <span class="right">Serving all of Auckland</span>
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

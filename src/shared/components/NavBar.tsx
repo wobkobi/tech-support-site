@@ -160,7 +160,7 @@ export function NavBar({ phone, phoneTel }: NavBarProps): React.ReactElement | n
       <div className={cn(CONTAINER, "flex items-center justify-between gap-6 py-3")}>
         <Link href="/" className="shrink-0">
           <Image
-            src="/source/logo-full.svg"
+            src="/source/logo-wordmark.svg"
             alt="To the Point Tech - home"
             width={2000}
             height={674}

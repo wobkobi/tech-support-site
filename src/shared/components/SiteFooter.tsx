@@ -76,7 +76,7 @@ export function SiteFooter({ phone, phoneTel, email }: SiteFooterProps): React.R
         <div className="grid gap-9 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
           <div>
             <Image
-              src="/source/logo-full.svg"
+              src="/source/logo-wordmark.svg"
               alt="To the Point Tech"
               width={2000}
               height={674}
