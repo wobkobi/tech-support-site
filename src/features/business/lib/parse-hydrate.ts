@@ -12,6 +12,7 @@ import {
 } from "@/features/business/lib/business";
 import { storeRunEntry } from "@/features/business/lib/calculator-helpers";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
+import { isHourlyTask } from "@/features/business/lib/task-timing";
 import { statesTimeRange } from "@/features/business/lib/time-parse";
 import type {
   EventPrefillSlot,
@@ -325,6 +326,8 @@ export interface ParsedJobPricing {
   minTravelCharge: number;
   /** Public-holiday labour uplift fraction for the job date (0 when none). */
   holidayUplift: number;
+  /** Share of an unsuccessful line still charged (0.5 = half price). */
+  unsuccessfulFactor?: number;
 }
 
 /** The invoice's current travel, for {@link parsedJobToLineItems} to keep when it should. */
@@ -368,6 +371,15 @@ function sameAddressKey(address: string | null | undefined): string {
 }
 
 /**
+ * A task's line total, rounded to the cent the way jobToLineItems rounds it.
+ * @param t - The task line.
+ * @returns qty x unit price, to the cent.
+ */
+function taskLineTotal(t: TaskLine): number {
+  return Math.round(t.qty * t.unitPrice * 100) / 100;
+}
+
+/**
  * Turns a parse straight into invoice line items, for editing an existing invoice where
  * there is no calculator state to hydrate.
  *
@@ -375,12 +387,19 @@ function sameAddressKey(address: string | null | undefined): string {
  * the description never mentions the trip (silence is not evidence it didn't happen), or
  * it parses to the booked address again (Google's live quote drifts between calls, so a
  * re-parse must not silently move the price). noTravelCharge still drops it.
+ *
+ * The unsuccessful-work discount is worked out the way the calculator does it: each
+ * unsuccessful hourly line is cut after its promo share comes off, so half price is half
+ * of what the customer was due. The invoice keeps only a promo total, not its per-line
+ * split, so that total is spread over the labour lines in proportion to their size.
  * @param result - The parse response.
  * @param slots - Booked event slots; empty for an unbooked job.
  * @param now - Current NZ wall-clock HH:MM.
  * @param pricing - Live pricing inputs.
  * @param existing - The invoice's current travel line and booked address.
- * @returns Line items plus the window fit (for a rebalance toast).
+ * @param promoDiscount - The promo discount the invoice keeps, for the unsuccessful cut.
+ * @returns Line items, the window fit (for a rebalance toast) and the unsuccessful-work
+ * discount for the new lines (0 when no hourly task was unsuccessful).
  */
 export function parsedJobToLineItems(
   result: ParseJobResponse,
@@ -388,7 +407,13 @@ export function parsedJobToLineItems(
   now: string,
   pricing: ParsedJobPricing,
   existing: ExistingInvoiceTravel,
-): { lineItems: LineItem[]; fit: FittedTasks; windowMins: number } {
+  promoDiscount = 0,
+): {
+  lineItems: LineItem[];
+  fit: FittedTasks;
+  windowMins: number;
+  unsuccessfulDiscount: number;
+} {
   const { windowMins } = parsedWindow(result, slots, now);
   const fit = fitTasksToWindow(
     hydrateParsedTasks(result),
@@ -426,5 +451,13 @@ export function parsedJobToLineItems(
     pricing.minTravelCharge,
     pricing.minBillableMins,
   );
-  return { lineItems, fit, windowMins };
+  // Same floor jobToLineItems applied, so these line totals are the ones just built.
+  const billed = enforceMinBillable(fit.tasks, pricing.minBillableMins).filter(isHourlyTask);
+  const labour = billed.reduce((s, t) => s + taskLineTotal(t), 0);
+  const failed = billed.filter((t) => t.unsuccessful).reduce((s, t) => s + taskLineTotal(t), 0);
+  const promoShare =
+    labour > 0 ? (Math.min(Math.max(0, promoDiscount), labour) * failed) / labour : 0;
+  const cut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
+  const unsuccessfulDiscount = Math.max(0, Math.round((failed - promoShare) * cut * 100) / 100);
+  return { lineItems, fit, windowMins, unsuccessfulDiscount };
 }

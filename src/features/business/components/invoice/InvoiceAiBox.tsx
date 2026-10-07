@@ -2,7 +2,7 @@
 // src/features/business/components/invoice/InvoiceAiBox.tsx
 // "Describe the job" box for the draft-invoice editor. Sends the description through the
 // same parse-job route and parse helpers as the calculator, then hands back replacement
-// line items. Discounts preserved on the invoice are not recalculated.
+// line items and the unsuccessful-work discount for them. The promo discount is kept.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
@@ -13,6 +13,7 @@ import {
   JOB_DESCRIPTION_HINT,
   JOB_DESCRIPTION_PLACEHOLDER,
 } from "@/features/business/lib/ai-input-copy";
+import { formatNZD } from "@/features/business/lib/business";
 import {
   buildParseInput,
   describeFit,
@@ -39,6 +40,8 @@ export interface InvoiceAiContext {
   /** Job address to quote travel from when the description names none. */
   fallbackDestination: string | null;
   pricing: ParsedJobPricing;
+  /** The promo discount the invoice keeps; unsuccessful lines are cut after their share. */
+  promoDiscount: number;
 }
 
 /** Props for {@link InvoiceAiBox}. */
@@ -48,8 +51,16 @@ interface InvoiceAiBoxProps {
   currentItems: LineItem[];
   /** Whether the parent form is saving. */
   disabled?: boolean;
-  /** Receives the parsed line items, any parsed notes and any cash amount already paid. */
-  onApply: (lineItems: LineItem[], notes: string | null, cashPaid: number | null) => void;
+  /**
+   * Receives the parsed line items, any parsed notes, any cash amount already paid and
+   * the unsuccessful-work discount for the new lines.
+   */
+  onApply: (
+    lineItems: LineItem[],
+    notes: string | null,
+    cashPaid: number | null,
+    unsuccessfulDiscount: number,
+  ) => void;
 }
 
 const PARSE_ERROR = "Couldn't parse that - try being more specific, or edit the line items below.";
@@ -60,7 +71,7 @@ const PARSE_ERROR = "Couldn't parse that - try being more specific, or edit the 
  * @param props.context - Booking and pricing context for the parse.
  * @param props.currentItems - The form's current line items.
  * @param props.disabled - Whether the parent form is saving.
- * @param props.onApply - Receives the parsed line items and notes.
+ * @param props.onApply - Receives the parsed line items, notes, cash paid and discount.
  * @returns The AI box element.
  */
 export function InvoiceAiBox({
@@ -107,29 +118,26 @@ export function InvoiceAiBox({
         const parsed = d.result as ParseJobResponse;
         const existingTravel =
           currentItems.find((li) => li.description.startsWith("Round-trip travel")) ?? null;
-        const { lineItems, fit, windowMins } = parsedJobToLineItems(
+        const { lineItems, fit, windowMins, unsuccessfulDiscount } = parsedJobToLineItems(
           parsed,
           context.slots,
           nzNowTime(),
           context.pricing,
           { line: existingTravel, destination: context.fallbackDestination },
+          context.promoDiscount,
         );
         if (lineItems.length === 0) {
           setError(PARSE_ERROR);
         } else {
           setResult(parsed);
           setAnswers({});
-          onApply(lineItems, parsed.notes || null, parsed.cashPaid ?? null);
+          onApply(lineItems, parsed.notes || null, parsed.cashPaid ?? null, unsuccessfulDiscount);
           const fitNote = describeFit(fit, windowMins);
           if (fitNote) toast(fitNote, { tone: "info" });
-          // The per-task half-price discount lives in the invoice's preserved
-          // unsuccessful-visit amount, which an edit doesn't recalculate.
-          if (parsed.tasks.some((t) => t.unsuccessful)) {
+          if (unsuccessfulDiscount > 0) {
             toast(
-              "A task was read as unsuccessful - adjust its price by hand if it's discounted.",
-              {
-                tone: "warning",
-              },
+              `A task was read as not fixed, so ${formatNZD(unsuccessfulDiscount)} comes off as the unsuccessful-work discount.`,
+              { tone: "info" },
             );
           }
         }
@@ -157,8 +165,9 @@ export function InvoiceAiBox({
         {context.slots.length > 0 && ` ${JOB_DESCRIPTION_BOOKED_HINT}`}
       </p>
       <p className="mb-2 text-sm text-admin-muted">
-        Parsing replaces every line item below, so check them before you save. The promo and
-        unsuccessful-visit discounts already on this invoice stay as they are.
+        Parsing replaces every line item below, so check them before you save. The promo discount
+        already on this invoice stays as it is. The unsuccessful-work discount is worked out again
+        from the new lines.
       </p>
       <textarea
         id="invoice-ai-input"

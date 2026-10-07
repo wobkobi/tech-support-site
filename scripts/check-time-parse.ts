@@ -4,6 +4,7 @@
 // fitted to, so a misread here changes what an invoice charges for labour.
 // Run with: npm run check:time-parse
 
+import { restatesTaskLine } from "@/features/business/lib/business-format";
 import {
   buildParseInput,
   parsedJobToLineItems,
@@ -83,6 +84,48 @@ function travelTotal(line: string, lineTotal: number): number | undefined {
       destination: "1 Queen St",
     },
   ).lineItems.find((l) => l.description.startsWith("Round-trip travel"))?.lineTotal;
+}
+
+/**
+ * One pinned hour at $80/hr, as the parse route returns it.
+ * @param unsuccessful - Whether the hour's problem was not fixed.
+ * @returns The parsed task row.
+ */
+function parsedHour(unsuccessful: boolean): ParseJobResponse["tasks"][number] {
+  return {
+    rateConfigId: null,
+    baseRateId: "r1",
+    description: "Labour",
+    minutes: 60,
+    qty: 1,
+    unitPrice: 80,
+    isExplicit: true,
+    unsuccessful,
+  };
+}
+
+/**
+ * Re-parses a two-hour unbooked job into two pinned $80/hr hours, the second not fixed,
+ * and reads back the unsuccessful-work discount.
+ * @param factor - Share of an unsuccessful line still charged.
+ * @param promoDiscount - The promo discount the invoice keeps.
+ * @returns The discount for the new lines.
+ */
+function unsuccessfulCut(factor: number, promoDiscount: number): number {
+  return parsedJobToLineItems(
+    reply({ durationMins: 120, tasks: [parsedHour(false), parsedHour(true)] }),
+    [],
+    "18:00",
+    {
+      minBillableMins: 60,
+      travelRatePerHour: 60,
+      minTravelCharge: 10,
+      holidayUplift: 0,
+      unsuccessfulFactor: factor,
+    },
+    { line: null, destination: null },
+    promoDiscount,
+  ).unsuccessfulDiscount;
 }
 
 /** Runs every fixture and exits non-zero on any failure. */
@@ -223,6 +266,49 @@ function main(): void {
     "a line with no drive is not kept on top of parking",
     travelTotal("Round-trip travel", 15),
     5,
+  );
+
+  console.log("\nUnsuccessful-work discount on a re-parsed invoice");
+  expectEqual("half price on the unfixed hour", unsuccessfulCut(0.5, 0), 40);
+  expectEqual("follows the live factor", unsuccessfulCut(0.75, 0), 20);
+  expectEqual("cut after the hour's share of a $32 promo", unsuccessfulCut(0.5, 32), 32);
+
+  console.log("\nDetails that only repeat the line");
+  expectEqual(
+    "'new printer' on Printer setup",
+    restatesTaskLine("new printer", "Printer", "Setup"),
+    true,
+  );
+  expectEqual(
+    "'Brand new TVs' on TV setup",
+    restatesTaskLine("Brand new TVs", "TV", "Setup"),
+    true,
+  );
+  expectEqual("bare 'new' on a Setup line", restatesTaskLine("new", "Laptop", "Setup"), true);
+  expectEqual(
+    "'printer setup' on Printer setup",
+    restatesTaskLine("printer setup", "Printer", "Setup"),
+    true,
+  );
+  expectEqual(
+    "'new Canon printer' keeps the brand",
+    restatesTaskLine("new Canon printer", "Printer", "Setup"),
+    false,
+  );
+  expectEqual(
+    "'new' is real wording off a Setup line",
+    restatesTaskLine("new", "Email account", "Configuration"),
+    false,
+  );
+  expectEqual(
+    "'from old laptop' is kept",
+    restatesTaskLine("from old laptop", "Laptop", "Data transfer"),
+    false,
+  );
+  expectEqual(
+    "multi-word device",
+    restatesTaskLine("email account", "Email account", "Troubleshooting"),
+    true,
   );
 
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);

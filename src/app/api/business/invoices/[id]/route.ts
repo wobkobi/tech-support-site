@@ -12,7 +12,7 @@ import {
 } from "@/features/business/lib/invoice-already-paid";
 import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
-import { parseDate, parseObjectId } from "@/features/business/lib/validation";
+import { parseAmount, parseDate, parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
@@ -204,6 +204,15 @@ export async function PATCH(
           : parseAlreadyPaid(body.alreadyPaid, body.alreadyPaidMethod)
         : undefined;
     if (prepaid && !prepaid.ok) return errorResponse(prepaid.error, 400);
+    // The editor's AI box re-prices unsuccessful tasks along with the lines it rebuilds, so
+    // a new figure only rides with replacement line items. Absent keeps the stored one.
+    const repricesUnsuccessful = lineItems !== undefined && body.unsuccessfulDiscount !== undefined;
+    let unsuccessfulDiscount = current.unsuccessfulDiscount ?? 0;
+    if (repricesUnsuccessful) {
+      const parsed = parseAmount(body.unsuccessfulDiscount ?? 0);
+      if (parsed === null) return errorResponse("Invalid unsuccessful-work discount", 400);
+      unsuccessfulDiscount = parsed;
+    }
     if (status !== undefined) {
       if (!isInvoiceStatus(status)) return errorResponse("Invalid status", 400);
       const err = validateTransition(current.status, status);
@@ -216,7 +225,7 @@ export async function PATCH(
     // Preserve the invoice's stored discounts when recomputing on a line-item
     // edit; recomputing with 0 would silently strip the promo / unsuccessful
     // discount from the total charged.
-    const preservedDiscount = (current.promoDiscount ?? 0) + (current.unsuccessfulDiscount ?? 0);
+    const preservedDiscount = (current.promoDiscount ?? 0) + unsuccessfulDiscount;
     const { subtotal, gstAmount, total } = calcInvoiceTotals(
       lineItems ?? [],
       preservedDiscount,
@@ -236,6 +245,10 @@ export async function PATCH(
           gstAmount,
           total,
           gst: gstAmount > 0,
+        }),
+        ...(repricesUnsuccessful && {
+          unsuccessful: unsuccessfulDiscount > 0,
+          unsuccessfulDiscount: unsuccessfulDiscount > 0 ? unsuccessfulDiscount : null,
         }),
         ...(notes !== undefined && { notes: notes || null }),
         ...(prepaid && { alreadyPaid: prepaid.amount, alreadyPaidMethod: prepaid.method }),
