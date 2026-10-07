@@ -31,6 +31,9 @@ import { NZ_TZ, nextNzWallClockOnWeekday, timeParts } from "@/shared/lib/timezon
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
+/** Clarifying-question ids the calculator's form can answer (the prompt's clarify block). */
+const CLARIFY_IDS = new Set(["location", "duration", "tasks"]);
+
 /**
  * Converts an operator-stated HH:MM (NZ wall clock) to a Date for the
  * traffic-aware travel lookup, anchored to the next occurrence of the job
@@ -235,8 +238,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (!parsed || typeof parsed !== "object") throw new Error("Invalid response shape");
 
+    // Clarify only on well-formed questions the form knows how to ask. An empty or
+    // garbled list would leave the operator with no questions and no result.
     if ("clarify" in parsed && Array.isArray(parsed.clarify)) {
-      return NextResponse.json({ ok: true, clarify: parsed.clarify });
+      const questions = parsed.clarify
+        .filter(
+          (q): q is ParseJobQuestion =>
+            !!q &&
+            typeof q === "object" &&
+            CLARIFY_IDS.has(q.id) &&
+            typeof q.question === "string" &&
+            q.question.trim() !== "",
+        )
+        .slice(0, 3)
+        .map((q) => ({
+          id: q.id,
+          question: q.question.trim(),
+          ...(typeof q.hint === "string" && q.hint.trim() && { hint: q.hint.trim() }),
+        }));
+      if (questions.length > 0) return NextResponse.json({ ok: true, clarify: questions });
+      if (!Array.isArray(parsed.tasks)) throw new Error("Clarify reply with no usable questions");
+    }
+
+    // Structural shape only: a reply missing the task list or carrying a non-number
+    // duration is read as no tasks / no duration rather than crashing the clamps below.
+    if (!Array.isArray(parsed.tasks)) parsed.tasks = [];
+    if (typeof parsed.durationMins !== "number" || !Number.isFinite(parsed.durationMins)) {
+      parsed.durationMins = null;
     }
 
     // Store runs and the cash fields are untrusted model output: short distinct store
@@ -566,7 +594,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Sanitise the model's out-of-session minutes (work explicitly stated to
     // have happened outside the session ranges, e.g. a call after the visit).
+    // With no stated session there is nothing to be outside of: a phone-only job's
+    // minutes reported here would leave the calculator a zero-length session.
+    const hasSession = precomputed !== null || (!!parsed.startTime && !!parsed.endTime);
     const outOfSessionMins =
+      hasSession &&
       typeof parsed.outOfSessionMins === "number" &&
       Number.isFinite(parsed.outOfSessionMins) &&
       parsed.outOfSessionMins > 0
@@ -607,7 +639,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // move the total. Below-cap values pass through (free work subtracts).
     if (precomputed !== null && precomputed > 0) {
       const statedTotal = precomputed + outOfSessionMins;
-      const cap = Math.min(statedTotal, maxJobMins);
+      // The longest-billable-day ceiling applies to each day on its own: two stated 9-5
+      // days bill both, while one 12pm-12am day is cut to the ceiling.
+      const minsByDay = new Map<number, number>();
+      for (const r of extractedRanges) {
+        minsByDay.set(r.day, (minsByDay.get(r.day) ?? 0) + r.durationMins);
+      }
+      const dayCapped = [...minsByDay.values()].reduce((s, m) => s + Math.min(m, maxJobMins), 0);
+      const cap = dayCapped + outOfSessionMins;
       if (typeof parsed.durationMins === "number" && parsed.durationMins > cap) {
         // Name the constraint that actually bound: a long-but-real session ("12pm-12am")
         // is cut by the longest-billable-day ceiling, not by a misread range, and blaming
@@ -615,7 +654,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         parsed.warnings = [
           ...(parsed.warnings ?? []),
           cap < statedTotal
-            ? `Session states ${statedTotal} min, over the ${maxJobMins} min longest-billable-day ceiling; capped to ${cap}. Raise it in Settings > Pricing if a job this long really bills in full.`
+            ? `A day states more than the ${maxJobMins} min longest-billable-day ceiling; capped the job to ${cap} min. Raise it in Settings > Pricing if a day this long really bills in full.`
             : `AI emitted durationMins ${parsed.durationMins} above the stated ${cap} min total; capped.`,
         ];
         parsed.durationMins = cap;
@@ -633,6 +672,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } else if (typeof parsed.durationMins === "number" && parsed.durationMins < 0) {
       // No stated ranges to restore from - drop garbage negatives entirely.
       parsed.durationMins = null;
+    } else if (
+      typeof parsed.durationMins === "number" &&
+      parsed.durationMins > maxJobMins + outOfSessionMins
+    ) {
+      // A bare duration has no ranges to bound it, so the day ceiling is the only check
+      // on a misread ("2 days" as 48 hours) or an injected "bill 20 hours".
+      parsed.warnings = [
+        ...(parsed.warnings ?? []),
+        `Duration of ${parsed.durationMins} min is over the ${maxJobMins} min longest-billable-day ceiling; capped. For a job over several days, give each day's times.`,
+      ];
+      parsed.durationMins = maxJobMins + outOfSessionMins;
     }
 
     // Fit task quantities to the billable total. `isExplicit` (operator-stated, so

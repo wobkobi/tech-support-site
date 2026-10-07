@@ -6,7 +6,7 @@
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import type { AlreadyPaidState } from "@/features/business/lib/already-paid-input";
-import type { JobPricing } from "@/features/business/lib/business";
+import { timeDiffMins, type JobPricing } from "@/features/business/lib/business";
 import {
   buildParseInput,
   describeFit,
@@ -16,6 +16,7 @@ import {
   parsedCostEntries,
   parsedStoreRunEntries,
   parsedWindow,
+  type WindowSlot,
 } from "@/features/business/lib/parse-hydrate";
 import type {
   EventPrefill,
@@ -28,7 +29,7 @@ import type {
 } from "@/features/business/types/business";
 import { nzNowTime } from "@/shared/lib/timezone-utils";
 import type React from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 /** Calculator state the parse session reads and writes. */
 interface UseJobParseArgs {
@@ -40,8 +41,13 @@ interface UseJobParseArgs {
   jobDate: string;
   /** Current job address, sent as the travel fallback destination. */
   jobAddress: string;
+  /** The Time card's ranges. */
+  timeRanges: ParsedRange[];
+  /** Whether those ranges are real times rather than a placeholder or the booking's own. */
+  timesSet: boolean;
   setFollowUpMins: React.Dispatch<React.SetStateAction<number>>;
   setTimeRanges: React.Dispatch<React.SetStateAction<ParsedRange[]>>;
+  setTimesSet: React.Dispatch<React.SetStateAction<boolean>>;
   setJobAddress: React.Dispatch<React.SetStateAction<string>>;
   setTravelEntries: React.Dispatch<React.SetStateAction<TravelEntry[]>>;
   setTasks: React.Dispatch<React.SetStateAction<TaskLine[]>>;
@@ -79,8 +85,11 @@ interface UseJobParse {
  * @param args.eventPrefill - Schedule-event prefill, or null.
  * @param args.jobDate - Job date for the traffic-pattern quote.
  * @param args.jobAddress - Current job address (travel fallback).
+ * @param args.timeRanges - The Time card's ranges.
+ * @param args.timesSet - Whether the Time card's ranges are real times.
  * @param args.setFollowUpMins - Follow-up minutes setter.
  * @param args.setTimeRanges - Time slots setter.
+ * @param args.setTimesSet - Setter for whether the Time card's ranges are real times.
  * @param args.setJobAddress - Job address setter.
  * @param args.setTravelEntries - Travel entries setter.
  * @param args.setTasks - Task lines setter.
@@ -95,8 +104,11 @@ export function useJobParse({
   eventPrefill,
   jobDate,
   jobAddress,
+  timeRanges,
+  timesSet,
   setFollowUpMins,
   setTimeRanges,
+  setTimesSet,
   setJobAddress,
   setTravelEntries,
   setTasks,
@@ -113,6 +125,31 @@ export function useJobParse({
   const [hasParsed, setHasParsed] = useState(false);
   const [clarifyQuestions, setClarifyQuestions] = useState<ParseJobQuestion[]>([]);
   const [clarifyAnswers, setClarifyAnswers] = useState<Record<string, string>>({});
+  // Bumped by every parse and by Clear, so a reply that lands after either is dropped
+  // instead of overwriting the form.
+  const requestId = useRef(0);
+
+  /**
+   * The job's known windows. A booked event's own slots, unless the operator has edited
+   * the times; then (or with no booking) the complete ranges on the Time card, provided
+   * they are real times. Without a window, a description with no times parses to none and
+   * the tasks stay at their quick-task guesses.
+   * @returns The windows, and whether they are a merged booking to keep as-is.
+   */
+  function knownWindow(): { slots: WindowSlot[]; merged: boolean } {
+    if (eventPrefill && eventPrefill.slots.length > 0 && !timesSet) {
+      return { slots: eventPrefill.slots, merged: eventPrefill.slots.length > 1 };
+    }
+    if (!timesSet) return { slots: [], merged: false };
+    const slots = timeRanges
+      .filter((r) => r.startTime && r.endTime && timeDiffMins(r.startTime, r.endTime) > 0)
+      .map((r, i) => ({
+        date: eventPrefill?.slots[i]?.date ?? jobDate,
+        startTime: r.startTime,
+        endTime: r.endTime,
+      }));
+    return { slots, merged: false };
+  }
 
   /**
    * Applies a parsed job response to the calculator state, hydrating time +
@@ -120,15 +157,25 @@ export function useJobParse({
    * created whenever the parser found any drive time; calcTravelCharge
    * applies the $10 minimum so a 1-min drive still bills the published floor.
    * @param result - The parsed job response returned by the AI.
+   * @param known - The known windows the description was sent with.
+   * @param known.slots - Booked slots or real Time card ranges; empty when none.
+   * @param known.merged - Whether the slots are a merged booking to keep as-is.
    */
-  function applyParseResult(result: ParseJobResponse): void {
-    const slots = eventPrefill?.slots ?? [];
-    const span = parsedWindow(result, slots, nzNowTime());
+  function applyParseResult(
+    result: ParseJobResponse,
+    known: { slots: WindowSlot[]; merged: boolean },
+  ): void {
+    const span = parsedWindow(result, known.slots, nzNowTime(), known.merged);
     setFollowUpMins(span.followUpMins);
     // A merged job's slots are the corrected calendar windows, so the parse fills
     // everything but the times. On a single event the description wins, and "Reset to
-    // event times" undoes a bad guess.
-    if (span.timeRanges) setTimeRanges(span.timeRanges);
+    // event times" undoes a bad guess. Stated times count as real for the next parse; a
+    // window made up from a bare duration doesn't, or a later "about 3 hours" would be
+    // capped to the made-up one.
+    if (span.timeRanges) {
+      setTimeRanges(span.timeRanges);
+      setTimesSet(span.stated);
+    }
 
     // A reparse is the new truth for the auto travel entry, the parsed out-of-pocket
     // costs (parking, tolls) and the parsed store runs. Operator-typed manual entries
@@ -196,13 +243,15 @@ export function useJobParse({
    */
   async function handleParse(answers?: Record<string, string>): Promise<void> {
     if (!aiInput.trim()) return;
+    const id = ++requestId.current;
     setParsing(true);
     setParseError(null);
     setParseResult(null);
     setClarifyQuestions([]);
     try {
       // jobDate quotes travel at the job's weekday traffic pattern, not today's.
-      const input = buildParseInput(aiInput, eventPrefill?.slots ?? []);
+      const known = knownWindow();
+      const input = buildParseInput(aiInput, known.slots);
       const body: Record<string, unknown> = { input, jobDate };
       // Typed descriptions rarely repeat the address, so hand the current job address
       // (event prefill or Travel card) to the route as a travel fallback. The AI's own
@@ -218,17 +267,19 @@ export function useJobParse({
         body: JSON.stringify(body),
       });
       const d = await res.json();
+      if (id !== requestId.current) return;
       if (d.ok && d.clarify) {
         setClarifyQuestions(d.clarify as ParseJobQuestion[]);
       } else if (d.ok && d.result) {
         setParseResult(d.result);
-        applyParseResult(d.result);
+        applyParseResult(d.result, known);
         setHasParsed(true);
         setClarifyAnswers({});
       } else {
         setParseError("Couldn't parse that - try being more specific, or build manually below.");
       }
     } catch {
+      if (id !== requestId.current) return;
       setParseError("Couldn't parse that - try being more specific, or build manually below.");
     }
     setParsing(false);
@@ -242,6 +293,8 @@ export function useJobParse({
 
   /** Clears the AI description box and its parse session; parsed rows below stay. */
   function clearAiInput(): void {
+    requestId.current++;
+    setParsing(false);
     setAiInput("");
     setParseResult(null);
     setParseError(null);

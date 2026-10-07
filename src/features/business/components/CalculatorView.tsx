@@ -44,6 +44,7 @@ import {
   AI_INPUT_HANDOFF_KEY,
   clearDraft,
   isMeaningfulDraft,
+  isPlaceholderHour,
   loadDraft,
   saveDraft,
   timeAgo,
@@ -155,6 +156,25 @@ export function CalculatorView({
     }
     return [{ startTime: "", endTime: "" }];
   });
+  // Whether the Time card holds real times (typed, edited on a booked job, restored from a
+  // draft, or read off the description) rather than a placeholder: the "now to an hour
+  // from now" a blank form seeds, a booking's own windows, or a window the parse made up
+  // from a bare duration. Only real times go to the parser, or a placeholder gets billed.
+  const [timesSet, setTimesSet] = useState(false);
+  /**
+   * Applies a Time card edit. Changing or removing an existing row makes the times real;
+   * appending a row (which starts with no end) leaves the rest as they were.
+   * @param next - The card's new ranges.
+   */
+  function handleTimeRangesChange(next: ParsedRange[]): void {
+    const edited =
+      next.length < timeRanges.length ||
+      timeRanges.some(
+        (r, i) => next[i]?.startTime !== r.startTime || next[i]?.endTime !== r.endTime,
+      );
+    setTimeRanges(next);
+    if (edited) setTimesSet(true);
+  }
   // Out-of-session work (a call after the visit, a remote fix later) billed on
   // top of the slot sum. The AI parse seeds it from outOfSessionMins.
   const [followUpMins, setFollowUpMins] = useState(0);
@@ -247,6 +267,7 @@ export function CalculatorView({
     if (!eventPrefill) return;
     setJobDate(eventPrefill.jobDate);
     setTimeRanges(eventPrefill.slots.map((s) => ({ startTime: s.startTime, endTime: s.endTime })));
+    setTimesSet(false);
   }
 
   // Travel lookup
@@ -307,8 +328,11 @@ export function CalculatorView({
     eventPrefill,
     jobDate,
     jobAddress,
+    timeRanges,
+    timesSet,
     setFollowUpMins,
     setTimeRanges,
+    setTimesSet,
     setJobAddress,
     setTravelEntries,
     setTasks,
@@ -353,6 +377,11 @@ export function CalculatorView({
     setParts,
   });
 
+  // A cancellation fee is a flat charge, not labour: no holiday uplift on it, and no
+  // promo, which would also spend a redemption on a job that never happened.
+  const pricedPromo = cancelMode ? null : activePromo;
+  const holidayUplift = cancelMode ? 0 : holiday.uplift;
+
   /**
    * Applies a picked Places suggestion: keep the full formatted address and
    * drop the stale auto travel entry (manual entries survive).
@@ -382,6 +411,9 @@ export function CalculatorView({
       setPromoCode(draft.promoCode ?? "");
       setPromoCodeInput(draft.promoCode ?? "");
       setTimeRanges(draft.timeRanges ?? [{ startTime: "", endTime: "" }]);
+      // Drafts saved before the flag existed count their times as real unless they are
+      // the lone one-hour row a blank form seeds.
+      setTimesSet(draft.timesSet ?? !isPlaceholderHour(draft.timeRanges));
       setFollowUpMins(draft.followUpMins ?? 0);
       setTravelEntries(draft.travelEntries ?? []);
       setJobAddress(draft.jobAddress ?? "");
@@ -452,6 +484,7 @@ export function CalculatorView({
         jobDate,
         promoCode,
         timeRanges,
+        timesSet,
         followUpMins,
         travelEntries,
         jobAddress,
@@ -474,6 +507,7 @@ export function CalculatorView({
     jobDate,
     promoCode,
     timeRanges,
+    timesSet,
     followUpMins,
     travelEntries,
     jobAddress,
@@ -546,25 +580,25 @@ export function CalculatorView({
     null;
   const jobPricing = {
     ...pricing,
-    holidayUplift: holiday.uplift,
+    holidayUplift,
     businessModifierId,
     standardRate,
     rates,
   };
-  const totals = calcJobTotal(job, !skipPromo ? activePromo : null, jobPricing);
+  const totals = calcJobTotal(job, !skipPromo ? pricedPromo : null, jobPricing);
   const showTotalBar = !finishInView && totals.total > 0;
   // Memoise the flattened line items so the preview panel's React.memo can
   // skip re-render when unrelated parent state changes (e.g. typing in the
   // AI input box). Recomputes when any meaningful input shifts.
   const previewLineItems = useMemo(
-    () => jobToLineItems(job, holiday.uplift, pricing.minTravelCharge, pricing.minBillableMins),
+    () => jobToLineItems(job, holidayUplift, pricing.minTravelCharge, pricing.minBillableMins),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       tasks,
       parts,
       timeRanges,
       durationMins,
-      holiday.uplift,
+      holidayUplift,
       travelEntries,
       clientName,
       clientEmail,
@@ -594,9 +628,9 @@ export function CalculatorView({
   } = useCalculatorSave({
     job,
     totals,
-    holidayUplift: holiday.uplift,
+    holidayUplift,
     pricing,
-    activePromo,
+    activePromo: pricedPromo,
     skipPromo,
     eventPrefill,
     pickedContactGoogleId,
@@ -642,6 +676,7 @@ export function CalculatorView({
     setPromoCode("");
     setPromoCodeInput("");
     setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
+    setTimesSet(false);
     setFollowUpMins(0);
     setTravelEntries([]);
     setJobAddress("");
@@ -756,7 +791,7 @@ export function CalculatorView({
         onClearForm={() => setConfirmClearOpen(true)}
 
         holiday={holiday}
-        activePromo={activePromo}
+        activePromo={pricedPromo}
         skipPromo={skipPromo}
         onSkipPromoChange={setSkipPromo}
       />
@@ -854,7 +889,7 @@ export function CalculatorView({
           {!cancelMode && (
             <JobDetailsSection
               timeRanges={timeRanges}
-              onTimeRangesChange={setTimeRanges}
+              onTimeRangesChange={handleTimeRangesChange}
               followUpMins={followUpMins}
               onFollowUpMinsChange={setFollowUpMins}
               durationMins={durationMins}
@@ -1025,10 +1060,10 @@ export function CalculatorView({
             unsuccessfulDiscount={totals.unsuccessfulDiscount}
             alreadyPaid={paidCash ? 0 : alreadyPaidAmount(alreadyPaid)}
             promoTitle={
-              activePromo && !skipPromo && totals.promoDiscount > 0 ? activePromo.title : null
+              pricedPromo && !skipPromo && totals.promoDiscount > 0 ? pricedPromo.title : null
             }
             promoDiscount={
-              activePromo && !skipPromo && totals.promoDiscount > 0 ? totals.promoDiscount : 0
+              pricedPromo && !skipPromo && totals.promoDiscount > 0 ? totals.promoDiscount : 0
             }
           />
         </div>

@@ -12,7 +12,7 @@ import {
 } from "@/features/business/lib/business";
 import { storeRunEntry } from "@/features/business/lib/calculator-helpers";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
-import { extractRanges } from "@/features/business/lib/time-parse";
+import { statesTimeRange } from "@/features/business/lib/time-parse";
 import type {
   EventPrefillSlot,
   LineItem,
@@ -24,21 +24,28 @@ import type {
 import { timeParts } from "@/shared/lib/timezone-utils";
 
 /**
- * Builds the parse-job `input` for a description. For a booked job, prepends the booking's
- * window as digit-led "HH:MM-HH:MM" lines so the parser bills the real session length
- * instead of falling back to the minimum - only when the description states no ranges of
- * its own, so operator times win. A merged job gets one line per event under a date line
- * per day; extractRanges sums them server-side excluding the gaps.
+ * A known time window for the job: a booked event's slot, or a range typed into the
+ * calculator's Time card. Only the day and times matter to the parse.
+ */
+export type WindowSlot = Pick<EventPrefillSlot, "date" | "startTime" | "endTime">;
+
+/**
+ * Builds the parse-job `input` for a description. With a known window (a booking, or real
+ * times on the Time card), prepends it as digit-led "HH:MM-HH:MM" lines so the parser bills
+ * the real session length instead of falling back to the minimum - only when the
+ * description states no range of its own, anywhere in it, so operator times win. A merged
+ * job gets one line per event under a date line per day; extractRanges sums them
+ * server-side excluding the gaps.
  *
  * A date line goes in whenever the day changes so the parser buckets each day on its own.
  * Without it a second day's window sitting inside the first day's hours merges away and
  * those minutes never bill. Only actual RANGES in the description count as stated times:
- * an incidental "drove to PB Tech @ 10:30 am" must not drop the booked window.
+ * an incidental "drove to PB Tech @ 10:30 am" must not drop the window.
  * @param aiInput - The operator's description.
- * @param slots - Booked event slots, date-ordered; empty for an unbooked job.
+ * @param slots - Known windows (booked slots or typed times), date-ordered; empty when none.
  * @returns The input string to send.
  */
-export function buildParseInput(aiInput: string, slots: EventPrefillSlot[]): string {
+export function buildParseInput(aiInput: string, slots: WindowSlot[]): string {
   const windowLines: string[] = [];
   let lastSlotDate: string | null = null;
   for (const slot of slots) {
@@ -49,7 +56,7 @@ export function buildParseInput(aiInput: string, slots: EventPrefillSlot[]): str
     }
     windowLines.push(`${slot.startTime}-${slot.endTime}`);
   }
-  if (windowLines.length === 0 || extractRanges(aiInput).length > 0) return aiInput;
+  if (windowLines.length === 0 || statesTimeRange(aiInput)) return aiInput;
   return `${windowLines.join("\n")}\n${aiInput}`;
 }
 
@@ -69,6 +76,11 @@ export function addMinsToTime(t: string, mins: number): string {
 export interface ParsedWindow {
   /** Slots to show, or null when the parse leaves the current slots alone. */
   timeRanges: ParsedRange[] | null;
+  /**
+   * Whether the slots are times the input stated (ranges, or a start and end), rather than
+   * a window built from a bare duration or an open start.
+   */
+  stated: boolean;
   /** Billable window in minutes: slot time plus out-of-session follow-up. */
   windowMins: number;
   /** Out-of-session minutes (a call after the visit). */
@@ -81,37 +93,52 @@ export interface ParsedWindow {
  * A merged job keeps its slots - they come from several corrected calendar windows,
  * exact and not reconstructable from free text.
  * @param result - The parse response.
- * @param slots - Booked event slots; empty for an unbooked job.
+ * @param slots - Known windows (booked slots or typed times); empty when none.
  * @param now - Current NZ wall-clock HH:MM, the anchor when no booked slot exists.
+ * @param merged - Whether the slots are a merged booking to keep as-is. Defaults to more
+ * than one slot; the calculator passes false for typed ranges, which the parse may correct.
  * @returns The window, follow-up minutes, and any slots to show.
  */
 export function parsedWindow(
   result: ParseJobResponse,
-  slots: EventPrefillSlot[],
+  slots: WindowSlot[],
   now: string,
+  merged: boolean = slots.length > 1,
 ): ParsedWindow {
   const followUpMins = Math.max(0, Math.round(result.outOfSessionMins ?? 0));
+  // A reply missing the field (or carrying a non-number) reads as no duration, not NaN.
+  const durationMins =
+    typeof result.durationMins === "number" && Number.isFinite(result.durationMins)
+      ? result.durationMins
+      : null;
   const anchor = slots[0] ?? null;
   let timeRanges: ParsedRange[] | null = null;
+  let stated = false;
   let windowMins = followUpMins;
-  const merged = slots.length > 1;
+  // A start with no end closes at the booked end, else now. Measured on the clock, not
+  // rolled overnight: "got there at 3pm" parsed at 9am the next day is not an 18-hour job.
+  const openEnd = anchor?.endTime ?? now;
+  const openSpan =
+    result.startTime && !result.endTime ? clockMins(openEnd) - clockMins(result.startTime) : 0;
   if (merged) {
     windowMins += slots.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
   } else if (result.ranges && result.ranges.length > 0) {
     timeRanges = result.ranges.map((r) => ({ startTime: r.startTime, endTime: r.endTime }));
+    stated = true;
     windowMins += result.ranges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
   } else if (result.startTime && result.endTime) {
     timeRanges = [{ startTime: result.startTime, endTime: result.endTime }];
+    stated = true;
     windowMins += timeDiffMins(result.startTime, result.endTime);
-  } else if (result.startTime) {
+  } else if (result.startTime && openSpan > 0) {
     // Start stated but no end: close at the booked event's end, else at now. Anchoring a
     // past job to now would end it at today's wall clock instead of inside its window.
-    const end = anchor?.endTime ?? now;
-    timeRanges = [{ startTime: result.startTime, endTime: end }];
-    windowMins += timeDiffMins(result.startTime, end);
-  } else if (result.durationMins !== null) {
+    timeRanges = [{ startTime: result.startTime, endTime: openEnd }];
+    windowMins += openSpan;
+  } else if (durationMins !== null) {
     // Duration only ("was there about 2 hours"): anchor to the booked start, else end now.
-    const inSessionMins = Math.max(0, result.durationMins - followUpMins);
+    // Also where a start-only job lands when its end would come before its start.
+    const inSessionMins = Math.max(0, durationMins - followUpMins);
     const startTime = anchor ? anchor.startTime : addMinsToTime(now, -inSessionMins);
     const endTime = anchor ? addMinsToTime(anchor.startTime, inSessionMins) : now;
     timeRanges = [{ startTime, endTime }];
@@ -120,15 +147,20 @@ export function parsedWindow(
   // The server's durationMins is the billable figure after its clamps: free work the
   // description states is already subtracted, and the longest-billable-day ceiling
   // applied. Fitting the tasks to the raw range sum would grow them back over both.
-  if (
-    !merged &&
-    result.durationMins !== null &&
-    result.durationMins > 0 &&
-    result.durationMins < windowMins
-  ) {
-    windowMins = result.durationMins;
+  if (!merged && durationMins !== null && durationMins > 0 && durationMins < windowMins) {
+    windowMins = durationMins;
   }
-  return { timeRanges, windowMins, followUpMins };
+  return { timeRanges, stated, windowMins, followUpMins };
+}
+
+/**
+ * Minutes since midnight for an HH:MM time, NaN-safe (a bad time reads as 0).
+ * @param t - HH:MM time.
+ * @returns Minutes since midnight.
+ */
+function clockMins(t: string): number {
+  const [h, m] = timeParts(t);
+  return Number.isNaN(h) || Number.isNaN(m) ? 0 : h * 60 + m;
 }
 
 /**
@@ -137,7 +169,8 @@ export function parsedWindow(
  * @returns One task line per parsed task.
  */
 export function hydrateParsedTasks(result: ParseJobResponse): TaskLine[] {
-  return result.tasks.map((t) => {
+  // A reply missing its task list hydrates to no tasks rather than throwing mid-apply.
+  return (Array.isArray(result.tasks) ? result.tasks : []).map((t) => {
     const device = t.device ?? null;
     const action = t.action ?? null;
     const details = t.details?.trim() ? t.details.trim() : null;
@@ -306,15 +339,16 @@ export interface ExistingInvoiceTravel {
  * The drive part of an existing travel line, as an auto entry. The line total also holds
  * any parking or tolls from the last parse, which the new parse re-adds, so a line that
  * records its drive minutes is re-priced from those minutes alone. One without minutes
- * keeps its total, since the drive can't be separated from the rest.
+ * ("Round-trip travel") holds no measured drive at all, only costs the new parse adds
+ * back, so there is nothing to keep.
  * @param line - The invoice's travel line.
  * @param pricing - Live pricing inputs.
- * @returns The kept drive as a travel entry.
+ * @returns The kept drive as a travel entry, or null when the line records no drive.
  */
-function keptTravelEntry(line: LineItem, pricing: ParsedJobPricing): TravelEntry {
+function keptTravelEntry(line: LineItem, pricing: ParsedJobPricing): TravelEntry | null {
   // "(N min drive)" is the round-trip total, so it rides entirely on the outbound leg.
   const driveMins = Number(/\((\d+) min drive\)/.exec(line.description)?.[1] ?? 0);
-  if (driveMins <= 0) return { label: line.description, cost: line.lineTotal, isAuto: true };
+  if (driveMins <= 0) return null;
   return {
     label: line.description,
     cost: calcTravelCharge(driveMins, 0, pricing.travelRatePerHour, pricing.minTravelCharge),
@@ -372,11 +406,12 @@ export function parsedJobToLineItems(
     auto !== null &&
     sameAddressKey(existing.destination) !== "" &&
     sameAddressKey(auto.destination) === sameAddressKey(existing.destination);
-  if (existing.line && booked && (auto === null || sameBookedPlace)) {
-    travelEntries.unshift(keptTravelEntry(existing.line, pricing));
-  } else if (auto) {
-    travelEntries.unshift(auto);
-  }
+  const kept =
+    existing.line && booked && (auto === null || sameBookedPlace)
+      ? keptTravelEntry(existing.line, pricing)
+      : null;
+  if (kept) travelEntries.unshift(kept);
+  else if (auto) travelEntries.unshift(auto);
   const lineItems = jobToLineItems(
     {
       durationMins: windowMins,
