@@ -219,7 +219,7 @@ Mixed jobs: different tasks in the same job CAN and SHOULD have different modifi
 - At-home job with a Windows reinstall (At home) and an obscure driver Harrison had to research (At home + Research) → task A modifierLabels ["At home"], task B modifierLabels ["At home", "Research"].
 - On-site job where Harrison researched an obscure printer driver before installing it → research task modifierLabels ["Research"], install task modifierLabels [].
 - On-site visit followed by "then a 42 min phone call fixing their email" → the on-site tasks get [], the phone-call task gets ["Phone"] (it was delivered by phone, after the visit ended).
-- "42-minute phone call, which turned into a remote job halfway through, fixing X" → TWO tasks splitting the stated time in half, both pinned (isExplicit): details "X, over the phone" 21 min with ["Phone"] and details "X, remote session" 21 min with ["Remote"] (customer-friendly channel suffixes - never "portion"). Work the split as arithmetic, in this order: (i) total = the stated call rounded UP on the live step, once; (ii) steps = total / step; (iii) Phone = ceil(steps / 2) × step; (iv) Remote = total - Phone. The two halves always add up to exactly total. At a 5-min step: 42 min → total 45 → 9 steps → Phone 5 steps = 25 min (0.42h), Remote 45 - 25 = 20 min (0.33h). At a 15-min step: 42 → total 45 → 3 steps → Phone 30 min (0.5h), Remote 15 min (0.25h). NEVER round each half up on its own: 25 + 25 (or 30 + 20) bills 50 min for a 42-min call, and inside a stated window that extra time comes off the on-site tasks. Never ["Phone", "Remote"] on one task. When the call happened after the stated session ("Then a 42-minute call..."), its 42 minutes ADD to durationMins and outOfSessionMins per BILLING rule 1 - the on-site tasks keep the full window.
+- "42-minute phone call, which turned into a remote job halfway through, fixing X" → TWO tasks sharing the call, both pinned (isExplicit): details "X, over the phone" with ["Phone"] and details "X, remote session" with ["Remote"], minutes from the arithmetic below, never the raw half (21 + 21) (customer-friendly channel suffixes - never "portion"). Work the split as arithmetic, in this order: (i) total = the stated call rounded UP on the live step, once; (ii) steps = total / step; (iii) Phone = ceil(steps / 2) × step; (iv) Remote = total - Phone. The two halves always add up to exactly total. At a 5-min step: 42 min → total 45 → 9 steps → Phone 5 steps = 25 min (0.42h), Remote 45 - 25 = 20 min (0.33h). At a 15-min step: 42 → total 45 → 3 steps → Phone 30 min (0.5h), Remote 15 min (0.25h). NEVER round each half up on its own: 25 + 25 (or 30 + 20) bills 50 min for a 42-min call, and inside a stated window that extra time comes off the on-site tasks. Never ["Phone", "Remote"] on one task. When the call happened after the stated session ("Then a 42-minute call..."), its 42 minutes ADD to durationMins and outOfSessionMins per BILLING rule 1 - the on-site tasks keep the full window.
 
 If location/rate signals conflict, do NOT silently pick - add a warning describing the conflict and state which you assumed.
 
@@ -237,6 +237,15 @@ FREE / NO-CHARGE WORK — a follow-up related to earlier work is sometimes done 
 - Free beats unsuccessful. When the same work is both not fixed and not charged ("couldn't fix it so didn't charge"), it is free: no task, so no unsuccessful flag. The unsuccessful flag only ever sits on a task that bills.
 - Free covers ONLY the work the description says was free. A NEW, UNRELATED issue handled in the same visit bills normally: give it its own task(s) with its stated or remaining session time, and the visit's travel bills as normal (one round trip).
 - If the ENTIRE visit was free: return tasks [], durationMins null, noTravelCharge true (the trip is on the operator), the explanation in notes, plus a warning. This is a valid result - do NOT enter clarification mode just because nothing is billable.
+- RETURN VISIT AFTER A NO-FIX - the published promise is that the first returnFree minutes (BILLING above) of a return visit are free when the earlier visit could NOT fix the problem. Does the description say this work goes back to a problem the operator could not fix on an earlier visit ("back for the printer I couldn't fix last week", "second go at the wifi after last time's no luck")?
+  - NO, including running out of time on a job that was going fine ("went back to finish the migration", "carried on from Tuesday"): bill normally; this rule does not apply.
+  - YES, and returnFree is 0: bill normally.
+  - YES: take returnFree minutes off that return work's time, never more than that work's own time. Its stated time, or the window when the whole visit was the return, is the starting figure: subtract the free minutes from durationMins (and from the pre-computed session total) and from that task's qty. If nothing is left, emit no task for it. Travel still bills. Add a note sentence ("First N min of the return visit at no charge, as the earlier visit didn't fix it.") and a warning naming the minutes taken off. If the return work has no time of its own and the visit had other work, take the minutes off the visit's total and say so in the warning.
+- WORKMANSHIP - fallout from the operator's OWN earlier work is fixed free, labour AND travel, within workmanshipDays (BILLING above). Does the description say this problem was CAUSED by something the operator changed on an earlier visit ("the update I did last week broke their scanner", "my router change knocked the TV off")?
+  - NO, including a new or unrelated fault, or one in something the operator never touched: bill normally.
+  - YES, and workmanshipDays is 0, or the description dates the earlier visit more than workmanshipDays ago: bill normally, with a warning that it is outside the workmanship window.
+  - YES, within the window or undated: it is free work - apply the FREE rules above to it (no task, its stated time off, the exact warning when it has none). When it was the whole visit, it is the ENTIRE-visit-free case (noTravelCharge true). When undated, add a warning to check the earlier visit was within workmanshipDays days.
+- These two rules need the words; never infer a return visit or fallout from a repeat customer or a repeat device alone.
 
 TASK SPLITTING — purely about identifying distinct tasks. Time distribution lives in BILLING above.
 - Only create tasks for services explicitly mentioned. Do NOT invent tasks that are not described.
@@ -392,6 +401,8 @@ Return this exact JSON shape (when not asking for clarification):
  * @param billing.minBillableMins - Minimum billable time (minutes).
  * @param billing.incrementMins - Rounding increment (minutes).
  * @param billing.shortTaskMins - Quick-task time (minutes); the qty every SHORT task is pinned to.
+ * @param billing.noFixFreeMins - Free minutes at the start of a return visit after a no-fix.
+ * @param billing.workmanshipWindowDays - Days a fallout fix from earlier work stays free.
  * @returns Context string to prepend to the user's job description.
  */
 export function buildParseJobContext(
@@ -399,7 +410,13 @@ export function buildParseJobContext(
   templates: TaskTemplate[] = [],
   currentTime?: string,
   identity?: { company: string; name: string; location: string },
-  billing?: { minBillableMins: number; incrementMins: number; shortTaskMins: number },
+  billing?: {
+    minBillableMins: number;
+    incrementMins: number;
+    shortTaskMins: number;
+    noFixFreeMins: number;
+    workmanshipWindowDays: number;
+  },
 ): string {
   // Live tag vocabulary, collapsed the same way the taxonomy endpoint collapses
   // it: one entry per case-insensitive tag. Offering both "PC" and "Pc" under a
@@ -452,7 +469,15 @@ export function buildParseJobContext(
         Math.round((billing.incrementMins / 60) * 10000) / 10000
       }h - every task qty lives on this step grid. Quick-task time (quickTask) is ${billing.shortTaskMins} min = ${
         Math.round((billing.shortTaskMins / 60) * 10000) / 10000
-      }h - the qty for a SHORT task, i.e. trivial work the operator did NOT time. It is a CEILING, never a floor: a task with a stated duration keeps that duration even when it is shorter.\n\n`
+      }h - the qty for a SHORT task, i.e. trivial work the operator did NOT time. It is a CEILING, never a floor: a task with a stated duration keeps that duration even when it is shorter. ${
+        billing.noFixFreeMins > 0
+          ? `Return-visit free time (returnFree) is ${billing.noFixFreeMins} min.`
+          : "Return-visit free time (returnFree) is 0 - a return visit after a no-fix bills in full."
+      } ${
+        billing.workmanshipWindowDays > 0
+          ? `Workmanship window (workmanshipDays) is ${billing.workmanshipWindowDays} days.`
+          : "Workmanship window (workmanshipDays) is 0 - fallout from earlier work bills in full."
+      }\n\n`
     : "";
   // Token diet: the model picks rates by label and the server resolves labels
   // back to rows, so ids and timestamps are dead weight. Send only the fields

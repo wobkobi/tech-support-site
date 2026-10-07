@@ -110,6 +110,32 @@ export function composeDescription(
 }
 
 /**
+ * Whether one comma item of a task's details only restates the line it hangs off, as in
+ * "Printer setup - new printer". Matched against the line's own device and action tags, a
+ * trailing plural "s" allowed. "New" / "brand new" count as a restatement only on a Setup
+ * line, since Setup already means first-time setup. Anything more ("new Canon printer")
+ * carries information and is kept whole.
+ * @param item - One trimmed comma item from details.
+ * @param device - The line's device tag.
+ * @param action - The line's action tag.
+ * @returns True when the item adds nothing the description doesn't already say.
+ */
+export function restatesTaskLine(
+  item: string,
+  device: string | null | undefined,
+  action: string | null | undefined,
+): boolean {
+  if (!device || !action) return false;
+  const words = item.toLowerCase().replace(/\s+/g, " ").trim();
+  const setup = action.toLowerCase() === "setup";
+  const rest = setup ? words.replace(/^(?:brand )?new\b ?/, "") : words;
+  if (!rest) return rest !== words;
+  const d = device.toLowerCase();
+  const a = action.toLowerCase();
+  return [d, a, `${d} ${a}`].some((s) => rest === s || rest === `${s}s`);
+}
+
+/**
  * Totals-block label for an invoice's promo line. No "labour only" suffix: a Free travel
  * promo comes off travel, and the invoice keeps only the promo's title, not its type.
  * Shared by the PDF, the calculator preview and the invoice page so all three agree.

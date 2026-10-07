@@ -39,6 +39,7 @@ export {
   lineItemQtyLabel,
   minsToHoursLabel,
   promoLineLabel,
+  restatesTaskLine,
   todayISO,
 } from "@/features/business/lib/business-format";
 export {

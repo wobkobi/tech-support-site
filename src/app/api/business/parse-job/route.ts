@@ -8,6 +8,7 @@ import {
   composeDescription,
   effectiveHourlyRate,
   isChannelModifier,
+  restatesTaskLine,
 } from "@/features/business/lib/business";
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import {
@@ -181,6 +182,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         minBillableMins: settings.pricing.minBillableMins,
         incrementMins: settings.pricing.billingIncrementMins,
         shortTaskMins: settings.pricing.shortTaskMins,
+        noFixFreeMins: settings.pricing.noFixFreeMins,
+        workmanshipWindowDays: settings.pricing.workmanshipWindowDays,
       },
     );
     // Live ceiling on one job's billable time; clamps the model's minutes below.
@@ -411,6 +414,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // drifted synonym gets corrected before it splits the price history.
       const newTags = new Set<string>();
       const strippedSpeedHints = new Set<string>();
+      const strippedRestatements = new Set<string>();
       parsed.tasks = parsed.tasks.map((task) => {
         const t = task as typeof task & {
           action?: string | null;
@@ -443,6 +447,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             if (!item) continue;
             if (/^(?:quick(?:ly)?|briefly)$/i.test(item)) {
               strippedSpeedHints.add(item.toLowerCase());
+              continue;
+            }
+            // The prompt's details INVARIANT forbids this too; same drop-and-warn backstop.
+            if (restatesTaskLine(item, device, action)) {
+              strippedRestatements.add(`"${composeDescription(device, action, item)}"`);
               continue;
             }
             kept.push(item);
@@ -519,6 +528,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           `Removed speed hint(s) from the invoice wording: ${[...strippedSpeedHints].join(
             ", ",
           )}. These set how long the task is billed for; they are not part of what the customer is told was done.`,
+        ];
+      }
+      if (strippedRestatements.size > 0) {
+        parsed.warnings = [
+          ...(parsed.warnings ?? []),
+          `Dropped wording that only repeated the line: ${[...strippedRestatements].join(
+            ", ",
+          )}. The device and action already say it.`,
         ];
       }
       if (newTags.size > 0) {
