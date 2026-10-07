@@ -327,10 +327,11 @@ export async function DELETE(
   }
   // A deleted draft is usually re-raised, so its already-paid entry goes with it rather
   // than being counted twice when the replacement records its own.
+  let incomeSheetWarning = false;
   if (existing.alreadyPaidIncomeId) {
     await prisma.invoice.update({ where: { id }, data: { alreadyPaid: null } });
-    await syncAlreadyPaidIncome(id);
+    incomeSheetWarning = (await syncAlreadyPaidIncome(id)).sheetSyncWarning;
   }
   await prisma.invoice.delete({ where: { id } });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, incomeSheetWarning });
 }

@@ -60,8 +60,13 @@ export function balanceIncomeWhere(invoice: {
  * Brings the already-paid income entry in line with the invoice: creates it when the
  * invoice gains a part payment, updates the amount and method when they change, and
  * deletes it (with its Cashbook row) when the part payment is cleared or the invoice is
- * a quote. The DB writes always land; a sheet failure only sets the warning flag, and
- * the sync cron reconciles it.
+ * a quote. The Cashbook sheet is the source of truth on the next import, so a sheet
+ * failure is not reconciled for you: an update that misses the sheet gets put back to the
+ * sheet's amount, and the warning tells the operator to fix the row by hand.
+ *
+ * A removal deletes the sheet row first and only then the entry. If the sheet delete
+ * fails, the entry is kept but unlinked from the invoice, so it keeps mirroring the row
+ * still in the sheet instead of the import re-adding that row as a second income entry.
  * @param invoiceId - The invoice to reconcile.
  * @param date - Date for a newly created entry; defaults to the invoice's issue date.
  * @returns Whether the Cashbook sheet write was skipped or failed.
@@ -89,18 +94,25 @@ export async function syncAlreadyPaidIncome(
       }
       return { sheetSyncWarning: false };
     }
-    await prisma.incomeEntry.delete({ where: { id: existing.id } });
+    let sheetRowGone = !existing.sheetRowKey;
+    if (existing.sheetRowKey) {
+      try {
+        const spreadsheetId = await resolveSheetIdForDate(existing.date);
+        if (spreadsheetId) {
+          await deleteRowBySyncId(spreadsheetId, "Cashbook", existing.sheetRowKey);
+          sheetRowGone = true;
+        }
+      } catch (err) {
+        console.error(`[already-paid] Sheet row delete failed for income ${existing.id}:`, err);
+      }
+    }
     await prisma.invoice.update({ where: { id: invoiceId }, data: { alreadyPaidIncomeId: null } });
-    if (!existing.sheetRowKey) return { sheetSyncWarning: false };
-    try {
-      const spreadsheetId = await resolveSheetIdForDate(existing.date);
-      if (!spreadsheetId) return { sheetSyncWarning: true };
-      await deleteRowBySyncId(spreadsheetId, "Cashbook", existing.sheetRowKey);
-      return { sheetSyncWarning: false };
-    } catch (err) {
-      console.error(`[already-paid] Sheet row delete failed for income ${existing.id}:`, err);
+    if (!sheetRowGone) {
+      await prisma.incomeEntry.update({ where: { id: existing.id }, data: { invoiceId: null } });
       return { sheetSyncWarning: true };
     }
+    await prisma.incomeEntry.delete({ where: { id: existing.id } });
+    return { sheetSyncWarning: false };
   }
 
   if (!existing) {

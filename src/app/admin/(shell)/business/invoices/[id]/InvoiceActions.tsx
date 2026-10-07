@@ -14,7 +14,10 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { PaymentDialog } from "@/features/business/components/invoice/PaymentDialog";
+import {
+  type LikelyIncome,
+  PaymentDialog,
+} from "@/features/business/components/invoice/PaymentDialog";
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -51,6 +54,8 @@ interface InvoiceActionsProps {
   reminderLastSentAt?: string | null;
   /** Apology stamp; passed to {@link PaymentDialog} so it can't be sent twice. */
   apologySentAt?: string | null;
+  /** Unlinked income row that looks like this invoice's payment, offered for linking. */
+  likelyIncome?: LikelyIncome | null;
   /** True when the row is a quote - swaps email copy, hides payment actions, adds Convert. */
   isQuote?: boolean;
 }
@@ -82,6 +87,7 @@ const headers = { "Content-Type": "application/json" };
  * @param props.reminderCount - Reminders already sent (null reads as 0).
  * @param props.reminderLastSentAt - Last reminder stamp, passed to the payment dialog.
  * @param props.apologySentAt - Apology stamp, passed to the payment dialog.
+ * @param props.likelyIncome - Unlinked income row matching this invoice, passed to the payment dialog.
  * @param props.isQuote - Whether the row is a quote.
  * @returns Invoice actions element with its modals.
  */
@@ -103,6 +109,7 @@ export function InvoiceActions({
   reminderCount = null,
   reminderLastSentAt = null,
   apologySentAt = null,
+  likelyIncome = null,
   isQuote = false,
 }: InvoiceActionsProps): React.ReactElement {
   const router = useRouter();
@@ -209,9 +216,17 @@ export function InvoiceActions({
     setDeleting(true);
     try {
       const res = await fetch(`/api/business/invoices/${invoiceId}`, { method: "DELETE", headers });
-      if (!res.ok) {
-        const d = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(d.error ?? "Delete failed");
+      const d = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        incomeSheetWarning?: boolean;
+      };
+      if (!res.ok) throw new Error(d.error ?? "Delete failed");
+      // The already-paid row is still in the Cashbook sheet, which wins on import.
+      if (d.incomeSheetWarning) {
+        toast(
+          "Draft deleted, but its already-paid row is still in the Cashbook sheet. Delete it there, or it stays in income.",
+          { tone: "warning" },
+        );
       }
       router.push("/admin/business/invoices");
     } catch (err) {
@@ -462,6 +477,7 @@ export function InvoiceActions({
             apologySentAt,
           }}
           hasLinkedIncome={hasPaymentIncome}
+          likelyIncome={likelyIncome}
           onClose={(recorded) => {
             setPayOpen(false);
             if (recorded) {

@@ -10,6 +10,10 @@ import {
   getNextInvoiceNumber,
   writeBackInvoiceCounter,
 } from "@/features/business/lib/invoice-numbering";
+import {
+  releaseBookingRedemptions,
+  settlePromoRedemption,
+} from "@/features/business/lib/promo-redemption";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -113,6 +117,20 @@ export async function POST(
     },
     "[invoices/convert]",
   );
+  // Creating the quote left its promo unsettled, since a quote is not a use. Now it is
+  // billed work, so settle it here, the same as creating an invoice does; without this a
+  // quoted job never counted toward the promo's cap.
+  if (converted.promoId && (converted.promoDiscount ?? 0) > 0) {
+    await settlePromoRedemption({
+      promoId: converted.promoId,
+      invoiceId: converted.id,
+      bookingId: converted.bookingId,
+      contactId: converted.contactId,
+      discountValue: converted.promoDiscount ?? 0,
+    });
+  } else if (converted.bookingId) {
+    await releaseBookingRedemptions(converted.bookingId);
+  }
   console.log(`[invoices/convert] Quote ${previousNumber} converted to ${converted.number}.`);
 
   // Re-render + re-upload the PDF under the new number (awaited; never throws).

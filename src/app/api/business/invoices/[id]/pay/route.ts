@@ -25,11 +25,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/business/invoices/[id]/pay
- * Body: `{ paidAt?, method, reference?, createIncome?, sendApology? }`. `method`
+ * Body: `{ paidAt?, method, reference?, createIncome?, sendApology?, adoptIncomeId? }`. `method`
  * must be an INCOME_METHODS value; `paidAt` defaults to now; `createIncome` and
  * `sendApology` both default true except on an already-PAID invoice (where a
  * non-dialog caller must not silently create a second ledger row or email about
- * a long-settled bill).
+ * a long-settled bill). `adoptIncomeId` names an unlinked income row (typed into the
+ * Cashbook sheet) that is this payment; it gets linked instead of a second row being made.
  * @param request - Next.js request (admin-auth gated).
  * @param ctx - Route ctx with the invoice id.
  * @param ctx.params - Resolved Next.js dynamic route params.
@@ -59,7 +60,12 @@ export async function POST(
     reference?: unknown;
     createIncome?: unknown;
     sendApology?: unknown;
+    adoptIncomeId?: unknown;
   };
+  const adoptIncomeId =
+    typeof body.adoptIncomeId === "string" && /^[a-f0-9]{24}$/i.test(body.adoptIncomeId)
+      ? body.adoptIncomeId
+      : null;
   const method = typeof body.method === "string" ? body.method : "";
   if (!(INCOME_METHODS as readonly string[]).includes(method)) {
     return errorResponse("Invalid payment method", 400);
@@ -100,9 +106,22 @@ export async function POST(
 
   // Income step (only the claim winner reaches here). The already-paid entry is not the
   // payment, so it is never updated here and never stops the balance being recorded.
-  const existingIncome = await prisma.incomeEntry.findFirst({
+  let existingIncome = await prisma.incomeEntry.findFirst({
     where: balanceIncomeWhere(invoice),
   });
+  // The page matched a sheet-entered row to this invoice and the operator confirmed it
+  // is this payment: link it, so the update path below refreshes it instead of a second
+  // row being booked. Only an unlinked row can be taken, so another invoice's income
+  // is never stolen.
+  if (!existingIncome && adoptIncomeId) {
+    const adopted = await prisma.incomeEntry.updateMany({
+      where: { id: adoptIncomeId, OR: [{ invoiceId: null }, { invoiceId: { isSet: false } }] },
+      data: { invoiceId: id },
+    });
+    if (adopted.count === 1) {
+      existingIncome = await prisma.incomeEntry.findUnique({ where: { id: adoptIncomeId } });
+    }
+  }
   const balance = balanceDue(invoice);
   let incomeEntry = existingIncome;
   let incomeAction: "created" | "updated" | "skipped" = "skipped";
@@ -114,7 +133,8 @@ export async function POST(
     // the ledger or the sheet.
     incomeEntry = await prisma.incomeEntry.update({
       where: { id: existingIncome.id },
-      data: { date: paidAt, method, notes: reference },
+      // A blank reference keeps whatever note the row already has (often typed in the sheet).
+      data: { date: paidAt, method, notes: reference ?? existingIncome.notes },
     });
     // Write those fields through to the existing sheet row (no new row). Null
     // cells preserve the sheet's customer/description/amount.

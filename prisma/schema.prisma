@@ -501,6 +501,9 @@ model Invoice {
   // Promo snapshot at creation time (kept stable if the source promo changes).
   promoTitle           String?
   promoDiscount        Float?
+  // The promo behind promoDiscount. Only read when a quote converts: a quote does not
+  // settle a redemption (it may never happen), so conversion settles it from this.
+  promoId              String?           @db.ObjectId
   // Half-price labour discount applied when the visit couldn't be fixed AND
   // couldn't be diagnosed (see pricing-policy.ts unsuccessfulWorkCopy).
   // Audit trail: lets the admin dashboard count how often the half-price

@@ -234,6 +234,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           total,
           promoTitle: discount > 0 && promoTitle ? promoTitle : null,
           promoDiscount: discount > 0 ? discount : null,
+          promoId: discount > 0 ? parseObjectId(promoId) : null,
           unsuccessful: unsuccessful === true,
           unsuccessfulDiscount: unsuccessfulDiscountValue > 0 ? unsuccessfulDiscountValue : null,
           notes: notes ?? null,
