@@ -44,8 +44,9 @@ export default function AdminShellLayout({
             overflow-x-clip preserves sticky descendants. Print drops the chrome. */}
         <div className="min-w-0 flex-1 bg-slate-50 lg:ml-56 print:ml-0 print:bg-white">
           {/* The root layout's skip link targets #main. */}
-          {/* pb-28 below lg keeps the end of every page clear of the + button. */}
-          <main id="main" className="px-4 pt-16 pb-28 sm:px-6 sm:pt-8 lg:pt-8 lg:pb-8 print:p-0">
+          {/* Below lg, pt-18 clears the 56px top bar and pb-28 keeps the end of every
+              page clear of the + button. */}
+          <main id="main" className="px-4 pt-18 pb-28 sm:px-6 lg:pt-8 lg:pb-8 print:p-0">
             {children}
           </main>
         </div>

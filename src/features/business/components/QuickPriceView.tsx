@@ -2,7 +2,9 @@
 // On-site quick price: an address and a start/end time priced as one Standard labour line
 // plus auto travel. Runs through calcJobTotal and lookupAutoTravel, the same pair the job
 // calculator uses, so the figure quoted at the door matches what a later invoice would say.
-// Travel can be dropped from the total, and the price can be recorded straight to income.
+// Travel can be dropped from the total, and the money taken can be recorded straight to
+// income: the amount received (which can differ from the total) by Bank, Cash, or split
+// across both as two rows, the same way an invoice's already-paid part and its balance are.
 
 "use client";
 
@@ -12,6 +14,13 @@ import { Card } from "@/features/admin/components/ui/Card";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { AlreadyPaidField } from "@/features/business/components/invoice/AlreadyPaidField";
+import {
+  EMPTY_ALREADY_PAID,
+  alreadyPaidAmount,
+  type AlreadyPaidMethod,
+  type AlreadyPaidState,
+} from "@/features/business/lib/already-paid-input";
 import {
   calcJobTotal,
   effectiveHourlyRate,
@@ -22,7 +31,6 @@ import {
   todayISO,
 } from "@/features/business/lib/business";
 import { lookupAutoTravel } from "@/features/business/lib/calculator-helpers";
-import { INCOME_METHODS } from "@/features/business/lib/constants";
 import { buildIncomeDescription } from "@/features/business/lib/invoice-maths";
 import { bankParticulars } from "@/features/business/lib/payment-fields";
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
@@ -74,8 +82,24 @@ export interface QuickPrefill {
   travel: TravelEntry | null;
 }
 
-/** How a quick-price job can be paid; Mixed is left to the full income form. */
-const PAID_BY = INCOME_METHODS.filter((m) => m !== "Mixed");
+/** How a quick-price job can be paid. Split records a Cash row and a Bank row, not "Mixed". */
+const PAID_BY = ["Bank", "Cash", "Split"] as const;
+
+/** One income row to record. */
+interface IncomeRow {
+  method: AlreadyPaidMethod;
+  amount: number;
+}
+
+/**
+ * Typed dollars to a number, rounded to cents.
+ * @param raw - The box's text, with or without "$" and commas.
+ * @returns The amount, or 0 when blank or not a number.
+ */
+function parseDollars(raw: string): number {
+  const n = Number(raw.replace(/[$,\s]/g, ""));
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+}
 
 interface Props {
   rates: RateConfig[];
@@ -129,7 +153,13 @@ export function QuickPriceView({
   const { toast } = useToast();
   const [customer, setCustomer] = useState(prefill?.clientName ?? "");
   const [paidBy, setPaidBy] = useState<(typeof PAID_BY)[number]>("Bank");
-  const [income, setIncome] = useState<"idle" | "saving" | "added">("idle");
+  // Null follows the total; text once the operator types a different amount.
+  const [received, setReceived] = useState<string | null>(null);
+  // The split's first part, in the same shape as an invoice's "Already paid" box.
+  const [part, setPart] = useState<AlreadyPaidState>(EMPTY_ALREADY_PAID);
+  // Methods already recorded, so a retry after a half-saved split posts only the missing row.
+  const [savedMethods, setSavedMethods] = useState<AlreadyPaidMethod[]>([]);
+  const [saving, setSaving] = useState(false);
   const [incomeError, setIncomeError] = useState<string | null>(null);
 
   const standard =
@@ -211,40 +241,84 @@ export function QuickPriceView({
     }
   }
 
-  /** Records the total on screen as today's income; locks once it has gone in. */
+  const receivedAmount = received === null ? totals.total : parseDollars(received);
+  const receivedDiff = Math.round((receivedAmount - totals.total) * 100) / 100;
+  const partAmount = alreadyPaidAmount(part);
+  const restMethod: AlreadyPaidMethod = part.method === "Cash" ? "Bank" : "Cash";
+  const restAmount = Math.round((receivedAmount - partAmount) * 100) / 100;
+  const isSplit = paidBy === "Split";
+  const rows: IncomeRow[] = isSplit
+    ? [
+        { method: part.method, amount: partAmount },
+        { method: restMethod, amount: restAmount },
+      ]
+    : [{ method: paidBy, amount: receivedAmount }];
+  // A split needs money on both sides; all of it one way is just Cash or Bank.
+  const canSave = receivedAmount > 0 && (!isSplit || (partAmount > 0 && restAmount > 0));
+  const pendingRows = rows.filter((r) => !savedMethods.includes(r.method));
+  const added = savedMethods.length > 0 && pendingRows.length === 0;
+  // Once a row is in, the figures stay put so the retry posts what the first row assumed.
+  const locked = saving || savedMethods.length > 0;
+  // Names the method on split rows, so a retry says which half is still to go in.
+  const saveLabel = `Add ${pendingRows
+    .map((r) => `${formatNZD(r.amount)}${isSplit ? ` ${r.method.toLowerCase()}` : ""}`)
+    .join(" + ")} to income`;
+
+  /**
+   * Records the money taken as today's income: one row, or a Cash row and a Bank row for a
+   * split. Rows already in are skipped, so a retry after a partial failure never doubles one.
+   */
   async function addToIncome(): Promise<void> {
-    setIncome("saving");
+    setSaving(true);
     setIncomeError(null);
-    try {
-      const res = await fetch("/api/business/income", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          date: todayISO(),
-          customer: customer.trim() || "Walk-in",
-          description: buildIncomeDescription(job) + (noTravel ? " - no travel charged" : ""),
-          amount: totals.total,
-          method: paidBy,
-        }),
-      });
-      const d = (await res.json()) as { ok?: boolean; error?: string; sheetSyncWarning?: boolean };
-      if (!d.ok) {
-        setIncome("idle");
-        setIncomeError(d.error || "Could not add to income.");
+    // The note keeps the quoted total when the money taken differs from it, or is split.
+    const totalNote = isSplit
+      ? ` (split, total ${formatNZD(totals.total)})`
+      : receivedDiff !== 0
+        ? ` (total ${formatNZD(totals.total)})`
+        : "";
+    const description =
+      buildIncomeDescription(job) + (noTravel ? " - no travel charged" : "") + totalNote;
+    let sheetWarning = false;
+    for (const row of pendingRows) {
+      try {
+        const res = await fetch("/api/business/income", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            date: todayISO(),
+            customer: customer.trim() || "Walk-in",
+            description,
+            amount: row.amount,
+            method: row.method,
+          }),
+        });
+        const d = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          sheetSyncWarning?: boolean;
+        };
+        if (!d.ok) {
+          setIncomeError(d.error || `Could not add the ${row.method} payment to income.`);
+          setSaving(false);
+          return;
+        }
+        // recordIncome keeps the entry even when the Cashbook append fails, so say so.
+        if (d.sheetSyncWarning) sheetWarning = true;
+        setSavedMethods((prev) => [...prev, row.method]);
+      } catch {
+        setIncomeError(`Could not add the ${row.method} payment to income. Please try again.`);
+        setSaving(false);
         return;
       }
-      setIncome("added");
-      // recordIncome keeps the entry even when the Cashbook append fails, so say so.
-      if (d.sheetSyncWarning) {
-        toast("Added to income, but the Cashbook sheet update didn't go through.", {
-          tone: "warning",
-        });
-      } else {
-        toast("Added to income.", { tone: "success" });
-      }
-    } catch {
-      setIncome("idle");
-      setIncomeError("Could not add to income. Please try again.");
+    }
+    setSaving(false);
+    if (sheetWarning) {
+      toast("Added to income, but the Cashbook sheet update didn't go through.", {
+        tone: "warning",
+      });
+    } else {
+      toast("Added to income.", { tone: "success" });
     }
   }
 
@@ -342,12 +416,14 @@ export function QuickPriceView({
               <label htmlFor="quick-start" className="mb-1 block text-sm font-medium">
                 Start
               </label>
+              {/* min-w-0 + appearance-none: iOS Safari gives time inputs an intrinsic
+                  width wider than a phone's half column, so they spill out of the card. */}
               <input
                 id="quick-start"
                 type="time"
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
-                className={ADMIN_INPUT_CLS}
+                className={cn(ADMIN_INPUT_CLS, "block min-w-0 appearance-none")}
               />
             </div>
             <div>
@@ -368,7 +444,7 @@ export function QuickPriceView({
                 type="time"
                 value={end}
                 onChange={(e) => setEnd(e.target.value)}
-                className={ADMIN_INPUT_CLS}
+                className={cn(ADMIN_INPUT_CLS, "block min-w-0 appearance-none")}
               />
               {prefill && end !== prefill.bookedEnd && (
                 <p className="mt-1 text-sm text-admin-text-secondary">
@@ -408,7 +484,7 @@ export function QuickPriceView({
             <dd>{billedMins > 0 ? formatNZD(totals.tasksTotal) : "Enter a start time"}</dd>
           </div>
           <div className="flex justify-between gap-3">
-            <dt>
+            <dt className="min-w-0">
               Travel
               {noTravel ? (
                 <span className="text-admin-text-secondary"> - not charged</span>
@@ -417,8 +493,17 @@ export function QuickPriceView({
                   <span className="text-admin-text-secondary"> - {driveMins} min round trip</span>
                 )
               )}
+              {(travel || noTravel) && (
+                <button
+                  type="button"
+                  onClick={() => setNoTravel((v) => !v)}
+                  className="ml-2 text-sm font-medium text-russian-violet underline underline-offset-2"
+                >
+                  {noTravel ? "Add back" : "No travel"}
+                </button>
+              )}
             </dt>
-            <dd className="flex items-center gap-2">
+            <dd className="shrink-0">
               {noTravel
                 ? formatNZD(0)
                 : travel
@@ -426,11 +511,6 @@ export function QuickPriceView({
                   : lookingUp
                     ? "Looking up..."
                     : "-"}
-              {(travel || noTravel) && (
-                <AdminButton size="xs" variant="secondary" onClick={() => setNoTravel((v) => !v)}>
-                  {noTravel ? "Add back" : "No travel"}
-                </AdminButton>
-              )}
             </dd>
           </div>
           {totals.holidaySurcharge > 0 && (
@@ -483,9 +563,41 @@ export function QuickPriceView({
               value={customer}
               onChange={(e) => setCustomer(e.target.value)}
               placeholder="Walk-in"
-              disabled={income === "added"}
+              disabled={locked}
               className={ADMIN_INPUT_CLS}
             />
+          </div>
+          <div>
+            <label htmlFor="quick-received" className="mb-1 block text-sm font-medium">
+              Amount received
+            </label>
+            <input
+              id="quick-received"
+              type="text"
+              inputMode="decimal"
+              value={received ?? totals.total.toFixed(2)}
+              onChange={(e) => setReceived(e.target.value)}
+              disabled={locked}
+              className={cn(ADMIN_INPUT_CLS, "w-32")}
+            />
+            {received !== null && (
+              <p className="mt-1 text-sm text-admin-text-secondary">
+                {receivedDiff > 0
+                  ? `${formatNZD(receivedDiff)} more than the total. `
+                  : receivedDiff < 0
+                    ? `${formatNZD(-receivedDiff)} less than the total. `
+                    : ""}
+                {!locked && (
+                  <button
+                    type="button"
+                    onClick={() => setReceived(null)}
+                    className="font-medium text-russian-violet underline underline-offset-2"
+                  >
+                    Use total
+                  </button>
+                )}
+              </p>
+            )}
           </div>
           <div>
             <span className="mb-1 block text-sm font-medium">Paid by</span>
@@ -495,7 +607,7 @@ export function QuickPriceView({
                   key={m}
                   aria-label={paidBy === m ? `Paid by ${m} (selected)` : `Paid by ${m}`}
                   variant={paidBy === m ? "primary" : "secondary"}
-                  disabled={income === "added"}
+                  disabled={locked}
                   onClick={() => setPaidBy(m)}
                 >
                   {m}
@@ -503,7 +615,19 @@ export function QuickPriceView({
               ))}
             </div>
           </div>
-          {income === "added" ? (
+          {isSplit && (
+            <AlreadyPaidField
+              value={part}
+              onChange={setPart}
+              total={receivedAmount}
+              disabled={locked}
+              inputClassName={ADMIN_INPUT_CLS}
+              label="Part paid"
+              balanceLabel={`Rest by ${restMethod}:`}
+              coversNote="That's all of it - pick Cash or Bank above instead."
+            />
+          )}
+          {added ? (
             <Link
               href="/admin/business/income"
               className="text-base font-semibold text-moonstone-700 underline underline-offset-2"
@@ -511,12 +635,8 @@ export function QuickPriceView({
               Added to income - view
             </Link>
           ) : (
-            <AdminButton
-              onClick={() => void addToIncome()}
-              busy={income === "saving"}
-              disabled={totals.total <= 0}
-            >
-              Add {formatNZD(totals.total)} to income
+            <AdminButton onClick={() => void addToIncome()} busy={saving} disabled={!canSave}>
+              {saveLabel}
             </AdminButton>
           )}
           {incomeError && <p className="text-sm text-coquelicot-700">{incomeError}</p>}

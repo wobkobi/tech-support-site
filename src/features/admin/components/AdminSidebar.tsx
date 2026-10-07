@@ -261,16 +261,19 @@ export function AdminSidebar(): React.ReactElement {
 
   return (
     <>
-      {/* Mobile hamburger - only rendered below lg. Sits over page content. */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Open menu"
-        aria-expanded={open}
-        className="fixed top-3 left-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-russian-violet text-white shadow-lg lg:hidden print:hidden"
-      >
-        <FaBars className="text-base" />
-      </button>
+      {/* Mobile top bar - only rendered below lg. A solid bar rather than a floating
+          button, so scrolled content passes under it instead of colliding with it. */}
+      <div className="fixed inset-x-0 top-0 z-30 flex h-14 items-center border-b border-admin-border bg-admin-surface px-3 lg:hidden print:hidden">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Open menu"
+          aria-expanded={open}
+          className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-russian-violet text-white"
+        >
+          <FaBars className="text-base" />
+        </button>
+      </div>
 
       {/* Mobile backdrop - visible only when drawer is open. */}
       <div
