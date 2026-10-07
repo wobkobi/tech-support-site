@@ -232,6 +232,20 @@ export function CalculatorView({
   const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(null);
   const [pickedContactGoogleId, setPickedContactGoogleId] = useState<string | null>(null);
   const [addressMode, setAddressModeState] = useState<"name" | "company" | "custom">("custom");
+  // "Also update the contact" box, shown once a picked contact's name is edited.
+  const [renameContact, setRenameContact] = useState(true);
+  // The typed name, when it is a hand edit of a picked contact's name (adding a last
+  // name, say) rather than the contact's own name or company again.
+  const typedClientName = clientName.trim();
+  const contactRenameOffer =
+    pickedContactName &&
+    pickedContactGoogleId &&
+    addressMode === "custom" &&
+    typedClientName &&
+    typedClientName !== pickedContactName &&
+    typedClientName !== pickedContactCompany
+      ? typedClientName
+      : null;
 
   // Full-clear confirm: clearing also deletes the saved draft, so it can't be undone.
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
@@ -626,6 +640,7 @@ export function CalculatorView({
     handleAddContactClose,
     resetSaveState,
   } = useCalculatorSave({
+    renameContactTo: renameContact ? contactRenameOffer : null,
     job,
     totals,
     holidayUplift,
@@ -692,6 +707,7 @@ export function CalculatorView({
     setPickedContactCompany(null);
     setPickedContactGoogleId(null);
     setAddressModeState("custom");
+    setRenameContact(true);
     // The description plus the non-persisted parse-session results, still part
     // of "starting fresh".
     clearAiInput();
@@ -1000,6 +1016,9 @@ export function CalculatorView({
             pickedContactCompany={pickedContactCompany}
             addressMode={addressMode}
             onAddressModeChange={setAddressMode}
+            renameOffer={contactRenameOffer}
+            renameContact={renameContact}
+            onRenameContactChange={setRenameContact}
             contacts={contacts}
             onSelectContact={(c) => {
               const company = c.company?.trim() || null;
@@ -1011,6 +1030,7 @@ export function CalculatorView({
               setPickedContactName(c.name);
               setPickedContactCompany(company);
               setPickedContactGoogleId(c.id || null);
+              setRenameContact(true);
               // Bypass the setAddressMode wrapper - it reads pickedContactName
               // from this same render's closure (still null), which would flip
               // the mode to "custom". The name is already set explicitly above.

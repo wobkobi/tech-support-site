@@ -1,9 +1,10 @@
 "use client";
 // src/features/business/components/calculator/ClientPickerSection.tsx
 // Right-rail "Client" card. Typing the name inline-searches saved contacts via
-// filterContacts; picking one fills name + email and locks it. A Name/Company/Custom
-// segmented control appears after a pick, and "Clear" resets so the operator can search
-// again.
+// filterContacts; picking one fills name + email. A Name/Company/Custom segmented control
+// appears after a pick, and typing over the picked name (adding a last name, say) switches
+// it to Custom and offers to rename the contact too. "Clear" resets so the operator can
+// search again.
 
 import type { GoogleContact } from "@/features/business/types/business";
 import { filterContacts } from "@/features/contacts/lib/contact-search";
@@ -23,6 +24,10 @@ interface Props {
   pickedContactCompany: string | null;
   addressMode: AddressMode;
   onAddressModeChange: (mode: AddressMode) => void;
+  /** The edited name a picked contact could be renamed to, or null when there is none. */
+  renameOffer: string | null;
+  renameContact: boolean;
+  onRenameContactChange: (value: boolean) => void;
   contacts: GoogleContact[];
   onSelectContact: (contact: GoogleContact) => void;
   onClearContact: () => void;
@@ -32,19 +37,22 @@ const MAX_SUGGESTIONS = 6;
 
 /**
  * Right-rail "Client" card. Type into Name to inline-search saved contacts -
- * a dropdown of matches surfaces below; click one to fill name + email and
- * lock the picked value. The Name/Company/Custom segmented control appears
- * after a pick (Name is read-only outside Custom mode). "x Clear" resets so
+ * a dropdown of matches surfaces below; click one to fill name + email. The
+ * Name/Company/Custom segmented control appears after a pick, and editing the
+ * filled name switches it to Custom so the edit sticks. "x Clear" resets so
  * the operator can search again or stay typing a custom name.
  * @param props - Component props.
  * @param props.clientName - Current Name value.
- * @param props.onClientNameChange - Name setter; fires on every keystroke when editable.
+ * @param props.onClientNameChange - Name setter; fires on every keystroke.
  * @param props.clientEmail - Current Email value.
  * @param props.onClientEmailChange - Email setter.
  * @param props.pickedContactName - Picked contact's name, or null.
  * @param props.pickedContactCompany - Picked contact's company (drives Company availability).
  * @param props.addressMode - Current segmented-control selection.
  * @param props.onAddressModeChange - Flips the segmented control + updates clientName.
+ * @param props.renameOffer - Edited name the picked contact could take, or null.
+ * @param props.renameContact - Whether saving the invoice renames the contact.
+ * @param props.onRenameContactChange - Ticks or unticks the rename.
  * @param props.contacts - All saved Google contacts (loaded once by the parent).
  * @param props.onSelectContact - Fires when the operator clicks a suggestion or commits one via Enter.
  * @param props.onClearContact - Fires when the operator clears the picked contact.
@@ -59,6 +67,9 @@ export function ClientPickerSection({
   pickedContactCompany,
   addressMode,
   onAddressModeChange,
+  renameOffer,
+  renameContact,
+  onRenameContactChange,
   contacts,
   onSelectContact,
   onClearContact,
@@ -67,15 +78,14 @@ export function ClientPickerSection({
   const [highlight, setHighlight] = useState(0);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Name is editable when no contact is picked, OR the segmented control is in
-  // Custom mode. Inline autocomplete only fires on the "no pick" path so a
-  // deliberate Custom override doesn't keep nagging with suggestions.
-  const editable = pickedContactName === null;
+  // Inline autocomplete only fires before a pick, so editing a picked contact's name
+  // doesn't keep nagging with suggestions.
+  const searching = pickedContactName === null;
 
   const suggestions = useMemo(() => {
-    if (!editable || !focused || !clientName.trim()) return [];
+    if (!searching || !focused || !clientName.trim()) return [];
     return filterContacts(contacts, clientName).slice(0, MAX_SUGGESTIONS);
-  }, [editable, focused, clientName, contacts]);
+  }, [searching, focused, clientName, contacts]);
 
   /**
    * Commits a suggestion. Cancels the pending blur-close so the click lands
@@ -158,8 +168,10 @@ export function ClientPickerSection({
           type="text"
           placeholder="Name"
           value={clientName}
-          readOnly={!editable && addressMode !== "custom"}
           onChange={(e) => {
+            // A hand edit no longer matches the contact's name or company, so mark it
+            // Custom; picking Name again puts the contact's own name back.
+            if (!searching && addressMode !== "custom") onAddressModeChange("custom");
             onClientNameChange(e.target.value);
             setHighlight(0);
           }}
@@ -169,10 +181,7 @@ export function ClientPickerSection({
             blurTimerRef.current = setTimeout(() => setFocused(false), 150);
           }}
           onKeyDown={onKeyDown}
-          className={cn(
-            "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-            !editable && addressMode !== "custom" && "bg-slate-50 text-slate-700",
-          )}
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
         />
         {suggestions.length > 0 && (
           <div className="absolute top-full right-0 left-0 z-20 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
@@ -207,6 +216,19 @@ export function ClientPickerSection({
           </div>
         )}
       </div>
+      {renameOffer && (
+        <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={renameContact}
+            onChange={(e) => onRenameContactChange(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-russian-violet"
+          />
+          <span>
+            Also change the contact from {pickedContactName} to {renameOffer} when the invoice saves
+          </span>
+        </label>
+      )}
       <EmailInput
         id="calculator-client-email"
         placeholder="Email"

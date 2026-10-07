@@ -49,6 +49,8 @@ interface UseCalculatorSaveArgs {
   eventPrefill: EventPrefill | null;
   /** Google id of the picked contact, for the contact check. */
   pickedContactGoogleId: string | null;
+  /** New name for the picked contact, set when the operator edited it and kept the box ticked. */
+  renameContactTo: string | null;
   /** Job date the income entry is recorded against. */
   jobDate: string;
   /** "Paid in cash" ticked: an invoice saves as paid, an income entry records Cash. */
@@ -92,6 +94,7 @@ interface UseCalculatorSave {
  * @param args.skipPromo - Whether the promo is skipped for this job.
  * @param args.eventPrefill - Schedule-event prefill, or null.
  * @param args.pickedContactGoogleId - Google id of the picked contact, or null.
+ * @param args.renameContactTo - New name for the picked contact on invoice save, or null.
  * @param args.jobDate - Job date for the income entry.
  * @param args.paidCash - Whether the client paid in cash on the day.
  * @param args.alreadyPaid - Amount and method handed over on the day, if any.
@@ -108,6 +111,7 @@ export function useCalculatorSave({
   skipPromo,
   eventPrefill,
   pickedContactGoogleId,
+  renameContactTo,
   jobDate,
   paidCash,
   alreadyPaid,
@@ -203,6 +207,28 @@ export function useCalculatorSave({
       });
     } catch {
       // Best-effort backfill; the invoice still saves without the FK.
+    }
+  }
+
+  /**
+   * Renames the picked contact to the name typed on the invoice. The contact route pushes
+   * the change to Google Contacts. The invoice is already saved, so a failure only warns.
+   * @param contactDbId - The picked contact's DB id.
+   * @param name - The new name.
+   */
+  async function renameContact(contactDbId: string, name: string): Promise<void> {
+    try {
+      const res = await fetch(`/api/admin/contacts/${contactDbId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      toast(`Contact renamed to ${name}.`, { tone: "success" });
+    } catch {
+      toast("Invoice saved, but the contact's name didn't update. Change it on the contact page.", {
+        tone: "warning",
+      });
     }
   }
 
@@ -417,10 +443,16 @@ export function useCalculatorSave({
           const checkData = (await checkRes.json()) as {
             exists?: boolean;
             contactId?: string | null;
+            linkedContactId?: string | null;
             existingContactId?: string | null;
             existingContactName?: string | null;
           };
           if (checkRes.ok) {
+            // Found by the picked contact's Google link, so a changed email can't point
+            // the rename at someone else.
+            if (renameContactTo && checkData.linkedContactId) {
+              await renameContact(checkData.linkedContactId, renameContactTo);
+            }
             const existingId = checkData.existingContactId ?? null;
             if (checkData.contactId) {
               await linkInvoiceToContact(invoiceId, checkData.contactId);
