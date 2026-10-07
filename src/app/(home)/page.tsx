@@ -125,7 +125,10 @@ export default async function Home(): Promise<React.ReactElement> {
           src="/source/backdrop.jpg"
           alt=""
           fill
-          priority
+          // The mobile LCP element. Eager + high priority rather than preload: Next 16's
+          // preload link carries no fetchpriority hint, which the LCP audit flags.
+          loading="eager"
+          fetchPriority="high"
           sizes="100vw"
           className="-z-20 object-cover object-[50%_60%] md:object-[70%_58%]"
         />
@@ -171,7 +174,7 @@ export default async function Home(): Promise<React.ReactElement> {
           </div>
           <figure className="relative m-0 max-w-104 md:max-w-none">
             <Image
-              src="/source/harrison.jpg"
+              src="/source/harrison-2026.jpg"
               alt="Harrison Raynes"
               width={2160}
               height={2160}

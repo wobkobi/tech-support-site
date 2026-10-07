@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 const LOGO_SRC = "/source/logo-wordmark.svg";
 
 /** Portrait used by the photo variant, relative to the public directory. */
-const PHOTO_PUBLIC_PATH = "/source/harrison.jpg";
+const PHOTO_PUBLIC_PATH = "/source/harrison-2026.jpg";
 
 /**
  * First-person intro, condensed from the poster's About Me so the two pieces of
@@ -99,7 +99,7 @@ export default async function IntroPage({
           src="/source/backdrop.jpg"
           alt=""
           fill
-          priority
+          preload
           sizes="1080px"
           className="scale-110 object-cover blur-xl"
         />
@@ -129,7 +129,7 @@ export default async function IntroPage({
                     alt="Harrison, To the Point Tech"
                     width={420}
                     height={420}
-                    priority
+                    preload
                     className={cn(
                       "rounded-full border-[6px] border-white object-cover shadow-lg",
                       isV3 ? "size-88" : "size-84",
@@ -154,7 +154,7 @@ export default async function IntroPage({
                   alt="To the Point Tech"
                   width={2000}
                   height={674}
-                  priority
+                  preload
                   className="h-auto w-110"
                 />
               </>
@@ -164,7 +164,7 @@ export default async function IntroPage({
                 alt="To the Point Tech"
                 width={2000}
                 height={674}
-                priority
+                preload
                 className="h-auto w-160"
               />
             )}

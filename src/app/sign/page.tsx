@@ -78,7 +78,7 @@ export default async function SignPage({
           src="/source/backdrop.jpg"
           alt=""
           fill
-          priority
+          preload
           sizes="1800px"
           className="scale-110 object-cover blur-xl"
         />
@@ -94,7 +94,7 @@ export default async function SignPage({
             alt={identity.company}
             width={2000}
             height={674}
-            priority
+            preload
             className="h-auto w-310"
           />
 

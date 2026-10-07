@@ -16,7 +16,7 @@ import type React from "react";
 const siteUrl = getSiteUrl();
 
 /** Portrait, relative to the public directory. */
-const PHOTO_SRC = "/source/harrison.jpg";
+const PHOTO_SRC = "/source/harrison-2026.jpg";
 
 export const metadata: Metadata = {
   title: "Harrison Raynes - Auckland Tech Support",
@@ -83,7 +83,7 @@ export default async function AboutPage(): Promise<React.ReactElement> {
           alt="Harrison Raynes"
           width={400}
           height={400}
-          priority
+          preload
           className="w-full max-w-[18rem] rounded-lg object-cover"
         />
         <div>

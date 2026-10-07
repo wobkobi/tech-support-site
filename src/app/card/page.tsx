@@ -86,7 +86,7 @@ function CardFront({ identity }: { identity: IdentitySettings }): React.ReactEle
         alt={identity.company}
         width={825}
         height={278}
-        priority
+        preload
         className="h-auto w-206.25"
       />
 
