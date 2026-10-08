@@ -14,6 +14,7 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import {
   type LikelyIncome,
   PaymentDialog,
@@ -60,10 +61,6 @@ interface InvoiceActionsProps {
   isQuote?: boolean;
 }
 
-const INPUT_CLS = cn(
-  "w-full rounded-lg border border-admin-border-strong px-3 py-2 text-sm text-admin-text",
-  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet",
-);
 /** Static JSON request headers. */
 const headers = { "Content-Type": "application/json" };
 
@@ -458,7 +455,7 @@ export function InvoiceActions({
           onChange={(e) => setNotesDraft(e.target.value)}
           disabled={notesSaving}
           placeholder="Optional note shown on the invoice."
-          className={cn(INPUT_CLS, "resize-y")}
+          className={cn(ADMIN_INPUT_CLS, "resize-y")}
         />
       </Modal>
 

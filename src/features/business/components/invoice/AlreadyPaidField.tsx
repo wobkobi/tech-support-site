@@ -27,6 +27,8 @@ interface Props {
   coversNote: string;
   /** Field label; defaults to "Already paid". */
   label?: string;
+  /** Classes for the label, so it matches the surrounding form's labels. */
+  labelClassName?: string;
   /** Words before the remaining amount; defaults to "Balance due". */
   balanceLabel?: string;
   /** What `total` is called in the over-the-amount warning; defaults to "the total". */
@@ -43,6 +45,7 @@ interface Props {
  * @param props.inputClassName - Classes for the amount input.
  * @param props.coversNote - Hint shown when the amount covers the whole total.
  * @param props.label - Field label; defaults to "Already paid".
+ * @param props.labelClassName - Classes for the label; defaults to a plain medium-weight label.
  * @param props.balanceLabel - Words before the remaining amount; defaults to "Balance due".
  * @param props.totalName - What `total` is called in the over-the-amount warning.
  * @returns The field element.
@@ -55,6 +58,7 @@ export function AlreadyPaidField({
   inputClassName,
   coversNote,
   label = "Already paid",
+  labelClassName = "block text-sm font-medium",
   balanceLabel = "Balance due",
   totalName = "the total",
 }: Props): React.ReactElement {
@@ -65,7 +69,7 @@ export function AlreadyPaidField({
 
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-sm font-medium">
+      <label htmlFor={id} className={labelClassName}>
         {label}
       </label>
       <div className="flex flex-wrap items-center gap-2">

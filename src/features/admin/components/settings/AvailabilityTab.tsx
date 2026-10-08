@@ -279,7 +279,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
             onChange={(e) =>
               setTop({ sameDayCutoffHour: e.target.value === "" ? null : Number(e.target.value) })
             }
-            className="rounded-lg border border-admin-border-strong px-2 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            className="rounded-lg border border-admin-border-strong px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
           >
             <option value="">No cutoff</option>
             {Array.from({ length: 24 }, (_, h) => (
@@ -400,7 +400,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                 value={g.label}
                 aria-label="Guard name"
                 onChange={(e) => setGuard(gi, { label: e.target.value })}
-                className="flex-1 rounded-lg border border-admin-border px-3 py-1.5 text-sm text-admin-text focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+                className="flex-1 rounded-lg border border-admin-border-strong px-3 py-2 text-sm text-admin-text focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
               />
               <button
                 type="button"
@@ -416,7 +416,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                 value={g.triggerDay}
                 aria-label="Trigger day"
                 onChange={(e) => setGuard(gi, { triggerDay: Number(e.target.value) })}
-                className="rounded-lg border border-admin-border px-2 py-2 text-sm text-admin-text focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+                className="rounded-lg border border-admin-border-strong px-2 py-2 text-sm text-admin-text focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
               >
                 {DAY_ORDER.map((d) => (
                   <option key={d.index} value={d.index}>

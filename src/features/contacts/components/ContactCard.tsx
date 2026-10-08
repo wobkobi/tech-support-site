@@ -101,6 +101,10 @@ interface ContactEditField {
   render: (p: FieldRenderProps) => React.ReactNode;
 }
 
+/** Shared by every edit input (name, email, phone, address) so they render alike. */
+const FIELD_INPUT_CLS =
+  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none";
+
 /**
  * Plain text input used by the Name field.
  * @param props - Field render props.
@@ -116,7 +120,7 @@ function renderNameField({ id, value, onChange }: FieldRenderProps): React.React
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
+      className={FIELD_INPUT_CLS}
     />
   );
 }
@@ -130,7 +134,7 @@ function renderNameField({ id, value, onChange }: FieldRenderProps): React.React
  * @returns Email input element.
  */
 function renderEmailField({ id, value, onChange }: FieldRenderProps): React.ReactElement {
-  return <EmailInput id={id} value={value} onChange={onChange} />;
+  return <EmailInput id={id} value={value} onChange={onChange} className={FIELD_INPUT_CLS} />;
 }
 
 /**
@@ -142,7 +146,7 @@ function renderEmailField({ id, value, onChange }: FieldRenderProps): React.Reac
  * @returns Phone input element.
  */
 function renderPhoneField({ id, value, onChange }: FieldRenderProps): React.ReactElement {
-  return <PhoneInput id={id} value={value} onChange={onChange} />;
+  return <PhoneInput id={id} value={value} onChange={onChange} className={FIELD_INPUT_CLS} />;
 }
 
 /**
@@ -160,6 +164,7 @@ function renderAddressField({ id, value, onChange }: FieldRenderProps): React.Re
       value={value}
       onChange={onChange}
       placeholder="Start typing address..."
+      inputClassName={FIELD_INPUT_CLS}
     />
   );
 }

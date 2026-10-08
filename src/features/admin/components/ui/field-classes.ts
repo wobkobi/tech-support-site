@@ -3,9 +3,13 @@
 // component because the same string is applied to input, select and textarea
 // interchangeably, which a wrapper would have to forward three prop unions for.
 
-/** Full-width admin text input / select / textarea. */
+/**
+ * Full-width admin text input / select / textarea. The disabled styles are needed
+ * because the explicit surface and text colours override the browser's own greying,
+ * which would otherwise leave a locked field looking editable.
+ */
 export const ADMIN_INPUT_CLS =
-  "w-full rounded-lg border border-admin-border-strong bg-admin-surface px-3 py-2 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
+  "w-full rounded-lg border border-admin-border-strong bg-admin-surface px-3 py-2 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet disabled:cursor-not-allowed disabled:bg-admin-bg disabled:text-admin-muted";
 
 /** Fixed-height variant used for filter-bar controls that sit next to buttons. */
 export const ADMIN_CONTROL_CLS = `h-9 ${ADMIN_INPUT_CLS}`;

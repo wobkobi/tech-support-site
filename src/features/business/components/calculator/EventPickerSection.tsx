@@ -245,7 +245,7 @@ export function EventPickerSection({
                 type="checkbox"
                 checked={billed}
                 onChange={() => toggleEvent(ev.id)}
-                className="h-3.5 w-3.5 shrink-0"
+                className="h-3.5 w-3.5 shrink-0 accent-russian-violet"
               />
               <span className="truncate font-medium text-slate-700">{ev.summary}</span>
             </span>
@@ -377,7 +377,7 @@ export function EventPickerSection({
                 type="checkbox"
                 checked={isTicked(s.event.id, s.preselected)}
                 onChange={(e) => setTicked((prev) => ({ ...prev, [s.event.id]: e.target.checked }))}
-                className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-russian-violet"
               />
               <span className="min-w-0">
                 <span className="font-medium">{s.event.summary}</span>{" "}

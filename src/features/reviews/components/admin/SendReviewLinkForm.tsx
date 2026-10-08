@@ -364,7 +364,7 @@ export function SendReviewLinkForm({
                   placeholder="Email address"
                   autoComplete="off"
                   required
-                  className="rounded-lg"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
                 />
               </div>
               <button
@@ -424,7 +424,7 @@ export function SendReviewLinkForm({
                   autoComplete="off"
                   required
                   hideError
-                  className="rounded-lg"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
                 />
               </div>
               {phoneInput && (

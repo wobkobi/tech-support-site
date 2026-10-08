@@ -244,8 +244,8 @@ export function TravelSection({
                       {lookingUpRun === index ? "..." : "Look up"}
                     </button>
                   )}
-                  <div className="flex items-center">
-                    <span className="rounded-l-lg border border-r-0 border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-500">
+                  <div className="flex items-stretch">
+                    <span className="flex items-center rounded-l-lg border border-r-0 border-slate-200 bg-slate-50 px-2 text-xs text-slate-500">
                       $
                     </span>
                     <input

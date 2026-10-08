@@ -147,7 +147,7 @@ export function CancelFeeSection({
   const noShow = reason === "no-show";
   const remote = meetingType === "remote";
   const inputClass =
-    "rounded-lg border border-slate-300 px-3 py-2 text-base text-slate-700 focus:border-russian-violet focus:outline-none";
+    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none";
 
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-coquelicot-500/30 bg-coquelicot-500/5 p-4">

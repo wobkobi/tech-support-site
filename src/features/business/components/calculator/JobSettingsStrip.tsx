@@ -166,7 +166,7 @@ export function JobSettingsStrip({
               type="checkbox"
               checked={skipPromo}
               onChange={(e) => onSkipPromoChange(e.target.checked)}
-              className="h-3.5 w-3.5"
+              className="h-3.5 w-3.5 accent-russian-violet"
             />
             Skip promo for this job
           </label>

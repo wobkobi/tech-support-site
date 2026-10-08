@@ -512,7 +512,7 @@ export default function ReviewFormProtected({
               }}
               disabled={loading}
               errorMessages={{ invalid: "Doesn't look right - check the number." }}
-              className={cn(FIELD_CLASSES, "text-base")}
+              className={cn(FIELD_CLASSES, "w-full rounded-md border px-3 py-2 text-base")}
             />
           </div>
 
@@ -526,7 +526,7 @@ export default function ReviewFormProtected({
               onChange={setContactEmail}
               placeholder="you@example.com"
               disabled={loading}
-              className={cn(FIELD_CLASSES, "text-base")}
+              className={cn(FIELD_CLASSES, "w-full rounded-md border px-3 py-2 text-base")}
             />
           </div>
         </div>

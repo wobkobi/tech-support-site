@@ -25,7 +25,11 @@ interface PhoneInputProps {
   error?: string | null;
   /** Wording override for blur errors. */
   errorMessages?: { invalid?: string };
-  /** Extra Tailwind classes appended to the default input styles. */
+  /**
+   * Input classes that REPLACE the default styles (the default focus ring would
+   * otherwise switch off a caller's outline-based focus style). The error border
+   * is still applied on top.
+   */
   className?: string;
   /** Skip rendering the inline error <p>. */
   hideError?: boolean;
@@ -55,7 +59,7 @@ const DEFAULT_INPUT_CLASSES = cn(
  * @param props.autoComplete - autocomplete token; defaults to "tel".
  * @param props.error - Externally-controlled error; overrides the internal blur error when supplied.
  * @param props.errorMessages - Per-form wording override for the invalid-phone message.
- * @param props.className - Extra Tailwind classes appended to the default input styles.
+ * @param props.className - Input classes that replace the default styles.
  * @param props.hideError - Skip rendering the inline error paragraph.
  * @param props.inputRef - Ref forwarded to the underlying input element.
  * @param props.disabled - HTML disabled attribute.
@@ -130,7 +134,10 @@ export function PhoneInput({
         placeholder={placeholder}
         autoComplete={autoComplete}
         disabled={disabled}
-        className={cn(DEFAULT_INPUT_CLASSES, activeError && "border-coquelicot-500/60", className)}
+        className={cn(
+          className ?? DEFAULT_INPUT_CLASSES,
+          activeError && "border-coquelicot-500/60",
+        )}
       />
       {/* text-sm, matching the sibling field errors on the booking form: this
           renders on customer-facing forms, and at text-xs it was the smallest

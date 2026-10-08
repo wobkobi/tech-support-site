@@ -317,6 +317,7 @@ export function InvoiceForm({
         total={totals.total}
         disabled={busy}
         inputClassName={ADMIN_INPUT_CLS}
+        labelClassName={LABEL_CLS}
         coversNote="Nothing left owing. Mark the invoice paid once it's sent."
       />
 

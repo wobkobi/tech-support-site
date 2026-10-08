@@ -361,6 +361,7 @@ export function ManualBookingModal({
                 clearFieldError("phone");
               }}
               error={fieldErrors.phone}
+              className={textInputClasses}
             />
           </Field>
           <Field label="Email" htmlFor="mb-email" required>
@@ -374,6 +375,7 @@ export function ManualBookingModal({
               error={fieldErrors.email}
               required
               maxLength={320}
+              className={textInputClasses}
             />
           </Field>
         </div>
@@ -402,6 +404,7 @@ export function ManualBookingModal({
                 onChange={setAddress}
                 placeholder="Street address"
                 maxLength={250}
+                inputClassName={textInputClasses}
               />
             </Field>
           </div>

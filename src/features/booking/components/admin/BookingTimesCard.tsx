@@ -11,9 +11,9 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import { formatMins } from "@/features/business/lib/business";
-import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { isPastEditWindow } from "@/shared/lib/edit-window";
 import { fromNzInputValue, toNzInputValue } from "@/shared/lib/timezone-utils";
@@ -35,10 +35,6 @@ interface BookingTimesCardProps {
   lockHours: number;
 }
 
-const INPUT_CLS = cn(
-  "w-full rounded-lg border border-admin-border-strong bg-admin-surface px-3 py-2 text-sm text-admin-text",
-  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet",
-);
 const LABEL_CLS = "text-xs font-semibold text-admin-muted uppercase";
 
 /**
@@ -175,7 +171,7 @@ export function BookingTimesCard({
           <span className={LABEL_CLS}>Start</span>
           <input
             type="datetime-local"
-            className={INPUT_CLS}
+            className={ADMIN_INPUT_CLS}
             value={form.start}
             onChange={(e) => setForm((f) => ({ ...f, start: e.target.value }))}
             disabled={saving}
@@ -185,7 +181,7 @@ export function BookingTimesCard({
           <span className={LABEL_CLS}>Finish</span>
           <input
             type="datetime-local"
-            className={INPUT_CLS}
+            className={ADMIN_INPUT_CLS}
             value={form.end}
             onChange={(e) => setForm((f) => ({ ...f, end: e.target.value }))}
             disabled={saving}

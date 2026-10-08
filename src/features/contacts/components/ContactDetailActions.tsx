@@ -307,6 +307,7 @@ export function ContactDetailActions({
               onChange={(v: string) => setField("address", v)}
               placeholder="Street address"
               maxLength={250}
+              inputClassName={ADMIN_INPUT_CLS}
             />
           </div>
           <label className="flex flex-col gap-1 text-sm">

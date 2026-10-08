@@ -7,6 +7,7 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import {
   DEFAULT_INVOICE_EMAIL_BODY,
@@ -42,10 +43,6 @@ export interface InvoiceSendFlow {
   closePreview: () => void;
 }
 
-const INPUT_CLS = cn(
-  "w-full rounded-lg border border-admin-border-strong px-3 py-2 text-sm text-admin-text",
-  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet",
-);
 const FIELD_LABEL_CLS = "mb-2 block text-xs font-semibold text-admin-muted uppercase";
 /** Static JSON request headers - module-scoped so it's a stable useCallback dep. */
 const headers = { "Content-Type": "application/json" };
@@ -308,7 +305,7 @@ export function SendInvoiceModal({
                   : "John (leave blank to use the first word of the client name)"
               }
               disabled={sending}
-              className={cn(INPUT_CLS, "mb-4")}
+              className={cn(ADMIN_INPUT_CLS, "mb-4")}
             />
             <label htmlFor="custom-body" className={FIELD_LABEL_CLS}>
               Message
@@ -320,7 +317,7 @@ export function SendInvoiceModal({
               onChange={(e) => setCustomBody(e.target.value)}
               onBlur={() => void openPreview()}
               disabled={sending}
-              className={cn(INPUT_CLS, "mb-4 resize-y")}
+              className={cn(ADMIN_INPUT_CLS, "mb-4 resize-y")}
             />
             {reviewAskInfo && (
               <div className="mb-4">

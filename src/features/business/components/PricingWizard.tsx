@@ -801,6 +801,7 @@ export function PricingWizard({
             onChange={setAddress}
             aria-label="Your address"
             placeholder="Start typing your address..."
+            inputClassName={FIELD_INPUT}
           />
         </div>
       )}

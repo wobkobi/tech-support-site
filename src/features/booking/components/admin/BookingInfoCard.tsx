@@ -289,6 +289,7 @@ export function BookingInfoCard({
           value={form.address}
           onChange={(v: string) => setField("address", v)}
           placeholder="Leave blank for a remote job"
+          inputClassName={ADMIN_INPUT_CLS}
         />
       </div>
       <div className="flex flex-col gap-1">

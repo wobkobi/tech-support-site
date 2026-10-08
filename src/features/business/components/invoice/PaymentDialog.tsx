@@ -11,6 +11,7 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { formatNZD, todayISO } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import { reminderChasedPaidInvoice } from "@/features/business/lib/invoice-apology";
@@ -58,9 +59,6 @@ interface PaymentDialogProps {
   /** Called on close; `recorded` is true when a payment was recorded. */
   onClose: (recorded: boolean) => void;
 }
-
-const INPUT_CLS =
-  "w-full rounded-lg border border-admin-border-strong px-3 py-2 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
 
 /**
  * Payment-recording dialog. Submits POST /api/business/invoices/[id]/pay.
@@ -181,13 +179,17 @@ export function PaymentDialog({
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className={INPUT_CLS}
+            className={ADMIN_INPUT_CLS}
           />
         </label>
 
         <label className="flex flex-col gap-1">
           <span className="font-medium text-admin-text">Method</span>
-          <select value={method} onChange={(e) => setMethod(e.target.value)} className={INPUT_CLS}>
+          <select
+            value={method}
+            onChange={(e) => setMethod(e.target.value)}
+            className={ADMIN_INPUT_CLS}
+          >
             {INCOME_METHODS.map((m) => (
               <option key={m} value={m}>
                 {m}
@@ -203,7 +205,7 @@ export function PaymentDialog({
             value={reference}
             onChange={(e) => setReference(e.target.value)}
             placeholder="e.g. bank ref, cheque no."
-            className={INPUT_CLS}
+            className={ADMIN_INPUT_CLS}
           />
         </label>
 

@@ -7,6 +7,7 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { formatNZD } from "@/features/business/lib/business";
 import { DEFAULT_VOID_EMAIL_BODY } from "@/features/business/lib/invoice-email-defaults";
 import { cn } from "@/shared/lib/cn";
@@ -44,10 +45,6 @@ export interface InvoiceVoidFlow {
   closeVoidModal: () => void;
 }
 
-const INPUT_CLS = cn(
-  "w-full rounded-lg border border-admin-border-strong px-3 py-2 text-sm text-admin-text",
-  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet",
-);
 const FIELD_LABEL_CLS = "mb-2 block text-xs font-semibold text-admin-muted uppercase";
 /** Static JSON request headers - module-scoped so it's a stable useCallback dep. */
 const headers = { "Content-Type": "application/json" };
@@ -387,7 +384,7 @@ export function VoidInvoiceModal({
                     : `${clientName?.trim().split(" ")[0] || "First name"} (leave blank to use the first word of the client name)`
                 }
                 disabled={voiding}
-                className={cn(INPUT_CLS, "mb-4")}
+                className={cn(ADMIN_INPUT_CLS, "mb-4")}
               />
               <label htmlFor="void-custom-body" className={FIELD_LABEL_CLS}>
                 Message
@@ -399,7 +396,7 @@ export function VoidInvoiceModal({
                 onChange={(e) => setVoidCustomBody(e.target.value)}
                 onBlur={() => void loadVoidPreview()}
                 disabled={voiding}
-                className={cn(INPUT_CLS, "mb-4 resize-y")}
+                className={cn(ADMIN_INPUT_CLS, "mb-4 resize-y")}
               />
               <p className={FIELD_LABEL_CLS}>Subject</p>
               <p className="mb-4 text-sm font-medium text-admin-text">

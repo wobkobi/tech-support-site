@@ -9,6 +9,8 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import type React from "react";
 import { useState } from "react";
@@ -148,7 +150,7 @@ function AddressReviewCard({ row, onDone }: AddressReviewCardProps): React.React
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
             placeholder="e.g. 4 Name Street, Onehunga"
-            className="min-w-0 flex-1 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-base text-admin-text"
+            className={cn(ADMIN_INPUT_CLS, "min-w-0 flex-1")}
           />
           <AdminButton variant="secondary" onClick={() => void check()} busy={checking}>
             Check
