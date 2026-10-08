@@ -1004,7 +1004,7 @@ export function CalculatorView({
 
         {/* RIGHT column - live invoice preview (replaces the legacy Summary
             panel - same totals, just inside the actual invoice layout). */}
-        <div ref={finishRef} className="min-w-0 scroll-mt-16 space-y-4">
+        <div ref={finishRef} className="min-w-0 space-y-4">
           {/* Client - moved above the preview so it stays in reach without
               scrolling past the full A4-sized invoice render. */}
           <ClientPickerSection

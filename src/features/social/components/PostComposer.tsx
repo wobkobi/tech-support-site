@@ -609,7 +609,7 @@ export function PostComposer({
       />
 
       {actionBar && (
-        <div className="sticky top-0 z-20 -mx-6 hidden bg-slate-50/90 px-6 py-3 backdrop-blur xl:block">
+        <div className="sticky top-14 z-20 -mx-6 hidden bg-admin-bg/90 px-6 py-3 backdrop-blur xl:block">
           {actionBar}
         </div>
       )}
@@ -618,7 +618,7 @@ export function PostComposer({
       <div
         role="tablist"
         aria-label="Show"
-        className="sticky top-16 z-20 grid grid-cols-2 gap-1 rounded-xl border border-admin-border bg-admin-surface p-1 shadow-sm lg:top-4 xl:hidden"
+        className="sticky top-16 z-20 grid grid-cols-2 gap-1 rounded-xl border border-admin-border bg-admin-surface p-1 shadow-sm lg:top-18 xl:hidden"
       >
         {(["write", "preview"] as const).map((k) => (
           <button
@@ -908,8 +908,8 @@ export function PostComposer({
             "flex-col gap-3 rounded-xl border border-admin-border bg-admin-surface p-4 xl:sticky xl:flex xl:overflow-y-auto",
             // Clear the pinned action bar when there is one (drafts and presets).
             actionBar
-              ? "xl:top-28 xl:max-h-[calc(100dvh-8rem)]"
-              : "xl:top-6 xl:max-h-[calc(100dvh-3rem)]",
+              ? "xl:top-42 xl:max-h-[calc(100dvh-11.5rem)]"
+              : "xl:top-20 xl:max-h-[calc(100dvh-6.5rem)]",
             pane === "write" ? "hidden" : "flex",
           )}
         >

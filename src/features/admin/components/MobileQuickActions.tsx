@@ -1,52 +1,17 @@
 "use client";
 // src/features/admin/components/MobileQuickActions.tsx
 // Round + button pinned bottom-right on every admin page below lg, opening a short list
-// of shortcuts. It rides above a phone action bar through --phone-bar-h (globals.css),
-// the same variable that lifts the toast stack; that height already includes the home
-// indicator, so the larger of the two is used rather than their sum.
+// of shortcuts from QUICK_ACTIONS (shared with the desktop top bar). It rides above a
+// phone action bar through --phone-bar-h (globals.css), the same variable that lifts the
+// toast stack; that height already includes the home indicator, so the larger of the two
+// is used rather than their sum.
 
+import { QUICK_ACTIONS, quickActionHref } from "@/features/admin/lib/quick-actions";
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import type React from "react";
 import { useEffect, useState } from "react";
-import {
-  FaArrowTrendUp,
-  FaCalculator,
-  FaHandHoldingDollar,
-  FaPlus,
-  FaReceipt,
-} from "react-icons/fa6";
-
-/** One shortcut in the menu. */
-interface QuickAction {
-  label: string;
-  icon: React.ReactNode;
-  path: string;
-  /** Opens a form: add ?new=<stamp> so each tap reopens it, even on the same page. */
-  opensForm?: boolean;
-}
-
-/** Listed bottom-up from the button, so the most used sits nearest the thumb. */
-const ACTIONS: QuickAction[] = [
-  {
-    label: "Quick price",
-    icon: <FaHandHoldingDollar aria-hidden />,
-    path: "/admin/business/quick",
-  },
-  {
-    label: "Add income",
-    icon: <FaArrowTrendUp aria-hidden />,
-    path: "/admin/business/income",
-    opensForm: true,
-  },
-  {
-    label: "Add expense",
-    icon: <FaReceipt aria-hidden />,
-    path: "/admin/business/expenses",
-    opensForm: true,
-  },
-  { label: "New invoice", icon: <FaCalculator aria-hidden />, path: "/admin/business/calculator" },
-];
+import { FaPlus } from "react-icons/fa6";
 
 /**
  * Mobile shortcut button and its menu.
@@ -84,14 +49,16 @@ export function MobileQuickActions(): React.ReactElement {
         {open && (
           <nav aria-label="Quick actions">
             <ul className="flex flex-col-reverse gap-2">
-              {ACTIONS.map((a) => (
+              {QUICK_ACTIONS.map((a) => (
                 <li key={a.label}>
                   <Link
-                    href={a.opensForm ? `${a.path}?new=${stamp}` : a.path}
+                    href={quickActionHref(a, stamp)}
                     onClick={() => setOpen(false)}
                     className="flex h-12 items-center gap-3 rounded-full border border-admin-border bg-admin-surface pr-5 pl-4 text-base font-semibold text-russian-violet shadow-lg"
                   >
-                    <span className="text-lg">{a.icon}</span>
+                    <span className="text-lg">
+                      <a.icon aria-hidden />
+                    </span>
                     {a.label}
                   </Link>
                 </li>

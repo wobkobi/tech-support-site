@@ -1,19 +1,20 @@
 // src/app/admin/(shell)/layout.tsx
-// Admin shell layout - renders the sidebar, the padded content column, and the toast
-// provider once for every page in the (shell) group. The route group is transparent in
-// the URL, so paths stay `/admin/...` unchanged. The chrome that used to live in
-// AdminPageLayout per-page now lives here.
+// Admin shell layout - renders AdminShell (sidebar, top bar and the padded content
+// column), the toast provider and the phone + button once for every page in the (shell)
+// group. The route group is transparent in the URL, so paths stay `/admin/...` unchanged.
 //
 // Auth stays PER-PAGE (`await requireAdminAuth(...)` as the first line of each page), NOT
 // in this layout: layouts do not re-run on client-side navigation between sibling pages,
 // so a layout-level gate would be a hole. The request-level gate is `src/proxy.ts`; the
 // per-page checks are defence-in-depth.
 
-import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
+import { AdminShell } from "@/features/admin/components/AdminShell";
 import { MobileQuickActions } from "@/features/admin/components/MobileQuickActions";
 import { AdminToastProvider } from "@/features/admin/components/ui/Toast";
+import { SIDEBAR_COLLAPSED, SIDEBAR_COOKIE } from "@/features/admin/lib/sidebar-cookie";
 import { PushRegistrar } from "@/features/notifications/components/PushRegistrar";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import type React from "react";
 
 // Installing from the admin should produce a home-screen icon that opens the
@@ -23,34 +24,23 @@ export const metadata: Metadata = {
 };
 
 /**
- * Renders the admin chrome (sidebar + content column) and the toast provider
- * around every page in the group.
+ * Renders the admin chrome and the toast provider around every page in the
+ * group. The desktop sidebar's collapsed state comes from the {@link SIDEBAR_COOKIE}
+ * cookie (set by {@link AdminShell}), so the first paint already has the saved width.
  * @param props - Layout props.
  * @param props.children - The active admin page.
  * @returns The admin shell element.
  */
-export default function AdminShellLayout({
+export default async function AdminShellLayout({
   children,
 }: {
   children: React.ReactNode;
-}): React.ReactElement {
+}): Promise<React.ReactElement> {
+  const initialCollapsed = (await cookies()).get(SIDEBAR_COOKIE)?.value === SIDEBAR_COLLAPSED;
   return (
     <AdminToastProvider>
       <PushRegistrar />
-      <div className="flex min-h-screen overflow-x-clip">
-        <AdminSidebar />
-        {/* Sidebar is fixed-position; reserve its width on lg+ only (mobile uses
-            the drawer). min-w-0 stops wide content blowing out the flex column;
-            overflow-x-clip preserves sticky descendants. Print drops the chrome. */}
-        <div className="min-w-0 flex-1 bg-admin-bg lg:ml-56 print:ml-0 print:bg-white">
-          {/* The root layout's skip link targets #main. */}
-          {/* Below lg, pt-18 clears the 56px top bar and pb-28 keeps the end of every
-              page clear of the + button. */}
-          <main id="main" className="px-4 pt-18 pb-28 sm:px-6 lg:pt-8 lg:pb-8 print:p-0">
-            {children}
-          </main>
-        </div>
-      </div>
+      <AdminShell initialCollapsed={initialCollapsed}>{children}</AdminShell>
       <MobileQuickActions />
     </AdminToastProvider>
   );

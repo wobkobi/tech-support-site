@@ -196,9 +196,32 @@ input[type="number"] {
   appearance: textfield;
 }
 
-/* Admin sidebar drawer - same Tailwind v4 caveat applies. */
+/* Admin sidebar: translate slides the phone drawer, width animates the desktop
+   collapse (matched by the content column's margin-left transition in AdminShell).
+   Named longhand `translate` because Tailwind v4's translate-* utilities set that
+   property, not `transform`, so transition-transform would not animate them. */
 aside.app-admin-drawer {
-  transition: translate 200ms ease-out !important;
+  transition:
+    translate 200ms ease-out,
+    width 200ms ease-out !important;
+}
+
+/* Below lg a closed drawer sits off-screen; hide it so Tab and screen readers skip it.
+   The hide waits out the 200ms slide; opening drops this rule, so it shows at once. */
+@media (width < 64rem) {
+  aside.app-admin-drawer:not([data-open]) {
+    visibility: hidden;
+    transition:
+      translate 200ms ease-out,
+      width 200ms ease-out,
+      visibility 0s linear 200ms !important;
+  }
+}
+
+/* Keep keyboard focus, #main skip-link jumps and scrollIntoView targets clear of the
+   sticky 56px admin top bar (AdminTopBar, h-14); 4rem leaves an 8px gap below it. */
+html:has(.app-admin) {
+  scroll-padding-top: 4rem;
 }
 
 /* iOS Safari zooms the whole page when a field under 16px takes focus, and the
@@ -279,6 +302,10 @@ body:has(:is(input:not([type="checkbox"], [type="radio"]), textarea, select):foc
 
   aside.app-admin-drawer {
     transition-duration: 0.01ms !important;
+  }
+  aside.app-admin-drawer:not([data-open]) {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
   }
 }
 

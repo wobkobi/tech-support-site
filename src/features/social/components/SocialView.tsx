@@ -145,6 +145,8 @@ export function SocialView({
   // (the start options above are short, so usually nothing moves), and put keyboard
   // focus on its heading, since the button that opened it may have been swapped out.
   // On close, focus goes back to Start a post. The page loading doesn't count.
+  // The first 56px sit under the sticky admin top bar (AdminTopBar, h-14), so a top
+  // edge there counts as off screen.
   const shownId = useRef(openId);
   useEffect(() => {
     if (shownId.current === openId) return;
@@ -155,7 +157,7 @@ export function SocialView({
       return;
     }
     const top = el.getBoundingClientRect().top;
-    if (top < 0 || top > window.innerHeight * 0.6) {
+    if (top < 56 || top > window.innerHeight * 0.6) {
       el.scrollIntoView({ block: "start", behavior: "smooth" });
     }
     composerHeadingRef.current?.focus({ preventScroll: true });
@@ -451,10 +453,7 @@ export function SocialView({
         <section
           ref={composerRef}
           aria-label={openRow.isPreset ? "Preset" : "Post"}
-          className={cn(
-            "flex scroll-mt-16 flex-col gap-4 transition-opacity lg:scroll-mt-4",
-            opening && "opacity-60",
-          )}
+          className={cn("flex flex-col gap-4 transition-opacity", opening && "opacity-60")}
         >
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-admin-border pb-3">
             <div className="flex min-w-0 items-center gap-2">

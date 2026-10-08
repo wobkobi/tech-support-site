@@ -288,7 +288,7 @@ export function ContactsAdminView({
       {/* end left column */}
 
       {/* Right column: Google sync */}
-      <div className="lg:sticky lg:top-8">
+      <div className="lg:sticky lg:top-22">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>

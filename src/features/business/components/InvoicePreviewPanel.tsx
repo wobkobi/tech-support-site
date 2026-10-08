@@ -85,7 +85,7 @@ function InvoicePreviewPanelImpl({
     <div
       className={cn(
         "flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm",
-        "lg:sticky lg:top-4 lg:aspect-210/297 lg:overflow-y-auto",
+        "lg:sticky lg:top-18 lg:aspect-210/297 lg:overflow-y-auto",
         // Print: defeat sticky + scroll so the browser captures the full invoice.
         "print:static print:aspect-auto print:overflow-visible print:rounded-none print:border-0 print:shadow-none",
       )}

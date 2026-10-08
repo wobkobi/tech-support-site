@@ -635,7 +635,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
         ref={formRef}
         onSubmit={(e) => void handleSubmit(e)}
         className={cn(
-          "scroll-mt-16 space-y-3 rounded-xl border border-admin-border bg-admin-surface p-4 shadow-sm sm:p-5",
+          "space-y-3 rounded-xl border border-admin-border bg-admin-surface p-4 shadow-sm sm:p-5",
           !formOpen && "max-lg:hidden",
         )}
       >

@@ -274,7 +274,7 @@ export function IncomeView(): React.ReactElement {
         ref={formRef}
         onSubmit={handleSubmit}
         className={cn(
-          "mb-6 scroll-mt-16 rounded-xl border border-admin-border bg-admin-surface p-4 shadow-sm sm:p-5",
+          "mb-6 rounded-xl border border-admin-border bg-admin-surface p-4 shadow-sm sm:p-5",
           !formOpen && "max-lg:hidden",
         )}
       >
