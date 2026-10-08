@@ -42,7 +42,7 @@ export function AdminCheckbox({
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
         disabled={disabled}
-        className="h-4 w-4 rounded border-admin-border-strong"
+        className="h-4 w-4 accent-russian-violet"
       />
       {label}
     </label>

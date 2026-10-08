@@ -184,7 +184,7 @@ export function InsertMenu({
       {open && (
         <div
           className={cn(
-            "absolute top-full z-30 mt-1 flex max-h-112 w-80 max-w-[calc(100vw-2rem)] flex-col rounded-xl border border-admin-border bg-admin-surface shadow-lg",
+            "absolute top-full z-30 mt-1 flex max-h-112 w-80 max-w-[calc(100vw-2rem)] flex-col rounded-lg border border-admin-border bg-admin-surface shadow-lg",
             align === "right" ? "right-0" : "left-0",
           )}
         >

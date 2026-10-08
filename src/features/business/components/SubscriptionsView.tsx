@@ -3,6 +3,7 @@
 // Records and lists recurring subscription expenses (description, supplier, amount, GST,
 // frequency, next due) and flags overdue ones.
 
+import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
@@ -14,7 +15,6 @@ import {
 } from "@/features/business/lib/constants";
 import type { Subscription } from "@/features/business/types/business";
 import { Button } from "@/shared/components/Button";
-import { Field } from "@/shared/components/Field";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
@@ -265,7 +265,7 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
             {editId ? "Edit subscription" : "New subscription"}
           </h3>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Field
+            <AdminField
               label="Description"
               htmlFor="sub-description"
               required
@@ -278,8 +278,8 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
                 onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
                 className={inputClasses}
               />
-            </Field>
-            <Field label="Supplier" htmlFor="sub-supplier" required>
+            </AdminField>
+            <AdminField label="Supplier" htmlFor="sub-supplier" required>
               <input
                 id="sub-supplier"
                 required
@@ -287,8 +287,8 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
                 onChange={(e) => setForm((p) => ({ ...p, supplier: e.target.value }))}
                 className={inputClasses}
               />
-            </Field>
-            <Field label="Category" htmlFor="sub-category">
+            </AdminField>
+            <AdminField label="Category" htmlFor="sub-category">
               <select
                 id="sub-category"
                 value={form.category}
@@ -301,8 +301,8 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
                   </option>
                 ))}
               </select>
-            </Field>
-            <Field label="Amount (incl. GST)" htmlFor="sub-amount" required>
+            </AdminField>
+            <AdminField label="Amount (incl. GST)" htmlFor="sub-amount" required>
               <input
                 id="sub-amount"
                 required
@@ -313,8 +313,8 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
                 onChange={(e) => setForm((p) => ({ ...p, amountIncl: e.target.value }))}
                 className={inputClasses}
               />
-            </Field>
-            <Field label="GST rate" htmlFor="sub-gst">
+            </AdminField>
+            <AdminField label="GST rate" htmlFor="sub-gst">
               <select
                 id="sub-gst"
                 value={form.gstRate}
@@ -324,8 +324,8 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
                 <option value="0.15">15%</option>
                 <option value="0">No GST</option>
               </select>
-            </Field>
-            <Field label="Payment method" htmlFor="sub-method">
+            </AdminField>
+            <AdminField label="Payment method" htmlFor="sub-method">
               <select
                 id="sub-method"
                 value={form.method}
@@ -338,8 +338,8 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
                   </option>
                 ))}
               </select>
-            </Field>
-            <Field label="Frequency" htmlFor="sub-frequency">
+            </AdminField>
+            <AdminField label="Frequency" htmlFor="sub-frequency">
               <select
                 id="sub-frequency"
                 value={form.frequency}
@@ -352,8 +352,8 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
                   </option>
                 ))}
               </select>
-            </Field>
-            <Field label={editId ? "Next due" : "First due"} htmlFor="sub-nextdue" required>
+            </AdminField>
+            <AdminField label={editId ? "Next due" : "First due"} htmlFor="sub-nextdue" required>
               <input
                 id="sub-nextdue"
                 required
@@ -362,15 +362,20 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
                 onChange={(e) => setForm((p) => ({ ...p, nextDue: e.target.value }))}
                 className={inputClasses}
               />
-            </Field>
-            <Field label="Notes" htmlFor="sub-notes" optional className="col-span-2 sm:col-span-3">
+            </AdminField>
+            <AdminField
+              label="Notes"
+              htmlFor="sub-notes"
+              optional
+              className="col-span-2 sm:col-span-3"
+            >
               <input
                 id="sub-notes"
                 value={form.notes}
                 onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
                 className={inputClasses}
               />
-            </Field>
+            </AdminField>
           </div>
           <div className="mt-4 flex gap-2">
             <Button type="submit" variant="secondary" size="sm" disabled={saving}>

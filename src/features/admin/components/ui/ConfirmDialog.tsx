@@ -78,7 +78,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      <div className="text-sm text-admin-text-secondary">
+      <div className="text-[0.9375rem] text-admin-text-secondary">
         {body ?? "This action cannot be undone."}
       </div>
     </Modal>

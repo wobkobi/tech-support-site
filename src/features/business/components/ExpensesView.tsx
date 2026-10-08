@@ -7,6 +7,7 @@
 // action.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { ADMIN_CONTROL_CLS, ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
@@ -19,7 +20,6 @@ import { calcGstFromInclusive, formatNZD, todayISO } from "@/features/business/l
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from "@/features/business/lib/constants";
 import { fyKeyOf, listFinancialYears } from "@/features/business/lib/financial-year";
 import type { ExpenseEntry, Subscription } from "@/features/business/types/business";
-import { Field } from "@/shared/components/Field";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { useSearchParams } from "next/navigation";
@@ -484,7 +484,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
           {editingId ? "Edit expense" : "Add expense"}
         </h2>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Date" htmlFor="exp-date" required>
+          <AdminField label="Date" htmlFor="exp-date" required>
             <input
               id="exp-date"
               type="date"
@@ -493,8 +493,8 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
               onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
               className={ADMIN_INPUT_CLS}
             />
-          </Field>
-          <Field label="Supplier" htmlFor="exp-supplier" required>
+          </AdminField>
+          <AdminField label="Supplier" htmlFor="exp-supplier" required>
             <input
               id="exp-supplier"
               type="text"
@@ -503,8 +503,8 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
               onChange={(e) => setForm((p) => ({ ...p, supplier: e.target.value }))}
               className={ADMIN_INPUT_CLS}
             />
-          </Field>
-          <Field label="Description" htmlFor="exp-description" required>
+          </AdminField>
+          <AdminField label="Description" htmlFor="exp-description" required>
             <input
               id="exp-description"
               type="text"
@@ -513,8 +513,8 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
               className={ADMIN_INPUT_CLS}
             />
-          </Field>
-          <Field label="Category" htmlFor="exp-category">
+          </AdminField>
+          <AdminField label="Category" htmlFor="exp-category">
             <select
               id="exp-category"
               value={form.category}
@@ -525,8 +525,8 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
                 <option key={c}>{c}</option>
               ))}
             </select>
-          </Field>
-          <Field label="Amount incl. GST" htmlFor="exp-amount" required>
+          </AdminField>
+          <AdminField label="Amount incl. GST" htmlFor="exp-amount" required>
             <input
               id="exp-amount"
               type="number"
@@ -537,8 +537,8 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
               onChange={(e) => setForm((p) => ({ ...p, amountIncl: e.target.value }))}
               className={ADMIN_INPUT_CLS}
             />
-          </Field>
-          <Field label="GST rate" htmlFor="exp-gst">
+          </AdminField>
+          <AdminField label="GST rate" htmlFor="exp-gst">
             <select
               id="exp-gst"
               value={form.gstRate}
@@ -553,8 +553,8 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
                 GST: {formatNZD(previewGst)} | Excl: {formatNZD(inclNum - previewGst)}
               </p>
             )}
-          </Field>
-          <Field label="Payment method" htmlFor="exp-method">
+          </AdminField>
+          <AdminField label="Payment method" htmlFor="exp-method">
             <select
               id="exp-method"
               value={form.method}
@@ -565,8 +565,8 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
                 <option key={m}>{m}</option>
               ))}
             </select>
-          </Field>
-          <Field label="Notes" htmlFor="exp-notes" optional>
+          </AdminField>
+          <AdminField label="Notes" htmlFor="exp-notes" optional>
             <input
               id="exp-notes"
               type="text"
@@ -574,7 +574,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
               className={ADMIN_INPUT_CLS}
             />
-          </Field>
+          </AdminField>
           <label className="flex items-center gap-2">
             <input
               type="checkbox"

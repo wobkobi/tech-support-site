@@ -22,11 +22,11 @@ function valueToneClass(tone: StatTone): string {
     case "default":
       return "text-admin-text";
     case "success":
-      return "text-emerald-600";
+      return "text-green-700";
     case "warning":
-      return "text-amber-600";
+      return "text-amber-700";
     case "critical":
-      return "text-coquelicot-600";
+      return "text-coquelicot-700";
     case "violet":
       return "text-russian-violet";
     case "info":
@@ -77,19 +77,18 @@ export function StatCard({
   className,
 }: StatCardProps): React.ReactElement {
   const base = cn(
-    "rounded-xl border bg-admin-surface p-3 text-left shadow-sm sm:p-4",
+    "rounded-lg border bg-admin-surface p-3 text-left sm:p-4",
     active ? "border-russian-violet ring-1 ring-russian-violet" : "border-admin-border",
     className,
   );
   // select-none unifies the link and button forms: clickable cards act as
   // controls, so neither should offer text selection (the static div still does).
-  const interactive =
-    "select-none transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet";
+  const interactive = "select-none transition-colors hover:border-russian-violet";
   const content = (
     <>
-      <p className={cn("text-xl font-extrabold", valueToneClass(tone))}>{value}</p>
-      <p className="mt-0.5 text-xs text-admin-muted">{label}</p>
-      {sub && <p className="mt-1 text-xs text-admin-faint">{sub}</p>}
+      <p className={cn("text-2xl font-extrabold", valueToneClass(tone))}>{value}</p>
+      <p className="mt-0.5 text-sm font-semibold text-admin-muted">{label}</p>
+      {sub && <p className="mt-1 text-sm text-admin-faint">{sub}</p>}
     </>
   );
 

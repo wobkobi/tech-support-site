@@ -141,13 +141,13 @@ export function Modal({
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "flex max-h-[85vh] w-full flex-col overflow-hidden rounded-xl border border-admin-border bg-admin-surface shadow-xl outline-none",
+          "flex max-h-[85vh] w-full flex-col overflow-hidden rounded-lg border border-admin-border bg-admin-surface shadow-xl outline-none",
           sizeClass(size),
         )}
       >
         <div className="flex items-start justify-between gap-3 border-b border-admin-border px-5 py-4">
           <div className="min-w-0">
-            <h2 id={titleId} className="text-lg font-bold text-russian-violet">
+            <h2 id={titleId} className="text-lg font-extrabold text-admin-text">
               {title}
             </h2>
             {description && (
@@ -162,7 +162,7 @@ export function Modal({
             type="button"
             onClick={requestClose}
             aria-label="Close"
-            className="-my-2 -mr-3 inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-2xl leading-none text-admin-muted transition-colors hover:bg-admin-bg hover:text-admin-text"
+            className="-my-2 -mr-3 inline-flex size-11 shrink-0 items-center justify-center rounded-md text-2xl leading-none text-admin-muted transition-colors hover:bg-admin-bg hover:text-admin-text"
           >
             &times;
           </button>
@@ -173,9 +173,9 @@ export function Modal({
         {confirmingDiscard ? (
           <div
             ref={discardBarRef}
-            className="flex flex-wrap items-center justify-end gap-2 border-t border-amber-200 bg-amber-50 px-5 py-3"
+            className="flex flex-wrap items-center justify-end gap-2 border-t border-l-4 border-admin-border border-l-coquelicot-600 bg-coquelicot-50 px-5 py-3"
           >
-            <p role="alert" className="mr-auto text-sm font-medium text-amber-900">
+            <p role="alert" className="mr-auto text-sm font-bold text-coquelicot-800">
               Discard what you&apos;ve entered?
             </p>
             <AdminButton variant="secondary" onClick={() => setConfirmingDiscard(false)}>

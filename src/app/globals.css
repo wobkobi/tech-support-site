@@ -105,20 +105,20 @@
   --color-moonstone-900: #0b2528;
   --color-moonstone-950: #071a1c;
 
-  /* admin neutrals - Polaris-like back-office chrome. Maps the slate values
-     hardcoded across admin pages so upgraded surfaces read from tokens; the
-     public site keeps its own palette untouched. */
-  --color-admin-bg: #f8fafc;
+  /* admin neutrals - the public site's palette under admin role names, so the
+     back office matches the public pages: seasalt ground, white panels,
+     rich-black text. Each value is a public token hex, never a new colour. */
+  --color-admin-bg: #f6f7f8; /* seasalt */
   --color-admin-surface: #ffffff;
-  --color-admin-border: #e2e8f0;
-  --color-admin-border-strong: #cbd5e1;
-  --color-admin-text: #1e293b;
-  --color-admin-text-secondary: #475569;
-  --color-admin-muted: #64748b;
-  /* Same as muted: slate-500 is the lightest grey that still reads at 4.5:1 on
+  --color-admin-border: #e2e6e9; /* seasalt-100 */
+  --color-admin-border-strong: #a9b3bc; /* seasalt-300, the public input border */
+  --color-admin-text: #001514; /* rich-black */
+  --color-admin-text-secondary: #2d3339; /* seasalt-800 */
+  --color-admin-muted: #434c56; /* seasalt-700 */
+  /* Same as muted: seasalt-700 is the lightest grey that still reads at 4.5:1 on
      admin-bg, and faint is nearly all text (dates, hints, empty states). Its
      lower rank comes from its smaller size, not a paler colour. */
-  --color-admin-faint: #64748b;
+  --color-admin-faint: #434c56;
 }
 
 /* Fixed light theme base colours */
@@ -248,6 +248,15 @@ body:has(:is(input:not([type="checkbox"], [type="radio"]), textarea, select):foc
 
 :where(:focus-visible) {
   outline: 2px solid color-mix(in oklab, var(--color-moonstone-500) 70%, white);
+  outline-offset: 2px;
+}
+
+/* Admin focus: a heavier, darker ring. The light public mix is under 3:1 on the white
+   and seasalt admin surfaces; moonstone-600 is 3.6:1 on white and 5.1:1 on the violet
+   sidebar, so one colour serves both. Unlayered like the rule above, so it beats any
+   `focus-visible:outline-*` utility - admin components set no outline of their own. */
+.app-admin :where(:focus-visible) {
+  outline: 3px solid var(--color-moonstone-600);
   outline-offset: 2px;
 }
 

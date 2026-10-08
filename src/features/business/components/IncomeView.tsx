@@ -7,6 +7,7 @@
 // here.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { ADMIN_CONTROL_CLS, ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
@@ -21,7 +22,6 @@ import {
   ContactNameInput,
   useGoogleContacts,
 } from "@/features/contacts/components/ContactNameInput";
-import { Field } from "@/shared/components/Field";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import Link from "next/link";
@@ -282,7 +282,7 @@ export function IncomeView(): React.ReactElement {
           {editingId ? "Edit income" : "Add income"}
         </h2>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Date" htmlFor="inc-date" required>
+          <AdminField label="Date" htmlFor="inc-date" required>
             <input
               id="inc-date"
               type="date"
@@ -291,8 +291,8 @@ export function IncomeView(): React.ReactElement {
               onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
               className={ADMIN_INPUT_CLS}
             />
-          </Field>
-          <Field label="Customer" htmlFor="inc-customer" required>
+          </AdminField>
+          <AdminField label="Customer" htmlFor="inc-customer" required>
             <ContactNameInput
               id="inc-customer"
               required
@@ -301,8 +301,8 @@ export function IncomeView(): React.ReactElement {
               contacts={contacts}
               className={ADMIN_INPUT_CLS}
             />
-          </Field>
-          <Field label="Description" htmlFor="inc-description" required>
+          </AdminField>
+          <AdminField label="Description" htmlFor="inc-description" required>
             <input
               id="inc-description"
               type="text"
@@ -311,8 +311,8 @@ export function IncomeView(): React.ReactElement {
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
               className={ADMIN_INPUT_CLS}
             />
-          </Field>
-          <Field label="Amount (NZD)" htmlFor="inc-amount" required>
+          </AdminField>
+          <AdminField label="Amount (NZD)" htmlFor="inc-amount" required>
             <input
               id="inc-amount"
               type="number"
@@ -323,8 +323,8 @@ export function IncomeView(): React.ReactElement {
               onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
               className={ADMIN_INPUT_CLS}
             />
-          </Field>
-          <Field label="Payment method" htmlFor="inc-method">
+          </AdminField>
+          <AdminField label="Payment method" htmlFor="inc-method">
             <select
               id="inc-method"
               value={form.method}
@@ -335,8 +335,8 @@ export function IncomeView(): React.ReactElement {
                 <option key={m}>{m}</option>
               ))}
             </select>
-          </Field>
-          <Field label="Notes" htmlFor="inc-notes" optional>
+          </AdminField>
+          <AdminField label="Notes" htmlFor="inc-notes" optional>
             <input
               id="inc-notes"
               type="text"
@@ -344,7 +344,7 @@ export function IncomeView(): React.ReactElement {
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
               className={ADMIN_INPUT_CLS}
             />
-          </Field>
+          </AdminField>
         </div>
         {formError && <p className="mt-2 text-sm text-coquelicot-600">{formError}</p>}
         <div className="mt-4 flex items-center gap-3">

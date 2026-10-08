@@ -1,7 +1,6 @@
 // src/features/admin/components/ui/Card.tsx
-// Canonical admin surface. Replaces the copy-pasted
-// `rounded-xl border ... bg-white shadow-sm` class strings with a tokenised Card plus an
-// optional CardHeader. Server-safe.
+// Canonical admin surface: a bordered 8px panel with no shadow, matching the public
+// site's panels, plus an optional CardHeader. Server-safe.
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -24,7 +23,7 @@ interface CardProps {
 
 /** Strips the card surface below `sm`; see {@link CardProps.flushOnPhone}. */
 export const FLUSH_ON_PHONE =
-  "max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none";
+  "max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:p-0";
 
 /**
  * Padding utility for the given preset.
@@ -60,7 +59,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-xl border border-admin-border bg-admin-surface shadow-sm",
+        "rounded-lg border border-admin-border bg-admin-surface",
         paddingClass(padding),
         flushOnPhone && FLUSH_ON_PHONE,
         className,
@@ -100,7 +99,7 @@ export function CardHeader({
   return (
     <div className={cn("mb-4 flex items-start justify-between gap-3", className)}>
       <div className="min-w-0">
-        <h2 className="text-base font-bold text-admin-text">{title}</h2>
+        <h2 className="text-lg font-extrabold text-admin-text">{title}</h2>
         {description && <p className="mt-0.5 text-sm text-admin-text-secondary">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}

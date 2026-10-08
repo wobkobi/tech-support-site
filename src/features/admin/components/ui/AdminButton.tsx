@@ -1,8 +1,8 @@
 // src/features/admin/components/ui/AdminButton.tsx
-// Compact back-office button. Cloned (not extended) from the shared public Button - the
-// public primary is coquelicot h-12 for the marketing site, whereas admin wants
-// russian-violet h-8/h-9 controls. Polymorphic: renders a Next.js Link when `href` is
-// set, otherwise a native button. A `busy` button shows a spinner and is disabled.
+// Compact back-office button. Same colours as the shared public Button (coquelicot
+// primary, violet outline) at admin density: h-8/h-10 instead of the public h-12.
+// Polymorphic: renders a Next.js Link when `href` is set, otherwise a native button. A
+// `busy` button shows a spinner and is disabled.
 
 "use client";
 
@@ -11,7 +11,7 @@ import Link from "next/link";
 import type React from "react";
 
 /** Visual variant. */
-type AdminButtonVariant = "primary" | "secondary" | "danger" | "ghost";
+type AdminButtonVariant = "primary" | "secondary" | "outline" | "danger" | "ghost";
 /** Control height. */
 type AdminButtonSize = "xs" | "sm";
 
@@ -51,12 +51,15 @@ type AdminButtonProps = AdminButtonAsLink | AdminButtonAsButton;
 function variantClasses(variant: AdminButtonVariant): string {
   switch (variant) {
     case "primary":
-      return "bg-russian-violet text-white hover:bg-russian-violet-800";
-    case "secondary":
-      return "border border-admin-border-strong bg-admin-surface text-admin-text hover:bg-admin-bg";
-    case "danger":
       // Hover darkens: white on coquelicot-500 fails AA (~3.5:1) at this size.
       return "bg-coquelicot-600 text-white hover:bg-coquelicot-700";
+    case "secondary":
+      return "border border-admin-border-strong bg-admin-surface text-admin-text hover:border-russian-violet";
+    case "outline":
+      return "border-2 border-russian-violet bg-admin-surface text-russian-violet hover:bg-russian-violet hover:text-white";
+    case "danger":
+      // Outlined, so a destructive action never reads as the filled red primary.
+      return "border-2 border-coquelicot-600 bg-admin-surface text-coquelicot-700 hover:bg-coquelicot-50";
     case "ghost":
       return "text-admin-text-secondary hover:bg-admin-bg";
   }
@@ -68,13 +71,13 @@ function variantClasses(variant: AdminButtonVariant): string {
  * @returns Class string.
  */
 function sizeClasses(size: AdminButtonSize): string {
-  // A finger needs about 44px where a mouse is happy with 32-36px, so touch
+  // A finger needs about 44px where a mouse is happy with 32-40px, so touch
   // screens grow the button without changing the desktop density.
   switch (size) {
     case "xs":
       return "h-8 gap-1.5 px-3 text-xs pointer-coarse:min-h-11";
     case "sm":
-      return "h-9 gap-2 px-4 text-sm pointer-coarse:min-h-11";
+      return "h-10 gap-2 px-4 text-[0.9375rem] pointer-coarse:min-h-11";
   }
 }
 
@@ -107,8 +110,7 @@ export function AdminButton(props: AdminButtonProps): React.ReactElement {
 
   const base = cn(
     // select-none keeps link-rendered buttons unselectable like native ones.
-    "inline-flex items-center justify-center rounded-lg font-semibold whitespace-nowrap select-none",
-    "transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet",
+    "inline-flex items-center justify-center rounded-md font-bold whitespace-nowrap transition-colors select-none",
     variantClasses(variant),
     sizeClasses(size),
     className,

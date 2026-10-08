@@ -42,7 +42,7 @@ export default function AdminShellLayout({
         {/* Sidebar is fixed-position; reserve its width on lg+ only (mobile uses
             the drawer). min-w-0 stops wide content blowing out the flex column;
             overflow-x-clip preserves sticky descendants. Print drops the chrome. */}
-        <div className="min-w-0 flex-1 bg-slate-50 lg:ml-56 print:ml-0 print:bg-white">
+        <div className="min-w-0 flex-1 bg-admin-bg lg:ml-56 print:ml-0 print:bg-white">
           {/* The root layout's skip link targets #main. */}
           {/* Below lg, pt-18 clears the 56px top bar and pb-28 keeps the end of every
               page clear of the + button. */}
