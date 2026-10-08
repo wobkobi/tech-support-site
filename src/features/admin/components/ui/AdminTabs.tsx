@@ -56,11 +56,17 @@ export function AdminTabs<K extends string>({
   const tabRefs = useRef<Array<HTMLAnchorElement | HTMLButtonElement | null>>([]);
 
   /**
-   * Moves focus between tabs on arrow / Home / End.
+   * Moves focus between tabs on arrow / Home / End. Space on a link tab follows the link,
+   * since browsers only activate anchors on Enter.
    * @param e - Key event from a tab.
    * @param index - Index of the focused tab.
    */
   const onKeyDown = (e: React.KeyboardEvent, index: number): void => {
+    if (e.key === " " && tabs[index]?.href) {
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).click();
+      return;
+    }
     const last = tabs.length - 1;
     let next: number | null = null;
     if (e.key === "ArrowRight") next = index === last ? 0 : index + 1;

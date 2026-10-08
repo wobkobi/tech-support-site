@@ -42,6 +42,8 @@ interface StatCardProps {
   value: React.ReactNode;
   /** Optional secondary line (e.g. an urgency hint or count). */
   sub?: React.ReactNode;
+  /** Optional trend graphic under the text, e.g. a Sparkline. */
+  trend?: React.ReactNode;
   /** Accent tone for the value. */
   tone?: StatTone;
   /** When set, the card renders as a link to this URL. Takes precedence over onClick. */
@@ -59,6 +61,7 @@ interface StatCardProps {
  * @param props.label - Label under the value.
  * @param props.value - Primary value.
  * @param props.sub - Optional secondary line.
+ * @param props.trend - Optional trend graphic under the text.
  * @param props.tone - Accent tone for the value.
  * @param props.href - When set, the card renders as a link.
  * @param props.onClick - Click handler; when set (and no href) the card renders as a button.
@@ -70,6 +73,7 @@ export function StatCard({
   label,
   value,
   sub,
+  trend,
   tone = "default",
   href,
   onClick,
@@ -89,6 +93,7 @@ export function StatCard({
       <p className={cn("text-2xl font-extrabold", valueToneClass(tone))}>{value}</p>
       <p className="mt-0.5 text-sm font-semibold text-admin-muted">{label}</p>
       {sub && <p className="mt-1 text-sm text-admin-faint">{sub}</p>}
+      {trend}
     </>
   );
 

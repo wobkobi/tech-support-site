@@ -1,10 +1,13 @@
 // src/app/admin/(shell)/business/page.tsx
 // Business dashboard. Resolves the displayed scope from the `?fy=` param (all-time or a
 // financial year via resolveScope), aggregates income, expenses, and invoices into
-// BusinessDashboardCards, and shows the tax planner with a cached snapshot plus a Sheets
-// import action.
+// BusinessDashboardCards and an income vs expenses chart (by month, or by FY for all
+// time), and shows the tax planner with a cached snapshot plus a Sheets import action.
 
+import { BarChart } from "@/features/admin/components/charts/BarChart";
+import { INCOME_EXPENSE_SERIES } from "@/features/admin/components/charts/series";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminTabs } from "@/features/admin/components/ui/AdminTabs";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import {
   BusinessDashboardCards,
@@ -17,6 +20,7 @@ import { TaxPlannerSection } from "@/features/business/components/TaxPlannerSect
 import { listFinancialYears } from "@/features/business/lib/financial-year";
 import { listSpreadsheetsInFolder } from "@/features/business/lib/google-drive";
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
+import { fyMonthGroups, fyTotalGroups } from "@/features/business/lib/ledger-chart";
 import { getFySheetIdForDate } from "@/features/business/lib/sheets-sync";
 import {
   clearTaxCache,
@@ -27,12 +31,10 @@ import { DEFAULT_TAX_RATES, type TaxRates } from "@/features/business/lib/tax-pl
 import { readPlannerConfig } from "@/features/business/lib/tax-settings";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
-import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { nzDateParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
-import Link from "next/link";
 import type React from "react";
 
 export const dynamic = "force-dynamic";
@@ -122,9 +124,9 @@ function filterByScope<T extends { date: string }>(
 /**
  * Business dashboard. The selected scope (All time / Current FY / a past FY)
  * comes from `?fy=` and drives every total: overview cards, breakdown modals,
- * tax planner, and the bottom-of-page invoice/income/expense links. Past-FY
- * scopes hide the "This month" cards since the current calendar month falls
- * outside the FY window.
+ * the income vs expenses chart, tax planner, and the bottom-of-page
+ * invoice/income/expense links. Past-FY scopes hide the "This month" cards
+ * since the current calendar month falls outside the FY window.
  * @param root0 - Page props.
  * @param root0.searchParams - URL search params (`?fy=` scope + optional `?refresh=1` cache-bust).
  * @returns Business dashboard element.
@@ -290,13 +292,21 @@ export default async function BusinessPage({
   ];
 
   /**
-   * Builds the URL for a tab, preserving the admin token.
+   * Builds the `?fy=` URL for a scope tab.
    * @param tabKey - The tab's scope key (e.g. "all" or "2026-27").
    * @returns Relative URL.
    */
   function tabHref(tabKey: string): string {
     return `/admin/business?${SCOPE_PARAM}=${encodeURIComponent(tabKey)}`;
   }
+
+  // Chart groups for the same scope as the cards: months inside an FY, FYs for all time.
+  // Both builders put every scoped row in a group, so the chart totals match the cards.
+  const chartRows = { income, expenses };
+  const chartGroups =
+    scope.startISO && scope.endISO
+      ? fyMonthGroups(chartRows, { startISO: scope.startISO, endISO: scope.endISO }, startDate, now)
+      : fyTotalGroups(chartRows, fyList, startDate, now);
 
   const links = [
     { label: "Income", href: `/admin/business/income` },
@@ -309,33 +319,23 @@ export default async function BusinessPage({
     <>
       <PageHeader title="Business" />
 
-      {/* FY scope selector */}
-      <div role="tablist" aria-label="Financial year scope" className="mb-6 flex flex-wrap gap-2">
-        {tabs.map((tab) => {
-          const active = tab.key === scope.key;
-          return (
-            <Link
-              key={tab.key}
-              href={tabHref(tab.key)}
-              role="tab"
-              aria-selected={active}
-              className={cn(
-                "rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors select-none",
-                active
-                  ? "border-russian-violet bg-russian-violet text-white"
-                  : "border-admin-border bg-admin-surface text-admin-muted hover:border-russian-violet/50 hover:text-russian-violet",
-              )}
-            >
-              {tab.label}
-              {tab.current && !active && (
-                <span className="ml-2 rounded-full bg-moonstone-400/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-moonstone-700 uppercase">
-                  Current
-                </span>
-              )}
-            </Link>
-          );
-        })}
-      </div>
+      {/* FY scope selector: links, so `?fy=` stays the source of truth. */}
+      <AdminTabs
+        aria-label="Financial year scope"
+        active={scope.key}
+        className="mb-6"
+        tabs={tabs.map((tab) => ({
+          key: tab.key,
+          label: tab.label,
+          href: tabHref(tab.key),
+          badge:
+            tab.current && tab.key !== scope.key ? (
+              <span className="rounded-full bg-moonstone-400/15 px-2 py-0.5 text-sm font-bold text-moonstone-700">
+                Current
+              </span>
+            ) : undefined,
+        }))}
+      />
 
       <BusinessDashboardCards
         scope={{
@@ -348,6 +348,21 @@ export default async function BusinessPage({
         invoices={invoiceRows}
         monthStartISO={monthStart.toISOString()}
         monthEndISO={monthEnd.toISOString()}
+      />
+
+      <BarChart
+        // Remount per scope so hover, focus and the tab stop don't carry over.
+        key={scope.key}
+        title={
+          scope.isAllTime ? "Income vs expenses by financial year" : "Income vs expenses by month"
+        }
+        description={scope.label}
+        series={INCOME_EXPENSE_SERIES}
+        groups={chartGroups}
+        groupHeading={scope.isAllTime ? "Financial year" : "Month"}
+        differenceLabel="Profit"
+        emptyText="No income or expenses recorded in this period."
+        className="mb-8"
       />
 
       <TaxPlannerSection
