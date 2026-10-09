@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.82.0",
+  "version": "4.83.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -36,6 +36,7 @@
     "check:tax-load": "dotenv -e .env.local -- tsx --conditions=react-server scripts/check-tax-load.ts",
     "check:tax-settings": "tsx scripts/check-tax-settings.ts",
     "check:time-parse": "tsx scripts/check-time-parse.ts",
+    "check:trips": "tsx scripts/check-trips.ts",
     "db:push": "prisma db push",
     "dev": "next dev",
     "eval:ai": "dotenv -e .env.local -- tsx scripts/eval-ai/index.ts",

@@ -23,6 +23,7 @@ import {
   FaCalculator,
   FaCalendarDays,
   FaCalendarWeek,
+  FaCar,
   FaEnvelope,
   FaFileInvoiceDollar,
   FaGaugeHigh,
@@ -49,6 +50,7 @@ type AdminPage =
   | "business-income"
   | "business-expenses"
   | "business-assets"
+  | "business-trips"
   | "business-invoices"
   | "business-calculator"
   | "business-quick"
@@ -113,7 +115,8 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 // Overview heads the group; the rest follow the billing flow: price the job,
-// invoice it, then the ledger it lands in, then the gear the business owns.
+// invoice it, then the ledger it lands in, then the gear the business owns and the
+// km it drives.
 const BUSINESS_NAV_ITEMS: NavItem[] = [
   {
     page: "business",
@@ -156,6 +159,12 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
     label: "Assets",
     icon: <FaBoxesStacked className="shrink-0" />,
     path: "/admin/business/assets",
+  },
+  {
+    page: "business-trips",
+    label: "Trips",
+    icon: <FaCar className="shrink-0" />,
+    path: "/admin/business/trips",
   },
 ];
 
