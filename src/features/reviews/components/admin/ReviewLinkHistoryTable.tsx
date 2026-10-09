@@ -1,19 +1,41 @@
 "use client";
 // src/features/reviews/components/admin/ReviewLinkHistoryTable.tsx
-// Table of review link history with inline editing of a contact's email/phone, Send again
-// for anyone with an email on file, and revoke for links not yet used. Rows that resolve
-// to no contact at all (Legacy) are read-only.
+// Review link history: cards up to xl and a table from xl, with inline editing of a
+// contact's email/phone, Send again for anyone with an email on file, and revoke for links
+// not yet used. Rows that resolve to no contact at all (Legacy) are read-only.
 
+import {
+  ROW_CLS,
+  TABLE_CLS,
+  TBODY_CLS,
+  TD_CLS,
+  TH_CLS,
+  THEAD_CLS,
+} from "@/features/admin/components/ui/admin-table";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { Card } from "@/features/admin/components/ui/Card";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
-import { StatusPill } from "@/features/admin/components/ui/StatusPill";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
+import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { cn } from "@/shared/lib/cn";
-import { formatDateShort } from "@/shared/lib/date-format";
-import { formatNZPhone, isValidPhone, toE164NZ } from "@/shared/lib/normalise-phone";
+import { formatNZPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useState } from "react";
-import { CopyLinkButton } from "./CopyLinkButton";
+import {
+  ContactEditForm,
+  ContactText,
+  dateLabel,
+  EditContactButton,
+  HistoryRowActions,
+  isReviewDerived,
+  ReviewedPill,
+  SourceBadge,
+} from "./ReviewLinkHistoryParts";
 import { useSendReviewAsk } from "./use-send-review-ask";
+
+/** Table cell, a little tighter than the kit default so three columns fit the 2/3 column. */
+const CELL_CLS = cn(TD_CLS, "px-3");
 
 /**
  * Which channel the review link went out on. The first four are tracked sends
@@ -51,31 +73,9 @@ interface ReviewLinkHistoryTableProps {
 }
 
 /**
- * Badge colour per source. Tracked sends get a channel colour; the two
- * reconstructed sources stay grey so they read as "no send on record".
- */
-const SOURCE_BADGE: Record<LinkSource, string> = {
-  Auto: "bg-moonstone-400/15 text-moonstone-700",
-  "Manual email": "bg-russian-violet/10 text-russian-violet",
-  "Manual SMS": "bg-coquelicot-500/10 text-coquelicot-500",
-  Invoice: "bg-mustard-300/25 text-mustard-700",
-  Linked: "bg-slate-100 text-slate-500",
-  Legacy: "bg-slate-100 text-slate-400",
-};
-
-/** Hover text spelling out where each kind of row came from. */
-const SOURCE_HINT: Record<LinkSource, string> = {
-  Auto: "Sent automatically after the booking",
-  "Manual email": "Emailed from the send form",
-  "Manual SMS": "Sent as a text from the send form",
-  Invoice: "Went out on the invoice email as the review line",
-  Linked: "Review attached to this contact - no send on record",
-  Legacy: "Review with no contact and no send on record",
-};
-
-/**
- * Renders the review link history table. Any row that resolves to a contact can
- * have its email/phone edited inline.
+ * Renders the review link history: cards on phones and narrow desktops, a table from xl.
+ * The list sits in the page's two-thirds column, which below xl is too narrow for three
+ * columns. Any row that resolves to a contact can have its email/phone edited inline.
  * @param props - Component props.
  * @param props.entries - History rows to display.
  * @returns History table element.
@@ -215,191 +215,177 @@ export function ReviewLinkHistoryTable({
     : entries;
 
   if (entries.length === 0) {
-    return <p className="text-sm text-slate-400">No review links sent yet.</p>;
+    return <EmptyState title="No review links sent yet." />;
+  }
+
+  /**
+   * Starts a fresh email ask to a row's person. A review-derived row has no send on
+   * record, so it passes no last-asked date.
+   * @param entry - The row to ask again.
+   */
+  function sendAgain(entry: LinkHistoryEntry): void {
+    ask.start(
+      {
+        name: entry.name,
+        email: entry.email,
+        phone: entry.phone,
+        lastAskedAt: isReviewDerived(entry) ? null : entry.sentAt,
+      },
+      "email",
+    );
+  }
+
+  /**
+   * Inline editor wired to the shared edit state, for whichever row is open.
+   * @param entry - The row being edited.
+   * @returns Editor element.
+   */
+  function editForm(entry: LinkHistoryEntry): React.ReactElement {
+    return (
+      <ContactEditForm
+        email={editEmail}
+        onEmailChange={setEditEmail}
+        phone={editPhoneInput}
+        onPhoneChange={setEditPhoneInput}
+        saving={saving}
+        onSave={() => void handleSave(entry)}
+        onCancel={cancelEdit}
+      />
+    );
   }
 
   return (
     <div className="flex flex-col gap-3">
-      <input
-        type="search"
-        placeholder="Search name, email, phone…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
+      <ListToolbar
+        className="mb-0"
+        search={
+          <AdminInput
+            type="search"
+            placeholder="Search name, email, phone…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-10"
+          />
+        }
       />
       {visibleEntries.length === 0 ? (
-        <p className="text-sm text-slate-400">No matching entries.</p>
+        <EmptyState title="No matching entries." />
       ) : (
-        <div className="flex max-h-128 flex-col gap-2 overflow-y-auto">
-          {visibleEntries.map((entry) => {
-            const key = entryKey(entry);
-            const isEditing = key !== null && editingKey === key;
-            // Only contact-backed rows are editable; booking sends and rows with
-            // nobody behind them display read-only, their fields living elsewhere.
-            const canEdit = entry.id !== null;
+        <>
+          {/* Phones and narrow desktops: one card per row */}
+          <div className="flex max-h-128 flex-col gap-2 overflow-y-auto xl:hidden">
+            {visibleEntries.map((entry) => {
+              const key = entryKey(entry);
+              const isEditing = key !== null && editingKey === key;
+              // Only contact-backed rows are editable; booking sends and rows with
+              // nobody behind them display read-only, their fields living elsewhere.
+              const canEdit = entry.id !== null;
 
-            const sourceBadge = (
-              <span
-                title={SOURCE_HINT[entry.source]}
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                  SOURCE_BADGE[entry.source],
-                )}
-              >
-                {entry.source}
-              </span>
-            );
-
-            const contact = entry.email
-              ? entry.email
-              : entry.phone
-                ? formatNZPhone(entry.phone)
-                : null;
-
-            return (
-              <div
-                key={key ?? entry.reviewUrl}
-                className="rounded-lg border border-slate-200 bg-white p-3"
-              >
-                {/* Name row */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-sm font-medium text-slate-800">
-                        {entry.name}
-                      </span>
-                      {sourceBadge}
-                    </div>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      {contact ?? (
-                        <span className="text-slate-400 italic">
-                          {entry.id ? "no contact details" : "no contact on file"}
-                        </span>
-                      )}
-                      {" · "}
-                      {/* Linked and Legacy rows have no send on record, so the
-                          date is when the review landed - label it as such
-                          rather than letting it read as a send date. */}
-                      {entry.source === "Linked" || entry.source === "Legacy"
-                        ? `reviewed ${formatDateShort(entry.sentAt)}`
-                        : formatDateShort(entry.sentAt)}
-                    </p>
-                  </div>
-                  {canEdit && !isEditing && (
-                    <button
-                      type="button"
-                      onClick={() => openEdit(entry)}
-                      className="shrink-0 text-slate-400 transition-colors hover:text-russian-violet"
-                      aria-label="Edit contact details"
-                    >
-                      ✎
-                    </button>
-                  )}
-                </div>
-
-                {/* Edit form */}
-                {isEditing &&
-                  (() => {
-                    const phoneValid = isValidPhone(toE164NZ(editPhoneInput));
-                    return (
-                      <div className="mt-2 flex flex-col gap-2 border-t border-slate-100 pt-2">
-                        <input
-                          type="email"
-                          value={editEmail}
-                          onChange={(e) => setEditEmail(e.target.value)}
-                          placeholder="Email (optional)"
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
-                        />
-                        <input
-                          type="tel"
-                          value={editPhoneInput}
-                          onChange={(e) => setEditPhoneInput(e.target.value)}
-                          onBlur={(e) => setEditPhoneInput(formatNZPhone(e.target.value))}
-                          placeholder="021 123 1234"
-                          className={cn(
-                            "w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-                            editPhoneInput && !phoneValid ? "border-coquelicot-500/60" : "",
-                          )}
-                        />
-                        {editPhoneInput && (
-                          <p
-                            className={cn(
-                              "text-xs",
-                              phoneValid ? "text-slate-400" : "text-coquelicot-600",
-                            )}
-                          >
-                            {phoneValid
-                              ? `Stored as: ${toE164NZ(editPhoneInput)}`
-                              : "Invalid phone number"}
-                          </p>
-                        )}
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            disabled={saving || (!!editPhoneInput && !phoneValid)}
-                            onClick={() => handleSave(entry)}
-                            className="rounded-lg bg-moonstone-400 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-moonstone-300 disabled:opacity-50"
-                          >
-                            {saving ? "Saving…" : "Save"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={cancelEdit}
-                            className="text-xs text-slate-500 transition-colors hover:text-slate-700"
-                          >
-                            Cancel
-                          </button>
-                        </div>
+              return (
+                <Card key={key ?? entry.reviewUrl} padding="sm">
+                  {/* Name row */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="truncate font-medium text-admin-text">{entry.name}</span>
+                        <SourceBadge source={entry.source} />
                       </div>
-                    );
-                  })()}
-
-                {/* Actions row */}
-                {!isEditing && (
-                  <div className="mt-2 flex items-center gap-3 border-t border-slate-100 pt-2">
-                    {entry.reviewed ? (
-                      <StatusPill tone="success">Reviewed</StatusPill>
-                    ) : (
-                      <StatusPill tone="neutral">Not reviewed</StatusPill>
-                    )}
-                    {entry.reviewUrl !== "" && <CopyLinkButton url={entry.reviewUrl} />}
-                    {entry.id && entry.email && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          ask.start(
-                            {
-                              name: entry.name,
-                              email: entry.email,
-                              phone: entry.phone,
-                              lastAskedAt:
-                                entry.source === "Linked" || entry.source === "Legacy"
-                                  ? null
-                                  : entry.sentAt,
-                            },
-                            "email",
-                          )
-                        }
-                        className="text-xs font-semibold text-russian-violet transition-colors hover:underline"
-                      >
-                        Send again
-                      </button>
-                    )}
-                    {entry.id && !entry.reviewed && (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmRevokeKey(key)}
-                        className="ml-auto text-xs text-slate-400 transition-colors hover:text-coquelicot-500"
-                      >
-                        Revoke
-                      </button>
-                    )}
+                      <p className="mt-0.5 text-sm wrap-anywhere text-admin-muted">
+                        <ContactText entry={entry} />
+                        {" · "}
+                        {dateLabel(entry)}
+                      </p>
+                    </div>
+                    {canEdit && !isEditing && <EditContactButton onClick={() => openEdit(entry)} />}
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+
+                  {isEditing && (
+                    <div className="mt-2 border-t border-admin-border pt-2">{editForm(entry)}</div>
+                  )}
+
+                  {/* Actions row */}
+                  {!isEditing && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-admin-border pt-2">
+                      <ReviewedPill reviewed={entry.reviewed} />
+                      <HistoryRowActions
+                        entry={entry}
+                        onSendAgain={() => sendAgain(entry)}
+                        onRevoke={() => setConfirmRevokeKey(key)}
+                        pushRevokeRight
+                      />
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Wide desktop: one table row per entry. Editing swaps the contact and
+              action cells for the editor, so the name stays in view. */}
+          <div className="hidden max-h-128 overflow-y-auto rounded-lg border border-admin-border xl:block">
+            <table className={cn(TABLE_CLS, "table-fixed")}>
+              <colgroup>
+                <col className="w-[22%]" />
+                <col className="w-[31%]" />
+                <col />
+              </colgroup>
+              <thead className={cn(THEAD_CLS, "sticky top-0 z-10")}>
+                <tr>
+                  <th className={cn(TH_CLS, "px-3")}>Name</th>
+                  <th className={cn(TH_CLS, "px-3")}>Contact</th>
+                  <th className={cn(TH_CLS, "px-3")}>Actions</th>
+                </tr>
+              </thead>
+              <tbody className={TBODY_CLS}>
+                {visibleEntries.map((entry) => {
+                  const key = entryKey(entry);
+                  const isEditing = key !== null && editingKey === key;
+                  const canEdit = entry.id !== null;
+
+                  return (
+                    <tr key={key ?? entry.reviewUrl} className={cn(ROW_CLS, "align-top")}>
+                      <td className={CELL_CLS}>
+                        <p className="font-medium wrap-break-word text-admin-text">{entry.name}</p>
+                        <div className="mt-1">
+                          <SourceBadge source={entry.source} />
+                        </div>
+                      </td>
+                      {isEditing ? (
+                        <td className={CELL_CLS} colSpan={2}>
+                          {editForm(entry)}
+                        </td>
+                      ) : (
+                        <>
+                          <td className={CELL_CLS}>
+                            <div className="flex items-start gap-1">
+                              <div className="min-w-0 text-sm">
+                                <p className="wrap-anywhere text-admin-text">
+                                  <ContactText entry={entry} />
+                                </p>
+                                <p className="mt-0.5 text-admin-muted">{dateLabel(entry)}</p>
+                              </div>
+                              {canEdit && <EditContactButton onClick={() => openEdit(entry)} />}
+                            </div>
+                          </td>
+                          <td className={CELL_CLS}>
+                            <ReviewedPill reviewed={entry.reviewed} />
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                              <HistoryRowActions
+                                entry={entry}
+                                onSendAgain={() => sendAgain(entry)}
+                                onRevoke={() => setConfirmRevokeKey(key)}
+                              />
+                            </div>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {/* One dialog for the list rather than a confirm pair per row: the entry

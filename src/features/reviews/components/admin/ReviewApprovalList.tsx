@@ -3,14 +3,18 @@
 // Interactive client component for approving, revoking, and deleting reviews, with
 // search, filter chips (status / verified / unlinked), and sort.
 
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
+import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
-import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useState } from "react";
 import { ContactPicker, type ContactPickerEntry } from "./ContactPicker";
+import { chipClass } from "./review-admin-classes";
 import type { ReviewRow } from "./review-types";
 import { ReviewCard } from "./ReviewCard";
 import { SendReviewLinkForm } from "./SendReviewLinkForm";
@@ -36,20 +40,6 @@ type Sort = "newest" | "oldest";
 
 /** Approved reviews per "Show more" batch. */
 const APPROVED_BATCH = 10;
-
-/**
- * Classes for a filter chip button.
- * @param active - Whether the chip is selected.
- * @returns Class string.
- */
-function chipClass(active: boolean): string {
-  return cn(
-    "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
-    active
-      ? "border-russian-violet bg-russian-violet text-white"
-      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100",
-  );
-}
 
 /**
  * Renders the full admin review list with pending and approved sections.
@@ -190,7 +180,7 @@ export function ReviewApprovalList({
       return (
         <button
           onClick={() => setLinkingId(row.id)}
-          className="rounded-full bg-moonstone-400/10 px-2 py-0.5 text-xs font-medium text-moonstone-700 transition-colors hover:bg-moonstone-400/20"
+          className="rounded-full bg-moonstone-400/10 px-2.5 py-0.5 text-sm font-semibold text-moonstone-700 transition-colors hover:bg-moonstone-400/20"
           title="Change linked contact"
         >
           {row.contactName}
@@ -201,7 +191,7 @@ export function ReviewApprovalList({
     return (
       <button
         onClick={() => setLinkingId(row.id)}
-        className="rounded px-1 py-0.5 text-xs text-russian-violet/50 transition-colors hover:text-russian-violet"
+        className="rounded px-1 py-0.5 text-sm font-semibold text-russian-violet underline underline-offset-2 hover:decoration-2"
       >
         Link contact
       </button>
@@ -238,66 +228,74 @@ export function ReviewApprovalList({
       {/* Send review link to past client */}
       {showSendForm && <SendReviewLinkForm />}
 
-      {/* Search */}
-      <input
-        type="search"
-        placeholder="Search name, review text…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
-      />
-
-      {/* Filter chips + sort */}
-      <div className="flex flex-wrap items-center gap-2">
-        {(["all", "pending", "approved"] as const).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setStatusFilter(s)}
-            className={chipClass(statusFilter === s)}
+      {/* Search, filter chips and sort */}
+      <ListToolbar
+        className="mb-0"
+        search={
+          <AdminInput
+            type="search"
+            placeholder="Search name, review text…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-10"
+          />
+        }
+        filters={
+          <>
+            {(["all", "pending", "approved"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setStatusFilter(s)}
+                className={chipClass(statusFilter === s)}
+              >
+                {s === "all" ? "All" : s === "pending" ? "Pending" : "Approved"}
+              </button>
+            ))}
+            <span className="mx-1 h-5 w-px bg-admin-border" />
+            <button
+              type="button"
+              onClick={() => setVerifiedOnly((v) => !v)}
+              className={chipClass(verifiedOnly)}
+            >
+              Verified only
+            </button>
+            <button
+              type="button"
+              onClick={() => setUnlinkedOnly((v) => !v)}
+              className={chipClass(unlinkedOnly)}
+            >
+              Unlinked only
+            </button>
+          </>
+        }
+        actions={
+          <AdminSelect
+            aria-label="Sort reviews"
+            value={sort}
+            onChange={(e) => setSort(e.target.value as Sort)}
+            className="h-10 w-auto"
           >
-            {s === "all" ? "All" : s === "pending" ? "Pending" : "Approved"}
-          </button>
-        ))}
-        <span className="mx-1 h-5 w-px bg-slate-200" />
-        <button
-          type="button"
-          onClick={() => setVerifiedOnly((v) => !v)}
-          className={chipClass(verifiedOnly)}
-        >
-          Verified only
-        </button>
-        <button
-          type="button"
-          onClick={() => setUnlinkedOnly((v) => !v)}
-          className={chipClass(unlinkedOnly)}
-        >
-          Unlinked only
-        </button>
-        <select
-          aria-label="Sort reviews"
-          value={sort}
-          onChange={(e) => setSort(e.target.value as Sort)}
-          className="ml-auto rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
-        >
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-        </select>
-      </div>
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </AdminSelect>
+        }
+      />
 
       {/* Pending */}
       {showPending && (
         <section>
-          <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-russian-violet">
+          <h3 className="mb-3 flex items-center gap-2 text-base font-extrabold text-admin-text">
             Pending
             {visiblePending.length > 0 && (
               <StatusPill tone="warning">{visiblePending.length}</StatusPill>
             )}
-          </h2>
+          </h3>
           {visiblePending.length === 0 ? (
-            <p className="text-sm text-slate-400">
-              {filtered ? "No matching pending reviews." : "No reviews pending approval."}
-            </p>
+            <EmptyState
+              className="py-4"
+              title={filtered ? "No matching pending reviews." : "No reviews pending approval."}
+            />
           ) : (
             <div className="flex flex-col gap-3">
               {visiblePending.map((row) => (
@@ -315,21 +313,22 @@ export function ReviewApprovalList({
         </section>
       )}
 
-      {showPending && showApproved && <hr className="border-slate-200" />}
+      {showPending && showApproved && <hr className="border-admin-border" />}
 
       {/* Approved */}
       {showApproved && (
         <section>
-          <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-russian-violet">
+          <h3 className="mb-3 flex items-center gap-2 text-base font-extrabold text-admin-text">
             Approved
             {visibleApproved.length > 0 && (
               <StatusPill tone="success">{visibleApproved.length}</StatusPill>
             )}
-          </h2>
+          </h3>
           {visibleApproved.length === 0 ? (
-            <p className="text-sm text-slate-400">
-              {filtered ? "No matching approved reviews." : "No approved reviews yet."}
-            </p>
+            <EmptyState
+              className="py-4"
+              title={filtered ? "No matching approved reviews." : "No approved reviews yet."}
+            />
           ) : (
             <div className="flex flex-col gap-3">
               {approvedPager.visible.map((row) => (

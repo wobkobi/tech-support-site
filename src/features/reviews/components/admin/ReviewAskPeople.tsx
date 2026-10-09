@@ -7,17 +7,20 @@
 // listed so it's clear why they have no button.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
+import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import type { AskPersonStatus } from "@/features/reviews/lib/review-ask-rules";
 import { apiFetch } from "@/shared/lib/api-client";
-import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { formatNZPhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useState } from "react";
+import { chipClass, ROW_BUTTON_CLS } from "./review-admin-classes";
 import { useSendReviewAsk, type ReviewAskTarget } from "./use-send-review-ask";
 
 /** One contact in the list. */
@@ -237,7 +240,11 @@ export function ReviewAskPeople({
     };
     if (p.status === "text_only") {
       return (
-        <AdminButton size="xs" variant="secondary" onClick={() => ask.start(target, "sms")}>
+        <AdminButton
+          variant="secondary"
+          onClick={() => ask.start(target, "sms")}
+          className={ROW_BUTTON_CLS}
+        >
           Text
         </AdminButton>
       );
@@ -245,9 +252,9 @@ export function ReviewAskPeople({
     if (p.status !== "ready" && p.status !== "recent" && p.status !== "reviewed") return null;
     return (
       <AdminButton
-        size="xs"
-        variant={p.status === "ready" ? "primary" : "secondary"}
+        variant={p.status === "ready" ? "outline" : "secondary"}
         onClick={() => ask.start(target, "email")}
+        className={ROW_BUTTON_CLS}
       >
         {p.lastAskedAt ? "Send again" : "Send"}
       </AdminButton>
@@ -256,16 +263,18 @@ export function ReviewAskPeople({
 
   return (
     <div className="flex flex-col gap-3">
-      <input
-        type="search"
-        placeholder="Search name, email, phone or address…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
-      />
-
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => {
+      <ListToolbar
+        className="mb-0"
+        search={
+          <AdminInput
+            type="search"
+            placeholder="Search name, email, phone or address…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-10"
+          />
+        }
+        filters={FILTERS.map((f) => {
           const count = people.filter((p) => inFilter(p.status, f.value)).length;
           return (
             <button
@@ -273,49 +282,48 @@ export function ReviewAskPeople({
               type="button"
               onClick={() => setFilter(f.value)}
               aria-pressed={filter === f.value}
-              className={cn(
-                "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
-                filter === f.value
-                  ? "border-russian-violet bg-russian-violet text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100",
-              )}
+              className={chipClass(filter === f.value)}
             >
               {f.label} ({count})
             </button>
           );
         })}
-      </div>
+      />
 
       {filter === "recent" && gapDays > 0 && (
-        <p className="text-xs text-admin-muted">
+        <p className="text-sm text-admin-muted">
           Asked in the last {gapDays} days. You can still send again.
         </p>
       )}
       {filter === "reviewed" && (
-        <p className="text-xs text-admin-muted">
+        <p className="text-sm text-admin-muted">
           They reviewed on your site. The ask leads with Google, so it asks them to post it there
           too.
         </p>
       )}
 
       {(selectable.length > 0 || chosen.length > 0) && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-admin-bg px-3 py-2">
           <label className="flex items-center gap-2 text-sm text-admin-text">
             <input
               type="checkbox"
               checked={allSelected}
               onChange={toggleAll}
               disabled={selectable.length === 0}
-              className="h-4 w-4 rounded border-admin-border-strong"
+              className="h-4 w-4 rounded border-admin-border-strong accent-russian-violet"
             />
             Select all {selectable.length} with an email
           </label>
           {chosen.length > 0 && (
             <div className="flex gap-2">
-              <AdminButton size="xs" variant="secondary" onClick={() => setSelected(new Set())}>
+              <AdminButton
+                variant="secondary"
+                onClick={() => setSelected(new Set())}
+                className={ROW_BUTTON_CLS}
+              >
                 Clear
               </AdminButton>
-              <AdminButton size="xs" onClick={() => setBulk({ kind: "confirm" })}>
+              <AdminButton onClick={() => setBulk({ kind: "confirm" })} className={ROW_BUTTON_CLS}>
                 Send to {chosen.length} {peopleWord(chosen.length)}
               </AdminButton>
             </div>
@@ -324,7 +332,7 @@ export function ReviewAskPeople({
       )}
 
       {visible.length === 0 ? (
-        <p className="text-sm text-admin-muted">{q ? "No matching people." : "Nobody here."}</p>
+        <EmptyState className="py-4" title={q ? "No matching people." : "Nobody here."} />
       ) : (
         <ul className="divide-y divide-admin-border">
           {pager.visible.map((p) => {
@@ -338,7 +346,7 @@ export function ReviewAskPeople({
                     checked={selected.has(p.id)}
                     onChange={(e) => toggle(p.id, e.target.checked)}
                     aria-label={`Select ${p.name}`}
-                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-admin-border-strong"
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-admin-border-strong accent-russian-violet"
                   />
                 ) : (
                   <span className="w-4 shrink-0" aria-hidden />
@@ -348,7 +356,7 @@ export function ReviewAskPeople({
                     <span className="truncate font-medium text-admin-text">{p.name}</span>
                     <StatusPill tone={pill.tone}>{pill.label}</StatusPill>
                   </div>
-                  <p className="mt-0.5 text-xs break-all text-admin-muted">
+                  <p className="mt-0.5 wrap-anywhere text-admin-muted">
                     {reach ?? "No email or phone"}
                     {" · "}
                     {p.lastAskedAt ? `Last asked ${formatDateShort(p.lastAskedAt)}` : "Never asked"}
