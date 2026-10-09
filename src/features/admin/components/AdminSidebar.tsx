@@ -18,6 +18,7 @@ import {
   FaArrowTrendUp,
   FaArrowUpRightFromSquare,
   FaBell,
+  FaBoxesStacked,
   FaBriefcase,
   FaCalculator,
   FaCalendarDays,
@@ -47,6 +48,7 @@ type AdminPage =
   | "business"
   | "business-income"
   | "business-expenses"
+  | "business-assets"
   | "business-invoices"
   | "business-calculator"
   | "business-quick"
@@ -111,7 +113,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 // Overview heads the group; the rest follow the billing flow: price the job,
-// invoice it, then the ledger it lands in.
+// invoice it, then the ledger it lands in, then the gear the business owns.
 const BUSINESS_NAV_ITEMS: NavItem[] = [
   {
     page: "business",
@@ -148,6 +150,12 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
     label: "Expenses",
     icon: <FaReceipt className="shrink-0" />,
     path: "/admin/business/expenses",
+  },
+  {
+    page: "business-assets",
+    label: "Assets",
+    icon: <FaBoxesStacked className="shrink-0" />,
+    path: "/admin/business/assets",
   },
 ];
 

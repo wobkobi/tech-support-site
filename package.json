@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.81.0",
+  "version": "4.82.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -18,6 +18,7 @@
     "build:social": "npx tsx scripts/export-social-screenshot.ts",
     "calibrate": "dotenv -e .env.local -- tsx scripts/calibrate-benchmarks.ts",
     "check:addresses": "tsx scripts/check-address-resolution.ts",
+    "check:assets": "tsx scripts/check-assets.ts",
     "check:bank-fields": "tsx scripts/check-bank-fields.ts",
     "check:emails": "dotenv -e .env.local -- tsx --conditions=react-server scripts/check-email-render.ts",
     "check:emails-merge": "tsx scripts/check-contact-emails.ts",

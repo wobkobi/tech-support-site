@@ -3,8 +3,9 @@
 // Records, edits, and lists expense entries against /api/business/expenses. The add form
 // doubles as the edit form and previews the GST split. The list has search, FY + method +
 // category filters, a missing-receipt toggle, sortable columns, filter-aware summary
-// cards with a per-category breakdown drill-in, and a "Migrate to subscription" row
-// action.
+// cards with a per-category breakdown drill-in, a "Migrate to subscription" row action,
+// and "Turn into an asset" on rows over the low-value write-off threshold ("View asset"
+// once one is linked).
 // Totals use the GST basis, and a new expense defaults to 0% GST while not registered.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
@@ -25,6 +26,7 @@ import type { GstStatus } from "@/features/business/lib/tax/types";
 import type { ExpenseEntry, Subscription } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -44,6 +46,10 @@ interface ExpensesViewProps {
   onMigrated?: () => void;
   /** GST registration; sets the new-expense GST default and the totals' basis. */
   gst: GstStatus;
+  /** Rows costing more than this on the GST basis offer "Turn into an asset"; settings.tax.lowValueThreshold. */
+  assetThreshold: number;
+  /** Expenses already linked to an asset; their rows offer "View asset" instead. */
+  linkedExpenseIds: readonly string[];
 }
 
 // An expense can only migrate to a subscription once its supplier+description has
@@ -97,13 +103,54 @@ function matchCount(groups: Map<string, ExpenseEntry[]>, e: ExpenseEntry): numbe
 }
 
 /**
+ * "Turn into an asset" for an expense over the low-value threshold, or "View asset" once
+ * an asset links it; nothing for smaller rows. Both open the Assets page, which fills a
+ * new asset from the expense or opens the linked one. The cost compared is the GST basis
+ * (incl. GST before registration, excl. after), the same figure the write-off test uses.
+ * @param props - Component props.
+ * @param props.entry - The expense row.
+ * @param props.gst - GST registration status, for the expense's cost basis.
+ * @param props.threshold - Low-value write-off threshold.
+ * @param props.linked - Whether an asset already links this expense.
+ * @param props.className - Classes matching the row's other actions.
+ * @returns The link, or null.
+ */
+function AssetLink({
+  entry,
+  gst,
+  threshold,
+  linked,
+  className,
+}: {
+  entry: ExpenseEntry;
+  gst: GstStatus;
+  threshold: number;
+  linked: boolean;
+  className: string;
+}): React.ReactElement | null {
+  if (!linked && expenseTaxBasis(entry, gst) <= threshold) return null;
+  return (
+    <Link href={`/admin/business/assets?fromExpense=${entry.id}`} className={className}>
+      {linked ? "View asset" : "Turn into an asset"}
+    </Link>
+  );
+}
+
+/**
  * Client component for recording, filtering, and displaying expense entries.
  * @param props - Component props.
  * @param props.onMigrated - Callback fired after a successful migrate-to-subscription.
  * @param props.gst - GST registration status from the pricing settings.
+ * @param props.assetThreshold - Cost (on the GST basis) above which a row offers "Turn into an asset".
+ * @param props.linkedExpenseIds - Expenses already linked to an asset.
  * @returns Expenses view element.
  */
-export function ExpensesView({ onMigrated, gst }: ExpensesViewProps): React.ReactElement {
+export function ExpensesView({
+  onMigrated,
+  gst,
+  assetThreshold,
+  linkedExpenseIds,
+}: ExpensesViewProps): React.ReactElement {
   const { toast } = useToast();
   const [entries, setEntries] = useState<ExpenseEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,6 +232,7 @@ export function ExpensesView({ onMigrated, gst }: ExpensesViewProps): React.Reac
     }
     return m;
   }, [entries]);
+  const linkedSet = useMemo(() => new Set(linkedExpenseIds), [linkedExpenseIds]);
 
   useEffect(() => {
     fetchEntries()
@@ -775,6 +823,13 @@ export function ExpensesView({ onMigrated, gst }: ExpensesViewProps): React.Reac
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-admin-muted">
                 <span>{formatDateShort(e.date)}</span>
                 <div className="ml-auto flex items-center gap-3">
+                  <AssetLink
+                    entry={e}
+                    gst={gst}
+                    threshold={assetThreshold}
+                    linked={linkedSet.has(e.id)}
+                    className="inline-flex h-8 items-center text-sm text-russian-violet hover:opacity-80"
+                  />
                   {canMigrate(e) && (
                     <button
                       onClick={() => setMigrateTarget(e)}
@@ -897,6 +952,13 @@ export function ExpensesView({ onMigrated, gst }: ExpensesViewProps): React.Reac
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-3">
+                      <AssetLink
+                        entry={e}
+                        gst={gst}
+                        threshold={assetThreshold}
+                        linked={linkedSet.has(e.id)}
+                        className="text-sm whitespace-nowrap text-russian-violet hover:opacity-80"
+                      />
                       {canMigrate(e) && (
                         <button
                           onClick={() => setMigrateTarget(e)}
