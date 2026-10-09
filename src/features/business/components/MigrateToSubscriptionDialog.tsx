@@ -10,14 +10,16 @@
 // sheet rows are left untouched; the new subscription is site-only.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { advanceNextDue, formatNZD } from "@/features/business/lib/business";
 import { VALID_FREQUENCIES } from "@/features/business/lib/constants";
 import type { ExpenseEntry } from "@/features/business/types/business";
 import type React from "react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 /** Props for {@link MigrateToSubscriptionDialog}. */
 interface MigrateToSubscriptionDialogProps {
@@ -101,6 +103,7 @@ export function MigrateToSubscriptionDialog({
   const [nextDue, setNextDue] = useState(() => defaultNextDue(latestDate, initialFrequency));
   const [nextDueEdited, setNextDueEdited] = useState(false);
   const [busy, setBusy] = useState(false);
+  const id = useId();
 
   /**
    * Changes the frequency and re-derives the next-due date unless it was edited.
@@ -166,8 +169,8 @@ export function MigrateToSubscriptionDialog({
       <div className="flex flex-col gap-4 text-sm">
         <div className="rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-admin-text-secondary">
           <p className="font-medium text-admin-text">{expense.supplier}</p>
-          <p className="text-xs">{expense.description}</p>
-          <p className="mt-1 text-xs">
+          <p>{expense.description}</p>
+          <p className="mt-1">
             {formatNZD(expense.amountIncl)} incl. · {expense.category} · {expense.method}
           </p>
         </div>
@@ -180,33 +183,31 @@ export function MigrateToSubscriptionDialog({
           </p>
         )}
 
-        <label className="flex flex-col gap-1">
-          <span className="font-medium text-admin-text">Frequency</span>
-          <select
+        <AdminField label="Frequency" htmlFor={`${id}-frequency`}>
+          <AdminSelect
+            id={`${id}-frequency`}
             value={frequency}
             onChange={(e) => changeFrequency(e.target.value)}
-            className={ADMIN_INPUT_CLS}
           >
             {VALID_FREQUENCIES.map((f) => (
               <option key={f} value={f}>
                 {f.charAt(0).toUpperCase() + f.slice(1)}
               </option>
             ))}
-          </select>
-        </label>
+          </AdminSelect>
+        </AdminField>
 
-        <label className="flex flex-col gap-1">
-          <span className="font-medium text-admin-text">Next due</span>
-          <input
+        <AdminField label="Next due" htmlFor={`${id}-next-due`}>
+          <AdminInput
+            id={`${id}-next-due`}
             type="date"
             value={nextDue}
             onChange={(e) => {
               setNextDue(e.target.value);
               setNextDueEdited(true);
             }}
-            className={ADMIN_INPUT_CLS}
           />
-        </label>
+        </AdminField>
 
         <p className="text-sm text-admin-muted">
           The expense entry is kept as a historical record (and stays on the Expenses sheet). This

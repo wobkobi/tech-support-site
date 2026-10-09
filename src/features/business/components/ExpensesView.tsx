@@ -1,41 +1,52 @@
 "use client";
 // src/features/business/components/ExpensesView.tsx
 // Records, edits, and lists expense entries against /api/business/expenses. The add form
-// doubles as the edit form and previews the GST split. The list has search, FY + method +
-// category filters, a missing-receipt toggle, sortable columns, filter-aware summary
-// cards with a per-category breakdown drill-in, a "Migrate to subscription" row action,
-// and "Turn into an asset" on rows over the low-value write-off threshold ("View asset"
-// once one is linked).
+// (ExpenseForm) doubles as the edit form and previews the GST split. The list has search,
+// FY + method + category filters, a missing-receipt toggle, sortable columns, filter-aware
+// summary cards with a per-category breakdown drill-in, a "Migrate to subscription" row
+// action, and "Turn into an asset" on rows over the low-value write-off threshold ("View
+// asset" once one is linked). The rows render in ExpensesListRows.
 // Totals use the GST basis, and a new expense defaults to 0% GST while not registered.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { Card } from "@/features/admin/components/ui/Card";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
-import { ADMIN_CONTROL_CLS, ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import { BreakdownModal, type BreakdownData } from "@/features/business/components/BreakdownModal";
+import { ExpenseForm, type ExpenseFormState } from "@/features/business/components/ExpenseForm";
+import {
+  groupKey,
+  matchCount,
+  MIGRATE_MIN_MATCHES,
+} from "@/features/business/components/expenses-recurrence";
+import {
+  ExpensesListCards,
+  ExpensesListTable,
+  type ExpenseSortDir,
+  type ExpenseSortKey,
+} from "@/features/business/components/ExpensesListRows";
+import { LedgerListToolbar } from "@/features/business/components/LedgerListToolbar";
 import { MigrateToSubscriptionDialog } from "@/features/business/components/MigrateToSubscriptionDialog";
 import { calcGstFromInclusive, formatNZD, todayISO } from "@/features/business/lib/business";
-import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from "@/features/business/lib/constants";
+import { PAYMENT_METHODS } from "@/features/business/lib/constants";
 import { fyKeyOf, listFinancialYears } from "@/features/business/lib/financial-year";
 import { expenseTaxBasis, isGstRegisteredOn } from "@/features/business/lib/tax/gst-basis";
 import type { GstStatus } from "@/features/business/lib/tax/types";
 import type { ExpenseEntry, Subscription } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
-import { formatDateShort } from "@/shared/lib/date-format";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FaPlus } from "react-icons/fa6";
 
 /** Sortable column keys. */
-type SortKey = "date" | "supplier" | "amount";
+type SortKey = ExpenseSortKey;
 /** Sort direction. */
-type SortDir = "asc" | "desc";
+type SortDir = ExpenseSortDir;
 
 /** Rows per "Show more" batch. */
 const BATCH = 25;
@@ -50,23 +61,6 @@ interface ExpensesViewProps {
   assetThreshold: number;
   /** Expenses already linked to an asset; their rows offer "View asset" instead. */
   linkedExpenseIds: readonly string[];
-}
-
-// An expense can only migrate to a subscription once its supplier+description has
-// repeated MORE THAN twice - one coincidental pair isn't a confirmed pattern.
-const MIGRATE_MIN_MATCHES = 3;
-
-/**
- * Recurrence key: normalised supplier + description. Expenses sharing a key are
- * the same repeat cost (a likely subscription), and an active subscription with
- * the key means that cost has already been migrated.
- * @param e - The expense or subscription.
- * @param e.supplier - Who is paid.
- * @param e.description - What the payment is for.
- * @returns The group key.
- */
-function groupKey(e: { supplier: string; description: string }): string {
-  return `${e.supplier.trim().toLowerCase()}||${e.description.trim().toLowerCase()}`;
 }
 
 /**
@@ -89,51 +83,6 @@ async function fetchSubscribedKeys(): Promise<Set<string>> {
   const d = (await r.json()) as { ok: boolean; subscriptions?: Subscription[] };
   if (!d.ok || !d.subscriptions) throw new Error(`subscriptions load failed (${r.status})`);
   return new Set(d.subscriptions.filter((s) => s.isActive).map(groupKey));
-}
-
-/**
- * How many expenses share this one's supplier+description; {@link MIGRATE_MIN_MATCHES}
- * or more marks it recurring and offers Migrate.
- * @param groups - The precomputed group map.
- * @param e - The expense.
- * @returns The match count (1 when unique).
- */
-function matchCount(groups: Map<string, ExpenseEntry[]>, e: ExpenseEntry): number {
-  return groups.get(groupKey(e))?.length ?? 1;
-}
-
-/**
- * "Turn into an asset" for an expense over the low-value threshold, or "View asset" once
- * an asset links it; nothing for smaller rows. Both open the Assets page, which fills a
- * new asset from the expense or opens the linked one. The cost compared is the GST basis
- * (incl. GST before registration, excl. after), the same figure the write-off test uses.
- * @param props - Component props.
- * @param props.entry - The expense row.
- * @param props.gst - GST registration status, for the expense's cost basis.
- * @param props.threshold - Low-value write-off threshold.
- * @param props.linked - Whether an asset already links this expense.
- * @param props.className - Classes matching the row's other actions.
- * @returns The link, or null.
- */
-function AssetLink({
-  entry,
-  gst,
-  threshold,
-  linked,
-  className,
-}: {
-  entry: ExpenseEntry;
-  gst: GstStatus;
-  threshold: number;
-  linked: boolean;
-  className: string;
-}): React.ReactElement | null {
-  if (!linked && expenseTaxBasis(entry, gst) <= threshold) return null;
-  return (
-    <Link href={`/admin/business/assets?fromExpense=${entry.id}`} className={className}>
-      {linked ? "View asset" : "Turn into an asset"}
-    </Link>
-  );
 }
 
 /**
@@ -170,7 +119,7 @@ export function ExpensesView({
     receipt: false,
     notes: "",
   };
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<ExpenseFormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -495,7 +444,7 @@ export function ExpensesView({
       {(loadError || subsError) && (
         <div
           role="alert"
-          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
         >
           <span>
             {loadError
@@ -507,6 +456,7 @@ export function ExpensesView({
             variant="secondary"
             onClick={() => void retryLoad()}
             busy={retrying}
+            className="text-sm"
           >
             Try again
           </AdminButton>
@@ -546,447 +496,101 @@ export function ExpensesView({
         </AdminButton>
       )}
 
-      {/* Add/edit form. */}
-      <form
-        ref={formRef}
+      <ExpenseForm
+        formRef={formRef}
+        formOpen={formOpen}
+        editingId={editingId}
+        form={form}
+        setForm={setForm}
         onSubmit={handleSubmit}
-        className={cn(
-          "mb-6 rounded-xl border border-admin-border bg-admin-surface p-4 shadow-sm sm:p-5",
-          !formOpen && "max-lg:hidden",
-        )}
-      >
-        <h2 className="mb-4 text-sm font-semibold text-russian-violet">
-          {editingId ? "Edit expense" : "Add expense"}
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <AdminField label="Date" htmlFor="exp-date" required>
-            <input
-              id="exp-date"
-              type="date"
-              required
-              value={form.date}
-              onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
-              className={ADMIN_INPUT_CLS}
-            />
-          </AdminField>
-          <AdminField label="Supplier" htmlFor="exp-supplier" required>
-            <input
-              id="exp-supplier"
-              type="text"
-              required
-              value={form.supplier}
-              onChange={(e) => setForm((p) => ({ ...p, supplier: e.target.value }))}
-              className={ADMIN_INPUT_CLS}
-            />
-          </AdminField>
-          <AdminField label="Description" htmlFor="exp-description" required>
-            <input
-              id="exp-description"
-              type="text"
-              required
-              value={form.description}
-              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-              className={ADMIN_INPUT_CLS}
-            />
-          </AdminField>
-          <AdminField label="Category" htmlFor="exp-category">
-            <select
-              id="exp-category"
-              value={form.category}
-              onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
-              className={ADMIN_INPUT_CLS}
-            >
-              {EXPENSE_CATEGORIES.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </AdminField>
-          <AdminField label="Amount incl. GST" htmlFor="exp-amount" required>
-            <input
-              id="exp-amount"
-              type="number"
-              required
-              min="0"
-              step="0.01"
-              value={form.amountIncl}
-              onChange={(e) => setForm((p) => ({ ...p, amountIncl: e.target.value }))}
-              className={ADMIN_INPUT_CLS}
-            />
-          </AdminField>
-          <AdminField label="GST rate" htmlFor="exp-gst">
-            <select
-              id="exp-gst"
-              value={form.gstRate}
-              onChange={(e) => setForm((p) => ({ ...p, gstRate: e.target.value }))}
-              className={ADMIN_INPUT_CLS}
-            >
-              <option value="0.15">15%</option>
-              <option value="0">0% (no GST)</option>
-            </select>
-            {inclNum > 0 && rate > 0 && (
-              <p className="mt-1 text-xs text-admin-muted">
-                GST: {formatNZD(previewGst)} | Excl: {formatNZD(inclNum - previewGst)}
-              </p>
-            )}
-          </AdminField>
-          <AdminField label="Payment method" htmlFor="exp-method">
-            <select
-              id="exp-method"
-              value={form.method}
-              onChange={(e) => setForm((p) => ({ ...p, method: e.target.value }))}
-              className={ADMIN_INPUT_CLS}
-            >
-              {PAYMENT_METHODS.map((m) => (
-                <option key={m}>{m}</option>
-              ))}
-            </select>
-          </AdminField>
-          <AdminField label="Notes" htmlFor="exp-notes" optional>
-            <input
-              id="exp-notes"
-              type="text"
-              value={form.notes}
-              onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-              className={ADMIN_INPUT_CLS}
-            />
-          </AdminField>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="receipt"
-              checked={form.receipt}
-              onChange={(e) => setForm((p) => ({ ...p, receipt: e.target.checked }))}
-              className="h-4 w-4"
-            />
-            <span className="text-sm text-admin-text-secondary">Receipt held</span>
-          </label>
-        </div>
-        {formError && <p className="mt-2 text-sm text-coquelicot-600">{formError}</p>}
-        <div className="mt-4 flex items-center gap-3">
-          <AdminButton type="submit" busy={saving}>
-            {editingId ? "Save changes" : "Add expense"}
-          </AdminButton>
-          {editingId ? (
-            <AdminButton type="button" variant="ghost" onClick={cancelEdit}>
-              Cancel edit
-            </AdminButton>
-          ) : (
-            <AdminButton type="button" variant="ghost" onClick={cancelEdit} className="lg:hidden">
-              Cancel
-            </AdminButton>
-          )}
-        </div>
-      </form>
+        onCancel={cancelEdit}
+        saving={saving}
+        formError={formError}
+        inclNum={inclNum}
+        rate={rate}
+        previewGst={previewGst}
+      />
 
-      {/* Filter controls. */}
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <label className="flex min-w-48 flex-1 flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">Search</span>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Supplier or description"
-            className={ADMIN_CONTROL_CLS}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">Financial year</span>
-          <select
-            value={fyKey}
-            onChange={(e) => setFyKey(e.target.value)}
-            className={ADMIN_CONTROL_CLS}
-          >
-            <option value="all">All years</option>
-            {financialYears.map((f) => (
-              <option key={f.label} value={fyKeyOf(f.label)}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">Category</span>
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className={ADMIN_CONTROL_CLS}
-          >
-            <option value="all">All categories</option>
-            {categoryOptions.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">Method</span>
-          <select
-            value={methodFilter}
-            onChange={(e) => setMethodFilter(e.target.value)}
-            className={ADMIN_CONTROL_CLS}
-          >
-            <option value="all">All methods</option>
-            {methodOptions.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">From</span>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className={ADMIN_CONTROL_CLS}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">To</span>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className={ADMIN_CONTROL_CLS}
-          />
-        </label>
-        <label className="flex h-9 items-center gap-2 text-sm text-admin-text-secondary">
-          <input
-            type="checkbox"
-            checked={missingReceiptOnly}
-            onChange={(e) => setMissingReceiptOnly(e.target.checked)}
-            className="h-4 w-4"
-          />
-          Missing receipt
-        </label>
-        {anyFilterActive && (
-          <AdminButton
-            variant="ghost"
-            onClick={() => {
-              setSearch("");
-              setFyKey("all");
-              setMethodFilter("all");
-              setCategoryFilter("all");
-              setFromDate("");
-              setToDate("");
-              setMissingReceiptOnly(false);
-            }}
-          >
-            Clear
-          </AdminButton>
-        )}
-      </div>
+      <LedgerListToolbar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Supplier or description"
+        fyKey={fyKey}
+        onFyChange={setFyKey}
+        financialYears={financialYears}
+        categoryFilter={categoryFilter}
+        onCategoryChange={setCategoryFilter}
+        categoryOptions={categoryOptions}
+        methodFilter={methodFilter}
+        onMethodChange={setMethodFilter}
+        methodOptions={methodOptions}
+        fromDate={fromDate}
+        onFromChange={setFromDate}
+        toDate={toDate}
+        onToChange={setToDate}
+        missingReceiptOnly={missingReceiptOnly}
+        onMissingReceiptChange={setMissingReceiptOnly}
+        anyFilterActive={anyFilterActive}
+        onClear={() => {
+          setSearch("");
+          setFyKey("all");
+          setMethodFilter("all");
+          setCategoryFilter("all");
+          setFromDate("");
+          setToDate("");
+          setMissingReceiptOnly(false);
+        }}
+      />
 
-      {/* Mobile card list. */}
-      <div className="space-y-2 lg:hidden">
-        {loading ? (
-          <p className="rounded-xl border border-admin-border bg-admin-surface px-5 py-6 text-sm text-admin-faint shadow-sm">
-            Loading...
-          </p>
-        ) : sorted.length === 0 ? (
-          <p className="rounded-xl border border-admin-border bg-admin-surface px-5 py-6 text-sm text-admin-faint shadow-sm">
-            {entries.length > 0
-              ? "No entries match your filters."
-              : loadError
-                ? "Expenses didn't load."
-                : "No expense entries yet."}
-          </p>
-        ) : (
-          pager.visible.map((e) => (
-            <div
-              key={e.id}
-              className="rounded-xl border border-admin-border bg-admin-surface p-3 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-admin-text">{e.supplier}</p>
-                  <p className="truncate text-xs text-admin-muted">
-                    {e.category}
-                    {matchCount(recurringGroups, e) >= MIGRATE_MIN_MATCHES && (
-                      <span className="ml-2 font-medium text-russian-violet">
-                        {subscribedKeys?.has(groupKey(e))
-                          ? "subscription"
-                          : `recurring ×${matchCount(recurringGroups, e)}`}
-                      </span>
-                    )}
-                    {!e.receipt && <span className="ml-2 text-amber-600">no receipt</span>}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-sm font-semibold text-admin-text">{formatNZD(e.amountExcl)}</p>
-                  <p className="text-[11px] text-admin-faint">{formatNZD(e.amountIncl)} incl.</p>
-                </div>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-admin-muted">
-                <span>{formatDateShort(e.date)}</span>
-                <div className="ml-auto flex items-center gap-3">
-                  <AssetLink
-                    entry={e}
-                    gst={gst}
-                    threshold={assetThreshold}
-                    linked={linkedSet.has(e.id)}
-                    className="inline-flex h-8 items-center text-sm text-russian-violet hover:opacity-80"
-                  />
-                  {canMigrate(e) && (
-                    <button
-                      onClick={() => setMigrateTarget(e)}
-                      className="inline-flex h-8 items-center text-russian-violet hover:opacity-80"
-                    >
-                      Migrate
-                    </button>
-                  )}
-                  <button
-                    onClick={() => startEdit(e)}
-                    className="inline-flex h-8 items-center text-russian-violet hover:opacity-80"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => setConfirmDeleteId(e.id)}
-                    className="inline-flex h-8 items-center text-coquelicot-600 hover:text-coquelicot-500"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Desktop table. */}
-      <div className="hidden overflow-x-auto rounded-xl border border-admin-border bg-admin-surface shadow-sm lg:block">
-        {loading ? (
-          <p className="px-5 py-6 text-sm text-admin-faint">Loading...</p>
-        ) : sorted.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-admin-faint">
-            {entries.length > 0
-              ? "No entries match your filters."
-              : loadError
-                ? "Expenses didn't load."
-                : "No expense entries yet."}
-          </p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b border-admin-border bg-admin-bg">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-admin-muted">
-                  <button
-                    type="button"
-                    onClick={() => toggleSort("date")}
-                    className="inline-flex items-center gap-1 hover:text-admin-text"
-                  >
-                    Date
-                    {sortKey === "date" && (
-                      <span aria-hidden className="text-[0.6rem] text-admin-text">
-                        {sortDir === "asc" ? "▲" : "▼"}
-                      </span>
-                    )}
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-admin-muted">
-                  <button
-                    type="button"
-                    onClick={() => toggleSort("supplier")}
-                    className="inline-flex items-center gap-1 hover:text-admin-text"
-                  >
-                    Supplier
-                    {sortKey === "supplier" && (
-                      <span aria-hidden className="text-[0.6rem] text-admin-text">
-                        {sortDir === "asc" ? "▲" : "▼"}
-                      </span>
-                    )}
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-admin-muted">
-                  Category
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-admin-muted">
-                  Incl. GST
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-admin-muted">
-                  <button
-                    type="button"
-                    onClick={() => toggleSort("amount")}
-                    className="inline-flex items-center gap-1 hover:text-admin-text"
-                  >
-                    Excl. GST
-                    {sortKey === "amount" && (
-                      <span aria-hidden className="text-[0.6rem] text-admin-text">
-                        {sortDir === "asc" ? "▲" : "▼"}
-                      </span>
-                    )}
-                  </button>
-                </th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-admin-border">
-              {pager.visible.map((e) => (
-                <tr key={e.id} className="hover:bg-admin-bg">
-                  <td className="px-4 py-3 text-xs whitespace-nowrap text-admin-muted">
-                    {formatDateShort(e.date)}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-admin-text">
-                    {e.supplier}
-                    {matchCount(recurringGroups, e) >= MIGRATE_MIN_MATCHES && (
-                      <span className="ml-2 rounded-full bg-russian-violet/10 px-1.5 py-0.5 text-[10px] font-semibold text-russian-violet">
-                        {subscribedKeys?.has(groupKey(e))
-                          ? "subscription"
-                          : `recurring ×${matchCount(recurringGroups, e)}`}
-                      </span>
-                    )}
-                    {!e.receipt && (
-                      <span className="ml-2 text-xs font-normal text-amber-600">no receipt</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-admin-muted">{e.category}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-admin-text-secondary">
-                    {formatNZD(e.amountIncl)}
-                  </td>
-                  <td className="px-4 py-3 font-semibold whitespace-nowrap text-admin-text">
-                    {formatNZD(e.amountExcl)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-3">
-                      <AssetLink
-                        entry={e}
-                        gst={gst}
-                        threshold={assetThreshold}
-                        linked={linkedSet.has(e.id)}
-                        className="text-sm whitespace-nowrap text-russian-violet hover:opacity-80"
-                      />
-                      {canMigrate(e) && (
-                        <button
-                          onClick={() => setMigrateTarget(e)}
-                          className="text-xs text-russian-violet hover:opacity-80"
-                        >
-                          Migrate
-                        </button>
-                      )}
-                      <button
-                        onClick={() => startEdit(e)}
-                        className="text-xs text-russian-violet hover:opacity-80"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(e.id)}
-                        className="text-xs text-coquelicot-600 hover:text-coquelicot-500"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Loading and empty states render once for every width; the rows split into phone
+          cards and the desktop table. */}
+      {loading ? (
+        <Card>
+          <p className="text-sm text-admin-muted">Loading...</p>
+        </Card>
+      ) : sorted.length === 0 ? (
+        <Card padding="none">
+          <EmptyState
+            title={
+              entries.length > 0
+                ? "No entries match your filters."
+                : loadError
+                  ? "Expenses didn't load."
+                  : "No expense entries yet."
+            }
+          />
+        </Card>
+      ) : (
+        <>
+          <ExpensesListCards
+            rows={pager.visible}
+            recurringGroups={recurringGroups}
+            subscribedKeys={subscribedKeys}
+            canMigrate={canMigrate}
+            gst={gst}
+            assetThreshold={assetThreshold}
+            linkedSet={linkedSet}
+            onMigrate={setMigrateTarget}
+            onEdit={startEdit}
+            onDelete={setConfirmDeleteId}
+          />
+          <ExpensesListTable
+            rows={pager.visible}
+            recurringGroups={recurringGroups}
+            subscribedKeys={subscribedKeys}
+            canMigrate={canMigrate}
+            gst={gst}
+            assetThreshold={assetThreshold}
+            linkedSet={linkedSet}
+            onMigrate={setMigrateTarget}
+            onEdit={startEdit}
+            onDelete={setConfirmDeleteId}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={toggleSort}
+          />
+        </>
+      )}
 
       {!loading && <ShowMoreButton pager={pager} noun={["expense", "expenses"]} className="mt-3" />}
 

@@ -9,8 +9,11 @@
 // fields; line-item and total problems show above the save button.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
+import { ADMIN_INPUT_CLS, ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { FieldError } from "@/features/admin/components/ui/FieldError";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { useUnsavedChangesWarning } from "@/features/admin/hooks/use-unsaved-changes-warning";
 import {
   checkContactFields,
@@ -89,10 +92,10 @@ interface InvoiceFormProps {
   ) => React.ReactNode;
 }
 
-const LABEL_CLS = "mb-1 block text-xs font-semibold text-admin-muted uppercase";
-
 /** DOM ids of the client fields, for focusing the first bad one. */
 const FIELD_IDS = { name: "invoice-client-name", email: "invoice-client-email" };
+/** DOM ids of the other labelled fields. */
+const OTHER_IDS = { issue: "invoice-issue-date", due: "invoice-due-date", notes: "invoice-notes" };
 
 /**
  * Adds `days` to an ISO YYYY-MM-DD date, returning ISO YYYY-MM-DD. Works on the
@@ -205,10 +208,7 @@ export function InvoiceForm({
       className="space-y-5"
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor={FIELD_IDS.name} className={LABEL_CLS}>
-            Client name
-          </label>
+        <AdminField label="Client name" htmlFor={FIELD_IDS.name}>
           <ContactNameInput
             id={FIELD_IDS.name}
             value={form.clientName}
@@ -237,11 +237,8 @@ export function InvoiceForm({
             className={cn(ADMIN_INPUT_CLS, fieldErrors.name && "border-coquelicot-500/60")}
           />
           <FieldError id={`${FIELD_IDS.name}-error`} message={fieldErrors.name} />
-        </div>
-        <div>
-          <label htmlFor={FIELD_IDS.email} className={LABEL_CLS}>
-            Client email
-          </label>
+        </AdminField>
+        <AdminField label="Client email" htmlFor={FIELD_IDS.email}>
           <EmailInput
             id={FIELD_IDS.email}
             value={form.clientEmail}
@@ -255,10 +252,10 @@ export function InvoiceForm({
             disabled={busy}
             className={ADMIN_INPUT_CLS}
           />
-        </div>
-        <label>
-          <span className={LABEL_CLS}>Issue date</span>
-          <input
+        </AdminField>
+        <AdminField label="Issue date" htmlFor={OTHER_IDS.issue}>
+          <AdminInput
+            id={OTHER_IDS.issue}
             type="date"
             value={form.issueDate}
             onChange={(e) =>
@@ -270,19 +267,17 @@ export function InvoiceForm({
               })
             }
             disabled={busy}
-            className={ADMIN_INPUT_CLS}
           />
-        </label>
-        <label>
-          <span className={LABEL_CLS}>Due date</span>
-          <input
+        </AdminField>
+        <AdminField label="Due date" htmlFor={OTHER_IDS.due}>
+          <AdminInput
+            id={OTHER_IDS.due}
             type="date"
             value={form.dueDate}
             onChange={(e) => update({ dueDate: e.target.value })}
             disabled={busy}
-            className={ADMIN_INPUT_CLS}
           />
-        </label>
+        </AdminField>
       </div>
 
       {renderAssist?.(form, (patch) => {
@@ -291,7 +286,7 @@ export function InvoiceForm({
       })}
 
       <div>
-        <span className={LABEL_CLS}>Line items</span>
+        <span className={ADMIN_LABEL_CLS}>Line items</span>
         <LineItemsEditor
           items={form.lineItems}
           onChange={(lineItems) => update({ lineItems })}
@@ -299,17 +294,16 @@ export function InvoiceForm({
         />
       </div>
 
-      <label className="block">
-        <span className={LABEL_CLS}>Notes</span>
-        <textarea
+      <AdminField label="Notes" htmlFor={OTHER_IDS.notes}>
+        <AdminTextarea
+          id={OTHER_IDS.notes}
           rows={3}
           value={form.notes}
           onChange={(e) => update({ notes: e.target.value })}
           disabled={busy}
           placeholder="Optional note shown on the invoice."
-          className={cn(ADMIN_INPUT_CLS, "resize-y")}
         />
-      </label>
+      </AdminField>
 
       <AlreadyPaidField
         value={form.alreadyPaid}
@@ -317,7 +311,7 @@ export function InvoiceForm({
         total={totals.total}
         disabled={busy}
         inputClassName={ADMIN_INPUT_CLS}
-        labelClassName={LABEL_CLS}
+        labelClassName={ADMIN_LABEL_CLS}
         coversNote="Nothing left owing. Mark the invoice paid once it's sent."
       />
 

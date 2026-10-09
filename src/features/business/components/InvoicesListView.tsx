@@ -8,73 +8,43 @@
 // so Back from an invoice and the dashboard's deep links land on the same view.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { Card } from "@/features/admin/components/ui/Card";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
-import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
-import { InvoiceStatusBadge } from "@/features/business/components/invoice/InvoiceStatusBadge";
 import { PaymentDialog } from "@/features/business/components/invoice/PaymentDialog";
-import { balanceDue, formatNZD } from "@/features/business/lib/business";
+import {
+  COLUMNS,
+  FILTER_OPTIONS,
+  type FilterKey,
+  type SortDir,
+  type SortKey,
+} from "@/features/business/components/invoices-list-options";
+import {
+  InvoicesListCards,
+  InvoicesListTable,
+} from "@/features/business/components/InvoicesListRows";
+import { InvoicesListToolbar } from "@/features/business/components/InvoicesListToolbar";
+import {
+  type InvoicesSummary,
+  InvoicesSummaryCards,
+} from "@/features/business/components/InvoicesSummaryCards";
+import { balanceDue } from "@/features/business/lib/business";
 import {
   deriveInvoiceDisplayStatus,
   isInvoiceOverdue,
 } from "@/features/business/lib/invoice-status";
 import type { Invoice } from "@/features/business/types/business";
-import { cn } from "@/shared/lib/cn";
-import { formatDateShort } from "@/shared/lib/date-format";
 import { nzDateKey } from "@/shared/lib/timezone-utils";
-import Link from "next/link";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { FaCaretRight } from "react-icons/fa6";
 
-/** Status filter buckets (OVERDUE and QUOTE are derived, not stored statuses). */
-type FilterKey = "all" | "QUOTE" | "DRAFT" | "SENT" | "OVERDUE" | "PAID" | "VOIDED";
-/** Sortable column keys. */
-type SortKey = "number" | "client" | "issued" | "due" | "total" | "status";
-/** Sort direction. */
-type SortDir = "asc" | "desc";
 /** Which Drive action (if any) is currently running. */
 type SyncMode = "import" | "sync" | null;
 
-/** Sortable columns, in table order. */
-const COLUMNS: { key: SortKey; label: string }[] = [
-  { key: "number", label: "Number" },
-  { key: "client", label: "Client" },
-  { key: "issued", label: "Issued" },
-  { key: "due", label: "Due" },
-  { key: "total", label: "Total" },
-  { key: "status", label: "Status" },
-];
-
-/** Status-filter dropdown options. */
-const FILTER_OPTIONS: { value: FilterKey; label: string }[] = [
-  { value: "all", label: "All statuses" },
-  { value: "QUOTE", label: "Quotes" },
-  { value: "DRAFT", label: "Draft" },
-  { value: "SENT", label: "Sent" },
-  { value: "OVERDUE", label: "Overdue" },
-  { value: "PAID", label: "Paid" },
-  { value: "VOIDED", label: "Voided" },
-];
-
-const CONTROL_CLS =
-  "h-9 rounded-lg border border-admin-border-strong bg-admin-surface px-3 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
-
 /** Rows shown per page before pagination kicks in. */
 const PAGE_SIZE = 25;
-
-/**
- * Whether a payment can be recorded from the list: SENT only. A DRAFT row
- * offers "Send invoice" instead (send comes before payment; recording payment
- * on an unsent draft stays possible from the detail page), and PAID is already
- * settled, VOIDED can't be paid.
- * @param inv - The invoice.
- * @returns True when the Record-payment action should show.
- */
-function canPay(inv: Invoice): boolean {
-  return inv.status === "SENT" && !inv.isQuote;
-}
 
 /**
  * Fetches the full invoice list.
@@ -254,7 +224,7 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
   // Summary across ALL invoices, not the filtered view. Legacy PAID rows with no paidAt
   // are excluded from "paid this month" (unknown pay date), and quotes are not money owed,
   // so they get their own counter and stay out of every dollar stat.
-  const summary = useMemo(() => {
+  const summary = useMemo<InvoicesSummary>(() => {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     let outstanding = 0;
     let overdue = 0;
@@ -402,124 +372,44 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
         }
       />
 
-      {/* Summary cards double as one-click status filters. */}
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatCard
-          label="Outstanding"
-          value={formatNZD(summary.outstanding)}
-          sub="Sent, awaiting payment"
-          tone="violet"
-          onClick={() => toggleFilter("SENT")}
-          active={statusFilter === "SENT"}
-        />
-        <StatCard
-          label="Overdue"
-          value={formatNZD(summary.overdue)}
-          sub={`${summary.overdueCount} invoice${summary.overdueCount !== 1 ? "s" : ""} past due`}
-          tone="critical"
-          onClick={() => toggleFilter("OVERDUE")}
-          active={statusFilter === "OVERDUE"}
-        />
-        <StatCard
-          label="Paid this month"
-          value={formatNZD(summary.paidThisMonth)}
-          sub={`${summary.paidCount} invoice${summary.paidCount !== 1 ? "s" : ""}`}
-          tone="success"
-          onClick={() => toggleFilter("PAID")}
-          active={statusFilter === "PAID"}
-        />
-        <StatCard
-          label="Drafts"
-          value={summary.draftCount}
-          sub={formatNZD(summary.draftSum)}
-          onClick={() => toggleFilter("DRAFT")}
-          active={statusFilter === "DRAFT"}
-        />
-        <StatCard
-          label="Quotes"
-          value={summary.quoteCount}
-          sub={`${formatNZD(summary.quoteSum)} quoted`}
-          onClick={() => toggleFilter("QUOTE")}
-          active={statusFilter === "QUOTE"}
-        />
-      </div>
+      <InvoicesSummaryCards summary={summary} statusFilter={statusFilter} onToggle={toggleFilter} />
 
-      {/* Filter controls. */}
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <label className="flex min-w-48 flex-1 flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">Search</span>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Number, client or contact"
-            className={CONTROL_CLS}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">Status</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as FilterKey);
-              setPage(1);
-            }}
-            className={CONTROL_CLS}
-          >
-            {FILTER_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">Issued from</span>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => {
-              setFromDate(e.target.value);
-              setPage(1);
-            }}
-            className={CONTROL_CLS}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">Issued to</span>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => {
-              setToDate(e.target.value);
-              setPage(1);
-            }}
-            className={CONTROL_CLS}
-          />
-        </label>
-        {anyFilterActive && (
-          <AdminButton
-            variant="ghost"
-            onClick={() => {
-              setSearch("");
-              setStatusFilter("all");
-              setFromDate("");
-              setToDate("");
-              setPage(1);
-            }}
-          >
-            Clear
-          </AdminButton>
-        )}
-      </div>
+      {/* Every filter change goes back to page 1. */}
+      <InvoicesListToolbar
+        search={search}
+        statusFilter={statusFilter}
+        fromDate={fromDate}
+        toDate={toDate}
+        onSearchChange={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
+        onStatusChange={(v) => {
+          setStatusFilter(v);
+          setPage(1);
+        }}
+        onFromChange={(v) => {
+          setFromDate(v);
+          setPage(1);
+        }}
+        onToChange={(v) => {
+          setToDate(v);
+          setPage(1);
+        }}
+        anyFilterActive={anyFilterActive}
+        onClear={() => {
+          setSearch("");
+          setStatusFilter("all");
+          setFromDate("");
+          setToDate("");
+          setPage(1);
+        }}
+      />
 
       {loadError && (
         <div
           role="alert"
-          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
         >
           <span>
             {invoices.length === 0
@@ -532,201 +422,27 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
         </div>
       )}
 
-      {/* Mobile card list - below lg the table is hard to read; stack each row
-          as a tap-to-open card with the derived status badge. */}
-      <div className="space-y-2 lg:hidden">
-        {loading ? (
-          <p className="rounded-xl border border-admin-border bg-admin-surface px-5 py-6 text-sm text-admin-faint shadow-sm">
-            Loading...
-          </p>
-        ) : sorted.length === 0 ? (
-          <p className="rounded-xl border border-admin-border bg-admin-surface px-5 py-6 text-sm text-admin-faint shadow-sm">
-            {emptyText}
-          </p>
-        ) : (
-          paged.map((inv) => (
-            <div
-              key={inv.id}
-              className={cn(
-                "rounded-xl border border-admin-border bg-admin-surface p-3 shadow-sm",
-                "transition-colors hover:border-russian-violet/30",
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <Link
-                  href={`/admin/business/invoices/${inv.id}`}
-                  className="font-mono text-xs font-semibold text-admin-text"
-                >
-                  {inv.number}
-                </Link>
-                <InvoiceStatusBadge invoice={inv} />
-              </div>
-              <Link
-                href={`/admin/business/invoices/${inv.id}`}
-                className="mt-1 block truncate text-sm font-medium text-admin-text"
-              >
-                {inv.clientName}
-                {inv.attention && (
-                  <span className="ml-2 text-xs font-normal text-admin-muted">
-                    attn {inv.attention}
-                  </span>
-                )}
-              </Link>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-admin-muted">
-                <span>Issued {formatDateShort(inv.issueDate)}</span>
-                <span>Due {formatDateShort(inv.dueDate)}</span>
-                <span className="font-semibold text-admin-text">{formatNZD(inv.total)}</span>
-                {inv.driveWebUrl ? (
-                  <a
-                    href={inv.driveWebUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="ml-auto inline-flex h-8 items-center text-blue-500 hover:text-blue-700"
-                  >
-                    PDF ↗
-                  </a>
-                ) : null}
-              </div>
-              {inv.status === "DRAFT" && (
-                <div className="mt-2">
-                  <AdminButton
-                    size="xs"
-                    variant="secondary"
-                    href={`/admin/business/invoices/${inv.id}?send=1`}
-                    aria-label={`Send ${inv.isQuote ? "quote" : "invoice"} ${inv.number}`}
-                  >
-                    {inv.isQuote ? "Send quote" : "Send invoice"}
-                  </AdminButton>
-                </div>
-              )}
-              {canPay(inv) && (
-                <div className="mt-2">
-                  <AdminButton
-                    size="xs"
-                    variant="secondary"
-                    onClick={() => setPayTarget(inv)}
-                    aria-label={`Record payment for ${inv.number}`}
-                  >
-                    Record payment
-                  </AdminButton>
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Desktop table - sortable headers, derived status badge, row-click opens
-          the invoice. */}
-      <div className="hidden overflow-x-auto rounded-xl border border-admin-border bg-admin-surface shadow-sm lg:block">
-        {loading ? (
-          <p className="px-5 py-6 text-sm text-admin-faint">Loading...</p>
-        ) : sorted.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-admin-faint">{emptyText}</p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b border-admin-border bg-admin-bg">
-              <tr>
-                {COLUMNS.map((col) => (
-                  <th
-                    key={col.key}
-                    className="px-4 py-3 text-left text-xs font-semibold text-admin-muted"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleSort(col.key)}
-                      className="inline-flex items-center gap-1 hover:text-admin-text"
-                    >
-                      {col.label}
-                      {sortKey === col.key && (
-                        <span aria-hidden className="text-[0.6rem] text-admin-text">
-                          {sortDir === "asc" ? "▲" : "▼"}
-                        </span>
-                      )}
-                    </button>
-                  </th>
-                ))}
-                <th className="px-4 py-3 text-left text-xs font-semibold text-admin-muted">PDF</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-admin-border">
-              {paged.map((inv) => (
-                <tr key={inv.id} className="hover:bg-admin-bg">
-                  <td className="px-4 py-3 font-mono text-xs font-semibold text-admin-text">
-                    {inv.number}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-admin-text">
-                    {inv.clientName}
-                    {inv.attention && (
-                      <span className="block text-xs font-normal text-admin-muted">
-                        attn {inv.attention}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-xs whitespace-nowrap text-admin-muted">
-                    {formatDateShort(inv.issueDate)}
-                  </td>
-                  <td className="px-4 py-3 text-xs whitespace-nowrap text-admin-muted">
-                    {formatDateShort(inv.dueDate)}
-                  </td>
-                  <td className="px-4 py-3 font-semibold whitespace-nowrap text-admin-text">
-                    {formatNZD(inv.total)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <InvoiceStatusBadge invoice={inv} />
-                  </td>
-                  <td className="px-4 py-3">
-                    {inv.driveWebUrl ? (
-                      <a
-                        href={inv.driveWebUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-blue-500 hover:text-blue-700"
-                      >
-                        PDF ↗
-                      </a>
-                    ) : (
-                      <span className="text-xs text-admin-faint">-</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-2">
-                      {inv.status === "DRAFT" && (
-                        <AdminButton
-                          size="xs"
-                          variant="secondary"
-                          href={`/admin/business/invoices/${inv.id}?send=1`}
-                          aria-label={`Send ${inv.isQuote ? "quote" : "invoice"} ${inv.number}`}
-                        >
-                          {inv.isQuote ? "Send quote" : "Send invoice"}
-                        </AdminButton>
-                      )}
-                      {canPay(inv) && (
-                        <AdminButton
-                          size="xs"
-                          variant="secondary"
-                          onClick={() => setPayTarget(inv)}
-                          aria-label={`Record payment for ${inv.number}`}
-                        >
-                          Record payment
-                        </AdminButton>
-                      )}
-                      <Link
-                        href={`/admin/business/invoices/${inv.id}`}
-                        className="inline-flex items-center gap-1 text-xs text-admin-faint hover:text-admin-text"
-                      >
-                        View
-                        <FaCaretRight className="h-3 w-3" aria-hidden />
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Phone cards below lg (the table is hard to read there), the sortable table from lg. */}
+      {loading ? (
+        <Card>
+          <p className="text-sm text-admin-muted">Loading...</p>
+        </Card>
+      ) : sorted.length === 0 ? (
+        <Card padding="none">
+          <EmptyState title={emptyText} />
+        </Card>
+      ) : (
+        <>
+          <InvoicesListCards rows={paged} onPay={setPayTarget} />
+          <InvoicesListTable
+            rows={paged}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={toggleSort}
+            onPay={setPayTarget}
+          />
+        </>
+      )}
 
       {/* Pagination - only when the filtered set spills past one page. */}
       {!loading && sorted.length > PAGE_SIZE && (

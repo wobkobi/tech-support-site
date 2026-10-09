@@ -384,7 +384,7 @@ export function BusinessDashboardCards({
 
   return (
     <>
-      <p className="mb-2 text-xs font-semibold tracking-wide text-admin-muted uppercase">
+      <p className="mb-2 text-sm font-semibold tracking-wide text-admin-muted uppercase">
         Showing: {scope.label}
       </p>
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">

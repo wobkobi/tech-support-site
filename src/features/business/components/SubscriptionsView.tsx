@@ -1,29 +1,29 @@
 "use client";
 // src/features/business/components/SubscriptionsView.tsx
 // Records and lists recurring subscription expenses (description, supplier, amount, GST,
-// frequency, next due) and flags overdue ones.
+// frequency, next due) and flags overdue ones. The rows render in SubscriptionsListRows.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { Card } from "@/features/admin/components/ui/Card";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
-import { StatusPill } from "@/features/admin/components/ui/StatusPill";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { formatNZD, todayISO } from "@/features/business/lib/business";
+import {
+  SubscriptionsListCards,
+  SubscriptionsListTable,
+} from "@/features/business/components/SubscriptionsListRows";
+import { todayISO } from "@/features/business/lib/business";
 import {
   EXPENSE_CATEGORIES,
   PAYMENT_METHODS,
   VALID_FREQUENCIES,
 } from "@/features/business/lib/constants";
 import type { Subscription } from "@/features/business/types/business";
-import { Button } from "@/shared/components/Button";
-import { cn } from "@/shared/lib/cn";
-import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
-
-const inputClasses = cn(
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm",
-  "focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-);
 
 interface FormState {
   description: string;
@@ -53,24 +53,6 @@ function emptyForm(): FormState {
     nextDue: todayISO(),
     notes: "",
   };
-}
-
-/**
- * Returns true if the subscription's next due date is in the past.
- * @param nextDue - ISO date string of next due date.
- * @returns Whether the subscription is overdue.
- */
-function isOverdue(nextDue: string): boolean {
-  return new Date(nextDue) < new Date(todayISO());
-}
-
-/**
- * Returns true if the subscription's next due date is today.
- * @param nextDue - ISO date string of next due date.
- * @returns Whether the subscription is due today.
- */
-function isDueToday(nextDue: string): boolean {
-  return nextDue.startsWith(todayISO());
 }
 
 /**
@@ -238,347 +220,187 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-slate-800">Subscriptions</h2>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-lg font-extrabold text-admin-text">Subscriptions</h2>
         {!showForm && (
-          <button
+          <AdminButton
+            variant="outline"
             onClick={() => {
               setEditId(null);
               setForm(emptyForm());
               setShowForm(true);
             }}
-            className="rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90"
           >
             + Add subscription
-          </button>
+          </AdminButton>
         )}
       </div>
 
       {showForm && (
-        <form
-          onSubmit={(e) => {
-            void handleSubmit(e);
-          }}
-          className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
-        >
-          <h3 className="mb-4 font-semibold text-slate-700">
-            {editId ? "Edit subscription" : "New subscription"}
-          </h3>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <AdminField
-              label="Description"
-              htmlFor="sub-description"
-              required
-              className="col-span-2 sm:col-span-2"
-            >
-              <input
-                id="sub-description"
+        <Card className="mb-6">
+          <form
+            onSubmit={(e) => {
+              void handleSubmit(e);
+            }}
+          >
+            <h3 className="mb-4 text-base font-bold text-admin-text">
+              {editId ? "Edit subscription" : "New subscription"}
+            </h3>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <AdminField
+                label="Description"
+                htmlFor="sub-description"
                 required
-                value={form.description}
-                onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-                className={inputClasses}
-              />
-            </AdminField>
-            <AdminField label="Supplier" htmlFor="sub-supplier" required>
-              <input
-                id="sub-supplier"
-                required
-                value={form.supplier}
-                onChange={(e) => setForm((p) => ({ ...p, supplier: e.target.value }))}
-                className={inputClasses}
-              />
-            </AdminField>
-            <AdminField label="Category" htmlFor="sub-category">
-              <select
-                id="sub-category"
-                value={form.category}
-                onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
-                className={inputClasses}
+                className="col-span-2 sm:col-span-2"
               >
-                {EXPENSE_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </AdminField>
-            <AdminField label="Amount (incl. GST)" htmlFor="sub-amount" required>
-              <input
-                id="sub-amount"
-                required
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={form.amountIncl}
-                onChange={(e) => setForm((p) => ({ ...p, amountIncl: e.target.value }))}
-                className={inputClasses}
-              />
-            </AdminField>
-            <AdminField label="GST rate" htmlFor="sub-gst">
-              <select
-                id="sub-gst"
-                value={form.gstRate}
-                onChange={(e) => setForm((p) => ({ ...p, gstRate: e.target.value }))}
-                className={inputClasses}
+                <AdminInput
+                  id="sub-description"
+                  required
+                  value={form.description}
+                  onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+                />
+              </AdminField>
+              <AdminField label="Supplier" htmlFor="sub-supplier" required>
+                <AdminInput
+                  id="sub-supplier"
+                  required
+                  value={form.supplier}
+                  onChange={(e) => setForm((p) => ({ ...p, supplier: e.target.value }))}
+                />
+              </AdminField>
+              <AdminField label="Category" htmlFor="sub-category">
+                <AdminSelect
+                  id="sub-category"
+                  value={form.category}
+                  onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
+                >
+                  {EXPENSE_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </AdminSelect>
+              </AdminField>
+              <AdminField label="Amount (incl. GST)" htmlFor="sub-amount" required>
+                <AdminInput
+                  id="sub-amount"
+                  required
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={form.amountIncl}
+                  onChange={(e) => setForm((p) => ({ ...p, amountIncl: e.target.value }))}
+                />
+              </AdminField>
+              <AdminField label="GST rate" htmlFor="sub-gst">
+                <AdminSelect
+                  id="sub-gst"
+                  value={form.gstRate}
+                  onChange={(e) => setForm((p) => ({ ...p, gstRate: e.target.value }))}
+                >
+                  <option value="0.15">15%</option>
+                  <option value="0">No GST</option>
+                </AdminSelect>
+              </AdminField>
+              <AdminField label="Payment method" htmlFor="sub-method">
+                <AdminSelect
+                  id="sub-method"
+                  value={form.method}
+                  onChange={(e) => setForm((p) => ({ ...p, method: e.target.value }))}
+                >
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </AdminSelect>
+              </AdminField>
+              <AdminField label="Frequency" htmlFor="sub-frequency">
+                <AdminSelect
+                  id="sub-frequency"
+                  value={form.frequency}
+                  onChange={(e) => setForm((p) => ({ ...p, frequency: e.target.value }))}
+                >
+                  {VALID_FREQUENCIES.map((f) => (
+                    <option key={f} value={f}>
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
+                    </option>
+                  ))}
+                </AdminSelect>
+              </AdminField>
+              <AdminField label={editId ? "Next due" : "First due"} htmlFor="sub-nextdue" required>
+                <AdminInput
+                  id="sub-nextdue"
+                  required
+                  type="date"
+                  value={form.nextDue}
+                  onChange={(e) => setForm((p) => ({ ...p, nextDue: e.target.value }))}
+                />
+              </AdminField>
+              <AdminField
+                label="Notes"
+                htmlFor="sub-notes"
+                optional
+                className="col-span-2 sm:col-span-3"
               >
-                <option value="0.15">15%</option>
-                <option value="0">No GST</option>
-              </select>
-            </AdminField>
-            <AdminField label="Payment method" htmlFor="sub-method">
-              <select
-                id="sub-method"
-                value={form.method}
-                onChange={(e) => setForm((p) => ({ ...p, method: e.target.value }))}
-                className={inputClasses}
-              >
-                {PAYMENT_METHODS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </AdminField>
-            <AdminField label="Frequency" htmlFor="sub-frequency">
-              <select
-                id="sub-frequency"
-                value={form.frequency}
-                onChange={(e) => setForm((p) => ({ ...p, frequency: e.target.value }))}
-                className={inputClasses}
-              >
-                {VALID_FREQUENCIES.map((f) => (
-                  <option key={f} value={f}>
-                    {f.charAt(0).toUpperCase() + f.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </AdminField>
-            <AdminField label={editId ? "Next due" : "First due"} htmlFor="sub-nextdue" required>
-              <input
-                id="sub-nextdue"
-                required
-                type="date"
-                value={form.nextDue}
-                onChange={(e) => setForm((p) => ({ ...p, nextDue: e.target.value }))}
-                className={inputClasses}
-              />
-            </AdminField>
-            <AdminField
-              label="Notes"
-              htmlFor="sub-notes"
-              optional
-              className="col-span-2 sm:col-span-3"
-            >
-              <input
-                id="sub-notes"
-                value={form.notes}
-                onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-                className={inputClasses}
-              />
-            </AdminField>
-          </div>
-          <div className="mt-4 flex gap-2">
-            <Button type="submit" variant="secondary" size="sm" disabled={saving}>
-              {saving ? "Saving..." : editId ? "Update" : "Add"}
-            </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={cancelForm}>
-              Cancel
-            </Button>
-          </div>
-        </form>
+                <AdminInput
+                  id="sub-notes"
+                  value={form.notes}
+                  onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+                />
+              </AdminField>
+            </div>
+            {/* Outline, not primary: the expense form above holds the page's one primary. */}
+            <div className="mt-4 flex gap-2">
+              <AdminButton type="submit" variant="outline" disabled={saving}>
+                {saving ? "Saving..." : editId ? "Update" : "Add"}
+              </AdminButton>
+              <AdminButton type="button" variant="ghost" onClick={cancelForm}>
+                Cancel
+              </AdminButton>
+            </div>
+          </form>
+        </Card>
       )}
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading...</p>
+        <Card>
+          <p className="text-sm text-admin-muted">Loading...</p>
+        </Card>
       ) : loadError ? (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
         >
           <span>Couldn&apos;t load your subscriptions. Try again, or come back later.</span>
-          <Button variant="secondary" size="sm" onClick={() => void load()}>
+          <AdminButton variant="secondary" onClick={() => void load()}>
             Try again
-          </Button>
+          </AdminButton>
         </div>
       ) : subs.length === 0 ? (
-        <p className="text-sm text-slate-500">No subscriptions yet.</p>
+        <Card padding="none">
+          <EmptyState title="No subscriptions yet." />
+        </Card>
       ) : (
         <>
-          {/* Mobile card list - the desktop table is too wide for phones with
-              seven columns including the action buttons. */}
-          <div className="space-y-2 lg:hidden">
-            {subs.map((sub) => {
-              const overdue = sub.isActive && isOverdue(sub.nextDue);
-              const dueToday = sub.isActive && isDueToday(sub.nextDue);
-              return (
-                <div
-                  key={sub.id}
-                  className={cn(
-                    "rounded-xl border border-slate-200 bg-white p-3 shadow-sm",
-                    overdue ? "border-amber-300 bg-amber-50" : dueToday ? "bg-amber-50/50" : "",
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-slate-800">
-                        {sub.description}
-                      </p>
-                      <p className="truncate text-xs text-slate-500">{sub.supplier}</p>
-                    </div>
-                    <p className="shrink-0 text-sm font-semibold text-slate-800">
-                      {formatNZD(sub.amountIncl)}
-                    </p>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                    <span className="text-slate-500 capitalize">{sub.frequency}</span>
-                    <span
-                      className={cn(
-                        overdue
-                          ? "font-semibold text-amber-700"
-                          : dueToday
-                            ? "font-semibold text-amber-600"
-                            : "text-slate-500",
-                      )}
-                    >
-                      Due {formatDateShort(sub.nextDue)}
-                      {overdue && " (overdue)"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => void handleToggleActive(sub)}
-                      className="ml-auto"
-                      title={sub.isActive ? "Click to pause" : "Click to activate"}
-                    >
-                      <StatusPill
-                        tone={!sub.isActive ? "neutral" : overdue ? "critical" : "success"}
-                      >
-                        {!sub.isActive ? "Paused" : overdue ? "Overdue" : "Active"}
-                      </StatusPill>
-                    </button>
-                  </div>
-                  {sub.notes && <p className="mt-1 truncate text-xs text-slate-400">{sub.notes}</p>}
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => {
-                        void handleRecord(sub);
-                      }}
-                      disabled={recording === sub.id}
-                      className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
-                    >
-                      {recording === sub.id ? "Recording..." : "Record"}
-                    </button>
-                    <button
-                      onClick={() => startEdit(sub)}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteSub(sub)}
-                      disabled={deleting === sub.id}
-                      className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Desktop table */}
-          <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50 text-left">
-                  <th className="px-4 py-3 font-semibold text-slate-600">Description</th>
-                  <th className="px-4 py-3 font-semibold text-slate-600">Supplier</th>
-                  <th className="px-4 py-3 font-semibold text-slate-600">Amount</th>
-                  <th className="px-4 py-3 font-semibold text-slate-600">Frequency</th>
-                  <th className="px-4 py-3 font-semibold text-slate-600">Next due</th>
-                  <th className="px-4 py-3 font-semibold text-slate-600">Active</th>
-                  <th className="px-4 py-3 font-semibold text-slate-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subs.map((sub) => {
-                  const overdue = sub.isActive && isOverdue(sub.nextDue);
-                  const dueToday = sub.isActive && isDueToday(sub.nextDue);
-                  return (
-                    <tr
-                      key={sub.id}
-                      className={cn(
-                        "border-b border-slate-100 last:border-0",
-                        overdue ? "bg-amber-50" : dueToday ? "bg-amber-50/50" : "",
-                      )}
-                    >
-                      <td className="px-4 py-3 font-medium text-slate-800">
-                        {sub.description}
-                        {sub.notes && (
-                          <span className="ml-1 text-xs text-slate-400">({sub.notes})</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{sub.supplier}</td>
-                      <td className="px-4 py-3 text-slate-800">{formatNZD(sub.amountIncl)}</td>
-                      <td className="px-4 py-3 text-slate-600 capitalize">{sub.frequency}</td>
-                      <td
-                        className={cn(
-                          "px-4 py-3",
-                          overdue
-                            ? "font-semibold text-amber-700"
-                            : dueToday
-                              ? "font-semibold text-amber-600"
-                              : "text-slate-600",
-                        )}
-                      >
-                        {formatDateShort(sub.nextDue)}
-                        {overdue && <span className="ml-1 text-xs">(overdue)</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => void handleToggleActive(sub)}
-                          title={sub.isActive ? "Click to pause" : "Click to activate"}
-                        >
-                          <StatusPill
-                            tone={!sub.isActive ? "neutral" : overdue ? "critical" : "success"}
-                          >
-                            {!sub.isActive ? "Paused" : overdue ? "Overdue" : "Active"}
-                          </StatusPill>
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              void handleRecord(sub);
-                            }}
-                            disabled={recording === sub.id}
-                            className="rounded-lg bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
-                          >
-                            {recording === sub.id ? "Recording..." : "Record"}
-                          </button>
-                          <button
-                            onClick={() => startEdit(sub)}
-                            className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => setConfirmDeleteSub(sub)}
-                            disabled={deleting === sub.id}
-                            className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <SubscriptionsListCards
+            subs={subs}
+            recording={recording}
+            deleting={deleting}
+            onRecord={(sub) => void handleRecord(sub)}
+            onToggleActive={(sub) => void handleToggleActive(sub)}
+            onEdit={startEdit}
+            onDelete={setConfirmDeleteSub}
+          />
+          <SubscriptionsListTable
+            subs={subs}
+            recording={recording}
+            deleting={deleting}
+            onRecord={(sub) => void handleRecord(sub)}
+            onToggleActive={(sub) => void handleToggleActive(sub)}
+            onEdit={startEdit}
+            onDelete={setConfirmDeleteSub}
+          />
         </>
       )}
 

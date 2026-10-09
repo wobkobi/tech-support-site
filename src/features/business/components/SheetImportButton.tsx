@@ -5,7 +5,7 @@
 // counts and errors.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { Card } from "@/features/admin/components/ui/Card";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import type React from "react";
 import { useState } from "react";
@@ -86,7 +86,7 @@ export function SheetImportButton(): React.ReactElement {
 
   return (
     <Card className="mt-6">
-      <h2 className="mb-3 font-semibold text-admin-text">Import from Google Sheets</h2>
+      <CardHeader title="Import from Google Sheets" className="mb-3" />
 
       {error && <p className="mb-3 text-sm text-coquelicot-500">{error}</p>}
 
@@ -103,7 +103,7 @@ export function SheetImportButton(): React.ReactElement {
             Expenses: {done.expensesImported} imported, {done.expensesSkipped} skipped
           </p>
           {done.perSheet && done.perSheet.length > 0 && (
-            <ul className="mt-2 list-inside list-disc text-xs text-emerald-900/80">
+            <ul className="mt-2 list-inside list-disc text-sm text-emerald-900/80">
               {done.perSheet.map((s) => (
                 <li key={s.fileId}>
                   <span className="font-medium">{s.name}</span>: {s.incomeImported} income,{" "}
@@ -136,7 +136,7 @@ export function SheetImportButton(): React.ReactElement {
             or invalid
           </p>
           {preview.perSheet && preview.perSheet.length > 0 && (
-            <ul className="mt-2 list-inside list-disc text-xs text-admin-muted">
+            <ul className="mt-2 list-inside list-disc text-sm text-admin-muted">
               {preview.perSheet.map((s) => (
                 <li key={s.fileId}>
                   <span className="font-medium">{s.name}</span>: {s.incomeImported} income,{" "}

@@ -8,12 +8,23 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
-import { ADMIN_CONTROL_CLS, ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
+import {
+  IncomeListCards,
+  IncomeListTable,
+  type IncomeSortDir,
+  type IncomeSortKey,
+} from "@/features/business/components/IncomeListRows";
+import { LedgerListToolbar } from "@/features/business/components/LedgerListToolbar";
 import { formatNZD, todayISO } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import { fyKeyOf, listFinancialYears } from "@/features/business/lib/financial-year";
@@ -23,17 +34,15 @@ import {
   useGoogleContacts,
 } from "@/features/contacts/components/ContactNameInput";
 import { cn } from "@/shared/lib/cn";
-import { formatDateShort } from "@/shared/lib/date-format";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FaPlus } from "react-icons/fa6";
 
 /** Sortable column keys. */
-type SortKey = "date" | "customer" | "amount";
+type SortKey = IncomeSortKey;
 /** Sort direction. */
-type SortDir = "asc" | "desc";
+type SortDir = IncomeSortDir;
 
 /** Rows per "Show more" batch. */
 const BATCH = 25;
@@ -269,27 +278,25 @@ export function IncomeView(): React.ReactElement {
         </AdminButton>
       )}
 
-      {/* Add/edit form. */}
+      {/* Add/edit form, with the Card look on the form itself so the edit scroll lands on
+          its top edge. */}
       <form
         ref={formRef}
         onSubmit={handleSubmit}
         className={cn(
-          "mb-6 rounded-xl border border-admin-border bg-admin-surface p-4 shadow-sm sm:p-5",
+          "mb-6 rounded-lg border border-admin-border bg-admin-surface p-4 sm:p-5",
           !formOpen && "max-lg:hidden",
         )}
       >
-        <h2 className="mb-4 text-sm font-semibold text-russian-violet">
-          {editingId ? "Edit income" : "Add income"}
-        </h2>
+        <CardHeader title={editingId ? "Edit income" : "Add income"} />
         <div className="grid gap-3 sm:grid-cols-2">
           <AdminField label="Date" htmlFor="inc-date" required>
-            <input
+            <AdminInput
               id="inc-date"
               type="date"
               required
               value={form.date}
               onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
-              className={ADMIN_INPUT_CLS}
             />
           </AdminField>
           <AdminField label="Customer" htmlFor="inc-customer" required>
@@ -303,17 +310,16 @@ export function IncomeView(): React.ReactElement {
             />
           </AdminField>
           <AdminField label="Description" htmlFor="inc-description" required>
-            <input
+            <AdminInput
               id="inc-description"
               type="text"
               required
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-              className={ADMIN_INPUT_CLS}
             />
           </AdminField>
           <AdminField label="Amount (NZD)" htmlFor="inc-amount" required>
-            <input
+            <AdminInput
               id="inc-amount"
               type="number"
               required
@@ -321,28 +327,25 @@ export function IncomeView(): React.ReactElement {
               step="0.01"
               value={form.amount}
               onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
-              className={ADMIN_INPUT_CLS}
             />
           </AdminField>
           <AdminField label="Payment method" htmlFor="inc-method">
-            <select
+            <AdminSelect
               id="inc-method"
               value={form.method}
               onChange={(e) => setForm((p) => ({ ...p, method: e.target.value }))}
-              className={ADMIN_INPUT_CLS}
             >
               {INCOME_METHODS.map((m) => (
                 <option key={m}>{m}</option>
               ))}
-            </select>
+            </AdminSelect>
           </AdminField>
           <AdminField label="Notes" htmlFor="inc-notes" optional>
-            <input
+            <AdminInput
               id="inc-notes"
               type="text"
               value={form.notes}
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-              className={ADMIN_INPUT_CLS}
             />
           </AdminField>
         </div>
@@ -363,239 +366,57 @@ export function IncomeView(): React.ReactElement {
         </div>
       </form>
 
-      {/* Filter controls. */}
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <label className="flex min-w-48 flex-1 flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">Search</span>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Customer or description"
-            className={ADMIN_CONTROL_CLS}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">Financial year</span>
-          <select
-            value={fyKey}
-            onChange={(e) => setFyKey(e.target.value)}
-            className={ADMIN_CONTROL_CLS}
-          >
-            <option value="all">All years</option>
-            {financialYears.map((f) => (
-              <option key={f.label} value={fyKeyOf(f.label)}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">Method</span>
-          <select
-            value={methodFilter}
-            onChange={(e) => setMethodFilter(e.target.value)}
-            className={ADMIN_CONTROL_CLS}
-          >
-            <option value="all">All methods</option>
-            {methodOptions.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">From</span>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className={ADMIN_CONTROL_CLS}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">To</span>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className={ADMIN_CONTROL_CLS}
-          />
-        </label>
-        {anyFilterActive && (
-          <AdminButton
-            variant="ghost"
-            onClick={() => {
-              setSearch("");
-              setFyKey("all");
-              setFromDate("");
-              setToDate("");
-              setMethodFilter("all");
-            }}
-          >
-            Clear
-          </AdminButton>
-        )}
-      </div>
+      <LedgerListToolbar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Customer or description"
+        fyKey={fyKey}
+        onFyChange={setFyKey}
+        financialYears={financialYears}
+        methodFilter={methodFilter}
+        onMethodChange={setMethodFilter}
+        methodOptions={methodOptions}
+        fromDate={fromDate}
+        onFromChange={setFromDate}
+        toDate={toDate}
+        onToChange={setToDate}
+        anyFilterActive={anyFilterActive}
+        onClear={() => {
+          setSearch("");
+          setFyKey("all");
+          setFromDate("");
+          setToDate("");
+          setMethodFilter("all");
+        }}
+      />
 
-      {/* Mobile card list. */}
-      <div className="space-y-2 lg:hidden">
-        {loading ? (
-          <p className="rounded-xl border border-admin-border bg-admin-surface px-5 py-6 text-sm text-admin-faint shadow-sm">
-            Loading...
-          </p>
-        ) : sorted.length === 0 ? (
-          <p className="rounded-xl border border-admin-border bg-admin-surface px-5 py-6 text-sm text-admin-faint shadow-sm">
-            {entries.length === 0 ? "No income entries yet." : "No entries match your filters."}
-          </p>
-        ) : (
-          pager.visible.map((e) => (
-            <div
-              key={e.id}
-              className="rounded-xl border border-admin-border bg-admin-surface p-3 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-admin-text">{e.customer}</p>
-                  <p className="truncate text-xs text-admin-muted">{e.description}</p>
-                </div>
-                <p className="shrink-0 text-sm font-semibold text-emerald-600">
-                  {formatNZD(e.amount)}
-                </p>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-admin-muted">
-                <span>{formatDateShort(e.date)}</span>
-                <span>{e.method}</span>
-                {e.invoiceId && (
-                  <Link
-                    href={`/admin/business/invoices/${e.invoiceId}`}
-                    className="text-blue-500 hover:text-blue-700"
-                  >
-                    Invoice ↗
-                  </Link>
-                )}
-                <button
-                  onClick={() => startEdit(e)}
-                  className="ml-auto inline-flex h-8 items-center text-russian-violet hover:opacity-80"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => setConfirmDeleteId(e.id)}
-                  className="inline-flex h-8 items-center text-coquelicot-600 hover:text-coquelicot-500"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Desktop table. */}
-      <div className="hidden overflow-x-auto rounded-xl border border-admin-border bg-admin-surface shadow-sm lg:block">
-        {loading ? (
-          <p className="px-5 py-6 text-sm text-admin-faint">Loading...</p>
-        ) : sorted.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-admin-faint">
-            {entries.length === 0 ? "No income entries yet." : "No entries match your filters."}
-          </p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b border-admin-border bg-admin-bg">
-              <tr>
-                {(
-                  [
-                    { key: "date", label: "Date" },
-                    { key: "customer", label: "Customer" },
-                  ] as { key: SortKey; label: string }[]
-                ).map((col) => (
-                  <th
-                    key={col.key}
-                    className="px-4 py-3 text-left text-xs font-semibold text-admin-muted"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleSort(col.key)}
-                      className="inline-flex items-center gap-1 hover:text-admin-text"
-                    >
-                      {col.label}
-                      {sortKey === col.key && (
-                        <span aria-hidden className="text-[0.6rem] text-admin-text">
-                          {sortDir === "asc" ? "▲" : "▼"}
-                        </span>
-                      )}
-                    </button>
-                  </th>
-                ))}
-                <th className="px-4 py-3 text-left text-xs font-semibold text-admin-muted">
-                  Description
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-admin-muted">
-                  <button
-                    type="button"
-                    onClick={() => toggleSort("amount")}
-                    className="inline-flex items-center gap-1 hover:text-admin-text"
-                  >
-                    Amount
-                    {sortKey === "amount" && (
-                      <span aria-hidden className="text-[0.6rem] text-admin-text">
-                        {sortDir === "asc" ? "▲" : "▼"}
-                      </span>
-                    )}
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-admin-muted">
-                  Method
-                </th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-admin-border">
-              {pager.visible.map((e) => (
-                <tr key={e.id} className="hover:bg-admin-bg">
-                  <td className="px-4 py-3 text-xs whitespace-nowrap text-admin-muted">
-                    {formatDateShort(e.date)}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-admin-text">{e.customer}</td>
-                  <td className="px-4 py-3 text-admin-text-secondary">
-                    {e.description}
-                    {e.invoiceId && (
-                      <Link
-                        href={`/admin/business/invoices/${e.invoiceId}`}
-                        className="ml-2 text-xs text-blue-500 hover:text-blue-700"
-                      >
-                        Invoice ↗
-                      </Link>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 font-semibold whitespace-nowrap text-emerald-600">
-                    {formatNZD(e.amount)}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-admin-muted">{e.method}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-3">
-                      <button
-                        onClick={() => startEdit(e)}
-                        className="text-xs text-russian-violet hover:opacity-80"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(e.id)}
-                        className="text-xs text-coquelicot-600 hover:text-coquelicot-500"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Loading and empty states render once for every width; the rows split into phone
+          cards and the desktop table. */}
+      {loading ? (
+        <Card>
+          <p className="text-sm text-admin-muted">Loading...</p>
+        </Card>
+      ) : sorted.length === 0 ? (
+        <Card padding="none">
+          <EmptyState
+            title={
+              entries.length === 0 ? "No income entries yet." : "No entries match your filters."
+            }
+          />
+        </Card>
+      ) : (
+        <>
+          <IncomeListCards rows={pager.visible} onEdit={startEdit} onDelete={setConfirmDeleteId} />
+          <IncomeListTable
+            rows={pager.visible}
+            onEdit={startEdit}
+            onDelete={setConfirmDeleteId}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={toggleSort}
+          />
+        </>
+      )}
 
       {!loading && <ShowMoreButton pager={pager} noun={["entry", "entries"]} className="mt-3" />}
 

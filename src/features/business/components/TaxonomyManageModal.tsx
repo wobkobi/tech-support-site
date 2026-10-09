@@ -13,8 +13,11 @@
 // vocabulary is built from these tags, so a cleared tag is never offered back to the
 // model and its rows go inert.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { ROW_BUTTON_CLS } from "@/features/business/components/ledger-classes";
 import type { TaxonomyTag } from "@/features/business/lib/task-taxonomy";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -202,7 +205,7 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
     >
       <div className="space-y-6">
         {loading && <p className="text-sm text-admin-muted">Loading...</p>}
-        {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
         {!loading &&
           (["devices", "actions"] as const).map((kind) => (
@@ -289,11 +292,11 @@ function TagSection({
 }): React.ReactElement {
   return (
     <section>
-      <h3 className="mb-2 text-xs font-bold tracking-wider text-russian-violet uppercase">
+      <h3 className="mb-2 text-sm font-bold tracking-wider text-russian-violet uppercase">
         {title}
       </h3>
       {tags.length === 0 ? (
-        <p className="text-xs text-admin-faint italic">None yet.</p>
+        <p className="text-sm text-admin-muted italic">None yet.</p>
       ) : (
         <ul className="flex flex-col gap-1">
           {tags.map((tag) => {
@@ -316,7 +319,7 @@ function TagSection({
               >
                 {isRenaming ? (
                   <>
-                    <input
+                    <AdminInput
                       autoFocus
                       value={renameValue}
                       onChange={(e) => onRenameValue(e.target.value)}
@@ -325,24 +328,26 @@ function TagSection({
                         if (e.key === "Escape") onCancelRename();
                       }}
                       aria-label={`Rename ${name}`}
-                      className="min-w-0 flex-1 rounded border border-admin-border-strong px-2 py-1 text-sm text-admin-text"
+                      className="h-10 w-auto min-w-0 flex-1"
                     />
                     <div className="flex shrink-0 items-center gap-2">
-                      <button
-                        type="button"
+                      <AdminButton
+                        size="xs"
+                        variant="outline"
                         disabled={isBusy}
                         onClick={() => onSubmitRename(name)}
-                        className="rounded bg-russian-violet px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                        className={ROW_BUTTON_CLS}
                       >
                         {isBusy ? "Saving..." : "Save"}
-                      </button>
-                      <button
-                        type="button"
+                      </AdminButton>
+                      <AdminButton
+                        size="xs"
+                        variant="ghost"
                         onClick={onCancelRename}
-                        className="rounded text-xs font-semibold text-admin-muted hover:text-admin-text"
+                        className={ROW_BUTTON_CLS}
                       >
                         Cancel
-                      </button>
+                      </AdminButton>
                     </div>
                   </>
                 ) : (
@@ -350,47 +355,51 @@ function TagSection({
                     <span className="flex min-w-0 flex-col">
                       <span className="truncate text-sm text-admin-text">{name}</span>
                       {tag.variants.length > 0 && (
-                        <span className="truncate text-xs text-admin-muted">
+                        <span className="truncate text-sm text-admin-muted">
                           Also spelt {tag.variants.join(", ")} - rename to settle on one.
                         </span>
                       )}
                     </span>
                     {isPending ? (
                       <div className="flex shrink-0 items-center gap-2">
-                        <span className="text-xs text-red-700">Clear for good?</span>
-                        <button
-                          type="button"
+                        <span className="text-sm font-semibold text-red-700">Clear for good?</span>
+                        <AdminButton
+                          size="xs"
+                          variant="danger"
                           onClick={() => onConfirmClear(name)}
-                          className="rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700"
+                          className={ROW_BUTTON_CLS}
                         >
                           Yes, clear
-                        </button>
-                        <button
-                          type="button"
+                        </AdminButton>
+                        <AdminButton
+                          size="xs"
+                          variant="ghost"
                           onClick={onCancelClear}
-                          className="rounded text-xs font-semibold text-admin-muted hover:text-admin-text"
+                          className={ROW_BUTTON_CLS}
                         >
                           Cancel
-                        </button>
+                        </AdminButton>
                       </div>
                     ) : (
-                      <div className="flex shrink-0 items-center gap-3">
-                        <button
-                          type="button"
+                      <div className="flex shrink-0 items-center gap-2">
+                        <AdminButton
+                          size="xs"
+                          variant="secondary"
                           disabled={isBusy}
                           onClick={() => onRequestRename(name)}
-                          className="rounded text-xs font-semibold text-admin-muted hover:text-russian-violet disabled:opacity-50"
+                          className={ROW_BUTTON_CLS}
                         >
                           Rename
-                        </button>
-                        <button
-                          type="button"
+                        </AdminButton>
+                        <AdminButton
+                          size="xs"
+                          variant="danger"
                           disabled={isBusy}
                           onClick={() => onRequestClear(name)}
-                          className="rounded text-xs font-semibold text-red-500 hover:text-red-700 disabled:opacity-50"
+                          className={ROW_BUTTON_CLS}
                         >
                           {isBusy ? "Clearing..." : "Clear"}
-                        </button>
+                        </AdminButton>
                       </div>
                     )}
                   </>

@@ -5,16 +5,18 @@
 // checkbox, and the "add to contacts" prompt when the ask would otherwise be skipped.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import {
   DEFAULT_INVOICE_EMAIL_BODY,
   DEFAULT_QUOTE_EMAIL_BODY,
 } from "@/features/business/lib/invoice-email-defaults";
 import type { InvoiceReviewAskInfo } from "@/features/reviews/lib/review-ask-rules";
-import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -43,7 +45,6 @@ export interface InvoiceSendFlow {
   closePreview: () => void;
 }
 
-const FIELD_LABEL_CLS = "mb-2 block text-xs font-semibold text-admin-muted uppercase";
 /** Static JSON request headers - module-scoped so it's a stable useCallback dep. */
 const headers = { "Content-Type": "application/json" };
 
@@ -290,55 +291,55 @@ export function SendInvoiceModal({
         )}
         {preview && !loading && (
           <div>
-            <label htmlFor="greeting-name" className={FIELD_LABEL_CLS}>
-              Greeting (the person you&apos;re emailing)
-            </label>
-            <input
-              id="greeting-name"
-              type="text"
-              value={greetingName}
-              onChange={(e) => setGreetingName(e.target.value)}
-              onBlur={() => void openPreview()}
-              placeholder={
-                preview.defaultGreeting
-                  ? `Leave blank to greet ${preview.defaultGreeting}`
-                  : "John (leave blank to use the first word of the client name)"
-              }
-              disabled={sending}
-              className={cn(ADMIN_INPUT_CLS, "mb-4")}
-            />
-            <label htmlFor="custom-body" className={FIELD_LABEL_CLS}>
-              Message
-            </label>
-            <textarea
-              id="custom-body"
-              rows={4}
-              value={customBody}
-              onChange={(e) => setCustomBody(e.target.value)}
-              onBlur={() => void openPreview()}
-              disabled={sending}
-              className={cn(ADMIN_INPUT_CLS, "mb-4 resize-y")}
-            />
+            <AdminField
+              label="Greeting (the person you're emailing)"
+              htmlFor="greeting-name"
+              className="mb-4"
+            >
+              <AdminInput
+                id="greeting-name"
+                type="text"
+                value={greetingName}
+                onChange={(e) => setGreetingName(e.target.value)}
+                onBlur={() => void openPreview()}
+                placeholder={
+                  preview.defaultGreeting
+                    ? `Leave blank to greet ${preview.defaultGreeting}`
+                    : "John (leave blank to use the first word of the client name)"
+                }
+                disabled={sending}
+              />
+            </AdminField>
+            <AdminField label="Message" htmlFor="custom-body" className="mb-4">
+              <AdminTextarea
+                id="custom-body"
+                rows={4}
+                value={customBody}
+                onChange={(e) => setCustomBody(e.target.value)}
+                onBlur={() => void openPreview()}
+                disabled={sending}
+              />
+            </AdminField>
             {reviewAskInfo && (
               <div className="mb-4">
-                <label className="flex items-start gap-2 text-sm">
+                <label className="flex items-start gap-2 text-sm text-admin-text">
                   <input
                     type="checkbox"
                     checked={reviewAsk}
                     disabled={sending}
                     onChange={(e) => setReviewAsk(e.target.checked)}
-                    className="mt-0.5"
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-russian-violet"
                   />
                   <span>
                     Ask for a Google review in {reviewAskInfo.delayDays}{" "}
                     {reviewAskInfo.delayDays === 1 ? "day" : "days"}
-                    <span className="ml-1 text-xs text-admin-muted">
+                    <span className="ml-1 text-sm text-admin-muted">
                       (a separate email on {reviewAskInfo.dueLabel})
                     </span>
                   </span>
                 </label>
                 {reviewAsk && !reviewAskInfo.hasContact && (
-                  <p className="mt-1 ml-6 text-xs text-admin-muted italic">
+                  <p className="mt-1 ml-6 text-sm text-admin-muted italic">
                     Not in your contacts yet -{" "}
                     <button
                       type="button"
@@ -352,15 +353,15 @@ export function SendInvoiceModal({
                 )}
               </div>
             )}
-            <p className={FIELD_LABEL_CLS}>Subject</p>
+            <p className={ADMIN_LABEL_CLS}>Subject</p>
             <p className="mb-4 text-sm font-medium text-admin-text">{preview.subject}</p>
-            <p className={FIELD_LABEL_CLS}>Body</p>
+            <p className={ADMIN_LABEL_CLS}>Body</p>
             <div className="rounded-lg border border-admin-border bg-admin-bg p-2">
               <iframe
                 title="Invoice email preview"
                 srcDoc={preview.html}
                 sandbox="allow-same-origin"
-                className="h-105 w-full rounded bg-white"
+                className="h-105 w-full rounded bg-admin-surface"
               />
             </div>
           </div>

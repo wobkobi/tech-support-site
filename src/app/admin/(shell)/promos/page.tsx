@@ -127,7 +127,7 @@ export default async function AdminPromosPage(): Promise<React.ReactElement> {
       />
       {/* The precedence rules matter when setting up an overlap, not on every
           visit, so they fold away instead of filling a phone's first screen. */}
-      <details className="mb-6 rounded-xl border border-admin-border bg-admin-surface px-4 py-3 text-sm text-admin-text-secondary">
+      <details className="mb-6 rounded-lg border border-admin-border bg-admin-surface px-4 py-3 text-sm text-admin-text-secondary">
         <summary className="cursor-pointer font-semibold text-admin-text">
           Which promo applies
         </summary>

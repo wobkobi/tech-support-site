@@ -82,12 +82,14 @@ function InvoicePreviewPanelImpl({
   const showPromoLine = promoDiscount > 0;
   const showUnsuccessfulLine = unsuccessfulDiscount > 0;
   return (
+    // Only this frame is admin chrome. The body inside keeps its own slate palette and
+    // sizes because it must match the generated PDF (invoice-pdf.ts).
     <div
       className={cn(
-        "flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm",
+        "flex flex-col overflow-hidden rounded-lg border border-admin-border bg-admin-surface",
         "lg:sticky lg:top-18 lg:aspect-210/297 lg:overflow-y-auto",
         // Print: defeat sticky + scroll so the browser captures the full invoice.
-        "print:static print:aspect-auto print:overflow-visible print:rounded-none print:border-0 print:shadow-none",
+        "print:static print:aspect-auto print:overflow-visible print:rounded-none print:border-0",
       )}
     >
       <div className="flex flex-1 flex-col px-5 pt-6 pb-6 sm:px-10 sm:pt-10 sm:pb-10">

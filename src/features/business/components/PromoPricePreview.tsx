@@ -141,12 +141,12 @@ export function PromoPricePreview({
   if (promo.kind === "code") notes.push("Only for customers who enter the code.");
 
   return (
-    <div className="rounded-xl border border-admin-border bg-admin-bg px-4 py-3">
-      <p className="text-xs font-medium text-admin-muted">Prices with this promo</p>
+    <div className="rounded-lg border border-admin-border bg-admin-bg px-4 py-3">
+      <p className="text-sm font-medium text-admin-muted">Prices with this promo</p>
       <div className="mt-2 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-xs text-admin-muted">
+            <tr className="text-left text-sm text-admin-muted">
               <th className="py-1 pr-3 font-medium">Rate</th>
               <th className="py-1 pr-3 font-medium">Now</th>
               {scenarios.map((s) => (

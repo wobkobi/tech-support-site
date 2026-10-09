@@ -3,15 +3,25 @@
 // Folded "Advanced options" section of the promo form: priority, spend
 // thresholds, usage limits and the weekday/time restriction.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import {
+  chipClass,
+  TEXT_ACTION_CLS,
+} from "@/features/business/components/calculator/calculator-classes";
 import {
   advancedChips,
   AMOUNT_LABEL,
-  PROMO_INPUT_CLASS,
   WEEKDAY_LABELS,
   type FormState,
 } from "@/features/business/lib/promo-form";
-import { cn } from "@/shared/lib/cn";
 import type React from "react";
+import { useId } from "react";
+
+/** Legend for a group of advanced fields. */
+const LEGEND_CLS = "px-1 text-sm font-bold text-admin-text";
 
 /** Props for {@link PromoAdvancedOptions}. */
 interface PromoAdvancedOptionsProps {
@@ -38,68 +48,68 @@ export function PromoAdvancedOptions({
   open,
   onOpenChange,
 }: PromoAdvancedOptionsProps): React.ReactElement {
+  const id = useId();
   const chips = advancedChips(form);
   return (
     <details
       open={open}
       onToggle={(e) => onOpenChange(e.currentTarget.open)}
-      className="rounded-xl border border-admin-border"
+      className="rounded-lg border border-admin-border"
     >
-      <summary className="flex cursor-pointer flex-wrap items-center gap-2 px-4 py-3 text-sm font-semibold text-admin-text">
+      <summary className="flex cursor-pointer flex-wrap items-center gap-2 px-4 py-3 text-[0.9375rem] font-bold text-admin-text">
         Advanced options
         {chips.map((chip) => (
           <span
             key={chip}
-            className="rounded bg-admin-bg px-1.5 py-0.5 text-xs font-semibold text-admin-muted"
+            className="rounded bg-admin-bg px-1.5 py-0.5 text-sm font-semibold text-admin-muted"
           >
             {chip}
           </span>
         ))}
         {chips.length === 0 && (
-          <span className="text-xs font-normal text-admin-faint">
+          <span className="text-sm font-normal text-admin-muted">
             Priority, spend thresholds, usage limits, days and times
           </span>
         )}
       </summary>
       <div className="flex flex-col gap-3 px-4 pb-4">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-admin-muted">Priority</span>
-          <input
+        <AdminField
+          label="Priority"
+          htmlFor={`${id}-priority`}
+          hint="Higher wins when two promos overlap. Ties go to the newer one."
+        >
+          <AdminInput
+            id={`${id}-priority`}
             type="number"
             step={1}
             value={form.priority}
             onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}
-            className={cn(PROMO_INPUT_CLASS, "w-32")}
+            className="w-32"
           />
-          <span className="text-xs text-admin-faint">
-            Higher wins when two promos overlap. Ties go to the newer one.
-          </span>
-        </label>
+        </AdminField>
 
-        <fieldset className="flex flex-col gap-3 rounded-xl border border-admin-border p-4">
-          <legend className="px-1 text-xs font-medium text-admin-muted">
-            Spend thresholds (optional)
-          </legend>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-admin-muted">Minimum spend ($)</span>
-            <input
+        <fieldset className="flex flex-col gap-3 rounded-lg border border-admin-border p-4">
+          <legend className={LEGEND_CLS}>Spend thresholds (optional)</legend>
+          <AdminField label="Minimum spend ($)" htmlFor={`${id}-min-spend`}>
+            <AdminInput
+              id={`${id}-min-spend`}
               type="number"
               min="0"
               step="0.01"
               value={form.minSpend}
               onChange={(e) => setForm((p) => ({ ...p, minSpend: e.target.value }))}
               placeholder="No minimum"
-              className={cn(PROMO_INPUT_CLASS, "w-40")}
+              className="w-40"
             />
-          </label>
+          </AdminField>
 
           {form.tiers.length > 0 && (
             <div className="flex flex-col gap-2">
               {form.tiers.map((tier, i) => (
                 <div key={i} className="flex flex-wrap items-end gap-2">
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-medium text-admin-muted">Spend over ($)</span>
-                    <input
+                  <AdminField label="Spend over ($)" htmlFor={`${id}-tier-${i}-spend`}>
+                    <AdminInput
+                      id={`${id}-tier-${i}-spend`}
                       type="number"
                       min="0"
                       step="0.01"
@@ -112,14 +122,12 @@ export function PromoAdvancedOptions({
                           ),
                         }))
                       }
-                      className={cn(PROMO_INPUT_CLASS, "w-32")}
+                      className="w-32"
                     />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-medium text-admin-muted">
-                      {AMOUNT_LABEL[form.type]}
-                    </span>
-                    <input
+                  </AdminField>
+                  <AdminField label={AMOUNT_LABEL[form.type]} htmlFor={`${id}-tier-${i}-amount`}>
+                    <AdminInput
+                      id={`${id}-tier-${i}-amount`}
                       type="number"
                       min="0"
                       step="0.01"
@@ -132,33 +140,34 @@ export function PromoAdvancedOptions({
                           ),
                         }))
                       }
-                      className={cn(PROMO_INPUT_CLASS, "w-32")}
+                      className="w-32"
                     />
-                  </label>
-                  <button
+                  </AdminField>
+                  <AdminButton
                     type="button"
+                    variant="danger"
                     onClick={() =>
                       setForm((p) => ({ ...p, tiers: p.tiers.filter((_, j) => j !== i) }))
                     }
-                    className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
                   >
                     Remove
-                  </button>
+                  </AdminButton>
                 </div>
               ))}
             </div>
           )}
 
-          <button
+          <AdminButton
             type="button"
+            variant="secondary"
             onClick={() =>
               setForm((p) => ({ ...p, tiers: [...p.tiers, { minSpend: "", amount: "" }] }))
             }
-            className="self-start rounded-lg border border-admin-border bg-admin-surface px-3 py-1.5 text-xs font-medium text-admin-muted hover:bg-admin-bg"
+            className="self-start"
           >
             Add a spend tier
-          </button>
-          <p className="text-sm text-admin-faint">
+          </AdminButton>
+          <p className="text-sm text-admin-muted">
             With no tiers the promo gives its single amount above. With tiers, the highest one the
             job reaches supplies the discount and the amount above is ignored - a job that reaches
             none gets nothing rather than a smaller discount. Thresholds are read against the low
@@ -167,54 +176,48 @@ export function PromoAdvancedOptions({
           </p>
         </fieldset>
 
-        <fieldset className="flex flex-col gap-3 rounded-xl border border-admin-border p-4">
-          <legend className="px-1 text-xs font-medium text-admin-muted">Who can use it</legend>
+        <fieldset className="flex flex-col gap-3 rounded-lg border border-admin-border p-4">
+          <legend className={LEGEND_CLS}>Who can use it</legend>
           <div className="flex flex-wrap gap-4">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-admin-muted">Total uses</span>
-              <input
+            <AdminField label="Total uses" htmlFor={`${id}-max-redemptions`}>
+              <AdminInput
+                id={`${id}-max-redemptions`}
                 type="number"
                 min="1"
                 step={1}
                 value={form.maxRedemptions}
                 onChange={(e) => setForm((p) => ({ ...p, maxRedemptions: e.target.value }))}
                 placeholder="No limit"
-                className={cn(PROMO_INPUT_CLASS, "w-32")}
+                className="w-32"
               />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-admin-muted">Uses per customer</span>
-              <input
+            </AdminField>
+            <AdminField label="Uses per customer" htmlFor={`${id}-per-customer`}>
+              <AdminInput
+                id={`${id}-per-customer`}
                 type="number"
                 min="1"
                 step={1}
                 value={form.perCustomerLimit}
                 onChange={(e) => setForm((p) => ({ ...p, perCustomerLimit: e.target.value }))}
                 placeholder="No limit"
-                className={cn(PROMO_INPUT_CLASS, "w-32")}
+                className="w-32"
               />
-            </label>
+            </AdminField>
           </div>
-          <label className="flex items-center gap-2 text-sm text-admin-muted">
-            <input
-              type="checkbox"
-              checked={form.newCustomersOnly}
-              onChange={(e) => setForm((p) => ({ ...p, newCustomersOnly: e.target.checked }))}
-              className="h-4 w-4"
-            />
-            New customers only (nobody with a completed job on file)
-          </label>
-          <p className="text-sm text-admin-faint">
+          <AdminCheckbox
+            checked={form.newCustomersOnly}
+            onChange={(checked) => setForm((p) => ({ ...p, newCustomersOnly: checked }))}
+            label="New customers only (nobody with a completed job on file)"
+          />
+          <p className="text-sm text-admin-muted">
             The total cap is approximate: two people can pass it at the same moment and both redeem.
             Per-customer and new-customer rules need someone the site can identify, so an
             unrecognised email is allowed through rather than refused.
           </p>
         </fieldset>
 
-        <fieldset className="flex flex-col gap-3 rounded-xl border border-admin-border p-4">
-          <legend className="px-1 text-xs font-medium text-admin-muted">
-            When it applies (optional)
-          </legend>
+        <fieldset className="flex flex-col gap-3 rounded-lg border border-admin-border p-4">
+          <legend className={LEGEND_CLS}>When it applies (optional)</legend>
           <div className="flex flex-wrap gap-1.5">
             {WEEKDAY_LABELS.map((label, day) => {
               const picked = form.activeWeekdays.includes(day);
@@ -231,12 +234,7 @@ export function PromoAdvancedOptions({
                         : [...p.activeWeekdays, day].sort((a, b) => a - b),
                     }))
                   }
-                  className={cn(
-                    "rounded-lg border px-3 py-1.5 text-sm font-medium",
-                    picked
-                      ? "border-admin-text bg-admin-text text-admin-surface"
-                      : "border-admin-border bg-admin-surface text-admin-muted hover:bg-admin-bg",
-                  )}
+                  className={chipClass(picked)}
                 >
                   {label}
                 </button>
@@ -244,35 +242,35 @@ export function PromoAdvancedOptions({
             })}
           </div>
           <div className="flex flex-wrap items-end gap-4">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-admin-muted">From</span>
-              <input
+            <AdminField label="From" htmlFor={`${id}-from`}>
+              <AdminInput
+                id={`${id}-from`}
                 type="time"
                 value={form.activeFrom}
                 onChange={(e) => setForm((p) => ({ ...p, activeFrom: e.target.value }))}
-                className={cn(PROMO_INPUT_CLASS, "w-32")}
+                className="w-32"
               />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-admin-muted">To</span>
-              <input
+            </AdminField>
+            <AdminField label="To" htmlFor={`${id}-to`}>
+              <AdminInput
+                id={`${id}-to`}
                 type="time"
                 value={form.activeTo}
                 onChange={(e) => setForm((p) => ({ ...p, activeTo: e.target.value }))}
-                className={cn(PROMO_INPUT_CLASS, "w-32")}
+                className="w-32"
               />
-            </label>
+            </AdminField>
             {(form.activeFrom || form.activeTo) && (
               <button
                 type="button"
                 onClick={() => setForm((p) => ({ ...p, activeFrom: "", activeTo: "" }))}
-                className="pb-2 text-xs font-medium text-admin-muted underline hover:text-admin-text"
+                className={`pb-2.5 ${TEXT_ACTION_CLS}`}
               >
                 Clear times
               </button>
             )}
           </div>
-          <p className="text-sm text-admin-faint">
+          <p className="text-sm text-admin-muted">
             Leave blank to run the whole window. These are matched against the appointment in NZ
             time, not against when the customer is browsing, so a Tuesday offer is earned by booking
             a Tuesday job on any day. The banner still advertises the promo throughout and names the

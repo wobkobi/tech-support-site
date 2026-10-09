@@ -360,10 +360,11 @@ export default async function BusinessPage({
         href={taxHref}
       />
 
-      {/* Action links - full-width stacked on mobile, side-by-side from sm+. */}
+      {/* Action links - full-width stacked on mobile, side-by-side from sm+. Outline, so four
+          equal links don't read as four competing primaries. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         {links.map((l) => (
-          <AdminButton key={l.label} href={l.href} variant="primary" className="w-full sm:w-auto">
+          <AdminButton key={l.label} href={l.href} variant="outline" className="w-full sm:w-auto">
             {l.label}
           </AdminButton>
         ))}
