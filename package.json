@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.79.1",
+  "version": "4.80.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -30,6 +30,7 @@
     "check:review-asks": "tsx scripts/check-review-asks.ts",
     "check:social": "tsx --conditions=react-server scripts/check-social.ts",
     "check:task-window": "tsx scripts/check-task-window.ts",
+    "check:tax": "tsx scripts/check-tax.ts",
     "check:time-parse": "tsx scripts/check-time-parse.ts",
     "db:push": "prisma db push",
     "dev": "next dev",
