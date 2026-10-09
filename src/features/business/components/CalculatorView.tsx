@@ -4,6 +4,7 @@
 // rate config into line items, supports AI parsing of a plain-English job description,
 // and renders a live invoice preview.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
@@ -11,10 +12,13 @@ import { TaxonomyManageModal } from "@/features/business/components/TaxonomyMana
 import { CancelFeeSection } from "@/features/business/components/calculator/CancelFeeSection";
 import { ClientPickerSection } from "@/features/business/components/calculator/ClientPickerSection";
 import { DescribeJobSection } from "@/features/business/components/calculator/DescribeJobSection";
+import { DraftRestoredBanner } from "@/features/business/components/calculator/DraftRestoredBanner";
 import { EventPickerSection } from "@/features/business/components/calculator/EventPickerSection";
 import { JobDetailsSection } from "@/features/business/components/calculator/JobDetailsSection";
 import { JobSettingsStrip } from "@/features/business/components/calculator/JobSettingsStrip";
+import { NotesSection } from "@/features/business/components/calculator/NotesSection";
 import { PartsSection } from "@/features/business/components/calculator/PartsSection";
+import { PhoneTotalBar } from "@/features/business/components/calculator/PhoneTotalBar";
 
 import { SaveActions } from "@/features/business/components/calculator/SaveActions";
 import { TaskTimeWarning } from "@/features/business/components/calculator/TaskTimeWarning";
@@ -32,7 +36,6 @@ import {
 } from "@/features/business/lib/already-paid-input";
 import {
   calcJobTotal,
-  formatNZD,
   jobToLineItems,
   timeDiffMins,
   todayISO,
@@ -45,7 +48,6 @@ import {
   isPlaceholderHour,
   loadDraft,
   saveDraft,
-  timeAgo,
 } from "@/features/business/lib/calculator-draft";
 import {
   addDaysISO,
@@ -72,7 +74,6 @@ import type {
   TravelEntry,
 } from "@/features/business/types/business";
 import { matchedByCompanyOnly } from "@/features/contacts/lib/contact-search";
-import { cn } from "@/shared/lib/cn";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import { nzNowTime } from "@/shared/lib/timezone-utils";
@@ -811,20 +812,12 @@ export function CalculatorView({
         onSkipPromoChange={setSkipPromo}
       />
 
-      {/* Draft-restored banner sits above the grid so the Discard action is
-          visible without scrolling on mobile, where cached values otherwise
-          look like a mystery pre-filled form. */}
       {draftRestoredAt !== null && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
-          <span>Draft restored - last edited {timeAgo(draftRestoredAt, mountedAt)}.</span>
-          <button
-            type="button"
-            onClick={resetFormState}
-            className="font-semibold text-blue-700 hover:underline"
-          >
-            Discard
-          </button>
-        </div>
+        <DraftRestoredBanner
+          draftRestoredAt={draftRestoredAt}
+          mountedAt={mountedAt}
+          onDiscard={resetFormState}
+        />
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -983,27 +976,14 @@ export function CalculatorView({
             />
           )}
 
-          {/* Notes */}
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-            <label className="mb-1 block text-xs font-medium text-slate-600">Notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
-            />
-          </div>
+          <NotesSection notes={notes} onNotesChange={setNotes} />
 
           {/* Early cancel entry. Parked at the bottom: billing a job that never
               happened is the rare case, so it stays out of the normal flow. */}
           {!cancelMode && (
-            <button
-              type="button"
-              onClick={enterCancelMode}
-              className="rounded-lg border border-coquelicot-500/40 px-3 py-1.5 text-sm font-semibold text-coquelicot-600 transition-colors hover:bg-coquelicot-500/10"
-            >
+            <AdminButton variant="danger" onClick={enterCancelMode}>
               Make early cancel
-            </button>
+            </AdminButton>
           )}
         </div>
 
@@ -1094,30 +1074,13 @@ export function CalculatorView({
         </div>
       </div>
 
-      {/* Phone total bar. Below lg the preview, and the total in it, sits under
-          every section, so the running figure stays pinned here while the job
-          is built, with a jump down to the client and save buttons. It stays
-          hidden until the job has a total, so an empty calculator isn't
-          topped by a $0.00 bar. */}
-      <div
-        data-phone-bar={showTotalBar ? "sticky" : undefined}
-        className={cn(
-          "sticky bottom-0 z-10 -mx-4 mt-4 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:-mx-6 sm:px-6 lg:hidden",
-          !showTotalBar && "hidden",
-        )}
-      >
-        <p className="text-sm text-slate-600">
-          Total{" "}
-          <span className="text-lg font-bold text-russian-violet">{formatNZD(totals.total)}</span>
-        </p>
-        <button
-          type="button"
-          onClick={() => finishRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-          className="rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
-        >
-          Client &amp; save
-        </button>
-      </div>
+      <PhoneTotalBar
+        show={showTotalBar}
+        total={totals.total}
+        onJumpToFinish={() =>
+          finishRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+      />
     </>
   );
 }

@@ -4,7 +4,6 @@
 // by the calculator and the invoice edit page. The method never shows on the invoice; it
 // only decides how the income entry is recorded.
 
-import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import {
   ALREADY_PAID_METHODS,
   alreadyPaidAmount,
@@ -83,18 +82,26 @@ export function AlreadyPaidField({
           disabled={disabled}
           className={cn(inputClassName, "w-28 flex-none")}
         />
-        <div className="flex gap-2">
+        {/* Segmented toggle, the same look as the schedule's Short/Long switch, so the
+            selected method never reads as a second coquelicot primary beside Save. */}
+        <div className="inline-flex rounded-lg border border-admin-border bg-admin-bg p-0.5">
           {ALREADY_PAID_METHODS.map((m) => (
-            <AdminButton
+            <button
               key={m}
-              size="sm"
+              type="button"
               aria-label={value.method === m ? `Paid by ${m} (selected)` : `Paid by ${m}`}
-              variant={value.method === m ? "primary" : "secondary"}
+              aria-pressed={value.method === m}
               disabled={disabled}
               onClick={() => onChange({ ...value, method: m })}
+              className={cn(
+                "h-9 rounded-md px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                value.method === m
+                  ? "bg-russian-violet text-white"
+                  : "text-admin-text-secondary hover:bg-admin-surface",
+              )}
             >
               {m}
-            </AdminButton>
+            </button>
           ))}
         </div>
       </div>

@@ -4,7 +4,13 @@
 // carrying "$"/commas route through parseMoney. Collapsed with an empty list is the
 // default - parts are opt-in per job.
 
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { Card } from "@/features/admin/components/ui/Card";
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
+import {
+  REMOVE_ROW_CLS,
+  TEXT_ACTION_CLS,
+} from "@/features/business/components/calculator/calculator-classes";
 import type { PartLine } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import { parseMoney } from "@/shared/lib/parse-money";
@@ -29,16 +35,18 @@ interface Props {
  */
 export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): React.ReactElement {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <Card>
       {/* Clear sits beside the collapse toggle rather than inside it - a button
           cannot nest inside another button. */}
       <div className="flex items-center gap-3">
         <button
+          type="button"
           onClick={onToggle}
-          className="flex flex-1 items-center justify-between text-left text-sm font-semibold text-russian-violet"
+          aria-expanded={show}
+          className="flex flex-1 items-center justify-between text-left text-lg font-extrabold text-admin-text"
         >
           Parts / materials
-          <span className="text-xs text-slate-400">{show ? "▲" : "▼"}</span>
+          <span className="text-sm text-admin-muted">{show ? "▲" : "▼"}</span>
         </button>
         {parts.length > 0 && (
           <SectionClearButton onClear={() => onPartsChange(() => [])} label="parts" />
@@ -51,10 +59,10 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
               key={idx}
               className={cn(
                 "grid grid-cols-[minmax(0,1fr)_44px] items-center gap-2",
-                "sm:grid-cols-[minmax(0,1fr)_88px_28px]",
+                "sm:grid-cols-[minmax(0,1fr)_96px_44px]",
               )}
             >
-              <input
+              <AdminInput
                 type="text"
                 placeholder="Description"
                 value={part.description}
@@ -65,9 +73,9 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
                     return n;
                   })
                 }
-                className="col-span-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:col-span-1 sm:py-2 sm:text-xs"
+                className="col-span-2 sm:col-span-1"
               />
-              <input
+              <AdminInput
                 type="number"
                 min="0"
                 step="0.01"
@@ -95,25 +103,26 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
                     return n;
                   })
                 }
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs"
               />
               <button
+                type="button"
                 onClick={() => onPartsChange((p) => p.filter((_, i) => i !== idx))}
                 aria-label="Remove part"
-                className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-slate-400 hover:bg-red-50 hover:text-red-500 sm:h-auto sm:w-auto sm:rounded-none sm:text-lg sm:hover:bg-transparent"
+                className={REMOVE_ROW_CLS}
               >
                 ×
               </button>
             </div>
           ))}
           <button
+            type="button"
             onClick={() => onPartsChange((p) => [...p, { description: "", cost: 0 }])}
-            className="inline-flex h-11 items-center text-sm text-slate-500 underline hover:text-russian-violet sm:h-auto sm:text-xs"
+            className={cn(TEXT_ACTION_CLS, "inline-flex h-11 items-center sm:h-auto")}
           >
             + Add part
           </button>
         </div>
       )}
-    </div>
+    </Card>
   );
 }

@@ -142,12 +142,12 @@ export function BreakdownModal({ data, onClose }: BreakdownModalProps): React.Re
                 className="flex items-baseline gap-3 border-b border-admin-border py-2 last:border-0"
               >
                 {row.date && (
-                  <span className="w-24 shrink-0 text-xs text-admin-faint">{row.date}</span>
+                  <span className="w-24 shrink-0 text-sm text-admin-faint">{row.date}</span>
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-admin-text">{row.label}</p>
                   {row.sublabel && (
-                    <p className="truncate text-xs text-admin-muted">{row.sublabel}</p>
+                    <p className="truncate text-sm text-admin-muted">{row.sublabel}</p>
                   )}
                 </div>
                 <span className="shrink-0 font-mono text-admin-text">

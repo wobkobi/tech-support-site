@@ -3,6 +3,9 @@
 // The calculator's "Paid in cash" tick, the Already paid box, its save buttons (invoice,
 // save & send, quote, income entry) and the error banners from the last failed save.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { Card } from "@/features/admin/components/ui/Card";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { AlreadyPaidField } from "@/features/business/components/invoice/AlreadyPaidField";
 import {
   alreadyPaidAmount,
@@ -84,7 +87,7 @@ export function SaveActions({
           {saveInvoiceError}
         </p>
       )}
-      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700">
+      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-admin-border bg-admin-surface px-3 py-2.5 text-sm font-medium text-admin-text">
         <input
           type="checkbox"
           checked={paidCash}
@@ -94,73 +97,77 @@ export function SaveActions({
         Paid in cash
       </label>
       {paidCash ? (
-        <p className="text-xs text-slate-500">
+        <p className="text-sm text-admin-muted">
           Saving an invoice marks it paid in cash on the job date and adds it to income. A quote
           stays unpaid.
         </p>
       ) : (
-        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-slate-700">
+        <Card padding="sm" className="text-admin-text">
           <AlreadyPaidField
             value={alreadyPaid}
             onChange={onAlreadyPaidChange}
             total={total}
-            inputClassName="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800"
+            inputClassName={ADMIN_INPUT_CLS}
             coversNote="Covers the total, so the invoice saves as paid."
           />
-        </div>
+        </Card>
       )}
       {overpaid && (
         <p className="text-sm text-coquelicot-700">
           Fix the job or the Already paid amount to save an invoice.
         </p>
       )}
-      <button
+      <AdminButton
+        variant="primary"
+        className="w-full"
         onClick={() => onSaveInvoice(false)}
         disabled={savingInvoice || parsing || overpaid}
         suppressHydrationWarning
-        className="w-full rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
       >
         {savingInvoice && !saveSendMode && !saveQuoteMode
           ? "Saving..."
           : paidInFull
             ? "Save paid invoice"
             : "Save invoice"}
-      </button>
-      <button
+      </AdminButton>
+      <AdminButton
+        variant="outline"
+        className="w-full"
         onClick={() => onSaveInvoice(true)}
         disabled={savingInvoice || parsing || overpaid}
         suppressHydrationWarning
         title="Save the invoice and jump straight to the send-to-client step."
-        className="w-full rounded-lg border border-russian-violet px-4 py-2 text-sm font-semibold text-russian-violet hover:bg-russian-violet/5 disabled:opacity-50"
       >
         {savingInvoice && saveSendMode
           ? "Saving..."
           : paidInFull
             ? "Save paid & send"
             : "Save & send"}
-      </button>
-      <button
+      </AdminButton>
+      <AdminButton
+        variant="outline"
+        className="w-full"
         onClick={() => onSaveInvoice(false, true)}
         disabled={savingInvoice || parsing}
         suppressHydrationWarning
         title="Save as a Q-numbered quote - convert it to an invoice once the client accepts."
-        className="w-full rounded-lg border border-russian-violet px-4 py-2 text-sm font-semibold text-russian-violet hover:bg-russian-violet/5 disabled:opacity-50"
       >
         {savingInvoice && saveQuoteMode ? "Saving..." : "Save as quote"}
-      </button>
-      <button
+      </AdminButton>
+      <AdminButton
+        variant="secondary"
+        className="w-full"
         onClick={onSaveIncome}
         suppressHydrationWarning
         disabled={savingIncome || subtotal === 0 || savingInvoice || overpaid}
         title="For jobs handled outside the invoice flow."
-        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
       >
         {savingIncome
           ? "Saving..."
           : paidCash
             ? "Save as cash income entry"
             : "Save as income entry"}
-      </button>
+      </AdminButton>
     </div>
   );
 }

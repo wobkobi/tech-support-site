@@ -39,6 +39,10 @@ interface AdminButtonAsButton extends AdminButtonCommon {
   disabled?: boolean;
   /** Shows a spinner and disables the button while an action is in flight. */
   busy?: boolean;
+  /** Native tooltip. */
+  title?: string;
+  /** Passed to the native button, for a label or disabled state that can differ at hydration. */
+  suppressHydrationWarning?: boolean;
 }
 
 type AdminButtonProps = AdminButtonAsLink | AdminButtonAsButton;
@@ -124,7 +128,14 @@ export function AdminButton(props: AdminButtonProps): React.ReactElement {
     );
   }
 
-  const { type = "button", onClick, disabled = false, busy = false } = props as AdminButtonAsButton;
+  const {
+    type = "button",
+    onClick,
+    disabled = false,
+    busy = false,
+    title,
+    suppressHydrationWarning,
+  } = props as AdminButtonAsButton;
   const isDisabled = disabled || busy;
 
   return (
@@ -132,6 +143,8 @@ export function AdminButton(props: AdminButtonProps): React.ReactElement {
       type={type}
       onClick={onClick}
       disabled={isDisabled}
+      title={title}
+      suppressHydrationWarning={suppressHydrationWarning}
       aria-busy={busy}
       aria-label={ariaLabel}
       aria-current={props["aria-current"]}

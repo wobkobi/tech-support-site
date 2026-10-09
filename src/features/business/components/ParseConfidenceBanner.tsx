@@ -61,8 +61,13 @@ export function ParseConfidenceBanner({
           <p className={cn("text-sm font-medium", text)}>{message}</p>
         </div>
         <button
+          type="button"
           onClick={onDismiss}
-          className={cn("text-sm leading-none opacity-50 hover:opacity-80", text)}
+          aria-label="Dismiss"
+          className={cn(
+            "-m-2 inline-flex size-8 shrink-0 items-center justify-center text-base leading-none opacity-60 hover:opacity-90",
+            text,
+          )}
         >
           &times;
         </button>

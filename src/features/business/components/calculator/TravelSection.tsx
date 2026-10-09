@@ -6,9 +6,17 @@
 // line. Looked-up entries show a step-by-step breakdownTravelCharge (there/back > raw >
 // rounded > final).
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
+import {
+  COMPACT_BUTTON_CLS,
+  REMOVE_ROW_CLS,
+} from "@/features/business/components/calculator/calculator-classes";
 import { formatNZD, travelEntriesTotal } from "@/features/business/lib/business";
 import { lookupStoreRunEntry } from "@/features/business/lib/calculator-helpers";
 import { breakdownTravelCharge } from "@/features/business/lib/pricing-policy";
@@ -121,19 +129,22 @@ export function TravelSection({
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-russian-violet">Travel</h2>
-        {(travelEntries.length > 0 || jobAddress.trim().length > 0) && (
-          <SectionClearButton
-            onClear={() => {
-              onJobAddressChange("");
-              onTravelEntriesChange([]);
-            }}
-            label="travel"
-          />
-        )}
-      </div>
+    <Card className="space-y-3">
+      <CardHeader
+        title="Travel"
+        className="mb-0 items-center"
+        actions={
+          (travelEntries.length > 0 || jobAddress.trim().length > 0) && (
+            <SectionClearButton
+              onClear={() => {
+                onJobAddressChange("");
+                onTravelEntriesChange([]);
+              }}
+              label="travel"
+            />
+          )
+        }
+      />
       <div className="flex gap-2">
         <div className="flex-1">
           <AddressAutocomplete
@@ -150,18 +161,17 @@ export function TravelSection({
                 onLookup();
               }
             }}
-            inputClassName="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            inputClassName={ADMIN_INPUT_CLS}
           />
         </div>
-        <button
-          type="button"
+        <AdminButton
+          variant="secondary"
           onClick={onLookup}
           suppressHydrationWarning
           disabled={lookingUpTravel || !jobAddress.trim()}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
         >
           {lookingUpTravel ? "..." : "Look up"}
-        </button>
+        </AdminButton>
       </div>
 
       {travelEntries.length > 0 && (
@@ -189,12 +199,12 @@ export function TravelSection({
             return (
               <div key={index} className="space-y-1">
                 {isRun && (
-                  <p className="text-xs font-medium text-slate-500">
+                  <p className="text-sm font-medium text-admin-muted">
                     Store run - from the client&apos;s place and back
                   </p>
                 )}
                 <div className="flex items-center gap-2">
-                  <input
+                  <AdminInput
                     type="text"
                     value={entry.label}
                     placeholder={
@@ -227,11 +237,11 @@ export function TravelSection({
                         void lookUpStoreRun(index);
                       }
                     }}
-                    className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+                    className="min-w-0 flex-1"
                   />
                   {isRun && (
-                    <button
-                      type="button"
+                    <AdminButton
+                      variant="secondary"
                       onClick={() => void lookUpStoreRun(index)}
                       disabled={lookingUpRun !== null || !entry.label.trim() || !jobAddress.trim()}
                       title={
@@ -239,16 +249,15 @@ export function TravelSection({
                           ? "Time the drive from the client's place to the store and back"
                           : "Add the client's address above first"
                       }
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                     >
                       {lookingUpRun === index ? "..." : "Look up"}
-                    </button>
+                    </AdminButton>
                   )}
                   <div className="flex items-stretch">
-                    <span className="flex items-center rounded-l-lg border border-r-0 border-slate-200 bg-slate-50 px-2 text-xs text-slate-500">
+                    <span className="flex items-center rounded-l-md border border-r-0 border-admin-border-strong bg-admin-bg px-2 text-sm text-admin-muted">
                       $
                     </span>
-                    <input
+                    <AdminInput
                       type="number"
                       min="0"
                       step="0.01"
@@ -275,59 +284,59 @@ export function TravelSection({
                           isParsedCost: false,
                         })
                       }
-                      className="w-24 rounded-r-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+                      className="w-24 rounded-l-none"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={() => removeEntry(index)}
                     aria-label={`Remove travel entry ${index + 1}`}
-                    className="rounded-lg border border-red-200 bg-white px-2 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+                    className={REMOVE_ROW_CLS}
                   >
                     ×
                   </button>
                 </div>
                 {breakdown && (
-                  <ul className="ml-1 space-y-0.5 rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                  <ul className="ml-1 space-y-0.5 rounded-md border border-admin-border bg-admin-bg px-3 py-2 text-sm text-admin-text-secondary">
                     <li>
-                      <span className="text-slate-400">{isRun ? "Store:" : "Destination:"}</span>{" "}
-                      <span className="wrap-break-word text-slate-700">{entry.destination}</span>
+                      <span className="text-admin-muted">{isRun ? "Store:" : "Destination:"}</span>{" "}
+                      <span className="wrap-break-word text-admin-text">{entry.destination}</span>
                     </li>
                     <li>
-                      <span className="text-slate-400">{isRun ? "To the store:" : "There:"}</span>{" "}
+                      <span className="text-admin-muted">{isRun ? "To the store:" : "There:"}</span>{" "}
                       {oneWayMin} min
                       {entry.distanceKmOneWay !== undefined && ` (${entry.distanceKmOneWay} km)`}
                     </li>
                     <li>
                       {/* Return leg quoted at its own departure time; km shown only on
                           There - the back-leg distance is not returned by the lookup. */}
-                      <span className="text-slate-400">
+                      <span className="text-admin-muted">
                         {isRun ? "Back to the client:" : "Back:"}
                       </span>{" "}
                       {backMin} min
                     </li>
                     <li>
-                      <span className="text-slate-400">Raw:</span> {roundTripMin} min round trip @{" "}
+                      <span className="text-admin-muted">Raw:</span> {roundTripMin} min round trip @{" "}
                       {formatNZD(travelRatePerHour)}/hr ={" "}
-                      <span className="text-slate-700">{formatNZD(breakdown.rawCost)}</span>
+                      <span className="text-admin-text">{formatNZD(breakdown.rawCost)}</span>
                     </li>
                     {breakdown.roundedCost !== breakdown.rawCost && (
                       <li>
-                        <span className="text-slate-400">Rounded to nearest $5:</span>{" "}
-                        <span className="text-slate-700">{formatNZD(breakdown.roundedCost)}</span>
+                        <span className="text-admin-muted">Rounded to nearest $5:</span>{" "}
+                        <span className="text-admin-text">{formatNZD(breakdown.roundedCost)}</span>
                       </li>
                     )}
                     {breakdown.minimumApplied && (
                       <li>
-                        <span className="text-slate-400">
+                        <span className="text-admin-muted">
                           {formatNZD(minTravelCharge)} minimum applied
                         </span>{" "}
                         (figure was under {formatNZD(minTravelCharge)}).
                       </li>
                     )}
                     <li>
-                      <span className="text-slate-400">Final:</span>{" "}
-                      <span className="font-medium text-slate-700">
+                      <span className="text-admin-muted">Final:</span>{" "}
+                      <span className="font-medium text-admin-text">
                         {formatNZD(breakdown.finalCost)}
                       </span>
                     </li>
@@ -341,28 +350,24 @@ export function TravelSection({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={addEntry}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-          >
+          <AdminButton variant="secondary" className={COMPACT_BUTTON_CLS} onClick={addEntry}>
             + Add travel
-          </button>
-          <button
-            type="button"
+          </AdminButton>
+          <AdminButton
+            variant="secondary"
+            className={COMPACT_BUTTON_CLS}
             onClick={addStoreRun}
             title="A drive from the client's place to a store and back during the job"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
           >
             + Store run
-          </button>
+          </AdminButton>
         </div>
         {travelEntries.length > 0 && (
-          <span className="text-xs text-slate-500">
-            Total <span className="font-medium text-slate-700">{formatNZD(total)}</span>
+          <span className="text-sm text-admin-muted">
+            Total <span className="font-medium text-admin-text">{formatNZD(total)}</span>
           </span>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
