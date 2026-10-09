@@ -242,7 +242,10 @@ export function TaxTab({ initial, defaults }: Props): React.ReactElement {
                         if (Number.isFinite(n)) setCategoryUse(category, n);
                       }}
                       aria-invalid={err ? true : undefined}
-                      className={cn("w-24", err && "border-coquelicot-600")}
+                      className={cn(
+                        "w-24",
+                        err && "border-coquelicot-600 focus:border-coquelicot-600",
+                      )}
                     />
                     <span className="text-admin-muted">%</span>
                   </span>

@@ -53,7 +53,7 @@ export function SettingsSaveBar({
         Reset to defaults
       </AdminButton>
       {dirty && !saving && <span className="text-sm text-admin-faint">Unsaved changes</span>}
-      {!dirty && savedAt && <span className="text-sm font-medium text-emerald-600">Saved</span>}
+      {!dirty && savedAt && <span className="text-sm font-medium text-green-700">Saved</span>}
     </div>
   );
 }

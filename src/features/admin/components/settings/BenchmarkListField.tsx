@@ -5,6 +5,9 @@
 // validation errors are keyed `benchmarks.<index>.label` / `benchmarks.<index>.mins` to
 // match the validator.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { COMPACT_BUTTON_CLS } from "@/features/business/components/calculator/calculator-classes";
 import { cn } from "@/shared/lib/cn";
 import { ESTIMATOR_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { Benchmark } from "@/shared/lib/settings/types";
@@ -52,17 +55,6 @@ export function BenchmarkListField({
     onChange([...benchmarks, { label: "", mins: 30 }]);
   };
 
-  /**
-   * Input class string, reddened when the field has a validation error.
-   * @param err - The field's error message, if any.
-   * @returns The composed className.
-   */
-  const inputClass = (err?: string): string =>
-    cn(
-      "rounded-lg border px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-      err ? "border-coquelicot-600" : "border-admin-border-strong",
-    );
-
   return (
     <div className="py-3">
       <p className="text-sm font-semibold text-russian-violet">{meta.title}</p>
@@ -79,15 +71,19 @@ export function BenchmarkListField({
           return (
             <div key={i}>
               <div className="flex items-center gap-2">
-                <input
+                <AdminInput
                   aria-label={`Benchmark ${i + 1} task`}
                   type="text"
                   value={b.label}
                   placeholder="Task name"
                   onChange={(e) => update(i, { label: e.target.value })}
-                  className={cn(inputClass(labelErr), "flex-1")}
+                  aria-invalid={labelErr ? true : undefined}
+                  className={cn(
+                    "w-auto min-w-0 flex-1",
+                    labelErr && "border-coquelicot-600 focus:border-coquelicot-600",
+                  )}
                 />
-                <input
+                <AdminInput
                   aria-label={`Benchmark ${i + 1} minutes`}
                   type="number"
                   inputMode="numeric"
@@ -98,17 +94,21 @@ export function BenchmarkListField({
                     const n = Number(e.target.value);
                     if (Number.isFinite(n)) update(i, { mins: n });
                   }}
-                  className={cn(inputClass(minsErr), "w-24")}
+                  aria-invalid={minsErr ? true : undefined}
+                  className={cn(
+                    "w-24",
+                    minsErr && "border-coquelicot-600 focus:border-coquelicot-600",
+                  )}
                 />
                 <span className="text-sm text-admin-muted">{meta.unit}</span>
-                <button
-                  type="button"
+                <AdminButton
+                  variant="danger"
                   aria-label={`Remove ${b.label || "benchmark"}`}
+                  className={cn("shrink-0", COMPACT_BUTTON_CLS)}
                   onClick={() => remove(i)}
-                  className="shrink-0 rounded-lg border border-admin-border-strong px-3 py-2.5 text-sm text-admin-muted hover:bg-red-50 hover:text-red-600"
                 >
                   Remove
-                </button>
+                </AdminButton>
               </div>
               {(labelErr || minsErr) && (
                 <p className="mt-1 text-sm font-medium text-red-600">{labelErr ?? minsErr}</p>
@@ -118,13 +118,9 @@ export function BenchmarkListField({
         })}
       </div>
 
-      <button
-        type="button"
-        onClick={add}
-        className="mt-3 rounded-lg border border-admin-border-strong bg-admin-surface px-4 py-2 text-sm font-medium text-admin-text-secondary hover:bg-admin-bg"
-      >
+      <AdminButton variant="secondary" className="mt-3" onClick={add}>
         + Add benchmark
-      </button>
+      </AdminButton>
     </div>
   );
 }

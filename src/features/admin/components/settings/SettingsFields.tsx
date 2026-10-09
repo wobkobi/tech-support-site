@@ -2,9 +2,13 @@
 // src/features/admin/components/settings/SettingsFields.tsx
 // Reusable settings inputs shared by every settings tab. Each field renders its title, a
 // plain-English description, the unit, an optional "what off does" note, and an inline
-// validation error - sourced from `field-meta`. Inputs are sized larger than the app
-// default for the older admin audience.
+// validation error - sourced from `field-meta`. Controls are the admin kit's inputs, so
+// every tab matches the rest of the back office.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { hourLabel } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
 import type { FieldMeta } from "@/shared/lib/settings/field-meta";
@@ -84,7 +88,7 @@ export function FieldShell({
               changed at some point in the past, so only the louder one shows. */}
             {unsaved ? (
               <span
-                className="ml-2 align-middle text-xs font-normal text-amber-600"
+                className="ml-2 align-middle text-sm font-normal text-amber-700"
                 title="Changed since the last save"
               >
                 unsaved
@@ -92,7 +96,7 @@ export function FieldShell({
             ) : (
               customised && (
                 <span
-                  className="ml-2 align-middle text-xs font-normal text-admin-faint"
+                  className="ml-2 align-middle text-sm font-normal text-admin-faint"
                   title="Differs from the shipped default"
                 >
                   edited
@@ -171,7 +175,7 @@ export function NumberField({
   return (
     <FieldShell id={id} meta={meta} error={error} customised={customised}>
       <div className="flex items-center gap-2">
-        <input
+        <AdminInput
           id={id}
           type="number"
           inputMode="decimal"
@@ -188,10 +192,8 @@ export function NumberField({
             const n = Number(raw);
             if (Number.isFinite(n)) onChange(n);
           }}
-          className={cn(
-            "w-32 rounded-lg border px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-            error ? "border-coquelicot-600" : "border-admin-border-strong",
-          )}
+          aria-invalid={error ? true : undefined}
+          className={cn("w-32", error && "border-coquelicot-600 focus:border-coquelicot-600")}
         />
         {meta.unit && <span className="text-sm text-admin-muted">{meta.unit}</span>}
         {minutesHint && value != null && value >= 60 && (
@@ -247,39 +249,38 @@ export function TextField({
   customised,
 }: TextFieldProps): React.ReactElement {
   const [revealed, setRevealed] = useState(false);
-  const inputClass = cn(
-    "w-full rounded-lg border px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-    error ? "border-coquelicot-600" : "border-admin-border-strong",
-  );
+  const errorCls = error ? "border-coquelicot-600 focus:border-coquelicot-600" : undefined;
   return (
     <FieldShell id={id} meta={meta} error={error} customised={customised}>
       {multiline ? (
-        <textarea
+        <AdminTextarea
           id={id}
           value={value}
           rows={2}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
-          className={inputClass}
+          aria-invalid={error ? true : undefined}
+          className={errorCls}
         />
       ) : (
         <div className="flex items-center gap-2">
-          <input
+          <AdminInput
             id={id}
             type={secret && !revealed ? "password" : (type ?? "text")}
             value={value}
             placeholder={placeholder}
             onChange={(e) => onChange(e.target.value)}
-            className={inputClass}
+            aria-invalid={error ? true : undefined}
+            className={errorCls}
           />
           {secret && (
-            <button
-              type="button"
+            <AdminButton
+              variant="secondary"
+              className="shrink-0"
               onClick={() => setRevealed((r) => !r)}
-              className="shrink-0 rounded-lg border border-admin-border-strong px-3 py-2.5 text-sm text-admin-text-secondary hover:bg-admin-bg"
             >
               {revealed ? "Hide" : "Show"}
-            </button>
+            </AdminButton>
           )}
         </div>
       )}
@@ -382,17 +383,17 @@ export function HourSelect({
   const opts: number[] = [];
   for (let h = from; h <= to; h++) opts.push(h);
   return (
-    <select
+    <AdminSelect
       value={value}
       aria-label={ariaLabel}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="rounded-lg border border-admin-border-strong px-2 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+      className="w-auto px-2"
     >
       {opts.map((h) => (
         <option key={h} value={h}>
           {close ? closeLabel(h) : hourLabel(h)}
         </option>
       ))}
-    </select>
+    </AdminSelect>
   );
 }

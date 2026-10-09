@@ -5,77 +5,30 @@
 // the composer. What has already gone out folds away under Posted, and the connection
 // check sits at the bottom, run once when the page opens.
 
-import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { Card } from "@/features/admin/components/ui/Card";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
-import { StatusPill } from "@/features/admin/components/ui/StatusPill";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { callApi } from "@/features/mailing/lib/api-client";
 import { PostComposer } from "@/features/social/components/PostComposer";
+import { SocialComposerHeader } from "@/features/social/components/SocialComposerHeader";
+import { SocialConnections } from "@/features/social/components/SocialConnections";
+import { SocialInProgress } from "@/features/social/components/SocialInProgress";
+import { SocialPostedList } from "@/features/social/components/SocialPostedList";
+import { SocialStartSection } from "@/features/social/components/SocialStartSection";
 import type { OpenPost } from "@/features/social/lib/open-post";
-import { POST_STATUS_PILL, liveOn, type Connection } from "@/features/social/lib/post-display";
+import { liveOn, type Connection } from "@/features/social/lib/post-display";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
-import { PLATFORM_LABEL, type SocialPlatformKey } from "@/features/social/lib/validate";
 import { cn } from "@/shared/lib/cn";
-import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { FaChevronDown, FaPen, FaPlus, FaXmark } from "react-icons/fa6";
 
 /**
  * Posts that still need something: being written, waiting to go out, or stuck
  * partway. Only posts that are done (up, or taken down) fold away under Posted.
  */
 const IN_PROGRESS = new Set(["draft", "scheduled", "posting", "partial", "failed", "removing"]);
-
-/**
- * Where an unfinished post is at, for its chip.
- * @param p - Post row.
- * @returns Wording and colour.
- */
-function chipStatus(p: SocialPostRow): { text: string; className: string } {
-  switch (p.status) {
-    case "scheduled":
-      return {
-        text: `Posts ${formatDateTimeShort(p.scheduledAt ?? p.updatedAt)}`,
-        className: "text-russian-violet",
-      };
-    case "posting":
-      return { text: "Going out now", className: "text-amber-800" };
-    case "removing":
-      return { text: "Being taken down", className: "text-amber-800" };
-    case "partial":
-      return { text: "Only partly posted", className: "text-amber-800" };
-    case "failed":
-      return { text: "Didn't post", className: "text-red-700" };
-    default:
-      return {
-        text: `Draft, edited ${formatDateTimeShort(p.updatedAt)}`,
-        className: "text-admin-muted",
-      };
-  }
-}
-
-/**
- * The date that matters for a row: when it went or will go out, else last edit.
- * @param p - Post row.
- * @returns Label for the date line.
- */
-function dateLabel(p: SocialPostRow): string {
-  if (p.status === "posting") return "Going out now";
-  if (p.status === "failed") return `Didn't post ${formatDateTimeShort(p.postedAt ?? p.updatedAt)}`;
-  if (p.postedAt) return `Posted ${formatDateTimeShort(p.postedAt)}`;
-  if (p.scheduledAt) return `Posts ${formatDateTimeShort(p.scheduledAt)}`;
-  return `Edited ${formatDateTimeShort(p.updatedAt)}`;
-}
-
-/**
- * First line of a post's text, for a one-line summary.
- * @param body - Post text.
- * @returns The first non-empty line, or "".
- */
-function firstLine(body: string): string {
-  return body.split("\n").find((l) => l.trim()) ?? "";
-}
 
 /**
  * Social page.
@@ -336,117 +289,25 @@ export function SocialView({
 
   return (
     <div className="flex flex-col gap-6">
-      <section
-        aria-labelledby="social-start"
-        className="flex flex-col gap-3 rounded-xl border border-admin-border bg-admin-surface p-4"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2
-            ref={startHeadingRef}
-            id="social-start"
-            tabIndex={-1}
-            className="text-base font-semibold text-admin-text focus:outline-none"
-          >
-            {editingPresets ? "Edit presets" : "Start a post"}
-          </h2>
-          <button
-            type="button"
-            onClick={() => setEditingPresets((e) => !e)}
-            className="text-sm font-semibold text-russian-violet underline-offset-2 hover:underline"
-          >
-            {editingPresets ? "Done" : "Edit presets"}
-          </button>
-        </div>
-        <p className={cn("-mt-2 text-sm text-admin-text-secondary", open && "hidden sm:block")}>
-          {editingPresets
-            ? "Pick a preset to change its wording, or add a new one."
-            : "Start blank, or from a preset that has the wording ready to change."}
-        </p>
-        <div
-          className={
-            // Roomy cards while nothing is open, since starting a post is the whole
-            // page then; a compact row of buttons once a post is being written.
-            // On a phone the compact row scrolls sideways, keeping the post in view.
-            open
-              ? "-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
-              : "grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
-          }
-        >
-          {editingPresets ? (
-            <StartButton
-              compact={open !== null}
-              icon={<FaPlus aria-hidden className="size-3" />}
-              label="New preset"
-              busy={isBusy("new-preset")}
-              onClick={() => void createAndOpen({ source: "blank", asPreset: true }, "new-preset")}
-            />
-          ) : (
-            <StartButton
-              compact={open !== null}
-              primary
-              icon={<FaPlus aria-hidden className="size-3" />}
-              label="Blank post"
-              hint="Write it from scratch."
-              busy={isBusy("blank")}
-              onClick={() => void createAndOpen({ source: "blank" }, "blank")}
-            />
-          )}
-          {presets.map((p) => (
-            <StartButton
-              key={p.id}
-              compact={open !== null}
-              icon={editingPresets ? <FaPen aria-hidden className="size-3" /> : undefined}
-              label={p.name}
-              hint={firstLine(p.body)}
-              current={editingPresets && p.id === openId}
-              busy={isBusy(`use-${p.id}`) || (editingPresets && isBusy(p.id))}
-              onClick={() =>
-                editingPresets
-                  ? void openPost(p.id)
-                  : void createAndOpen({ source: "copy", sourceId: p.id }, `use-${p.id}`)
-              }
-            />
-          ))}
-        </div>
-      </section>
+      <SocialStartSection
+        headingRef={startHeadingRef}
+        editingPresets={editingPresets}
+        onToggleEditing={() => setEditingPresets((e) => !e)}
+        hasOpen={open !== null}
+        openId={openId}
+        presets={presets}
+        isBusy={isBusy}
+        onCreate={(body, key) => void createAndOpen(body, key)}
+        onOpenPost={(id) => void openPost(id)}
+      />
 
       {inProgress.length > 0 && (
-        <section aria-labelledby="social-in-progress" className="flex flex-col gap-2">
-          <h2 id="social-in-progress" className="text-sm font-semibold text-admin-text">
-            In progress
-          </h2>
-          <ul className="flex flex-wrap gap-2">
-            {inProgress.map((r) => {
-              const current = r.id === openId;
-              const status = chipStatus(r);
-              return (
-                <li key={r.id} className="w-full sm:w-64">
-                  <button
-                    type="button"
-                    aria-current={current ? "true" : undefined}
-                    aria-busy={isBusy(r.id)}
-                    onClick={() => void openPost(r.id)}
-                    className={cn(
-                      "flex w-full flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors",
-                      current
-                        ? "border-russian-violet bg-russian-violet/10"
-                        : "border-admin-border bg-admin-surface hover:border-russian-violet/50",
-                      isBusy(r.id) && "opacity-60",
-                    )}
-                  >
-                    <span className="w-full truncate text-sm font-semibold text-admin-text">
-                      {r.name || "Untitled"}
-                    </span>
-                    <span className="w-full truncate text-sm text-admin-text-secondary">
-                      {firstLine(r.body) || <span className="italic">No text yet</span>}
-                    </span>
-                    <span className={cn("text-sm", status.className)}>{status.text}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+        <SocialInProgress
+          rows={inProgress}
+          openId={openId}
+          isBusy={isBusy}
+          onOpen={(id) => void openPost(id)}
+        />
       )}
 
       {open && openRow ? (
@@ -455,73 +316,16 @@ export function SocialView({
           aria-label={openRow.isPreset ? "Preset" : "Post"}
           className={cn("flex flex-col gap-4 transition-opacity", opening && "opacity-60")}
         >
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-admin-border pb-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <h2
-                ref={composerHeadingRef}
-                tabIndex={-1}
-                className="truncate text-lg font-bold text-admin-text focus:outline-none"
-              >
-                {openRow.name || "Untitled"}
-              </h2>
-              {openRow.isPreset ? (
-                <StatusPill tone="neutral">Preset</StatusPill>
-              ) : (
-                <StatusPill tone={POST_STATUS_PILL[openRow.status].tone}>
-                  {POST_STATUS_PILL[openRow.status].label}
-                </StatusPill>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {openRow.isPreset && (
-                <AdminButton
-                  size="sm"
-                  busy={isBusy(`use-${openRow.id}`)}
-                  onClick={() =>
-                    void createAndOpen(
-                      { source: "copy", sourceId: openRow.id },
-                      `use-${openRow.id}`,
-                    )
-                  }
-                >
-                  Write a post from this
-                </AdminButton>
-              )}
-              {!openRow.isPreset && (
-                <>
-                  <AdminButton
-                    size="sm"
-                    variant="secondary"
-                    busy={isBusy(`copy-${openRow.id}`)}
-                    onClick={() =>
-                      void createAndOpen(
-                        { source: "copy", sourceId: openRow.id },
-                        `copy-${openRow.id}`,
-                      )
-                    }
-                  >
-                    Duplicate
-                  </AdminButton>
-                  <AdminButton
-                    size="sm"
-                    variant="secondary"
-                    busy={busyId === `preset-${openRow.id}`}
-                    onClick={() => void saveAsPreset(openRow)}
-                  >
-                    Save as preset
-                  </AdminButton>
-                </>
-              )}
-              {openRow.status !== "posting" && openRow.status !== "removing" && (
-                <AdminButton size="sm" variant="ghost" onClick={() => askDelete(openRow)}>
-                  Delete
-                </AdminButton>
-              )}
-              <AdminButton size="sm" variant="ghost" onClick={() => void openPost(null)}>
-                <FaXmark aria-hidden className="size-3.5" /> Close
-              </AdminButton>
-            </div>
-          </div>
+          <SocialComposerHeader
+            row={openRow}
+            headingRef={composerHeadingRef}
+            isBusy={isBusy}
+            savingPreset={busyId === `preset-${openRow.id}`}
+            onCreate={(body, key) => void createAndOpen(body, key)}
+            onSaveAsPreset={() => void saveAsPreset(openRow)}
+            onDelete={() => askDelete(openRow)}
+            onClose={() => void openPost(null)}
+          />
           {/* Keyed on status and last save: router.refresh() after a publish or schedule
               change remounts the composer with the new state instead of keeping stale fields. */}
           <PostComposer
@@ -537,85 +341,26 @@ export function SocialView({
           />
         </section>
       ) : openMissing ? (
-        <p className="rounded-xl border border-dashed border-admin-border bg-admin-surface px-4 py-6 text-center text-sm text-admin-muted">
-          That post has been deleted. Start a new one above.
-        </p>
+        <Card padding="none">
+          <EmptyState title="That post has been deleted. Start a new one above." />
+        </Card>
       ) : null}
 
-      <details
+      <SocialPostedList
+        posted={posted}
         open={historyOpen}
-        onToggle={(e) => setHistoryOpen(e.currentTarget.open)}
-        className="group rounded-xl border border-admin-border bg-admin-surface"
-      >
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-base font-semibold text-admin-text">
-          <span>
-            Posted
-            {posted.length > 0 && (
-              <span className="ml-1.5 font-normal text-admin-muted">{posted.length}</span>
-            )}
-          </span>
-          <FaChevronDown
-            aria-hidden
-            className="size-3 text-admin-muted transition-[rotate] group-open:rotate-180"
-          />
-        </summary>
-        {posted.length === 0 ? (
-          <p className="border-t border-admin-border px-4 py-4 text-sm text-admin-muted">
-            Nothing posted yet.
-          </p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-admin-border border-t border-admin-border">
-            {posted.map((row) => (
-              <PostedRow
-                key={row.id}
-                row={row}
-                current={row.id === openId}
-                busy={isBusy(row.id)}
-                onOpen={() => void openPost(row.id)}
-              />
-            ))}
-          </ul>
-        )}
-      </details>
+        onToggle={setHistoryOpen}
+        openId={openId}
+        isBusy={isBusy}
+        onOpen={(id) => void openPost(id)}
+      />
 
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="font-semibold text-admin-text">Connections</span>
-          {connections === null ? (
-            <span className="text-admin-muted">
-              {connectionsError ? `Couldn't check: ${connectionsError}` : "Checking..."}
-            </span>
-          ) : (
-            connections.map((c) => (
-              <span key={c.platform} title={c.ok ? c.label : c.error}>
-                <StatusPill tone={c.ok ? "success" : "critical"}>
-                  {PLATFORM_LABEL[c.platform]}
-                  {c.ok ? `: ${c.label}` : ": not connected"}
-                </StatusPill>
-              </span>
-            ))
-          )}
-          <AdminButton
-            size="xs"
-            variant="secondary"
-            busy={busyId === "connections"}
-            onClick={() => void checkConnections()}
-          >
-            Check
-          </AdminButton>
-        </div>
-        {connections?.some((c) => !c.ok) && (
-          <ul className="list-disc pl-5 text-sm text-admin-text-secondary">
-            {connections
-              .filter((c) => !c.ok)
-              .map((c) => (
-                <li key={c.platform}>
-                  {PLATFORM_LABEL[c.platform]}: {c.error}
-                </li>
-              ))}
-          </ul>
-        )}
-      </div>
+      <SocialConnections
+        connections={connections}
+        error={connectionsError}
+        checking={busyId === "connections"}
+        onCheck={() => void checkConnections()}
+      />
 
       <ConfirmDialog
         open={deleting !== null}
@@ -623,15 +368,11 @@ export function SocialView({
         body={
           deletingLive.length > 0 ? (
             <div className="flex flex-col gap-3">
-              <label className="flex items-start gap-2 text-admin-text">
-                <input
-                  type="checkbox"
-                  checked={alsoTakeDown}
-                  onChange={(e) => setAlsoTakeDown(e.target.checked)}
-                  className="mt-0.5 size-4 accent-russian-violet"
-                />
-                <span>Also take it down from {deletingLive.join(" and ")}</span>
-              </label>
+              <AdminCheckbox
+                checked={alsoTakeDown}
+                onChange={setAlsoTakeDown}
+                label={`Also take it down from ${deletingLive.join(" and ")}`}
+              />
               <p>
                 {alsoTakeDown
                   ? "It's deleted there too, along with its likes and comments. If that fails, the post stays here so you can try again."
@@ -649,179 +390,5 @@ export function SocialView({
         onCancel={() => setDeleting(null)}
       />
     </div>
-  );
-}
-
-/**
- * One way to start a post: a roomy card with a hint while nothing is open, or a
- * compact button beside a post being written.
- * @param props - Component props.
- * @param props.label - What it starts.
- * @param props.hint - A line on what's in it; only shown on the roomy card.
- * @param props.icon - Optional leading icon.
- * @param props.primary - Highlight it as the main choice.
- * @param props.compact - Show the compact button.
- * @param props.current - Whether it's the preset open in the composer.
- * @param props.busy - Whether it's being created.
- * @param props.onClick - Click handler.
- * @returns Start button element.
- */
-function StartButton({
-  label,
-  hint,
-  icon,
-  primary = false,
-  compact,
-  current = false,
-  busy,
-  onClick,
-}: {
-  label: string;
-  hint?: string;
-  icon?: React.ReactNode;
-  primary?: boolean;
-  compact: boolean;
-  current?: boolean;
-  busy: boolean;
-  onClick: () => void;
-}): React.ReactElement {
-  if (compact) {
-    return (
-      <AdminButton
-        size="sm"
-        variant={primary ? "primary" : "secondary"}
-        busy={busy}
-        aria-current={current ? "true" : undefined}
-        className={cn("shrink-0", current && "border-russian-violet text-russian-violet")}
-        onClick={onClick}
-      >
-        {icon}
-        {label}
-      </AdminButton>
-    );
-  }
-  return (
-    <button
-      type="button"
-      disabled={busy}
-      aria-current={current ? "true" : undefined}
-      onClick={onClick}
-      className={cn(
-        "flex min-h-20 flex-col items-start gap-1 rounded-lg border px-4 py-3 text-left transition-colors disabled:opacity-60",
-        primary
-          ? "border-russian-violet bg-russian-violet text-white hover:bg-russian-violet/90"
-          : "border-admin-border bg-admin-bg hover:border-russian-violet/50",
-        current && "border-russian-violet",
-      )}
-    >
-      <span
-        className={cn(
-          "inline-flex items-center gap-2 font-semibold",
-          primary ? "text-white" : "text-admin-text",
-        )}
-      >
-        {icon}
-        {busy ? "Opening..." : label}
-      </span>
-      {hint && (
-        <span
-          className={cn(
-            "line-clamp-2 text-sm",
-            primary ? "text-white/80" : "text-admin-text-secondary",
-          )}
-        >
-          {hint}
-        </span>
-      )}
-    </button>
-  );
-}
-
-/**
- * One post in the Posted list: its outcome on each platform, with links to the live
- * copies, and a button to open it for take-down, retry or duplicating.
- * @param props - Component props.
- * @param props.row - Post row.
- * @param props.current - Whether it's open in the composer.
- * @param props.busy - Whether it's being opened.
- * @param props.onOpen - Opens it in the composer.
- * @returns Row element.
- */
-function PostedRow({
-  row,
-  current,
-  busy,
-  onOpen,
-}: {
-  row: SocialPostRow;
-  current: boolean;
-  busy: boolean;
-  onOpen: () => void;
-}): React.ReactElement {
-  const pill = POST_STATUS_PILL[row.status];
-  const outcomes = row.targets.filter((t) => t.enabled && t.status !== "skipped");
-  return (
-    <li
-      className={cn(
-        "flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
-        current && "bg-russian-violet/5",
-      )}
-    >
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold text-admin-text">{row.name || "Untitled"}</span>
-          <StatusPill tone={pill.tone}>{pill.label}</StatusPill>
-        </div>
-        <p className="truncate text-sm text-admin-text-secondary">
-          {firstLine(row.body) || <span className="italic">No text</span>}
-        </p>
-        <p className="text-sm text-admin-muted">{dateLabel(row)}</p>
-        {outcomes.length > 0 && (
-          <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-            {outcomes.map((t) => {
-              const label = PLATFORM_LABEL[t.platform as SocialPlatformKey] ?? t.platform;
-              return (
-                <li key={t.platform}>
-                  {t.status === "posted" && t.permalink ? (
-                    <a
-                      href={t.permalink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-russian-violet underline"
-                    >
-                      See it on {label}
-                    </a>
-                  ) : t.status === "posted" ? (
-                    <span className="text-admin-text">{label}: posted</span>
-                  ) : t.status === "removed" ? (
-                    <span className="text-admin-muted">{label}: taken down</span>
-                  ) : t.status === "failed" ? (
-                    <span className="text-coquelicot-600">
-                      {label}: {t.error ?? "failed"}
-                    </span>
-                  ) : (
-                    <span className="text-admin-muted">{label}: still going</span>
-                  )}
-                  {t.status === "posted" && t.error && (
-                    <span className="text-coquelicot-600"> (couldn&apos;t take it down)</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-      <AdminButton
-        size="sm"
-        variant="secondary"
-        busy={busy}
-        aria-current={current ? "true" : undefined}
-        disabled={current}
-        onClick={onOpen}
-        className="shrink-0 self-start sm:self-center"
-      >
-        {current ? "Open above" : "Open"}
-      </AdminButton>
-    </li>
   );
 }

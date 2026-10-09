@@ -8,7 +8,9 @@
 // Settings, never re-prompted from the page.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { COMPACT_BUTTON_CLS } from "@/features/business/components/calculator/calculator-classes";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -55,9 +57,6 @@ function describeThisDevice(): string {
   if (/Safari/.test(ua) && !/Chrome/.test(ua)) return "Desktop Safari";
   return "Desktop browser";
 }
-
-/** Shared card shell so every state reads as the same surface. */
-const CARD_CLS = "space-y-3 rounded-xl border border-admin-border bg-admin-surface p-5 shadow-sm";
 
 /**
  * Push notification setup and device management for the current browser.
@@ -214,20 +213,20 @@ export function NotificationsView(): React.ReactElement {
 
   if (state === "unsupported") {
     return (
-      <div className={CARD_CLS}>
-        <h2 className="font-semibold text-russian-violet">Not supported here</h2>
+      <Card className="space-y-3">
+        <CardHeader title="Not supported here" className="mb-0" />
         <p className="text-admin-muted">
           This browser can&apos;t receive push notifications. Booking and review emails still arrive
           as normal.
         </p>
-      </div>
+      </Card>
     );
   }
 
   if (state === "needs-install") {
     return (
-      <div className={CARD_CLS}>
-        <h2 className="font-semibold text-russian-violet">Add this to your Home Screen first</h2>
+      <Card className="space-y-3">
+        <CardHeader title="Add this to your Home Screen first" className="mb-0" />
         <p className="text-admin-muted">
           On iPhone, notifications only work once the admin is installed to the Home Screen. Safari
           tabs can&apos;t receive them.
@@ -239,27 +238,27 @@ export function NotificationsView(): React.ReactElement {
           <li>Sign in again - the installed app has its own login</li>
           <li>Come back to this page and turn notifications on</li>
         </ol>
-      </div>
+      </Card>
     );
   }
 
   if (state === "blocked") {
     return (
-      <div className={CARD_CLS}>
-        <h2 className="font-semibold text-russian-violet">Notifications are blocked</h2>
+      <Card className="space-y-3">
+        <CardHeader title="Notifications are blocked" className="mb-0" />
         <p className="text-admin-muted">
           This device declined the prompt, and it can&apos;t be asked again from the page. On
           iPhone, turn it back on in Settings &gt; Notifications &gt; To the Point Admin, then
           reload this page.
         </p>
-      </div>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className={CARD_CLS}>
-        <h2 className="font-semibold text-russian-violet">This device</h2>
+      <Card className="space-y-3">
+        <CardHeader title="This device" className="mb-0" />
         {state === "on" ? (
           <>
             <p className="text-admin-muted">Notifications are on for this device.</p>
@@ -282,11 +281,11 @@ export function NotificationsView(): React.ReactElement {
             </AdminButton>
           </>
         )}
-      </div>
+      </Card>
 
       {devices.length > 0 && (
-        <div className={CARD_CLS}>
-          <h2 className="font-semibold text-russian-violet">Registered devices</h2>
+        <Card className="space-y-3">
+          <CardHeader title="Registered devices" className="mb-0" />
           <ul className="divide-y divide-admin-border">
             {devices.map((d) => (
               <li key={d.id} className="flex items-center justify-between gap-3 py-3">
@@ -299,8 +298,8 @@ export function NotificationsView(): React.ReactElement {
                   </p>
                 </div>
                 <AdminButton
-                  variant="secondary"
-                  size="xs"
+                  variant="danger"
+                  className={COMPACT_BUTTON_CLS}
                   onClick={() => void removeDevice(d.endpoint)}
                 >
                   Remove
@@ -308,7 +307,7 @@ export function NotificationsView(): React.ReactElement {
               </li>
             ))}
           </ul>
-        </div>
+        </Card>
       )}
     </div>
   );

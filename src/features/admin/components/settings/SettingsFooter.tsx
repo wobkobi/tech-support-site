@@ -6,6 +6,7 @@
 
 import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import type { SettingsFormApi } from "@/features/admin/components/settings/useSettingsForm";
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import type { SettingsGroup } from "@/shared/lib/settings/types";
 import type React from "react";
 
@@ -51,14 +52,16 @@ export function SettingsFooter<G extends SettingsGroup>({
               <li key={w}>{w}</li>
             ))}
           </ul>
-          <button
-            type="button"
+          {/* Amber tint, not the coquelicot primary: this overrides a warning, and the
+              save bar's Save stays the one primary on the tab. */}
+          <AdminButton
+            variant="secondary"
             onClick={() => void form.save(true)}
             disabled={saving}
-            className="mt-3 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+            className="mt-3 border-amber-300 bg-amber-100 text-amber-900 hover:border-amber-500 hover:bg-amber-200"
           >
             Save anyway
-          </button>
+          </AdminButton>
         </div>
       )}
 

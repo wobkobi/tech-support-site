@@ -5,6 +5,11 @@
 // back into the editor draft (via onRestore) to review and re-save - the re-save records
 // its own audit row, so a revert is just another tracked change.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import {
+  COMPACT_BUTTON_CLS,
+  TEXT_ACTION_CLS,
+} from "@/features/business/components/calculator/calculator-classes";
 import { formatDateTimeLong } from "@/shared/lib/date-format";
 import type { SettingsGroup } from "@/shared/lib/settings/types";
 import type React from "react";
@@ -84,11 +89,7 @@ export function SettingsHistory<T>({ group, onRestore }: Props<T>): React.ReactE
 
   return (
     <div className="mt-6 border-t border-admin-border pt-4">
-      <button
-        type="button"
-        onClick={toggle}
-        className="text-sm font-medium text-russian-violet hover:underline"
-      >
+      <button type="button" onClick={toggle} className={TEXT_ACTION_CLS}>
         {open ? "Hide change history" : "Change history"}
       </button>
 
@@ -108,7 +109,7 @@ export function SettingsHistory<T>({ group, onRestore }: Props<T>): React.ReactE
                       {formatDateTimeLong(new Date(e.changedAt))}
                       {i === 0 && <span className="text-admin-faint"> - current</span>}
                     </p>
-                    <p className="truncate text-xs text-admin-muted">
+                    <p className="truncate text-sm text-admin-muted">
                       {e.isInitial
                         ? "First saved"
                         : e.changedKeys.length > 0
@@ -117,20 +118,20 @@ export function SettingsHistory<T>({ group, onRestore }: Props<T>): React.ReactE
                     </p>
                   </div>
                   {i !== 0 && (
-                    <button
-                      type="button"
+                    <AdminButton
+                      variant="secondary"
+                      className={`shrink-0 ${COMPACT_BUTTON_CLS}`}
                       onClick={() => restore(e)}
-                      className="shrink-0 rounded-lg border border-admin-border-strong bg-admin-surface px-3 py-1.5 text-xs font-medium text-admin-text-secondary hover:bg-admin-bg"
                     >
                       {restoredId === e.id ? "Loaded" : "Restore"}
-                    </button>
+                    </AdminButton>
                   )}
                 </li>
               ))}
             </ul>
           )}
           {restoredId && (
-            <p className="mt-2 text-sm text-emerald-600">
+            <p className="mt-2 text-sm text-green-700">
               Loaded into the form above - review the values and Save to apply.
             </p>
           )}

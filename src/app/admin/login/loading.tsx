@@ -10,5 +10,5 @@ import type React from "react";
  * @returns Loading element.
  */
 export default function AdminLoginLoading(): React.ReactElement {
-  return <LoadingSpinner label="sign-in page" className="min-h-screen bg-slate-50" />;
+  return <LoadingSpinner label="sign-in page" className="min-h-screen bg-admin-bg" />;
 }

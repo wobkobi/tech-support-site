@@ -16,6 +16,8 @@ import { SettingsFooter } from "@/features/admin/components/settings/SettingsFoo
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
+import { cn } from "@/shared/lib/cn";
 import { PRICING_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { PricingSettings } from "@/shared/lib/settings/types";
 import type React from "react";
@@ -204,9 +206,7 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
         />
       </div>
 
-      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
-        Cancellation
-      </h3>
+      <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Cancellation</h3>
       <div className="divide-y divide-admin-border">
         <NumberField
           id="freeNoticeHours"
@@ -304,9 +304,7 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
         />
       </div>
 
-      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
-        Reschedule
-      </h3>
+      <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Reschedule</h3>
       <div className="divide-y divide-admin-border">
         <NumberField
           id="reschedule.cutoffHours"

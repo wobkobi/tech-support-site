@@ -17,12 +17,23 @@ import {
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
+import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
 import { hourLabel } from "@/features/booking/lib/booking";
+import {
+  chipClass,
+  COMPACT_BUTTON_CLS,
+} from "@/features/business/components/calculator/calculator-classes";
 import { cn } from "@/shared/lib/cn";
 import { AVAILABILITY_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { AvailabilitySettings, DayWindow, MorningGuard } from "@/shared/lib/settings/types";
 import type { Weekday } from "@/shared/lib/timezone-utils";
 import type React from "react";
+import { useId } from "react";
 
 interface Props {
   initial: AvailabilitySettings;
@@ -50,6 +61,8 @@ const DAY_ORDER: { index: Weekday; name: string }[] = [
 export function AvailabilityTab({ initial, defaults }: Props): React.ReactElement {
   const form = useSettingsForm("availability", initial, defaults);
   const { draft, setDraft, fieldErrors } = form;
+  // Prefix for the day-name and guard-name ids the switches point their aria-labelledby at.
+  const uid = useId();
   const m = AVAILABILITY_FIELD_META;
 
   /**
@@ -141,20 +154,17 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           meta={m.closedMessage}
           customised={draft.closedMessage !== defaults.closedMessage}
         >
-          <textarea
+          <AdminTextarea
             id="closedMessage"
             value={draft.closedMessage}
             rows={2}
             onChange={(e) => setTop({ closedMessage: e.target.value })}
-            className="w-full rounded-lg border border-admin-border-strong px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
           />
         </FieldShell>
       </div>
 
       {/* Weekly hours */}
-      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
-        Weekly hours
-      </h3>
+      <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Weekly hours</h3>
       <p className="mt-1 text-sm text-admin-muted">
         Set the hours you take bookings each day. Turn a day off, or add a midday break that splits
         it into two windows.
@@ -165,11 +175,17 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           return (
             <div key={index} className="rounded-lg border border-admin-border px-3 py-2">
               <div className="flex flex-wrap items-center gap-3">
-                <span className="w-24 text-sm font-semibold text-admin-text">{name}</span>
+                <span
+                  id={`${uid}-day-${index}`}
+                  className="w-24 text-sm font-semibold text-admin-text"
+                >
+                  {name}
+                </span>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={d.enabled}
+                  aria-labelledby={`${uid}-day-${index}`}
                   onClick={() => setDay(index, { enabled: !d.enabled })}
                   className={cn(
                     "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
@@ -199,18 +215,17 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                       close
                       onChange={(h) => setDay(index, { close: h })}
                     />
-                    <label className="ml-2 flex items-center gap-1.5">
-                      <input
-                        type="checkbox"
+                    <span className="ml-2">
+                      <AdminCheckbox
+                        label="Break"
                         checked={d.break !== null}
-                        onChange={(e) =>
+                        onChange={(checked) =>
                           setDay(index, {
-                            break: e.target.checked ? { start: 13, end: 14 } : null,
+                            break: checked ? { start: 13, end: 14 } : null,
                           })
                         }
                       />
-                      Break
-                    </label>
+                    </span>
                     {d.break && (
                       <span className="flex items-center gap-2">
                         <HourSelect
@@ -244,9 +259,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       </div>
 
       {/* Booking rules */}
-      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
-        Booking rules
-      </h3>
+      <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Booking rules</h3>
       <div className="divide-y divide-admin-border">
         <NumberField
           id="maxAdvanceDays"
@@ -273,13 +286,13 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           error={fieldErrors.sameDayCutoffHour}
           customised={draft.sameDayCutoffHour !== defaults.sameDayCutoffHour}
         >
-          <select
+          <AdminSelect
             id="sameDayCutoffHour"
             value={draft.sameDayCutoffHour ?? ""}
             onChange={(e) =>
               setTop({ sameDayCutoffHour: e.target.value === "" ? null : Number(e.target.value) })
             }
-            className="rounded-lg border border-admin-border-strong px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            className="w-auto"
           >
             <option value="">No cutoff</option>
             {Array.from({ length: 24 }, (_, h) => (
@@ -287,7 +300,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                 {hourLabel(h)}
               </option>
             ))}
-          </select>
+          </AdminSelect>
         </FieldShell>
         <NumberField
           id="bufferMin"
@@ -312,9 +325,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       </div>
 
       {/* Durations + daily caps */}
-      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
-        Job lengths &amp; daily limits
-      </h3>
+      <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Job lengths &amp; daily limits</h3>
       <div className="divide-y divide-admin-border">
         <NumberField
           id="durations.short"
@@ -363,11 +374,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       {/* Morning guards - protect early slots once the night-before arrives.
           id matches the `morningGuards` field-meta key so search can scroll
           here; the repeating rows have no single input to carry it. */}
-      <h3
-        id="morningGuards"
-        tabIndex={-1}
-        className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase"
-      >
+      <h3 id="morningGuards" tabIndex={-1} className={cn("mt-5", ADMIN_EYEBROW_CLS)}>
         Morning guards
       </h3>
       <p className="mt-1 text-sm text-admin-muted">
@@ -382,6 +389,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                 type="button"
                 role="switch"
                 aria-checked={g.enabled}
+                aria-labelledby={`morningGuards ${uid}-guard-${gi}`}
                 onClick={() => setGuard(gi, { enabled: !g.enabled })}
                 className={cn(
                   "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
@@ -395,35 +403,36 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                   )}
                 />
               </button>
-              <input
+              <AdminInput
+                id={`${uid}-guard-${gi}`}
                 type="text"
                 value={g.label}
                 aria-label="Guard name"
                 onChange={(e) => setGuard(gi, { label: e.target.value })}
-                className="flex-1 rounded-lg border border-admin-border-strong px-3 py-2 text-sm text-admin-text focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+                className="w-auto min-w-0 flex-1"
               />
-              <button
-                type="button"
+              <AdminButton
+                variant="danger"
+                className={COMPACT_BUTTON_CLS}
                 onClick={() => removeGuard(gi)}
-                className="text-sm font-medium text-red-600 hover:underline"
               >
                 Remove
-              </button>
+              </AdminButton>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-admin-text-secondary">
               <span>From</span>
-              <select
+              <AdminSelect
                 value={g.triggerDay}
                 aria-label="Trigger day"
                 onChange={(e) => setGuard(gi, { triggerDay: Number(e.target.value) })}
-                className="rounded-lg border border-admin-border-strong px-2 py-2 text-sm text-admin-text focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+                className="w-auto px-2"
               >
                 {DAY_ORDER.map((d) => (
                   <option key={d.index} value={d.index}>
                     {d.name}
                   </option>
                 ))}
-              </select>
+              </AdminSelect>
               <span>at</span>
               <HourSelect
                 value={g.triggerHour}
@@ -438,12 +447,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                   type="button"
                   aria-pressed={g.protectedDays.includes(d.index)}
                   onClick={() => toggleProtectedDay(gi, d.index)}
-                  className={cn(
-                    "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                    g.protectedDays.includes(d.index)
-                      ? "bg-russian-violet text-white"
-                      : "border border-admin-border text-admin-muted hover:border-russian-violet",
-                  )}
+                  className={chipClass(g.protectedDays.includes(d.index))}
                 >
                   {d.name.slice(0, 3)}
                 </button>
@@ -463,13 +467,9 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
             )}
           </div>
         ))}
-        <button
-          type="button"
-          onClick={addGuard}
-          className="rounded-lg border border-admin-border px-3 py-1.5 text-sm font-medium text-admin-text hover:border-russian-violet"
-        >
+        <AdminButton variant="secondary" onClick={addGuard}>
           + Add guard
-        </button>
+        </AdminButton>
       </div>
 
       <AvailabilityPreview config={draft} />

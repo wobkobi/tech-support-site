@@ -6,8 +6,9 @@
 
 import { SettingsSearch } from "@/features/admin/components/settings/SettingsSearch";
 import { SettingsAllContext } from "@/features/admin/components/settings/useSettingsForm";
+import { type AdminTab, AdminTabs } from "@/features/admin/components/ui/AdminTabs";
+import { Card } from "@/features/admin/components/ui/Card";
 import type { RateConfig } from "@/features/business/types/business";
-import { cn } from "@/shared/lib/cn";
 import { GROUP_META } from "@/shared/lib/settings/field-meta";
 import type {
   AvailabilitySettings,
@@ -76,7 +77,7 @@ const RatesTab = dynamic(
 /** A settings group, or the Rates tab. */
 export type SettingsTabKey = SettingsGroup | "rates";
 
-/** Title and blurb for the Rates tab, which has no entry in GROUP_META. */
+/** Title and blurb for the Rates tab, which has no entry in {@link GROUP_META}. */
 const RATES_META = {
   title: "Rates",
   blurb: "Your hourly rate and the adjustments the calculator and pricing page use.",
@@ -94,6 +95,12 @@ const TAB_ORDER: SettingsTabKey[] = [
   "scheduling",
   "reviews",
 ];
+
+/** Tab strip entries, labelled from {@link GROUP_META} and {@link RATES_META}. */
+const TABS: AdminTab<SettingsTabKey>[] = TAB_ORDER.map((key) => ({
+  key,
+  label: key === "rates" ? RATES_META.title : GROUP_META[key].title,
+}));
 
 interface Props {
   /** Tab to open on, e.g. from the calculator's Manage rates link. */
@@ -209,30 +216,18 @@ export function SettingsView({
       <div>
         <SettingsSearch onJump={handleJump} />
 
-        {/* Tab bar - scrolls sideways on phones, wraps from md up so every tab shows. */}
-        <div className="mb-3 flex gap-x-1 overflow-x-auto border-b border-admin-border md:flex-wrap md:overflow-visible">
-          {TAB_ORDER.map((tab) => {
-            const isActive = tab === active;
-            return (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActive(tab)}
-                className={cn(
-                  "-mb-px border-b-2 px-2.5 py-2 text-sm font-medium whitespace-nowrap transition-colors",
-                  isActive
-                    ? "border-russian-violet text-russian-violet"
-                    : "border-transparent text-admin-muted hover:text-admin-text",
-                )}
-              >
-                {tab === "rates" ? RATES_META.title : GROUP_META[tab].title}
-              </button>
-            );
-          })}
-        </div>
+        {/* Button tabs: the tab is local state, opened from `?tab=` once on load. */}
+        <AdminTabs
+          aria-label="Settings sections"
+          tabs={TABS}
+          active={active}
+          onSelect={setActive}
+          className="mb-3"
+        />
 
-        {/* The active tab already names the section, so the card leads with its blurb. */}
-        <div className="rounded-xl border border-admin-border bg-admin-surface p-4 shadow-sm sm:px-5">
+        {/* The active tab already names the section, so the card leads with its blurb.
+            The md padding (16px, 20px from sm) is what the save bar's negative margins undo. */}
+        <Card>
           <p className="text-sm text-admin-muted">{meta.blurb}</p>
           <div className="mt-1">
             {active === "rates" ? (
@@ -261,7 +256,7 @@ export function SettingsView({
               <SchedulingTab initial={scheduling} defaults={schedulingDefaults} />
             ) : null}
           </div>
-        </div>
+        </Card>
       </div>
     </SettingsAllContext.Provider>
   );

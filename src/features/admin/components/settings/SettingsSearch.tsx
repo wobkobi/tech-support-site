@@ -5,6 +5,7 @@
 // focus it. The index is built once from the shared field metadata, so search and the
 // editors never drift apart.
 
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { FIELD_META_BY_GROUP, GROUP_META } from "@/shared/lib/settings/field-meta";
 import type { SettingsGroup } from "@/shared/lib/settings/types";
 import type React from "react";
@@ -57,12 +58,12 @@ export function SettingsSearch({ onJump }: Props): React.ReactElement {
 
   return (
     <div className="relative mb-4">
-      <input
+      <AdminInput
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search settings, e.g. GST"
-        className="w-full rounded-lg border border-admin-border-strong px-4 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+        className="h-10"
       />
       {results.length > 0 && (
         <ul className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-lg border border-admin-border bg-admin-surface shadow-lg">
@@ -74,11 +75,11 @@ export function SettingsSearch({ onJump }: Props): React.ReactElement {
                   onJump(it.group, it.fieldKey);
                   setQuery("");
                 }}
-                className="block w-full px-4 py-2.5 text-left hover:bg-admin-bg focus:bg-admin-bg focus:outline-none"
+                className="block w-full px-4 py-2.5 text-left hover:bg-admin-bg focus:bg-admin-bg"
               >
                 <span className="text-sm font-medium text-admin-text">{it.fieldTitle}</span>
-                <span className="text-xs text-admin-faint"> - {it.groupTitle}</span>
-                <p className="truncate text-xs text-admin-muted">{it.description}</p>
+                <span className="text-sm text-admin-faint"> - {it.groupTitle}</span>
+                <p className="truncate text-sm text-admin-muted">{it.description}</p>
               </button>
             </li>
           ))}

@@ -3,7 +3,18 @@
 // Read-only admin view of travel time blocks computed for calendar events, with per-event
 // transport mode selector and custom origin override.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { Card } from "@/features/admin/components/ui/Card";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
+import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
+import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import {
+  chipClass,
+  COMPACT_BUTTON_CLS,
+} from "@/features/business/components/calculator/calculator-classes";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { NZ_TZ } from "@/shared/lib/timezone-utils";
@@ -242,9 +253,7 @@ export function TravelBlockAdminList({
 
   if (blocks.length === 0) {
     return (
-      <p className="text-sm text-admin-faint">
-        No travel blocks yet. Run the calendar cache cron to generate them.
-      </p>
+      <EmptyState title="No travel blocks yet. Run the calendar cache cron to generate them." />
     );
   }
 
@@ -262,12 +271,10 @@ export function TravelBlockAdminList({
           const isPast = new Date(b.eventEndAt) < new Date();
 
           return (
-            <div
+            <Card
               key={b.id}
-              className={cn(
-                "rounded-xl border border-admin-border p-4",
-                b.ignored ? "bg-admin-bg/60 opacity-70" : "bg-admin-surface/50",
-              )}
+              padding="none"
+              className={cn("p-4", b.ignored && "bg-admin-bg/60 opacity-70")}
             >
               <div className="flex flex-col gap-2">
                 {/* Header: event identity */}
@@ -275,36 +282,34 @@ export function TravelBlockAdminList({
                   <span className="min-w-0 truncate text-sm font-semibold text-russian-violet">
                     {b.summary ?? b.sourceEventId}
                   </span>
-                  <span className="shrink-0 rounded bg-admin-bg px-1.5 py-0.5 text-xs text-admin-faint">
+                  <StatusPill tone="neutral" className="shrink-0">
                     {calendarLabels[b.calendarEmail] ?? b.calendarEmail}
-                  </span>
+                  </StatusPill>
                   {b.ignored && (
-                    <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+                    <StatusPill tone="warning" className="shrink-0">
                       Ignored - I have the car
-                    </span>
+                    </StatusPill>
                   )}
                   {b.isCarEvent && (
-                    <label className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-admin-text-secondary">
-                      <input
-                        type="checkbox"
+                    <div className="ml-auto shrink-0">
+                      <AdminCheckbox
+                        label="Ignore (I have the car)"
                         checked={b.ignored}
                         disabled={isSaving}
-                        onChange={(e) => void setIgnored(b.id, e.target.checked)}
-                        className="h-3.5 w-3.5"
+                        onChange={(checked) => void setIgnored(b.id, checked)}
                       />
-                      Ignore (I have the car)
-                    </label>
+                    </div>
                   )}
                 </div>
 
                 {/* Event time */}
-                <p className="text-xs text-admin-text-secondary">
+                <p className="text-sm text-admin-text-secondary">
                   {formatEventTime(b.eventStartAt, b.eventEndAt)}
                 </p>
 
                 {/* Destination address - wrap long unbroken strings on mobile. */}
                 {b.destination && (
-                  <p className="text-xs wrap-break-word text-admin-muted">
+                  <p className="text-sm wrap-break-word text-admin-muted">
                     <span className="font-medium text-admin-muted">To: </span>
                     {b.destination}
                   </p>
@@ -312,20 +317,18 @@ export function TravelBlockAdminList({
 
                 {/* Transport mode selector */}
                 <div>
-                  <p className="mb-1 text-xs font-medium tracking-wide text-admin-muted uppercase">
-                    How I'm getting there
-                  </p>
-                  <div className="flex flex-wrap gap-1">
+                  <p className={cn("mb-1", ADMIN_EYEBROW_CLS)}>How I'm getting there</p>
+                  <div className="flex flex-wrap gap-1.5">
                     {MODES.map((m) => (
                       <button
                         key={m.value}
+                        type="button"
                         disabled={isSaving}
+                        aria-pressed={currentMode === m.value}
                         onClick={() => void setMode(b.id, m.value)}
                         className={cn(
-                          "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 pointer-coarse:min-h-11",
-                          currentMode === m.value
-                            ? "bg-russian-violet text-white"
-                            : "bg-admin-bg text-admin-muted hover:bg-admin-border",
+                          chipClass(currentMode === m.value),
+                          "pointer-coarse:min-h-11",
                         )}
                       >
                         {m.icon} {m.label}
@@ -343,70 +346,69 @@ export function TravelBlockAdminList({
 
                 {/* Origin */}
                 <div>
-                  <p className="mb-1 text-xs font-medium tracking-wide text-admin-muted uppercase">
-                    Departing from
-                  </p>
+                  <p className={cn("mb-1", ADMIN_EYEBROW_CLS)}>Departing from</p>
                   {isEditingOrigin ? (
                     <div className="flex flex-col gap-1.5">
-                      <input
+                      <AdminInput
                         type="text"
                         value={originInput}
                         autoComplete="off"
                         onChange={(e) => setOriginInput(e.target.value)}
                         placeholder={b.detectedOrigin ?? "Enter address…"}
-                        className="w-full rounded-lg border border-admin-border-strong px-2.5 py-1.5 text-xs focus:border-russian-violet focus:outline-none"
                         disabled={isSaving}
                       />
-                      <div className="flex flex-wrap gap-1">
-                        <button
+                      {/* Save is outline, not primary: Recalculate in the page header is
+                          the page's main action, and Clear override sits beside it. */}
+                      <div className="flex flex-wrap gap-1.5">
+                        <AdminButton
+                          variant="outline"
+                          className={COMPACT_BUTTON_CLS}
                           disabled={isSaving || !originInput.trim()}
                           onClick={() => void saveOrigin(b.id, originInput.trim() || null)}
-                          className="rounded-lg bg-russian-violet px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 pointer-coarse:min-h-11"
                         >
                           Save
-                        </button>
-                        <button
+                        </AdminButton>
+                        <AdminButton
+                          variant="secondary"
+                          className={COMPACT_BUTTON_CLS}
                           disabled={isSaving}
                           onClick={() => setEditingOriginId(null)}
-                          className="rounded-lg bg-admin-bg px-2.5 py-1 text-xs font-medium text-admin-muted hover:bg-admin-border disabled:opacity-50 pointer-coarse:min-h-11"
                         >
                           Cancel
-                        </button>
+                        </AdminButton>
                         {b.customOrigin && (
-                          <button
+                          <AdminButton
+                            variant="danger"
+                            className={COMPACT_BUTTON_CLS}
                             disabled={isSaving}
                             onClick={() => void saveOrigin(b.id, null)}
-                            className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 pointer-coarse:min-h-11"
                           >
                             Clear override
-                          </button>
+                          </AdminButton>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-admin-text">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm text-admin-text">
                         {effectiveOrigin ?? "Home (default)"}
                       </span>
                       {b.customOrigin ? (
-                        <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-600">
-                          override
-                        </span>
+                        <StatusPill tone="warning">override</StatusPill>
                       ) : b.detectedOrigin ? (
-                        <span className="rounded bg-admin-bg px-1.5 py-0.5 text-xs text-admin-faint">
-                          auto
-                        </span>
+                        <StatusPill tone="neutral">auto</StatusPill>
                       ) : null}
-                      <button
+                      <AdminButton
+                        variant="ghost"
+                        className={COMPACT_BUTTON_CLS}
                         disabled={isSaving}
                         onClick={() => {
                           setEditingOriginId(b.id);
                           setOriginInput(b.customOrigin ?? "");
                         }}
-                        className="rounded px-1.5 py-0.5 text-xs font-medium text-admin-muted hover:bg-admin-bg hover:text-admin-text-secondary disabled:opacity-50 pointer-coarse:min-h-11 pointer-coarse:px-3"
                       >
                         Edit
-                      </button>
+                      </AdminButton>
                     </div>
                   )}
                   {!isPast &&
@@ -421,16 +423,14 @@ export function TravelBlockAdminList({
                 {/* Travel times grid */}
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div>
-                    <p className="mb-0.5 text-xs font-medium tracking-wide text-admin-muted uppercase">
-                      Travel there
-                    </p>
+                    <p className={cn("mb-0.5", ADMIN_EYEBROW_CLS)}>Travel there</p>
                     <p className="text-sm text-admin-text">
                       {formatMinutes(b.rawTravelMinutes, b.roundedMinutes)}
                     </p>
                     {!isPast && (
                       <p
                         className={cn(
-                          "text-xs",
+                          "text-sm",
                           !b.beforeExpiresAt || new Date(b.beforeExpiresAt) < new Date()
                             ? "text-red-600"
                             : "text-admin-faint",
@@ -442,9 +442,7 @@ export function TravelBlockAdminList({
                     )}
                   </div>
                   <div>
-                    <p className="mb-0.5 text-xs font-medium tracking-wide text-admin-muted uppercase">
-                      Travel back
-                    </p>
+                    <p className={cn("mb-0.5", ADMIN_EYEBROW_CLS)}>Travel back</p>
                     <p className="text-sm text-admin-text">
                       {b.travelBackSuppressed
                         ? "chained to next event"
@@ -457,7 +455,7 @@ export function TravelBlockAdminList({
                     ) : !isPast ? (
                       <p
                         className={cn(
-                          "text-xs",
+                          "text-sm",
                           !b.afterExpiresAt || new Date(b.afterExpiresAt) < new Date()
                             ? "text-red-600"
                             : "text-admin-faint",
@@ -470,7 +468,7 @@ export function TravelBlockAdminList({
                   </div>
                 </div>
               </div>
-            </div>
+            </Card>
           );
         })}
       </div>

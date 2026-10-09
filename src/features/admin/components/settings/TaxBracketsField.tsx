@@ -8,6 +8,7 @@
 import { FieldShell } from "@/features/admin/components/settings/SettingsFields";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { COMPACT_BUTTON_CLS } from "@/features/business/components/calculator/calculator-classes";
 import type { TaxBracket } from "@/features/business/lib/tax/types";
 import { cn } from "@/shared/lib/cn";
 import { TAX_FIELD_META } from "@/shared/lib/settings/field-meta";
@@ -140,8 +141,8 @@ export function TaxBracketsField({
                 <span className="text-sm text-admin-muted">%</span>
                 <AdminButton
                   type="button"
-                  size="xs"
-                  variant="ghost"
+                  variant="danger"
+                  className={COMPACT_BUTTON_CLS}
                   aria-label={`Remove band ${i + 1}`}
                   disabled={brackets.length <= 1}
                   onClick={() => remove(i)}
