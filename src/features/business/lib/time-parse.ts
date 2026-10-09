@@ -5,8 +5,9 @@
 // meridiem a support job actually runs at, then a non-positive span retries as an am/pm
 // pair (+12h) if the meridiem was assumed, or rolls overnight if it was stated.
 // Overlapping ranges merge so a minute never bills twice, but only inside ONE day: a date
-// or weekday header opens a new bucket, so the same clock time worked on two days bills
-// twice instead of collapsing into one. Pure, so tsx can import it.
+// or weekday header, or a prose line naming a weekday next to its range, opens a new
+// bucket, so the same clock time worked on two days bills twice instead of collapsing into
+// one. Pure, so tsx can import it.
 
 /** am/pm marker, or null when a time fragment carries none. */
 type Meridiem = "am" | "pm" | null;
@@ -35,6 +36,11 @@ export interface RangeStats {
    * job at one day's clock times.
    */
   spanMins: number;
+  /**
+   * Ranges read off a prose line naming a weekday ("MacBook printer set up Friday, 1:46 pm
+   * to 2:05 pm"), as written before merging. Each belongs to the work named on its line.
+   */
+  taskLineRanges: { startTime: string; endTime: string; durationMins: number }[];
 }
 
 // One range: two time fragments - colon ("11:30"), compact ("0900", "130") or bare hours,
@@ -63,6 +69,35 @@ const DAY_HEADER_RE = new RegExp(
     ")",
   "i",
 );
+
+/** Weekday abbreviations, Sunday first so the index matches Date.getUTCDay(). */
+const WEEKDAY_ABBREVS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+
+// A full weekday name anywhere in a prose line ("printer set up Friday, 1:46-2:05pm"). Full
+// names only: "sat", "sun" and "mon" are ordinary words mid-sentence.
+const PROSE_WEEKDAY_RE = /\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i;
+
+/**
+ * Weekday of a YYYY-MM-DD date key.
+ * @param dateKey - Date key such as "2026-10-07".
+ * @returns 0 (Sunday) to 6, or null when the key is not a real date.
+ */
+export function weekdayOfDateKey(dateKey: string): number | null {
+  const m = dateKey.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const day = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).getUTCDay();
+  return Number.isNaN(day) ? null : day;
+}
+
+/**
+ * Weekday a day header names: a leading weekday ("Fri 9 Oct") or an ISO date line.
+ * @param line - A line {@link DAY_HEADER_RE} matched.
+ * @returns 0 (Sunday) to 6, or null for headers that name no weekday ("Day 2", "9 Oct").
+ */
+function headerWeekday(line: string): number | null {
+  if (WEEKDAY_LEAD_RE.test(line)) return WEEKDAY_ABBREVS.indexOf(line.slice(0, 3).toLowerCase());
+  return weekdayOfDateKey(line);
+}
 
 /**
  * Detects the compact no-colon form ("0900", "130").
@@ -149,62 +184,133 @@ function minsToHHMM(mins: number): string {
 }
 
 /**
- * Extracts every start/end time segment found on digit-led or weekday-led
- * lines, then merges overlapping or duplicate segments WITHIN each day so a
- * pasted duplicate cannot double-bill while a genuine second day cannot be
- * swallowed. Zero-length ranges ("9am-9am") state no duration and are dropped.
- * Used to compute the worked-minutes hint passed to the AI as a "pre-computed
- * session total" annotation, and by the auditor to derive the canonical
- * expected duration.
- * @param input - Raw job description text.
- * @returns Ranges plus the stated, billable and discarded minute totals.
+ * Reads one TIME_RANGE_RE match into a clock interval, resolving the meridiem and any
+ * overnight or am/pm roll.
+ * @param line - The normalised line the match came from.
+ * @param match - The range match.
+ * @returns Start and end in minutes since midnight (end may pass 1440), or null when the
+ * match is a phone number, a dashed date, an impossible time or a zero-length range.
  */
-export function extractRangeStats(input: string): RangeStats {
-  const intervals: { day: number; start: number; end: number }[] = [];
+function readRange(line: string, match: RegExpMatchArray): { start: number; end: number } | null {
+  const [, startRaw = "", startMerRaw, sep = "", endRaw = "", endMerRaw] = match;
+  // Bare-space compact pairs are phone numbers or IDs, never a range.
+  if (!/[-–—]|to/.test(sep) && (isCompact(startRaw) || isCompact(endRaw))) return null;
+  // A dashed date reads as a range at face value: "2026-08-25" pairs 2026 with 08 as
+  // 20:26-08:00, a near-15-hour overnight. A third dash-joined number on either side
+  // means it is a date, not a time - no real range carries one.
+  const matchEnd = (match.index ?? 0) + match[0].length;
+  if (/^\s*[-–—]\s*\d/.test(line.slice(matchEnd))) return null;
+  if (/\d\s*[-–—]\s*$/.test(line.slice(0, match.index ?? 0))) return null;
+  const startMer = (startMerRaw?.toLowerCase() ?? null) as Meridiem;
+  const endMer = (endMerRaw?.toLowerCase() ?? null) as Meridiem;
+  // A meridiem stated on either end covers both; only a wholly bare pair is inferred.
+  let start = parseTimeMins(startRaw, startMer ?? endMer ?? inferBareMeridiem(startRaw));
+  const end = parseTimeMins(endRaw, endMer ?? startMer ?? inferBareMeridiem(endRaw));
+  if (start === null || end === null) return null;
+  // Zero-length states no duration - never invent a 12h or 24h roll.
+  let dur = end - start;
+  if (dur === 0) return null;
+  if (dur < 0) {
+    const withNoon = dur + 12 * 60;
+    if (startMer !== null && endMer !== null) {
+      // Both meridiems stated ("2pm-9am"): genuinely overnight.
+      dur += 24 * 60;
+    } else if (withNoon > 0 && withNoon <= 16 * 60) {
+      // Assumed meridiem: retry as an am/pm pair. When the start borrowed the end's,
+      // the start is the half that flips: "11-1pm" (read 23:00-13:00) is 11:00-13:00,
+      // and "11-1am" (read 11:00-01:00) is 23:00-01:00.
+      if (startMer === null && endMer !== null) start += endMer === "pm" ? -12 * 60 : 12 * 60;
+      dur = withNoon;
+    } else {
+      dur += 24 * 60;
+    }
+  }
+  return { start, end: start + dur };
+}
+
+/**
+ * Whether a range match in prose is clearly clock times: a dashed or "to" pair with a
+ * colon, a meridiem or four digits on one side, and no price or date run-on. Mid-sentence
+ * a bare pair is too often a count ("2-3 hours") or a price ("$50-60") to trust.
+ * @param line - The normalised line the match came from.
+ * @param match - The range match.
+ * @returns True when the match can only be a time range.
+ */
+function isProseRange(line: string, match: RegExpMatchArray): boolean {
+  const [, startRaw = "", startMer, sep = "", endRaw = "", endMer] = match;
+  if (!/[-–—]|to/.test(sep)) return false;
+  if (!startMer && !endMer && !isClockShaped(startRaw) && !isClockShaped(endRaw)) return false;
+  const before = line.slice(0, match.index ?? 0);
+  const after = line.slice((match.index ?? 0) + match[0].length);
+  return !/[$\d]\s*[-–—]?\s*$/.test(before) && !/^\s*[-–—]\s*\d/.test(after);
+}
+
+/** One pass over a description's lines: the ranges to bill, and the day of every stated one. */
+interface RangeWalk {
+  /** Readable ranges, each in its 0-based day bucket. */
+  intervals: { day: number; start: number; end: number }[];
+  /** Weekday (0 = Sunday) of every range the text states, or null when no day is named for it. */
+  statedWeekdays: (number | null)[];
+  /** The subset of intervals read off a prose line naming a weekday. */
+  taskLine: { start: number; end: number }[];
+}
+
+/**
+ * Walks a description line by line. Ranges are read on digit-led and weekday-led lines,
+ * and on a prose line that names a weekday in full ("MacBook printer set up Friday, 1:46
+ * pm to 2:05 pm"), which also opens that day's bucket. An undated mid-sentence range is
+ * only recorded as stated, never billed from here: without a day it could be the booked
+ * visit restated, or a future appointment.
+ * @param input - Raw job description text.
+ * @returns The billable intervals and the weekday of every stated range.
+ */
+function walkRanges(input: string): RangeWalk {
+  const intervals: RangeWalk["intervals"] = [];
+  const statedWeekdays: (number | null)[] = [];
+  const taskLine: RangeWalk["taskLine"] = [];
   let day = 0;
+  let weekday: number | null = null;
   for (const rawLine of input.split("\n")) {
     const line = normaliseTimeLine(rawLine.trim());
     // A header opens the next day before its own ranges are read, so
     // "Tue 4 Aug, 9-11am" lands on the day it names rather than the one before.
-    if (DAY_HEADER_RE.test(line)) day += 1;
-    if (!/^\d/.test(line) && !WEEKDAY_LEAD_RE.test(line)) continue;
-    for (const match of line.matchAll(TIME_RANGE_RE)) {
-      const [, startRaw = "", startMerRaw, sep = "", endRaw = "", endMerRaw] = match;
-      // Bare-space compact pairs are phone numbers or IDs, never a range.
-      if (!/[-–—]|to/.test(sep) && (isCompact(startRaw) || isCompact(endRaw))) continue;
-      // A dashed date reads as a range at face value: "2026-08-25" pairs 2026 with 08 as
-      // 20:26-08:00, a near-15-hour overnight. A third dash-joined number on either side
-      // means it is a date, not a time - no real range carries one.
-      const matchEnd = (match.index ?? 0) + match[0].length;
-      if (/^\s*[-–—]\s*\d/.test(line.slice(matchEnd))) continue;
-      if (/\d\s*[-–—]\s*$/.test(line.slice(0, match.index ?? 0))) continue;
-      const startMer = (startMerRaw?.toLowerCase() ?? null) as Meridiem;
-      const endMer = (endMerRaw?.toLowerCase() ?? null) as Meridiem;
-      // A meridiem stated on either end covers both; only a wholly bare pair is inferred.
-      let start = parseTimeMins(startRaw, startMer ?? endMer ?? inferBareMeridiem(startRaw));
-      const end = parseTimeMins(endRaw, endMer ?? startMer ?? inferBareMeridiem(endRaw));
-      if (start === null || end === null) continue;
-      // Zero-length states no duration - never invent a 12h or 24h roll.
-      let dur = end - start;
-      if (dur === 0) continue;
-      if (dur < 0) {
-        const withNoon = dur + 12 * 60;
-        if (startMer !== null && endMer !== null) {
-          // Both meridiems stated ("2pm-9am"): genuinely overnight.
-          dur += 24 * 60;
-        } else if (withNoon > 0 && withNoon <= 16 * 60) {
-          // Assumed meridiem: retry as an am/pm pair. When the start borrowed the end's,
-          // the start is the half that flips: "11-1pm" (read 23:00-13:00) is 11:00-13:00,
-          // and "11-1am" (read 11:00-01:00) is 23:00-01:00.
-          if (startMer === null && endMer !== null) start += endMer === "pm" ? -12 * 60 : 12 * 60;
-          dur = withNoon;
-        } else {
-          dur += 24 * 60;
-        }
-      }
-      intervals.push({ day, start, end: start + dur });
+    if (DAY_HEADER_RE.test(line)) {
+      day += 1;
+      weekday = headerWeekday(line);
+    }
+    const timeLine = /^\d/.test(line) || WEEKDAY_LEAD_RE.test(line);
+    const matches = [...line.matchAll(TIME_RANGE_RE)];
+    const prose = timeLine ? [] : matches.filter((m) => isProseRange(line, m));
+    const named = prose.length > 0 ? line.match(PROSE_WEEKDAY_RE)?.[1] : undefined;
+    const namedDay = named ? WEEKDAY_ABBREVS.indexOf(named.slice(0, 3).toLowerCase()) : null;
+    // Naming the day already open stays in it; any other day is a separate visit.
+    if (namedDay !== null && namedDay !== weekday) {
+      day += 1;
+      weekday = namedDay;
+    }
+    for (const match of matches) {
+      const billable = timeLine || (namedDay !== null && prose.includes(match));
+      const read = billable ? readRange(line, match) : null;
+      if (read) intervals.push({ day, ...read });
+      if (read && !timeLine) taskLine.push(read);
+      if (read || isProseRange(line, match)) statedWeekdays.push(weekday);
     }
   }
+  return { intervals, statedWeekdays, taskLine };
+}
+
+/**
+ * Extracts every start/end time segment {@link walkRanges} reads, then merges
+ * overlapping or duplicate segments WITHIN each day so a pasted duplicate cannot
+ * double-bill while a genuine second day cannot be swallowed. Zero-length ranges
+ * ("9am-9am") state no duration and are dropped. Used to compute the worked-minutes
+ * hint passed to the AI as a "pre-computed session total" annotation, and by the
+ * auditor to derive the canonical expected duration.
+ * @param input - Raw job description text.
+ * @returns Ranges plus the stated, billable and discarded minute totals.
+ */
+export function extractRangeStats(input: string): RangeStats {
+  const { intervals, taskLine } = walkRanges(input);
   const statedMins = intervals.reduce((sum, iv) => sum + (iv.end - iv.start), 0);
   // Merge overlaps and duplicates - the same minute of the same DAY can only be worked
   // once. Sorting by day first keeps each day's run contiguous for the sweep.
@@ -231,7 +337,19 @@ export function extractRangeStats(input: string): RangeStats {
     else spanByDay.set(iv.day, { start: iv.start, end: iv.end });
   }
   const spanMins = [...spanByDay.values()].reduce((sum, d) => sum + (d.end - d.start), 0);
-  return { ranges, statedMins, billableMins, discardedMins: statedMins - billableMins, spanMins };
+  const taskLineRanges = taskLine.map((iv) => ({
+    startTime: minsToHHMM(iv.start),
+    endTime: minsToHHMM(iv.end),
+    durationMins: iv.end - iv.start,
+  }));
+  return {
+    ranges,
+    statedMins,
+    billableMins,
+    discardedMins: statedMins - billableMins,
+    spanMins,
+    taskLineRanges,
+  };
 }
 
 /**
@@ -245,31 +363,26 @@ function isClockShaped(fragment: string): boolean {
 
 /**
  * Whether the description states a time range anywhere, including mid-sentence ("TV setup
- * 4:30-5:40") where {@link extractRangeStats} doesn't look. Only a dashed or "to" pair
- * counts, and one side must be clock-shaped (a colon, a meridiem, or four digits), so a
- * count ("2-3 hours"), a price ("$50-60") or a dashed date is not read as times.
+ * 4:30-5:40") where {@link extractRangeStats} doesn't bill from. Mid-sentence, only a
+ * dashed or "to" pair counts, and one side must be clock-shaped (a colon, a meridiem, or
+ * four digits), so a count ("2-3 hours"), a price ("$50-60") or a dashed date is not read
+ * as times.
  * @param input - Raw job description text.
  * @returns True when the text names a time range of its own.
  */
 export function statesTimeRange(input: string): boolean {
-  if (extractRangeStats(input).ranges.length > 0) return true;
-  for (const rawLine of input.split("\n")) {
-    const line = normaliseTimeLine(rawLine.trim());
-    for (const match of line.matchAll(TIME_RANGE_RE)) {
-      const [, startRaw = "", startMer, sep = "", endRaw = "", endMer] = match;
-      if (!/[-–—]|to/.test(sep)) continue;
-      /**
-       *
-       * @param f
-       */
-      if (!startMer && !endMer && !isClockShaped(startRaw) && !isClockShaped(endRaw)) continue;
-      const before = line.slice(0, match.index ?? 0);
-      const after = line.slice((match.index ?? 0) + match[0].length);
-      if (/[$\d]\s*[-–—]?\s*$/.test(before) || /^\s*[-–—]\s*\d/.test(after)) continue;
-      return true;
-    }
-  }
-  return false;
+  return walkRanges(input).statedWeekdays.length > 0;
+}
+
+/**
+ * The day each stated range falls on, so a caller can tell a later visit ("Friday,
+ * 1:46-2:05pm") from times that restate the booked one.
+ * @param input - Raw job description text.
+ * @returns One weekday (0 = Sunday) per range {@link statesTimeRange} counts, or null for
+ * a range with no day named on its line or in a header above it.
+ */
+export function statedRangeWeekdays(input: string): (number | null)[] {
+  return walkRanges(input).statedWeekdays;
 }
 
 /**

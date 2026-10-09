@@ -10,7 +10,11 @@ import {
   parsedJobToLineItems,
   parsedWindow,
 } from "@/features/business/lib/parse-hydrate";
-import { extractRanges, statesTimeRange } from "@/features/business/lib/time-parse";
+import {
+  extractRangeStats,
+  extractRanges,
+  statesTimeRange,
+} from "@/features/business/lib/time-parse";
 import type { ParseJobResponse } from "@/features/business/types/business";
 
 let failures = 0;
@@ -143,6 +147,30 @@ function main(): void {
   expectEqual("compact 0900-1100", ranges("0900-1100"), ["09:00-11:00 (120)"]);
   expectEqual("prose-led line is not read", ranges("Fixed printer 9-11"), []);
   expectEqual("dashed date is not a range", ranges("2026-08-25 printer"), []);
+  expectEqual("undated mid-line range is not read", ranges("TV setup 4:30-5:40"), []);
+  expectEqual(
+    "mid-line range on a named day is read",
+    ranges("MacBook printer set up Friday, 1:46 pm to 2:05 pm"),
+    ["13:46-14:05 (19)"],
+  );
+  expectEqual(
+    "a named day in prose opens its own day",
+    ranges("Printer on Wednesday, 1:00-2:00pm\nBack Friday, 1:00-2:00pm for the scanner"),
+    ["13:00-14:00 (60)", "13:00-14:00 (60)"],
+  );
+  expectEqual(
+    "booked window plus a later named-day visit",
+    ranges(
+      "2026-10-07\n16:30-17:30\nTV setup\nPrinter setup\n\nMacBook printer set up Friday, 1:46 pm to 2:05 pm",
+    ),
+    ["16:30-17:30 (60)", "13:46-14:05 (19)"],
+  );
+  expectEqual(
+    "only the later visit is a task-line range",
+    extractRangeStats("2026-10-07\n16:30-17:30\nMacBook printer set up Friday, 1:46 pm to 2:05 pm")
+      .taskLineRanges,
+    [{ startTime: "13:46", endTime: "14:05", durationMins: 19 }],
+  );
 
   console.log("\nWhether a description states its own range");
   expectEqual("mid-line clock range", statesTimeRange("TV setup 4:30-5:40"), true);
@@ -166,6 +194,33 @@ function main(): void {
     "TV setup 4:30-6:00",
   );
   expectEqual("no window: sent as-is", buildParseInput("TV setup", []), "TV setup");
+  // 2026-10-07 is a Wednesday.
+  const wednesday = [{ date: "2026-10-07", startTime: "16:30", endTime: "17:30" }];
+  const laterVisit =
+    "TV setup\nPrinter setup\n\nAlready paid $47.00\n\nMacBook printer set up Friday, 1:46 pm to 2:05 pm";
+  expectEqual(
+    "times on another named day: window kept alongside them",
+    buildParseInput(laterVisit, wednesday),
+    `2026-10-07\n16:30-17:30\n${laterVisit}`,
+  );
+  expectEqual(
+    "times on the booked day: sent as-is",
+    buildParseInput("Printer setup Wednesday, 4:30-6:00pm", wednesday),
+    "Printer setup Wednesday, 4:30-6:00pm",
+  );
+  expectEqual(
+    "one dated and one undated range: sent as-is",
+    buildParseInput("TV setup 4:30-5:30\nPrinter Friday, 1:46-2:05pm", wednesday),
+    "TV setup 4:30-5:30\nPrinter Friday, 1:46-2:05pm",
+  );
+  expectEqual(
+    "re-parse does not send the later visit twice",
+    buildParseInput(laterVisit, [
+      ...wednesday,
+      { date: "2026-10-07", startTime: "13:46", endTime: "14:05" },
+    ]),
+    `2026-10-07\n16:30-17:30\n${laterVisit}`,
+  );
 
   console.log("\nWindow from a parse reply");
   expectEqual(

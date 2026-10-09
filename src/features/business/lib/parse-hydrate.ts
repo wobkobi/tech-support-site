@@ -3,17 +3,23 @@
 // the calculator and the draft-invoice editor so a description bills the same either way.
 
 import {
+  billableMins,
   collapseToWindow,
   composeDescription,
   enforceMinBillable,
   jobToLineItems,
+  TASK_TIMING_FALLBACK,
   timeDiffMins,
   type TaskTimingConfig,
 } from "@/features/business/lib/business";
 import { storeRunEntry } from "@/features/business/lib/calculator-helpers";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
 import { isHourlyTask } from "@/features/business/lib/task-timing";
-import { statesTimeRange } from "@/features/business/lib/time-parse";
+import {
+  extractRanges,
+  statedRangeWeekdays,
+  weekdayOfDateKey,
+} from "@/features/business/lib/time-parse";
 import type {
   EventPrefillSlot,
   LineItem,
@@ -31,12 +37,30 @@ import { timeParts } from "@/shared/lib/timezone-utils";
 export type WindowSlot = Pick<EventPrefillSlot, "date" | "startTime" | "endTime">;
 
 /**
+ * Whether the description's own times leave the known window standing. Times with no day
+ * named, or on a window's own weekday, restate the visit and replace it, so operator times
+ * win. Times that all sit on other named days ("MacBook printer set up Friday, 1:46 pm to
+ * 2:05 pm" on a Wednesday booking) are a later visit, billed on top of the window.
+ * @param aiInput - The operator's description.
+ * @param slots - Known windows.
+ * @returns True when the window should still be sent.
+ */
+function windowSurvivesStatedTimes(aiInput: string, slots: WindowSlot[]): boolean {
+  const stated = statedRangeWeekdays(aiInput);
+  if (stated.length === 0) return true;
+  const windowDays = new Set(slots.map((s) => weekdayOfDateKey(s.date)));
+  return stated.every((d) => d !== null && !windowDays.has(d));
+}
+
+/**
  * Builds the parse-job `input` for a description. With a known window (a booking, or real
  * times on the Time card), prepends it as digit-led "HH:MM-HH:MM" lines so the parser bills
- * the real session length instead of falling back to the minimum - only when the
- * description states no range of its own, anywhere in it, so operator times win. A merged
- * job gets one line per event under a date line per day; extractRanges sums them
- * server-side excluding the gaps.
+ * the real session length instead of falling back to the minimum. When the description
+ * states its own times the window goes in only if {@link windowSurvivesStatedTimes}, and
+ * then without any slot the description already states: a re-parse reads the later visit
+ * back off the Time card, and sending it twice would bill it twice. A merged job gets one
+ * line per event under a date line per day; extractRanges sums them server-side excluding
+ * the gaps.
  *
  * A date line goes in whenever the day changes so the parser buckets each day on its own.
  * Without it a second day's window sitting inside the first day's hours merges away and
@@ -47,17 +71,20 @@ export type WindowSlot = Pick<EventPrefillSlot, "date" | "startTime" | "endTime"
  * @returns The input string to send.
  */
 export function buildParseInput(aiInput: string, slots: WindowSlot[]): string {
+  if (!windowSurvivesStatedTimes(aiInput, slots)) return aiInput;
+  const restated = new Set(extractRanges(aiInput).map((r) => `${r.startTime}-${r.endTime}`));
   const windowLines: string[] = [];
   let lastSlotDate: string | null = null;
   for (const slot of slots) {
     if (!slot.startTime || !slot.endTime) continue;
+    if (restated.has(`${slot.startTime}-${slot.endTime}`)) continue;
     if (slot.date !== lastSlotDate) {
       windowLines.push(slot.date);
       lastSlotDate = slot.date;
     }
     windowLines.push(`${slot.startTime}-${slot.endTime}`);
   }
-  if (windowLines.length === 0 || statesTimeRange(aiInput)) return aiInput;
+  if (windowLines.length === 0) return aiInput;
   return `${windowLines.join("\n")}\n${aiInput}`;
 }
 
@@ -216,8 +243,12 @@ export interface FittedTasks {
  * Rebalances tasks proportionally to fit the window - over-long tasks absorb more of the
  * correction, tasks scaling below the minimum drop - then floors the whole job so a
  * sub-minimum one bills at the minimum.
+ *
+ * The window snaps to the billing grid first, the same rounding the parse route's
+ * clampBillableMins applies. Fitting to the raw clock sum would shave an on-grid split
+ * back to it: a 79-min visit the route splits 30/30/20 would bill 29/30/20.
  * @param tasks - Hydrated task lines.
- * @param windowMins - Billable window from {@link parsedWindow}.
+ * @param windowMins - Billable window from {@link parsedWindow}, or the Time card's total.
  * @param timing - Live task-timing settings.
  * @param minBillableMins - Live minimum billable minutes.
  * @returns The fitted tasks and what changed.
@@ -228,7 +259,8 @@ export function fitTasksToWindow(
   timing: TaskTimingConfig | undefined,
   minBillableMins: number,
 ): FittedTasks {
-  const collapsed = collapseToWindow(tasks, windowMins, timing);
+  const gridMins = billableMins(windowMins, (timing ?? TASK_TIMING_FALLBACK).snapMins);
+  const collapsed = collapseToWindow(tasks, gridMins, timing);
   return {
     tasks: enforceMinBillable(collapsed.tasks, minBillableMins),
     rescaled: collapsed.rescaled,

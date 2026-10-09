@@ -1,12 +1,12 @@
 "use client";
 // src/features/business/components/invoice/LineItemsEditor.tsx
-// Editable list of invoice line items: description, qty, unit price, with `lineTotal`
-// auto-derived (qty x unitPrice, rounded to cents) as the operator types. Add/remove
-// rows. Purely controlled - the parent owns the array and validates it (mirroring
+// Editable list of invoice line items: description, qty, unit price, with every row's
+// `lineTotal` re-derived through splitLineTotals as the operator types, adds or removes a
+// row. Purely controlled - the parent owns the array and validates it (mirroring
 // isValidLineItem) before persisting.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { formatNZD } from "@/features/business/lib/business";
+import { formatNZD, splitLineTotals } from "@/features/business/lib/business";
 import type { LineItem } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -26,13 +26,14 @@ const INPUT_CLS =
   "rounded-lg border border-admin-border-strong bg-admin-surface px-2.5 py-2 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
 
 /**
- * Rounds a derived line total to cents.
- * @param qty - Quantity.
- * @param unitPrice - Unit price.
- * @returns qty x unitPrice, rounded to 2dp.
+ * Re-derives every row's line total. Timed rows at one rate share their cents (see
+ * splitLineTotals), so an edit to one row can move a cent on another.
+ * @param items - Rows after the edit.
+ * @returns The rows with their line totals.
  */
-function deriveLineTotal(qty: number, unitPrice: number): number {
-  return Math.round(qty * unitPrice * 100) / 100;
+function withLineTotals(items: LineItem[]): LineItem[] {
+  const totals = splitLineTotals(items);
+  return items.map((item, i) => ({ ...item, lineTotal: totals[i]! }));
 }
 
 /**
@@ -65,22 +66,20 @@ export function LineItemsEditor({
    */
   function updateRow(idx: number, patch: Partial<LineItem>): void {
     onChange(
-      items.map((item, i) => {
-        if (i !== idx) return item;
-        const merged = { ...item, ...patch };
-        // This editor works in decimal quantities. A hand-typed qty on a row
-        // that carried billed minutes has to rewrite them, or the stale minutes
-        // would keep printing the old h:mm while the total moved.
-        const minutes =
-          patch.qty !== undefined && merged.minutes != null
-            ? Math.round(merged.qty * 60)
-            : merged.minutes;
-        return {
-          ...merged,
-          ...(minutes != null && { minutes }),
-          lineTotal: deriveLineTotal(merged.qty, merged.unitPrice),
-        };
-      }),
+      withLineTotals(
+        items.map((item, i) => {
+          if (i !== idx) return item;
+          const merged = { ...item, ...patch };
+          // This editor works in decimal quantities. A hand-typed qty on a row
+          // that carried billed minutes has to rewrite them, or the stale minutes
+          // would keep printing the old h:mm while the total moved.
+          const minutes =
+            patch.qty !== undefined && merged.minutes != null
+              ? Math.round(merged.qty * 60)
+              : merged.minutes;
+          return { ...merged, ...(minutes != null && { minutes }) };
+        }),
+      ),
     );
   }
 
@@ -140,7 +139,7 @@ export function LineItemsEditor({
           </span>
           <button
             type="button"
-            onClick={() => onChange(items.filter((_, i) => i !== idx))}
+            onClick={() => onChange(withLineTotals(items.filter((_, i) => i !== idx)))}
             disabled={disabled}
             aria-label={`Remove line ${idx + 1}`}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-admin-faint hover:bg-admin-bg hover:text-coquelicot-600 disabled:opacity-50"

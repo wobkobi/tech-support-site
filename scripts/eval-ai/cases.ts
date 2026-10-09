@@ -177,6 +177,13 @@ export const PARSE_CASES: ParseCase[] = [
   },
   // Empty description line after the range.
   { id: "parse-range-only", input: "9-11am\n", expectMode: "info" },
+  // A booked Wednesday window with a later visit named mid-sentence: both bill (60 + 19),
+  // and the MacBook line stays its own task pinned to its 19 min.
+  {
+    id: "parse-booked-plus-later-visit",
+    input:
+      "2026-10-07\n16:30-17:30\nTV setup\nPrinter setup\n\nAlready paid $47.00\n\nMacBook printer set up Friday, 1:46 pm to 2:05 pm",
+  },
 ];
 
 export const ESTIMATE_CASES: EstimateCase[] = [

@@ -18,6 +18,7 @@ import {
   parsedWindow,
   type WindowSlot,
 } from "@/features/business/lib/parse-hydrate";
+import { extractRanges } from "@/features/business/lib/time-parse";
 import type {
   EventPrefill,
   ParsedRange,
@@ -134,6 +135,11 @@ export function useJobParse({
    * the times; then (or with no booking) the complete ranges on the Time card, provided
    * they are real times. Without a window, a description with no times parses to none and
    * the tasks stay at their quick-task guesses.
+   *
+   * A Time card holding nothing but ranges the description itself states has not edited
+   * the booking: it is a later visit ("Friday, 1:46 pm to 2:05 pm") read back by an
+   * earlier parse that dropped the booked window. The booking's slots go back in ahead of
+   * it so the booked visit still bills; buildParseInput then skips the restated range.
    * @returns The windows, and whether they are a merged booking to keep as-is.
    */
   function knownWindow(): { slots: WindowSlot[]; merged: boolean } {
@@ -148,6 +154,12 @@ export function useJobParse({
         startTime: r.startTime,
         endTime: r.endTime,
       }));
+    const restated = new Set(extractRanges(aiInput).map((r) => `${r.startTime}-${r.endTime}`));
+    const onlyRestated =
+      slots.length > 0 && slots.every((s) => restated.has(`${s.startTime}-${s.endTime}`));
+    if (eventPrefill && eventPrefill.slots.length > 0 && onlyRestated) {
+      return { slots: [...eventPrefill.slots, ...slots], merged: false };
+    }
     return { slots, merged: false };
   }
 

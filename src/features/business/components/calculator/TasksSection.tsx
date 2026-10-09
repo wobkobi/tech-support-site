@@ -7,7 +7,7 @@
 
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
 import { Combobox } from "@/features/business/components/Combobox";
-import { composeDescription, formatNZD } from "@/features/business/lib/business";
+import { composeDescription, formatNZD, taskLineTotals } from "@/features/business/lib/business";
 import { collectTaxonomyTags } from "@/features/business/lib/task-taxonomy";
 import type { RateConfig, TaskLine, TaskTemplate } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
@@ -78,6 +78,8 @@ export function TasksSection({
   modifierRates,
   flatRates,
 }: Props): React.ReactElement {
+  // The invoice's cents, not each row rounded alone: timed rows at one rate share them.
+  const lineTotals = taskLineTotals(tasks);
   return (
     <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-center justify-between gap-2">
@@ -129,6 +131,7 @@ export function TasksSection({
                 </p>
                 <TaskTotalsRow
                   task={task}
+                  lineTotal={lineTotals[idx]!}
                   onQty={(v) => onUpdateTask(idx, "qty", v)}
                   onPrice={(v) => onUpdateTask(idx, "unitPrice", v)}
                   onDelete={() => onTasksChange((p) => p.filter((_, i) => i !== idx))}
@@ -310,6 +313,7 @@ export function TasksSection({
                 </div>
                 <TaskTotalsRow
                   task={task}
+                  lineTotal={lineTotals[idx]!}
                   spread
                   onQty={(v) => onUpdateTask(idx, "qty", v)}
                   onPrice={(v) => onUpdateTask(idx, "unitPrice", v)}
@@ -351,6 +355,7 @@ function hoursFromHM(h: number, m: number): number {
  * unchanged.
  * @param props - Component props.
  * @param props.task - The task line to render controls for.
+ * @param props.lineTotal - The line's total as the invoice prints it.
  * @param props.onQty - Called with the new decimal qty when hrs/mins/qty change.
  * @param props.onPrice - Called when the operator edits the $/unit input.
  * @param props.onDelete - Called when the × button is pressed.
@@ -359,12 +364,14 @@ function hoursFromHM(h: number, m: number): number {
  */
 function TaskTotalsRow({
   task,
+  lineTotal,
   onQty,
   onPrice,
   onDelete,
   spread = false,
 }: {
   task: TaskLine;
+  lineTotal: number;
   onQty: (v: number) => void;
   onPrice: (v: number) => void;
   onDelete: () => void;
@@ -466,7 +473,7 @@ function TaskTotalsRow({
         )}
         aria-label="Line total"
       >
-        {formatNZD(task.lineTotal)}
+        {formatNZD(lineTotal)}
       </span>
       <button
         type="button"

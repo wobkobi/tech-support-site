@@ -8,7 +8,7 @@ export const JOB_DESCRIPTION_HINT =
 
 /** Extra line shown when the job comes from a booking. */
 export const JOB_DESCRIPTION_BOOKED_HINT =
-  "The booking's times are used unless you write your own.";
+  'The booking\'s times are used unless you write your own. Times on another day, like "Friday, 1:30-2pm", bill as a second visit on top.';
 
 /** Worked example for the textarea. */
 export const JOB_DESCRIPTION_PLACEHOLDER =

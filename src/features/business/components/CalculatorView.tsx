@@ -32,8 +32,6 @@ import {
 } from "@/features/business/lib/already-paid-input";
 import {
   calcJobTotal,
-  collapseToWindow,
-  enforceMinBillable,
   formatNZD,
   jobToLineItems,
   timeDiffMins,
@@ -59,6 +57,7 @@ import {
   toggleTaskModifierLine,
   updateTaskField,
 } from "@/features/business/lib/calculator-helpers";
+import { fitTasksToWindow } from "@/features/business/lib/parse-hydrate";
 import { calcTravelCharge, type CancellationPolicy } from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
 import type {
@@ -924,10 +923,16 @@ export function CalculatorView({
                 windowMin={durationMins}
                 minBillableMins={pricing.minBillableMins}
                 snapMins={pricing.taskTiming?.snapMins}
-                onFix={() => {
-                  const collapsed = collapseToWindow(tasks, durationMins, pricing.taskTiming);
-                  setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
-                }}
+                onFix={() =>
+                  setTasks(
+                    fitTasksToWindow(
+                      tasks,
+                      durationMins,
+                      pricing.taskTiming,
+                      pricing.minBillableMins,
+                    ).tasks,
+                  )
+                }
               />
               <TasksSection
                 tasks={tasks}
