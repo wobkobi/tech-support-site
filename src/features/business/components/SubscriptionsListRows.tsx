@@ -5,6 +5,7 @@
 // the data, the form, the record/toggle/delete handlers and the delete confirm.
 
 import {
+  PINNED_CELL_CLS,
   ROW_CLS,
   TABLE_CLS,
   TBODY_CLS,
@@ -13,12 +14,7 @@ import {
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
-import {
-  LEDGER_TD_CLS,
-  LEDGER_TH_CLS,
-  PINNED_CLS,
-  ROW_BUTTON_CLS,
-} from "@/features/business/components/ledger-classes";
+import { LEDGER_TD_CLS, LEDGER_TH_CLS } from "@/features/business/components/ledger-classes";
 import { formatNZD, todayISO } from "@/features/business/lib/business";
 import type { Subscription } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
@@ -119,18 +115,12 @@ function SubscriptionRowActions({
         variant="outline"
         onClick={() => onRecord(sub)}
         disabled={recording === sub.id}
-        className={ROW_BUTTON_CLS}
       >
         {recording === sub.id ? "Recording..." : "Record"}
       </AdminButton>
       {/* Edit and Delete wrap as a pair, so a wrapped row never splits them. */}
       <span className="flex gap-2">
-        <AdminButton
-          size="xs"
-          variant="secondary"
-          onClick={() => onEdit(sub)}
-          className={ROW_BUTTON_CLS}
-        >
+        <AdminButton size="xs" variant="secondary" onClick={() => onEdit(sub)}>
           Edit
         </AdminButton>
         <AdminButton
@@ -138,7 +128,6 @@ function SubscriptionRowActions({
           variant="danger"
           onClick={() => onDelete(sub)}
           disabled={deleting === sub.id}
-          className={ROW_BUTTON_CLS}
         >
           Delete
         </AdminButton>
@@ -247,7 +236,7 @@ export function SubscriptionsListTable({
             <th className={LEDGER_TH_CLS}>Frequency</th>
             <th className={LEDGER_TH_CLS}>Next due</th>
             <th className={LEDGER_TH_CLS}>Active</th>
-            <th className={cn(LEDGER_TH_CLS, PINNED_CLS, "bg-admin-bg")}>Actions</th>
+            <th className={cn(LEDGER_TH_CLS, PINNED_CELL_CLS, "bg-admin-bg")}>Actions</th>
           </tr>
         </thead>
         <tbody className={TBODY_CLS}>
@@ -292,7 +281,7 @@ export function SubscriptionsListTable({
                 <td
                   className={cn(
                     LEDGER_TD_CLS,
-                    PINNED_CLS,
+                    PINNED_CELL_CLS,
                     "max-xl:w-44",
                     overdue
                       ? "bg-amber-50"

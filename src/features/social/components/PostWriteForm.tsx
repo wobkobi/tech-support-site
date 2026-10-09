@@ -11,7 +11,6 @@ import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { InsertMenu, type InsertGroup } from "@/features/admin/components/ui/InsertMenu";
-import { COMPACT_BUTTON_CLS } from "@/features/business/components/calculator/calculator-classes";
 import type { PostContent } from "@/features/social/components/PostComposer";
 import {
   PLATFORM_LABEL,
@@ -115,13 +114,7 @@ export function PostWriteForm({
               post once that promo has ended.
             </span>
             {editable && (
-              <AdminButton
-                size="xs"
-                variant="ghost"
-                className={COMPACT_BUTTON_CLS}
-                busy={unlinking}
-                onClick={onUnlink}
-              >
+              <AdminButton size="xs" variant="ghost" busy={unlinking} onClick={onUnlink}>
                 Unlink
               </AdminButton>
             )}
@@ -229,7 +222,6 @@ export function PostWriteForm({
                     <AdminButton
                       size="xs"
                       variant="secondary"
-                      className={COMPACT_BUTTON_CLS}
                       busy={imageBusy}
                       disabled={!canUpload}
                       onClick={() => fileRef.current?.click()}
@@ -239,7 +231,6 @@ export function PostWriteForm({
                     <AdminButton
                       size="xs"
                       variant="ghost"
-                      className={COMPACT_BUTTON_CLS}
                       onClick={() =>
                         setContent((c) => ({
                           ...c,

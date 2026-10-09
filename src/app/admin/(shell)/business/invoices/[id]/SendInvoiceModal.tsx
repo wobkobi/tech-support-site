@@ -10,7 +10,7 @@ import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
+import { ADMIN_CHECKBOX_CLS, ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import {
   DEFAULT_INVOICE_EMAIL_BODY,
@@ -328,7 +328,7 @@ export function SendInvoiceModal({
                     checked={reviewAsk}
                     disabled={sending}
                     onChange={(e) => setReviewAsk(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-russian-violet"
+                    className={ADMIN_CHECKBOX_CLS}
                   />
                   <span>
                     Ask for a Google review in {reviewAskInfo.delayDays}{" "}

@@ -9,6 +9,7 @@ import {
   useGlobalSearchShortcut,
 } from "@/features/admin/components/GlobalSearch";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { adminButtonClass } from "@/features/admin/components/ui/button-classes";
 import { ADMIN_CONTROL_CLS } from "@/features/admin/components/ui/field-classes";
 import { QUICK_ACTIONS, quickActionHref } from "@/features/admin/lib/quick-actions";
 import { signOut } from "@/features/admin/lib/sign-out";
@@ -198,7 +199,7 @@ export function AdminTopBar({
         {/* Phones get the same shortcuts from the + button instead. */}
         <div className="ml-auto hidden shrink-0 items-center gap-2 lg:flex">
           <div ref={menuWrapRef} className="relative" onKeyDown={onMenuKeyDown}>
-            {/* Mirrors AdminButton primary/sm, which has no way to take the menu-button ARIA or a ref. */}
+            {/* AdminButton's primary look on a native button, since AdminButton has no way to take the menu-button ARIA or a ref. */}
             <button
               ref={quickButtonRef}
               id={quickButtonId}
@@ -207,7 +208,7 @@ export function AdminTopBar({
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               aria-controls={menuOpen ? menuId : undefined}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-coquelicot-600 px-4 text-[0.9375rem] font-bold whitespace-nowrap text-white transition-colors select-none hover:bg-coquelicot-700 pointer-coarse:min-h-11"
+              className={adminButtonClass({ variant: "primary" })}
             >
               <FaPlus aria-hidden className="text-sm" />
               Quick actions

@@ -7,7 +7,7 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
-import { COMPACT_BUTTON_CLS } from "@/features/business/components/calculator/calculator-classes";
+import { ADMIN_CHECKBOX_CLS } from "@/features/admin/components/ui/field-classes";
 import { minsToHoursLabel } from "@/features/business/lib/business";
 import {
   findMergeSuggestions,
@@ -285,7 +285,7 @@ export function EventPickerSection({
           title="Bill a calendar event"
           className="mb-0 items-center"
           actions={
-            <AdminButton variant="secondary" className={COMPACT_BUTTON_CLS} onClick={togglePicker}>
+            <AdminButton variant="secondary" size="xs" onClick={togglePicker}>
               {pickerOpen ? "Hide" : "Pick a recent event"}
             </AdminButton>
           }
@@ -331,11 +331,7 @@ export function EventPickerSection({
             </>
           )}
         </p>
-        <AdminButton
-          variant="secondary"
-          className={cn(COMPACT_BUTTON_CLS, "shrink-0")}
-          onClick={togglePicker}
-        >
+        <AdminButton variant="secondary" size="xs" className="shrink-0" onClick={togglePicker}>
           {pickerOpen ? "Hide" : "Change event"}
         </AdminButton>
       </div>
@@ -355,11 +351,7 @@ export function EventPickerSection({
             {prefill.jobDate}, {prefill.slots.map((s) => `${s.startTime}-${s.endTime}`).join(" + ")}
             ).
           </span>
-          <AdminButton
-            variant="secondary"
-            className={COMPACT_BUTTON_CLS}
-            onClick={onResetToEventTimes}
-          >
+          <AdminButton variant="secondary" size="xs" onClick={onResetToEventTimes}>
             Reset to event times
           </AdminButton>
         </div>
@@ -381,7 +373,7 @@ export function EventPickerSection({
                 type="checkbox"
                 checked={isTicked(s.event.id, s.preselected)}
                 onChange={(e) => setTicked((prev) => ({ ...prev, [s.event.id]: e.target.checked }))}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-russian-violet"
+                className={ADMIN_CHECKBOX_CLS}
               />
               <span className="min-w-0">
                 <span className="font-medium">{s.event.summary}</span>{" "}
@@ -393,7 +385,7 @@ export function EventPickerSection({
           ))}
           <AdminButton
             variant="outline"
-            className={COMPACT_BUTTON_CLS}
+            size="xs"
             disabled={chosen.length === 0}
             onClick={() => onBillEvents([...billedIds, ...chosen.map((s) => s.event.id)])}
           >

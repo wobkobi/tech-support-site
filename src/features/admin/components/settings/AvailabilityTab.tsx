@@ -22,12 +22,9 @@ import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
+import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
 import { hourLabel } from "@/features/booking/lib/booking";
-import {
-  chipClass,
-  COMPACT_BUTTON_CLS,
-} from "@/features/business/components/calculator/calculator-classes";
 import { cn } from "@/shared/lib/cn";
 import { AVAILABILITY_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { AvailabilitySettings, DayWindow, MorningGuard } from "@/shared/lib/settings/types";
@@ -411,11 +408,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                 onChange={(e) => setGuard(gi, { label: e.target.value })}
                 className="w-auto min-w-0 flex-1"
               />
-              <AdminButton
-                variant="danger"
-                className={COMPACT_BUTTON_CLS}
-                onClick={() => removeGuard(gi)}
-              >
+              <AdminButton variant="danger" size="xs" onClick={() => removeGuard(gi)}>
                 Remove
               </AdminButton>
             </div>
@@ -447,7 +440,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                   type="button"
                   aria-pressed={g.protectedDays.includes(d.index)}
                   onClick={() => toggleProtectedDay(gi, d.index)}
-                  className={chipClass(g.protectedDays.includes(d.index))}
+                  className={adminChipClass(g.protectedDays.includes(d.index))}
                 >
                   {d.name.slice(0, 3)}
                 </button>

@@ -17,7 +17,6 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { ROW_BUTTON_CLS } from "@/features/business/components/ledger-classes";
 import type { TaxonomyTag } from "@/features/business/lib/task-taxonomy";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -310,8 +309,10 @@ function TagSection({
                 key={name}
                 className={cn(
                   "flex items-center justify-between gap-3 rounded-lg border px-3 py-2",
+                  // The pending confirm (label + two buttons) is wider than a phone row,
+                  // so it may drop under the name and wrap its buttons.
                   isPending
-                    ? "border-red-300 bg-red-50"
+                    ? "flex-wrap gap-y-2 border-red-300 bg-red-50"
                     : isRenaming
                       ? "border-admin-border-strong bg-admin-bg"
                       : "border-admin-border",
@@ -336,16 +337,10 @@ function TagSection({
                         variant="outline"
                         disabled={isBusy}
                         onClick={() => onSubmitRename(name)}
-                        className={ROW_BUTTON_CLS}
                       >
                         {isBusy ? "Saving..." : "Save"}
                       </AdminButton>
-                      <AdminButton
-                        size="xs"
-                        variant="ghost"
-                        onClick={onCancelRename}
-                        className={ROW_BUTTON_CLS}
-                      >
+                      <AdminButton size="xs" variant="ghost" onClick={onCancelRename}>
                         Cancel
                       </AdminButton>
                     </div>
@@ -361,22 +356,16 @@ function TagSection({
                       )}
                     </span>
                     {isPending ? (
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="text-sm font-semibold text-red-700">Clear for good?</span>
                         <AdminButton
                           size="xs"
                           variant="danger"
                           onClick={() => onConfirmClear(name)}
-                          className={ROW_BUTTON_CLS}
                         >
                           Yes, clear
                         </AdminButton>
-                        <AdminButton
-                          size="xs"
-                          variant="ghost"
-                          onClick={onCancelClear}
-                          className={ROW_BUTTON_CLS}
-                        >
+                        <AdminButton size="xs" variant="ghost" onClick={onCancelClear}>
                           Cancel
                         </AdminButton>
                       </div>
@@ -387,7 +376,6 @@ function TagSection({
                           variant="secondary"
                           disabled={isBusy}
                           onClick={() => onRequestRename(name)}
-                          className={ROW_BUTTON_CLS}
                         >
                           Rename
                         </AdminButton>
@@ -396,7 +384,6 @@ function TagSection({
                           variant="danger"
                           disabled={isBusy}
                           onClick={() => onRequestClear(name)}
-                          className={ROW_BUTTON_CLS}
                         >
                           {isBusy ? "Clearing..." : "Clear"}
                         </AdminButton>

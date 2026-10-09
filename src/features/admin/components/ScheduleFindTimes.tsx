@@ -11,7 +11,10 @@
 import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card } from "@/features/admin/components/ui/Card";
-import { cn } from "@/shared/lib/cn";
+import {
+  SEGMENTED_GROUP_CLS,
+  segmentedButtonClass,
+} from "@/features/admin/components/ui/chip-classes";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
@@ -144,18 +147,13 @@ export function ScheduleFindTimes(): React.ReactElement {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="text-sm font-bold text-admin-text">Next open times</span>
 
-        <div className="inline-flex rounded-lg border border-admin-border bg-admin-bg p-0.5">
+        <div className={SEGMENTED_GROUP_CLS}>
           {(["short", "long"] as const).map((d) => (
             <button
               key={d}
               type="button"
               onClick={() => setDuration(d)}
-              className={cn(
-                "h-9 rounded-md px-3 text-sm font-semibold transition-colors",
-                duration === d
-                  ? "bg-russian-violet text-white"
-                  : "text-admin-text-secondary hover:bg-admin-surface",
-              )}
+              className={segmentedButtonClass(duration === d)}
             >
               {d === "short" ? "Short" : "Long"}
             </button>

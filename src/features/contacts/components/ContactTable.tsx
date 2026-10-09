@@ -7,6 +7,7 @@
 // so the row actions stay in view when a narrow screen scrolls the table sideways.
 
 import {
+  PINNED_CELL_CLS,
   ROW_CLS,
   TABLE_CLS,
   TBODY_CLS,
@@ -14,13 +15,13 @@ import {
   TH_CLS,
   THEAD_CLS,
 } from "@/features/admin/components/ui/admin-table";
+import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import {
   ContactCard,
   type ContactCardProps,
   type ContactRow,
 } from "@/features/contacts/components/ContactCard";
 import {
-  CONTACT_LINK_CLS,
   ContactDeleteConfirm,
   ContactReviewsList,
   ContactReviewsToggle,
@@ -45,12 +46,6 @@ const HEAD_CLS = cn(TH_CLS, "px-3");
 
 /** The narrow Sync and Reviewed cells: tighter padding so the pill and toggle fit 6rem. */
 const NARROW_CELL_CLS = cn(TD_CLS, "px-2 align-top");
-
-/**
- * Pinned actions column. Collapsed table borders don't travel with a sticky cell, so the
- * left rule is an inset shadow. The background is opaque so scrolled cells pass under it.
- */
-const PINNED_CLS = "sticky right-0 shadow-[inset_1px_0_0_var(--color-admin-border)]";
 
 /**
  * Content of a full-width row (editor or expanding panel). The table can be wider than its
@@ -110,7 +105,7 @@ function ContactTableRow({
         </td>
         <td className={CELL_CLS}>
           {c.email ? (
-            <a href={`mailto:${c.email}`} className={cn("text-sm break-all", CONTACT_LINK_CLS)}>
+            <a href={`mailto:${c.email}`} className={cn("text-sm break-all", ADMIN_LINK_CLS)}>
               {c.email}
             </a>
           ) : (
@@ -153,7 +148,7 @@ function ContactTableRow({
         <td
           className={cn(
             CELL_CLS,
-            PINNED_CLS,
+            PINNED_CELL_CLS,
             "px-2",
             expanded ? "bg-admin-bg" : "bg-admin-surface group-hover:bg-admin-bg",
           )}
@@ -234,7 +229,9 @@ export function ContactTable({
             <th className={HEAD_CLS}>Address</th>
             <th className={cn(HEAD_CLS, "px-2")}>Sync</th>
             <th className={cn(HEAD_CLS, "px-2")}>Reviewed</th>
-            <th className={cn(HEAD_CLS, PINNED_CLS, "bg-admin-bg px-2 text-right")}>Actions</th>
+            <th className={cn(HEAD_CLS, PINNED_CELL_CLS, "bg-admin-bg px-2 text-right")}>
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody className={TBODY_CLS}>

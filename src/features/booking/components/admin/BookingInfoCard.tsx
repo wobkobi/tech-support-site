@@ -13,8 +13,12 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
+import {
+  ADMIN_INPUT_CLS,
+  ADMIN_LINK_CLS,
+  ADMIN_META_LABEL_CLS,
+} from "@/features/admin/components/ui/field-classes";
 import { FieldError } from "@/features/admin/components/ui/FieldError";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import {
   type ContactFieldErrors,
   checkContactFields,
@@ -48,9 +52,6 @@ interface BookingInfoCardProps {
   accessNotes: string | null;
 }
 
-/** Label over a read-only value row. */
-const LABEL_CLS = "text-sm font-semibold text-admin-muted uppercase";
-
 /**
  * A read-only label/value row.
  * @param props - Component props.
@@ -67,7 +68,7 @@ function Row({
 }): React.ReactElement {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className={LABEL_CLS}>{label}</span>
+      <span className={ADMIN_META_LABEL_CLS}>{label}</span>
       <span className="text-sm wrap-break-word text-admin-text">{children}</span>
     </div>
   );
@@ -193,19 +194,13 @@ export function BookingInfoCard({
         </div>
         <Row label="Name">{name}</Row>
         <Row label="Email">
-          <a
-            href={`mailto:${email}`}
-            className="font-semibold text-russian-violet underline underline-offset-2 hover:decoration-2"
-          >
+          <a href={`mailto:${email}`} className={ADMIN_LINK_CLS}>
             {email}
           </a>
         </Row>
         <Row label="Phone">
           {phone ? (
-            <a
-              href={`tel:${phone}`}
-              className="font-semibold text-russian-violet underline underline-offset-2 hover:decoration-2"
-            >
+            <a href={`tel:${phone}`} className={ADMIN_LINK_CLS}>
               {phone}
             </a>
           ) : (
@@ -219,7 +214,7 @@ export function BookingInfoCard({
               href={mapsSearchUrl(initialAddress)}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold whitespace-nowrap text-russian-violet underline underline-offset-2 hover:decoration-2"
+              className={cn(ADMIN_LINK_CLS, "whitespace-nowrap")}
             >
               Maps ↗
             </a>

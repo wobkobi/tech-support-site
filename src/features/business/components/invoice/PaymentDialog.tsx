@@ -12,6 +12,7 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { ADMIN_CHECKBOX_CLS } from "@/features/admin/components/ui/field-classes";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { formatNZD, todayISO } from "@/features/business/lib/business";
@@ -20,9 +21,6 @@ import { reminderChasedPaidInvoice } from "@/features/business/lib/invoice-apolo
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
 import { useId, useState } from "react";
-
-/** Checkbox beside a two-line label, nudged down to sit level with the first line. */
-const CHECKBOX_CLS = "mt-0.5 h-4 w-4 shrink-0 accent-russian-violet";
 
 /** The minimal invoice shape the dialog needs. */
 interface PaymentDialogInvoice {
@@ -218,7 +216,7 @@ export function PaymentDialog({
               type="checkbox"
               checked={adoptLikely}
               onChange={(e) => setAdoptLikely(e.target.checked)}
-              className={CHECKBOX_CLS}
+              className={ADMIN_CHECKBOX_CLS}
             />
             <span>
               <span className="font-medium text-admin-text">
@@ -239,7 +237,7 @@ export function PaymentDialog({
               type="checkbox"
               checked={createIncome}
               onChange={(e) => setCreateIncome(e.target.checked)}
-              className={CHECKBOX_CLS}
+              className={ADMIN_CHECKBOX_CLS}
             />
             <span>
               <span className="font-medium text-admin-text">Record income entry</span>
@@ -260,7 +258,7 @@ export function PaymentDialog({
               type="checkbox"
               checked={sendApology}
               onChange={(e) => setSendApology(e.target.checked)}
-              className={CHECKBOX_CLS}
+              className={ADMIN_CHECKBOX_CLS}
             />
             <span>
               <span className="font-medium text-admin-text">Apologise for the reminder</span>

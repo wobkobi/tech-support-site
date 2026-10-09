@@ -6,6 +6,7 @@
 // these only render the rows it hands over.
 
 import {
+  PINNED_CELL_CLS,
   ROW_CLS,
   TABLE_CLS,
   TBODY_CLS,
@@ -13,6 +14,7 @@ import {
 } from "@/features/admin/components/ui/admin-table";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
+import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { SortableTh } from "@/features/admin/components/ui/SortableTh";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import {
@@ -20,13 +22,7 @@ import {
   matchCount,
   MIGRATE_MIN_MATCHES,
 } from "@/features/business/components/expenses-recurrence";
-import {
-  LEDGER_LINK_CLS,
-  LEDGER_TD_CLS,
-  LEDGER_TH_CLS,
-  PINNED_CLS,
-  ROW_BUTTON_CLS,
-} from "@/features/business/components/ledger-classes";
+import { LEDGER_TD_CLS, LEDGER_TH_CLS } from "@/features/business/components/ledger-classes";
 import { formatNZD } from "@/features/business/lib/business";
 import { expenseTaxBasis } from "@/features/business/lib/tax/gst-basis";
 import type { GstStatus } from "@/features/business/lib/tax/types";
@@ -159,34 +155,19 @@ function ExpenseRowActions({
         gst={gst}
         threshold={assetThreshold}
         linked={linkedSet.has(entry.id)}
-        className={cn(LEDGER_LINK_CLS, "inline-flex h-8 items-center whitespace-nowrap")}
+        className={cn("text-sm", ADMIN_LINK_CLS, "inline-flex h-8 items-center whitespace-nowrap")}
       />
       {canMigrate(entry) && (
-        <AdminButton
-          size="xs"
-          variant="secondary"
-          onClick={() => onMigrate(entry)}
-          className={ROW_BUTTON_CLS}
-        >
+        <AdminButton size="xs" variant="secondary" onClick={() => onMigrate(entry)}>
           Migrate
         </AdminButton>
       )}
       {/* Edit and Delete wrap as a pair, so a wrapped row never splits them. */}
       <span className="flex gap-2">
-        <AdminButton
-          size="xs"
-          variant="secondary"
-          onClick={() => onEdit(entry)}
-          className={ROW_BUTTON_CLS}
-        >
+        <AdminButton size="xs" variant="secondary" onClick={() => onEdit(entry)}>
           Edit
         </AdminButton>
-        <AdminButton
-          size="xs"
-          variant="danger"
-          onClick={() => onDelete(entry.id)}
-          className={ROW_BUTTON_CLS}
-        >
+        <AdminButton size="xs" variant="danger" onClick={() => onDelete(entry.id)}>
           Delete
         </AdminButton>
       </span>
@@ -315,7 +296,7 @@ export function ExpensesListTable({
               onSort={() => onSort("amount")}
               className="max-xl:px-3"
             />
-            <th className={cn(LEDGER_TH_CLS, PINNED_CLS, "bg-admin-bg")} />
+            <th className={cn(LEDGER_TH_CLS, PINNED_CELL_CLS, "bg-admin-bg")} />
           </tr>
         </thead>
         <tbody className={TBODY_CLS}>
@@ -347,7 +328,7 @@ export function ExpensesListTable({
               <td
                 className={cn(
                   LEDGER_TD_CLS,
-                  PINNED_CLS,
+                  PINNED_CELL_CLS,
                   "bg-admin-surface group-hover:bg-admin-bg max-xl:w-44",
                 )}
               >

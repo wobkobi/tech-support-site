@@ -5,8 +5,8 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
+import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
-import { LEDGER_LINK_CLS } from "@/features/business/components/ledger-classes";
 import { dateLabel, firstLine } from "@/features/social/components/social-list-helpers";
 import { POST_STATUS_PILL } from "@/features/social/lib/post-display";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
@@ -128,7 +128,7 @@ function PostedRow({
                       href={t.permalink}
                       target="_blank"
                       rel="noreferrer"
-                      className={LEDGER_LINK_CLS}
+                      className={cn("text-sm", ADMIN_LINK_CLS)}
                     >
                       See it on {label}
                     </a>

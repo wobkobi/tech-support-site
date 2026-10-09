@@ -7,6 +7,7 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import type { ContactRow, MergeRole } from "@/features/contacts/components/ContactCard";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
@@ -14,18 +15,14 @@ import { cn } from "@/shared/lib/cn";
 import { formatNZPhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 
-/** Inline link inside a contact row or panel: underlined violet, as on the detail pages. */
-export const CONTACT_LINK_CLS =
-  "font-semibold text-russian-violet underline underline-offset-2 hover:decoration-2";
-
-/** Compact row-action button: a little shorter and tighter than the kit default. */
+/**
+ * Compact row-action button: h-9, between the kit's xs and sm, with tighter padding. No
+ * kit size matches, so it stays an override on the default size.
+ */
 const ROW_ACTION_CLS = "h-9 px-2";
 
-/**
- * Tighter still, for the desktop table's actions column: the kit's xs height and padding
- * at text-sm (the xs size itself shrinks the text too), with the xs touch-target floor.
- */
-const TABLE_ACTION_CLS = "h-8 px-1.5 pointer-coarse:min-h-11";
+/** Tighter side padding on the xs size, for the desktop table's narrow actions column. */
+const TABLE_ACTION_CLS = "px-1.5";
 
 /**
  * Sync state for a contact: the "Synced" pill, "Syncing…" while a push runs, or the
@@ -129,9 +126,10 @@ export function ContactRowActions({
   onCancelMerge: () => void;
 }): React.ReactElement {
   const btnCls = compact ? TABLE_ACTION_CLS : ROW_ACTION_CLS;
+  const btnSize = compact ? "xs" : "sm";
   if (mergeRole === "target") {
     return (
-      <AdminButton variant="outline" onClick={onMergeHere} className={btnCls}>
+      <AdminButton size={btnSize} variant="outline" onClick={onMergeHere} className={btnCls}>
         Keep this one
       </AdminButton>
     );
@@ -139,6 +137,7 @@ export function ContactRowActions({
   if (mergeRole === "source") {
     return (
       <AdminButton
+        size={btnSize}
         variant="secondary"
         onClick={onCancelMerge}
         className={cn(
@@ -152,13 +151,14 @@ export function ContactRowActions({
   }
   return (
     <>
-      <AdminButton variant="ghost" onClick={onStartEdit} className={btnCls}>
+      <AdminButton size={btnSize} variant="ghost" onClick={onStartEdit} className={btnCls}>
         Edit
       </AdminButton>
-      <AdminButton variant="ghost" onClick={onStartMerge} className={btnCls}>
+      <AdminButton size={btnSize} variant="ghost" onClick={onStartMerge} className={btnCls}>
         Merge
       </AdminButton>
       <AdminButton
+        size={btnSize}
         variant="ghost"
         onClick={onRequestDelete}
         className={cn(btnCls, "text-coquelicot-700 hover:bg-coquelicot-50")}
@@ -284,7 +284,7 @@ export function ContactReviewsList({
                 href={`/review?token=${rv.customerRef}`}
                 target="_blank"
                 rel="noreferrer"
-                className={cn("shrink-0 text-sm", CONTACT_LINK_CLS)}
+                className={cn("shrink-0 text-sm", ADMIN_LINK_CLS)}
               >
                 Review link ↗
               </a>

@@ -3,10 +3,8 @@
 // Button that copies a review link to the clipboard.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useState } from "react";
-import { ROW_BUTTON_CLS } from "./review-admin-classes";
 
 /**
  * Props for the {@link CopyLinkButton} component.
@@ -36,7 +34,8 @@ export function CopyLinkButton({ url }: CopyLinkButtonProps): React.ReactElement
     <AdminButton
       variant="secondary"
       onClick={handleCopy}
-      className={cn(ROW_BUTTON_CLS, copied && "border-moonstone-600 text-moonstone-700")}
+      size="xs"
+      className={copied ? "border-moonstone-600 text-moonstone-700" : undefined}
     >
       {copied ? "Copied!" : "Copy link"}
     </AdminButton>

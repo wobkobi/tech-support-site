@@ -6,10 +6,7 @@
 // its own audit row, so a revert is just another tracked change.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import {
-  COMPACT_BUTTON_CLS,
-  TEXT_ACTION_CLS,
-} from "@/features/business/components/calculator/calculator-classes";
+import { TEXT_ACTION_CLS } from "@/features/business/components/calculator/calculator-classes";
 import { formatDateTimeLong } from "@/shared/lib/date-format";
 import type { SettingsGroup } from "@/shared/lib/settings/types";
 import type React from "react";
@@ -120,7 +117,8 @@ export function SettingsHistory<T>({ group, onRestore }: Props<T>): React.ReactE
                   {i !== 0 && (
                     <AdminButton
                       variant="secondary"
-                      className={`shrink-0 ${COMPACT_BUTTON_CLS}`}
+                      size="xs"
+                      className="shrink-0"
                       onClick={() => restore(e)}
                     >
                       {restoredId === e.id ? "Loaded" : "Restore"}

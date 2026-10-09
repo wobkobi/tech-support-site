@@ -11,7 +11,6 @@ import { formatDateShort } from "@/shared/lib/date-format";
 import { formatNZPhone, isValidPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { CopyLinkButton } from "./CopyLinkButton";
-import { ROW_BUTTON_CLS } from "./review-admin-classes";
 import type { LinkHistoryEntry, LinkSource } from "./ReviewLinkHistoryTable";
 
 /**
@@ -187,11 +186,11 @@ export function ContactEditForm({
           variant="outline"
           disabled={saving || (!!phone && !phoneValid)}
           onClick={onSave}
-          className={ROW_BUTTON_CLS}
+          size="xs"
         >
           {saving ? "Saving…" : "Save"}
         </AdminButton>
-        <AdminButton variant="ghost" onClick={onCancel} className={ROW_BUTTON_CLS}>
+        <AdminButton variant="ghost" onClick={onCancel} size="xs">
           Cancel
         </AdminButton>
       </div>
@@ -224,7 +223,7 @@ export function HistoryRowActions({
     <>
       {entry.reviewUrl !== "" && <CopyLinkButton url={entry.reviewUrl} />}
       {entry.id && entry.email && (
-        <AdminButton variant="outline" onClick={onSendAgain} className={ROW_BUTTON_CLS}>
+        <AdminButton variant="outline" onClick={onSendAgain} size="xs">
           Send again
         </AdminButton>
       )}
@@ -232,7 +231,8 @@ export function HistoryRowActions({
         <AdminButton
           variant="danger"
           onClick={onRevoke}
-          className={cn(ROW_BUTTON_CLS, pushRevokeRight && "ml-auto")}
+          size="xs"
+          className={pushRevokeRight ? "ml-auto" : undefined}
         >
           Revoke
         </AdminButton>

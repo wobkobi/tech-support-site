@@ -5,16 +5,18 @@
 
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
+import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
+import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useState } from "react";
 import { ContactPicker, type ContactPickerEntry } from "./ContactPicker";
-import { chipClass } from "./review-admin-classes";
 import type { ReviewRow } from "./review-types";
 import { ReviewCard } from "./ReviewCard";
 import { SendReviewLinkForm } from "./SendReviewLinkForm";
@@ -191,7 +193,7 @@ export function ReviewApprovalList({
     return (
       <button
         onClick={() => setLinkingId(row.id)}
-        className="rounded px-1 py-0.5 text-sm font-semibold text-russian-violet underline underline-offset-2 hover:decoration-2"
+        className={cn("rounded px-1 py-0.5 text-sm", ADMIN_LINK_CLS)}
       >
         Link contact
       </button>
@@ -247,7 +249,7 @@ export function ReviewApprovalList({
                 key={s}
                 type="button"
                 onClick={() => setStatusFilter(s)}
-                className={chipClass(statusFilter === s)}
+                className={adminChipClass(statusFilter === s)}
               >
                 {s === "all" ? "All" : s === "pending" ? "Pending" : "Approved"}
               </button>
@@ -256,14 +258,14 @@ export function ReviewApprovalList({
             <button
               type="button"
               onClick={() => setVerifiedOnly((v) => !v)}
-              className={chipClass(verifiedOnly)}
+              className={adminChipClass(verifiedOnly)}
             >
               Verified only
             </button>
             <button
               type="button"
               onClick={() => setUnlinkedOnly((v) => !v)}
-              className={chipClass(unlinkedOnly)}
+              className={adminChipClass(unlinkedOnly)}
             >
               Unlinked only
             </button>

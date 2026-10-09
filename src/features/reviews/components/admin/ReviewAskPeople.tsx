@@ -8,7 +8,9 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
+import { ADMIN_CHECKBOX_CLS } from "@/features/admin/components/ui/field-classes";
 import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
@@ -16,11 +18,11 @@ import { StatusPill, type StatusTone } from "@/features/admin/components/ui/Stat
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import type { AskPersonStatus } from "@/features/reviews/lib/review-ask-rules";
 import { apiFetch } from "@/shared/lib/api-client";
+import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { formatNZPhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useState } from "react";
-import { chipClass, ROW_BUTTON_CLS } from "./review-admin-classes";
 import { useSendReviewAsk, type ReviewAskTarget } from "./use-send-review-ask";
 
 /** One contact in the list. */
@@ -240,11 +242,7 @@ export function ReviewAskPeople({
     };
     if (p.status === "text_only") {
       return (
-        <AdminButton
-          variant="secondary"
-          onClick={() => ask.start(target, "sms")}
-          className={ROW_BUTTON_CLS}
-        >
+        <AdminButton variant="secondary" onClick={() => ask.start(target, "sms")} size="xs">
           Text
         </AdminButton>
       );
@@ -254,7 +252,7 @@ export function ReviewAskPeople({
       <AdminButton
         variant={p.status === "ready" ? "outline" : "secondary"}
         onClick={() => ask.start(target, "email")}
-        className={ROW_BUTTON_CLS}
+        size="xs"
       >
         {p.lastAskedAt ? "Send again" : "Send"}
       </AdminButton>
@@ -282,7 +280,7 @@ export function ReviewAskPeople({
               type="button"
               onClick={() => setFilter(f.value)}
               aria-pressed={filter === f.value}
-              className={chipClass(filter === f.value)}
+              className={adminChipClass(filter === f.value)}
             >
               {f.label} ({count})
             </button>
@@ -316,14 +314,10 @@ export function ReviewAskPeople({
           </label>
           {chosen.length > 0 && (
             <div className="flex gap-2">
-              <AdminButton
-                variant="secondary"
-                onClick={() => setSelected(new Set())}
-                className={ROW_BUTTON_CLS}
-              >
+              <AdminButton variant="secondary" onClick={() => setSelected(new Set())} size="xs">
                 Clear
               </AdminButton>
-              <AdminButton onClick={() => setBulk({ kind: "confirm" })} className={ROW_BUTTON_CLS}>
+              <AdminButton onClick={() => setBulk({ kind: "confirm" })} size="xs">
                 Send to {chosen.length} {peopleWord(chosen.length)}
               </AdminButton>
             </div>
@@ -346,7 +340,7 @@ export function ReviewAskPeople({
                     checked={selected.has(p.id)}
                     onChange={(e) => toggle(p.id, e.target.checked)}
                     aria-label={`Select ${p.name}`}
-                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-admin-border-strong accent-russian-violet"
+                    className={cn(ADMIN_CHECKBOX_CLS, "rounded border-admin-border-strong")}
                   />
                 ) : (
                   <span className="w-4 shrink-0" aria-hidden />

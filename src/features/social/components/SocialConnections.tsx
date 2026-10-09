@@ -5,7 +5,6 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
-import { ROW_BUTTON_CLS } from "@/features/business/components/ledger-classes";
 import type { Connection } from "@/features/social/lib/post-display";
 import { PLATFORM_LABEL } from "@/features/social/lib/validate";
 import type React from "react";
@@ -48,13 +47,7 @@ export function SocialConnections({
             </span>
           ))
         )}
-        <AdminButton
-          size="xs"
-          variant="secondary"
-          className={ROW_BUTTON_CLS}
-          busy={checking}
-          onClick={onCheck}
-        >
+        <AdminButton size="xs" variant="secondary" busy={checking} onClick={onCheck}>
           Check
         </AdminButton>
       </div>

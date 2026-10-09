@@ -8,6 +8,7 @@
 // instrumented.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { InfoRow } from "@/features/admin/components/ui/InfoRow";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
@@ -20,6 +21,7 @@ import { formatMins, formatNZD } from "@/features/business/lib/business";
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { Notice } from "@/shared/components/Notice";
 import { requireAdminAuth } from "@/shared/lib/auth";
+import { cn } from "@/shared/lib/cn";
 import { formatDateShort, formatDateTimeShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
 import { ServerTimer } from "@/shared/lib/server-timing";
@@ -327,10 +329,7 @@ export default async function BookingDetailPage({
             <dl className="space-y-2 text-sm">
               <InfoRow label="Contact">
                 {contact ? (
-                  <Link
-                    href={`/admin/contacts/${contact.id}`}
-                    className="font-semibold text-russian-violet underline underline-offset-2 hover:decoration-2"
-                  >
+                  <Link href={`/admin/contacts/${contact.id}`} className={ADMIN_LINK_CLS}>
                     {contact.name}
                   </Link>
                 ) : (
@@ -345,7 +344,7 @@ export default async function BookingDetailPage({
                       <li key={inv.id} className="flex items-center justify-between gap-2">
                         <Link
                           href={`/admin/business/invoices/${inv.id}`}
-                          className="font-mono font-semibold text-russian-violet underline underline-offset-2 hover:decoration-2"
+                          className={cn("font-mono", ADMIN_LINK_CLS)}
                         >
                           {inv.number}
                         </Link>
@@ -362,10 +361,7 @@ export default async function BookingDetailPage({
               </div>
               <InfoRow label="Review">
                 {review ? (
-                  <Link
-                    href="/admin/reviews"
-                    className="font-semibold text-russian-violet underline underline-offset-2 hover:decoration-2"
-                  >
+                  <Link href="/admin/reviews" className={ADMIN_LINK_CLS}>
                     {review.status}
                     {review.verified ? " · verified" : ""}
                     <span className="block text-sm font-normal text-admin-muted">

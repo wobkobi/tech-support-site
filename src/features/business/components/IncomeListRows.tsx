@@ -12,13 +12,9 @@ import {
 } from "@/features/admin/components/ui/admin-table";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
+import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { SortableTh } from "@/features/admin/components/ui/SortableTh";
-import {
-  LEDGER_LINK_CLS,
-  LEDGER_TD_CLS,
-  LEDGER_TH_CLS,
-  ROW_BUTTON_CLS,
-} from "@/features/business/components/ledger-classes";
+import { LEDGER_TD_CLS, LEDGER_TH_CLS } from "@/features/business/components/ledger-classes";
 import { formatNZD } from "@/features/business/lib/business";
 import type { IncomeEntry } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
@@ -60,20 +56,10 @@ function IncomeRowActions({
 }): React.ReactElement {
   return (
     <>
-      <AdminButton
-        size="xs"
-        variant="secondary"
-        onClick={() => onEdit(entry)}
-        className={ROW_BUTTON_CLS}
-      >
+      <AdminButton size="xs" variant="secondary" onClick={() => onEdit(entry)}>
         Edit
       </AdminButton>
-      <AdminButton
-        size="xs"
-        variant="danger"
-        onClick={() => onDelete(entry.id)}
-        className={ROW_BUTTON_CLS}
-      >
+      <AdminButton size="xs" variant="danger" onClick={() => onDelete(entry.id)}>
         Delete
       </AdminButton>
     </>
@@ -108,7 +94,10 @@ export function IncomeListCards({ rows, onEdit, onDelete }: IncomeRowsProps): Re
             <span>{formatDateShort(e.date)}</span>
             <span>{e.method}</span>
             {e.invoiceId && (
-              <Link href={`/admin/business/invoices/${e.invoiceId}`} className={LEDGER_LINK_CLS}>
+              <Link
+                href={`/admin/business/invoices/${e.invoiceId}`}
+                className={cn("text-sm", ADMIN_LINK_CLS)}
+              >
                 Invoice ↗
               </Link>
             )}
@@ -189,7 +178,7 @@ export function IncomeListTable({
                 {e.invoiceId && (
                   <Link
                     href={`/admin/business/invoices/${e.invoiceId}`}
-                    className={cn(LEDGER_LINK_CLS, "ml-2 whitespace-nowrap")}
+                    className={cn("text-sm", ADMIN_LINK_CLS, "ml-2 whitespace-nowrap")}
                   >
                     Invoice ↗
                   </Link>

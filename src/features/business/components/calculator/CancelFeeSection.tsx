@@ -6,11 +6,8 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
-import {
-  COMPACT_BUTTON_CLS,
-  chipClass,
-} from "@/features/business/components/calculator/calculator-classes";
 import type { CancelMeetingType, CancellationReason } from "@/features/business/lib/pricing-policy";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -160,7 +157,7 @@ export function CancelFeeSection({
         title="Early cancel"
         className="mb-0 items-center"
         actions={
-          <AdminButton variant="ghost" className={COMPACT_BUTTON_CLS} onClick={onExit}>
+          <AdminButton variant="ghost" size="xs" onClick={onExit}>
             Back to job calculator
           </AdminButton>
         }
@@ -182,7 +179,7 @@ export function CancelFeeSection({
                 type="button"
                 onClick={() => onReasonChange(r.value)}
                 aria-pressed={reason === r.value}
-                className={chipClass(reason === r.value)}
+                className={adminChipClass(reason === r.value)}
               >
                 {r.label}
               </button>
@@ -198,7 +195,7 @@ export function CancelFeeSection({
                 type="button"
                 onClick={() => onMeetingTypeChange(m.value)}
                 aria-pressed={meetingType === m.value}
-                className={chipClass(meetingType === m.value)}
+                className={adminChipClass(meetingType === m.value)}
               >
                 {m.label}
               </button>

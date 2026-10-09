@@ -3,14 +3,16 @@
 // owns the state through the URL, e.g. `?fy=`); otherwise it is a button that calls
 // `onSelect`. Roving tabindex: Tab enters the strip on the active tab, the arrow keys and
 // Home/End move focus between tabs, and Enter/Space activates (manual activation, so
-// arrowing past a tab never fires a navigation or a state change on its own).
+// arrowing past a tab never fires a navigation or a state change on its own). On phones
+// the strip scrolls sideways, and a selected tab past the edge (a deep link such as
+// `?tab=rates`) is scrolled into view within the strip.
 
 "use client";
 
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import type React from "react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 /** One tab in an {@link AdminTabs} strip. */
 export interface AdminTab<K extends string> {
@@ -54,6 +56,26 @@ export function AdminTabs<K extends string>({
   ...aria
 }: AdminTabsProps<K>): React.ReactElement {
   const tabRefs = useRef<Array<HTMLAnchorElement | HTMLButtonElement | null>>([]);
+  const listRef = useRef<HTMLDivElement>(null);
+  const activeIndex = tabs.findIndex((t) => t.key === active);
+
+  // Bring the selected tab into the strip's own sideways scroll. Sets scrollLeft directly
+  // rather than calling scrollIntoView, which can also scroll the page vertically. A strip
+  // that doesn't overflow (every tab fits, or md and up where it wraps) is left alone.
+  useEffect(() => {
+    const list = listRef.current;
+    const tab = tabRefs.current[activeIndex];
+    if (!list || !tab || list.scrollWidth <= list.clientWidth) return;
+    // The tab's position within the scrolled content: its on-screen offset from the
+    // strip plus how far the strip is already scrolled. Measured from the boxes rather
+    // than offsetLeft, so a positioned ancestor can't skew it.
+    const left =
+      tab.getBoundingClientRect().left - list.getBoundingClientRect().left + list.scrollLeft;
+    const right = left + tab.offsetWidth;
+    if (left >= list.scrollLeft && right <= list.scrollLeft + list.clientWidth) return;
+    // Centre it; the browser clamps scrollLeft at either end.
+    list.scrollLeft = left - (list.clientWidth - tab.offsetWidth) / 2;
+  }, [activeIndex]);
 
   /**
    * Moves focus between tabs on arrow / Home / End. Space on a link tab follows the link,
@@ -81,6 +103,7 @@ export function AdminTabs<K extends string>({
   return (
     // Scrolls sideways on phones, wraps from md up so every tab shows.
     <div
+      ref={listRef}
       role="tablist"
       aria-label={aria["aria-label"]}
       className={cn(

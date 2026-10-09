@@ -13,10 +13,7 @@ import { useToast } from "@/features/admin/components/ui/Toast";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
-import {
-  COMPACT_BUTTON_CLS,
-  REMOVE_ROW_CLS,
-} from "@/features/business/components/calculator/calculator-classes";
+import { REMOVE_ROW_CLS } from "@/features/business/components/calculator/calculator-classes";
 import { formatNZD, travelEntriesTotal } from "@/features/business/lib/business";
 import { lookupStoreRunEntry } from "@/features/business/lib/calculator-helpers";
 import { breakdownTravelCharge } from "@/features/business/lib/pricing-policy";
@@ -350,12 +347,12 @@ export function TravelSection({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
-          <AdminButton variant="secondary" className={COMPACT_BUTTON_CLS} onClick={addEntry}>
+          <AdminButton variant="secondary" size="xs" onClick={addEntry}>
             + Add travel
           </AdminButton>
           <AdminButton
             variant="secondary"
-            className={COMPACT_BUTTON_CLS}
+            size="xs"
             onClick={addStoreRun}
             title="A drive from the client's place to a store and back during the job"
           >

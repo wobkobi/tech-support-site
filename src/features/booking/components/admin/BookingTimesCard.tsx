@@ -13,6 +13,7 @@ import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { ADMIN_META_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import { formatMins } from "@/features/business/lib/business";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
@@ -35,9 +36,6 @@ interface BookingTimesCardProps {
   /** Hours after the end before the past-edit lock closes the window. */
   lockHours: number;
 }
-
-/** Label over a time, in the read view and the edit form. */
-const LABEL_CLS = "text-sm font-semibold text-admin-muted uppercase";
 
 /**
  * Editable appointment times card.
@@ -132,15 +130,15 @@ export function BookingTimesCard({
           )}
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className={LABEL_CLS}>Start</span>
+          <span className={ADMIN_META_LABEL_CLS}>Start</span>
           <span className="text-sm text-admin-text">{formatDateTimeShort(startAt)}</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className={LABEL_CLS}>Finish</span>
+          <span className={ADMIN_META_LABEL_CLS}>Finish</span>
           <span className="text-sm text-admin-text">{formatDateTimeShort(endAt)}</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className={LABEL_CLS}>On site</span>
+          <span className={ADMIN_META_LABEL_CLS}>On site</span>
           <span className="text-sm text-admin-text">{formatMins(spanMins)}</span>
         </div>
         {locked && status !== "cancelled" && (

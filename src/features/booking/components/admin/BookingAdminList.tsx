@@ -18,6 +18,7 @@ import {
 } from "@/features/admin/components/ui/admin-table";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { SEGMENTED_GROUP_CLS } from "@/features/admin/components/ui/chip-classes";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
@@ -332,7 +333,7 @@ export function BookingAdminList({
       </div>
 
       {/* Status buckets. */}
-      <div className="inline-flex flex-wrap self-start rounded-lg border border-admin-border bg-admin-bg p-0.5">
+      <div className={cn(SEGMENTED_GROUP_CLS, "flex-wrap self-start")}>
         {FILTERS.map((f) => {
           const label = f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1);
           const count = f === "all" ? bookings.length : counts[f];

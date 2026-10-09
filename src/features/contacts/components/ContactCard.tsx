@@ -8,10 +8,9 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card } from "@/features/admin/components/ui/Card";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { ADMIN_INPUT_CLS, ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import {
-  CONTACT_LINK_CLS,
   ContactDeleteConfirm,
   ContactReviewsList,
   ContactReviewsToggle,
@@ -316,7 +315,7 @@ export function ContactCard({
         </div>
       )}
       {c.email ? (
-        <a href={`mailto:${c.email}`} className={cn("text-sm break-all", CONTACT_LINK_CLS)}>
+        <a href={`mailto:${c.email}`} className={cn("text-sm break-all", ADMIN_LINK_CLS)}>
           {c.email}
         </a>
       ) : (

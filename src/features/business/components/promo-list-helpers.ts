@@ -1,12 +1,17 @@
 // src/features/business/components/promo-list-helpers.ts
 // Lifecycle status, overlap detection and display phrases for the admin promo list,
-// shared by PromosView and its row/card markup.
+// shared by PromosView and its row/card markup, plus the restriction tag style the list
+// rows and the form's Advanced options summary share.
 
 import type { PromoRow } from "@/app/admin/(shell)/promos/page";
 import type { StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { formatNZD } from "@/features/business/lib/business";
 import { promoTypeOf } from "@/features/business/lib/promo-form";
 import { pickWinningPromo } from "@/features/business/lib/promos";
+
+/** Grey tag naming one restriction on a promo. */
+export const PROMO_TAG_CLS =
+  "rounded bg-admin-bg px-1.5 py-0.5 text-sm font-semibold text-admin-muted";
 
 /** Lifecycle bucket a promo sits in right now. */
 export type PromoStatus = "active" | "upcoming" | "expired" | "disabled";

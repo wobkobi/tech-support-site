@@ -5,6 +5,7 @@
 // only render the rows it hands over.
 
 import {
+  PINNED_CELL_CLS,
   ROW_CLS,
   TABLE_CLS,
   TBODY_CLS,
@@ -14,6 +15,7 @@ import {
 } from "@/features/admin/components/ui/admin-table";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
+import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { SortableTh } from "@/features/admin/components/ui/SortableTh";
 import { InvoiceStatusBadge } from "@/features/business/components/invoice/InvoiceStatusBadge";
 import {
@@ -34,18 +36,6 @@ import { FaCaretRight } from "react-icons/fa6";
 const CELL_CLS = cn(TD_CLS, "max-xl:px-3");
 /** Header cell with the same tighter padding. */
 const HEAD_CLS = cn(TH_CLS, "max-xl:px-3");
-
-/**
- * Actions column pinned to the right edge, so Send, Record payment and View stay on screen
- * when the table scrolls sideways. Collapsed table borders don't travel with a sticky
- * cell, so the left rule is an inset shadow; the background is opaque so scrolled cells
- * pass under it, and it follows the row's hover tint.
- */
-const PINNED_CLS = "sticky right-0 shadow-[inset_1px_0_0_var(--color-admin-border)]";
-
-/** Underlined violet text link, the admin card link style. */
-const LINK_CLS =
-  "text-sm font-semibold text-russian-violet underline underline-offset-2 hover:decoration-2";
 
 /**
  * Send (DRAFT) or Record payment (SENT invoice) for one row; never both.
@@ -138,7 +128,7 @@ export function InvoicesListCards({
                 href={inv.driveWebUrl}
                 target="_blank"
                 rel="noreferrer"
-                className={cn(LINK_CLS, "ml-auto inline-flex h-8 items-center")}
+                className={cn("text-sm", ADMIN_LINK_CLS, "ml-auto inline-flex h-8 items-center")}
               >
                 PDF ↗
               </a>
@@ -194,7 +184,7 @@ export function InvoicesListTable({
               />
             ))}
             <th className={HEAD_CLS}>PDF</th>
-            <th className={cn(HEAD_CLS, PINNED_CLS, "bg-admin-bg")} />
+            <th className={cn(HEAD_CLS, PINNED_CELL_CLS, "bg-admin-bg")} />
           </tr>
         </thead>
         <tbody className={TBODY_CLS}>
@@ -234,7 +224,7 @@ export function InvoicesListTable({
                     href={inv.driveWebUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className={cn(LINK_CLS, "whitespace-nowrap")}
+                    className={cn("text-sm", ADMIN_LINK_CLS, "whitespace-nowrap")}
                   >
                     PDF ↗
                   </a>
@@ -242,12 +232,18 @@ export function InvoicesListTable({
                   <span className="text-sm text-admin-muted">-</span>
                 )}
               </td>
-              <td className={cn(CELL_CLS, PINNED_CLS, "bg-admin-surface group-hover:bg-admin-bg")}>
+              <td
+                className={cn(
+                  CELL_CLS,
+                  PINNED_CELL_CLS,
+                  "bg-admin-surface group-hover:bg-admin-bg",
+                )}
+              >
                 <div className="flex items-center justify-end gap-2">
                   <InvoiceRowActions inv={inv} onPay={onPay} />
                   <Link
                     href={`/admin/business/invoices/${inv.id}`}
-                    className={cn(LINK_CLS, "inline-flex items-center gap-1")}
+                    className={cn("text-sm", ADMIN_LINK_CLS, "inline-flex items-center gap-1")}
                   >
                     View
                     <FaCaretRight className="h-3 w-3" aria-hidden />

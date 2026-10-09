@@ -12,7 +12,6 @@ import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { ROW_BUTTON_CLS } from "./review-admin-classes";
 import { type ReviewRow } from "./review-types";
 
 /**
@@ -128,7 +127,7 @@ export function ReviewCard({
             variant="danger"
             onClick={() => setConfirmOpen(true)}
             disabled={loading !== null}
-            className={ROW_BUTTON_CLS}
+            size="xs"
           >
             {loading === "delete" ? "Deleting…" : "Delete"}
           </AdminButton>
@@ -138,7 +137,7 @@ export function ReviewCard({
             variant="outline"
             onClick={() => void patch("approve")}
             disabled={loading !== null}
-            className={ROW_BUTTON_CLS}
+            size="xs"
           >
             {loading === "approve" ? "Approving…" : "Approve"}
           </AdminButton>
@@ -150,7 +149,7 @@ export function ReviewCard({
             variant="secondary"
             onClick={() => setMenuOpen((v) => !v)}
             disabled={loading !== null}
-            className={ROW_BUTTON_CLS}
+            size="xs"
             aria-label="More actions"
           >
             ⋯

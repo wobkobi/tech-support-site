@@ -7,8 +7,8 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
-import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
 /** Sync filter: tri-state, since a contact is exactly one of synced or not. */
@@ -16,20 +16,6 @@ export type SyncFilter = "all" | "synced" | "unsynced";
 
 /** List order. */
 export type ContactSort = "name" | "newest" | "oldest";
-
-/**
- * Classes for a filter chip button.
- * @param active - Whether the chip is selected.
- * @returns Class string.
- */
-function chipClass(active: boolean): string {
-  return cn(
-    "h-9 rounded-full border px-3 text-sm font-semibold transition-colors",
-    active
-      ? "border-russian-violet bg-russian-violet text-white"
-      : "border-admin-border-strong bg-admin-surface text-admin-text-secondary hover:border-russian-violet",
-  );
-}
 
 /** Props for {@link ContactListToolbar}. */
 interface ContactListToolbarProps {
@@ -122,7 +108,7 @@ export function ContactListToolbar({
           type="button"
           onClick={() => setSyncFilter((f) => (f === "synced" ? "all" : "synced"))}
           aria-pressed={syncFilter === "synced"}
-          className={chipClass(syncFilter === "synced")}
+          className={adminChipClass(syncFilter === "synced")}
         >
           Synced
         </button>
@@ -130,7 +116,7 @@ export function ContactListToolbar({
           type="button"
           onClick={() => setSyncFilter((f) => (f === "unsynced" ? "all" : "unsynced"))}
           aria-pressed={syncFilter === "unsynced"}
-          className={chipClass(syncFilter === "unsynced")}
+          className={adminChipClass(syncFilter === "unsynced")}
         >
           Unsynced
         </button>
@@ -138,7 +124,7 @@ export function ContactListToolbar({
           type="button"
           onClick={() => setReviewedOnly((v) => !v)}
           aria-pressed={reviewedOnly}
-          className={chipClass(reviewedOnly)}
+          className={adminChipClass(reviewedOnly)}
         >
           Has reviews
         </button>
@@ -146,7 +132,7 @@ export function ContactListToolbar({
           type="button"
           onClick={() => setRetainerOnly((v) => !v)}
           aria-pressed={retainerOnly}
-          className={chipClass(retainerOnly)}
+          className={adminChipClass(retainerOnly)}
         >
           Retainer
         </button>
@@ -154,7 +140,7 @@ export function ContactListToolbar({
           type="button"
           onClick={() => setNoEmail((v) => !v)}
           aria-pressed={noEmail}
-          className={chipClass(noEmail)}
+          className={adminChipClass(noEmail)}
         >
           No email
         </button>
@@ -162,7 +148,7 @@ export function ContactListToolbar({
           type="button"
           onClick={() => setNoPhone((v) => !v)}
           aria-pressed={noPhone}
-          className={chipClass(noPhone)}
+          className={adminChipClass(noPhone)}
         >
           No phone
         </button>

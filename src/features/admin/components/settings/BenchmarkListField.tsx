@@ -7,7 +7,6 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
-import { COMPACT_BUTTON_CLS } from "@/features/business/components/calculator/calculator-classes";
 import { cn } from "@/shared/lib/cn";
 import { ESTIMATOR_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { Benchmark } from "@/shared/lib/settings/types";
@@ -104,7 +103,8 @@ export function BenchmarkListField({
                 <AdminButton
                   variant="danger"
                   aria-label={`Remove ${b.label || "benchmark"}`}
-                  className={cn("shrink-0", COMPACT_BUTTON_CLS)}
+                  size="xs"
+                  className="shrink-0"
                   onClick={() => remove(i)}
                 >
                   Remove

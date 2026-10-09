@@ -16,7 +16,6 @@ import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { InsertMenu, type InsertGroup } from "@/features/admin/components/ui/InsertMenu";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { COMPACT_BUTTON_CLS } from "@/features/business/components/calculator/calculator-classes";
 import {
   CampaignPreviewCard,
   type CampaignPreview,
@@ -465,7 +464,6 @@ export function CampaignEditor({
                   <AdminButton
                     size="xs"
                     variant="ghost"
-                    className={COMPACT_BUTTON_CLS}
                     busy={busy === "unlink"}
                     onClick={() => void unlinkPromo()}
                   >
@@ -486,7 +484,6 @@ export function CampaignEditor({
                       key={s.label}
                       size="xs"
                       variant="secondary"
-                      className={COMPACT_BUTTON_CLS}
                       onClick={() => insert(s.before, s.after, s.line)}
                     >
                       <span title={s.title}>{s.label}</span>
@@ -495,7 +492,6 @@ export function CampaignEditor({
                   <AdminButton
                     size="xs"
                     variant="secondary"
-                    className={COMPACT_BUTTON_CLS}
                     busy={busy === "image"}
                     disabled={!canUpload}
                     onClick={() => fileRef.current?.click()}

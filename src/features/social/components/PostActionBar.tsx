@@ -5,7 +5,7 @@
 // screens and to the bottom on narrower ones, so it holds no state of its own.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { LEDGER_LINK_CLS } from "@/features/business/components/ledger-classes";
+import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
@@ -62,7 +62,7 @@ export function PostActionBar({
           {saveState === "error" && (
             <>
               Couldn&apos;t save.{" "}
-              <button type="button" onClick={onRetrySave} className={LEDGER_LINK_CLS}>
+              <button type="button" onClick={onRetrySave} className={cn("text-sm", ADMIN_LINK_CLS)}>
                 Try again
               </button>
             </>

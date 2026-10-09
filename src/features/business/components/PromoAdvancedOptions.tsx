@@ -7,10 +7,9 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
-import {
-  chipClass,
-  TEXT_ACTION_CLS,
-} from "@/features/business/components/calculator/calculator-classes";
+import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
+import { TEXT_ACTION_CLS } from "@/features/business/components/calculator/calculator-classes";
+import { PROMO_TAG_CLS } from "@/features/business/components/promo-list-helpers";
 import {
   advancedChips,
   AMOUNT_LABEL,
@@ -59,10 +58,7 @@ export function PromoAdvancedOptions({
       <summary className="flex cursor-pointer flex-wrap items-center gap-2 px-4 py-3 text-[0.9375rem] font-bold text-admin-text">
         Advanced options
         {chips.map((chip) => (
-          <span
-            key={chip}
-            className="rounded bg-admin-bg px-1.5 py-0.5 text-sm font-semibold text-admin-muted"
-          >
+          <span key={chip} className={PROMO_TAG_CLS}>
             {chip}
           </span>
         ))}
@@ -234,7 +230,7 @@ export function PromoAdvancedOptions({
                         : [...p.activeWeekdays, day].sort((a, b) => a - b),
                     }))
                   }
-                  className={chipClass(picked)}
+                  className={adminChipClass(picked)}
                 >
                   {label}
                 </button>

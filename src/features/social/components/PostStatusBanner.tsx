@@ -4,8 +4,8 @@
 // and taking down went on each platform, with the retry and take-down actions.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
-import { LEDGER_LINK_CLS } from "@/features/business/components/ledger-classes";
 import { POST_STATUS_PILL } from "@/features/social/lib/post-display";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
 import { PLATFORM_LABEL, type SocialPlatformKey } from "@/features/social/lib/validate";
@@ -143,7 +143,7 @@ export function PostStatusBanner({
                       href={t.permalink}
                       target="_blank"
                       rel="noreferrer"
-                      className={LEDGER_LINK_CLS}
+                      className={cn("text-sm", ADMIN_LINK_CLS)}
                     >
                       view the post
                     </a>

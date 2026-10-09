@@ -372,6 +372,8 @@ export function SocialView({
                 checked={alsoTakeDown}
                 onChange={setAlsoTakeDown}
                 label={`Also take it down from ${deletingLive.join(" and ")}`}
+                // The label can wrap onto two lines: keep the box level with the first.
+                className="items-start [&>input]:mt-0.5 [&>input]:shrink-0"
               />
               <p>
                 {alsoTakeDown

@@ -7,6 +7,10 @@
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import {
+  SEGMENTED_GROUP_CLS,
+  segmentedButtonClass,
+} from "@/features/admin/components/ui/chip-classes";
 import { BLANK_TEMPLATE_ID, type Template } from "@/features/mailing/lib/templates";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -55,19 +59,14 @@ export function CampaignPreviewCard({
         title="Preview"
         description={preview ? `Subject: ${preview.subject}` : "Loading..."}
         actions={
-          <div className="inline-flex rounded-lg border border-admin-border bg-admin-bg p-0.5">
+          <div className={SEGMENTED_GROUP_CLS}>
             {(["desktop", "phone"] as const).map((w) => (
               <button
                 key={w}
                 type="button"
                 aria-pressed={width === w}
                 onClick={() => onWidth(w)}
-                className={cn(
-                  "h-9 rounded-md px-3 text-sm font-semibold transition-colors",
-                  width === w
-                    ? "bg-russian-violet text-white"
-                    : "text-admin-text-secondary hover:bg-admin-surface",
-                )}
+                className={segmentedButtonClass(width === w)}
               >
                 {w === "desktop" ? "Desktop" : "Phone"}
               </button>

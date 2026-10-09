@@ -6,11 +6,11 @@
 import type { PromoRow } from "@/app/admin/(shell)/promos/page";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
+import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { chipClass } from "@/features/business/components/calculator/calculator-classes";
 import {
   findOverlaps,
   getStatus,
@@ -382,7 +382,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
                   type="button"
                   aria-pressed={selected}
                   onClick={() => setStatusFilter(key)}
-                  className={cn(chipClass(selected), "capitalize")}
+                  className={cn(adminChipClass(selected), "capitalize")}
                 >
                   {key} ({count})
                 </button>

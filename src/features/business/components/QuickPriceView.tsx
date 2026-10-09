@@ -13,6 +13,10 @@ import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import {
+  SEGMENTED_GROUP_CLS,
+  segmentedButtonClass,
+} from "@/features/admin/components/ui/chip-classes";
 import { ADMIN_INPUT_CLS, ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { QuickTodaysJobs, QuickTotalCard } from "@/features/business/components/QuickPriceCards";
@@ -489,7 +493,7 @@ export function QuickPriceView({
           <div>
             <span className={ADMIN_LABEL_CLS}>Paid by</span>
             {/* Segmented toggle, the same look as the schedule's Short/Long switch. */}
-            <div className="inline-flex rounded-lg border border-admin-border bg-admin-bg p-0.5">
+            <div className={SEGMENTED_GROUP_CLS}>
               {PAID_BY.map((m) => (
                 <button
                   key={m}
@@ -498,12 +502,7 @@ export function QuickPriceView({
                   aria-pressed={paidBy === m}
                   disabled={locked}
                   onClick={() => setPaidBy(m)}
-                  className={cn(
-                    "h-9 rounded-md px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                    paidBy === m
-                      ? "bg-russian-violet text-white"
-                      : "text-admin-text-secondary hover:bg-admin-surface",
-                  )}
+                  className={segmentedButtonClass(paidBy === m)}
                 >
                   {m}
                 </button>

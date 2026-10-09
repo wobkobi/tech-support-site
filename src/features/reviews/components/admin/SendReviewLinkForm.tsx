@@ -5,7 +5,11 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
-import { ADMIN_EYEBROW_CLS, ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import {
+  ADMIN_EYEBROW_CLS,
+  ADMIN_INPUT_CLS,
+  ADMIN_LINK_CLS,
+} from "@/features/admin/components/ui/field-classes";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { EmailInput } from "@/shared/components/EmailInput";
@@ -16,7 +20,6 @@ import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useRef, useState } from "react";
 import { CopyLinkButton } from "./CopyLinkButton";
-import { ROW_BUTTON_CLS } from "./review-admin-classes";
 
 /**
  * A contact entry used to pre-fill the review link form.
@@ -247,7 +250,7 @@ export function SendReviewLinkForm({
             resetState();
             clearFields();
           }}
-          className="w-full text-left text-[0.9375rem] font-semibold text-russian-violet underline underline-offset-2 hover:decoration-2"
+          className={cn("w-full text-left text-[0.9375rem]", ADMIN_LINK_CLS)}
         >
           {open ? "Hide form" : "+ Send review link to past client"}
         </button>
@@ -471,7 +474,7 @@ export function SendReviewLinkForm({
               <div className="flex flex-wrap items-center gap-2">
                 <AdminButton
                   busy={loading}
-                  className={ROW_BUTTON_CLS}
+                  size="xs"
                   onClick={() => void (mode === "email" ? handleSend(true) : generateSms(true))}
                 >
                   {mode === "email" ? "Send again" : "Write the text again"}
@@ -486,7 +489,7 @@ export function SendReviewLinkForm({
             <div className="rounded-lg border border-admin-border bg-admin-bg p-3">
               <p className={cn("mb-2", ADMIN_EYEBROW_CLS)}>Copy and send from your phone</p>
               <p className="mb-3 text-sm leading-relaxed text-admin-text">{smsText}</p>
-              <AdminButton variant="outline" onClick={handleCopy} className={ROW_BUTTON_CLS}>
+              <AdminButton variant="outline" onClick={handleCopy} size="xs">
                 {copied ? "Copied!" : "Copy message"}
               </AdminButton>
             </div>

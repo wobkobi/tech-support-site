@@ -9,6 +9,7 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { adminButtonClass } from "@/features/admin/components/ui/button-classes";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import type {
@@ -54,8 +55,7 @@ const SHEET_NO_SHOW_CLS =
  * because Reschedule opens a new tab and the others do a full page load, which the
  * AdminButton link form (a client-side Next Link) would change.
  */
-const SHEET_LINK_CLS =
-  "inline-flex h-11 w-full items-center justify-center rounded-md border border-admin-border-strong bg-admin-surface px-4 text-[0.9375rem] font-bold text-admin-text transition-colors select-none hover:border-russian-violet";
+const SHEET_LINK_CLS = cn(adminButtonClass({ variant: "secondary" }), SHEET_BUTTON_CLS);
 
 interface EventActionSheetProps {
   /**

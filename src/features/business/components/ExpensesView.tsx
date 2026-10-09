@@ -456,7 +456,6 @@ export function ExpensesView({
             variant="secondary"
             onClick={() => void retryLoad()}
             busy={retrying}
-            className="text-sm"
           >
             Try again
           </AdminButton>

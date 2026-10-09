@@ -12,7 +12,6 @@ import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { ROW_BUTTON_CLS } from "@/features/business/components/ledger-classes";
 import { callApi } from "@/features/mailing/lib/api-client";
 import type { CampaignRow } from "@/features/mailing/lib/campaign-row";
 import type { Recipient } from "@/features/mailing/lib/recipients";
@@ -319,20 +318,10 @@ export function SendDialog({
               )}
             </p>
             <div className="flex gap-2">
-              <AdminButton
-                size="xs"
-                variant="ghost"
-                className={ROW_BUTTON_CLS}
-                onClick={() => setAllShown(true)}
-              >
+              <AdminButton size="xs" variant="ghost" onClick={() => setAllShown(true)}>
                 Select all
               </AdminButton>
-              <AdminButton
-                size="xs"
-                variant="ghost"
-                className={ROW_BUTTON_CLS}
-                onClick={() => setAllShown(false)}
-              >
+              <AdminButton size="xs" variant="ghost" onClick={() => setAllShown(false)}>
                 Select none
               </AdminButton>
             </div>

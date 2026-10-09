@@ -8,11 +8,9 @@
 
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
-import {
-  TEXT_ACTION_CLS,
-  chipClass,
-} from "@/features/business/components/calculator/calculator-classes";
+import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
+import { ADMIN_CHECKBOX_CLS, ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { TEXT_ACTION_CLS } from "@/features/business/components/calculator/calculator-classes";
 import type { GoogleContact } from "@/features/business/types/business";
 import { filterContacts } from "@/features/contacts/lib/contact-search";
 import { EmailInput } from "@/shared/components/EmailInput";
@@ -156,7 +154,7 @@ export function ClientPickerSection({
                 onClick={() => onAddressModeChange(mode)}
                 title={disabled ? "Picked contact has no company" : undefined}
                 aria-pressed={active}
-                className={chipClass(active)}
+                className={adminChipClass(active)}
               >
                 {label}
               </button>
@@ -220,7 +218,7 @@ export function ClientPickerSection({
             type="checkbox"
             checked={renameContact}
             onChange={(e) => onRenameContactChange(e.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0 accent-russian-violet"
+            className={ADMIN_CHECKBOX_CLS}
           />
           <span>
             Also change the contact from {pickedContactName} to {renameOffer} when the invoice saves

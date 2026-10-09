@@ -10,7 +10,7 @@ import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
+import { ADMIN_CHECKBOX_CLS, ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { formatNZD } from "@/features/business/lib/business";
 import { DEFAULT_VOID_EMAIL_BODY } from "@/features/business/lib/invoice-email-defaults";
 import { useRouter } from "next/navigation";
@@ -361,7 +361,7 @@ export function VoidInvoiceModal({
               checked={voidSendNotification}
               onChange={(e) => setVoidSendNotification(e.target.checked)}
               disabled={voiding}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-russian-violet"
+              className={ADMIN_CHECKBOX_CLS}
             />
             <span>
               Send notification email to <strong>{clientEmail}</strong>

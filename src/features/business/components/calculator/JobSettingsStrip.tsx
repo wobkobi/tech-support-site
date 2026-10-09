@@ -8,7 +8,6 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
-import { COMPACT_BUTTON_CLS } from "@/features/business/components/calculator/calculator-classes";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -116,14 +115,10 @@ export function JobSettingsStrip({
             the end, and destructive styling keeps it from reading as a fifth
             way to save. */}
         <div className="ml-auto flex gap-2">
-          <AdminButton variant="danger" className={COMPACT_BUTTON_CLS} onClick={onClearForm}>
+          <AdminButton variant="danger" size="xs" onClick={onClearForm}>
             Clear form
           </AdminButton>
-          <AdminButton
-            variant="secondary"
-            className={COMPACT_BUTTON_CLS}
-            href="/admin/settings?tab=rates"
-          >
+          <AdminButton variant="secondary" size="xs" href="/admin/settings?tab=rates">
             Manage rates
           </AdminButton>
         </div>

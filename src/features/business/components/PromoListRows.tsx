@@ -15,11 +15,11 @@ import {
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
-import { ROW_BUTTON_CLS } from "@/features/business/components/ledger-classes";
 import {
   describeDiscount,
   getStatus,
   overlapNote,
+  PROMO_TAG_CLS,
   statusLabel,
   statusTone,
   usageNote,
@@ -31,9 +31,6 @@ import { describeRecurringWindow } from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import React from "react";
-
-/** Grey tag naming one restriction on a promo. */
-const PROMO_TAG_CLS = "rounded bg-admin-bg px-1.5 py-0.5 text-sm font-semibold text-admin-muted";
 
 /** Props for {@link PromoStatsBlock}. */
 interface PromoStatsBlockProps {
@@ -268,7 +265,6 @@ export function PromoListRows({
                         <AdminButton
                           variant="outline"
                           size="xs"
-                          className={ROW_BUTTON_CLS}
                           onClick={() => onEmail(p)}
                           disabled={emailingId !== null}
                         >
@@ -279,43 +275,22 @@ export function PromoListRows({
                         <AdminButton
                           variant="outline"
                           size="xs"
-                          className={ROW_BUTTON_CLS}
                           onClick={() => onPost(p)}
                           disabled={postingId !== null}
                         >
                           {postingId === p.id ? "Opening..." : "Post it"}
                         </AdminButton>
                       )}
-                      <AdminButton
-                        variant="secondary"
-                        size="xs"
-                        className={ROW_BUTTON_CLS}
-                        onClick={() => onToggleActive(p)}
-                      >
+                      <AdminButton variant="secondary" size="xs" onClick={() => onToggleActive(p)}>
                         {p.isActive ? "Disable" : "Enable"}
                       </AdminButton>
-                      <AdminButton
-                        variant="secondary"
-                        size="xs"
-                        className={ROW_BUTTON_CLS}
-                        onClick={() => onEdit(p)}
-                      >
+                      <AdminButton variant="secondary" size="xs" onClick={() => onEdit(p)}>
                         Edit
                       </AdminButton>
-                      <AdminButton
-                        variant="secondary"
-                        size="xs"
-                        className={ROW_BUTTON_CLS}
-                        onClick={() => onDuplicate(p)}
-                      >
+                      <AdminButton variant="secondary" size="xs" onClick={() => onDuplicate(p)}>
                         Duplicate
                       </AdminButton>
-                      <AdminButton
-                        variant="danger"
-                        size="xs"
-                        className={ROW_BUTTON_CLS}
-                        onClick={() => onDelete(p)}
-                      >
+                      <AdminButton variant="danger" size="xs" onClick={() => onDelete(p)}>
                         Delete
                       </AdminButton>
                     </div>

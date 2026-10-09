@@ -17,10 +17,10 @@ import { AdminTabs } from "@/features/admin/components/ui/AdminTabs";
 import { Card } from "@/features/admin/components/ui/Card";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
+import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { LEDGER_LINK_CLS, ROW_BUTTON_CLS } from "@/features/business/components/ledger-classes";
 import { SubscribersPanel } from "@/features/mailing/components/SubscribersPanel";
 import { callApi } from "@/features/mailing/lib/api-client";
 import type { CampaignRow, CampaignStatus } from "@/features/mailing/lib/campaign-row";
@@ -173,7 +173,6 @@ export function MailingView({
           <AdminButton
             size="xs"
             variant="outline"
-            className={ROW_BUTTON_CLS}
             busy={busyId === `use-${row.id}`}
             onClick={() =>
               void createAndOpen({ source: "copy", sourceId: row.id }, `use-${row.id}`)
@@ -186,7 +185,6 @@ export function MailingView({
             <AdminButton
               size="xs"
               variant="secondary"
-              className={ROW_BUTTON_CLS}
               busy={busyId === `copy-${row.id}`}
               onClick={() =>
                 void createAndOpen({ source: "copy", sourceId: row.id }, `copy-${row.id}`)
@@ -197,7 +195,6 @@ export function MailingView({
             <AdminButton
               size="xs"
               variant="secondary"
-              className={ROW_BUTTON_CLS}
               busy={busyId === `preset-${row.id}`}
               onClick={() => void saveAsPreset(row)}
             >
@@ -206,12 +203,7 @@ export function MailingView({
           </>
         )}
         {row.status !== "sending" && (
-          <AdminButton
-            size="xs"
-            variant="danger"
-            className={ROW_BUTTON_CLS}
-            onClick={() => setDeleting(row)}
-          >
+          <AdminButton size="xs" variant="danger" onClick={() => setDeleting(row)}>
             Delete
           </AdminButton>
         )}
@@ -286,7 +278,10 @@ export function MailingView({
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link href={`/admin/mailing/${row.id}`} className={LEDGER_LINK_CLS}>
+                      <Link
+                        href={`/admin/mailing/${row.id}`}
+                        className={cn("text-sm", ADMIN_LINK_CLS)}
+                      >
                         {row.name}
                       </Link>
                       {!row.isPreset && <StatusPill tone={pill.tone}>{pill.label}</StatusPill>}
@@ -321,7 +316,10 @@ export function MailingView({
                 return (
                   <tr key={row.id} className={ROW_CLS}>
                     <td className={cn(TD_CLS, "max-w-0 align-top")}>
-                      <Link href={`/admin/mailing/${row.id}`} className={LEDGER_LINK_CLS}>
+                      <Link
+                        href={`/admin/mailing/${row.id}`}
+                        className={cn("text-sm", ADMIN_LINK_CLS)}
+                      >
                         {row.name}
                       </Link>
                       <p className="truncate text-sm text-admin-text-secondary">

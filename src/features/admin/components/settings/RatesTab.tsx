@@ -11,7 +11,6 @@ import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { COMPACT_BUTTON_CLS } from "@/features/business/components/calculator/calculator-classes";
 import { DEFAULT_RATE_ROWS } from "@/features/business/lib/pricing-policy";
 import type { RateConfig } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
@@ -466,7 +465,7 @@ export function RatesTab({ initialRates }: Props): React.ReactElement {
                           ) : (
                             <AdminButton
                               variant="ghost"
-                              className={COMPACT_BUTTON_CLS}
+                              size="xs"
                               disabled={savingId === r.id}
                               onClick={() => void makeBase(r)}
                             >
@@ -480,16 +479,12 @@ export function RatesTab({ initialRates }: Props): React.ReactElement {
                             <AdminButton
                               variant="outline"
                               type="submit"
-                              className={COMPACT_BUTTON_CLS}
+                              size="xs"
                               busy={savingId === r.id}
                             >
                               Save
                             </AdminButton>
-                            <AdminButton
-                              variant="ghost"
-                              className={COMPACT_BUTTON_CLS}
-                              onClick={() => undoRow(r.id)}
-                            >
+                            <AdminButton variant="ghost" size="xs" onClick={() => undoRow(r.id)}>
                               Undo
                             </AdminButton>
                           </>
@@ -497,7 +492,7 @@ export function RatesTab({ initialRates }: Props): React.ReactElement {
                         {!builtIn && !r.isDefault && (
                           <AdminButton
                             variant="danger"
-                            className={COMPACT_BUTTON_CLS}
+                            size="xs"
                             onClick={() => setConfirmDeleteId(r.id)}
                           >
                             Delete

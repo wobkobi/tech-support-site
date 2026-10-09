@@ -10,7 +10,6 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { COMPACT_BUTTON_CLS } from "@/features/business/components/calculator/calculator-classes";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -299,7 +298,7 @@ export function NotificationsView(): React.ReactElement {
                 </div>
                 <AdminButton
                   variant="danger"
-                  className={COMPACT_BUTTON_CLS}
+                  size="xs"
                   onClick={() => void removeDevice(d.endpoint)}
                 >
                   Remove

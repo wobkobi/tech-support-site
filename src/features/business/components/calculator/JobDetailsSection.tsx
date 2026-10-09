@@ -10,10 +10,7 @@ import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
-import {
-  COMPACT_BUTTON_CLS,
-  REMOVE_ROW_CLS,
-} from "@/features/business/components/calculator/calculator-classes";
+import { REMOVE_ROW_CLS } from "@/features/business/components/calculator/calculator-classes";
 import { minsToHoursLabel, timeDiffMins } from "@/features/business/lib/business";
 import type { ParsedRange } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
@@ -187,7 +184,7 @@ export function JobDetailsSection({
             </div>
           );
         })}
-        <AdminButton variant="secondary" className={COMPACT_BUTTON_CLS} onClick={addRange}>
+        <AdminButton variant="secondary" size="xs" onClick={addRange}>
           + Add time slot
         </AdminButton>
       </div>

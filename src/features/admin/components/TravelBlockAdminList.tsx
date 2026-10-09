@@ -7,14 +7,11 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card } from "@/features/admin/components/ui/Card";
+import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import {
-  chipClass,
-  COMPACT_BUTTON_CLS,
-} from "@/features/business/components/calculator/calculator-classes";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { NZ_TZ } from "@/shared/lib/timezone-utils";
@@ -327,7 +324,7 @@ export function TravelBlockAdminList({
                         aria-pressed={currentMode === m.value}
                         onClick={() => void setMode(b.id, m.value)}
                         className={cn(
-                          chipClass(currentMode === m.value),
+                          adminChipClass(currentMode === m.value),
                           "pointer-coarse:min-h-11",
                         )}
                       >
@@ -362,7 +359,7 @@ export function TravelBlockAdminList({
                       <div className="flex flex-wrap gap-1.5">
                         <AdminButton
                           variant="outline"
-                          className={COMPACT_BUTTON_CLS}
+                          size="xs"
                           disabled={isSaving || !originInput.trim()}
                           onClick={() => void saveOrigin(b.id, originInput.trim() || null)}
                         >
@@ -370,7 +367,7 @@ export function TravelBlockAdminList({
                         </AdminButton>
                         <AdminButton
                           variant="secondary"
-                          className={COMPACT_BUTTON_CLS}
+                          size="xs"
                           disabled={isSaving}
                           onClick={() => setEditingOriginId(null)}
                         >
@@ -379,7 +376,7 @@ export function TravelBlockAdminList({
                         {b.customOrigin && (
                           <AdminButton
                             variant="danger"
-                            className={COMPACT_BUTTON_CLS}
+                            size="xs"
                             disabled={isSaving}
                             onClick={() => void saveOrigin(b.id, null)}
                           >
@@ -400,7 +397,7 @@ export function TravelBlockAdminList({
                       ) : null}
                       <AdminButton
                         variant="ghost"
-                        className={COMPACT_BUTTON_CLS}
+                        size="xs"
                         disabled={isSaving}
                         onClick={() => {
                           setEditingOriginId(b.id);

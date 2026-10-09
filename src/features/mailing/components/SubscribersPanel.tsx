@@ -7,7 +7,6 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { ROW_BUTTON_CLS } from "@/features/business/components/ledger-classes";
 import { callApi } from "@/features/mailing/lib/api-client";
 import type { Recipient } from "@/features/mailing/lib/recipients";
 import React, { useState } from "react";
@@ -155,7 +154,6 @@ function SubscriberList({
               <AdminButton
                 size="xs"
                 variant="secondary"
-                className={ROW_BUTTON_CLS}
                 busy={busyId === r.contactId}
                 onClick={() => onAction(r)}
               >
