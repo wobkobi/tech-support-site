@@ -7,6 +7,8 @@
 //      but allowed). The same function powers the live-preview banner later.
 // Hand-rolled to match the repo's existing manual-validation convention (no zod).
 
+import type { IetcConfig, TaxBracket } from "@/features/business/lib/tax/types";
+import { VEHICLE_FUEL_LABELS } from "@/shared/lib/settings/field-meta";
 import type {
   AvailabilitySettings,
   CommsSettings,
@@ -51,6 +53,86 @@ function inRange(n: unknown, min: number, max: number): n is number {
  */
 function nonNeg(n: unknown): n is number {
   return typeof n === "number" && Number.isFinite(n) && n >= 0;
+}
+
+/** Most income-tax bands the settings accept (NZ has five). */
+export const MAX_TAX_BANDS = 10;
+
+/**
+ * True for a real calendar date written "YYYY-MM-DD". A round trip through Date rejects
+ * dates like 2026-02-30, which the Date constructor would roll into March.
+ * @param s - Candidate date text.
+ * @returns Whether `s` names a real day.
+ */
+function isIsoDateKey(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00.000Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
+/**
+ * True for a plain `{}` object (not null, not an array).
+ * @param v - Candidate value.
+ * @returns Whether `v` is a plain object.
+ */
+function isPlainObject(v: unknown): boolean {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Validates the income-tax bands: 1 to {@link MAX_TAX_BANDS} of them, each rate a
+ * fraction, limits rising, and only the last band open-ended (`upTo: null`).
+ * @param brackets - Proposed bands, lowest first.
+ * @returns List of field errors (empty when valid).
+ */
+function validateBrackets(brackets: TaxBracket[]): FieldError[] {
+  if (!Array.isArray(brackets) || brackets.length === 0 || brackets.length > MAX_TAX_BANDS)
+    return [{ field: "brackets", message: `Needs 1-${MAX_TAX_BANDS} tax bands.` }];
+  if (!brackets.every(isPlainObject))
+    return [{ field: "brackets", message: "Each band needs a limit and a rate." }];
+  const errors: FieldError[] = [];
+  const last = brackets.length - 1;
+  let prevUpTo = 0;
+  brackets.forEach((b, i) => {
+    if (!inRange(b.rate, 0, 1))
+      errors.push({ field: `brackets.${i}.rate`, message: "Must be 0-100%." });
+    if (i === last) {
+      if (b.upTo !== null)
+        errors.push({ field: `brackets.${i}.upTo`, message: "The top band has no upper limit." });
+    } else if (!nonNeg(b.upTo) || b.upTo <= prevUpTo) {
+      errors.push({
+        field: `brackets.${i}.upTo`,
+        message: "Each limit must be above the one before.",
+      });
+    } else {
+      prevUpTo = b.upTo;
+    }
+  });
+  return errors;
+}
+
+/**
+ * Validates the IETC settings: dollar figures 0 or more, the reduction a fraction of a
+ * dollar, and start <= full-credit limit <= cut-off.
+ * @param ietc - Proposed IETC settings.
+ * @returns List of field errors (empty when valid).
+ */
+function validateIetc(ietc: IetcConfig): FieldError[] {
+  if (!isPlainObject(ietc))
+    return [{ field: "ietc.enabled", message: "Missing the IETC settings." }];
+  const errors: FieldError[] = [];
+  if (typeof ietc.enabled !== "boolean")
+    errors.push({ field: "ietc.enabled", message: "Must be on or off." });
+  for (const key of ["annual", "from", "fullTo", "cutoff"] as const) {
+    if (!nonNeg(ietc[key])) errors.push({ field: `ietc.${key}`, message: "Must be $0 or more." });
+  }
+  if (!inRange(ietc.abatementPerDollar, 0, 1))
+    errors.push({ field: "ietc.abatementPerDollar", message: "Must be 0-100 cents per dollar." });
+  if (nonNeg(ietc.from) && nonNeg(ietc.fullTo) && ietc.from > ietc.fullTo)
+    errors.push({ field: "ietc.fullTo", message: "Must be at or above where the credit starts." });
+  if (nonNeg(ietc.fullTo) && nonNeg(ietc.cutoff) && ietc.fullTo > ietc.cutoff)
+    errors.push({ field: "ietc.cutoff", message: "Must be at or above the full-credit limit." });
+  return errors;
 }
 
 /**
@@ -151,6 +233,14 @@ function validatePricing(p: PricingSettings): FieldError[] {
   const errors: FieldError[] = [];
   if (typeof p.gstRegistered !== "boolean")
     errors.push({ field: "gstRegistered", message: "Must be on or off." });
+  if (
+    typeof p.gstRegisteredFrom !== "string" ||
+    (p.gstRegisteredFrom.trim() !== "" && !isIsoDateKey(p.gstRegisteredFrom.trim()))
+  )
+    errors.push({
+      field: "gstRegisteredFrom",
+      message: "Must be a date, or blank for from the business start.",
+    });
   if (!nonNeg(p.minBillableMins))
     errors.push({ field: "minBillableMins", message: "Must be 0 or more minutes (0 = no floor)." });
   if (!inRange(p.billingIncrementMins, 1, 60))
@@ -442,9 +532,29 @@ function validateTax(t: TaxSettings): FieldError[] {
   if (!inRange(t.incomeTax, 0, 1))
     errors.push({ field: "incomeTax", message: "Must be a fraction 0-1 (e.g. 0.2 = 20%)." });
   if (!inRange(t.acc, 0, 1))
-    errors.push({ field: "acc", message: "Must be a fraction 0-1 (e.g. 0.0146 = 1.46%)." });
+    errors.push({ field: "acc", message: "Must be a fraction 0-1 (e.g. 0.0175 = 1.75%)." });
   if (!inRange(t.kiwiSaver, 0, 1))
     errors.push({ field: "kiwiSaver", message: "Must be a fraction 0-1 (e.g. 0.12 = 12%)." });
+  errors.push(...validateBrackets(t.brackets), ...validateIetc(t.ietc));
+  if (!nonNeg(t.lowValueThreshold))
+    errors.push({ field: "lowValueThreshold", message: "Must be $0 or more." });
+  if (!nonNeg(t.provisionalThreshold))
+    errors.push({ field: "provisionalThreshold", message: "Must be $0 or more." });
+  if (
+    typeof t.vehicleFuel !== "string" ||
+    !Object.keys(VEHICLE_FUEL_LABELS).includes(t.vehicleFuel)
+  )
+    errors.push({ field: "vehicleFuel", message: "Pick one of the listed fuel types." });
+  if (!isPlainObject(t.categoryBusinessUse)) {
+    errors.push({ field: "categoryBusinessUse", message: "Must be a percent per category." });
+  } else {
+    // Keys aren't checked against EXPENSE_CATEGORIES: a renamed category's old entry is
+    // harmless (nothing matches it) and the editor only writes current categories.
+    for (const [category, pct] of Object.entries(t.categoryBusinessUse)) {
+      if (!inRange(pct, 0, 100))
+        errors.push({ field: `categoryBusinessUse.${category}`, message: "Must be 0-100%." });
+    }
+  }
   return errors;
 }
 

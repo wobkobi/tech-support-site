@@ -13,7 +13,9 @@ export {
   lowValueGroupTotals,
 } from "@/features/business/lib/tax/depreciation";
 export {
+  expenseGstRateOn,
   expenseTaxBasis,
+  gstStatusFromPricing,
   incomeTaxBasis,
   isGstRegisteredOn,
 } from "@/features/business/lib/tax/gst-basis";

@@ -48,3 +48,36 @@ export function expenseTaxBasis(
 export function incomeTaxBasis(row: LedgerIncome, gst: GstStatus): number {
   return isGstRegisteredOn(row.date, gst) ? roundCents(row.amount / (1 + GST_RATE)) : row.amount;
 }
+
+/**
+ * GST status from the pricing settings. A blank "registered from" date means registered
+ * from the business start.
+ * @param pricing - The two GST fields of the pricing settings.
+ * @param pricing.gstRegistered - Whether the business is GST registered.
+ * @param pricing.gstRegisteredFrom - "YYYY-MM-DD" registration took effect, or "".
+ * @returns Status for {@link isGstRegisteredOn}.
+ */
+export function gstStatusFromPricing(pricing: {
+  gstRegistered: boolean;
+  gstRegisteredFrom: string;
+}): GstStatus {
+  const from = pricing.gstRegisteredFrom.trim();
+  return { registered: pricing.gstRegistered, registeredFrom: from === "" ? null : from };
+}
+
+/**
+ * GST rate for an expense dated `date` when the caller gave none: 0 while not registered
+ * (or before registration took effect), since there is no GST to claim back, else the
+ * registered rate.
+ * @param date - Expense date.
+ * @param gst - Registration status.
+ * @param registeredRate - Rate once registered ({@link GST_RATE}).
+ * @returns The rate as a fraction.
+ */
+export function expenseGstRateOn(
+  date: string | Date,
+  gst: GstStatus,
+  registeredRate: number,
+): number {
+  return isGstRegisteredOn(date, gst) ? registeredRate : 0;
+}

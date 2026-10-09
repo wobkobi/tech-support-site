@@ -1180,3 +1180,90 @@ model SocialPost {
   @@index([isPreset, status])
   @@index([status, scheduledAt])
 }
+
+// One entry in the depreciable asset register (/admin/business/assets). Site-only, like
+// Subscription: nothing here syncs to the Google Sheets workbook. Money is NZD on the GST
+// basis at entry; rates are fractions.
+model Asset {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  // IR265 class key from ASSET_CLASSES in src/features/business/lib/tax/asset-classes.ts.
+  classKey        String
+  // "purchased" (bought for the business) or "introduced" (brought in from private use
+  // at market value).
+  origin          String
+  // First used or available for business use: where depreciation starts (NZ ledger date).
+  inServiceDate   DateTime
+  // Purchase cost, or market value on inServiceDate for an introduced asset.
+  costBase        Float
+  // For the low-value same-supplier same-day grouping; null for introduced assets.
+  supplier        String?
+  // How an introduced asset's market value was worked out (listing, quote, receipt).
+  valuationNote   String?
+  // "DV" (diminishing value) or "SL" (straight line).
+  method          String    @default("DV")
+  // Annual depreciation rate as a fraction (0.5 = 50%).
+  rate            Float
+  // Business share, 0-100.
+  businessUsePct  Float     @default(100)
+  // Claims the 20% Investment Boost in the first year.
+  investmentBoost Boolean   @default(false)
+  // "km" for a vehicle claimed on IRD kilometre rates: never depreciated or written off.
+  vehicleMethod   String?
+  // ExpenseEntry the asset was bought through; that expense is left out of deductions.
+  expenseId       String?   @db.ObjectId
+  disposedAt      DateTime?
+  disposalAmount  Float?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([expenseId])
+}
+
+// One business trip in the km log (/admin/business/trips), claimed at IRD kilometre
+// rates. Site-only; one round trip per job.
+model Trip {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  // NZ ledger date of the trip.
+  date      DateTime
+  // Business kilometres for the whole trip (there and back).
+  km        Float
+  purpose   String
+  // Booking the trip was for, when it came from "Jobs without a trip".
+  bookingId String?  @db.ObjectId
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@index([bookingId])
+}
+
+// Per-financial-year inputs for the Tax page plus the filed snapshot. Blank rate fields
+// fall back to IRD_YEAR_RATES for the year. Site-only.
+model TaxYear {
+  id                     String    @id @default(auto()) @map("_id") @db.ObjectId
+  // "YYYY-YY", e.g. "2026-27".
+  fyKey                  String    @unique
+  // Home office floor area and whole-house floor area (square metres).
+  officeSqm              Float?
+  houseSqm               Float?
+  // Overrides IRD's square-metre rate for the year.
+  sqmRate                Float?
+  // Override the IRD kilometre rates for the year (first 14,000 km, then beyond).
+  kmTier1                Float?
+  kmTier2                Float?
+  // The car's total km for the FY, read from the odometer; sets the km Tier 1 split.
+  totalVehicleKm         Float?
+  // Whole-house mortgage interest or rent, and council rates, for the year.
+  mortgageInterestOrRent Float?
+  rates                  Float?
+  // Set when the year's return is filed; the figures are then frozen.
+  filedAt                DateTime?
+  // Figures frozen at filing (closing ATV per asset and the year's totals), so later edits
+  // can't change a filed year.
+  snapshot               Json?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+}

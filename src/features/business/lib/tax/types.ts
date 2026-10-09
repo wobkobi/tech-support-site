@@ -161,7 +161,7 @@ export interface TaxYearRecordInput {
   rates: number | null;
 }
 
-/** The `settings.tax` fields the maths reads (see T2 for the settings shape). */
+/** The `settings.tax` fields the maths reads (the full shape is `TaxSettings` in the settings types). */
 export interface TaxRulesSettings {
   brackets: TaxBracket[];
   ietc: IetcConfig;

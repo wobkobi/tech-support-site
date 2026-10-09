@@ -5,11 +5,14 @@
 // persists the returned sheetRowKey.
 
 import { splitGstInclusive } from "@/features/business/lib/business";
+import { GST_RATE } from "@/features/business/lib/pricing-policy";
 import {
   appendRowWithSyncId,
   buildExpenseCells,
   resolveSheetIdForDate,
 } from "@/features/business/lib/sheets-sync";
+import { expenseGstRateOn } from "@/features/business/lib/tax/gst-basis";
+import { loadGstStatus } from "@/features/business/lib/tax/load";
 import { prisma } from "@/shared/lib/prisma";
 import type { ExpenseEntry } from "@prisma/client";
 
@@ -25,8 +28,11 @@ export interface RecordExpenseInput {
   category: string;
   /** GST-inclusive amount (already parsed/validated). */
   amountIncl: number;
-  /** GST rate as a decimal (e.g. 0.15); the split is derived from it. */
-  gstRate: number;
+  /**
+   * GST rate as a decimal (e.g. 0.15); the split is derived from it. Omitted = the rate
+   * on the entry date: 0 while not GST registered (nothing to claim), else {@link GST_RATE}.
+   */
+  gstRate?: number;
   /** Payment method (a PAYMENT_METHODS value). */
   method: string;
   /** Whether a receipt is held. */
@@ -55,7 +61,8 @@ export interface RecordExpenseResult {
  * @returns The created entry, its sheet row key, and a sync-warning flag.
  */
 export async function recordExpense(data: RecordExpenseInput): Promise<RecordExpenseResult> {
-  const { gstAmount, amountExcl } = splitGstInclusive(data.amountIncl, data.gstRate);
+  const rate = data.gstRate ?? expenseGstRateOn(data.date, await loadGstStatus(), GST_RATE);
+  const { gstAmount, amountExcl } = splitGstInclusive(data.amountIncl, rate);
 
   const entry = await prisma.expenseEntry.create({
     data: {

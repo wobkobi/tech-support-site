@@ -5,6 +5,7 @@
 // so the help text and the rules never drift apart. Authored per group as each
 // tab is built; GROUP_META covers all groups so the tab bar can render.
 
+import type { VehicleFuel } from "@/features/business/lib/tax/types";
 import type { SettingsGroup } from "@/shared/lib/settings/types";
 
 /** Display metadata for one editable field, keyed by its dotted path in a group. */
@@ -347,7 +348,72 @@ export const TAX_FIELD_META = {
     description: "Voluntary KiwiSaver contribution as a percent of profit.",
     unit: "%",
   },
+  brackets: {
+    title: "Income-tax brackets",
+    description:
+      "NZ income-tax bands the Tax page works your tax out with. Each band's rate applies to income up to its limit; the last band covers everything above.",
+  },
+  "ietc.enabled": {
+    title: "Independent earner tax credit",
+    description:
+      "Claim the IETC when your income falls in its range. Turn it off if you get Working for Families or a main benefit, which rule it out.",
+  },
+  "ietc.annual": {
+    title: "IETC full amount",
+    description: "The credit for a full year at the full rate.",
+    unit: "$ a year",
+  },
+  "ietc.from": {
+    title: "IETC starts at",
+    description: "The lowest yearly income that gets the credit.",
+    unit: "$",
+  },
+  "ietc.fullTo": {
+    title: "IETC full credit up to",
+    description: "Income up to this gets the full credit; above it the credit shrinks.",
+    unit: "$",
+  },
+  "ietc.cutoff": {
+    title: "IETC stops above",
+    description: "Income above this gets no credit at all.",
+    unit: "$",
+  },
+  "ietc.abatementPerDollar": {
+    title: "IETC reduction",
+    description: "How much credit you lose for each dollar earned above the full-credit limit.",
+    unit: "cents per $",
+  },
+  lowValueThreshold: {
+    title: "Low-value write-off limit",
+    description:
+      "Bought items costing this much or less are claimed in full in the year you buy them instead of depreciated. Items from one supplier on one day count together.",
+    unit: "$",
+  },
+  provisionalThreshold: {
+    title: "Provisional tax threshold",
+    description:
+      "When a year's tax to pay is over this, IRD expects provisional tax the year after. The Tax page warns you when an estimate passes it.",
+    unit: "$",
+  },
+  vehicleFuel: {
+    title: "Vehicle fuel type",
+    description: "Picks which IRD kilometre rates the Trips and Tax pages use.",
+  },
+  categoryBusinessUse: {
+    title: "Business use by category",
+    description:
+      "How much of each expense category is for the business. Leave 100% for costs that are all business; lower it for shared costs like your phone or internet.",
+    unit: "%",
+  },
 } satisfies Record<string, FieldMeta>;
+
+/** Display names for the IRD kilometre-rate fuel types, in the order the picker lists them. */
+export const VEHICLE_FUEL_LABELS: Record<VehicleFuel, string> = {
+  petrol: "Petrol",
+  diesel: "Diesel",
+  "petrol-hybrid": "Petrol hybrid",
+  electric: "Electric",
+};
 
 /** Field metadata for the advanced scheduling group, keyed by dotted path. */
 export const SCHEDULING_FIELD_META = {
@@ -400,6 +466,11 @@ export const PRICING_FIELD_META = {
     title: "GST registered",
     description:
       "Turn on once you cross the $60k GST threshold. Invoices then show a GST breakdown. Requires a GST number to be set.",
+  },
+  gstRegisteredFrom: {
+    title: "GST registered from",
+    description:
+      "The date your GST registration took effect. Expenses before it count with GST included; from this date you claim the GST back instead. Leave blank if you were registered from the start.",
   },
   minBillableMins: {
     title: "Minimum billable time",

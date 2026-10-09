@@ -7,7 +7,7 @@
 // Counts link to the list filtered to what they count (?status=held), and rows to their record.
 
 import { BarChart } from "@/features/admin/components/charts/BarChart";
-import { INCOME_EXPENSE_SERIES } from "@/features/admin/components/charts/series";
+import { incomeExpenseSeries } from "@/features/admin/components/charts/series";
 import { Sparkline } from "@/features/admin/components/charts/Sparkline";
 import { CompleteEventsPanel } from "@/features/admin/components/CompleteEventsPanel";
 import { DashboardAlerts } from "@/features/admin/components/dashboard/DashboardAlerts";
@@ -70,6 +70,9 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     {
       label: "Revenue this month",
       value: formatNZD(monthRevenue),
+      // Money received: once registered the chart below counts income excl. GST, so say
+      // which side this figure is on.
+      sub: data.gstRegistered ? "Incl. GST" : undefined,
       href: `/admin/business`,
       urgent: false,
       trend: <Sparkline values={data.revenueTrend} />,
@@ -190,7 +193,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       <BarChart
         title="Income vs expenses"
         description="Last 12 months"
-        series={INCOME_EXPENSE_SERIES}
+        series={incomeExpenseSeries(data.gstRegistered)}
         groups={data.incomeExpenseGroups}
         groupHeading="Month"
         differenceLabel="Profit"

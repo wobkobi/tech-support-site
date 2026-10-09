@@ -2,6 +2,8 @@
 // Bar groups for the income vs expenses charts on the dashboard and the business page:
 // one group per NZ month, or one per financial year for the all-time view. Every row in
 // scope lands in exactly one group, so a chart's totals equal the matching stat cards'.
+// Income and expenses arrive already on the GST basis (basisIncomeRows, basisExpenseRows),
+// the same figures the cards sum.
 
 import type { BarGroup } from "@/features/admin/components/charts/BarChart";
 import {
@@ -18,12 +20,47 @@ import {
   nzMonthSpan,
   type NzMonth,
 } from "@/features/business/lib/monthly";
+import { expenseTaxBasis, incomeTaxBasis } from "@/features/business/lib/tax/gst-basis";
+import type { GstStatus } from "@/features/business/lib/tax/types";
 
 /** Income and expense rows; dates as Date (from Prisma) or ISO strings (page payloads). */
 export interface LedgerRows {
+  /** Income on the GST basis (see {@link basisIncomeRows}), matching the income cards. */
   income: ReadonlyArray<{ date: Date | string; amount: number }>;
-  /** Expenses chart excl. GST, matching the "Expenses (excl. GST)" cards. */
-  expenses: ReadonlyArray<{ date: Date | string; amountExcl: number }>;
+  /** Expenses on the GST basis (see {@link basisExpenseRows}), matching the expense cards. */
+  expenses: ReadonlyArray<{ date: Date | string; amount: number }>;
+}
+
+/**
+ * Expense rows on the GST basis for {@link LedgerRows}: GST-inclusive while not registered
+ * (or dated before registration took effect), GST-exclusive once registered.
+ * @param rows - Expense rows with both amounts.
+ * @param gst - Registration status.
+ * @returns One `{ date, amount }` per row, in the same order.
+ */
+export function basisExpenseRows(
+  rows: ReadonlyArray<{ date: Date | string; amountIncl: number; amountExcl: number }>,
+  gst: GstStatus,
+): Array<{ date: Date | string; amount: number }> {
+  return rows.map((r) => ({ date: r.date, amount: expenseTaxBasis(r, gst) }));
+}
+
+/**
+ * Income rows on the GST basis for {@link LedgerRows}: the GST-inclusive amount as
+ * received while not registered (or dated before registration took effect), with its GST
+ * backed out to the cent once registered.
+ * @param rows - Income rows (GST-inclusive amounts).
+ * @param gst - Registration status.
+ * @returns One `{ date, amount }` per row, in the same order, each keeping its own date.
+ */
+export function basisIncomeRows(
+  rows: ReadonlyArray<{ date: Date | string; amount: number }>,
+  gst: GstStatus,
+): Array<{ date: Date | string; amount: number }> {
+  return rows.map((r) => ({
+    date: r.date,
+    amount: incomeTaxBasis({ date: isoOf(r.date), amount: r.amount }, gst),
+  }));
 }
 
 /** Suffix on the label of the period that is still running. */
@@ -55,7 +92,7 @@ export function ledgerMonthGroups(
   const income = bucketByNzMonth(rows.income, { date: "date", amount: "amount" }, months, monthOf);
   const expenses = bucketByNzMonth(
     rows.expenses,
-    { date: "date", amount: "amountExcl" },
+    { date: "date", amount: "amount" },
     months,
     monthOf,
   );
@@ -157,9 +194,7 @@ export function fyTotalGroups(
       return iso >= startISO && iso < endISO;
     };
     const income = rows.income.filter((r) => inFy(r.date)).reduce((s, r) => s + r.amount, 0);
-    const expenses = rows.expenses
-      .filter((r) => inFy(r.date))
-      .reduce((s, r) => s + r.amountExcl, 0);
+    const expenses = rows.expenses.filter((r) => inFy(r.date)).reduce((s, r) => s + r.amount, 0);
     const key = fyKeyOf(fy.label);
     return {
       key,

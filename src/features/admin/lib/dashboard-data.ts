@@ -8,8 +8,13 @@ import type { BarGroup } from "@/features/admin/components/charts/BarChart";
 import { meetingTypeFromNotes } from "@/features/booking/lib/booking";
 import { balanceDue, formatNZD } from "@/features/business/lib/business";
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
-import { ledgerMonthGroups } from "@/features/business/lib/ledger-chart";
-import { nzMonthOf, nzMonthsEnding } from "@/features/business/lib/monthly";
+import {
+  basisExpenseRows,
+  basisIncomeRows,
+  ledgerMonthGroups,
+} from "@/features/business/lib/ledger-chart";
+import { bucketByNzMonth, nzMonthOf, nzMonthsEnding } from "@/features/business/lib/monthly";
+import { loadGstStatus } from "@/features/business/lib/tax/load";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -103,8 +108,13 @@ export interface DashboardData {
   calendarLastRefreshMs: number | null;
   /** Income vs expenses for the last 12 NZ months, oldest first. */
   incomeExpenseGroups: BarGroup[];
-  /** Income per month for the same 12 months, for the revenue sparkline. */
+  /**
+   * Income received per month (GST-inclusive, like {@link DashboardData.monthRevenue}) for
+   * the same 12 months, for the revenue sparkline.
+   */
   revenueTrend: number[];
+  /** GST registered; the chart's series read "(excl. GST)" only when true. */
+  gstRegistered: boolean;
 }
 
 /**
@@ -152,6 +162,7 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     reviewAskOptOuts,
     chartIncome,
     chartExpenses,
+    gst,
   ] = await Promise.all([
     prisma.review.count({ where: { status: "pending" } }),
     prisma.review.count({ where: { status: "approved" } }),
@@ -298,8 +309,10 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     }),
     prisma.expenseEntry.findMany({
       where: { date: { gte: chartStart } },
-      select: { date: true, amountExcl: true },
+      select: { date: true, amountIncl: true, amountExcl: true },
     }),
+    // GST basis for the chart's income and expense series.
+    loadGstStatus(),
   ]);
 
   // --- Retainers due this month ---
@@ -409,12 +422,14 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     : null;
 
   // --- Income vs expenses chart ---
+  // Both series on the GST basis, so the bars read as profit; the sparkline stays money
+  // received, matching the "Revenue this month" card it sits on.
   const incomeExpenseGroups = ledgerMonthGroups(
-    { income: chartIncome, expenses: chartExpenses },
+    { income: basisIncomeRows(chartIncome, gst), expenses: basisExpenseRows(chartExpenses, gst) },
     months,
     now,
   );
-  const revenueTrend = incomeExpenseGroups.map((g) => g.values[0] ?? 0);
+  const revenueTrend = bucketByNzMonth(chartIncome, { date: "date", amount: "amount" }, months);
 
   return {
     todayKey,
@@ -443,5 +458,6 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     calendarLastRefreshMs,
     incomeExpenseGroups,
     revenueTrend,
+    gstRegistered: gst.registered,
   };
 }

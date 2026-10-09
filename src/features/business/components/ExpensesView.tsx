@@ -5,6 +5,7 @@
 // category filters, a missing-receipt toggle, sortable columns, filter-aware summary
 // cards with a per-category breakdown drill-in, and a "Migrate to subscription" row
 // action.
+// Totals use the GST basis, and a new expense defaults to 0% GST while not registered.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -19,6 +20,8 @@ import { MigrateToSubscriptionDialog } from "@/features/business/components/Migr
 import { calcGstFromInclusive, formatNZD, todayISO } from "@/features/business/lib/business";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from "@/features/business/lib/constants";
 import { fyKeyOf, listFinancialYears } from "@/features/business/lib/financial-year";
+import { expenseTaxBasis, isGstRegisteredOn } from "@/features/business/lib/tax/gst-basis";
+import type { GstStatus } from "@/features/business/lib/tax/types";
 import type { ExpenseEntry, Subscription } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
@@ -39,6 +42,8 @@ const BATCH = 25;
 interface ExpensesViewProps {
   /** Called after an expense is migrated to a subscription (bumps the sibling list). */
   onMigrated?: () => void;
+  /** GST registration; sets the new-expense GST default and the totals' basis. */
+  gst: GstStatus;
 }
 
 // An expense can only migrate to a subscription once its supplier+description has
@@ -95,9 +100,10 @@ function matchCount(groups: Map<string, ExpenseEntry[]>, e: ExpenseEntry): numbe
  * Client component for recording, filtering, and displaying expense entries.
  * @param props - Component props.
  * @param props.onMigrated - Callback fired after a successful migrate-to-subscription.
+ * @param props.gst - GST registration status from the pricing settings.
  * @returns Expenses view element.
  */
-export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElement {
+export function ExpensesView({ onMigrated, gst }: ExpensesViewProps): React.ReactElement {
   const { toast } = useToast();
   const [entries, setEntries] = useState<ExpenseEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,7 +114,9 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
     description: "",
     category: "Other",
     amountIncl: "",
-    gstRate: "0.15",
+    // No GST to claim while unregistered, so a new expense isn't split; an edit keeps
+    // its own rate (startEdit).
+    gstRate: isGstRegisteredOn(todayISO(), gst) ? "0.15" : "0",
     // Cast to string so the field stays widenable; the const-array element is a
     // literal type, which would otherwise pin `method` and reject edits.
     method: PAYMENT_METHODS[0] as string,
@@ -402,17 +410,28 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
     ].join("|"),
   );
 
-  const totalExcl = filtered.reduce((s, e) => s + e.amountExcl, 0);
-  const totalGst = filtered.reduce((s, e) => s + e.gstAmount, 0);
+  // GST basis: a row dated before registration (or any row while unregistered) costs its
+  // GST-inclusive amount, and none of its GST is claimable.
+  const totalExpenses = filtered.reduce((s, e) => s + expenseTaxBasis(e, gst), 0);
+  const totalGst = filtered.reduce(
+    (s, e) => s + (isGstRegisteredOn(e.date, gst) ? e.gstAmount : 0),
+    0,
+  );
+  const expensesLabel = gst.registered ? "Expenses (excl. GST)" : "Expenses";
 
   const categoryBreakdown: BreakdownData = useMemo(() => {
     const map = new Map<string, number>();
-    for (const e of filtered) map.set(e.category, (map.get(e.category) ?? 0) + e.amountExcl);
+    for (const e of filtered) {
+      map.set(e.category, (map.get(e.category) ?? 0) + expenseTaxBasis(e, gst));
+    }
     const rows = Array.from(map.entries())
       .map(([label, amount]) => ({ label, amount }))
       .sort((a, b) => b.amount - a.amount);
-    return { title: "Expenses by category (excl. GST)", rows };
-  }, [filtered]);
+    return {
+      title: gst.registered ? "Expenses by category (excl. GST)" : "Expenses by category",
+      rows,
+    };
+  }, [filtered, gst]);
 
   const anyFilterActive =
     search !== "" ||
@@ -448,13 +467,21 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
 
       {/* Summary cards - reflect the active filters; the category card drills in.
           Unloaded data shows "-", not totals of an empty list. */}
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Expenses (excl. GST)" value={loadError ? "-" : formatNZD(totalExcl)} />
-        <StatCard
-          label="GST claimable"
-          value={loadError ? "-" : formatNZD(totalGst)}
-          tone="success"
-        />
+      <div
+        className={cn(
+          "mb-5 grid grid-cols-2 gap-3",
+          gst.registered ? "lg:grid-cols-4" : "lg:grid-cols-3",
+        )}
+      >
+        <StatCard label={expensesLabel} value={loadError ? "-" : formatNZD(totalExpenses)} />
+        {/* Nothing is claimable while unregistered, so the card would only ever read $0.00. */}
+        {gst.registered && (
+          <StatCard
+            label="GST claimable"
+            value={loadError ? "-" : formatNZD(totalGst)}
+            tone="success"
+          />
+        )}
         <StatCard label="Entries" value={loadError ? "-" : sorted.length} />
         <StatCard
           label="Categories"

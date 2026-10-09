@@ -12,14 +12,21 @@ export interface ChartSeries {
 }
 
 /**
- * Income vs expenses. Teal rich-black-700 (#009991) and violet russian-violet-400
- * (#5450e2): worst colour-blind separation ΔE 20.7 (deutan), both above 3:1 on white.
- * Moonstone was rejected: its 600 step sits under the chroma floor and reads as grey.
+ * Income vs expenses, with both labels on the GST basis: "(excl. GST)" only while
+ * registered, when income counts without the GST owed to IRD and expenses without the GST
+ * claimed back. Teal rich-black-700 (#009991) and violet russian-violet-400 (#5450e2):
+ * worst colour-blind separation ΔE 20.7 (deutan), both above 3:1 on white. Moonstone was
+ * rejected: its 600 step sits under the chroma floor and reads as grey.
+ * @param gstRegistered - Whether the business is GST registered.
+ * @returns The two series, income first.
  */
-export const INCOME_EXPENSE_SERIES: readonly ChartSeries[] = [
-  { key: "income", label: "Income", fillClass: "bg-rich-black-700" },
-  { key: "expenses", label: "Expenses (excl. GST)", fillClass: "bg-russian-violet-400" },
-];
+export function incomeExpenseSeries(gstRegistered: boolean): readonly ChartSeries[] {
+  const suffix = gstRegistered ? " (excl. GST)" : "";
+  return [
+    { key: "income", label: `Income${suffix}`, fillClass: "bg-rich-black-700" },
+    { key: "expenses", label: `Expenses${suffix}`, fillClass: "bg-russian-violet-400" },
+  ];
+}
 
 /** Line colour for a stat-card sparkline: the de-emphasis grey, so only the end dot pops. */
 export const SPARKLINE_LINE_CLASS = "text-seasalt-400";

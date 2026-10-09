@@ -70,7 +70,10 @@ export function FieldShell({
   customised,
   children,
 }: FieldShellProps): React.ReactElement {
-  const unsaved = useContext(ChangedPathsContext)?.has(id) ?? false;
+  const changed = useContext(ChangedPathsContext);
+  // A map field (categoryBusinessUse) reports its edits as `<id>.<key>` paths.
+  const unsaved =
+    (changed?.has(id) ?? false) || [...(changed ?? [])].some((path) => path.startsWith(`${id}.`));
   return (
     <div className="py-3 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-x-6">
       <div>

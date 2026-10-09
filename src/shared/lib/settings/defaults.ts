@@ -71,6 +71,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // (shortTaskMins / minTaskMins) in business.ts.
   pricing: {
     gstRegistered: false,
+    gstRegisteredFrom: "",
     minBillableMins: 15,
     billingIncrementMins: 5,
     shortTaskMins: 15,
@@ -206,11 +207,32 @@ export const DEFAULT_SETTINGS: Settings = {
     emailSignature: "**{name}** · Owner / Technician\n{phone} · {email}\n{website} · {location}",
   },
 
-  // Source: DEFAULT_TAX_RATES in tax-planner.ts (sheet still overrides per-FY).
+  // Source: DEFAULT_TAX_RATES in tax-planner.ts (sheet still overrides per-FY). Brackets
+  // and the IETC are IRD's from 31 July 2024. ACC is the 2026-27 earners' levy (1.75%); a
+  // self-employed person also pays a work levy, so match it to the ACC invoice.
   tax: {
     incomeTax: 0.2,
-    acc: 0.0146,
+    acc: 0.0175,
     kiwiSaver: 0.12,
+    brackets: [
+      { upTo: 15600, rate: 0.105 },
+      { upTo: 53500, rate: 0.175 },
+      { upTo: 78100, rate: 0.3 },
+      { upTo: 180000, rate: 0.33 },
+      { upTo: null, rate: 0.39 },
+    ],
+    ietc: {
+      enabled: true,
+      annual: 520,
+      from: 24000,
+      fullTo: 66000,
+      cutoff: 70000,
+      abatementPerDollar: 0.13,
+    },
+    lowValueThreshold: 1000,
+    provisionalThreshold: 5000,
+    vehicleFuel: "petrol",
+    categoryBusinessUse: {},
   },
 
   // Source: cron route literals.

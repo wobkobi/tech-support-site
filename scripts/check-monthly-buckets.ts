@@ -163,7 +163,7 @@ function main(): void {
       { date: "2025-10-06T00:00:00.000Z", amount: 100 },
       { date: "2026-03-31T00:00:00.000Z", amount: 50 },
     ],
-    expenses: [{ date: "2025-11-12T00:00:00.000Z", amountExcl: 10 }],
+    expenses: [{ date: "2025-11-12T00:00:00.000Z", amount: 10 }],
   };
   const pastGroups = fyMonthGroups(past, fy2526, businessStart, now);
   expectEqual(
@@ -211,7 +211,7 @@ function main(): void {
   );
   const ahead: LedgerRows = {
     ...running,
-    expenses: [{ date: "2026-12-05T00:00:00.000Z", amountExcl: 9 }],
+    expenses: [{ date: "2026-12-05T00:00:00.000Z", amount: 9 }],
   };
   expectEqual(
     "a future-dated row extends the current FY to its month",

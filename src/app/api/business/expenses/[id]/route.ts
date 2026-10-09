@@ -47,8 +47,8 @@ export async function PUT(
   if (inclNum === null) {
     return errorResponse("Invalid amount", 400);
   }
-  const rate = gstRate === undefined ? GST_RATE : parseRate(gstRate);
-  if (rate === null) {
+  const parsedRate = gstRate === undefined ? undefined : parseRate(gstRate);
+  if (parsedRate === null) {
     return errorResponse("Invalid GST rate", 400);
   }
 
@@ -62,6 +62,9 @@ export async function PUT(
     return errorResponse("Expense entry not found", 404);
   }
 
+  // No rate sent: keep the split the row already has rather than assuming 15%, so an edit
+  // never adds GST to a row recorded without it (or strips it from one recorded with it).
+  const rate = parsedRate ?? (existing.gstAmount > 0 ? GST_RATE : 0);
   const { gstAmount, amountExcl } = splitGstInclusive(inclNum, rate);
 
   const updated = await prisma.expenseEntry.update({

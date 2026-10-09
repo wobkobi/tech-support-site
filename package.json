@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.80.0",
+  "version": "4.81.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -21,6 +21,7 @@
     "check:bank-fields": "tsx scripts/check-bank-fields.ts",
     "check:emails": "dotenv -e .env.local -- tsx --conditions=react-server scripts/check-email-render.ts",
     "check:emails-merge": "tsx scripts/check-contact-emails.ts",
+    "check:gst-basis": "tsx scripts/check-gst-basis.ts",
     "check:invoice-recipient": "tsx scripts/check-invoice-recipient.ts",
     "check:mailing": "tsx --conditions=react-server scripts/check-mailing.ts",
     "check:monthly": "tsx scripts/check-monthly-buckets.ts",
@@ -31,6 +32,8 @@
     "check:social": "tsx --conditions=react-server scripts/check-social.ts",
     "check:task-window": "tsx scripts/check-task-window.ts",
     "check:tax": "tsx scripts/check-tax.ts",
+    "check:tax-load": "dotenv -e .env.local -- tsx --conditions=react-server scripts/check-tax-load.ts",
+    "check:tax-settings": "tsx scripts/check-tax-settings.ts",
     "check:time-parse": "tsx scripts/check-time-parse.ts",
     "db:push": "prisma db push",
     "dev": "next dev",

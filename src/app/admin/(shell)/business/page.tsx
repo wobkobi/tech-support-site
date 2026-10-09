@@ -3,9 +3,11 @@
 // financial year via resolveScope), aggregates income, expenses, and invoices into
 // BusinessDashboardCards and an income vs expenses chart (by month, or by FY for all
 // time), and shows the tax planner with a cached snapshot plus a Sheets import action.
+// Income and expenses count on the GST basis: incl. GST while not registered, excl. GST
+// once registered.
 
 import { BarChart } from "@/features/admin/components/charts/BarChart";
-import { INCOME_EXPENSE_SERIES } from "@/features/admin/components/charts/series";
+import { incomeExpenseSeries } from "@/features/admin/components/charts/series";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminTabs } from "@/features/admin/components/ui/AdminTabs";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
@@ -29,6 +31,11 @@ import {
 } from "@/features/business/lib/tax-cache";
 import { DEFAULT_TAX_RATES, type TaxRates } from "@/features/business/lib/tax-planner";
 import { readPlannerConfig } from "@/features/business/lib/tax-settings";
+import {
+  gstStatusFromPricing,
+  incomeTaxBasis,
+  isGstRegisteredOn,
+} from "@/features/business/lib/tax/gst-basis";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
@@ -169,6 +176,7 @@ export default async function BusinessPage({
         date: true,
         supplier: true,
         description: true,
+        amountIncl: true,
         amountExcl: true,
         gstAmount: true,
       },
@@ -193,23 +201,35 @@ export default async function BusinessPage({
   // Business start date (from identity settings) drives the FY list + "(partial)" label.
   const startDate = new Date(identity.startDateIso);
   const scope = resolveScope(fyParam, now, startDate);
+  // GST basis for every income and expense figure below: incl. GST while unregistered (or
+  // dated before registration took effect), excl. GST once registered.
+  const gst = gstStatusFromPricing(settings.pricing);
 
   // Plain-data shapes for the client component (avoids passing Date objects across the boundary).
-  const incomeAll: IncomeRow[] = incomeEntries.map((e) => ({
-    id: e.id,
-    date: e.date.toISOString(),
-    customer: e.customer,
-    description: e.description,
-    amount: e.amount,
-  }));
-  const expensesAll: ExpenseRow[] = expenseEntries.map((e) => ({
-    id: e.id,
-    date: e.date.toISOString(),
-    supplier: e.supplier,
-    description: e.description,
-    amountExcl: e.amountExcl,
-    gstAmount: e.gstAmount,
-  }));
+  const incomeAll: IncomeRow[] = incomeEntries.map((e) => {
+    const date = e.date.toISOString();
+    return {
+      id: e.id,
+      date,
+      customer: e.customer,
+      description: e.description,
+      amount: e.amount,
+      basisAmount: incomeTaxBasis({ date, amount: e.amount }, gst),
+    };
+  });
+  const expensesAll: ExpenseRow[] = expenseEntries.map((e) => {
+    const registered = isGstRegisteredOn(e.date, gst);
+    return {
+      id: e.id,
+      date: e.date.toISOString(),
+      supplier: e.supplier,
+      description: e.description,
+      amountExcl: e.amountExcl,
+      gstAmount: e.gstAmount,
+      basisAmount: registered ? e.amountExcl : e.amountIncl,
+      gstClaimable: registered ? e.gstAmount : 0,
+    };
+  });
   const invoicesAll: InvoiceRow[] = invoices.map((inv) => ({
     id: inv.id,
     number: inv.number,
@@ -228,9 +248,9 @@ export default async function BusinessPage({
   });
 
   // Aggregates for the tax planner.
-  const scopedIncomeTotal = income.reduce((s, r) => s + r.amount, 0);
-  const scopedExpensesTotal = expenses.reduce((s, r) => s + r.amountExcl, 0);
-  const scopedGstTotal = expenses.reduce((s, r) => s + r.gstAmount, 0);
+  const scopedIncomeTotal = income.reduce((s, r) => s + r.basisAmount, 0);
+  const scopedExpensesTotal = expenses.reduce((s, r) => s + r.basisAmount, 0);
+  const scopedGstTotal = expenses.reduce((s, r) => s + r.gstClaimable, 0);
 
   // Per-FY rates from the workbook's SETTINGS tab. The sheet stays authoritative; live tax
   // settings fill any cell it leaves blank, or all of them when there's no workbook.
@@ -302,7 +322,10 @@ export default async function BusinessPage({
 
   // Chart groups for the same scope as the cards: months inside an FY, FYs for all time.
   // Both builders put every scoped row in a group, so the chart totals match the cards.
-  const chartRows = { income, expenses };
+  const chartRows = {
+    income: income.map((r) => ({ date: r.date, amount: r.basisAmount })),
+    expenses: expenses.map((e) => ({ date: e.date, amount: e.basisAmount })),
+  };
   const chartGroups =
     scope.startISO && scope.endISO
       ? fyMonthGroups(chartRows, { startISO: scope.startISO, endISO: scope.endISO }, startDate, now)
@@ -342,6 +365,7 @@ export default async function BusinessPage({
           label: scope.label,
           isAllTime: scope.isAllTime,
           isCurrentFy: scope.isCurrentFy,
+          gstRegistered: gst.registered,
         }}
         income={income}
         expenses={expenses}
@@ -357,7 +381,7 @@ export default async function BusinessPage({
           scope.isAllTime ? "Income vs expenses by financial year" : "Income vs expenses by month"
         }
         description={scope.label}
-        series={INCOME_EXPENSE_SERIES}
+        series={incomeExpenseSeries(gst.registered)}
         groups={chartGroups}
         groupHeading={scope.isAllTime ? "Financial year" : "Month"}
         differenceLabel="Profit"

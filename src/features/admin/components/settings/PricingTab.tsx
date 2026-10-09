@@ -9,6 +9,7 @@ import { PricingPreview } from "@/features/admin/components/settings/PricingPrev
 import {
   NumberField,
   SettingsTabBody,
+  TextField,
   ToggleField,
 } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
@@ -66,6 +67,17 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
           customised={draft.gstRegistered !== defaults.gstRegistered}
           onChange={setGst}
         />
+        {draft.gstRegistered && (
+          <TextField
+            id="gstRegisteredFrom"
+            meta={m.gstRegisteredFrom}
+            type="date"
+            value={draft.gstRegisteredFrom}
+            error={fieldErrors.gstRegisteredFrom}
+            customised={draft.gstRegisteredFrom !== defaults.gstRegisteredFrom}
+            onChange={(v) => setTop({ gstRegisteredFrom: v })}
+          />
+        )}
         <NumberField
           id="minBillableMins"
           meta={m.minBillableMins}
@@ -325,7 +337,10 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
 
       <SettingsFooter form={form} />
 
-      <SettingsHistory group="pricing" onRestore={(v: PricingSettings) => setDraft(v)} />
+      <SettingsHistory
+        group="pricing"
+        onRestore={(v: PricingSettings) => setDraft({ ...defaults, ...v })}
+      />
 
       <ConfirmDialog
         open={confirmGst}

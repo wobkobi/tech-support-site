@@ -1,10 +1,10 @@
 // src/app/api/business/expenses/route.ts
 // Admin expense-ledger endpoint. GET lists every expense entry (newest first); POST
 // creates one, computing GST and the excl-GST amount server-side from the GST-inclusive
-// amount and rate.
+// amount and rate. With no rate sent, the rate for the entry date applies: 0 while not
+// GST registered.
 
 import { recordExpense } from "@/features/business/lib/expense-recording";
-import { GST_RATE } from "@/features/business/lib/pricing-policy";
 import { parseAmount, parseDate, parseRate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -48,7 +48,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Invalid amount", 400);
   }
 
-  const rate = gstRate === undefined ? GST_RATE : parseRate(gstRate);
+  // Undefined lets recordExpense pick the rate for the entry date.
+  const rate = gstRate === undefined ? undefined : parseRate(gstRate);
   if (rate === null) {
     return errorResponse("Invalid GST rate", 400);
   }

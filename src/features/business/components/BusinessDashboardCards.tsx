@@ -7,6 +7,10 @@
 //
 // Past-FY scopes hide the "This month" cards, since the current calendar month falls
 // outside the FY window and would always show zero.
+//
+// Income and expense figures are on the GST basis the page computes per row (basisAmount,
+// gstClaimable): incl. GST while not registered, so the GST card and the "(excl. GST)"
+// labels show only once registered.
 
 import { StatCard, type StatTone } from "@/features/admin/components/ui/StatCard";
 import {
@@ -25,7 +29,10 @@ export interface IncomeRow {
   date: string; // ISO
   customer: string;
   description: string;
+  /** GST-inclusive amount, as received. */
   amount: number;
+  /** What the row counts as income: `amount` while unregistered or dated before registration, else excl. GST. */
+  basisAmount: number;
 }
 
 /** Expense entry payload passed in from the server component (already scope-filtered). */
@@ -36,6 +43,10 @@ export interface ExpenseRow {
   description: string;
   amountExcl: number;
   gstAmount: number;
+  /** What the row costs for profit: incl. GST while unregistered or dated before registration, else excl. */
+  basisAmount: number;
+  /** GST claimed back on the row: its gstAmount once registered on its date, else 0. */
+  gstClaimable: number;
 }
 
 /** Invoice payload passed in from the server component (already scope-filtered). */
@@ -53,6 +64,8 @@ interface DashboardScope {
   label: string;
   isAllTime: boolean;
   isCurrentFy: boolean;
+  /** GST registered (pricing setting); shows the GST card and the "(excl. GST)" labels. */
+  gstRegistered: boolean;
 }
 
 interface Props {
@@ -77,17 +90,17 @@ function incomeRows(entries: IncomeRow[]): BreakdownRow[] {
       date: formatDateSlash(e.date),
       label: e.customer,
       sublabel: e.description,
-      amount: e.amount,
+      amount: e.basisAmount,
     }));
 }
 
 /**
  * Builds the BreakdownRow list for expense entries.
  * @param entries - Expense entries to map.
- * @param field - Which numeric field to display (excl. GST or GST amount).
+ * @param field - Which numeric field to display (GST-basis cost or GST claimable).
  * @returns Modal rows.
  */
-function expenseRows(entries: ExpenseRow[], field: "amountExcl" | "gstAmount"): BreakdownRow[] {
+function expenseRows(entries: ExpenseRow[], field: "basisAmount" | "gstClaimable"): BreakdownRow[] {
   return entries
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -95,7 +108,7 @@ function expenseRows(entries: ExpenseRow[], field: "amountExcl" | "gstAmount"): 
       date: formatDateSlash(e.date),
       label: e.supplier,
       sublabel: e.description,
-      amount: field === "amountExcl" ? e.amountExcl : e.gstAmount,
+      amount: e[field],
     }));
 }
 
@@ -111,21 +124,21 @@ function inRange<T extends { date: string }>(entries: T[], startISO: string, end
 }
 
 /**
- * Sums the `amount` field of an income list.
+ * Sums an income list on the GST basis (`basisAmount`).
  * @param rows - Income rows.
  * @returns Sum.
  */
 function sumIncome(rows: IncomeRow[]): number {
-  return rows.reduce((s, r) => s + r.amount, 0);
+  return rows.reduce((s, r) => s + r.basisAmount, 0);
 }
 
 /**
  * Sums a chosen numeric field across an expense list.
  * @param rows - Expense rows.
- * @param field - "amountExcl" or "gstAmount".
+ * @param field - "basisAmount" or "gstClaimable".
  * @returns Sum.
  */
-function sumExpense(rows: ExpenseRow[], field: "amountExcl" | "gstAmount"): number {
+function sumExpense(rows: ExpenseRow[], field: "basisAmount" | "gstClaimable"): number {
   return rows.reduce((s, r) => s + r[field], 0);
 }
 
@@ -151,8 +164,9 @@ export function BusinessDashboardCards({
   const [active, setActive] = useState<BreakdownData | null>(null);
 
   const totalIncome = sumIncome(income);
-  const totalExpensesExcl = sumExpense(expenses, "amountExcl");
-  const totalGst = sumExpense(expenses, "gstAmount");
+  /// On the GST basis (incl. GST while unregistered), despite the "Excl" in the name.
+  const totalExpensesExcl = sumExpense(expenses, "basisAmount");
+  const totalGst = sumExpense(expenses, "gstClaimable");
   const profit = totalIncome - totalExpensesExcl;
   // Income-tax reserve is 20% of PROFIT (not raw income) - matches NZ sole-trader
   // Tax Planner. Clamp to >= 0 so a loss year doesn't show a negative reserve.
@@ -163,8 +177,11 @@ export function BusinessDashboardCards({
   const showThisMonthCards = scope.isAllTime || scope.isCurrentFy;
   // Card titles read more naturally as "Income" / "Expenses" inside an FY
   // scope, but stay as "Total income" / "Total expenses" in the all-time view.
-  const incomePrefix = scope.isAllTime ? "Total income" : "Income";
-  const expensesPrefix = scope.isAllTime ? "Total expenses (excl. GST)" : "Expenses (excl. GST)";
+  // "(excl. GST)" only while registered: unregistered income and expenses count with their
+  // GST in.
+  const gstSuffix = scope.gstRegistered ? " (excl. GST)" : "";
+  const incomePrefix = (scope.isAllTime ? "Total income" : "Income") + gstSuffix;
+  const expensesPrefix = (scope.isAllTime ? "Total expenses" : "Expenses") + gstSuffix;
 
   /** All-income breakdown shown when the income card is clicked. */
   const totalIncomeBreakdown: BreakdownData = {
@@ -174,10 +191,10 @@ export function BusinessDashboardCards({
     viewAll: { label: "View all income", href: `/admin/business/income` },
   };
 
-  /** All-expense (excl. GST) breakdown for the expenses card. */
+  /** All-expense breakdown (GST basis) for the expenses card. */
   const totalExpensesBreakdown: BreakdownData = {
     title: expensesPrefix,
-    rows: expenseRows(expenses, "amountExcl"),
+    rows: expenseRows(expenses, "basisAmount"),
     total: { label: "Total", value: formatNZD(totalExpensesExcl) },
     viewAll: { label: "View all expenses", href: `/admin/business/expenses` },
   };
@@ -215,15 +232,18 @@ export function BusinessDashboardCards({
   /** This-month expense breakdown. */
   const monthExpensesBreakdown: BreakdownData = {
     title: "This month expenses",
-    rows: expenseRows(monthExpenses, "amountExcl"),
-    total: { label: "Total", value: formatNZD(sumExpense(monthExpenses, "amountExcl")) },
+    rows: expenseRows(monthExpenses, "basisAmount"),
+    total: { label: "Total", value: formatNZD(sumExpense(monthExpenses, "basisAmount")) },
     viewAll: { label: "View all expenses", href: `/admin/business/expenses` },
   };
 
-  /** GST claimable breakdown - shows the GST amount per expense entry. */
+  /** GST claimable breakdown - the GST claimed back per expense, rows with none left out. */
   const gstBreakdown: BreakdownData = {
     title: "GST claimable",
-    rows: expenseRows(expenses, "gstAmount"),
+    rows: expenseRows(
+      expenses.filter((e) => e.gstClaimable !== 0),
+      "gstClaimable",
+    ),
     total: { label: "Total GST", value: formatNZD(totalGst) },
     viewAll: { label: "View all expenses", href: `/admin/business/expenses` },
   };
@@ -284,18 +304,23 @@ export function BusinessDashboardCards({
           },
           {
             label: "This month expenses",
-            value: formatNZD(sumExpense(monthExpenses, "amountExcl")),
+            value: formatNZD(sumExpense(monthExpenses, "basisAmount")),
             tone: "default" as StatTone,
             breakdown: monthExpensesBreakdown,
           },
         ]
       : []),
-    {
-      label: "GST claimable",
-      value: formatNZD(totalGst),
-      tone: "info",
-      breakdown: gstBreakdown,
-    },
+    // Nothing is claimable while unregistered, so the card would only ever read $0.00.
+    ...(scope.gstRegistered
+      ? [
+          {
+            label: "GST claimable",
+            value: formatNZD(totalGst),
+            tone: "info" as StatTone,
+            breakdown: gstBreakdown,
+          },
+        ]
+      : []),
     {
       label: "Invoices",
       value: String(invoices.length),
