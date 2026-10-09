@@ -9,10 +9,12 @@
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { FiledYearWarning } from "@/features/business/components/tax/FiledYearWarning";
 import { TripFormModal } from "@/features/business/components/trips/TripFormModal";
 import { TripLog } from "@/features/business/components/trips/TripLog";
 import { TripSuggestions } from "@/features/business/components/trips/TripSuggestions";
 import { formatNZD, todayISO } from "@/features/business/lib/business-format";
+import type { FiledYearRef } from "@/features/business/lib/tax/snapshot";
 import type { KmVehiclePeriod } from "@/features/business/lib/tax/types";
 import { inKmVehiclePeriod, kmClaim, splitTripKm } from "@/features/business/lib/tax/vehicle";
 import {
@@ -66,6 +68,8 @@ interface TripsViewProps {
   kmPeriods: KmVehiclePeriod[];
   /** Display name of the vehicle fuel type. */
   fuelLabel: string;
+  /** Filed years the edit forms warn about, oldest first. */
+  filedYears: readonly FiledYearRef[];
 }
 
 /**
@@ -81,6 +85,7 @@ interface TripsViewProps {
  * @param props.totalVehicleKm - The car's total km for the FY, or null when not entered.
  * @param props.kmPeriods - km-rate vehicle service periods; trips outside them earn nothing.
  * @param props.fuelLabel - Vehicle fuel type for the rates note.
+ * @param props.filedYears - Filed years the edit forms warn about.
  * @returns The page body.
  */
 export function TripsView({
@@ -94,6 +99,7 @@ export function TripsView({
   totalVehicleKm,
   kmPeriods,
   fuelLabel,
+  filedYears,
 }: TripsViewProps): React.ReactElement {
   const { toast } = useToast();
   const [trips, setTrips] = useState<TripRow[]>(initialTrips);
@@ -409,6 +415,15 @@ export function TripsView({
         figures for the days the car is on km rates, and only trips on those days earn the rate.
       </Notice>
 
+      {/* Adding from the jobs list has no dialog, so warn here when this FY is filed. A
+          one-day span on the FY's first day keys it to this year alone, so it shows even
+          when the jobs list is empty. */}
+      <FiledYearWarning
+        filedYears={filedYears}
+        spans={[{ from: startISO, to: startISO }]}
+        variant="page"
+        className="mb-6"
+      />
       <TripSuggestions
         suggestions={suggestions}
         kmDrafts={kmDrafts}
@@ -436,6 +451,7 @@ export function TripsView({
           defaultDate={defaultTripDate(startISO, endISO, todayISO())}
           onSaved={handleSaved}
           onClose={closeForm}
+          filedYears={filedYears}
         />
       )}
 
@@ -443,11 +459,18 @@ export function TripsView({
         open={deleting !== null}
         title="Delete this trip?"
         body={
-          deleting
-            ? `${formatDateShort(deleting.date)}, ${formatKm(deleting.km)}: ${deleting.purpose}.${
+          deleting ? (
+            <>
+              {`${formatDateShort(deleting.date)}, ${formatKm(deleting.km)}: ${deleting.purpose}.${
                 deleting.bookingId ? " The job goes back on the jobs without a trip list." : ""
-              }`
-            : undefined
+              }`}
+              <FiledYearWarning
+                filedYears={filedYears}
+                spans={[{ from: deleting.date, to: deleting.date }]}
+                className="mt-3"
+              />
+            </>
+          ) : undefined
         }
         confirmLabel="Delete"
         tone="danger"

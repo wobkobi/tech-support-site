@@ -11,6 +11,7 @@ import { TripsView } from "@/features/business/components/trips/TripsView";
 import { fyKeyOf } from "@/features/business/lib/financial-year";
 import { loadAllFys, loadTaxInputs } from "@/features/business/lib/tax/load";
 import { kmVehiclePeriods } from "@/features/business/lib/tax/vehicle";
+import { loadFiledYears } from "@/features/business/lib/tax/view.server";
 import { pickFy } from "@/features/business/lib/trips";
 import { loadTripSuggestions, loadTrips } from "@/features/business/lib/trips.server";
 import { Notice } from "@/shared/components/Notice";
@@ -55,10 +56,11 @@ export default async function TripsPage({
   }
   const fyKey = fyKeyOf(fy.label);
 
-  const [trips, suggestions, taxInputs] = await Promise.all([
+  const [trips, suggestions, taxInputs, filedYears] = await Promise.all([
     loadTrips({ start: fy.start, end: fy.end }),
     loadTripSuggestions(fy, now),
     loadTaxInputs(fy, now),
+    loadFiledYears(now),
   ]);
 
   return (
@@ -102,6 +104,7 @@ export default async function TripsPage({
         totalVehicleKm={taxInputs.year.totalVehicleKm ?? null}
         kmPeriods={kmVehiclePeriods(taxInputs.assets)}
         fuelLabel={VEHICLE_FUEL_LABELS[taxInputs.settings.vehicleFuel]}
+        filedYears={filedYears}
       />
     </>
   );

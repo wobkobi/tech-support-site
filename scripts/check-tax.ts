@@ -36,8 +36,19 @@ import {
   type TaxRulesSettings,
   type TaxYearInput,
   type TaxYearRecordInput,
+  type TaxYearResult,
 } from "@/features/business/lib/tax";
+import { buildTaxCsv, csvMoney, csvText } from "@/features/business/lib/tax/export-csv";
 import { inFy, ledgerDay, pctFraction, roundCents } from "@/features/business/lib/tax/helpers";
+import {
+  buildTaxYearSnapshot,
+  closingAtvFromSnapshot,
+  diffSnapshots,
+  filedClosingAtvByFy,
+  filedYearsTouched,
+  parseTaxYearSnapshot,
+  type FiledYearRef,
+} from "@/features/business/lib/tax/snapshot";
 
 let failures = 0;
 
@@ -1278,6 +1289,483 @@ function checkTaxYear(): void {
   );
 }
 
+/** Register for the snapshot fixtures: two assets in FY 2025-26 and the car from 2026-27. */
+const SNAPSHOT_ASSETS: AssetInput[] = [
+  {
+    id: "a2",
+    name: "=Desk, oak",
+    classKey: "fixture-desk",
+    origin: "introduced",
+    inServiceDate: "2025-10-01T00:00:00.000Z",
+    costBase: 400,
+    supplier: null,
+    method: "SL",
+    rate: 0.085,
+    businessUsePct: 100,
+    investmentBoost: false,
+    vehicleMethod: null,
+    disposedAt: null,
+    disposalAmount: null,
+    expenseId: null,
+  },
+  {
+    id: "a1",
+    name: 'Laptop, "Pro" 14in',
+    classKey: "fixture-laptop",
+    origin: "introduced",
+    inServiceDate: "2025-10-01T00:00:00.000Z",
+    costBase: 2500,
+    supplier: null,
+    method: "DV",
+    rate: 0.5,
+    businessUsePct: 100,
+    investmentBoost: false,
+    vehicleMethod: null,
+    disposedAt: null,
+    disposalAmount: null,
+    expenseId: null,
+  },
+  {
+    id: "car",
+    name: "Car",
+    classKey: "fixture-car",
+    origin: "purchased",
+    inServiceDate: "2026-08-26T00:00:00.000Z",
+    costBase: 4500,
+    supplier: "Kevin",
+    method: "DV",
+    rate: 0.3,
+    businessUsePct: 100,
+    investmentBoost: false,
+    vehicleMethod: "km",
+    disposedAt: null,
+    disposalAmount: null,
+    expenseId: null,
+  },
+];
+
+/**
+ * Hand-built FY 2025-26 result. It only has to be internally consistent: these fixtures
+ * test storage, comparison and export, not the tax maths (the fixtures above cover that).
+ */
+const SNAPSHOT_RESULT: TaxYearResult = {
+  fyKey: "2025-26",
+  income: 4207.5,
+  recoveryIncome: 0,
+  deductions: {
+    expenses: 560.63,
+    excludedFuel: 0,
+    excludedAssetLinked: 0,
+    unclaimedKm: 0,
+    depreciation: 642,
+    lowValueWriteOffs: 0,
+    investmentBoost: 0,
+    km: 51,
+    homeOffice: 0,
+    lossOnDisposal: 0,
+    total: 1253.63,
+    lines: [
+      { key: "expenses", label: "Expenses", amount: 560.63 },
+      {
+        key: "depreciation",
+        label: "Depreciation",
+        amount: 642,
+        note: 'Laptop, "Pro" 14in and desk',
+      },
+      { key: "km", label: "Vehicle km claim", amount: 51 },
+    ],
+  },
+  profit: 2953.87,
+  taxable: 2953.87,
+  incomeTax: 310.16,
+  ietc: 0,
+  residualIncomeTax: 310.16,
+  acc: 49.33,
+  kiwiSaver: 354.46,
+  totalToSetAside: 359.49,
+  provisionalWarning: false,
+  assets: [
+    {
+      assetId: "a1",
+      fyKey: "2025-26",
+      months: 6,
+      openingAtv: 2500,
+      depreciation: 625,
+      investmentBoost: 0,
+      writtenOff: false,
+      deductible: 625,
+      closingAtv: 1875,
+      recoveryIncome: 0,
+      lossOnDisposal: 0,
+      disposed: false,
+    },
+    {
+      assetId: "a2",
+      fyKey: "2025-26",
+      months: 6,
+      openingAtv: 400,
+      depreciation: 17,
+      investmentBoost: 0,
+      writtenOff: false,
+      deductible: 17,
+      closingAtv: 383,
+      recoveryIncome: 0,
+      lossOnDisposal: 0,
+      disposed: false,
+    },
+  ],
+  km: { businessKm: 42.5, tier1Km: 42.5, tier2Km: 0, amount: 51 },
+  homeOffice: { officePct: 0, sqmPart: 0, proportionalPart: 0, amount: 0 },
+  ir: {
+    ir3NetIncome: 2953.87,
+    ir10Box52Depreciation: 642,
+    ir10Box54Additions: 2900,
+    ir10Box55Disposals: 0,
+    ir10Box59LossOnDisposal: 0,
+    ir10Box60BoostValue: 0,
+  },
+};
+
+/** FY 2025-26 as a filed year, for the edit-warning cases. */
+const FILED_2025: FiledYearRef = {
+  fyKey: "2025-26",
+  label: "FY 2025-26 (partial)",
+  startIso: "2025-04-01T00:00:00.000Z",
+  endIso: "2026-04-01T00:00:00.000Z",
+  filedAtIso: "2026-06-30T13:00:00.000Z",
+};
+
+/**
+ * Filed-year snapshot fixtures: build, JSON round trip, closing-value carry-forward,
+ * comparison with a live recompute, and which filed years an edit reaches.
+ */
+function checkSnapshots(): void {
+  console.log("\nFiled-year snapshots:");
+  const trips = [
+    { date: "2026-02-10T00:00:00.000Z", km: 12.5, purpose: "Client visit, Ponsonby" },
+    { date: "2025-11-03T00:00:00.000Z", km: 30, purpose: "-Parts run" },
+  ];
+  const built = buildTaxYearSnapshot({
+    result: SNAPSHOT_RESULT,
+    assets: SNAPSHOT_ASSETS,
+    trips,
+    totalVehicleKm: 9000,
+    filedAt: FILED_2025.filedAtIso,
+  });
+  expectEqual(
+    "keeps only assets with a row this year, oldest in service first",
+    built.assets.map((a) => a.id),
+    ["a1", "a2"],
+  );
+  expectEqual(
+    "unknown class key falls back to the key",
+    built.assets[1]?.classLabel,
+    "fixture-desk",
+  );
+  expectEqual(
+    "trips oldest first",
+    built.trips.map((t) => t.date),
+    ["2025-11-03T00:00:00.000Z", "2026-02-10T00:00:00.000Z"],
+  );
+  expectEqual("closing values per asset", built.closingAtv, { a1: 1875, a2: 383 });
+  expectEqual("total vehicle km kept", built.totalVehicleKm, 9000);
+
+  // Round trip through the same JSON the Mongo document stores.
+  const stored: unknown = JSON.parse(JSON.stringify(built));
+  const parsed = parseTaxYearSnapshot(stored);
+  expectEqual("round trip parses", parsed !== null, true);
+  expectEqual("round trip is lossless", JSON.stringify(parsed), JSON.stringify(built));
+  expectEqual(
+    "closing values read back",
+    parsed ? [...closingAtvFromSnapshot(parsed).entries()] : null,
+    [
+      ["a1", 1875],
+      ["a2", 383],
+    ],
+  );
+  expectEqual("null snapshot rejected", parseTaxYearSnapshot(null), null);
+  expectEqual("other version rejected", parseTaxYearSnapshot({ ...built, version: 2 }), null);
+  expectEqual("bare TaxYearResult rejected", parseTaxYearSnapshot(SNAPSHOT_RESULT), null);
+
+  // Damaged version-1 documents: anything the Tax page or the CSV would trip over is rejected.
+  expectEqual(
+    "thin v1 snapshot rejected",
+    parseTaxYearSnapshot({
+      version: 1,
+      filedAt: null,
+      result: { fyKey: "2025-26", assets: [] },
+      assets: [],
+      trips: [],
+      closingAtv: {},
+    }),
+    null,
+  );
+  expectEqual(
+    "unparseable filedAt rejected",
+    parseTaxYearSnapshot({ ...built, filedAt: "garbage" }),
+    null,
+  );
+  expectEqual(
+    "trip with non-number km rejected",
+    parseTaxYearSnapshot({
+      ...built,
+      trips: [{ date: "2025-11-03T00:00:00.000Z", km: "30", purpose: "Parts run" }],
+    }),
+    null,
+  );
+  expectEqual(
+    "trip with unparseable date rejected",
+    parseTaxYearSnapshot({ ...built, trips: [{ date: "31/02/2026", km: 30, purpose: "x" }] }),
+    null,
+  );
+  expectEqual(
+    "asset with unparseable in-service date rejected",
+    parseTaxYearSnapshot({
+      ...built,
+      assets: built.assets.map((a, i) => (i === 0 ? { ...a, inServiceDate: "soon" } : a)),
+    }),
+    null,
+  );
+  expectEqual(
+    "deduction line without an amount rejected",
+    parseTaxYearSnapshot({
+      ...built,
+      result: {
+        ...built.result,
+        deductions: { ...built.result.deductions, lines: [{ key: "x", label: "X" }] },
+      },
+    }),
+    null,
+  );
+  expectEqual(
+    "missing IR figures rejected",
+    parseTaxYearSnapshot({ ...built, result: { ...built.result, ir: undefined } }),
+    null,
+  );
+  expectEqual(
+    "non-finite schedule figure rejected",
+    parseTaxYearSnapshot(
+      JSON.parse(JSON.stringify(built).replace('"closingAtv":1875', '"closingAtv":null')),
+    ),
+    null,
+  );
+  expectEqual(
+    "non-number closing value rejected",
+    parseTaxYearSnapshot({ ...built, closingAtv: { a1: "1875" } }),
+    null,
+  );
+  expectEqual(
+    "valid snapshot still round-trips",
+    JSON.stringify(parseTaxYearSnapshot(JSON.parse(JSON.stringify(built)))),
+    JSON.stringify(built),
+  );
+
+  // Total km not entered: stored as null, and a missing field reads back as null too.
+  const noTotalKm = buildTaxYearSnapshot({
+    result: SNAPSHOT_RESULT,
+    assets: SNAPSHOT_ASSETS,
+    trips,
+    totalVehicleKm: null,
+    filedAt: null,
+  });
+  const noTotalKmParsed = parseTaxYearSnapshot(JSON.parse(JSON.stringify(noTotalKm)));
+  expectEqual("null total km round trip", noTotalKmParsed?.totalVehicleKm, null);
+  expectEqual(
+    "missing total km reads as null",
+    parseTaxYearSnapshot({ ...built, totalVehicleKm: undefined })?.totalVehicleKm,
+    null,
+  );
+  expectEqual(
+    "non-numeric total km rejected",
+    parseTaxYearSnapshot({ ...built, totalVehicleKm: "9000" }),
+    null,
+  );
+
+  // Carry-forward map loadTaxInputs feeds into the next FY: filed rows only, bad JSON skipped.
+  const byFy = filedClosingAtvByFy([
+    { fyKey: "2025-26", filedAt: new Date(FILED_2025.filedAtIso), snapshot: stored },
+    { fyKey: "2026-27", filedAt: null, snapshot: stored },
+    { fyKey: "2024-25", filedAt: new Date("2025-07-01T00:00:00.000Z"), snapshot: { junk: true } },
+  ]);
+  expectEqual("carry-forward only from filed years", [...byFy.keys()], ["2025-26"]);
+  expectEqual("carry-forward value for a1", byFy.get("2025-26")?.get("a1"), 1875);
+
+  // Comparison: identical > nothing; changed income and a removed asset > listed.
+  expectEqual("no changes against itself", diffSnapshots(built, built), []);
+  const live = buildTaxYearSnapshot({
+    result: {
+      ...SNAPSHOT_RESULT,
+      income: 4300,
+      profit: 3046.37,
+      ir: { ...SNAPSHOT_RESULT.ir, ir3NetIncome: 3046.37 },
+      assets: SNAPSHOT_RESULT.assets.filter((row) => row.assetId === "a1"),
+    },
+    assets: SNAPSHOT_ASSETS,
+    trips,
+    totalVehicleKm: 9000,
+    filedAt: null,
+  });
+  expectEqual("changes listed in display order", diffSnapshots(built, live), [
+    { key: "income", label: "Income", unit: "money", filed: 4207.5, live: 4300 },
+    { key: "profit", label: "Net profit", unit: "money", filed: 2953.87, live: 3046.37 },
+    {
+      key: "ir.ir3NetIncome",
+      label: "Net income (IR3 question 24)",
+      unit: "money",
+      filed: 2953.87,
+      live: 3046.37,
+    },
+    {
+      key: "asset:a2",
+      label: "=Desk, oak closing value (no longer in this year)",
+      unit: "money",
+      filed: 383,
+      live: 0,
+    },
+  ]);
+
+  // Total km for the year: changed, entered after filing, and cleared after filing.
+  expectEqual("total km changed", diffSnapshots(built, { ...built, totalVehicleKm: 21000 }), [
+    {
+      key: "totalVehicleKm",
+      label: "Total km the car travelled (odometer)",
+      unit: "km",
+      filed: 9000,
+      live: 21000,
+    },
+  ]);
+  expectEqual("total km entered after filing", diffSnapshots(noTotalKm, built), [
+    {
+      key: "totalVehicleKm",
+      label: "Total km the car travelled (not entered when filed)",
+      unit: "km",
+      filed: 0,
+      live: 9000,
+    },
+  ]);
+  expectEqual("total km cleared after filing", diffSnapshots(built, noTotalKm), [
+    {
+      key: "totalVehicleKm",
+      label: "Total km the car travelled (now cleared)",
+      unit: "km",
+      filed: 9000,
+      live: 0,
+    },
+  ]);
+  expectEqual("total km null on both sides", diffSnapshots(noTotalKm, noTotalKm), []);
+
+  // Which filed years an edit reaches. FY windows are half-open: 1 April belongs to the next FY.
+  /**
+   * Filed FY keys the given spans reach, against FY 2025-26 only.
+   * @param spans - Date spans of the edited record.
+   * @returns Matching FY keys.
+   */
+  const keys = (spans: { from: string; to: string | null }[]): string[] =>
+    filedYearsTouched(spans, [FILED_2025]).map((fy) => fy.fyKey);
+  expectEqual("trip on 31 March", keys([{ from: "2026-03-31", to: "2026-03-31" }]), ["2025-26"]);
+  expectEqual("trip on 1 April", keys([{ from: "2026-04-01", to: "2026-04-01" }]), []);
+  expectEqual("asset in service Oct 2025, kept", keys([{ from: "2025-10-01", to: null }]), [
+    "2025-26",
+  ]);
+  expectEqual(
+    "asset in service Aug 2026",
+    keys([{ from: "2026-08-26T00:00:00.000Z", to: null }]),
+    [],
+  );
+  expectEqual("asset disposed before the FY", keys([{ from: "2024-01-01", to: "2025-03-31" }]), []);
+  expectEqual("empty date touches nothing", keys([{ from: "", to: null }]), []);
+  expectEqual(
+    "trip moved out of a filed year still warns",
+    keys([
+      { from: "2026-04-02", to: "2026-04-02" },
+      { from: "2026-03-31", to: "2026-03-31" },
+    ]),
+    ["2025-26"],
+  );
+
+  console.log("\nAccountant CSV:");
+  expectEqual("quotes doubled", csvText('He said "hi"'), '"He said ""hi"""');
+  expectEqual("formula guarded", csvText("=1+1"), `"'=1+1"`);
+  expectEqual("leading minus guarded", csvText("-5"), `"'-5"`);
+  expectEqual("null is empty", csvText(null), '""');
+  expectEqual("money two decimals", csvMoney(1234.5), "1234.50");
+  expectEqual("tiny negative is zero", csvMoney(-0.004), "0.00");
+
+  // 30 Jun 13:00Z is 1 Jul in NZ; 8 Oct 23:30Z is 9 Oct. Both must print the NZ day.
+  const csv = buildTaxCsv(built, {
+    fyLabel: "FY 2025-26 (partial)",
+    generatedAt: new Date("2026-10-08T23:30:00.000Z"),
+  });
+  const lines = csv.split("\r\n");
+  expectEqual("BOM and title row", lines[0], '\uFEFF"Tax summary","FY 2025-26 (partial)"');
+  expectEqual("filed status in NZ date", lines[1], '"Status","Filed 01/07/2026"');
+  expectEqual("generated in NZ date", lines[2], '"Generated","09/10/2026"');
+  expectEqual("IR3 net income row", lines.includes('"Net income",2953.87,"IR3 question 24"'), true);
+  expectEqual(
+    "IR10 box 52 row",
+    lines.includes('"Depreciation incl. Investment Boost",642.00,"IR10 box 52"'),
+    true,
+  );
+  expectEqual(
+    "asset row escaped and complete",
+    lines.includes(
+      `"'=Desk, oak","fixture-desk","Brought in","01/10/2025",400.00,"SL",8.5,100,6,400.00,17.00,0.00,"No",17.00,383.00,"","",0.00,0.00,"No"`,
+    ),
+    true,
+  );
+  expectEqual(
+    "asset name with quotes",
+    lines.some((line) => line.startsWith('"Laptop, ""Pro"" 14in","fixture-laptop"')),
+    true,
+  );
+  expectEqual("trip row", lines.includes(`"03/11/2025",30,"'-Parts run"`), true);
+  expectEqual(
+    "trip km decimal",
+    lines.includes('"10/02/2026",12.5,"Client visit, Ponsonby"'),
+    true,
+  );
+  expectEqual("km claim row", lines.includes('"Km claim",51.00'), true);
+  expectEqual("unclaimed km row", lines.includes('"Km not claimed (no km-rate vehicle)",0'), true);
+  expectEqual(
+    "total km row before the tier split",
+    lines.slice(lines.indexOf('"Km not claimed (no km-rate vehicle)",0') + 1).slice(0, 2),
+    ['"Total km the car travelled (odometer)",9000', '"Tier 1 km",42.5'],
+  );
+  expectEqual("ends with a line break", csv.endsWith("\r\n"), true);
+  expectEqual(
+    "stored snapshot exports the same CSV",
+    parsed
+      ? buildTaxCsv(parsed, {
+          fyLabel: "FY 2025-26 (partial)",
+          generatedAt: new Date("2026-10-08T23:30:00.000Z"),
+        })
+      : null,
+    csv,
+  );
+  const liveCsv = buildTaxCsv(live, { fyLabel: "FY 2025-26 (partial)", generatedAt: new Date() });
+  expectEqual("live status", liveCsv.split("\r\n")[1], '"Status","Not filed - live figures"');
+  // A filed year whose snapshot won't parse exports live figures, still dated as filed.
+  const unreadableCsv = buildTaxCsv(live, {
+    fyLabel: "FY 2025-26 (partial)",
+    generatedAt: new Date(),
+    unreadableFiledAt: "2026-06-30T13:00:00.000Z",
+  });
+  expectEqual(
+    "unreadable filed status",
+    unreadableCsv.split("\r\n")[1],
+    `"Status","Filed 01/07/2026 - saved figures couldn't be read, these are fresh figures"`,
+  );
+  const noTotalKmCsv = buildTaxCsv(noTotalKm, {
+    fyLabel: "FY 2025-26 (partial)",
+    generatedAt: new Date(),
+  });
+  expectEqual(
+    "total km not entered",
+    noTotalKmCsv.split("\r\n").includes('"Total km the car travelled (odometer)","Not entered"'),
+    true,
+  );
+}
+
 /** Runs every fixture group and exits non-zero on any failure. */
 function main(): void {
   checkHelpers();
@@ -1288,6 +1776,7 @@ function main(): void {
   checkSetAside();
   checkDepreciation();
   checkTaxYear();
+  checkSnapshots();
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);
 }

@@ -1,13 +1,11 @@
 // scripts/check-tax-load.ts
 // The pure mappers inside the tax loader: stored Asset rows > AssetInput, TaxYear rows >
-// the year record (blank rates filled from IRD for the year and fuel type), filed
-// snapshots > closing ATVs, and settings.tax > the rules the maths reads. load.ts is
-// server-only, hence the react-server condition; nothing here touches the database.
+// the year record (blank rates filled from IRD for the year and fuel type), and
+// settings.tax > the rules the maths reads. load.ts is server-only, hence the
+// react-server condition; nothing here touches the database.
 // Run with: npm run check:tax-load
 
 import {
-  closingAtvFromSnapshot,
-  filedClosingAtvFrom,
   taxRulesFrom,
   toAssetInput,
   yearRecordFor,
@@ -163,26 +161,6 @@ function main(): void {
     "unset total vehicle km reads as null",
     yearRecordFor("2026-27", { ...stored, totalVehicleKm: null }, "petrol").totalVehicleKm,
     null,
-  );
-
-  console.log("\nFiled snapshots:");
-  expectEqual(
-    "closing ATVs: numbers only",
-    [...closingAtvFromSnapshot({ closingAtv: { a1: 12600, a2: "x" }, totals: { income: 1 } })],
-    [["a1", 12600]],
-  );
-  expectEqual("no snapshot", [...closingAtvFromSnapshot(null)], []);
-  expectEqual("array snapshot", [...closingAtvFromSnapshot([1, 2])], []);
-  expectEqual("snapshot without closingAtv", [...closingAtvFromSnapshot({ totals: 1 })], []);
-  expectEqual(
-    "only filed years count",
-    [
-      ...filedClosingAtvFrom([
-        { ...stored, fyKey: "2025-26", filedAt: stamp, snapshot: { closingAtv: { a1: 12600 } } },
-        { ...stored, filedAt: null, snapshot: { closingAtv: { a1: 8820 } } },
-      ]),
-    ].map(([fyKey, m]) => [fyKey, [...m]]),
-    [["2025-26", [["a1", 12600]]]],
   );
 
   console.log("\nTax rules:");

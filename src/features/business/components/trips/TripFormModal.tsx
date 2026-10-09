@@ -9,6 +9,8 @@ import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { Modal } from "@/features/admin/components/ui/Modal";
+import { FiledYearWarning } from "@/features/business/components/tax/FiledYearWarning";
+import type { FiledYearRef } from "@/features/business/lib/tax/snapshot";
 import { MAX_TRIP_KM, type TripApiResponse, type TripRow } from "@/features/business/lib/trips";
 import { Notice } from "@/shared/components/Notice";
 import type React from "react";
@@ -24,6 +26,8 @@ interface TripFormModalProps {
   onSaved: (trip: TripRow) => void;
   /** Closes the dialog without saving. */
   onClose: () => void;
+  /** Filed years the edit forms warn about, oldest first. */
+  filedYears: readonly FiledYearRef[];
 }
 
 /** The form's field values, all as typed. */
@@ -58,6 +62,7 @@ function initialForm(trip: TripRow | null, defaultDate: string): TripForm {
  * @param props.defaultDate - Date a new trip starts on.
  * @param props.onSaved - Called with the stored row after a save.
  * @param props.onClose - Closes the dialog.
+ * @param props.filedYears - Filed years the edit forms warn about.
  * @returns The dialog element.
  */
 export function TripFormModal({
@@ -65,6 +70,7 @@ export function TripFormModal({
   defaultDate,
   onSaved,
   onClose,
+  filedYears,
 }: TripFormModalProps): React.ReactElement {
   const idBase = useId();
   const formRef = useRef<HTMLFormElement>(null);
@@ -138,6 +144,14 @@ export function TripFormModal({
         onSubmit={(e) => void handleSubmit(e)}
         className="grid gap-4 sm:grid-cols-2"
       >
+        <FiledYearWarning
+          filedYears={filedYears}
+          spans={[
+            { from: form.date, to: form.date },
+            ...(trip ? [{ from: trip.date, to: trip.date }] : []),
+          ]}
+          className="sm:col-span-2"
+        />
         <AdminField label="Date" htmlFor={`${idBase}-date`} required>
           <AdminInput
             id={`${idBase}-date`}

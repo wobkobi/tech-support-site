@@ -19,8 +19,10 @@ import {
   type AssetFormState,
   type AssetFormTarget,
 } from "@/features/business/components/assets/asset-form-state";
+import { FiledYearWarning } from "@/features/business/components/tax/FiledYearWarning";
 import type { ExpenseOption } from "@/features/business/lib/assets";
 import type { GstStatus } from "@/features/business/lib/tax";
+import type { FiledYearRef } from "@/features/business/lib/tax/snapshot";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
@@ -38,6 +40,8 @@ interface AssetFormModalProps {
   onClose: () => void;
   /** Called after a successful save with the confirmation to toast. */
   onSaved: (message: string) => void;
+  /** Filed years the edit forms warn about, oldest first. */
+  filedYears: readonly FiledYearRef[];
 }
 
 /**
@@ -61,6 +65,7 @@ function formDescription(target: AssetFormTarget): string | undefined {
  * @param props.gst - GST registration status, for the cost label and hint.
  * @param props.onClose - Closes without saving.
  * @param props.onSaved - Called after a save.
+ * @param props.filedYears - Filed years the edit forms warn about.
  * @returns The dialog.
  */
 export function AssetFormModal({
@@ -70,6 +75,7 @@ export function AssetFormModal({
   gst,
   onClose,
   onSaved,
+  filedYears,
 }: AssetFormModalProps): React.ReactElement {
   const [initial] = useState<AssetFormState>(() => initialForm(target));
   const [form, setForm] = useState<AssetFormState>(initial);
@@ -131,6 +137,17 @@ export function AssetFormModal({
       }
     >
       <div className="space-y-5">
+        {/* Both the saved and the edited dates count, so moving an asset out of a filed year still warns. */}
+        <FiledYearWarning
+          filedYears={filedYears}
+          spans={[
+            {
+              from: form.inServiceDate,
+              to: form.disposed && form.disposedAt !== "" ? form.disposedAt : null,
+            },
+            ...(editing ? [{ from: editing.inServiceDate, to: editing.disposedAt }] : []),
+          ]}
+        />
         <AdminField
           label="Name"
           htmlFor="asset-name"

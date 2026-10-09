@@ -26,6 +26,8 @@ interface DeductionsBreakdownProps {
   result: TaxYearResult;
   /** GST registration status, for the line saying which amounts count. */
   gst: GstStatus;
+  /** True when the result is a filed year's saved figures; the live GST line is left off. */
+  filed: boolean;
 }
 
 /**
@@ -46,16 +48,21 @@ function gstBasisText(gst: GstStatus): string {
  * @param props - Component props.
  * @param props.result - computeTaxYear output for the FY.
  * @param props.gst - GST registration status.
+ * @param props.filed - True when the result is a filed year's saved figures.
  * @returns The card.
  */
-export function DeductionsBreakdown({ result, gst }: DeductionsBreakdownProps): React.ReactElement {
+export function DeductionsBreakdown({
+  result,
+  gst,
+  filed,
+}: DeductionsBreakdownProps): React.ReactElement {
   const { lines, total, excludedFuel, excludedAssetLinked, unclaimedKm } = result.deductions;
   const counted = lines.filter((line) => line.amount !== 0);
   const anyExcluded = excludedFuel > 0 || excludedAssetLinked > 0 || unclaimedKm > 0;
 
   return (
     <Card>
-      <CardHeader title="Deductions" description={gstBasisText(gst)} />
+      <CardHeader title="Deductions" description={filed ? undefined : gstBasisText(gst)} />
       <ul className="divide-y divide-admin-border">
         {counted.length === 0 ? (
           <WorkingRow label="Nothing to deduct yet" value={formatNZD(0)} tone="muted" />

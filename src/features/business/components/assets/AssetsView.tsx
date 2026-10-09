@@ -8,10 +8,11 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import type { AssetFormTarget } from "@/features/business/components/assets/asset-form-state";
 import { AssetFormModal } from "@/features/business/components/assets/AssetFormModal";
 import { AssetList } from "@/features/business/components/assets/AssetList";
 import { AssetScheduleModal } from "@/features/business/components/assets/AssetScheduleModal";
-import type { AssetFormTarget } from "@/features/business/components/assets/asset-form-state";
+import { FiledYearWarning } from "@/features/business/components/tax/FiledYearWarning";
 import {
   formatThreshold,
   type AssetPrefill,
@@ -20,6 +21,7 @@ import {
 } from "@/features/business/lib/assets";
 import { formatNZD } from "@/features/business/lib/business-format";
 import { roundCents, type GstStatus } from "@/features/business/lib/tax";
+import type { FiledYearRef } from "@/features/business/lib/tax/snapshot";
 import { Notice } from "@/shared/components/Notice";
 import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
@@ -44,6 +46,8 @@ interface AssetsViewProps {
   initialEditId: string | null;
   /** True when ?fromExpense named an expense that doesn't exist. */
   fromExpenseMissing: boolean;
+  /** Filed years the edit forms warn about, oldest first. */
+  filedYears: readonly FiledYearRef[];
 }
 
 /**
@@ -95,6 +99,7 @@ function sumCents(values: readonly number[]): number {
  * @param props.prefill - Values from ?fromExpense, or null.
  * @param props.initialEditId - Asset linked to the ?fromExpense expense, or null.
  * @param props.fromExpenseMissing - Whether ?fromExpense named a missing expense.
+ * @param props.filedYears - Filed years the edit forms warn about.
  * @returns The view.
  */
 export function AssetsView({
@@ -106,6 +111,7 @@ export function AssetsView({
   prefill,
   initialEditId,
   fromExpenseMissing,
+  filedYears,
 }: AssetsViewProps): React.ReactElement {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -216,6 +222,7 @@ export function AssetsView({
           gst={gst}
           onClose={closeForm}
           onSaved={handleSaved}
+          filedYears={filedYears}
         />
       )}
 
@@ -225,9 +232,18 @@ export function AssetsView({
         open={deleteTarget !== null}
         title={`Delete ${deleteTarget?.name ?? "this asset"}?`}
         body={
-          deleteTarget?.expenseId
-            ? "This removes it from the register and the tax figures. Its linked expense counts as an ordinary expense again."
-            : "This removes it from the register and the tax figures."
+          <>
+            {deleteTarget?.expenseId
+              ? "This removes it from the register and the tax figures. Its linked expense counts as an ordinary expense again."
+              : "This removes it from the register and the tax figures."}
+            {deleteTarget && (
+              <FiledYearWarning
+                filedYears={filedYears}
+                spans={[{ from: deleteTarget.inServiceDate, to: deleteTarget.disposedAt }]}
+                className="mt-3"
+              />
+            )}
+          </>
         }
         confirmLabel="Delete"
         tone="danger"

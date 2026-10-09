@@ -2,10 +2,11 @@
 // Admin per-FY tax record endpoint. PUT upserts the TaxYear row for one FY key: the home
 // office floor areas and whole-house costs, that year's IRD square-metre and kilometre
 // rates, and the car's total km for the year. A filed year is refused so its figures stay
-// frozen.
+// frozen. POST `{ action: "file" | "unfile" }` saves the year's figures as a snapshot or
+// releases them.
 
-import { fyKeyOf } from "@/features/business/lib/financial-year";
-import { loadAllFys } from "@/features/business/lib/tax/load";
+import { fileTaxYear, unfileTaxYear } from "@/features/business/lib/tax/filing.server";
+import { resolveFinancialYear } from "@/features/business/lib/tax/view.server";
 import { parseAmount } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -13,8 +14,8 @@ import { prisma } from "@/shared/lib/prisma";
 import { Prisma, type TaxYear } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
-/** FY key shape: start year, hyphen, the end year's last two digits ("2026-27"). */
-const FY_KEY_RE = /^(\d{4})-(\d{2})$/;
+/** Shown for a malformed key, or one outside the business start to the current FY. */
+const UNKNOWN_FY_ERROR = "Unknown financial year";
 
 /** TaxYear fields this route writes. Null clears a value (rates then fall back to IRD's). */
 const EDITABLE_FIELDS = [
@@ -53,18 +54,6 @@ function isUniqueConflict(err: unknown): boolean {
 }
 
 /**
- * True for a well-formed FY key whose two halves are consecutive years
- * ("2026-27" and "2099-00" yes, "2026-28" no).
- * @param key - Candidate key from the URL.
- * @returns Whether the key names a real financial year.
- */
-function isFyKey(key: string): boolean {
-  const match = FY_KEY_RE.exec(key);
-  if (!match) return false;
-  return (Number(match[1]) + 1) % 100 === Number(match[2]);
-}
-
-/**
  * PUT /api/business/tax-years/[fyKey] - Creates or updates one FY's TaxYear record.
  * @param request - Incoming request; JSON body with any of the editable fields.
  * @param root0 - Route context.
@@ -80,13 +69,10 @@ export async function PUT(
   }
 
   const { fyKey } = await params;
-  if (!isFyKey(fyKey)) {
-    return noStore(errorResponse("Invalid financial year", 400));
-  }
-  // A well-formed key outside the business start to the current FY has no year to record.
-  const fys = await loadAllFys(new Date());
-  if (!fys.some((fy) => fyKeyOf(fy.label) === fyKey)) {
-    return noStore(errorResponse("Financial year not found", 404));
+  // A malformed key, or one outside the business start to the current FY, has no year to
+  // record; POST answers it the same way.
+  if (!(await resolveFinancialYear(fyKey, new Date()))) {
+    return noStore(errorResponse(UNKNOWN_FY_ERROR, 404));
   }
 
   let body: unknown;
@@ -160,4 +146,38 @@ export async function PUT(
     taxYear = await upsert();
   }
   return noStore(NextResponse.json({ ok: true, taxYear }));
+}
+
+/**
+ * POST /api/business/tax-years/[fyKey] - Marks a financial year filed or unfiled.
+ * `{ action: "file" }` saves the year's live figures as TaxYear.snapshot and stamps
+ * filedAt; `{ action: "unfile" }` clears both, so the year goes back to live figures.
+ * @param request - Incoming request with `{ action }` in the body.
+ * @param root0 - Route context.
+ * @param root0.params - Route params promise carrying the FY key ("2025-26").
+ * @returns JSON `{ ok: true, filedAt }`, or `{ ok: false, error }` with 400/401/404/409.
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ fyKey: string }> },
+): Promise<NextResponse> {
+  if (!(await isAdminRequest(request))) return noStore(errorResponse("Unauthorized", 401));
+
+  const { fyKey } = await params;
+  // Check the key before the body, as PUT does, so a bad key gets the same answer on both.
+  if (!(await resolveFinancialYear(fyKey, new Date()))) {
+    return noStore(errorResponse(UNKNOWN_FY_ERROR, 404));
+  }
+  const body: unknown = await request.json().catch(() => null);
+  const action =
+    typeof body === "object" && body !== null ? (body as { action?: unknown }).action : undefined;
+  if (action !== "file" && action !== "unfile") {
+    return noStore(errorResponse('action must be "file" or "unfile"', 400));
+  }
+
+  const now = new Date();
+  const outcome =
+    action === "file" ? await fileTaxYear(fyKey, now) : await unfileTaxYear(fyKey, now);
+  if (!outcome.ok) return noStore(errorResponse(outcome.error, outcome.status));
+  return noStore(NextResponse.json({ ok: true, filedAt: outcome.filedAt }));
 }

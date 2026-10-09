@@ -2,25 +2,32 @@
 // Tax page for one NZ financial year, picked by `?fy=` (defaults to the current FY). The
 // server loads the year's ledger, assets, trips and TaxYear record, runs computeTaxYear,
 // and renders the estimate, set-aside targets, deductions, income tax workings, the home
-// office and car form and the questions to raise with the accountant.
+// office and car form and the questions to raise with the accountant. A filed year renders
+// its saved snapshot, with a Filed pill, the differences a fresh calculation shows, a locked
+// home office and car form, and the accountant summary with CSV export.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminTabs } from "@/features/admin/components/ui/AdminTabs";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { AccountantNotes } from "@/features/business/components/tax/AccountantNotes";
+import { AccountantSummary } from "@/features/business/components/tax/AccountantSummary";
 import { DeductionsBreakdown } from "@/features/business/components/tax/DeductionsBreakdown";
+import { FiledChangesNotice } from "@/features/business/components/tax/FiledChangesNotice";
+import { FiledYearControls } from "@/features/business/components/tax/FiledYearControls";
 import { HomeOfficeForm } from "@/features/business/components/tax/HomeOfficeForm";
 import { IncomeTaxWorkings } from "@/features/business/components/tax/IncomeTaxWorkings";
 import { TaxEstimateCards } from "@/features/business/components/tax/TaxEstimateCards";
 import { formatNZD } from "@/features/business/lib/business";
 import { fyKeyOf, type FinancialYear } from "@/features/business/lib/financial-year";
-import { computeTaxYear, irdRatesFor, setAsideTargets } from "@/features/business/lib/tax";
-import { loadAllFys, loadTaxInputs } from "@/features/business/lib/tax/load";
+import { irdRatesFor, setAsideTargets } from "@/features/business/lib/tax";
+import { loadAllFys } from "@/features/business/lib/tax/load";
+import { loadTaxYearView } from "@/features/business/lib/tax/view.server";
 import { fuelLabel } from "@/features/business/lib/tax/workings";
 import { Notice } from "@/shared/components/Notice";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
+import { nzDayStartUtc } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import type React from "react";
 
@@ -69,8 +76,8 @@ function FyTabs(props: { fys: FinancialYear[]; active: string }): React.ReactEle
 }
 
 /**
- * Tax page. Every figure is computed live from the ledger, the asset register, the trip
- * log, the FY's TaxYear record and the tax settings; nothing is cached.
+ * Tax page. An unfiled year is computed live from the ledger, the asset register, the trip
+ * log, the FY's TaxYear record and the tax settings; a filed year shows its saved snapshot.
  * @param root0 - Page props.
  * @param root0.searchParams - URL search params (`?fy=` FY key).
  * @returns Tax page element.
@@ -120,11 +127,21 @@ export default async function TaxPage({
   }
 
   const fyKey = fyKeyOf(selected.label);
-  const [input, record] = await Promise.all([
-    loadTaxInputs(selected, now),
+  // While the year is filed every figure on the page comes from the saved snapshot; the
+  // live recompute only feeds the list of differences. `record` still feeds the home office
+  // form, whose fields the PUT refuses to change while filed.
+  const [view, record] = await Promise.all([
+    loadTaxYearView(selected, now),
     prisma.taxYear.findUnique({ where: { fyKey } }),
   ]);
-  const result = computeTaxYear(input);
+  const input = view.input;
+  const result = view.shown.result;
+  const filed = view.filedAtIso !== null;
+  // The threshold in Settings may have moved since the year was filed, so a filed year
+  // names it without the live figure.
+  const provisionalOver = filed
+    ? "the provisional tax threshold"
+    : formatNZD(input.settings.provisionalThreshold);
   // Nothing records what has already been put aside, so the whole total is "remaining".
   const targets = setAsideTargets(result.totalToSetAside, input.fy, now);
   const irdDefaults = irdRatesFor(fyKey);
@@ -135,19 +152,32 @@ export default async function TaxPage({
       {header}
       <FyTabs fys={fys} active={fyKey} />
 
+      <FiledYearControls
+        fyKey={fyKey}
+        fyLabel={selected.label}
+        filedAtIso={view.filedAtIso}
+        canFile={selected.end <= nzDayStartUtc(now)}
+      />
+      {filed && (
+        <FiledChangesNotice
+          fyLabel={selected.label}
+          changes={view.changes}
+          unreadable={view.snapshotUnreadable}
+        />
+      )}
+
       {result.provisionalWarning && (
         <Notice tone="warn" onGrey className="mb-6">
-          Income tax for this year is over {formatNZD(input.settings.provisionalThreshold)}, so IRD
-          will expect provisional tax for next year. Ask your accountant which option suits you and
-          when the payments are due.
+          Income tax for this year is over {provisionalOver}, so IRD will expect provisional tax for
+          next year. Ask your accountant which option suits you and when the payments are due.
         </Notice>
       )}
 
       <TaxEstimateCards result={result} targets={targets} current={input.fy.current} />
 
       <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <DeductionsBreakdown result={result} gst={input.gst} />
-        <IncomeTaxWorkings result={result} settings={input.settings} />
+        <DeductionsBreakdown result={result} gst={input.gst} filed={filed} />
+        <IncomeTaxWorkings result={result} settings={input.settings} filed={filed} />
       </div>
 
       <HomeOfficeForm
@@ -155,7 +185,7 @@ export default async function TaxPage({
         key={fyKey}
         fyKey={fyKey}
         fyLabel={selected.label}
-        filed={record?.filedAt != null}
+        filed={filed}
         initial={{
           officeSqm: record?.officeSqm ?? null,
           houseSqm: record?.houseSqm ?? null,
@@ -177,6 +207,13 @@ export default async function TaxPage({
       />
 
       <AccountantNotes />
+
+      <AccountantSummary
+        view={view.shown}
+        fyKey={fyKey}
+        fyLabel={selected.label}
+        unreadable={view.snapshotUnreadable}
+      />
     </>
   );
 }

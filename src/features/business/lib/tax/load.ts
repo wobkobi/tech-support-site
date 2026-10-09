@@ -8,6 +8,7 @@ import "server-only";
 
 import { listFinancialYears, type FinancialYear } from "@/features/business/lib/financial-year";
 import { gstStatusFromPricing } from "@/features/business/lib/tax/gst-basis";
+import { filedClosingAtvByFy } from "@/features/business/lib/tax/snapshot";
 import { toTaxFy } from "@/features/business/lib/tax/tax-year";
 import type {
   AssetInput,
@@ -123,39 +124,6 @@ export function yearRecordFor(
 }
 
 /**
- * Closing ATV per asset id from a filed snapshot's `closingAtv` object. Anything that
- * isn't a finite number is skipped, so a malformed snapshot reads as "nothing filed".
- * @param snapshot - TaxYear.snapshot.
- * @returns Asset id > closing ATV.
- */
-export function closingAtvFromSnapshot(snapshot: Prisma.JsonValue | null): Map<string, number> {
-  const out = new Map<string, number>();
-  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return out;
-  const closing = snapshot.closingAtv;
-  if (!closing || typeof closing !== "object" || Array.isArray(closing)) return out;
-  for (const [assetId, value] of Object.entries(closing)) {
-    if (typeof value === "number" && Number.isFinite(value)) out.set(assetId, value);
-  }
-  return out;
-}
-
-/**
- * Closing ATVs from every filed year, keyed by FY then asset id. Unfiled years are left
- * out even when they hold a snapshot: only a filed return fixes the next year's opening.
- * @param taxYears - TaxYear rows.
- * @returns FY key > (asset id > closing ATV).
- */
-export function filedClosingAtvFrom(
-  taxYears: readonly TaxYearRow[],
-): Map<string, ReadonlyMap<string, number>> {
-  const out = new Map<string, ReadonlyMap<string, number>>();
-  for (const t of taxYears) {
-    if (t.filedAt) out.set(t.fyKey, closingAtvFromSnapshot(t.snapshot));
-  }
-  return out;
-}
-
-/**
  * Every row the tax maths reads, once per request. Ledger rows cover all years:
  * computeTaxYear filters to its FY with the half-open ISO window.
  * @returns Income, expenses, assets, trips and TaxYear rows.
@@ -209,7 +177,8 @@ export async function loadTaxInputs(fy: FinancialYear, now: Date): Promise<TaxYe
   const [settings, rows] = await Promise.all([getSettings(), loadTaxRows()]);
   const { income, expenses, assets, trips, taxYears } = rows;
   const taxFy = toTaxFy(fy);
-  const filedClosingAtv = filedClosingAtvFrom(taxYears);
+  // Filed years carry their saved closing values into the next year's opening values.
+  const filedClosingAtv = filedClosingAtvByFy(taxYears);
   return {
     fy: taxFy,
     businessStart: new Date(settings.identity.startDateIso),

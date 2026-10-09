@@ -16,6 +16,7 @@ import {
 } from "@/features/business/lib/assets";
 import { toTaxFy } from "@/features/business/lib/tax";
 import { loadAllFys, loadTaxInputs } from "@/features/business/lib/tax/load";
+import { loadFiledYears } from "@/features/business/lib/tax/view.server";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
@@ -48,9 +49,10 @@ export default async function AssetsPage({
   const current = fys.find((f) => f.current) ?? fys[0];
   if (!current) throw new Error("No financial year to show the asset register against");
 
-  const [input, rows] = await Promise.all([
+  const [input, rows, filedYears] = await Promise.all([
     loadTaxInputs(current, now),
     prisma.asset.findMany({ orderBy: { inServiceDate: "desc" } }),
+    loadFiledYears(now),
   ]);
 
   // Schedules run oldest FY first, whatever order the loader lists them in.
@@ -93,6 +95,7 @@ export default async function AssetsPage({
         prefill={prefill}
         initialEditId={initialEditId}
         fromExpenseMissing={fromExpenseMissing}
+        filedYears={filedYears}
       />
     </>
   );

@@ -8,6 +8,7 @@ import { formatNZD } from "@/features/business/lib/business-format";
 import { GST_RATE } from "@/features/business/lib/pricing-policy";
 import { isGstRegisteredOn } from "@/features/business/lib/tax/gst-basis";
 import { roundCents } from "@/features/business/lib/tax/helpers";
+import { incomeTaxOnBrackets } from "@/features/business/lib/tax/income-tax";
 import type {
   GstStatus,
   TaxBracket,
@@ -106,6 +107,36 @@ export function bandBreakdown(taxable: number, brackets: readonly TaxBracket[]):
 export function formatRatePct(rate: number): string {
   // toFixed first: 0.0146 * 100 is 1.4600000000000002 in floating point.
   return `${Number((rate * 100).toFixed(2))}%`;
+}
+
+/**
+ * Rate label for a filed year, worked back from the saved amounts so it can't drift
+ * from them when the rate in Settings changes later: 1.67% from acc / taxable.
+ * @param amount - Saved levy or contribution (ACC, KiwiSaver).
+ * @param taxable - Saved taxable profit.
+ * @returns Percent label, or null when there is no taxable profit to divide by.
+ */
+export function filedRateLabel(amount: number, taxable: number): string | null {
+  if (taxable <= 0) return null;
+  return formatRatePct(amount / taxable);
+}
+
+/**
+ * Whether the brackets in Settings still give a filed year's saved income tax, to the
+ * cent. Compares against incomeTaxOnBrackets rather than the summed band rows, because
+ * {@link bandBreakdown} rounds each band on its own and can sit a cent or two off by design.
+ * @param result - Saved result of the filed year.
+ * @param brackets - Brackets in Settings now.
+ * @returns True when the band rows can be shown beside the saved total.
+ */
+export function bracketsMatchFiled(
+  result: Pick<TaxYearResult, "taxable" | "incomeTax">,
+  brackets: readonly TaxBracket[],
+): boolean {
+  const diffCents = Math.round(
+    Math.abs(incomeTaxOnBrackets(result.taxable, brackets) - result.incomeTax) * 100,
+  );
+  return diffCents <= 1;
 }
 
 /**
