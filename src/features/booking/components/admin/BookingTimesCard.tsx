@@ -10,8 +10,9 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import { formatMins } from "@/features/business/lib/business";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
@@ -35,7 +36,8 @@ interface BookingTimesCardProps {
   lockHours: number;
 }
 
-const LABEL_CLS = "text-xs font-semibold text-admin-muted uppercase";
+/** Label over a time, in the read view and the edit form. */
+const LABEL_CLS = "text-sm font-semibold text-admin-muted uppercase";
 
 /**
  * Editable appointment times card.
@@ -167,26 +169,24 @@ export function BookingTimesCard({
             This records what actually happened. No email is sent.
           </p>
         )}
-        <label className="flex flex-col gap-1">
-          <span className={LABEL_CLS}>Start</span>
-          <input
+        <AdminField label="Start" htmlFor={`edit-start-${id}`}>
+          <AdminInput
+            id={`edit-start-${id}`}
             type="datetime-local"
-            className={ADMIN_INPUT_CLS}
             value={form.start}
             onChange={(e) => setForm((f) => ({ ...f, start: e.target.value }))}
             disabled={saving}
           />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className={LABEL_CLS}>Finish</span>
-          <input
+        </AdminField>
+        <AdminField label="Finish" htmlFor={`edit-end-${id}`}>
+          <AdminInput
+            id={`edit-end-${id}`}
             type="datetime-local"
-            className={ADMIN_INPUT_CLS}
             value={form.end}
             onChange={(e) => setForm((f) => ({ ...f, end: e.target.value }))}
             disabled={saving}
           />
-        </label>
+        </AdminField>
         <div className="flex flex-wrap gap-2">
           <AdminButton
             onClick={() => void save()}

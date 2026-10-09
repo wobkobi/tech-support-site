@@ -5,6 +5,7 @@
 
 import { BlockDayButton } from "@/features/admin/components/BlockDayButton";
 import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { useOptimisticDayBlocks } from "@/features/admin/hooks/use-optimistic-day-blocks";
 import {
   KIND_STYLES,
@@ -293,7 +294,7 @@ export function WeekView({
   return (
     <div className={cn("transition-opacity", isPending && "opacity-60")}>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-base font-semibold text-admin-text">
+        <p className="text-lg font-bold text-admin-text">
           {days[0]?.subLabel} - {days[6]?.subLabel} (
           {days[0]?.date
             ? new Intl.DateTimeFormat("en-NZ", { timeZone: NZ_TZ, year: "numeric" }).format(
@@ -303,37 +304,33 @@ export function WeekView({
           )
         </p>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
+          <AdminButton
+            variant="secondary"
             onClick={() => goToWeek(prevWeekKey)}
             aria-label="Previous week"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-admin-border bg-admin-surface text-admin-text-secondary hover:bg-admin-bg sm:h-9 sm:w-9"
+            className="w-10 px-0"
           >
             <FaChevronLeft />
-          </button>
-          <button
-            type="button"
-            onClick={() => goToWeek(todayWeekKey)}
-            className="inline-flex h-11 items-center gap-2 rounded-md border border-admin-border bg-admin-surface px-3 text-sm font-medium text-admin-text hover:bg-admin-bg sm:h-9"
-          >
+          </AdminButton>
+          <AdminButton variant="secondary" onClick={() => goToWeek(todayWeekKey)}>
             <FaCalendarDay />
             Today
-          </button>
-          <button
-            type="button"
+          </AdminButton>
+          <AdminButton
+            variant="secondary"
             onClick={() => goToWeek(nextWeekKey)}
             aria-label="Next week"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-admin-border bg-admin-surface text-admin-text-secondary hover:bg-admin-bg sm:h-9 sm:w-9"
+            className="w-10 px-0"
           >
             <FaChevronRight />
-          </button>
+          </AdminButton>
         </div>
       </div>
 
       {/* relative wrapper carries the right-edge fade hint - the grid is wider
           than the admin content area until ~xl, so it scrolls horizontally. */}
       <div className="relative">
-        <div className="overflow-x-auto rounded-xl border border-admin-border bg-admin-surface shadow-sm">
+        <div className="overflow-x-auto rounded-lg border border-admin-border bg-admin-surface">
           <div className="min-w-225">
             {/* Day headers */}
             <div className="grid grid-cols-[64px_repeat(7,1fr)] border-b border-admin-border">
@@ -352,7 +349,7 @@ export function WeekView({
                   <div
                     key={day.key}
                     className={cn(
-                      "relative border-r border-admin-border px-2 pt-4 pb-3 text-center last:border-r-0",
+                      "relative border-r border-admin-border px-2 pt-5 pb-3 text-center last:border-r-0",
                       isToday && "bg-russian-violet/5",
                     )}
                   >
@@ -360,13 +357,13 @@ export function WeekView({
                         down - every day/week keeps the same header height. */}
                     {holidayName && (
                       <div
-                        className="absolute inset-x-0 top-0.5 truncate px-1 text-[9px] leading-none font-semibold tracking-wide text-amber-700 uppercase"
+                        className="absolute inset-x-0 top-1 truncate px-1 text-sm leading-none font-semibold text-amber-700 uppercase"
                         title={holidayName}
                       >
                         {holidayName}
                       </div>
                     )}
-                    <div className="text-xs font-semibold tracking-wide text-admin-muted uppercase">
+                    <div className="text-sm font-semibold tracking-wide text-admin-muted uppercase">
                       {day.label}
                     </div>
                     <div className="mt-0.5 flex items-center justify-center gap-1.5">
@@ -403,7 +400,7 @@ export function WeekView({
                   <div
                     key={bar.key}
                     className={cn(
-                      "mx-1 truncate rounded border px-2 py-0.5 text-center text-[11px] font-semibold",
+                      "mx-1 truncate rounded border px-2 py-0.5 text-center text-sm font-semibold",
                       KIND_STYLES[bar.kind],
                     )}
                     style={{
@@ -424,7 +421,7 @@ export function WeekView({
               className="relative grid grid-cols-[64px_repeat(7,1fr)]"
               style={{ height: `${DAY_HEIGHT_PX}px` }}
             >
-              {/* Time gutter */}
+              {/* Time gutter. 11px stays: the -6px label offset below centres each label on its hour line at this size. */}
               <div className="relative border-r border-admin-border">
                 {hours.map((h, i) => (
                   <div
@@ -457,7 +454,7 @@ export function WeekView({
             </div>
 
             {/* Legend */}
-            <div className="flex flex-wrap items-center gap-3 border-t border-admin-border px-4 py-3 text-xs text-admin-muted">
+            <div className="flex flex-wrap items-center gap-3 border-t border-admin-border px-4 py-3 text-sm text-admin-muted">
               <LegendDot kind="booking" label="Booking" />
               <LegendDot kind="car" label="No car (Car cal)" />
               <LegendDot kind="personal" label="Personal" />
@@ -470,7 +467,7 @@ export function WeekView({
         </div>
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-xl bg-linear-to-l from-white to-transparent"
+          className="pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-lg bg-linear-to-l from-admin-surface to-transparent"
         />
       </div>
 
@@ -512,8 +509,7 @@ function DayColumn({
       tabIndex={0}
       onClick={onClick}
       className={cn(
-        "relative border-r border-admin-border last:border-r-0 hover:bg-admin-bg/40",
-        "cursor-pointer focus:ring-2 focus:ring-russian-violet/30 focus:outline-none focus:ring-inset",
+        "relative cursor-pointer border-r border-admin-border last:border-r-0 hover:bg-admin-bg/40",
       )}
       style={{ height: `${DAY_HEIGHT_PX}px` }}
     >
@@ -546,6 +542,7 @@ function DayColumn({
               if (bookingId) onOpenBooking(bookingId);
               else if (calendarLink) window.open(calendarLink, "_blank", "noopener,noreferrer");
             }}
+            // 11px stays: the height > 32 and > 50 thresholds below are tuned to fit two and three lines at this size.
             className={cn(
               "absolute right-1 left-1 overflow-hidden rounded-md border px-1.5 py-1 text-[11px] leading-tight shadow-sm select-none",
               KIND_STYLES[ev.kind],

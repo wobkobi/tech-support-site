@@ -1,8 +1,8 @@
 "use client";
 // src/features/admin/hooks/use-dialog-keys.ts
-// Keyboard handling shared by the admin dialogs (Modal, the schedule's action sheet and the
-// phone sidebar drawer): Escape dismisses, and Tab stays inside the dialog instead of
-// wandering onto the page behind the backdrop.
+// Keyboard handling shared by the admin dialogs (Modal and the phone sidebar drawer):
+// Escape dismisses, and Tab stays inside the dialog instead of wandering onto the page
+// behind the backdrop.
 
 import { type RefObject, useEffect, useRef } from "react";
 

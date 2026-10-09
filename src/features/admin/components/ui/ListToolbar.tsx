@@ -39,7 +39,10 @@ export function ListToolbar({
   return (
     <div className={cn("mb-4 flex flex-wrap items-center gap-3", className)}>
       {search && <div className="min-w-0 flex-1 basis-64">{search}</div>}
-      {filters && <div className="flex flex-wrap items-center gap-2">{filters}</div>}
+      {/* Capped at the toolbar width so a full-width filter group shrinks to fit a phone. */}
+      {filters && (
+        <div className="flex max-w-full min-w-0 flex-wrap items-center gap-2">{filters}</div>
+      )}
       {(count || actions) && (
         <div className="ml-auto flex flex-wrap items-center gap-3">
           {count && <p className="text-sm text-admin-muted">{count}</p>}

@@ -91,7 +91,7 @@ export function mondayOf(dayKey: string): string {
 export const KIND_STYLES: Record<WeekViewKind, string> = {
   booking: "bg-russian-violet/90 text-white border-russian-violet ring-1 ring-white/10",
   car: "bg-red-100 text-red-900 border-red-300",
-  personal: "bg-slate-200 text-slate-700 border-slate-300",
+  personal: "bg-admin-border text-admin-text-secondary border-admin-border-strong",
   travel: "bg-amber-100 text-amber-900 border-amber-300",
 };
 
@@ -99,7 +99,7 @@ export const KIND_STYLES: Record<WeekViewKind, string> = {
 export const KIND_BAR_BG: Record<WeekViewKind, string> = {
   booking: "bg-russian-violet",
   car: "bg-red-400",
-  personal: "bg-slate-400",
+  personal: "bg-admin-border-strong",
   travel: "bg-amber-400",
 };
 

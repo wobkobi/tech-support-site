@@ -18,6 +18,9 @@ import { useEffect, useId, useRef, useState } from "react";
 /** Dialog width. */
 type ModalSize = "sm" | "md" | "lg";
 
+/** Where the dialog sits: centred, or a bottom sheet on phones that centres from sm. */
+type ModalPlacement = "centre" | "sheet";
+
 /** Props for {@link Modal}. */
 interface ModalProps {
   /** Whether the dialog is shown. */
@@ -34,6 +37,8 @@ interface ModalProps {
   size?: ModalSize;
   /** Unsaved input: a backdrop tap, Escape or the close button asks before discarding. */
   dirty?: boolean;
+  /** "sheet" pins the dialog to the bottom edge below sm, within thumb reach (defaults to "centre"). */
+  placement?: ModalPlacement;
   children: React.ReactNode;
 }
 
@@ -63,6 +68,7 @@ function sizeClass(size: ModalSize): string {
  * @param props.footer - Optional footer content.
  * @param props.size - Dialog width.
  * @param props.dirty - Whether dismissing would throw away unsaved input.
+ * @param props.placement - Centred, or a bottom sheet on phones.
  * @param props.children - Dialog body.
  * @returns The dialog element, or null when closed.
  */
@@ -74,6 +80,7 @@ export function Modal({
   footer,
   size = "md",
   dirty = false,
+  placement = "centre",
   children,
 }: ModalProps): React.ReactElement | null {
   const titleId = useId();
@@ -129,7 +136,10 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden"
+      className={cn(
+        "fixed inset-0 z-50 flex justify-center bg-black/50 p-4 print:hidden",
+        placement === "sheet" ? "items-end sm:items-center" : "items-center",
+      )}
       onClick={requestClose}
       role="dialog"
       aria-modal="true"
