@@ -4,16 +4,20 @@
 // resolution and drives the Google Contacts sync (import + push) with a confirmation step
 // and result message.
 
-import { FLUSH_ON_PHONE } from "@/features/admin/components/ui/Card";
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import type { PageQuery } from "@/features/admin/hooks/use-query-sync";
 import type { ConflictEntry } from "@/features/contacts/lib/maintenance";
-import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { ContactAdminList } from "./ContactAdminList";
 import type { ContactRow } from "./ContactCard";
+
+/** Small uppercase label above each conflict's pick buttons. */
+const CONFLICT_LABEL_CLS = "text-sm font-semibold tracking-wide text-admin-muted uppercase";
 
 interface ContactsAdminViewProps {
   initialConflicts: ConflictEntry[];
@@ -182,13 +186,17 @@ export function ContactsAdminView({
   }, []);
 
   return (
-    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+    // The list's seven-column table needs about 60rem, so the sync rail only sits beside
+    // it on screens 1800px and wider. Below that, from lg, the left column dissolves into
+    // the grid (contents) and the list is ordered last, so the conflicts panel still leads,
+    // then the rail's two cards share a row, then the list. Phones keep the rail under it.
+    <div className="grid grid-cols-1 items-start gap-6 min-[1800px]:grid-cols-[minmax(0,1fr)_20rem]">
       {/* Left column: conflicts + contact list */}
-      <div className="flex flex-col gap-6 lg:col-span-2">
+      <div className="flex min-w-0 flex-col gap-6 lg:max-[1800px]:contents">
         {/* Conflicts */}
         {conflicts.length > 0 && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
-            <p className="mb-3 text-sm font-semibold text-amber-700">
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 sm:p-5">
+            <p className="mb-3 text-sm font-bold text-amber-900">
               {conflicts.length} data conflict{conflicts.length === 1 ? "" : "s"} need your
               attention
             </p>
@@ -196,78 +204,71 @@ export function ContactsAdminView({
               {conflicts.map((conflict) => (
                 <div
                   key={conflict.sourceId}
-                  className="rounded-lg border border-amber-200 bg-white p-4"
+                  className="rounded-lg border border-amber-200 bg-admin-surface p-4"
                 >
                   <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-semibold text-admin-text">
                       {conflict.contactName}
                     </span>
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500">
+                    <StatusPill tone="neutral">
                       {conflict.contactEmail ?? conflict.contactPhone ?? "Unknown"}
-                    </span>
-                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+                    </StatusPill>
+                    <StatusPill tone="warning">
                       {conflict.source === "Booking" ? "Booking" : "Review"}
-                    </span>
+                    </StatusPill>
                   </div>
                   <div className="space-y-3">
                     {conflict.conflictFields.includes("name") && (
                       <div className="space-y-1.5">
-                        <p className="text-xs font-medium tracking-wide text-slate-400 uppercase">
-                          Name - pick one
-                        </p>
+                        <p className={CONFLICT_LABEL_CLS}>Name - pick one</p>
                         <div className="flex flex-wrap gap-2">
-                          <button
+                          <AdminButton
+                            variant="secondary"
                             onClick={() =>
                               void resolveConflict(conflict, conflict.contactName, null)
                             }
-                            className="rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet"
                           >
                             {conflict.contactName}
-                          </button>
-                          <button
+                          </AdminButton>
+                          <AdminButton
+                            variant="secondary"
                             onClick={() =>
                               void resolveConflict(conflict, conflict.sourceName, null)
                             }
-                            className="rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet"
                           >
                             {conflict.sourceName}
-                          </button>
+                          </AdminButton>
                         </div>
                       </div>
                     )}
                     {conflict.conflictFields.includes("phone") && (
                       <div className="space-y-1.5">
-                        <p className="text-xs font-medium tracking-wide text-slate-400 uppercase">
-                          Phone - pick one
-                        </p>
+                        <p className={CONFLICT_LABEL_CLS}>Phone - pick one</p>
                         <div className="flex flex-wrap gap-2">
-                          <button
+                          <AdminButton
+                            variant="secondary"
                             onClick={() =>
                               void resolveConflict(conflict, null, conflict.contactPhone)
                             }
-                            className="rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet"
                           >
                             {conflict.contactPhone ?? "-"}
-                          </button>
-                          <button
+                          </AdminButton>
+                          <AdminButton
+                            variant="secondary"
                             onClick={() =>
                               void resolveConflict(conflict, null, conflict.sourcePhone)
                             }
-                            className="rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet"
                           >
                             {conflict.sourcePhone}
-                          </button>
+                          </AdminButton>
                         </div>
                       </div>
                     )}
                   </div>
                   <div className="mt-3 flex justify-end">
-                    <button
-                      onClick={() => skipConflict(conflict.sourceId)}
-                      className="rounded px-2 py-1 text-xs font-semibold text-slate-400 transition-colors hover:text-slate-600"
-                    >
+                    <AdminButton variant="ghost" onClick={() => skipConflict(conflict.sourceId)}>
                       Skip
-                    </button>
+                    </AdminButton>
                   </div>
                 </div>
               ))}
@@ -276,45 +277,33 @@ export function ContactsAdminView({
         )}
 
         {/* Contact list */}
-        <div
-          className={cn(
-            "rounded-xl border border-slate-200 bg-white p-6 shadow-sm",
-            FLUSH_ON_PHONE,
-          )}
-        >
+        <Card flushOnPhone className="min-w-0 lg:max-[1800px]:order-last">
           <ContactAdminList contacts={contacts} query={query} />
-        </div>
+        </Card>
       </div>
       {/* end left column */}
 
-      {/* Right column: Google sync */}
-      <div className="lg:sticky lg:top-22">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-slate-700">Google Contacts sync</p>
-              <p className="mt-0.5 text-sm text-slate-400">
-                {syncedCount} synced · {unsyncedCount} not yet in Google
-              </p>
-            </div>
-            <button
-              onClick={() => setSyncConfirmPending(true)}
-              disabled={syncing || syncConfirmPending}
-              className={cn(
-                "rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
-                syncing || syncConfirmPending
-                  ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                  : "bg-russian-violet text-white hover:bg-russian-violet/90",
-              )}
-            >
-              {syncing ? "Syncing…" : "Sync with Google Contacts"}
-            </button>
-          </div>
+      {/* Right column: Google sync. top-22 clears the 56px top bar. */}
+      <div className="grid grid-cols-1 items-start gap-4 min-[1800px]:sticky min-[1800px]:top-22 lg:max-[1800px]:grid-cols-2">
+        <Card>
+          <CardHeader
+            className="mb-3"
+            title="Google Contacts sync"
+            description={`${syncedCount} synced · ${unsyncedCount} not yet in Google`}
+          />
+          <AdminButton
+            variant="outline"
+            onClick={() => setSyncConfirmPending(true)}
+            disabled={syncing || syncConfirmPending}
+            className="w-full"
+          >
+            {syncing ? "Syncing…" : "Sync with Google Contacts"}
+          </AdminButton>
 
           {syncConfirmPending && (
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="mb-2 text-sm font-medium text-slate-700">Confirm sync with Google?</p>
-              <ul className="mb-3 space-y-1 text-xs text-slate-500">
+            <div className="mt-4 rounded-lg border border-admin-border bg-admin-bg p-4">
+              <p className="mb-2 text-sm font-bold text-admin-text">Confirm sync with Google?</p>
+              <ul className="mb-3 space-y-1 text-sm text-admin-text-secondary">
                 <li>• {unsyncedCount} contacts will be created in Google Contacts</li>
                 <li>
                   • {syncedCount} contacts will have their email, phone, and address pushed to
@@ -323,45 +312,40 @@ export function ContactsAdminView({
                 <li>• Google contacts not in your local DB will be imported</li>
               </ul>
               <div className="flex gap-2">
-                <button
-                  onClick={() => void runSync()}
-                  className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90"
-                >
+                <AdminButton variant="outline" onClick={() => void runSync()}>
                   Confirm
-                </button>
-                <button
-                  onClick={() => setSyncConfirmPending(false)}
-                  className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-300"
-                >
+                </AdminButton>
+                <AdminButton variant="secondary" onClick={() => setSyncConfirmPending(false)}>
                   Cancel
-                </button>
+                </AdminButton>
               </div>
             </div>
           )}
 
-          {syncResult && <p className="mt-3 text-sm text-slate-500">{syncResult}</p>}
-        </div>
+          {syncResult && <p className="mt-3 text-sm text-admin-muted">{syncResult}</p>}
+        </Card>
 
-        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <p className="text-sm font-semibold text-slate-700">Address check</p>
-          <p className="mt-0.5 text-sm text-slate-400">
-            Re-checks every stored address and flags the ones that don&apos;t match a single
-            Auckland address. Takes a while - one lookup per contact.
-          </p>
-          <button
+        <Card>
+          <CardHeader
+            className="mb-3"
+            title="Address check"
+            description={
+              <>
+                Re-checks every stored address and flags the ones that don&apos;t match a single
+                Auckland address. Takes a while - one lookup per contact.
+              </>
+            }
+          />
+          <AdminButton
+            variant="outline"
             onClick={() => void runAddressCheck()}
             disabled={checkingAddresses}
-            className={cn(
-              "mt-3 rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
-              checkingAddresses
-                ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                : "bg-russian-violet text-white hover:bg-russian-violet/90",
-            )}
+            className="w-full"
           >
             {checkingAddresses ? "Checking…" : "Check all addresses"}
-          </button>
-          {addressResult && <p className="mt-3 text-sm text-slate-500">{addressResult}</p>}
-        </div>
+          </AdminButton>
+          {addressResult && <p className="mt-3 text-sm text-admin-muted">{addressResult}</p>}
+        </Card>
       </div>
       {/* end right column */}
     </div>

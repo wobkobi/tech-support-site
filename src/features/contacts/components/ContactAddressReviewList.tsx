@@ -6,11 +6,11 @@
 // /api/admin/contacts/[id]. A saved or dismissed row drops out of the list.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card } from "@/features/admin/components/ui/Card";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
-import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import type React from "react";
 import { useState } from "react";
@@ -114,7 +114,7 @@ function AddressReviewCard({ row, onDone }: AddressReviewCardProps): React.React
       </div>
 
       <div className="rounded-lg border border-admin-border bg-admin-bg p-3">
-        <p className="mb-1 text-xs font-semibold text-admin-faint uppercase">As imported</p>
+        <p className="mb-1 text-sm font-semibold text-admin-faint uppercase">As imported</p>
         <p className="text-base font-medium text-admin-text">{row.address}</p>
       </div>
 
@@ -137,26 +137,26 @@ function AddressReviewCard({ row, onDone }: AddressReviewCardProps): React.React
         </div>
       )}
 
-      <div className="mt-4">
-        <label
-          htmlFor={`addr-${row.contactId}`}
-          className="mb-1 block text-sm font-semibold text-admin-text"
-        >
-          {row.candidates.length > 0 ? "Or type it" : "Type the correct address"}
-        </label>
+      <AdminField
+        className="mt-4"
+        htmlFor={`addr-${row.contactId}`}
+        label={row.candidates.length > 0 ? "Or type it" : "Type the correct address"}
+      >
         <div className="flex gap-2">
-          <input
+          <AdminInput
             id={`addr-${row.contactId}`}
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
             placeholder="e.g. 4 Name Street, Onehunga"
-            className={cn(ADMIN_INPUT_CLS, "min-w-0 flex-1")}
+            className="min-w-0 flex-1"
           />
           <AdminButton variant="secondary" onClick={() => void check()} busy={checking}>
             Check
           </AdminButton>
         </div>
+      </AdminField>
 
+      <div>
         {checked !== null && checked.length === 0 && (
           <p className="mt-2 text-sm text-admin-faint">
             No Auckland match for that. Save it anyway if you know it&apos;s right.

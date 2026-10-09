@@ -8,6 +8,10 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { FieldError } from "@/features/admin/components/ui/FieldError";
@@ -255,25 +259,19 @@ export function ContactDetailActions({
         }
       >
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1 text-sm">
-            <label htmlFor={FIELD_IDS.name} className="font-medium text-admin-muted">
-              Name
-            </label>
-            <input
+          <AdminField label="Name" htmlFor={FIELD_IDS.name}>
+            <AdminInput
               id={FIELD_IDS.name}
               value={form.name}
               onChange={(e) => setField("name", e.target.value)}
               autoComplete="off"
               aria-invalid={fieldErrors.name ? true : undefined}
               aria-describedby={fieldErrors.name ? `${FIELD_IDS.name}-error` : undefined}
-              className={cn(ADMIN_INPUT_CLS, fieldErrors.name && "border-coquelicot-500/60")}
+              className={cn(fieldErrors.name && "border-coquelicot-500/60")}
             />
             <FieldError id={`${FIELD_IDS.name}-error`} message={fieldErrors.name} />
-          </div>
-          <div className="flex flex-col gap-1 text-sm">
-            <label htmlFor={FIELD_IDS.email} className="font-medium text-admin-muted">
-              Email
-            </label>
+          </AdminField>
+          <AdminField label="Email" htmlFor={FIELD_IDS.email}>
             <EmailInput
               id={FIELD_IDS.email}
               value={form.email}
@@ -283,11 +281,8 @@ export function ContactDetailActions({
               autoComplete="off"
               className={ADMIN_INPUT_CLS}
             />
-          </div>
-          <div className="flex flex-col gap-1 text-sm">
-            <label htmlFor={FIELD_IDS.phone} className="font-medium text-admin-muted">
-              Phone
-            </label>
+          </AdminField>
+          <AdminField label="Phone" htmlFor={FIELD_IDS.phone}>
             <PhoneInput
               id={FIELD_IDS.phone}
               value={form.phone}
@@ -296,11 +291,8 @@ export function ContactDetailActions({
               autoComplete="off"
               className={ADMIN_INPUT_CLS}
             />
-          </div>
-          <div className="flex flex-col gap-1 text-sm">
-            <label htmlFor="contact-edit-address" className="font-medium text-admin-muted">
-              Address
-            </label>
+          </AdminField>
+          <AdminField label="Address" htmlFor="contact-edit-address">
             <AddressAutocomplete
               id="contact-edit-address"
               value={form.address}
@@ -309,29 +301,27 @@ export function ContactDetailActions({
               maxLength={250}
               inputClassName={ADMIN_INPUT_CLS}
             />
-          </div>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-admin-muted">Site notes</span>
-            <textarea
+          </AdminField>
+          <AdminField label="Site notes" htmlFor="contact-edit-site-notes">
+            <AdminTextarea
+              id="contact-edit-site-notes"
               rows={3}
               value={form.siteNotes}
               onChange={(e) => setForm((f) => ({ ...f, siteNotes: e.target.value }))}
-              className={ADMIN_INPUT_CLS}
               placeholder="Router model, ISP, M365 tenant, where the NAS lives... never passwords."
             />
-          </label>
+          </AdminField>
 
           {/* Retainer arrangement: tier gates the rest - no tier means not a
               retainer client and clears the other fields on save. */}
           <div className="mt-2 border-t border-admin-border pt-3">
-            <p className="mb-2 text-sm font-semibold text-admin-text">Retainer</p>
+            <p className="mb-2 text-sm font-bold text-admin-text">Retainer</p>
             <div className="flex flex-col gap-3">
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-admin-muted">Tier</span>
-                <select
+              <AdminField label="Tier" htmlFor="contact-edit-tier">
+                <AdminSelect
+                  id="contact-edit-tier"
                   value={form.retainerTier}
                   onChange={(e) => setForm((f) => ({ ...f, retainerTier: e.target.value }))}
-                  className={ADMIN_INPUT_CLS}
                 >
                   <option value="">Not a retainer client</option>
                   {RETAINER_TIERS.map((t) => (
@@ -339,53 +329,49 @@ export function ContactDetailActions({
                       {t}
                     </option>
                   ))}
-                </select>
-              </label>
+                </AdminSelect>
+              </AdminField>
               {form.retainerTier && (
                 <>
                   <div className="grid grid-cols-2 gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
-                      <span className="font-medium text-admin-muted">$/month</span>
-                      <input
+                    <AdminField label="$/month" htmlFor="contact-edit-retainer-price">
+                      <AdminInput
+                        id="contact-edit-retainer-price"
                         type="number"
                         min="0"
                         step="1"
                         value={form.retainerPrice}
                         onChange={(e) => setForm((f) => ({ ...f, retainerPrice: e.target.value }))}
-                        className={ADMIN_INPUT_CLS}
                       />
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm">
-                      <span className="font-medium text-admin-muted">Included hrs/month</span>
-                      <input
+                    </AdminField>
+                    <AdminField label="Included hrs/month" htmlFor="contact-edit-retainer-hours">
+                      <AdminInput
+                        id="contact-edit-retainer-hours"
                         type="number"
                         min="0"
                         step="0.5"
                         value={form.retainerHours}
                         onChange={(e) => setForm((f) => ({ ...f, retainerHours: e.target.value }))}
-                        className={ADMIN_INPUT_CLS}
                       />
-                    </label>
+                    </AdminField>
                   </div>
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="font-medium text-admin-muted">Since</span>
-                    <input
+                  <AdminField label="Since" htmlFor="contact-edit-retainer-since">
+                    <AdminInput
+                      id="contact-edit-retainer-since"
                       type="date"
                       value={form.retainerSince}
                       onChange={(e) => setForm((f) => ({ ...f, retainerSince: e.target.value }))}
-                      className={ADMIN_INPUT_CLS}
                     />
-                  </label>
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="font-medium text-admin-muted">Notes</span>
-                    <textarea
+                  </AdminField>
+                  <AdminField label="Notes" htmlFor="contact-edit-retainer-notes">
+                    <AdminTextarea
+                      id="contact-edit-retainer-notes"
                       rows={2}
                       value={form.retainerNotes}
                       onChange={(e) => setForm((f) => ({ ...f, retainerNotes: e.target.value }))}
-                      className={ADMIN_INPUT_CLS}
                       placeholder="Agreed scope, rollover stance, discounted rate..."
                     />
-                  </label>
+                  </AdminField>
                 </>
               )}
             </div>

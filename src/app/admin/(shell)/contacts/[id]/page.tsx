@@ -5,6 +5,7 @@
 // contact fields, sync state and review-ask state.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { InfoRow } from "@/features/admin/components/ui/InfoRow";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
@@ -146,9 +147,7 @@ export default async function ContactDetailPage({
             />
           </div>
           {timeline.length === 0 ? (
-            <p className="px-5 pb-5 text-sm text-admin-faint">
-              Nothing linked to this contact yet.
-            </p>
+            <EmptyState title="Nothing linked to this contact yet." className="pt-2" />
           ) : (
             <ul className="divide-y divide-admin-border">
               {timeline.map((e, i) => {
@@ -157,7 +156,7 @@ export default async function ContactDetailPage({
                   <span className="flex items-start gap-3 px-5 py-3">
                     <span
                       className={cn(
-                        "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                        "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold",
                         badge.className,
                       )}
                       aria-hidden="true"
@@ -168,9 +167,9 @@ export default async function ContactDetailPage({
                       <span className="block truncate text-sm font-medium text-admin-text">
                         {e.title}
                       </span>
-                      <span className="block truncate text-xs text-admin-muted">{e.detail}</span>
+                      <span className="block truncate text-sm text-admin-muted">{e.detail}</span>
                     </span>
-                    <span className="shrink-0 text-xs text-admin-faint">
+                    <span className="shrink-0 text-sm text-admin-faint">
                       {formatDateShort(e.timestamp.toISOString())}
                     </span>
                   </span>

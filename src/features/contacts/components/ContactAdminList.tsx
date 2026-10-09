@@ -1,12 +1,14 @@
 "use client";
 // src/features/contacts/components/ContactAdminList.tsx
 // Admin component listing contacts saved from booking submissions, with inline editing
-// and Google Places autocomplete for the address field. Contacts are split into two
-// sections: unsynced (needs attention) and synced (already linked to Google Contacts,
-// shown in a collapsible drawer).
+// and Google Places autocomplete for the address field. Contacts are split into
+// sections: new (last 7 days), unsynced (needs attention) and synced (already linked to
+// Google Contacts, shown in a collapsible drawer). Phones show each contact as a
+// ContactCard; from lg each section is a ContactTable.
 
-import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
+import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
@@ -17,22 +19,23 @@ import {
   type ContactRow,
   type EditValues,
 } from "@/features/contacts/components/ContactCard";
+import {
+  ContactListToolbar,
+  type ContactSort,
+  type SyncFilter,
+} from "@/features/contacts/components/ContactListToolbar";
+import {
+  ContactMergeBanner,
+  ContactMergeDialog,
+} from "@/features/contacts/components/ContactMergePrompts";
+import { ContactTable } from "@/features/contacts/components/ContactTable";
+import { cn } from "@/shared/lib/cn";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useEffect, useState } from "react";
 
-/**
- * Classes for a filter chip button.
- * @param active - Whether the chip is selected.
- * @returns Class string.
- */
-function chipClass(active: boolean): string {
-  return `rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-    active
-      ? "border-russian-violet bg-russian-violet text-white"
-      : "border-slate-200 bg-white text-slate-500 hover:bg-slate-100"
-  }`;
-}
+/** Section heading: the admin eyebrow, coloured per section. */
+const SECTION_HEADING_CLS = "text-sm font-bold tracking-wide uppercase";
 
 const PAGE_LOAD_TIME = Date.now();
 
@@ -79,7 +82,7 @@ export function ContactAdminList({
   const [query, setQuery] = useState(() => queryValue(pageQuery, "q"));
   // Filter chips, AND-combined with the search. Sync is tri-state (all/one/other)
   // since a contact is exactly one of synced or not.
-  const [syncFilter, setSyncFilter] = useState<"all" | "synced" | "unsynced">(() => {
+  const [syncFilter, setSyncFilter] = useState<SyncFilter>(() => {
     const v = queryValue(pageQuery, "sync");
     return v === "synced" || v === "unsynced" ? v : "all";
   });
@@ -87,7 +90,7 @@ export function ContactAdminList({
   const [retainerOnly, setRetainerOnly] = useState(() => queryValue(pageQuery, "retainer") === "1");
   const [noEmail, setNoEmail] = useState(() => queryValue(pageQuery, "noemail") === "1");
   const [noPhone, setNoPhone] = useState(() => queryValue(pageQuery, "nophone") === "1");
-  const [sort, setSort] = useState<"name" | "newest" | "oldest">(() => {
+  const [sort, setSort] = useState<ContactSort>(() => {
     const v = queryValue(pageQuery, "sort");
     return v === "newest" || v === "oldest" ? v : "name";
   });
@@ -510,200 +513,113 @@ export function ContactAdminList({
     };
   }
 
-  if (contacts.length === 0) {
+  /**
+   * Renders one section's contacts: cards on phones, the table from lg.
+   * @param list - Contacts in the section, already sorted and paged.
+   * @returns The section body.
+   */
+  function renderGroup(list: ContactRow[]): React.ReactElement {
     return (
-      <p className="text-sm text-slate-400">
-        No contacts yet. They will appear here after customers book.
-      </p>
+      <>
+        <div className="flex flex-col gap-3 lg:hidden">
+          {list.map((c) => (
+            <ContactCard key={c.id} c={c} {...buildCardProps(c)} />
+          ))}
+        </div>
+        <ContactTable contacts={list} cardProps={buildCardProps} />
+      </>
     );
+  }
+
+  if (contacts.length === 0) {
+    return <EmptyState title="No contacts yet. They will appear here after customers book." />;
   }
 
   return (
     <div className="flex flex-col gap-6">
       {mergeSourceId && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <span>
-            Merging <strong>{mergeSource?.name ?? "contact"}</strong> - pick the contact to keep by
-            clicking &ldquo;Keep this one&rdquo;. Its reviews move over and this duplicate is
-            removed.
-          </span>
-          <button
-            onClick={() => setMergeSourceId(null)}
-            className="ml-auto font-semibold text-amber-700 underline underline-offset-2 hover:text-amber-900"
-          >
-            Cancel
-          </button>
-        </div>
+        <ContactMergeBanner source={mergeSource} onCancel={() => setMergeSourceId(null)} />
       )}
 
-      {/* Search + export row */}
-      <div className="flex items-center gap-3">
-        <input
-          type="search"
-          placeholder="Search name, email, phone, address…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
-        />
-        <button
-          type="button"
-          onClick={() => void exportContacts()}
-          disabled={exporting}
-          className="shrink-0 text-xs font-medium text-moonstone-700 underline underline-offset-2 hover:text-moonstone-800 disabled:opacity-50"
-        >
-          {exporting ? "Exporting…" : "Export CSV"}
-        </button>
-      </div>
+      <ContactListToolbar
+        query={query}
+        setQuery={setQuery}
+        exporting={exporting}
+        onExport={() => void exportContacts()}
+        syncFilter={syncFilter}
+        setSyncFilter={setSyncFilter}
+        reviewedOnly={reviewedOnly}
+        setReviewedOnly={setReviewedOnly}
+        retainerOnly={retainerOnly}
+        setRetainerOnly={setRetainerOnly}
+        noEmail={noEmail}
+        setNoEmail={setNoEmail}
+        noPhone={noPhone}
+        setNoPhone={setNoPhone}
+        anyFilter={anyFilter}
+        onClearFilters={() => {
+          setSyncFilter("all");
+          setReviewedOnly(false);
+          setRetainerOnly(false);
+          setNoEmail(false);
+          setNoPhone(false);
+        }}
+        sort={sort}
+        setSort={setSort}
+      />
 
-      <ConfirmDialog
-        open={mergeSource !== undefined && mergeTarget !== undefined}
-        title={`Merge into ${mergeTarget?.name ?? "this contact"}?`}
-        body={
-          <p>
-            <strong>{mergeTarget?.name}</strong> keeps its details and fills any blanks from{" "}
-            <strong>{mergeSource?.name}</strong>. Reviews, emails and phone numbers move across,
-            then <strong>{mergeSource?.name}</strong> is deleted
-            {mergeSource?.googleContactId &&
-            mergeSource.googleContactId !== mergeTarget?.googleContactId
-              ? " here and from Google Contacts"
-              : ""}
-            . This can&apos;t be undone.
-          </p>
-        }
-        confirmLabel="Merge"
-        tone="danger"
+      <ContactMergeDialog
+        source={mergeSource}
+        target={mergeTarget}
         busy={merging}
         onConfirm={() => mergeTargetId && handleMergeInto(mergeTargetId)}
         onCancel={() => setMergeTargetId(null)}
       />
 
-      {/* Filter chips - narrow the list without leaving the page. */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => setSyncFilter((f) => (f === "synced" ? "all" : "synced"))}
-          aria-pressed={syncFilter === "synced"}
-          className={chipClass(syncFilter === "synced")}
-        >
-          Synced
-        </button>
-        <button
-          type="button"
-          onClick={() => setSyncFilter((f) => (f === "unsynced" ? "all" : "unsynced"))}
-          aria-pressed={syncFilter === "unsynced"}
-          className={chipClass(syncFilter === "unsynced")}
-        >
-          Unsynced
-        </button>
-        <button
-          type="button"
-          onClick={() => setReviewedOnly((v) => !v)}
-          aria-pressed={reviewedOnly}
-          className={chipClass(reviewedOnly)}
-        >
-          Has reviews
-        </button>
-        <button
-          type="button"
-          onClick={() => setRetainerOnly((v) => !v)}
-          aria-pressed={retainerOnly}
-          className={chipClass(retainerOnly)}
-        >
-          Retainer
-        </button>
-        <button
-          type="button"
-          onClick={() => setNoEmail((v) => !v)}
-          aria-pressed={noEmail}
-          className={chipClass(noEmail)}
-        >
-          No email
-        </button>
-        <button
-          type="button"
-          onClick={() => setNoPhone((v) => !v)}
-          aria-pressed={noPhone}
-          className={chipClass(noPhone)}
-        >
-          No phone
-        </button>
-        {anyFilter && (
-          <button
-            type="button"
-            onClick={() => {
-              setSyncFilter("all");
-              setReviewedOnly(false);
-              setRetainerOnly(false);
-              setNoEmail(false);
-              setNoPhone(false);
-            }}
-            className="ml-1 text-xs font-medium text-slate-400 underline underline-offset-2 hover:text-slate-600"
-          >
-            Clear
-          </button>
-        )}
-        <select
-          aria-label="Sort contacts"
-          value={sort}
-          onChange={(e) => setSort(e.target.value as "name" | "newest" | "oldest")}
-          className="ml-auto rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
-        >
-          <option value="name">Name A-Z</option>
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-        </select>
-      </div>
-
       {/* New contacts - added in the last 7 days */}
       {newContacts.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <h3 className="flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-700 uppercase">
+        <section className="flex flex-col gap-3">
+          <h3 className={cn(SECTION_HEADING_CLS, "flex items-center gap-2 text-admin-text")}>
             New
-            <span className="rounded-full bg-moonstone-400/15 px-2 py-0.5 text-[10px] font-semibold text-moonstone-700">
-              {newContacts.length}
-            </span>
+            <StatusPill tone="info">{newContacts.length}</StatusPill>
           </h3>
-          {newContacts.map((c) => (
-            <ContactCard key={c.id} c={c} {...buildCardProps(c)} />
-          ))}
-        </div>
+          {renderGroup(newContacts)}
+        </section>
       )}
 
       {/* Unsynced contacts - shown prominently */}
       {unsynced.length > 0 ? (
-        <div className="flex flex-col gap-3">
-          <h3 className="text-xs font-semibold tracking-wide text-russian-violet uppercase">
+        <section className="flex flex-col gap-3">
+          <h3 className={cn(SECTION_HEADING_CLS, "text-russian-violet")}>
             Needs syncing ({unsynced.length})
           </h3>
-          {unsynced.map((c) => (
-            <ContactCard key={c.id} c={c} {...buildCardProps(c)} />
-          ))}
-        </div>
+          {renderGroup(unsynced)}
+        </section>
       ) : (
-        <p className="text-sm text-slate-400">All contacts are synced to Google.</p>
+        <p className="text-sm text-admin-muted">All contacts are synced to Google.</p>
       )}
 
       {/* Synced contacts - collapsible */}
       {synced.length > 0 && (
-        <div className="flex flex-col gap-3">
+        <section className="flex flex-col gap-3">
           <button
+            type="button"
             onClick={() => setSyncedOpen((o) => !o)}
-            className="flex items-center gap-2 text-left"
+            aria-expanded={syncedOpen}
+            className="flex items-center gap-2 self-start text-left"
           >
-            <span className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+            <span className={cn(SECTION_HEADING_CLS, "text-admin-muted")}>
               Synced contacts ({synced.length})
             </span>
-            <span className="text-xs text-slate-400">{syncedOpen ? "▲" : "▼"}</span>
+            <span className="text-sm text-admin-muted">{syncedOpen ? "▲" : "▼"}</span>
           </button>
           {syncedOpen && (
             <div className="flex flex-col gap-3">
-              {syncedPager.visible.map((c) => (
-                <ContactCard key={c.id} c={c} {...buildCardProps(c)} />
-              ))}
+              {renderGroup(syncedPager.visible)}
               <ShowMoreButton pager={syncedPager} noun={["contact", "contacts"]} />
             </div>
           )}
-        </div>
+        </section>
       )}
     </div>
   );
