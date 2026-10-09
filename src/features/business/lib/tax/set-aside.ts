@@ -2,11 +2,9 @@
 // Weekly and monthly set-aside targets: what is still owed spread over the time left
 // in the FY, rather than a flat /52 and /12 that ignores the weeks already gone.
 
+import { DAY_MS } from "@/features/business/lib/financial-year";
 import { ledgerDay, roundCents } from "@/features/business/lib/tax/helpers";
 import type { SetAsidePlan, TaxFy } from "@/features/business/lib/tax/types";
-
-/** Milliseconds in a day. */
-const DAY_MS = 86_400_000;
 
 /**
  * Spreads the tax still to put aside over the rest of the FY. Counts from NZ

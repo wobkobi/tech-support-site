@@ -16,7 +16,6 @@ import {
   kmByAddressFrom,
   kmDraftsFor,
   parseKm,
-  parseLedgerDate,
   parseTripInput,
   pickFy,
   sortTrips,
@@ -25,6 +24,7 @@ import {
   type TripCandidate,
   type TripRow,
 } from "@/features/business/lib/trips";
+import { parseDateKey } from "@/shared/lib/date-format";
 
 let failures = 0;
 
@@ -106,13 +106,14 @@ function main(): void {
   console.log("\nLedger dates:");
   expectEqual(
     "valid day is UTC midnight",
-    parseLedgerDate("2026-10-09")?.toISOString() ?? null,
+    parseDateKey("2026-10-09")?.toISOString() ?? null,
     "2026-10-09T00:00:00.000Z",
   );
-  expectEqual("30 Feb is rejected, not rolled into March", parseLedgerDate("2026-02-30"), null);
-  expectEqual("month 13", parseLedgerDate("2026-13-01"), null);
-  expectEqual("NZ-style date", parseLedgerDate("9/10/2026"), null);
-  expectEqual("number", parseLedgerDate(20261009), null);
+  expectEqual("30 Feb is rejected, not rolled into March", parseDateKey("2026-02-30"), null);
+  expectEqual("month 13", parseDateKey("2026-13-01"), null);
+  expectEqual("NZ-style date", parseDateKey("9/10/2026"), null);
+  expectEqual("number", parseDateKey(20261009), null);
+  expectEqual("full ISO instant", parseDateKey("2026-10-09T00:00:00Z"), null);
 
   console.log("\nRequest bodies:");
   expectEqual(
@@ -165,34 +166,35 @@ function main(): void {
   );
   expectEqual("not an object", parseTripInput(null), {
     ok: false,
-    error: "Invalid request body.",
+    error: "Expected a JSON object",
   });
+  expectEqual("an array", parseTripInput([]), { ok: false, error: "Expected a JSON object" });
   expectEqual("bad date", parseTripInput({ date: "2026-13-01", km: 12, purpose: "x" }), {
     ok: false,
-    error: "Enter a valid date.",
+    error: "Enter a valid date",
   });
   expectEqual("zero km", parseTripInput({ date: "2026-10-09", km: 0, purpose: "x" }), {
     ok: false,
-    error: "Enter the round-trip km, more than 0 and up to 2,000.",
+    error: "Enter the round-trip km, more than 0 and up to 2,000",
   });
   expectEqual("blank purpose", parseTripInput({ date: "2026-10-09", km: 5, purpose: "   " }), {
     ok: false,
-    error: "Enter what the trip was for, up to 200 characters.",
+    error: "Enter what the trip was for, up to 200 characters",
   });
   expectEqual(
     "long notes",
     parseTripInput({ date: "2026-10-09", km: 5, purpose: "x", notes: "n".repeat(1001) }),
-    { ok: false, error: "Notes can be up to 1,000 characters." },
+    { ok: false, error: "Notes can be up to 1,000 characters" },
   );
   expectEqual(
     "malformed booking id",
     parseTripInput({ date: "2026-10-09", km: 5, purpose: "x", bookingId: "abc" }),
-    { ok: false, error: "Invalid booking id." },
+    { ok: false, error: "Invalid booking id" },
   );
   expectEqual(
     "filter object as booking id",
     parseTripInput({ date: "2026-10-09", km: 5, purpose: "x", bookingId: { not: "" } }),
-    { ok: false, error: "Invalid booking id." },
+    { ok: false, error: "Invalid booking id" },
   );
 
   console.log("\nFY window and picking:");

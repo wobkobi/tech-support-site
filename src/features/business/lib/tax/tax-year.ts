@@ -5,6 +5,8 @@
 
 import type { EXPENSE_CATEGORIES } from "@/features/business/lib/constants";
 import {
+  APRIL,
+  DAY_MS,
   fyKeyOf,
   getFinancialYear,
   type FinancialYear,
@@ -12,6 +14,7 @@ import {
 import {
   assetSchedule,
   assetStartDay,
+  filedAtvFor,
   lowValueGroupTotals,
 } from "@/features/business/lib/tax/depreciation";
 import {
@@ -41,12 +44,6 @@ import {
 
 /** The expense category a km-rate vehicle replaces (the rate already covers fuel). */
 const FUEL_CATEGORY: (typeof EXPENSE_CATEGORIES)[number] = "Fuel";
-
-/** Index of April in JS Date (0 = January). */
-const APRIL = 3;
-
-/** One day in ms, to step back from an FY's exclusive end to its last day. */
-const DAY_MS = 86_400_000;
 
 /**
  * The tax maths' view of a financial year.
@@ -137,16 +134,11 @@ export function computeTaxYear(input: TaxYearInput): TaxYearResult {
   let disposals = 0;
   let boostValue = 0;
   for (const asset of input.assets) {
-    const filed = new Map<string, number>();
-    for (const [fyKey, byAsset] of input.filedClosingAtv) {
-      const atv = byAsset.get(asset.id);
-      if (atv !== undefined) filed.set(fyKey, atv);
-    }
     const row = assetSchedule(asset, fys, {
       businessStart: input.businessStart,
       lowValueThreshold: settings.lowValueThreshold,
       groupTotal: groupTotals.get(asset.id) ?? asset.costBase,
-      filedClosingAtv: filed,
+      filedClosingAtv: filedAtvFor(asset.id, input.filedClosingAtv),
     }).find((r) => r.fyKey === fy.key);
     if (!row) continue;
     assetRows.push(row);

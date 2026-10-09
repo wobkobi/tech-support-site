@@ -6,20 +6,10 @@
 import { expenseLinkProblem } from "@/features/business/lib/asset-links.server";
 import { parseAssetBody } from "@/features/business/lib/assets";
 import { parseObjectId } from "@/features/business/lib/validation";
-import { errorResponse } from "@/shared/lib/api-response";
+import { errorResponse, isRecordNotFound, noStore } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-
-/**
- * Marks a response as never cacheable: the register changes with every save.
- * @param res - Response to mark.
- * @returns The same response.
- */
-function noStore<T>(res: NextResponse<T>): NextResponse<T> {
-  res.headers.set("Cache-Control", "no-store");
-  return res;
-}
 
 /**
  * PUT /api/business/assets/[id] - Replaces an asset's fields.
@@ -42,7 +32,7 @@ export async function PUT(
   try {
     body = await request.json();
   } catch {
-    return noStore(errorResponse("Body must be JSON", 400));
+    return noStore(errorResponse("Invalid JSON body", 400));
   }
   const parsed = parseAssetBody(body);
   if (!parsed.ok) return noStore(errorResponse(parsed.error, 400));
@@ -79,8 +69,9 @@ export async function DELETE(
   try {
     await prisma.asset.delete({ where: { id } });
     return noStore(NextResponse.json({ ok: true }));
-  } catch {
-    // Missing or stale id (Prisma P2025), the same 404 the other [id] routes return.
-    return noStore(errorResponse("Asset not found", 404));
+  } catch (err) {
+    // A missing or stale id (P2025) is a 404; anything else, such as a DB outage, is a 500.
+    if (isRecordNotFound(err)) return noStore(errorResponse("Asset not found", 404));
+    throw err;
   }
 }

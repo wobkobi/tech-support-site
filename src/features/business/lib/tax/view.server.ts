@@ -1,12 +1,18 @@
 // src/features/business/lib/tax/view.server.ts
 // Server loaders behind the Tax page, the CSV export and the filed toggle: one financial
 // year's live figures in snapshot shape, the saved snapshot when the year is filed (and how
-// a fresh calculation differs from it), and the filed years the asset and trip forms warn about.
+// a fresh calculation differs from it), the result every other page shows for a year (the
+// snapshot's while filed), and the filed years the asset and trip forms warn about.
 
 import "server-only";
 
 import { fyKeyOf, type FinancialYear } from "@/features/business/lib/financial-year";
-import { loadAllFys, loadTaxInputs } from "@/features/business/lib/tax/load";
+import {
+  loadAllFys,
+  loadTaxInputsWithRecord,
+  loadTaxYearRows,
+  type TaxYearRow,
+} from "@/features/business/lib/tax/load";
 import {
   buildTaxYearSnapshot,
   diffSnapshots,
@@ -17,7 +23,7 @@ import {
   type TaxYearSnapshot,
 } from "@/features/business/lib/tax/snapshot";
 import { computeTaxYear } from "@/features/business/lib/tax/tax-year";
-import type { TaxYearInput } from "@/features/business/lib/tax/types";
+import type { TaxYearInput, TaxYearResult } from "@/features/business/lib/tax/types";
 import { prisma } from "@/shared/lib/prisma";
 
 /** FY keys look like "2025-26". */
@@ -26,8 +32,13 @@ const FY_KEY_PATTERN = /^\d{4}-\d{2}$/;
 /** One year as the Tax page and CSV see it. */
 export interface TaxYearView {
   fyKey: string;
-  /** Live inputs: the home office form reads its saved values from `input.year`. */
+  /** Live inputs, with blank rates already filled from IRD's published ones. */
   input: TaxYearInput;
+  /**
+   * The year's stored TaxYear row as saved (blank rates stay null), or null when none
+   * exists. The home office form starts from it.
+   */
+  record: TaxYearRow | null;
   /** The year computed now. */
   live: TaxYearSnapshot;
   /** ISO instant the year was marked filed, or null. */
@@ -85,23 +96,28 @@ async function loadFyTrips(fy: FinancialYear): Promise<SnapshotTrip[]> {
  * @param fy - The year.
  * @param now - Reference instant.
  * @param filedAt - ISO filing instant to stamp, or null for a live view.
- * @returns The live inputs and the snapshot built from them.
+ * @returns The live inputs, the year's TaxYear row from the same read (null when none is
+ * stored), and the snapshot built from them.
  */
 export async function buildLiveSnapshot(
   fy: FinancialYear,
   now: Date,
   filedAt: string | null = null,
-): Promise<{ input: TaxYearInput; snapshot: TaxYearSnapshot }> {
-  const [input, trips] = await Promise.all([loadTaxInputs(fy, now), loadFyTrips(fy)]);
+): Promise<{ input: TaxYearInput; record: TaxYearRow | null; snapshot: TaxYearSnapshot }> {
+  const [{ input, record }, trips] = await Promise.all([
+    loadTaxInputsWithRecord(fy, now),
+    loadFyTrips(fy),
+  ]);
   const result = computeTaxYear(input);
   const snapshot = buildTaxYearSnapshot({
     result,
     assets: input.assets,
     trips,
     totalVehicleKm: input.year.totalVehicleKm ?? null,
+    yearInputs: input.year,
     filedAt,
   });
-  return { input, snapshot };
+  return { input, record, snapshot };
 }
 
 /**
@@ -115,15 +131,15 @@ export async function buildLiveSnapshot(
  */
 export async function loadTaxYearView(fy: FinancialYear, now: Date): Promise<TaxYearView> {
   const fyKey = fyKeyOf(fy.label);
-  const [{ input, snapshot: live }, record] = await Promise.all([
-    buildLiveSnapshot(fy, now),
-    prisma.taxYear.findUnique({ where: { fyKey }, select: { filedAt: true, snapshot: true } }),
-  ]);
+  // The record comes from the same read as the inputs: a route handler (the CSV export)
+  // has no React cache to dedupe a second read.
+  const { input, record, snapshot: live } = await buildLiveSnapshot(fy, now);
   const filedAtIso = record?.filedAt ? record.filedAt.toISOString() : null;
   const filed = filedAtIso ? parseTaxYearSnapshot(record?.snapshot) : null;
   return {
     fyKey,
     input,
+    record,
     live,
     filedAtIso,
     filed,
@@ -131,6 +147,63 @@ export async function loadTaxYearView(fy: FinancialYear, now: Date): Promise<Tax
     shown: filed ?? live,
     changes: filed ? diffSnapshots(filed, live) : [],
   };
+}
+
+/**
+ * A filed year's saved result.
+ * @param record - The year's TaxYear row, or undefined when none exists.
+ * @returns The snapshot's result, or null when the year isn't filed or its snapshot
+ * can't be read.
+ */
+function filedResultOf(
+  record: Pick<TaxYearRow, "filedAt" | "snapshot"> | undefined,
+): TaxYearResult | null {
+  if (!record?.filedAt) return null;
+  return parseTaxYearSnapshot(record.snapshot)?.result ?? null;
+}
+
+/**
+ * The figures a year shows outside the Tax page: the filed snapshot's result while the
+ * year is filed, so the overview agrees with the Tax page and the CSV; the live result
+ * for an unfiled year, or for a filed year whose snapshot can't be read (the same
+ * fallback the Tax page makes).
+ * @param input - The year's live inputs.
+ * @param record - The year's TaxYear row, or undefined when none exists.
+ * @returns The result to show.
+ */
+export function shownResultFor(
+  input: TaxYearInput,
+  record: Pick<TaxYearRow, "filedAt" | "snapshot"> | undefined,
+): TaxYearResult {
+  return filedResultOf(record) ?? computeTaxYear(input);
+}
+
+/**
+ * One year's filed result, for a page that keeps its own live figures but names the
+ * saved ones beside them (the Trips page's km claim).
+ * @param fyKey - FY key, e.g. "2025-26".
+ * @returns The snapshot's result, or null when the year isn't filed or its snapshot
+ * can't be read.
+ */
+export async function loadFiledResult(fyKey: string): Promise<TaxYearResult | null> {
+  const rows = await loadTaxYearRows();
+  return filedResultOf(rows.find((row) => row.fyKey === fyKey));
+}
+
+/**
+ * {@link shownResultFor} for several years, matching each to its TaxYear row from the
+ * request's single read.
+ * @param inputs - Each year's live inputs.
+ * @returns One result per input, in the same order.
+ */
+export async function loadShownResults(inputs: readonly TaxYearInput[]): Promise<TaxYearResult[]> {
+  const rows = await loadTaxYearRows();
+  return inputs.map((input) =>
+    shownResultFor(
+      input,
+      rows.find((row) => row.fyKey === input.fy.key),
+    ),
+  );
 }
 
 /**

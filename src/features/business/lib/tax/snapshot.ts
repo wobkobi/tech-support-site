@@ -6,7 +6,11 @@
 // years an asset or trip edit reaches. Pure: no Prisma, no React.
 
 import { assetClassByKey } from "@/features/business/lib/tax/asset-classes";
-import type { AssetInput, TaxYearResult } from "@/features/business/lib/tax/types";
+import type {
+  AssetInput,
+  TaxYearRecordInput,
+  TaxYearResult,
+} from "@/features/business/lib/tax/types";
 
 /** Stored shape version; bump it when TaxYearSnapshot changes shape. */
 export const SNAPSHOT_VERSION = 1;
@@ -42,6 +46,15 @@ export interface SnapshotTrip {
   purpose: string;
 }
 
+/**
+ * The rates and home office inputs the year's car and home office figures were worked
+ * from, so a filed CSV shows how they were reached even after the rates table changes.
+ */
+export type SnapshotYearInputs = Pick<
+  TaxYearRecordInput,
+  "kmTier1" | "kmTier2" | "sqmRate" | "officeSqm" | "houseSqm" | "mortgageInterestOrRent" | "rates"
+>;
+
 /** Everything one year's Tax page and CSV show, saved (filed) or freshly computed (live). */
 export interface TaxYearSnapshot {
   version: typeof SNAPSHOT_VERSION;
@@ -57,6 +70,8 @@ export interface TaxYearSnapshot {
    * Tier 1 split; null when it wasn't entered.
    */
   totalVehicleKm: number | null;
+  /** Km tier rates, square-metre rate, floor areas and house costs used for the year. */
+  yearInputs: SnapshotYearInputs;
   /** Closing adjusted tax value per asset id: the opening value the next year carries forward. */
   closingAtv: Record<string, number>;
 }
@@ -183,6 +198,7 @@ function toSnapshotAsset(asset: AssetInput): SnapshotAsset {
  * @param args.assets - Every asset on the register.
  * @param args.trips - Trips dated inside the year.
  * @param args.totalVehicleKm - The year's TaxYear.totalVehicleKm, or null when not entered.
+ * @param args.yearInputs - The year's rates and home office inputs (extra fields are dropped).
  * @param args.filedAt - ISO filing instant, or null for a live view.
  * @returns The snapshot.
  */
@@ -191,9 +207,10 @@ export function buildTaxYearSnapshot(args: {
   assets: readonly AssetInput[];
   trips: readonly SnapshotTrip[];
   totalVehicleKm: number | null;
+  yearInputs: SnapshotYearInputs;
   filedAt: string | null;
 }): TaxYearSnapshot {
-  const { result, assets, trips, totalVehicleKm, filedAt } = args;
+  const { result, assets, trips, totalVehicleKm, yearInputs, filedAt } = args;
   const inYear = new Set(result.assets.map((row) => row.assetId));
   const closingAtv: Record<string, number> = {};
   for (const row of result.assets) closingAtv[row.assetId] = row.closingAtv;
@@ -209,6 +226,15 @@ export function buildTaxYearSnapshot(args: {
       (a, b) => a.date.localeCompare(b.date) || a.purpose.localeCompare(b.purpose),
     ),
     totalVehicleKm,
+    yearInputs: {
+      kmTier1: yearInputs.kmTier1,
+      kmTier2: yearInputs.kmTier2,
+      sqmRate: yearInputs.sqmRate,
+      officeSqm: yearInputs.officeSqm,
+      houseSqm: yearInputs.houseSqm,
+      mortgageInterestOrRent: yearInputs.mortgageInterestOrRent,
+      rates: yearInputs.rates,
+    },
     closingAtv,
   };
 }
@@ -287,6 +313,15 @@ const IR_NUMBERS: ReadonlyArray<keyof TaxYearResult["ir"]> = [
  */
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+/**
+ * Narrows to a finite number or null.
+ * @param value - Anything.
+ * @returns True for null or a finite number.
+ */
+function isFiniteOrNull(value: unknown): value is number | null {
+  return value === null || isFiniteNumber(value);
 }
 
 /**
@@ -412,6 +447,23 @@ function isStoredTrip(value: unknown): boolean {
 }
 
 /**
+ * Checks the stored rates and home office inputs: the rates must be numbers, the areas
+ * and house costs a number or null (not entered).
+ * @param value - Anything.
+ * @returns True for a usable {@link SnapshotYearInputs}.
+ */
+function isStoredYearInputs(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    allFinite(value, ["kmTier1", "kmTier2", "sqmRate"]) &&
+    isFiniteOrNull(value.officeSqm) &&
+    isFiniteOrNull(value.houseSqm) &&
+    isFiniteOrNull(value.mortgageInterestOrRent) &&
+    isFiniteOrNull(value.rates)
+  );
+}
+
+/**
  * Reads a stored snapshot back. Returns null for anything that isn't a current-version
  * snapshot, so a corrupt or foreign value never reaches the maths as a filed year. The
  * check goes down to every field the Tax page and the CSV read (numbers finite, dates
@@ -422,8 +474,9 @@ function isStoredTrip(value: unknown): boolean {
  */
 export function parseTaxYearSnapshot(json: unknown): TaxYearSnapshot | null {
   if (!isRecord(json) || json.version !== SNAPSHOT_VERSION) return null;
-  const { result, assets, trips, closingAtv, filedAt, totalVehicleKm } = json;
+  const { result, assets, trips, closingAtv, filedAt, totalVehicleKm, yearInputs } = json;
   if (!isStoredResult(result)) return null;
+  if (!isStoredYearInputs(yearInputs)) return null;
   if (!Array.isArray(assets) || !assets.every(isStoredAsset)) return null;
   if (!Array.isArray(trips) || !trips.every(isStoredTrip)) return null;
   if (!isRecord(closingAtv) || !Object.values(closingAtv).every(isFiniteNumber)) return null;

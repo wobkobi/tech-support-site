@@ -48,6 +48,7 @@ import {
   filedYearsTouched,
   parseTaxYearSnapshot,
   type FiledYearRef,
+  type SnapshotYearInputs,
 } from "@/features/business/lib/tax/snapshot";
 
 let failures = 0;
@@ -1426,6 +1427,20 @@ const SNAPSHOT_RESULT: TaxYearResult = {
   },
 };
 
+/**
+ * Rates and home office inputs the snapshot records; council rates left unentered. The
+ * three-decimal Tier 2 rate checks the CSV prints rates unrounded.
+ */
+const SNAPSHOT_YEAR_INPUTS: SnapshotYearInputs = {
+  kmTier1: 1.2,
+  kmTier2: 0.355,
+  sqmRate: 55.6,
+  officeSqm: 12,
+  houseSqm: 120.5,
+  mortgageInterestOrRent: 18000,
+  rates: null,
+};
+
 /** FY 2025-26 as a filed year, for the edit-warning cases. */
 const FILED_2025: FiledYearRef = {
   fyKey: "2025-26",
@@ -1450,8 +1465,11 @@ function checkSnapshots(): void {
     assets: SNAPSHOT_ASSETS,
     trips,
     totalVehicleKm: 9000,
+    // A full TaxYearRecordInput passes straight in; the extra total km is dropped.
+    yearInputs: { ...SNAPSHOT_YEAR_INPUTS, totalVehicleKm: 5 } as SnapshotYearInputs,
     filedAt: FILED_2025.filedAtIso,
   });
+  expectEqual("year inputs kept, extra fields dropped", built.yearInputs, SNAPSHOT_YEAR_INPUTS);
   expectEqual(
     "keeps only assets with a row this year, oldest in service first",
     built.assets.map((a) => a.id),
@@ -1566,6 +1584,7 @@ function checkSnapshots(): void {
     assets: SNAPSHOT_ASSETS,
     trips,
     totalVehicleKm: null,
+    yearInputs: SNAPSHOT_YEAR_INPUTS,
     filedAt: null,
   });
   const noTotalKmParsed = parseTaxYearSnapshot(JSON.parse(JSON.stringify(noTotalKm)));
@@ -1578,6 +1597,44 @@ function checkSnapshots(): void {
   expectEqual(
     "non-numeric total km rejected",
     parseTaxYearSnapshot({ ...built, totalVehicleKm: "9000" }),
+    null,
+  );
+
+  // Year inputs are required: rates must be numbers, areas and house costs a number or null.
+  expectEqual(
+    "missing year inputs rejected",
+    parseTaxYearSnapshot({ ...built, yearInputs: undefined }),
+    null,
+  );
+  expectEqual(
+    "non-numeric km rate rejected",
+    parseTaxYearSnapshot({ ...built, yearInputs: { ...SNAPSHOT_YEAR_INPUTS, kmTier1: "1.2" } }),
+    null,
+  );
+  expectEqual(
+    "null square-metre rate rejected",
+    parseTaxYearSnapshot({ ...built, yearInputs: { ...SNAPSHOT_YEAR_INPUTS, sqmRate: null } }),
+    null,
+  );
+  expectEqual(
+    "missing house area rejected",
+    parseTaxYearSnapshot({
+      ...built,
+      yearInputs: { ...SNAPSHOT_YEAR_INPUTS, houseSqm: undefined },
+    }),
+    null,
+  );
+  expectEqual(
+    "unentered areas and costs accepted",
+    parseTaxYearSnapshot({
+      ...built,
+      yearInputs: {
+        ...SNAPSHOT_YEAR_INPUTS,
+        officeSqm: null,
+        houseSqm: null,
+        mortgageInterestOrRent: null,
+      },
+    })?.yearInputs.officeSqm,
     null,
   );
 
@@ -1603,6 +1660,7 @@ function checkSnapshots(): void {
     assets: SNAPSHOT_ASSETS,
     trips,
     totalVehicleKm: 9000,
+    yearInputs: SNAPSHOT_YEAR_INPUTS,
     filedAt: null,
   });
   expectEqual("changes listed in display order", diffSnapshots(built, live), [
@@ -1730,6 +1788,22 @@ function checkSnapshots(): void {
     "total km row before the tier split",
     lines.slice(lines.indexOf('"Km not claimed (no km-rate vehicle)",0') + 1).slice(0, 2),
     ['"Total km the car travelled (odometer)",9000', '"Tier 1 km",42.5'],
+  );
+  expectEqual(
+    "each tier's rate follows its km",
+    lines.slice(lines.indexOf('"Tier 1 km",42.5'), lines.indexOf('"Km claim",51.00')),
+    ['"Tier 1 km",42.5', '"Tier 1 rate ($/km)",1.2', '"Tier 2 km",0', '"Tier 2 rate ($/km)",0.355'],
+  );
+  expectEqual(
+    "home office inputs before the claim",
+    lines.slice(lines.indexOf('"Home office"') + 1, lines.indexOf('"Home office"') + 6),
+    [
+      '"Office floor area (m²)",12',
+      '"Whole house floor area (m²)",120.5',
+      '"Square-metre rate ($/m²)",55.6',
+      '"Mortgage interest or rent (whole house)",18000.00',
+      '"Council rates (whole house)","Not entered"',
+    ],
   );
   expectEqual("ends with a line break", csv.endsWith("\r\n"), true);
   expectEqual(

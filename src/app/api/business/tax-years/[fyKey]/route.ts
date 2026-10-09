@@ -8,10 +8,10 @@
 import { fileTaxYear, unfileTaxYear } from "@/features/business/lib/tax/filing.server";
 import { resolveFinancialYear } from "@/features/business/lib/tax/view.server";
 import { parseAmount } from "@/features/business/lib/validation";
-import { errorResponse } from "@/shared/lib/api-response";
+import { errorResponse, isUniqueConflict, noStore } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
-import { Prisma, type TaxYear } from "@prisma/client";
+import type { TaxYear } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
 /** Shown for a malformed key, or one outside the business start to the current FY. */
@@ -31,27 +31,20 @@ const EDITABLE_FIELDS = [
 
 type EditableField = (typeof EDITABLE_FIELDS)[number];
 
+/** Each field as the Tax page's year form names it, so a refusal points at the right input. */
+const FIELD_LABELS: Record<EditableField, string> = {
+  officeSqm: "office floor area",
+  houseSqm: "whole house floor area",
+  sqmRate: "square-metre rate",
+  kmTier1: "Tier 1 kilometre rate",
+  kmTier2: "Tier 2 kilometre rate",
+  totalVehicleKm: "total km the car travelled",
+  mortgageInterestOrRent: "mortgage interest or rent",
+  rates: "council rates",
+};
+
 /** Shown for a zero, negative or non-numeric total km. */
-const TOTAL_KM_ERROR = "Enter the car's total km, or leave it blank.";
-
-/**
- * Marks a response as never cacheable: it reflects a record that changes on every save.
- * @param res - Response to mark.
- * @returns The same response.
- */
-function noStore<T>(res: NextResponse<T>): NextResponse<T> {
-  res.headers.set("Cache-Control", "no-store");
-  return res;
-}
-
-/**
- * Whether an error is Prisma's unique-constraint violation (P2002).
- * @param err - Caught error.
- * @returns True for P2002.
- */
-function isUniqueConflict(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
-}
+const TOTAL_KM_ERROR = "Enter the car's total km, or leave it blank";
 
 /**
  * PUT /api/business/tax-years/[fyKey] - Creates or updates one FY's TaxYear record.
@@ -82,7 +75,7 @@ export async function PUT(
     return noStore(errorResponse("Invalid JSON body", 400));
   }
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
-    return noStore(errorResponse("Invalid body", 400));
+    return noStore(errorResponse("Expected a JSON object", 400));
   }
   const raw = body as Record<string, unknown>;
 
@@ -104,7 +97,7 @@ export async function PUT(
       return noStore(errorResponse(TOTAL_KM_ERROR, 400));
     }
     if (parsed === null) {
-      return noStore(errorResponse(`Invalid ${field}`, 400));
+      return noStore(errorResponse(`Invalid ${FIELD_LABELS[field]}`, 400));
     }
     data[field] = parsed;
   }
@@ -118,7 +111,7 @@ export async function PUT(
   });
   if (existing?.filedAt) {
     return noStore(
-      errorResponse("This year is filed. Unfile it on the Tax page before changing it.", 409),
+      errorResponse("This year is filed, so unfile it on the Tax page before changing it", 409),
     );
   }
 
@@ -127,7 +120,7 @@ export async function PUT(
   const office = data.officeSqm !== undefined ? data.officeSqm : (existing?.officeSqm ?? null);
   const house = data.houseSqm !== undefined ? data.houseSqm : (existing?.houseSqm ?? null);
   if (office !== null && house !== null && office > house) {
-    return noStore(errorResponse("The office can't be bigger than the house.", 400));
+    return noStore(errorResponse("The office can't be bigger than the house", 400));
   }
 
   /**
@@ -168,7 +161,12 @@ export async function POST(
   if (!(await resolveFinancialYear(fyKey, new Date()))) {
     return noStore(errorResponse(UNKNOWN_FY_ERROR, 404));
   }
-  const body: unknown = await request.json().catch(() => null);
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return noStore(errorResponse("Invalid JSON body", 400));
+  }
   const action =
     typeof body === "object" && body !== null ? (body as { action?: unknown }).action : undefined;
   if (action !== "file" && action !== "unfile") {

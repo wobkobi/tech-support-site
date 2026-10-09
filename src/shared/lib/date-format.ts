@@ -1,5 +1,6 @@
 // src/shared/lib/date-format.ts
-// Canonical NZ date/time formatters (Pacific/Auckland for clocked outputs).
+// Canonical NZ date/time formatters (Pacific/Auckland for clocked outputs), plus the
+// spreadsheet-cell and YYYY-MM-DD date-key parsers.
 
 import { NZ_TZ } from "@/shared/lib/timezone-utils";
 
@@ -95,4 +96,23 @@ export function parseSheetDate(raw: string): Date | null {
     : t;
   const d = new Date(value);
   return isNaN(d.getTime()) ? null : d;
+}
+
+/** "YYYY-MM-DD", the date-key shape `<input type="date">` sends. */
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Parses a "YYYY-MM-DD" date key to UTC midnight of that day, the scale ledger dates are
+ * stored on. Surrounding whitespace is ignored. The round trip through toISOString
+ * refuses days the calendar doesn't have: the Date constructor would roll 2026-02-30
+ * forward into March.
+ * @param value - Raw value, e.g. from a request body or a settings field.
+ * @returns The date, or null when the value isn't a real YYYY-MM-DD day.
+ */
+export function parseDateKey(value: unknown): Date | null {
+  if (typeof value !== "string") return null;
+  const key = value.trim();
+  if (!DATE_KEY_RE.test(key)) return null;
+  const date = new Date(`${key}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === key ? date : null;
 }

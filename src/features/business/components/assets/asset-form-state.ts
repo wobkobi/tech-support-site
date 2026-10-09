@@ -8,7 +8,6 @@
 import {
   defaultRate,
   isVehicleClass,
-  parseLedgerDay,
   type AssetPrefill,
   type AssetView,
 } from "@/features/business/lib/assets";
@@ -21,6 +20,7 @@ import {
   type DepreciationMethod,
   type GstStatus,
 } from "@/features/business/lib/tax";
+import { parseDateKey } from "@/shared/lib/date-format";
 
 /** Class key stored when the operator types a rate instead of picking an IR265 class. */
 export const CUSTOM_CLASS_KEY = "custom";
@@ -65,7 +65,7 @@ export interface ClassGroup {
  * @param classes - Classes to group.
  * @returns One entry per group, in first-seen order.
  */
-export function groupClasses(classes: readonly AssetClass[]): ClassGroup[] {
+function groupClasses(classes: readonly AssetClass[]): ClassGroup[] {
   const out: ClassGroup[] = [];
   for (const c of classes) {
     const existing = out.find((g) => g.group === c.group);
@@ -275,7 +275,7 @@ export function costFieldText(
   f: Pick<AssetFormState, "origin" | "inServiceDate">,
   gst: GstStatus,
 ): CostFieldText {
-  const day = parseLedgerDay(f.inServiceDate) ?? parseLedgerDay(todayISO()) ?? new Date();
+  const day = parseDateKey(f.inServiceDate) ?? parseDateKey(todayISO()) ?? new Date();
   const gstInclusive = !isGstRegisteredOn(day, gst);
   if (f.origin === "introduced") {
     // A second-hand market value has no GST line to strip, so the label stays plain and

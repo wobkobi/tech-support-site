@@ -5,8 +5,11 @@
 
 import { nzDayStartUtc } from "@/shared/lib/timezone-utils";
 
-/** Index of April in JS Date (0 = January). */
-const APRIL = 3;
+/** Index of April in JS Date (0 = January): the first month of an NZ FY. */
+export const APRIL = 3;
+
+/** One day in ms, for stepping across a ledger date or an FY's exclusive end. */
+export const DAY_MS = 86_400_000;
 
 /**
  * Code default for the business start date; the live value comes from

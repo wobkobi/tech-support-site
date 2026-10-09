@@ -9,6 +9,8 @@ import {
   assetClassByKey,
   assetSchedule,
   expenseTaxBasis,
+  filedAtvFor,
+  INVESTMENT_BOOST_FROM,
   lowValueGroupTotals,
   roundCents,
   VEHICLE_CLASS_KEY,
@@ -26,16 +28,12 @@ import {
   parseRate,
   parseString,
 } from "@/features/business/lib/validation";
-import { formatDateShort } from "@/shared/lib/date-format";
+import { formatDateShort, parseDateKey } from "@/shared/lib/date-format";
 
 /** Longest name, class key or supplier accepted. */
 const MAX_SHORT_TEXT = 120;
 /** Longest valuation note or notes accepted. */
 const MAX_LONG_TEXT = 1000;
-/** First in-service day Investment Boost covers (TIB 37/7: first used on or after 22 May 2025). */
-const BOOST_FIRST_DAY = new Date(Date.UTC(2025, 4, 22));
-/** The only date shape the asset routes accept: YYYY-MM-DD, captured as year, month, day. */
-const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /** The fields an asset write stores: the Prisma `Asset` columns minus id and timestamps. */
 export interface AssetWriteData {
@@ -152,26 +150,6 @@ function fail(error: string): AssetBodyResult {
 }
 
 /**
- * Parses a YYYY-MM-DD string to UTC midnight of that day, the scale ledger dates are
- * stored on. Refuses other shapes and impossible days (2026-02-30), which `Date` would
- * otherwise roll into the next month.
- * @param value - Raw value from a request body.
- * @returns The date, or null when the value isn't a real YYYY-MM-DD day.
- */
-export function parseLedgerDay(value: unknown): Date | null {
-  if (typeof value !== "string") return null;
-  const m = DATE_ONLY_RE.exec(value.trim());
-  if (!m) return null;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const d = Number(m[3]);
-  const date = new Date(Date.UTC(y, mo - 1, d));
-  const real =
-    date.getUTCFullYear() === y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d;
-  return real ? date : null;
-}
-
-/**
  * Reads an optional free-text field.
  * @param value - Raw value from a request body.
  * @param maxLen - Longest accepted length.
@@ -272,7 +250,7 @@ export function parseAssetBody(body: unknown): AssetBodyResult {
   if (methodRaw !== "DV" && methodRaw !== "SL") return fail("Method must be DV or SL");
   const method: DepreciationMethod = methodRaw;
 
-  const inServiceDate = parseLedgerDay(b.inServiceDate);
+  const inServiceDate = parseDateKey(b.inServiceDate);
   if (inServiceDate === null) return fail("In-service date must be a real date (YYYY-MM-DD)");
 
   const cost = isNumberish(b.costBase) ? parseAmount(b.costBase) : null;
@@ -312,7 +290,7 @@ export function parseAssetBody(body: unknown): AssetBodyResult {
       "A vehicle on kilometre rates isn't depreciated, so Investment Boost doesn't apply",
     );
   }
-  if (investmentBoost && inServiceDate < BOOST_FIRST_DAY) {
+  if (investmentBoost && inServiceDate < INVESTMENT_BOOST_FROM) {
     return fail("Investment Boost only covers items first used on or after 22 May 2025");
   }
 
@@ -332,7 +310,7 @@ export function parseAssetBody(body: unknown): AssetBodyResult {
 
   let disposedAt: Date | null = null;
   if (!isBlank(b.disposedAt)) {
-    disposedAt = parseLedgerDay(b.disposedAt);
+    disposedAt = parseDateKey(b.disposedAt);
     if (disposedAt === null) return fail("Disposal date must be a real date (YYYY-MM-DD)");
     if (disposedAt < inServiceDate)
       return fail("Disposal date can't be before the in-service date");
@@ -372,28 +350,11 @@ export function parseAssetBody(body: unknown): AssetBodyResult {
 }
 
 /**
- * One asset's filed closing values out of the all-assets snapshot map.
- * @param assetId - Asset id.
- * @param filed - Closing ATV by FY key then asset id, from filed TaxYear snapshots.
- * @returns Closing ATV by FY key for this asset (empty when no filed year lists it).
- */
-export function filedAtvFor(
-  assetId: string,
-  filed: ReadonlyMap<string, ReadonlyMap<string, number>>,
-): Map<string, number> {
-  const out = new Map<string, number>();
-  for (const [fyKey, byAsset] of filed) {
-    const atv = byAsset.get(assetId);
-    if (atv !== undefined) out.set(fyKey, atv);
-  }
-  return out;
-}
-
-/**
  * Depreciation schedule for every asset. The low-value grouping (same supplier, same day,
  * same rate tested together) is worked out across the whole register first, so a lone
  * asset's schedule depends on its neighbours; never call assetSchedule on one asset in
- * isolation. Filed closing values replace the computed opening value of the next year.
+ * isolation. Filed closing values replace the computed opening value of the next year,
+ * through the same {@link filedAtvFor} pin computeTaxYear uses.
  * @param assets - Every asset on the register.
  * @param fys - Financial years, oldest first.
  * @param opts - Business start, write-off threshold and filed closing values.
@@ -421,29 +382,11 @@ export function assetSchedules(
 }
 
 /**
- * A rate fraction as a short percentage.
- * @param rate - Fraction, e.g. 0.105.
- * @returns Percentage text, e.g. "10.5%".
- */
-export function formatRatePct(rate: number): string {
-  return `${Math.round(rate * 10000) / 100}%`;
-}
-
-/**
- * A dollar threshold for copy: whole dollars lose the ".00".
- * @param amount - Threshold in dollars.
- * @returns e.g. "$1,000" or "$999.50".
- */
-export function formatThreshold(amount: number): string {
-  return formatNZD(amount).replace(/\.00$/, "");
-}
-
-/**
  * The picker label for an expense.
  * @param e - The expense.
  * @returns e.g. "26 Aug 2026 - Kevin: Car ($4,500.00)".
  */
-export function expenseOptionLabel(e: LedgerExpense): string {
+function expenseOptionLabel(e: LedgerExpense): string {
   return `${formatDateShort(e.date)} - ${e.supplier}: ${e.description} (${formatNZD(e.amountIncl)})`;
 }
 

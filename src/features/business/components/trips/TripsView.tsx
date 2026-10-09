@@ -16,7 +16,12 @@ import { TripSuggestions } from "@/features/business/components/trips/TripSugges
 import { formatNZD, todayISO } from "@/features/business/lib/business-format";
 import type { FiledYearRef } from "@/features/business/lib/tax/snapshot";
 import type { KmVehiclePeriod } from "@/features/business/lib/tax/types";
-import { inKmVehiclePeriod, kmClaim, splitTripKm } from "@/features/business/lib/tax/vehicle";
+import {
+  inKmVehiclePeriod,
+  KM_TIER1_LIMIT,
+  kmClaim,
+  splitTripKm,
+} from "@/features/business/lib/tax/vehicle";
 import {
   defaultTripDate,
   formatKm,
@@ -49,6 +54,8 @@ interface TripsViewProps {
   fyKey: string;
   /** FY display label, e.g. "FY 2026-27". */
   fyLabel: string;
+  /** True when the selected FY is the one today falls in. */
+  fyCurrent: boolean;
   /** FY start on the ledger scale (inclusive ISO). */
   startISO: string;
   /** FY end on the ledger scale (exclusive ISO). */
@@ -61,15 +68,17 @@ interface TripsViewProps {
   rates: { tier1: number; tier2: number };
   /**
    * Every km the car travelled in the FY (business and private) from the Tax page, or
-   * null when not entered. Over 14,000 it scales Tier 1 down to the business share.
+   * null when not entered. Over {@link KM_TIER1_LIMIT} it scales Tier 1 down to the business share.
    */
   totalVehicleKm: number | null;
   /** Service periods of every km-rate vehicle on the asset register. */
   kmPeriods: KmVehiclePeriod[];
-  /** Display name of the vehicle fuel type. */
+  /** Vehicle fuel type in sentence case, e.g. "petrol hybrid". */
   fuelLabel: string;
   /** Filed years the edit forms warn about, oldest first. */
   filedYears: readonly FiledYearRef[];
+  /** The km claim saved when the FY was filed, or null when it isn't filed. */
+  filedClaim: number | null;
 }
 
 /**
@@ -77,6 +86,7 @@ interface TripsViewProps {
  * @param props - Component props.
  * @param props.fyKey - Selected FY key.
  * @param props.fyLabel - FY display label.
+ * @param props.fyCurrent - Whether the selected FY is the current one.
  * @param props.startISO - FY start (inclusive ISO).
  * @param props.endISO - FY end (exclusive ISO).
  * @param props.initialTrips - Trips logged in the FY.
@@ -86,11 +96,13 @@ interface TripsViewProps {
  * @param props.kmPeriods - km-rate vehicle service periods; trips outside them earn nothing.
  * @param props.fuelLabel - Vehicle fuel type for the rates note.
  * @param props.filedYears - Filed years the edit forms warn about.
+ * @param props.filedClaim - Saved km claim of a filed FY, shown beside the live figures.
  * @returns The page body.
  */
 export function TripsView({
   fyKey,
   fyLabel,
+  fyCurrent,
   startISO,
   endISO,
   initialTrips,
@@ -100,6 +112,7 @@ export function TripsView({
   kmPeriods,
   fuelLabel,
   filedYears,
+  filedClaim,
 }: TripsViewProps): React.ReactElement {
   const { toast } = useToast();
   const [trips, setTrips] = useState<TripRow[]>(initialTrips);
@@ -117,7 +130,7 @@ export function TripsView({
   // Same rule as computeTaxYear: only trips on a day a km-rate vehicle was in service count.
   const split = splitTripKm(trips, kmPeriods);
   const claim = kmClaim(split.claimableKm, rates, totalVehicleKm);
-  // Without the car's total km, the first 14,000 business km stand in for Tier 1.
+  // Without the car's total km, the first KM_TIER1_LIMIT business km stand in for Tier 1.
   const needsTotalKm = totalVehicleKm === null && claim.businessKm > 0;
   const outsideIds = new Set(
     trips.filter((t) => !inKmVehiclePeriod(t.date, kmPeriods)).map((t) => t.id),
@@ -409,8 +422,9 @@ export function TripsView({
       )}
 
       <Notice onGrey className="mb-6">
-        IRD {fuelLabel.toLowerCase()} rates for {fyLabel}: {formatNZD(rates.tier1)}/km for the
-        business share of the car&apos;s first 14,000 km in the year, then {formatNZD(rates.tier2)}
+        IRD {fuelLabel} rates for {fyLabel}: {formatNZD(rates.tier1)}/km for the business share of
+        the car&apos;s first {KM_TIER1_LIMIT.toLocaleString("en-NZ")} km in the year, then{" "}
+        {formatNZD(rates.tier2)}
         /km. The rate covers fuel, wear and depreciation, so Fuel expenses come out of the tax
         figures for the days the car is on km rates, and only trips on those days earn the rate.
       </Notice>
@@ -422,8 +436,15 @@ export function TripsView({
         filedYears={filedYears}
         spans={[{ from: startISO, to: startISO }]}
         variant="page"
-        className="mb-6"
+        className={filedClaim === null ? "mb-6" : "mb-2"}
       />
+      {/* The figures above stay live so late edits show; the filed claim is what the Tax
+          page and the CSV carry. */}
+      {filedClaim !== null && (
+        <p className="mb-6 text-sm text-admin-text-secondary">
+          Filed: the Tax page shows the saved claim of {formatNZD(filedClaim)}.
+        </p>
+      )}
       <TripSuggestions
         suggestions={suggestions}
         kmDrafts={kmDrafts}
@@ -432,6 +453,8 @@ export function TripsView({
         onDraftChange={handleDraftChange}
         onAdd={(s) => void handleAdd(s)}
         onAddAll={() => void handleAddAll()}
+        // The key, not the label: the first year's label carries "(partial)".
+        yearPhrase={fyCurrent ? "this year" : `in FY ${fyKey}`}
         className="mb-6"
       />
 

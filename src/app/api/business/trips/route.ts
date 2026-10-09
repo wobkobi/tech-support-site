@@ -6,20 +6,10 @@
 import { loadAllFys } from "@/features/business/lib/tax/load";
 import { parseTripInput, pickFy, toTripRow } from "@/features/business/lib/trips";
 import { loadTrips, TRIP_SELECT } from "@/features/business/lib/trips.server";
-import { errorResponse } from "@/shared/lib/api-response";
+import { errorResponse, noStore } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-
-/**
- * Marks a response as never cacheable: trip data is per-admin and changes on every save.
- * @param res - Response to mark.
- * @returns The same response.
- */
-function noStore<T>(res: NextResponse<T>): NextResponse<T> {
-  res.headers.set("Cache-Control", "no-store");
-  return res;
-}
 
 /**
  * GET /api/business/trips - Lists trips, newest first, optionally for one FY.
@@ -35,7 +25,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   let window: { start: Date; end: Date } | null = null;
   if (fyKey) {
     const fy = pickFy(await loadAllFys(new Date()), fyKey);
-    if (!fy) return noStore(errorResponse("Unknown financial year", 400));
+    if (!fy) return noStore(errorResponse("Unknown financial year", 404));
     window = { start: fy.start, end: fy.end };
   }
 
@@ -70,7 +60,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     ]);
     if (!booking) return noStore(errorResponse("Booking not found", 404));
     // Travel is one round trip per job, so a booking gets one trip.
-    if (existing) return noStore(errorResponse("A trip is already logged for this job.", 409));
+    if (existing) return noStore(errorResponse("A trip is already logged for this job", 409));
   }
 
   const trip = await prisma.trip.create({ data: parsed.value, select: TRIP_SELECT });

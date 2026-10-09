@@ -21,12 +21,8 @@ import {
   assetPrefillFromExpense,
   assetSchedules,
   expenseOptions,
-  filedAtvFor,
-  formatRatePct,
-  formatThreshold,
   isVehicleClass,
   parseAssetBody,
-  parseLedgerDay,
   toAssetView,
   type AssetBodyResult,
   type AssetRecord,
@@ -34,10 +30,13 @@ import {
 import { listFinancialYears } from "@/features/business/lib/financial-year";
 import {
   ASSET_CLASSES,
+  filedAtvFor,
   toTaxFy,
   type AssetInput,
   type LedgerExpense,
 } from "@/features/business/lib/tax";
+import { formatDollars, formatRatePct } from "@/features/business/lib/tax/workings";
+import { parseDateKey } from "@/shared/lib/date-format";
 
 let failures = 0;
 
@@ -139,15 +138,15 @@ function main(): void {
     process.exit(1);
   }
 
-  console.log("parseLedgerDay:");
+  console.log("parseDateKey:");
   expectEqual(
     "2025-10-01 > UTC midnight",
-    parseLedgerDay("2025-10-01")?.toISOString(),
+    parseDateKey("2025-10-01")?.toISOString(),
     "2025-10-01T00:00:00.000Z",
   );
-  expectEqual("2026-02-30 refused", parseLedgerDay("2026-02-30"), null);
-  expectEqual("26/08/2026 refused", parseLedgerDay("26/08/2026"), null);
-  expectEqual("full ISO instant refused", parseLedgerDay("2025-10-01T00:00:00Z"), null);
+  expectEqual("2026-02-30 refused", parseDateKey("2026-02-30"), null);
+  expectEqual("26/08/2026 refused", parseDateKey("26/08/2026"), null);
+  expectEqual("full ISO instant refused", parseDateKey("2025-10-01T00:00:00Z"), null);
 
   console.log("\nparseAssetBody, accepted:");
   const laptop = parseAssetBody(laptopBody(other.key));
@@ -529,8 +528,8 @@ function main(): void {
     "Custom rate",
   );
   expectEqual("rate 0.105 shows as 10.5%", formatRatePct(0.105), "10.5%");
-  expectEqual("threshold drops .00", formatThreshold(1000), "$1,000");
-  expectEqual("threshold keeps cents", formatThreshold(999.5), "$999.50");
+  expectEqual("threshold drops .00", formatDollars(1000), "$1,000");
+  expectEqual("threshold keeps cents", formatDollars(999.5), "$999.50");
 
   console.log("\nForm state round trip:");
   const prefill = assetPrefillFromExpense(CAR, { registered: false, registeredFrom: null });

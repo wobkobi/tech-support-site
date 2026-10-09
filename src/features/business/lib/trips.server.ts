@@ -4,7 +4,7 @@
 
 import "server-only";
 
-import type { FinancialYear } from "@/features/business/lib/financial-year";
+import { DAY_MS, type FinancialYear } from "@/features/business/lib/financial-year";
 import {
   kmByAddressFrom,
   suggestTrips,
@@ -13,9 +13,6 @@ import {
   type TripSuggestion,
 } from "@/features/business/lib/trips";
 import { prisma } from "@/shared/lib/prisma";
-
-/** One day in ms, for padding the booking query around the FY. */
-const DAY_MS = 86_400_000;
 
 /** Fields a {@link TripRow} needs, shared by the page and every trips route. */
 export const TRIP_SELECT = {

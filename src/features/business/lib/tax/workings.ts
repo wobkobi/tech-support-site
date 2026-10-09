@@ -149,6 +149,16 @@ export function formatWholeDollars(amount: number): string {
 }
 
 /**
+ * Dollars that drop only a ".00": 1000 > "$1,000", 999.5 > "$999.50". For a figure such
+ * as the write-off limit, where rounding would misstate the rule the maths applies.
+ * @param amount - Dollar amount.
+ * @returns Formatted amount.
+ */
+export function formatDollars(amount: number): string {
+  return formatNZD(amount).replace(/\.00$/, "");
+}
+
+/**
  * Plain-English label for one band: "10.5% on the first $15,600",
  * "17.5% from $15,600 to $53,500", "39% over $180,000".
  * @param band - Band from {@link bandBreakdown}.

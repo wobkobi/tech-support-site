@@ -17,6 +17,7 @@ import { TaxExportButton } from "@/features/business/components/tax/TaxExportBut
 import { formatNZD } from "@/features/business/lib/business-format";
 import type { SnapshotAsset, TaxYearSnapshot } from "@/features/business/lib/tax/snapshot";
 import type { AssetYearRow, TaxYearResult } from "@/features/business/lib/tax/types";
+import { KM_TIER1_LIMIT } from "@/features/business/lib/tax/vehicle";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
@@ -208,7 +209,7 @@ export function AccountantSummary({
         {/* The car's total km sets the Tier 1 split, so the accountant needs it beside the claim. */}
         {km.businessKm > 0 &&
           (view.totalVehicleKm === null
-            ? " The car's total km for the year isn't entered, so Tier 1 covers the first 14,000 business km."
+            ? ` The car's total km for the year isn't entered, so Tier 1 covers the first ${KM_TIER1_LIMIT.toLocaleString("en-NZ")} business km.`
             : ` The car travelled ${formatKm(view.totalVehicleKm)} in total this year (odometer).`)}
       </p>
     </Card>

@@ -18,7 +18,7 @@ const RATES_2025_26: IrdYearRates = {
 };
 
 /** Published rates by FY key ("2025-26"). Add a year when IRD publishes it. */
-export const IRD_YEAR_RATES: Record<string, IrdYearRates> = {
+const IRD_YEAR_RATES: Record<string, IrdYearRates> = {
   "2025-26": RATES_2025_26,
 };
 

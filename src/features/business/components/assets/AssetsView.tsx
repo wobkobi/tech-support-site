@@ -13,15 +13,11 @@ import { AssetFormModal } from "@/features/business/components/assets/AssetFormM
 import { AssetList } from "@/features/business/components/assets/AssetList";
 import { AssetScheduleModal } from "@/features/business/components/assets/AssetScheduleModal";
 import { FiledYearWarning } from "@/features/business/components/tax/FiledYearWarning";
-import {
-  formatThreshold,
-  type AssetPrefill,
-  type AssetView,
-  type ExpenseOption,
-} from "@/features/business/lib/assets";
+import type { AssetPrefill, AssetView, ExpenseOption } from "@/features/business/lib/assets";
 import { formatNZD } from "@/features/business/lib/business-format";
 import { roundCents, type GstStatus } from "@/features/business/lib/tax";
 import type { FiledYearRef } from "@/features/business/lib/tax/snapshot";
+import { formatDollars } from "@/features/business/lib/tax/workings";
 import { Notice } from "@/shared/components/Notice";
 import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
@@ -124,6 +120,7 @@ export function AssetsView({
   const [deleting, setDeleting] = useState(false);
 
   const ordered = useMemo(() => [...assets].sort(registerOrder), [assets]);
+  const filedFyKeys = useMemo(() => new Set(filedYears.map((fy) => fy.fyKey)), [filedYears]);
   const inUse = assets.filter((a) => a.disposedAt === null);
   const valueNow = sumCents(inUse.map((a) => a.current?.closingAtv ?? 0));
   const claimThisFy = sumCents(assets.map((a) => a.current?.deductible ?? 0));
@@ -188,20 +185,23 @@ export function AssetsView({
       </div>
 
       <Notice className="mb-5">
-        Bought items costing {formatThreshold(lowValueThreshold)} or less are written off in full in
+        Bought items costing {formatDollars(lowValueThreshold)} or less are written off in full in
         the year you start using them. Items from the same supplier on the same day count together.
         Brought-in items are depreciated instead.
       </Notice>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-extrabold text-admin-text">Register</h2>
-        <AdminButton
-          onClick={() => setFormTarget({ mode: "new", prefill: null })}
-          className="max-sm:w-full"
-        >
-          <FaPlus aria-hidden />
-          Add asset
-        </AdminButton>
+        {/* An empty register has its own Add asset in the empty state. */}
+        {assets.length > 0 && (
+          <AdminButton
+            onClick={() => setFormTarget({ mode: "new", prefill: null })}
+            className="max-sm:w-full"
+          >
+            <FaPlus aria-hidden />
+            Add asset
+          </AdminButton>
+        )}
       </div>
 
       <AssetList
@@ -226,7 +226,11 @@ export function AssetsView({
         />
       )}
 
-      <AssetScheduleModal asset={scheduleAsset} onClose={() => setScheduleAsset(null)} />
+      <AssetScheduleModal
+        asset={scheduleAsset}
+        onClose={() => setScheduleAsset(null)}
+        filedFyKeys={filedFyKeys}
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}

@@ -14,8 +14,9 @@ import {
   withOrigin,
   type AssetFormState,
 } from "@/features/business/components/assets/asset-form-state";
-import { formatThreshold, type ExpenseOption } from "@/features/business/lib/assets";
+import type { ExpenseOption } from "@/features/business/lib/assets";
 import type { AssetOrigin, GstStatus } from "@/features/business/lib/tax";
+import { formatDollars } from "@/features/business/lib/tax/workings";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
@@ -146,7 +147,7 @@ export function AssetOriginFields({
               label="Supplier"
               htmlFor="asset-supplier"
               optional
-              hint={`Items from one supplier on one day are added together for the ${formatThreshold(lowValueThreshold)} write-off limit.`}
+              hint={`Items from one supplier on one day are added together for the ${formatDollars(lowValueThreshold)} write-off limit.`}
             >
               <AdminInput
                 id="asset-supplier"

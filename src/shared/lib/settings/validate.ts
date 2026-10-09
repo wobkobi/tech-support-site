@@ -8,6 +8,7 @@
 // Hand-rolled to match the repo's existing manual-validation convention (no zod).
 
 import type { IetcConfig, TaxBracket } from "@/features/business/lib/tax/types";
+import { parseDateKey } from "@/shared/lib/date-format";
 import { VEHICLE_FUEL_LABELS } from "@/shared/lib/settings/field-meta";
 import type {
   AvailabilitySettings,
@@ -57,18 +58,6 @@ function nonNeg(n: unknown): n is number {
 
 /** Most income-tax bands the settings accept (NZ has five). */
 export const MAX_TAX_BANDS = 10;
-
-/**
- * True for a real calendar date written "YYYY-MM-DD". A round trip through Date rejects
- * dates like 2026-02-30, which the Date constructor would roll into March.
- * @param s - Candidate date text.
- * @returns Whether `s` names a real day.
- */
-function isIsoDateKey(s: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const d = new Date(`${s}T00:00:00.000Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
-}
 
 /**
  * True for a plain `{}` object (not null, not an array).
@@ -235,7 +224,7 @@ function validatePricing(p: PricingSettings): FieldError[] {
     errors.push({ field: "gstRegistered", message: "Must be on or off." });
   if (
     typeof p.gstRegisteredFrom !== "string" ||
-    (p.gstRegisteredFrom.trim() !== "" && !isIsoDateKey(p.gstRegisteredFrom.trim()))
+    (p.gstRegisteredFrom.trim() !== "" && parseDateKey(p.gstRegisteredFrom) === null)
   )
     errors.push({
       field: "gstRegisteredFrom",

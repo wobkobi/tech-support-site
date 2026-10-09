@@ -13,6 +13,8 @@ import { toTaxFy } from "@/features/business/lib/tax/tax-year";
 import type {
   AssetInput,
   GstStatus,
+  IrdYearRates,
+  KmTierRates,
   LedgerExpense,
   LedgerIncome,
   LedgerTrip,
@@ -95,6 +97,17 @@ export function taxRulesFrom(tax: TaxSettings): TaxRulesSettings {
 }
 
 /**
+ * IRD's km rates for a fuel type. A fuel outside the union (a hand-edited settings
+ * document) reads as petrol rather than crash.
+ * @param ird - One year's IRD rates.
+ * @param fuel - settings.tax.vehicleFuel.
+ * @returns The Tier 1 and Tier 2 rates.
+ */
+export function kmRatesFor(ird: IrdYearRates, fuel: VehicleFuel): KmTierRates {
+  return ird.km[fuel] ?? ird.km.petrol;
+}
+
+/**
  * A year's inputs: what the TaxYear record stores, with any blank rate taken from IRD's
  * published rates for that year (or the latest year before it) and the settings' fuel type.
  * An unset total vehicle km stays null (the km claim then skips the Tier 1 scaling).
@@ -109,8 +122,7 @@ export function yearRecordFor(
   fuel: VehicleFuel,
 ): TaxYearRecordInput {
   const ird = irdRatesFor(fyKey);
-  // A stored fuel outside the union (hand-edited document) reads as petrol rather than crash.
-  const km = ird.km[fuel] ?? ird.km.petrol;
+  const km = kmRatesFor(ird, fuel);
   return {
     officeSqm: stored?.officeSqm ?? null,
     houseSqm: stored?.houseSqm ?? null,
@@ -168,34 +180,56 @@ const loadTaxRows = cache(
 );
 
 /**
- * Everything computeTaxYear needs for one FY.
+ * Every stored TaxYear row, from the same once-per-request read the tax inputs use, so a
+ * page that also needs the raw record or the filed snapshot reads the table once.
+ * @returns The TaxYear rows.
+ */
+export async function loadTaxYearRows(): Promise<TaxYearRow[]> {
+  return (await loadTaxRows()).taxYears;
+}
+
+/**
+ * Everything computeTaxYear needs for one FY, plus the FY's raw TaxYear row from the same
+ * read. Route handlers get no React cache, so a caller that needs both (the CSV export)
+ * takes them from here rather than reading the tables a second time.
  * @param fy - The FY (from {@link loadAllFys}).
  * @param now - Current instant.
- * @returns The tax-year input.
+ * @returns The tax-year input and the FY's TaxYear row, or null when none is stored.
  */
-export async function loadTaxInputs(fy: FinancialYear, now: Date): Promise<TaxYearInput> {
+export async function loadTaxInputsWithRecord(
+  fy: FinancialYear,
+  now: Date,
+): Promise<{ input: TaxYearInput; record: TaxYearRow | null }> {
   const [settings, rows] = await Promise.all([getSettings(), loadTaxRows()]);
   const { income, expenses, assets, trips, taxYears } = rows;
   const taxFy = toTaxFy(fy);
+  const record = taxYears.find((t) => t.fyKey === taxFy.key) ?? null;
   // Filed years carry their saved closing values into the next year's opening values.
   const filedClosingAtv = filedClosingAtvByFy(taxYears);
-  return {
+  const input: TaxYearInput = {
     fy: taxFy,
     businessStart: new Date(settings.identity.startDateIso),
     income,
     expenses,
     assets,
     trips,
-    year: yearRecordFor(
-      taxFy.key,
-      taxYears.find((t) => t.fyKey === taxFy.key),
-      settings.tax.vehicleFuel,
-    ),
+    year: yearRecordFor(taxFy.key, record ?? undefined, settings.tax.vehicleFuel),
     settings: taxRulesFrom(settings.tax),
     gst: gstStatusFromPricing(settings.pricing),
     filedClosingAtv,
     now,
   };
+  return { input, record };
+}
+
+/**
+ * Everything computeTaxYear needs for one FY.
+ * @param fy - The FY (from {@link loadAllFys}).
+ * @param now - Current instant.
+ * @returns The tax-year input.
+ */
+export async function loadTaxInputs(fy: FinancialYear, now: Date): Promise<TaxYearInput> {
+  return (await loadTaxInputsWithRecord(fy, now)).input;
 }
 
 /**

@@ -6,30 +6,10 @@
 import { parseTripInput, toTripRow } from "@/features/business/lib/trips";
 import { TRIP_SELECT } from "@/features/business/lib/trips.server";
 import { parseObjectId } from "@/features/business/lib/validation";
-import { errorResponse } from "@/shared/lib/api-response";
+import { errorResponse, isRecordNotFound, noStore } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
-import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
-
-/**
- * Marks a response as never cacheable: trip data is per-admin and changes on every save.
- * @param res - Response to mark.
- * @returns The same response.
- */
-function noStore<T>(res: NextResponse<T>): NextResponse<T> {
-  res.headers.set("Cache-Control", "no-store");
-  return res;
-}
-
-/**
- * Whether an error is Prisma's "record to update or delete does not exist" (P2025).
- * @param err - Caught error.
- * @returns True for P2025.
- */
-function isRecordNotFound(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025";
-}
 
 /**
  * PUT /api/business/trips/[id] - Replaces a trip's editable fields.

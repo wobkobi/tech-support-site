@@ -7,19 +7,9 @@ import { fyKeyOf } from "@/features/business/lib/financial-year";
 import { loadAllFys } from "@/features/business/lib/tax/load";
 import { pickFy } from "@/features/business/lib/trips";
 import { loadTripSuggestions } from "@/features/business/lib/trips.server";
-import { errorResponse } from "@/shared/lib/api-response";
+import { errorResponse, noStore } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
-
-/**
- * Marks a response as never cacheable: suggestions change as trips are logged.
- * @param res - Response to mark.
- * @returns The same response.
- */
-function noStore<T>(res: NextResponse<T>): NextResponse<T> {
-  res.headers.set("Cache-Control", "no-store");
-  return res;
-}
 
 /**
  * GET /api/business/trips/suggest - Jobs in the FY that still need a trip.
@@ -33,7 +23,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const now = new Date();
   const fy = pickFy(await loadAllFys(now), request.nextUrl.searchParams.get("fy") ?? undefined);
-  if (!fy) return noStore(errorResponse("Unknown financial year", 400));
+  if (!fy) return noStore(errorResponse("Unknown financial year", 404));
 
   const suggestions = await loadTripSuggestions(fy, now);
   return noStore(NextResponse.json({ ok: true, fyKey: fyKeyOf(fy.label), suggestions }));

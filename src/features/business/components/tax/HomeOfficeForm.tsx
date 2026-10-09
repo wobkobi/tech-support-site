@@ -11,6 +11,7 @@ import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { FieldError } from "@/features/admin/components/ui/FieldError";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { formatNZD } from "@/features/business/lib/business";
+import { KM_TIER1_LIMIT } from "@/features/business/lib/tax/vehicle";
 import { formatKm } from "@/features/business/lib/trips";
 import { Notice } from "@/shared/components/Notice";
 import { useRouter } from "next/navigation";
@@ -61,6 +62,9 @@ interface HomeOfficeFormProps {
   /** Business km the FY's km claim counts, for the total km sanity check. */
   businessKm: number;
 }
+
+/** The Tier 1 km limit as the hint prints it, e.g. "14,000". */
+const TIER1_KM = KM_TIER1_LIMIT.toLocaleString("en-NZ");
 
 /** Every editable key, in the order the draft and the parser walk them. */
 const FIELD_KEYS: readonly FieldKey[] = [
@@ -205,7 +209,7 @@ function carFields(defaults: RateDefaults, fuel: string): FieldSpec[] {
     {
       key: "totalVehicleKm",
       label: "Total km the car travelled this year (odometer)",
-      hint: "Business and private km together. If it's over 14,000 km, Tier 1 covers only your business share of the first 14,000.",
+      hint: `Business and private km together. If it's over ${TIER1_KM} km, Tier 1 covers only your business share of the first ${TIER1_KM}.`,
     },
   ];
 }

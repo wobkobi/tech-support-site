@@ -30,6 +30,8 @@ interface TripSuggestionsProps {
   onAdd: (suggestion: TripSuggestion) => void;
   /** Adds every job that has km filled in. */
   onAddAll: () => void;
+  /** Which year the jobs are from: "this year" for the current FY, "in FY 2025-26" otherwise. */
+  yearPhrase: string;
   className?: string;
 }
 
@@ -59,6 +61,7 @@ function hintFor(s: TripSuggestion): string {
  * @param props.onDraftChange - Km input change handler.
  * @param props.onAdd - Adds one job's trip.
  * @param props.onAddAll - Adds every job with km filled in.
+ * @param props.yearPhrase - Which year the jobs are from, worked into the copy.
  * @param props.className - Extra classes on the card.
  * @returns The card element.
  */
@@ -70,6 +73,7 @@ export function TripSuggestions({
   onDraftChange,
   onAdd,
   onAddAll,
+  yearPhrase,
   className,
 }: TripSuggestionsProps): React.ReactElement {
   const busy = addingAll || addingId !== null;
@@ -78,7 +82,7 @@ export function TripSuggestions({
       <div className="px-4 pt-4 sm:px-5 sm:pt-5">
         <CardHeader
           title="Jobs without a trip"
-          description="Completed jobs this year with no trip logged. Each job is one round trip: enter the km there and back, then add it."
+          description={`Completed jobs ${yearPhrase} with no trip logged. Each job is one round trip: enter the km there and back, then add it.`}
           actions={
             suggestions.length > 0 ? (
               <AdminButton
@@ -96,7 +100,7 @@ export function TripSuggestions({
       {suggestions.length === 0 ? (
         <EmptyState
           title="No jobs waiting"
-          body="Every completed job this year has a trip logged."
+          body={`Every completed job ${yearPhrase} has a trip logged.`}
         />
       ) : (
         <ul className="divide-y divide-admin-border border-t border-admin-border">

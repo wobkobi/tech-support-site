@@ -80,8 +80,9 @@ export function FiledYearControls({
       });
       const data = await readReply(res);
       if (res.status === 409) {
+        // API errors carry no full stop, so the sentence break is added here.
         toast(
-          `${data.error ?? "The filed status has changed."} The page now shows where it stands.`,
+          `${data.error ?? "The filed status has changed"}. The page now shows where it stands.`,
           { tone: "warning" },
         );
         setConfirming(false);

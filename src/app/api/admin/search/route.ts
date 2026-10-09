@@ -8,20 +8,9 @@ import {
   searchAdmin,
   type SearchGroups,
 } from "@/features/admin/lib/global-search";
-import { errorResponse } from "@/shared/lib/api-response";
+import { errorResponse, noStore } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
-
-/**
- * Marks a response as never cacheable: results carry customer details and go
- * stale the moment a record changes.
- * @param res - Response to mark.
- * @returns The same response.
- */
-function noStore<T>(res: NextResponse<T>): NextResponse<T> {
-  res.headers.set("Cache-Control", "no-store");
-  return res;
-}
 
 /**
  * GET /api/admin/search?q=<text>

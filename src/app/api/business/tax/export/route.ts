@@ -5,19 +5,9 @@
 
 import { buildTaxCsv } from "@/features/business/lib/tax/export-csv";
 import { loadTaxYearView, resolveFinancialYear } from "@/features/business/lib/tax/view.server";
-import { errorResponse } from "@/shared/lib/api-response";
+import { errorResponse, noStore } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
-
-/**
- * Marks a response as never cacheable: it carries the business's tax figures.
- * @param res - Response to mark.
- * @returns The same response.
- */
-function noStore<T>(res: NextResponse<T>): NextResponse<T> {
-  res.headers.set("Cache-Control", "no-store");
-  return res;
-}
 
 /**
  * GET /api/business/tax/export?fy=<key> - Downloads the year's accountant CSV.
@@ -42,12 +32,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     generatedAt: now,
     unreadableFiledAt: view.snapshotUnreadable ? view.filedAtIso : null,
   });
-  return new NextResponse(csv, {
-    status: 200,
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="tax-summary-${fyKey}.csv"`,
-      "Cache-Control": "no-store",
-    },
-  });
+  return noStore(
+    new NextResponse(csv, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="tax-summary-${fyKey}.csv"`,
+      },
+    }),
+  );
 }

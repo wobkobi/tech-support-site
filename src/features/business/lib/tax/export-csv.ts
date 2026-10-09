@@ -4,6 +4,7 @@
 // and the home office claim. Pure, so the export route and the check-tax fixtures share it.
 // Dates are NZ day-first (DD/MM/YYYY); amounts are bare numbers so a spreadsheet can sum them.
 
+import { roundCents, roundKm } from "@/features/business/lib/tax/helpers";
 import {
   readFigure,
   type SnapshotAsset,
@@ -86,7 +87,7 @@ export function csvText(value: string | null | undefined): string {
  * @returns The amount with two decimals.
  */
 export function csvMoney(amount: number): string {
-  return (Math.round(amount * 100) / 100).toFixed(2);
+  return roundCents(amount).toFixed(2);
 }
 
 /**
@@ -95,16 +96,39 @@ export function csvMoney(amount: number): string {
  * @returns The number as text.
  */
 function csvKm(km: number): string {
-  return String(Math.round(km * 10) / 10);
+  return String(roundKm(km));
 }
 
 /**
- * Percentage cell (already on the 0-100 scale), to two decimal places.
- * @param pct - Percentage.
+ * Plain number cell (a percentage on the 0-100 scale, or a floor area), to two decimal
+ * places.
+ * @param value - The number.
  * @returns The number as text.
  */
-function csvPercent(pct: number): string {
-  return String(Math.round(pct * 100) / 100);
+function csvNumber(value: number): string {
+  return String(roundCents(value));
+}
+
+/**
+ * Rate cell ($/km or $/m²), unrounded: the Tax page takes a rate to any precision, and
+ * the cell must show the exact rate the claim was worked from. A finite number never
+ * starts with a formula character, so it needs no guard beyond staying a bare number.
+ * @param rate - The rate.
+ * @returns The number as text.
+ */
+function csvRate(rate: number): string {
+  return String(rate);
+}
+
+/**
+ * Cell for an input that may not have been entered: the formatted number, or a
+ * "Not entered" text cell.
+ * @param value - The input, or null.
+ * @param format - Cell formatter for a number.
+ * @returns The cell.
+ */
+function csvOptional(value: number | null, format: (n: number) => string): string {
+  return value === null ? csvText("Not entered") : format(value);
 }
 
 /**
@@ -160,8 +184,8 @@ function assetLine(row: AssetYearRow, asset: SnapshotAsset | undefined): string 
     asset ? ledgerDate(asset.inServiceDate) : csvText(""),
     csvMoney(asset?.costBase ?? 0),
     csvText(asset?.method ?? ""),
-    csvPercent((asset?.rate ?? 0) * 100),
-    csvPercent(asset?.businessUsePct ?? 0),
+    csvNumber((asset?.rate ?? 0) * 100),
+    csvNumber(asset?.businessUsePct ?? 0),
     String(row.months),
     csvMoney(row.openingAtv),
     csvMoney(row.depreciation),
@@ -249,6 +273,8 @@ export function buildTaxCsv(
 
   // Trip log and the tier split. The car's total km sets the Tier 1 share, so it sits
   // just above the tier rows; "Not entered" means the first 14,000 business km were Tier 1.
+  // Each tier's rate follows its km so the claim can be worked by hand.
+  const year = view.yearInputs;
   lines.push(csvText("Vehicle trips"));
   lines.push(line(csvText("Date"), csvText("Km"), csvText("Purpose")));
   for (const trip of view.trips) {
@@ -259,20 +285,29 @@ export function buildTaxCsv(
     line(csvText("Km not claimed (no km-rate vehicle)"), csvKm(result.deductions.unclaimedKm)),
   );
   lines.push(
-    line(
-      csvText("Total km the car travelled (odometer)"),
-      view.totalVehicleKm === null ? csvText("Not entered") : csvKm(view.totalVehicleKm),
-    ),
+    line(csvText("Total km the car travelled (odometer)"), csvOptional(view.totalVehicleKm, csvKm)),
   );
   lines.push(line(csvText("Tier 1 km"), csvKm(result.km.tier1Km)));
+  lines.push(line(csvText("Tier 1 rate ($/km)"), csvRate(year.kmTier1)));
   lines.push(line(csvText("Tier 2 km"), csvKm(result.km.tier2Km)));
+  lines.push(line(csvText("Tier 2 rate ($/km)"), csvRate(year.kmTier2)));
   lines.push(line(csvText("Km claim"), csvMoney(result.km.amount)));
   lines.push("");
 
-  // Home office
+  // Home office: the inputs first, then the two parts worked from them
   lines.push(csvText("Home office"));
+  lines.push(line(csvText("Office floor area (m²)"), csvOptional(year.officeSqm, csvNumber)));
+  lines.push(line(csvText("Whole house floor area (m²)"), csvOptional(year.houseSqm, csvNumber)));
+  lines.push(line(csvText("Square-metre rate ($/m²)"), csvRate(year.sqmRate)));
   lines.push(
-    line(csvText("Office share of house (%)"), csvPercent(result.homeOffice.officePct * 100)),
+    line(
+      csvText("Mortgage interest or rent (whole house)"),
+      csvOptional(year.mortgageInterestOrRent, csvMoney),
+    ),
+  );
+  lines.push(line(csvText("Council rates (whole house)"), csvOptional(year.rates, csvMoney)));
+  lines.push(
+    line(csvText("Office share of house (%)"), csvNumber(result.homeOffice.officePct * 100)),
   );
   lines.push(line(csvText("Square-metre part"), csvMoney(result.homeOffice.sqmPart)));
   lines.push(line(csvText("Proportional part"), csvMoney(result.homeOffice.proportionalPart)));

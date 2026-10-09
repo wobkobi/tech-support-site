@@ -4,6 +4,7 @@
 // Investment Boost, private-use split, and disposal recovery or loss. Pure; computed
 // fresh every time except where a filed year's snapshot pins the opening value.
 
+import { APRIL } from "@/features/business/lib/financial-year";
 import { ledgerDay, pctFraction, roundCents } from "@/features/business/lib/tax/helpers";
 import type {
   AssetInput,
@@ -13,13 +14,29 @@ import type {
 } from "@/features/business/lib/tax/types";
 
 /** Investment Boost share of cost deducted in year one (TIB 37/7). */
-export const INVESTMENT_BOOST_RATE = 0.2;
+const INVESTMENT_BOOST_RATE = 0.2;
 
 /** Investment Boost covers assets first used on or after 22 May 2025 (ledger scale). */
-const INVESTMENT_BOOST_FROM = new Date(Date.UTC(2025, 4, 22));
+export const INVESTMENT_BOOST_FROM = new Date(Date.UTC(2025, 4, 22));
 
-/** Index of April in JS Date (0 = January): the first month of an NZ FY. */
-const APRIL = 3;
+/**
+ * One asset's filed closing values out of the all-assets map, so the tax maths and the
+ * Assets page pin the same opening values.
+ * @param assetId - Asset id.
+ * @param filed - Closing ATV by FY key then asset id, from filed TaxYear snapshots.
+ * @returns Closing ATV by FY key for this asset (empty when no filed year lists it).
+ */
+export function filedAtvFor(
+  assetId: string,
+  filed: ReadonlyMap<string, ReadonlyMap<string, number>>,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const [fyKey, byAsset] of filed) {
+    const atv = byAsset.get(assetId);
+    if (atv !== undefined) out.set(fyKey, atv);
+  }
+  return out;
+}
 
 /**
  * The NZ day an asset starts depreciating: its in-service date, but never before

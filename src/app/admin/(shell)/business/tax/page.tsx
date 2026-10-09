@@ -21,12 +21,12 @@ import { TaxEstimateCards } from "@/features/business/components/tax/TaxEstimate
 import { formatNZD } from "@/features/business/lib/business";
 import { fyKeyOf, type FinancialYear } from "@/features/business/lib/financial-year";
 import { irdRatesFor, setAsideTargets } from "@/features/business/lib/tax";
-import { loadAllFys } from "@/features/business/lib/tax/load";
+import { kmRatesFor, loadAllFys } from "@/features/business/lib/tax/load";
 import { loadTaxYearView } from "@/features/business/lib/tax/view.server";
 import { fuelLabel } from "@/features/business/lib/tax/workings";
+import { pickFy } from "@/features/business/lib/trips";
 import { Notice } from "@/shared/components/Notice";
 import { requireAdminAuth } from "@/shared/lib/auth";
-import { prisma } from "@/shared/lib/prisma";
 import { nzDayStartUtc } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import type React from "react";
@@ -94,8 +94,7 @@ export default async function TaxPage({
   // Most recent first, like the overview's tabs. An unknown or missing key falls back
   // to the current FY.
   const fys = [...(await loadAllFys(now))].sort((a, b) => b.start.getTime() - a.start.getTime());
-  const selected =
-    fys.find((f) => fyKeyOf(f.label) === fyParam) ?? fys.find((f) => f.current) ?? fys[0];
+  const selected = pickFy(fys, fyParam) ?? pickFy(fys, undefined);
 
   const header = (
     <PageHeader
@@ -130,11 +129,8 @@ export default async function TaxPage({
   // While the year is filed every figure on the page comes from the saved snapshot; the
   // live recompute only feeds the list of differences. `record` still feeds the home office
   // form, whose fields the PUT refuses to change while filed.
-  const [view, record] = await Promise.all([
-    loadTaxYearView(selected, now),
-    prisma.taxYear.findUnique({ where: { fyKey } }),
-  ]);
-  const input = view.input;
+  const view = await loadTaxYearView(selected, now);
+  const { input, record } = view;
   const result = view.shown.result;
   const filed = view.filedAtIso !== null;
   // The threshold in Settings may have moved since the year was filed, so a filed year
@@ -145,7 +141,7 @@ export default async function TaxPage({
   // Nothing records what has already been put aside, so the whole total is "remaining".
   const targets = setAsideTargets(result.totalToSetAside, input.fy, now);
   const irdDefaults = irdRatesFor(fyKey);
-  const kmDefaults = irdDefaults.km[input.settings.vehicleFuel];
+  const kmDefaults = kmRatesFor(irdDefaults, input.settings.vehicleFuel);
 
   return (
     <>

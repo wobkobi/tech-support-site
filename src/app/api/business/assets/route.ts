@@ -5,20 +5,10 @@
 
 import { expenseLinkProblem } from "@/features/business/lib/asset-links.server";
 import { parseAssetBody } from "@/features/business/lib/assets";
-import { errorResponse } from "@/shared/lib/api-response";
+import { errorResponse, noStore } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-
-/**
- * Marks a response as never cacheable: the register changes with every save.
- * @param res - Response to mark.
- * @returns The same response.
- */
-function noStore<T>(res: NextResponse<T>): NextResponse<T> {
-  res.headers.set("Cache-Control", "no-store");
-  return res;
-}
 
 /**
  * GET /api/business/assets - Returns every asset, newest in-service date first.
@@ -43,7 +33,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     body = await request.json();
   } catch {
-    return noStore(errorResponse("Body must be JSON", 400));
+    return noStore(errorResponse("Invalid JSON body", 400));
   }
   const parsed = parseAssetBody(body);
   if (!parsed.ok) return noStore(errorResponse(parsed.error, 400));

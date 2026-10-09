@@ -7,9 +7,9 @@ export {
   assetClassByKey,
 } from "@/features/business/lib/tax/asset-classes";
 export {
-  INVESTMENT_BOOST_RATE,
+  INVESTMENT_BOOST_FROM,
   assetSchedule,
-  assetStartDay,
+  filedAtvFor,
   lowValueGroupTotals,
 } from "@/features/business/lib/tax/depreciation";
 export {
@@ -37,4 +37,4 @@ export {
   kmVehiclePeriods,
   splitTripKm,
 } from "@/features/business/lib/tax/vehicle";
-export { IRD_YEAR_RATES, irdRatesFor } from "@/features/business/lib/tax/year-rates";
+export { irdRatesFor } from "@/features/business/lib/tax/year-rates";

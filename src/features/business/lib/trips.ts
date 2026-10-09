@@ -4,8 +4,10 @@
 // no React), so the page, the API routes, the client view and scripts/check-trips.ts all
 // share one copy.
 
-import { fyKeyOf } from "@/features/business/lib/financial-year";
+import { DAY_MS, fyKeyOf } from "@/features/business/lib/financial-year";
+import { inFy } from "@/features/business/lib/tax/helpers";
 import { parseObjectId } from "@/features/business/lib/validation";
+import { parseDateKey } from "@/shared/lib/date-format";
 import { nzDayStartUtc } from "@/shared/lib/timezone-utils";
 
 /** Longest round trip one entry may log, in km. Anything longer is a typo. */
@@ -16,12 +18,6 @@ const MAX_PURPOSE_LEN = 200;
 
 /** Longest notes field. */
 const MAX_NOTES_LEN = 1000;
-
-/** One day in ms, for stepping back from an exclusive FY end. */
-const DAY_MS = 86_400_000;
-
-/** YYYY-MM-DD, the only date shape the trips API accepts (what `<input type="date">` sends). */
-const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** One logged trip as the API and page hand it to the client. */
 export interface TripRow {
@@ -135,20 +131,6 @@ export function parseKm(value: unknown): number | null {
 }
 
 /**
- * Parses a YYYY-MM-DD ledger date into UTC midnight of that day (the scale ledger rows
- * are stored on). The round-trip check rejects days the calendar doesn't have: V8 rolls
- * "2026-02-30" forward to 2 March instead of failing.
- * @param value - Raw value from a request body.
- * @returns The date, or null when the value isn't a real YYYY-MM-DD day.
- */
-export function parseLedgerDate(value: unknown): Date | null {
-  if (typeof value !== "string" || !DATE_KEY_RE.test(value)) return null;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) return null;
-  return date;
-}
-
-/**
  * Validates a trips API body. Checks run in field order (date, km, purpose, notes,
  * booking) and the first failure's message is returned for the form to show.
  * `bookingId` goes through parseObjectId: an unchecked object there would reach a Prisma
@@ -157,19 +139,19 @@ export function parseLedgerDate(value: unknown): Date | null {
  * @returns The validated fields, or the first error.
  */
 export function parseTripInput(body: unknown): TripInputResult {
-  if (typeof body !== "object" || body === null) {
-    return { ok: false, error: "Invalid request body." };
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return { ok: false, error: "Expected a JSON object" };
   }
   const b = body as Record<string, unknown>;
 
-  const date = parseLedgerDate(b.date);
-  if (!date) return { ok: false, error: "Enter a valid date." };
+  const date = parseDateKey(b.date);
+  if (!date) return { ok: false, error: "Enter a valid date" };
 
   const km = parseKm(b.km);
   if (km === null) {
     return {
       ok: false,
-      error: `Enter the round-trip km, more than 0 and up to ${MAX_TRIP_KM.toLocaleString("en-NZ")}.`,
+      error: `Enter the round-trip km, more than 0 and up to ${MAX_TRIP_KM.toLocaleString("en-NZ")}`,
     };
   }
 
@@ -177,7 +159,7 @@ export function parseTripInput(body: unknown): TripInputResult {
   if (!purpose || purpose.length > MAX_PURPOSE_LEN) {
     return {
       ok: false,
-      error: `Enter what the trip was for, up to ${MAX_PURPOSE_LEN} characters.`,
+      error: `Enter what the trip was for, up to ${MAX_PURPOSE_LEN} characters`,
     };
   }
 
@@ -186,7 +168,7 @@ export function parseTripInput(body: unknown): TripInputResult {
     if (typeof b.notes !== "string" || b.notes.length > MAX_NOTES_LEN) {
       return {
         ok: false,
-        error: `Notes can be up to ${MAX_NOTES_LEN.toLocaleString("en-NZ")} characters.`,
+        error: `Notes can be up to ${MAX_NOTES_LEN.toLocaleString("en-NZ")} characters`,
       };
     }
     notes = b.notes.trim() || null;
@@ -195,7 +177,7 @@ export function parseTripInput(body: unknown): TripInputResult {
   let bookingId: string | null = null;
   if (b.bookingId !== undefined && b.bookingId !== null && b.bookingId !== "") {
     bookingId = parseObjectId(b.bookingId);
-    if (!bookingId) return { ok: false, error: "Invalid booking id." };
+    if (!bookingId) return { ok: false, error: "Invalid booking id" };
   }
 
   return { ok: true, value: { date, km, purpose, notes, bookingId } };
@@ -231,19 +213,20 @@ export function toTripRow(trip: {
 }
 
 /**
- * Half-open window check on ISO strings, the same comparison the business page uses.
+ * Half-open window check on ISO bounds, through the tax maths' {@link inFy} so the trips
+ * page and the Tax page draw the FY edge in the same place.
  * @param iso - Date to test (ledger scale).
  * @param startISO - Inclusive start.
  * @param endISO - Exclusive end.
  * @returns True when start <= iso < end.
  */
 export function isInWindow(iso: string, startISO: string, endISO: string): boolean {
-  return iso >= startISO && iso < endISO;
+  return inFy(iso, { start: new Date(startISO), end: new Date(endISO) });
 }
 
 /**
  * Picks the FY a `?fy=` key names. A given key must match exactly (an unknown key yields
- * undefined, so an API can 400 and a page can fall back); no key means the current FY,
+ * undefined, so an API can 404 and a page can fall back); no key means the current FY,
  * or the newest listed when none is current.
  * @param fys - Financial years to choose from.
  * @param key - FY key such as "2026-27", or undefined.

@@ -42,7 +42,6 @@ export interface ExpenseRow {
   date: string; // ISO
   supplier: string;
   description: string;
-  amountExcl: number;
   gstAmount: number;
   /** What the row costs for profit: incl. GST while unregistered or dated before registration, else excl. */
   basisAmount: number;
@@ -173,10 +172,9 @@ export function BusinessDashboardCards({
   const [active, setActive] = useState<BreakdownData | null>(null);
 
   const totalIncome = sumIncome(income);
-  /// On the GST basis (incl. GST while unregistered), despite the "Excl" in the name.
-  const totalExpensesExcl = sumExpense(expenses, "basisAmount");
+  const totalExpensesBasis = sumExpense(expenses, "basisAmount");
   const totalGst = sumExpense(expenses, "gstClaimable");
-  const profit = totalIncome - totalExpensesExcl;
+  const profit = totalIncome - totalExpensesBasis;
   const taxToSetAside = taxEstimate?.totalToSetAside ?? 0;
   const monthIncome = inRange(income, monthStartISO, monthEndISO);
   const monthExpenses = inRange(expenses, monthStartISO, monthEndISO);
@@ -202,7 +200,7 @@ export function BusinessDashboardCards({
   const totalExpensesBreakdown: BreakdownData = {
     title: expensesPrefix,
     rows: expenseRows(expenses, "basisAmount"),
-    total: { label: "Total", value: formatNZD(totalExpensesExcl) },
+    total: { label: "Total", value: formatNZD(totalExpensesBasis) },
     viewAll: { label: "View all expenses", href: `/admin/business/expenses` },
   };
 
@@ -211,7 +209,7 @@ export function BusinessDashboardCards({
     title: "Profit",
     calculation: [
       { label: incomePrefix, value: formatNZD(totalIncome) },
-      { label: expensesPrefix, value: formatNZD(totalExpensesExcl), subtract: true },
+      { label: expensesPrefix, value: formatNZD(totalExpensesBasis), subtract: true },
     ],
     total: { label: "Profit", value: formatNZD(profit) },
   };
@@ -333,7 +331,7 @@ export function BusinessDashboardCards({
     },
     {
       label: expensesPrefix,
-      value: formatNZD(totalExpensesExcl),
+      value: formatNZD(totalExpensesBasis),
       tone: "default",
       breakdown: totalExpensesBreakdown,
     },

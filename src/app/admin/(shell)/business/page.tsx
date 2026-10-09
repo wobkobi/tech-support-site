@@ -23,13 +23,15 @@ import { TaxSummaryCard } from "@/features/business/components/tax/TaxSummaryCar
 import { listFinancialYears } from "@/features/business/lib/financial-year";
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
 import { fyMonthGroups, fyTotalGroups } from "@/features/business/lib/ledger-chart";
-import { computeTaxYear, setAsideTargets } from "@/features/business/lib/tax";
+import { setAsideTargets } from "@/features/business/lib/tax";
 import {
+  expenseTaxBasis,
   gstStatusFromPricing,
   incomeTaxBasis,
   isGstRegisteredOn,
 } from "@/features/business/lib/tax/gst-basis";
 import { loadAllFys, loadTaxInputs } from "@/features/business/lib/tax/load";
+import { loadShownResults } from "@/features/business/lib/tax/view.server";
 import { gstToPay, sumTaxEstimates } from "@/features/business/lib/tax/workings";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -211,19 +213,15 @@ export default async function BusinessPage({
       basisAmount: incomeTaxBasis({ date, amount: e.amount }, gst),
     };
   });
-  const expensesAll: ExpenseRow[] = expenseEntries.map((e) => {
-    const registered = isGstRegisteredOn(e.date, gst);
-    return {
-      id: e.id,
-      date: e.date.toISOString(),
-      supplier: e.supplier,
-      description: e.description,
-      amountExcl: e.amountExcl,
-      gstAmount: e.gstAmount,
-      basisAmount: registered ? e.amountExcl : e.amountIncl,
-      gstClaimable: registered ? e.gstAmount : 0,
-    };
-  });
+  const expensesAll: ExpenseRow[] = expenseEntries.map((e) => ({
+    id: e.id,
+    date: e.date.toISOString(),
+    supplier: e.supplier,
+    description: e.description,
+    gstAmount: e.gstAmount,
+    basisAmount: expenseTaxBasis(e, gst),
+    gstClaimable: isGstRegisteredOn(e.date, gst) ? e.gstAmount : 0,
+  }));
   const invoicesAll: InvoiceRow[] = invoices.map((inv) => ({
     id: inv.id,
     number: inv.number,
@@ -241,10 +239,11 @@ export default async function BusinessPage({
     return inv.issueDate >= scope.startISO && inv.issueDate < scope.endISO;
   });
 
-  // Tax estimate for the scope, from the same maths as the Tax page. Each FY is computed
-  // on its own (brackets, the IETC and ACC apply per year), then summed for "All time".
+  // Tax estimate for the scope, the figures the Tax page shows: a filed year's saved
+  // snapshot, any other year computed live. Each FY stands on its own (brackets, the IETC
+  // and ACC apply per year), then they are summed for "All time".
   const taxInputs = allTaxInputs.filter((input) => scope.isAllTime || input.fy.key === scope.key);
-  const taxResults = taxInputs.map((input) => computeTaxYear(input));
+  const taxResults = await loadShownResults(taxInputs);
   const taxEstimate = taxResults.length > 0 ? sumTaxEstimates(taxResults) : null;
   // A weekly pace only means something for the year still running.
   const currentTaxInput = scope.isCurrentFy ? taxInputs[0] : undefined;

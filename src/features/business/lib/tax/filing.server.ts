@@ -6,23 +6,14 @@
 import "server-only";
 
 import { buildLiveSnapshot, resolveFinancialYear } from "@/features/business/lib/tax/view.server";
+import { isRecordNotFound, isUniqueConflict } from "@/shared/lib/api-response";
 import { prisma } from "@/shared/lib/prisma";
 import { nzDayStartUtc } from "@/shared/lib/timezone-utils";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 /** Result of a file or unfile request, mapped straight onto the route's response. */
 export type FilingOutcome =
   { ok: true; filedAt: string | null } | { ok: false; error: string; status: 404 | 409 };
-
-/**
- * Whether an error is Prisma's known-request error with the given code.
- * @param err - Caught error.
- * @param code - Prisma error code, e.g. "P2002".
- * @returns True when the codes match.
- */
-function isPrismaError(err: unknown, code: string): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === code;
-}
 
 /**
  * Saves a year's current figures as its filed snapshot. Refuses a year that is still
@@ -39,7 +30,7 @@ export async function fileTaxYear(fyKey: string, now: Date): Promise<FilingOutco
   if (fy.end > nzDayStartUtc(now)) {
     return {
       ok: false,
-      error: `FY ${fyKey} hasn't ended yet. You can mark it filed from 1 April.`,
+      error: `FY ${fyKey} hasn't ended yet, so it can be marked filed from 1 April`,
       status: 409,
     };
   }
@@ -48,7 +39,7 @@ export async function fileTaxYear(fyKey: string, now: Date): Promise<FilingOutco
     select: { filedAt: true },
   });
   if (existing?.filedAt) {
-    return { ok: false, error: `FY ${fyKey} is already marked filed.`, status: 409 };
+    return { ok: false, error: `FY ${fyKey} is already marked filed`, status: 409 };
   }
 
   const filedAt = now.toISOString();
@@ -73,7 +64,7 @@ export async function fileTaxYear(fyKey: string, now: Date): Promise<FilingOutco
     // A first save from the home office form racing this one can also take the create
     // path; the loser hits the fyKey unique index (P2002). Retry once: the row now
     // exists, so the retry updates it.
-    if (!isPrismaError(err, "P2002")) throw err;
+    if (!isUniqueConflict(err)) throw err;
     await upsert();
   }
   return { ok: true, filedAt };
@@ -93,7 +84,7 @@ export async function unfileTaxYear(fyKey: string, now: Date): Promise<FilingOut
     select: { filedAt: true },
   });
   if (!existing?.filedAt) {
-    return { ok: false, error: `FY ${fyKey} isn't marked filed.`, status: 409 };
+    return { ok: false, error: `FY ${fyKey} isn't marked filed`, status: 409 };
   }
   try {
     // On MongoDB a Json? field takes a plain null to clear it.
@@ -104,8 +95,8 @@ export async function unfileTaxYear(fyKey: string, now: Date): Promise<FilingOut
     });
   } catch (err) {
     // The row was deleted between the read and the update (P2025).
-    if (!isPrismaError(err, "P2025")) throw err;
-    return { ok: false, error: `FY ${fyKey} has no tax record.`, status: 404 };
+    if (!isRecordNotFound(err)) throw err;
+    return { ok: false, error: `FY ${fyKey} has no tax record`, status: 404 };
   }
   return { ok: true, filedAt: null };
 }

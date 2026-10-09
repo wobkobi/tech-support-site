@@ -15,9 +15,10 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { Modal } from "@/features/admin/components/ui/Modal";
-import { formatRatePct, type AssetView } from "@/features/business/lib/assets";
+import type { AssetView } from "@/features/business/lib/assets";
 import { formatNZD } from "@/features/business/lib/business-format";
 import type { AssetYearRow } from "@/features/business/lib/tax";
+import { formatRatePct } from "@/features/business/lib/tax/workings";
 import { Notice } from "@/shared/components/Notice";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -33,14 +34,18 @@ interface AssetScheduleModalProps {
   asset: AssetView | null;
   /** Closes the dialog. */
   onClose: () => void;
+  /** Keys of the filed years, whose rows note that the Tax page shows the saved figures. */
+  filedFyKeys: ReadonlySet<string>;
 }
 
 /**
- * What else happened in a year, in words.
+ * What else happened in a year, in words. A filed year's row is computed live, so it
+ * also points to the saved figures.
  * @param row - One FY of the schedule.
+ * @param filed - Whether the row's FY is marked filed.
  * @returns Note text, or "" when nothing else happened.
  */
-function rowNote(row: AssetYearRow): string {
+function rowNote(row: AssetYearRow, filed: boolean): string {
   const notes: string[] = [];
   if (row.writtenOff) notes.push("Written off in full (low value)");
   if (row.investmentBoost > 0)
@@ -52,6 +57,7 @@ function rowNote(row: AssetYearRow): string {
       notes.push(`Disposed: ${formatNZD(row.lossOnDisposal)} loss claimed`);
     else notes.push("Disposed");
   }
+  if (filed) notes.push("Filed: the Tax page shows the saved figures");
   return notes.join(". ");
 }
 
@@ -60,11 +66,13 @@ function rowNote(row: AssetYearRow): string {
  * @param props - Component props.
  * @param props.asset - Asset to show, or null when closed.
  * @param props.onClose - Closes the dialog.
+ * @param props.filedFyKeys - Keys of the filed years.
  * @returns The dialog, or null when closed.
  */
 export function AssetScheduleModal({
   asset,
   onClose,
+  filedFyKeys,
 }: AssetScheduleModalProps): React.ReactElement | null {
   if (!asset) return null;
   const rate =
@@ -100,7 +108,7 @@ export function AssetScheduleModal({
         <>
           <ul className="space-y-2 md:hidden">
             {asset.schedule.map((row) => {
-              const note = rowNote(row);
+              const note = rowNote(row, filedFyKeys.has(row.fyKey));
               return (
                 <li key={row.fyKey}>
                   <Card padding="sm">
@@ -151,7 +159,7 @@ export function AssetScheduleModal({
                     <td className={cn(NUM_TD, "font-bold")}>{formatNZD(row.deductible)}</td>
                     <td className={NUM_TD}>{formatNZD(row.closingAtv)}</td>
                     <td className={cn(TD_CLS, "text-sm text-admin-text-secondary")}>
-                      {rowNote(row)}
+                      {rowNote(row, filedFyKeys.has(row.fyKey))}
                     </td>
                   </tr>
                 ))}

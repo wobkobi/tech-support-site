@@ -5,6 +5,7 @@
 // `?fromExpense=<id>` opens the asset already linked to that expense, or a new asset
 // filled in from it.
 
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { AssetsView } from "@/features/business/components/assets/AssetsView";
 import {
@@ -47,7 +48,23 @@ export default async function AssetsPage({
   const now = new Date();
   const fys = await loadAllFys(now);
   const current = fys.find((f) => f.current) ?? fys[0];
-  if (!current) throw new Error("No financial year to show the asset register against");
+  const header = (
+    <PageHeader
+      title="Assets"
+      description="Gear the business uses for more than a year. Each item is depreciated here instead of counted as a one-off expense."
+    />
+  );
+  if (!current) {
+    return (
+      <>
+        {header}
+        <EmptyState
+          title="No financial years yet"
+          body="Set the business start date in Settings and the asset register shows here."
+        />
+      </>
+    );
+  }
 
   const [input, rows, filedYears] = await Promise.all([
     loadTaxInputs(current, now),
@@ -82,10 +99,7 @@ export default async function AssetsPage({
 
   return (
     <>
-      <PageHeader
-        title="Assets"
-        description="Gear the business uses for more than a year. Each item is depreciated here instead of counted as a one-off expense."
-      />
+      {header}
       <AssetsView
         assets={assets}
         expenseOptions={options}

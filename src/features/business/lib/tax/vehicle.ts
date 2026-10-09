@@ -5,7 +5,7 @@
 // business share of the first 14,000 km the vehicle travels in total (business and
 // private); without a total, the first 14,000 business km stand in for it.
 
-import { ledgerDay, roundCents } from "@/features/business/lib/tax/helpers";
+import { ledgerDay, roundCents, roundKm } from "@/features/business/lib/tax/helpers";
 import type {
   AssetInput,
   KmClaim,
@@ -17,15 +17,6 @@ import type {
 
 /** Total vehicle km (business and private) whose business share is claimed at the Tier 1 rate. */
 export const KM_TIER1_LIMIT = 14_000;
-
-/**
- * Rounds a distance to 0.1 km so summed float trips don't leave 0.30000000004 tails.
- * @param km - Distance.
- * @returns Distance to one decimal place.
- */
-function roundKm(km: number): number {
-  return Math.round(km * 10) / 10;
-}
 
 /**
  * Splits a year's business km across the two IRD tiers and prices them. IRD's

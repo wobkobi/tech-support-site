@@ -14,6 +14,15 @@ export function roundCents(n: number): number {
 }
 
 /**
+ * Rounds a distance to 0.1 km so summed float trips don't leave 0.30000000004 tails.
+ * @param km - Distance.
+ * @returns Distance to one decimal place.
+ */
+export function roundKm(km: number): number {
+  return Math.round(km * 10) / 10;
+}
+
+/**
  * Turns a 0-100 percentage into a 0-1 fraction, clamped. A non-finite value
  * counts as 100 so a bad stored figure never silently zeroes a deduction.
  * @param pct - Percentage, normally 0-100.
@@ -40,10 +49,10 @@ export function ledgerDay(date: string | Date): Date {
  * filterByScope. The date is normalised through Date first so a bare
  * "2026-04-01" compares as "2026-04-01T00:00:00.000Z".
  * @param date - ISO string or Date.
- * @param fy - The financial year.
+ * @param fy - The financial year (only its bounds are read).
  * @returns True when start <= date < end.
  */
-export function inFy(date: string | Date, fy: TaxFy): boolean {
+export function inFy(date: string | Date, fy: Pick<TaxFy, "start" | "end">): boolean {
   const iso = (typeof date === "string" ? new Date(date) : date).toISOString();
   return iso >= fy.start.toISOString() && iso < fy.end.toISOString();
 }
