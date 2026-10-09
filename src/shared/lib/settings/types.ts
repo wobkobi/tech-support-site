@@ -251,8 +251,6 @@ export interface EstimatorSettings {
 }
 
 export interface TaxSettings {
-  /** Income-tax reserve rate (fraction). */
-  incomeTax: number;
   /** ACC levy estimate (fraction). */
   acc: number;
   /** KiwiSaver contribution rate (fraction). */

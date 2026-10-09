@@ -2,7 +2,8 @@
 // Business dashboard. Resolves the displayed scope from the `?fy=` param (all-time or a
 // financial year via resolveScope), aggregates income, expenses, and invoices into
 // BusinessDashboardCards and an income vs expenses chart (by month, or by FY for all
-// time), and shows the tax planner with a cached snapshot plus a Sheets import action.
+// time), and shows a compact tax card (the Tax page's estimate for the same scope) plus a
+// Sheets import action.
 // Income and expenses count on the GST basis: incl. GST while not registered, excl. GST
 // once registered.
 
@@ -18,24 +19,18 @@ import {
   type InvoiceRow,
 } from "@/features/business/components/BusinessDashboardCards";
 import { SheetImportButton } from "@/features/business/components/SheetImportButton";
-import { TaxPlannerSection } from "@/features/business/components/TaxPlannerSection";
+import { TaxSummaryCard } from "@/features/business/components/tax/TaxSummaryCard";
 import { listFinancialYears } from "@/features/business/lib/financial-year";
-import { listSpreadsheetsInFolder } from "@/features/business/lib/google-drive";
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
 import { fyMonthGroups, fyTotalGroups } from "@/features/business/lib/ledger-chart";
-import { getFySheetIdForDate } from "@/features/business/lib/sheets-sync";
-import {
-  clearTaxCache,
-  readCachedTaxSnapshot,
-  writeCachedTaxSnapshot,
-} from "@/features/business/lib/tax-cache";
-import { DEFAULT_TAX_RATES, type TaxRates } from "@/features/business/lib/tax-planner";
-import { readPlannerConfig } from "@/features/business/lib/tax-settings";
+import { computeTaxYear, setAsideTargets } from "@/features/business/lib/tax";
 import {
   gstStatusFromPricing,
   incomeTaxBasis,
   isGstRegisteredOn,
 } from "@/features/business/lib/tax/gst-basis";
+import { loadAllFys, loadTaxInputs } from "@/features/business/lib/tax/load";
+import { gstToPay, sumTaxEstimates } from "@/features/business/lib/tax/workings";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
@@ -131,26 +126,22 @@ function filterByScope<T extends { date: string }>(
 /**
  * Business dashboard. The selected scope (All time / Current FY / a past FY)
  * comes from `?fy=` and drives every total: overview cards, breakdown modals,
- * the income vs expenses chart, tax planner, and the bottom-of-page
+ * the income vs expenses chart, the tax card, and the bottom-of-page
  * invoice/income/expense links. Past-FY scopes hide the "This month" cards
  * since the current calendar month falls outside the FY window.
+ * Every render reads live data, so an old `?refresh=1` link still loads the page and
+ * has nothing to clear.
  * @param root0 - Page props.
- * @param root0.searchParams - URL search params (`?fy=` scope + optional `?refresh=1` cache-bust).
+ * @param root0.searchParams - URL search params (`?fy=` scope).
  * @returns Business dashboard element.
  */
 export default async function BusinessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fy?: string; refresh?: string }>;
+  searchParams: Promise<{ fy?: string }>;
 }): Promise<React.ReactElement> {
   await requireAdminAuth("/admin/business");
-  const { fy: fyParam, refresh } = await searchParams;
-
-  // ?refresh=1 invalidates every cached scope so the next render hits the live
-  // Google APIs. Useful when the operator edits the Sheet directly and wants
-  // the dashboard to pick up the change immediately.
-  const forceRefresh = refresh === "1";
-  if (forceRefresh) await clearTaxCache();
+  const { fy: fyParam } = await searchParams;
 
   const now = new Date();
   // "This month" window on NZ midnight boundaries, not the server's UTC midnight
@@ -161,42 +152,45 @@ export default async function BusinessPage({
   const monthEnd = nzMidnightUtc(nzYear, nzMonth + 1, 1);
 
   // One parallel pass over the independent reads: identity (FY list +
-  // "(partial)" label), the three ledgers, and the settings bundle used by the
-  // tax planner further down.
-  const [identity, incomeEntries, expenseEntries, invoices, settings] = await Promise.all([
-    getIdentity(),
-    prisma.incomeEntry.findMany({
-      orderBy: { date: "desc" },
-      select: { id: true, date: true, customer: true, description: true, amount: true },
-    }),
-    prisma.expenseEntry.findMany({
-      orderBy: { date: "desc" },
-      select: {
-        id: true,
-        date: true,
-        supplier: true,
-        description: true,
-        amountIncl: true,
-        amountExcl: true,
-        gstAmount: true,
-      },
-    }),
-    prisma.invoice.findMany({
-      // Quotes are excluded: this feed drives FY revenue aggregates and a
-      // quoted total is not revenue.
-      where: { ...NOT_A_QUOTE_FILTER },
-      orderBy: { issueDate: "desc" },
-      select: {
-        id: true,
-        number: true,
-        clientName: true,
-        issueDate: true,
-        total: true,
-        status: true,
-      },
-    }),
-    getSettings(),
-  ]);
+  // "(partial)" label), the three ledgers, the settings bundle (GST status for the
+  // expense basis), and the tax inputs for every FY. The tax inputs don't depend on the
+  // scope, so they load here and get filtered to it once the scope is resolved.
+  const [identity, incomeEntries, expenseEntries, invoices, settings, allTaxInputs] =
+    await Promise.all([
+      getIdentity(),
+      prisma.incomeEntry.findMany({
+        orderBy: { date: "desc" },
+        select: { id: true, date: true, customer: true, description: true, amount: true },
+      }),
+      prisma.expenseEntry.findMany({
+        orderBy: { date: "desc" },
+        select: {
+          id: true,
+          date: true,
+          supplier: true,
+          description: true,
+          amountIncl: true,
+          amountExcl: true,
+          gstAmount: true,
+        },
+      }),
+      prisma.invoice.findMany({
+        // Quotes are excluded: this feed drives FY revenue aggregates and a
+        // quoted total is not revenue.
+        where: { ...NOT_A_QUOTE_FILTER },
+        orderBy: { issueDate: "desc" },
+        select: {
+          id: true,
+          number: true,
+          clientName: true,
+          issueDate: true,
+          total: true,
+          status: true,
+        },
+      }),
+      getSettings(),
+      loadAllFys(now).then((fys) => Promise.all(fys.map((f) => loadTaxInputs(f, now)))),
+    ]);
 
   // Business start date (from identity settings) drives the FY list + "(partial)" label.
   const startDate = new Date(identity.startDateIso);
@@ -247,58 +241,24 @@ export default async function BusinessPage({
     return inv.issueDate >= scope.startISO && inv.issueDate < scope.endISO;
   });
 
-  // Aggregates for the tax planner.
-  const scopedIncomeTotal = income.reduce((s, r) => s + r.basisAmount, 0);
-  const scopedExpensesTotal = expenses.reduce((s, r) => s + r.basisAmount, 0);
-  const scopedGstTotal = expenses.reduce((s, r) => s + r.gstClaimable, 0);
-
-  // Per-FY rates from the workbook's SETTINGS tab. The sheet stays authoritative; live tax
-  // settings fill any cell it leaves blank, or all of them when there's no workbook.
-  // Cached per scope - the Drive/Sheets reads cost 3-5s on a miss.
-  const taxSettings = settings.tax;
-  const gstRegistered = settings.pricing.gstRegistered;
-  let rates: TaxRates = {
-    incomeTax: taxSettings.incomeTax,
-    acc: taxSettings.acc,
-    kiwiSaver: taxSettings.kiwiSaver,
-    gstOutOfInclusive: DEFAULT_TAX_RATES.gstOutOfInclusive,
-  };
-
-  const cached = forceRefresh ? null : await readCachedTaxSnapshot(scope.key);
-  if (cached) {
-    rates = cached.rates;
-  } else {
-    try {
-      let configSpreadsheetId: string | null = null;
-
-      if (scope.isAllTime) {
-        const folderId = process.env.GOOGLE_BUSINESS_SHEETS_FOLDER_ID?.trim();
-        if (folderId) {
-          const allSheets = await listSpreadsheetsInFolder(folderId);
-          // For All time, use the most recent workbook for rates.
-          configSpreadsheetId = allSheets[allSheets.length - 1]?.fileId ?? null;
-        }
-      } else if (scope.startISO) {
-        configSpreadsheetId = await getFySheetIdForDate(new Date(scope.startISO));
-      }
-
-      if (configSpreadsheetId) {
-        const config = await readPlannerConfig(configSpreadsheetId, taxSettings);
-        if (config) {
-          rates = config.rates;
-        }
-      }
-
-      // Persist the snapshot - failures non-fatal, just stays cold next time.
-      try {
-        await writeCachedTaxSnapshot(scope.key, { rates });
-      } catch (cacheErr) {
-        console.error("[business/page] tax-cache write failed (non-fatal):", cacheErr);
-      }
-    } catch (err) {
-      console.error("[business/page] Failed to read planner config:", err);
-    }
-  }
+  // Tax estimate for the scope, from the same maths as the Tax page. Each FY is computed
+  // on its own (brackets, the IETC and ACC apply per year), then summed for "All time".
+  const taxInputs = allTaxInputs.filter((input) => scope.isAllTime || input.fy.key === scope.key);
+  const taxResults = taxInputs.map((input) => computeTaxYear(input));
+  const taxEstimate = taxResults.length > 0 ? sumTaxEstimates(taxResults) : null;
+  // A weekly pace only means something for the year still running.
+  const currentTaxInput = scope.isCurrentFy ? taxInputs[0] : undefined;
+  const currentTaxResult = scope.isCurrentFy ? taxResults[0] : undefined;
+  const taxTargets =
+    currentTaxInput && currentTaxResult
+      ? setAsideTargets(currentTaxResult.totalToSetAside, currentTaxInput.fy, now)
+      : null;
+  // GST roll-up for a registered business, over the scoped rows dated from registration.
+  // gstToPay does its own registration-date gating, so the scoped rows go in as they are.
+  const gstRollup = gst.registered ? gstToPay(income, expenses, gst) : null;
+  const taxHref = scope.isAllTime
+    ? "/admin/business/tax"
+    : `/admin/business/tax?fy=${encodeURIComponent(scope.key)}`;
 
   // Tab list - "All time" first, then each FY most-recent first.
   const fyList = listFinancialYears(now, startDate);
@@ -372,6 +332,8 @@ export default async function BusinessPage({
         invoices={invoiceRows}
         monthStartISO={monthStart.toISOString()}
         monthEndISO={monthEnd.toISOString()}
+        taxEstimate={taxEstimate}
+        taxHref={taxHref}
       />
 
       <BarChart
@@ -389,13 +351,14 @@ export default async function BusinessPage({
         className="mb-8"
       />
 
-      <TaxPlannerSection
-        fyLabel={scope.label}
-        income={scopedIncomeTotal}
-        expensesExcl={scopedExpensesTotal}
-        gstClaimable={scopedGstTotal}
-        gstRegistered={gstRegistered}
-        rates={rates}
+      <TaxSummaryCard
+        scopeLabel={scope.label}
+        isAllTime={scope.isAllTime}
+        estimate={taxEstimate}
+        targets={taxTargets}
+        gst={gstRollup}
+        gstRegisteredFrom={gst.registeredFrom}
+        href={taxHref}
       />
 
       {/* Action links - full-width stacked on mobile, side-by-side from sm+. */}

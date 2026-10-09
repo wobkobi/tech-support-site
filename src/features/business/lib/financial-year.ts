@@ -91,60 +91,6 @@ export function listFinancialYears(
 }
 
 /**
- * Aggregated totals for a single financial year.
- */
-export interface FinancialYearTotals {
-  fy: FinancialYear;
-  income: number;
-  expensesExcl: number;
-  gstClaimable: number;
-  profit: number;
-  taxReserve: number;
-  incomeCount: number;
-  expenseCount: number;
-}
-
-/**
- * Buckets income and expense entries into per-FY totals, returning one row
- * per FY the business has operated through (most-recent first).
- * @param income - Income entries with `amount` and `date`.
- * @param expenses - Expense entries with `amountExcl`, `gstAmount`, and `date`.
- * @param now - "Today"; defaults to the current time.
- * @param incomeTaxRate - Income-tax provision rate (fraction); defaults to 0.2.
- * @param startDate - Business start date (for the FY list + partial label).
- * @returns Per-FY totals, most recent first.
- */
-export function aggregateByFinancialYear(
-  income: ReadonlyArray<{ amount: number; date: Date }>,
-  expenses: ReadonlyArray<{ amountExcl: number; gstAmount: number; date: Date }>,
-  now: Date = new Date(),
-  incomeTaxRate: number = 0.2,
-  startDate: Date = DEFAULT_START_DATE,
-): FinancialYearTotals[] {
-  return listFinancialYears(now, startDate).map((fy) => {
-    const fyIncome = income.filter((e) => e.date >= fy.start && e.date < fy.end);
-    const fyExpenses = expenses.filter((e) => e.date >= fy.start && e.date < fy.end);
-    const totalIncome = fyIncome.reduce((s, e) => s + e.amount, 0);
-    const totalExpensesExcl = fyExpenses.reduce((s, e) => s + e.amountExcl, 0);
-    const totalGstClaimable = fyExpenses.reduce((s, e) => s + e.gstAmount, 0);
-    const profit = totalIncome - totalExpensesExcl;
-    return {
-      fy,
-      income: totalIncome,
-      expensesExcl: totalExpensesExcl,
-      gstClaimable: totalGstClaimable,
-      profit: Math.round(profit * 100) / 100,
-      // Income-tax provision is on PROFIT, not raw income (matches the NZ
-      // sole-trader Tax Planner sheet); the rate comes from the tax settings.
-      // Negative profit yields zero reserve.
-      taxReserve: Math.round(Math.max(0, profit * incomeTaxRate) * 100) / 100,
-      incomeCount: fyIncome.length,
-      expenseCount: fyExpenses.length,
-    };
-  });
-}
-
-/**
  * Extracts the `YYYY-YY` key from a financial-year label ("FY 2025-26").
  * The ledger filters store the key, while {@link FinancialYear} carries the
  * display label, so the two need converting at the boundary.

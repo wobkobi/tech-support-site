@@ -522,15 +522,13 @@ function validateIdentity(i: IdentitySettings): FieldError[] {
 }
 
 /**
- * Validates the tax-planner group's shape + bounds. Rates are fractions
- * (0.2 = 20%).
+ * Validates the tax group's shape + bounds. Rates are fractions
+ * (0.0175 = 1.75%).
  * @param t - Proposed tax settings.
  * @returns List of field errors (empty when valid).
  */
 function validateTax(t: TaxSettings): FieldError[] {
   const errors: FieldError[] = [];
-  if (!inRange(t.incomeTax, 0, 1))
-    errors.push({ field: "incomeTax", message: "Must be a fraction 0-1 (e.g. 0.2 = 20%)." });
   if (!inRange(t.acc, 0, 1))
     errors.push({ field: "acc", message: "Must be a fraction 0-1 (e.g. 0.0175 = 1.75%)." });
   if (!inRange(t.kiwiSaver, 0, 1))

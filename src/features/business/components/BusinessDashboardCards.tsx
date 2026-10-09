@@ -19,6 +19,7 @@ import {
   type BreakdownRow,
 } from "@/features/business/components/BreakdownModal";
 import { formatNZD } from "@/features/business/lib/business";
+import type { TaxEstimateSummary } from "@/features/business/lib/tax/workings";
 import { formatDateSlash } from "@/shared/lib/date-format";
 import type React from "react";
 import { useState } from "react";
@@ -75,6 +76,10 @@ interface Props {
   invoices: InvoiceRow[];
   monthStartISO: string;
   monthEndISO: string;
+  /** Tax page estimate for the same scope (FYs summed for all time), or null with no FYs. */
+  taxEstimate: TaxEstimateSummary | null;
+  /** Tax page link for the same scope. */
+  taxHref: string;
 }
 
 /**
@@ -151,6 +156,8 @@ function sumExpense(rows: ExpenseRow[], field: "basisAmount" | "gstClaimable"): 
  * @param props.invoices - Invoice rows in scope.
  * @param props.monthStartISO - ISO start of the active month.
  * @param props.monthEndISO - ISO end of the active month.
+ * @param props.taxEstimate - Tax page estimate for the same scope, or null.
+ * @param props.taxHref - Tax page link for the same scope.
  * @returns Cards section.
  */
 export function BusinessDashboardCards({
@@ -160,6 +167,8 @@ export function BusinessDashboardCards({
   invoices,
   monthStartISO,
   monthEndISO,
+  taxEstimate,
+  taxHref,
 }: Props): React.ReactElement {
   const [active, setActive] = useState<BreakdownData | null>(null);
 
@@ -168,9 +177,7 @@ export function BusinessDashboardCards({
   const totalExpensesExcl = sumExpense(expenses, "basisAmount");
   const totalGst = sumExpense(expenses, "gstClaimable");
   const profit = totalIncome - totalExpensesExcl;
-  // Income-tax reserve is 20% of PROFIT (not raw income) - matches NZ sole-trader
-  // Tax Planner. Clamp to >= 0 so a loss year doesn't show a negative reserve.
-  const taxReserve = Math.max(0, profit) * 0.2;
+  const taxToSetAside = taxEstimate?.totalToSetAside ?? 0;
   const monthIncome = inRange(income, monthStartISO, monthEndISO);
   const monthExpenses = inRange(expenses, monthStartISO, monthEndISO);
 
@@ -209,16 +216,64 @@ export function BusinessDashboardCards({
     total: { label: "Profit", value: formatNZD(profit) },
   };
 
-  /** Calculation walk-through for "Tax reserve (20%)". Profit-based, clamped at 0. */
-  const taxReserveBreakdown: BreakdownData = {
-    title: "Tax reserve (20%)",
-    calculation: [
-      { label: incomePrefix, value: formatNZD(totalIncome) },
-      { label: expensesPrefix, value: formatNZD(totalExpensesExcl), subtract: true },
-      { label: "Profit", value: formatNZD(profit) },
-      { label: "Tax rate", value: "20%" },
-    ],
-    total: { label: "Tax reserve", value: formatNZD(taxReserve) },
+  /**
+   * Calculation walk-through for "Tax to set aside", from the Tax page's estimate. Its
+   * income and deductions are the tax figures (depreciation, km claim, home office and
+   * exclusions applied), so they can differ from the Income and Expenses cards.
+   * All time adds up finished FY figures, and a loss FY's taxable profit is $0, so on All
+   * time the income and deductions are listed as plain totals rather than subtracted into
+   * taxable.
+   */
+  const taxBreakdown: BreakdownData = {
+    title: "Tax to set aside",
+    note:
+      taxEstimate && scope.isAllTime
+        ? "Each financial year is worked out on its own, then the years are added up. A year that made a loss has $0 taxable profit, so the taxable profit here isn't the income less the deductions."
+        : undefined,
+    calculation: taxEstimate
+      ? [
+          ...(scope.isAllTime
+            ? [
+                {
+                  label: "Income for tax, each year added up",
+                  value: formatNZD(taxEstimate.income),
+                },
+                {
+                  label: "Tax deductions, each year added up",
+                  value: formatNZD(taxEstimate.deductions),
+                },
+                {
+                  label: "Taxable profit, each year added up (a loss year counts as $0)",
+                  value: formatNZD(taxEstimate.taxable),
+                },
+              ]
+            : [
+                { label: "Income for tax", value: formatNZD(taxEstimate.income) },
+                {
+                  label: "Tax deductions",
+                  value: formatNZD(taxEstimate.deductions),
+                  subtract: true,
+                },
+                {
+                  label: "Taxable profit (never below $0)",
+                  value: formatNZD(taxEstimate.taxable),
+                },
+              ]),
+          { label: "Income tax on the NZ brackets", value: formatNZD(taxEstimate.incomeTax) },
+          {
+            label: "Independent earner tax credit",
+            value: formatNZD(taxEstimate.ietc),
+            subtract: true,
+          },
+          {
+            label: "Income tax after the credit",
+            value: formatNZD(taxEstimate.residualIncomeTax),
+          },
+          { label: "ACC levies", value: formatNZD(taxEstimate.acc) },
+        ]
+      : [],
+    total: { label: "Tax to set aside", value: formatNZD(taxToSetAside) },
+    viewAll: { label: "Open tax page", href: taxHref },
   };
 
   /** This-month income breakdown. */
@@ -289,10 +344,10 @@ export function BusinessDashboardCards({
       breakdown: profitBreakdown,
     },
     {
-      label: "Tax reserve (20%)",
-      value: formatNZD(taxReserve),
+      label: "Tax to set aside",
+      value: formatNZD(taxToSetAside),
       tone: "warning",
-      breakdown: taxReserveBreakdown,
+      breakdown: taxBreakdown,
     },
     ...(showThisMonthCards
       ? [

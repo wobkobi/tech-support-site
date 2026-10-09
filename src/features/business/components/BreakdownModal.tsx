@@ -38,6 +38,8 @@ interface BreakdownCalcStep {
  */
 export interface BreakdownData {
   title: string;
+  /** Optional sentence above the rows or calculation, for a figure that needs context. */
+  note?: string;
   /** When set, the modal shows a scrollable list of these rows. */
   rows?: BreakdownRow[];
   /** When set (and `rows` is not), the modal shows a calculation walk-through. */
@@ -110,6 +112,8 @@ export function BreakdownModal({ data, onClose }: BreakdownModalProps): React.Re
       }
     >
       <div>
+        {data.note && <p className="mb-3 text-sm text-admin-text-secondary">{data.note}</p>}
+
         {data.calculation && data.calculation.length > 0 && (
           <ul className="flex flex-col gap-2 text-sm">
             {data.calculation.map((step, i) => (

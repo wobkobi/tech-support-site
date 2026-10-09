@@ -1,10 +1,9 @@
 "use client";
 // src/features/admin/components/settings/TaxTab.tsx
-// Editor for the tax-planner group: the income-tax / ACC / KiwiSaver reserve rates
-// (stored as fractions). These feed the dashboard tax planner and the per-FY tax reserve;
-// a per-FY workbook rate, when present, still takes precedence over these.
-// Below them: the income-tax bands, the IETC, the thresholds, the vehicle fuel type and
-// the per-category business-use shares the Tax, Assets and Trips pages read.
+// Editor for the tax group: the ACC and KiwiSaver rates (stored as fractions), the
+// income-tax bands, the IETC, the thresholds, the vehicle fuel type and the per-category
+// business-use shares. The Tax, Assets and Trips pages and the overview's tax card read
+// these live; nothing overrides them.
 
 import {
   FieldShell,
@@ -35,7 +34,7 @@ interface Props {
 const FULL_BUSINESS_USE = 100;
 
 /**
- * Tax-planner settings tab.
+ * Tax settings tab.
  * @param props - Component props.
  * @param props.initial - Server-resolved current tax settings.
  * @param props.defaults - Code default tax settings.
@@ -82,25 +81,12 @@ export function TaxTab({ initial, defaults }: Props): React.ReactElement {
 
   return (
     <SettingsTabBody changed={form.changedPaths}>
-      <p className="mb-4 text-sm text-admin-muted">
-        Enter each rate as a percentage. If a per-FY workbook fills the matching rate cell, that
-        value is used for that year and these act as the fallback.
-      </p>
+      <p className="mb-4 text-sm text-admin-muted">Enter each rate as a percentage.</p>
       <div className="divide-y divide-admin-border">
-        <NumberField
-          id="incomeTax"
-          meta={m.incomeTax}
-          // Stored as a fraction; shown + edited as a percent (2dp, so ACC's 1.46% survives).
-          value={Math.round(draft.incomeTax * 10000) / 100}
-          min={0}
-          max={100}
-          error={fieldErrors.incomeTax}
-          customised={draft.incomeTax !== defaults.incomeTax}
-          onChange={(v) => set({ incomeTax: (v ?? 0) / 100 })}
-        />
         <NumberField
           id="acc"
           meta={m.acc}
+          // Stored as a fraction; shown + edited as a percent (2dp, so ACC's 1.75% survives).
           value={Math.round(draft.acc * 10000) / 100}
           min={0}
           max={100}

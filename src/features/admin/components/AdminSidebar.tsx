@@ -32,6 +32,7 @@ import {
   FaMagnifyingGlassDollar,
   FaReceipt,
   FaRoute,
+  FaScaleBalanced,
   FaShareNodes,
   FaStar,
   FaTags,
@@ -49,6 +50,7 @@ type AdminPage =
   | "business"
   | "business-income"
   | "business-expenses"
+  | "business-tax"
   | "business-assets"
   | "business-trips"
   | "business-invoices"
@@ -115,8 +117,8 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 // Overview heads the group; the rest follow the billing flow: price the job,
-// invoice it, then the ledger it lands in, then the gear the business owns and the
-// km it drives.
+// invoice it, then the ledger it lands in and the tax on it, then the gear the
+// business owns and the km it drives.
 const BUSINESS_NAV_ITEMS: NavItem[] = [
   {
     page: "business",
@@ -153,6 +155,12 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
     label: "Expenses",
     icon: <FaReceipt className="shrink-0" />,
     path: "/admin/business/expenses",
+  },
+  {
+    page: "business-tax",
+    label: "Tax",
+    icon: <FaScaleBalanced className="shrink-0" />,
+    path: "/admin/business/tax",
   },
   {
     page: "business-assets",

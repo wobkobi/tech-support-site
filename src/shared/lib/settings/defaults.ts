@@ -207,11 +207,10 @@ export const DEFAULT_SETTINGS: Settings = {
     emailSignature: "**{name}** · Owner / Technician\n{phone} · {email}\n{website} · {location}",
   },
 
-  // Source: DEFAULT_TAX_RATES in tax-planner.ts (sheet still overrides per-FY). Brackets
-  // and the IETC are IRD's from 31 July 2024. ACC is the 2026-27 earners' levy (1.75%); a
-  // self-employed person also pays a work levy, so match it to the ACC invoice.
+  // Read live by the Tax page and the overview's tax card; settings are the only source.
+  // Brackets and the IETC are IRD's from 31 July 2024. ACC is the 2026-27 earners' levy
+  // (1.75%); a self-employed person also pays a work levy, so match it to the ACC invoice.
   tax: {
-    incomeTax: 0.2,
     acc: 0.0175,
     kiwiSaver: 0.12,
     brackets: [

@@ -40,8 +40,8 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
     blurb: "Contact details, base address, payment terms, GST number, and bank account.",
   },
   tax: {
-    title: "Tax planner",
-    blurb: "Income-tax, ACC and KiwiSaver reserve rates.",
+    title: "Tax",
+    blurb: "Tax brackets, the IETC, ACC and KiwiSaver rates, and the thresholds the Tax page uses.",
   },
   comms: {
     title: "Comms & automation",
@@ -330,17 +330,11 @@ export const IDENTITY_FIELD_META = {
   },
 } satisfies Record<string, FieldMeta>;
 
-/** Field metadata for the tax-planner group, keyed by dotted path. */
+/** Field metadata for the tax group, keyed by dotted path. */
 export const TAX_FIELD_META = {
-  incomeTax: {
-    title: "Income-tax reserve rate",
-    description:
-      "Percent of profit set aside for income tax. Used by the dashboard planner; a per-FY workbook rate, when present, still takes precedence.",
-    unit: "%",
-  },
   acc: {
     title: "ACC levy rate",
-    description: "Percent of profit reserved for the ACC levy (e.g. 1.46%).",
+    description: "Percent of profit reserved for the ACC levy (e.g. 1.75%).",
     unit: "%",
   },
   kiwiSaver: {
