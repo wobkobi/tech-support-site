@@ -56,7 +56,7 @@ export function SocialStartSection({
             ref={headingRef}
             id="social-start"
             tabIndex={-1}
-            className="text-lg font-extrabold text-admin-text focus:outline-none"
+            className="text-lg font-semibold text-admin-text focus:outline-none"
           >
             {editingPresets ? "Edit presets" : "Start a post"}
           </h2>

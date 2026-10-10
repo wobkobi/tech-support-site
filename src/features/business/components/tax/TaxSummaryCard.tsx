@@ -65,7 +65,7 @@ export function TaxSummaryCard({
       />
       {estimate ? (
         <>
-          <p className="text-3xl font-extrabold text-amber-700">
+          <p className="text-3xl font-semibold tracking-tight text-amber-700 tabular-nums">
             {formatNZD(estimate.totalToSetAside)}
           </p>
           <p className="mt-1 text-[0.9375rem] text-admin-text-secondary">

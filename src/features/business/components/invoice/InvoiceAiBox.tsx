@@ -159,7 +159,7 @@ export function InvoiceAiBox({
       {/* A real label for the textarea, sized like the calculator's CardHeader title. */}
       <label
         htmlFor="invoice-ai-input"
-        className="mb-1 block text-lg font-extrabold text-admin-text"
+        className="mb-1 block text-lg font-semibold text-admin-text"
       >
         Describe the job
       </label>

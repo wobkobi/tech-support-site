@@ -160,7 +160,7 @@ export function BarChart({
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
-          <h2 id={titleId} className="text-lg font-extrabold text-admin-text">
+          <h2 id={titleId} className="text-base font-semibold text-admin-text">
             {title}
           </h2>
           {description && <p className="mt-0.5 text-sm text-admin-text-secondary">{description}</p>}

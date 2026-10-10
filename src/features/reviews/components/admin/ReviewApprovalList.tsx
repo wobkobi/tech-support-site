@@ -287,7 +287,7 @@ export function ReviewApprovalList({
       {/* Pending */}
       {showPending && (
         <section>
-          <h3 className="mb-3 flex items-center gap-2 text-base font-extrabold text-admin-text">
+          <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-admin-text">
             Pending
             {visiblePending.length > 0 && (
               <StatusPill tone="warning">{visiblePending.length}</StatusPill>
@@ -320,7 +320,7 @@ export function ReviewApprovalList({
       {/* Approved */}
       {showApproved && (
         <section>
-          <h3 className="mb-3 flex items-center gap-2 text-base font-extrabold text-admin-text">
+          <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-admin-text">
             Approved
             {visibleApproved.length > 0 && (
               <StatusPill tone="success">{visibleApproved.length}</StatusPill>

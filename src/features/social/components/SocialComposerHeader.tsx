@@ -48,7 +48,7 @@ export function SocialComposerHeader({
         <h2
           ref={headingRef}
           tabIndex={-1}
-          className="truncate text-lg font-extrabold text-admin-text focus:outline-none"
+          className="truncate text-lg font-semibold text-admin-text focus:outline-none"
         >
           {row.name || "Untitled"}
         </h2>

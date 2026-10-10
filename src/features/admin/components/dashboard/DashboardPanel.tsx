@@ -37,15 +37,15 @@ export function DashboardPanel({
 }): React.ReactElement {
   return (
     <Card padding="none" className={className}>
-      <div className="flex items-center justify-between gap-3 border-b border-admin-border px-5 py-4">
-        <h2 className="flex items-center gap-2 text-base font-extrabold text-admin-text">
+      <div className="flex items-center justify-between gap-3 border-b border-admin-border px-4 py-3.5 sm:px-5">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-admin-text">
           {title}
           {badge}
         </h2>
         {action && (
           <Link
             href={action.href}
-            className="inline-flex items-center gap-1 text-sm font-bold text-russian-violet hover:underline"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-russian-violet hover:underline"
           >
             {action.label}
             <FaCaretRight className="h-3 w-3" aria-hidden />

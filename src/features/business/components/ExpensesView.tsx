@@ -14,6 +14,7 @@ import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { lastCardSpan, StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import { BreakdownModal, type BreakdownData } from "@/features/business/components/BreakdownModal";
@@ -464,11 +465,9 @@ export function ExpensesView({
 
       {/* Summary cards - reflect the active filters; the category card drills in.
           Unloaded data shows "-", not totals of an empty list. */}
-      <div
-        className={cn(
-          "mb-5 grid grid-cols-2 gap-3",
-          gst.registered ? "lg:grid-cols-4" : "lg:grid-cols-3",
-        )}
+      <StatStrip
+        label="Expense totals"
+        className={cn("mb-5 grid-cols-2", gst.registered ? "lg:grid-cols-4" : "lg:grid-cols-3")}
       >
         <StatCard label={expensesLabel} value={loadError ? "-" : formatNZD(totalExpenses)} />
         {/* Nothing is claimable while unregistered, so the card would only ever read $0.00. */}
@@ -485,8 +484,9 @@ export function ExpensesView({
           value={loadError ? "-" : (categoryBreakdown.rows?.length ?? 0)}
           sub="View breakdown"
           onClick={() => setBreakdownOpen(true)}
+          className={lastCardSpan(gst.registered ? 4 : 3, { base: 2, lg: gst.registered ? 4 : 3 })}
         />
-      </div>
+      </StatStrip>
 
       {!formOpen && (
         <AdminButton className="mb-6 w-full lg:hidden" onClick={() => setFormOpen(true)}>

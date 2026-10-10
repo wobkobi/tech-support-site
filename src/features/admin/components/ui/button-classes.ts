@@ -65,7 +65,7 @@ export function adminButtonClass({
 } = {}): string {
   return cn(
     // select-none keeps link-rendered buttons unselectable like native ones.
-    "inline-flex items-center justify-center rounded-md font-bold whitespace-nowrap transition-colors select-none",
+    "inline-flex items-center justify-center rounded-md font-semibold whitespace-nowrap transition-colors select-none",
     variantClasses(variant),
     sizeClasses(size),
   );

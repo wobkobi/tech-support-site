@@ -82,8 +82,9 @@ function InvoicePreviewPanelImpl({
   const showPromoLine = promoDiscount > 0;
   const showUnsuccessfulLine = unsuccessfulDiscount > 0;
   return (
-    // Only this frame is admin chrome. The body inside keeps its own slate palette and
-    // sizes because it must match the generated PDF (invoice-pdf.ts).
+    // Only this frame is admin chrome. The body inside keeps its own slate palette, sizes
+    // and Helvetica face (not the admin UI font) because it must match the generated PDF
+    // (invoice-pdf.ts embeds Helvetica).
     <div
       className={cn(
         "flex flex-col overflow-hidden rounded-lg border border-admin-border bg-admin-surface",
@@ -92,7 +93,7 @@ function InvoicePreviewPanelImpl({
         "print:static print:aspect-auto print:overflow-visible print:rounded-none print:border-0",
       )}
     >
-      <div className="flex flex-1 flex-col px-5 pt-6 pb-6 sm:px-10 sm:pt-10 sm:pb-10">
+      <div className="flex flex-1 flex-col px-5 pt-6 pb-6 font-[Helvetica,Arial,sans-serif] sm:px-10 sm:pt-10 sm:pb-10">
         {/* Header row: chip + wordmark on the left, INVOICE block on the right. */}
         <div className="mb-8 flex items-start justify-between gap-4">
           <Image

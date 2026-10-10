@@ -32,7 +32,7 @@ function toneTextClass(tone: WorkingRowTone): string {
     case "muted":
       return "text-admin-muted";
     case "total":
-      return "font-bold text-russian-violet";
+      return "font-semibold text-russian-violet";
   }
 }
 
@@ -58,7 +58,7 @@ export function WorkingRow({
         <p className={cn("text-[0.9375rem]", text)}>{label}</p>
         {note && <p className="mt-0.5 text-sm text-admin-muted">{note}</p>}
       </div>
-      <p className={cn("shrink-0 font-mono text-[0.9375rem]", text)}>{value}</p>
+      <p className={cn("shrink-0 text-[0.9375rem] tabular-nums", text)}>{value}</p>
     </li>
   );
 }

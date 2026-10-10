@@ -25,6 +25,7 @@ import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { SortableTh } from "@/features/admin/components/ui/SortableTh";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
@@ -320,8 +321,7 @@ export function BookingAdminList({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Summary StatCards. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <StatStrip label="Booking totals" className="grid-cols-2 sm:grid-cols-4">
         <StatCard label="Upcoming confirmed" value={stats.upcoming} tone="default" />
         <StatCard label="Completed this month" value={stats.completedThisMonth} tone="success" />
         <StatCard
@@ -330,7 +330,7 @@ export function BookingAdminList({
           tone={stats.cancelledThisMonth > 0 ? "critical" : "default"}
         />
         <StatCard label="Held" value={stats.held} tone={stats.held > 0 ? "warning" : "default"} />
-      </div>
+      </StatStrip>
 
       {/* Status buckets. */}
       <div className={cn(SEGMENTED_GROUP_CLS, "flex-wrap self-start")}>

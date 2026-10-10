@@ -1,13 +1,15 @@
 // src/app/admin/(shell)/business/tax/page.tsx
 // Tax page for one NZ financial year, picked by `?fy=` (defaults to the current FY). The
 // server loads the year's ledger, assets, trips and TaxYear record, runs computeTaxYear,
-// and renders the estimate, set-aside targets, deductions, income tax workings, the home
-// office and car form and the questions to raise with the accountant. A filed year renders
-// its saved snapshot, with a Filed pill, the differences a fresh calculation shows, a locked
-// home office and car form, and the accountant summary with CSV export.
+// and renders the summary strip, then deductions, income tax workings and the home office
+// and car form beside the set-aside targets, the filed status and the questions to raise
+// with the accountant, then the accountant summary with CSV export. A filed year renders
+// its saved snapshot, with a Filed pill, the differences a fresh calculation shows and a
+// locked home office and car form.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminTabs } from "@/features/admin/components/ui/AdminTabs";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { AccountantNotes } from "@/features/business/components/tax/AccountantNotes";
@@ -17,7 +19,10 @@ import { FiledChangesNotice } from "@/features/business/components/tax/FiledChan
 import { FiledYearControls } from "@/features/business/components/tax/FiledYearControls";
 import { HomeOfficeForm } from "@/features/business/components/tax/HomeOfficeForm";
 import { IncomeTaxWorkings } from "@/features/business/components/tax/IncomeTaxWorkings";
-import { TaxEstimateCards } from "@/features/business/components/tax/TaxEstimateCards";
+import {
+  SetAsideCard,
+  TaxEstimateCards,
+} from "@/features/business/components/tax/TaxEstimateCards";
 import { formatNZD } from "@/features/business/lib/business";
 import { fyKeyOf, type FinancialYear } from "@/features/business/lib/financial-year";
 import { irdRatesFor, setAsideTargets } from "@/features/business/lib/tax";
@@ -148,12 +153,6 @@ export default async function TaxPage({
       {header}
       <FyTabs fys={fys} active={fyKey} />
 
-      <FiledYearControls
-        fyKey={fyKey}
-        fyLabel={selected.label}
-        filedAtIso={view.filedAtIso}
-        canFile={selected.end <= nzDayStartUtc(now)}
-      />
       {filed && (
         <FiledChangesNotice
           fyLabel={selected.label}
@@ -169,40 +168,68 @@ export default async function TaxPage({
         </Notice>
       )}
 
-      <TaxEstimateCards result={result} targets={targets} current={input.fy.current} />
+      <TaxEstimateCards result={result} fyLabel={selected.label} />
 
-      <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <DeductionsBreakdown result={result} gst={input.gst} filed={filed} />
-        <IncomeTaxWorkings result={result} settings={input.settings} filed={filed} />
-      </div>
-
-      <HomeOfficeForm
-        // Remount per FY so a half-typed draft never carries into another year.
-        key={fyKey}
-        fyKey={fyKey}
+      {/* Phone: the set-aside card straight after the strip, as it answers the question
+          most visits are for. Desktop shows the same card at the top of the side column. */}
+      <SetAsideCard
+        result={result}
+        targets={targets}
+        current={input.fy.current}
         fyLabel={selected.label}
-        filed={filed}
-        initial={{
-          officeSqm: record?.officeSqm ?? null,
-          houseSqm: record?.houseSqm ?? null,
-          sqmRate: record?.sqmRate ?? null,
-          kmTier1: record?.kmTier1 ?? null,
-          kmTier2: record?.kmTier2 ?? null,
-          totalVehicleKm: record?.totalVehicleKm ?? null,
-          mortgageInterestOrRent: record?.mortgageInterestOrRent ?? null,
-          rates: record?.rates ?? null,
-        }}
-        defaults={{
-          sqmRate: irdDefaults.sqmRate,
-          kmTier1: kmDefaults.tier1,
-          kmTier2: kmDefaults.tier2,
-        }}
-        fuel={fuelLabel(input.settings.vehicleFuel)}
-        claim={result.homeOffice}
-        businessKm={result.km.businessKm}
+        className="mb-6 lg:hidden"
       />
 
-      <AccountantNotes />
+      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-8">
+          <DeductionsBreakdown result={result} gst={input.gst} filed={filed} />
+          <IncomeTaxWorkings result={result} settings={input.settings} filed={filed} />
+          <HomeOfficeForm
+            // Remount per FY so a half-typed draft never carries into another year.
+            key={fyKey}
+            fyKey={fyKey}
+            fyLabel={selected.label}
+            filed={filed}
+            initial={{
+              officeSqm: record?.officeSqm ?? null,
+              houseSqm: record?.houseSqm ?? null,
+              sqmRate: record?.sqmRate ?? null,
+              kmTier1: record?.kmTier1 ?? null,
+              kmTier2: record?.kmTier2 ?? null,
+              totalVehicleKm: record?.totalVehicleKm ?? null,
+              mortgageInterestOrRent: record?.mortgageInterestOrRent ?? null,
+              rates: record?.rates ?? null,
+            }}
+            defaults={{
+              sqmRate: irdDefaults.sqmRate,
+              kmTier1: kmDefaults.tier1,
+              kmTier2: kmDefaults.tier2,
+            }}
+            fuel={fuelLabel(input.settings.vehicleFuel)}
+            claim={result.homeOffice}
+            businessKm={result.km.businessKm}
+          />
+        </div>
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-4">
+          <SetAsideCard
+            result={result}
+            targets={targets}
+            current={input.fy.current}
+            fyLabel={selected.label}
+            className="max-lg:hidden"
+          />
+          <Card>
+            <CardHeader title="Filing" />
+            <FiledYearControls
+              fyKey={fyKey}
+              fyLabel={selected.label}
+              filedAtIso={view.filedAtIso}
+              canFile={selected.end <= nzDayStartUtc(now)}
+            />
+          </Card>
+          <AccountantNotes />
+        </div>
+      </div>
 
       <AccountantSummary
         view={view.shown}

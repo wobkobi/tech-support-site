@@ -8,6 +8,7 @@
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewApprovalList";
 import {
   ReviewAskPeople,
@@ -455,7 +456,7 @@ export default async function AdminReviewsPage({
         description="Ask past clients for a Google review. Approve anything left on your site."
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatStrip label="Review totals" className="mb-6 grid-cols-2 lg:grid-cols-4">
         <StatCard label="Ready to ask" value={readyCount} sub="not asked lately" />
         <StatCard label="Links sent" value={sentLast30.length} sub="last 30 days" />
         <StatCard
@@ -474,7 +475,7 @@ export default async function AdminReviewsPage({
           sub={pending.length > 0 ? "waiting on you" : "all caught up"}
           tone={pending.length > 0 ? "warning" : "default"}
         />
-      </div>
+      </StatStrip>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">

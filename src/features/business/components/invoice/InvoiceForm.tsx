@@ -343,7 +343,7 @@ export function InvoiceForm({
         )}
         <div className="flex justify-between gap-3 border-t border-admin-border pt-1">
           <span className="font-semibold text-admin-text">Total</span>
-          <span className="font-extrabold text-russian-violet">{formatNZD(totals.total)}</span>
+          <span className="font-semibold text-russian-violet">{formatNZD(totals.total)}</span>
         </div>
         {paid > 0 && (
           <>
@@ -353,7 +353,7 @@ export function InvoiceForm({
             </div>
             <div className="flex justify-between gap-3 border-t border-admin-border pt-1">
               <span className="font-semibold text-admin-text">Balance due</span>
-              <span className="font-extrabold text-russian-violet">
+              <span className="font-semibold text-russian-violet">
                 {formatNZD(balanceDue({ total: totals.total, alreadyPaid: paid }))}
               </span>
             </div>

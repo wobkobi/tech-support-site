@@ -7,6 +7,7 @@
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import type { PageQuery } from "@/features/admin/hooks/use-query-sync";
 import { ContactsAdminView } from "@/features/contacts/components/ContactsAdminView";
 import { UNRESOLVED_CONFLICT_FILTER } from "@/features/contacts/lib/contact-conflicts";
@@ -129,7 +130,7 @@ export default async function AdminContactsPage({
         description="Everyone who has booked, been invoiced, or reviewed."
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatStrip label="Contact totals" className="mb-6 grid-cols-2 lg:grid-cols-4">
         <StatCard label="Contacts" value={allContacts.length} />
         <StatCard
           label="Not synced"
@@ -144,7 +145,7 @@ export default async function AdminContactsPage({
           tone={openConflicts > 0 ? "critical" : "default"}
         />
         <StatCard label="Reviewed" value={reviewCovered} sub="left a review" tone="success" />
-      </div>
+      </StatStrip>
 
       {pendingConflictsCount > 0 && (
         <Link

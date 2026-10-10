@@ -16,6 +16,7 @@ import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import {
@@ -266,10 +267,10 @@ export function IncomeView(): React.ReactElement {
   return (
     <div>
       {/* Summary cards - reflect the active filters. */}
-      <div className="mb-5 grid grid-cols-2 gap-3">
+      <StatStrip label="Income totals" className="mb-5 grid-cols-2">
         <StatCard label="Income (filtered)" value={formatNZD(filteredTotal)} tone="success" />
         <StatCard label="Entries" value={sorted.length} />
-      </div>
+      </StatStrip>
 
       {!formOpen && (
         <AdminButton className="mb-6 w-full lg:hidden" onClick={() => setFormOpen(true)}>

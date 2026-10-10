@@ -3,6 +3,7 @@
 // filter; InvoicesListView owns the figures and the filter state.
 
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { lastCardSpan, StatStrip } from "@/features/admin/components/ui/StatStrip";
 import type { FilterKey } from "@/features/business/components/invoices-list-options";
 import { formatNZD } from "@/features/business/lib/business";
 import type React from "react";
@@ -26,7 +27,7 @@ export interface InvoicesSummary {
  * @param props.summary - Totals across every invoice.
  * @param props.statusFilter - Active status bucket; its card shows as active.
  * @param props.onToggle - Toggles a status bucket (clicking the active one clears it).
- * @returns The summary card grid.
+ * @returns The summary strip.
  */
 export function InvoicesSummaryCards({
   summary,
@@ -38,7 +39,7 @@ export function InvoicesSummaryCards({
   onToggle: (key: FilterKey) => void;
 }): React.ReactElement {
   return (
-    <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <StatStrip label="Invoice totals" className="mb-5 grid-cols-2 lg:grid-cols-5">
       <StatCard
         label="Outstanding"
         value={formatNZD(summary.outstanding)}
@@ -76,7 +77,8 @@ export function InvoicesSummaryCards({
         sub={`${formatNZD(summary.quoteSum)} quoted`}
         onClick={() => onToggle("QUOTE")}
         active={statusFilter === "QUOTE"}
+        className={lastCardSpan(5, { base: 2, lg: 5 })}
       />
-    </div>
+    </StatStrip>
   );
 }

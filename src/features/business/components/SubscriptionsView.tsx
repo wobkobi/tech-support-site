@@ -221,7 +221,7 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
   return (
     <div>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-extrabold text-admin-text">Subscriptions</h2>
+        <h2 className="text-base font-semibold text-admin-text">Subscriptions</h2>
         {!showForm && (
           <AdminButton
             variant="outline"

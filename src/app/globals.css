@@ -247,12 +247,49 @@ html:has(.app-admin) {
   .app-admin:has([data-phone-bar="fixed"]) main {
     padding-bottom: calc(var(--phone-bar-h) + 7rem);
   }
-  /* Hidden while typing: iOS keeps fixed elements above the on-screen keyboard,
-     where the button would cover the field being typed in. */
-  .app-admin:has(:is(input:not([type="checkbox"], [type="radio"]), textarea, select):focus)
-    .admin-quick-actions {
+  /* Bottom bar vs floating +: a page with its own action bar hides the bottom bar
+     (the page's buttons own that edge) and brings the floating + back above its bar,
+     so the quick actions stay one tap away. The top bar's menu button returns too. */
+  .app-admin:not(:has([data-phone-bar])) :is(.admin-quick-actions, .admin-menu-button) {
     display: none;
   }
+  .app-admin:has([data-phone-bar]) .admin-tab-bar {
+    display: none;
+  }
+  /* Hidden while typing: iOS keeps fixed elements above the on-screen keyboard,
+     where the button or bar would cover the field being typed in. */
+  .app-admin:has(:is(input:not([type="checkbox"], [type="radio"]), textarea, select):focus)
+    :is(.admin-quick-actions, .admin-tab-bar) {
+    display: none;
+  }
+}
+
+/* Admin type: Plex for body copy and figures, Exo kept for headings. In @layer base so a
+   font or weight utility on any element still wins. */
+@layer base {
+  .app-admin {
+    font-family:
+      var(--font-plex),
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      Arial,
+      sans-serif;
+    font-weight: 400;
+  }
+  .app-admin :where(h1, h2, h3) {
+    font-family: var(--font-sans);
+  }
+}
+
+/* StatStrip: stat cards share one panel, split by the 1px gaps showing the strip's
+   border-coloured background. Unlayered so it beats each card's own border and radius
+   utilities. */
+.admin-stat-strip > * {
+  border: 0;
+  border-radius: 0;
 }
 
 /* Phone Call + Book bar (MobileActionBar). Off while the nav drawer is open

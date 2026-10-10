@@ -7,6 +7,7 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import type { AssetFormTarget } from "@/features/business/components/assets/asset-form-state";
 import { AssetFormModal } from "@/features/business/components/assets/AssetFormModal";
@@ -172,7 +173,7 @@ export function AssetsView({
         </Notice>
       )}
 
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatStrip label="Register totals" className="mb-5 grid-cols-2 lg:grid-cols-4">
         <StatCard label="In use" value={inUse.length} />
         <StatCard label="Tax value now" value={formatNZD(valueNow)} sub="Items still in use" />
         <StatCard
@@ -182,7 +183,7 @@ export function AssetsView({
           tone="success"
         />
         <StatCard label="Disposed" value={assets.length - inUse.length} />
-      </div>
+      </StatStrip>
 
       <Notice className="mb-5">
         Bought items costing {formatDollars(lowValueThreshold)} or less are written off in full in
@@ -191,7 +192,7 @@ export function AssetsView({
       </Notice>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-extrabold text-admin-text">Register</h2>
+        <h2 className="text-base font-semibold text-admin-text">Register</h2>
         {/* An empty register has its own Add asset in the empty state. */}
         {assets.length > 0 && (
           <AdminButton

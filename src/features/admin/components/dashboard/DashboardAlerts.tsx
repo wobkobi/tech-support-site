@@ -30,7 +30,7 @@ export function DashboardAlerts({
       {overdueCount > 0 && (
         <Notice tone="warn" onGrey>
           <Link href="/admin/business/invoices?status=overdue" className={ALERT_LINK_CLS}>
-            <span className="font-extrabold">{overdueCount}</span> overdue invoice
+            <span className="font-semibold">{overdueCount}</span> overdue invoice
             {overdueCount === 1 ? "" : "s"}
           </Link>
         </Notice>
@@ -38,7 +38,7 @@ export function DashboardAlerts({
       {heldCount > 0 && (
         <Notice tone="warn" onGrey>
           <Link href="/admin/bookings?status=held" className={ALERT_LINK_CLS}>
-            <span className="font-extrabold">{heldCount}</span> held booking
+            <span className="font-semibold">{heldCount}</span> held booking
             {heldCount === 1 ? "" : "s"} to action
           </Link>
         </Notice>

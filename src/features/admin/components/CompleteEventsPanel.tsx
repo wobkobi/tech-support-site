@@ -95,7 +95,7 @@ export function CompleteEventsPanel({
   return (
     <Card padding="none">
       <div className="border-b border-admin-border px-5 py-4">
-        <h2 className="flex items-center gap-2 text-base font-extrabold text-admin-text">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-admin-text">
           Complete events
           {bookings.length > 0 && <StatusPill tone="critical">{bookings.length}</StatusPill>}
         </h2>

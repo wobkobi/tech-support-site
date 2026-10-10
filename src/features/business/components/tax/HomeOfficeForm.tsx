@@ -341,7 +341,7 @@ export function HomeOfficeForm({
   const kmWarning = totalKmWarning(draft.totalVehicleKm, businessKm);
 
   return (
-    <Card className="mb-8">
+    <Card>
       <CardHeader
         title="Home office and car"
         description={`${fyLabel}. The office is claimed on IRD's square-metre rate, plus its share of mortgage interest or rent and rates. The car is claimed on IRD's kilometre rates.`}
@@ -356,13 +356,13 @@ export function HomeOfficeForm({
           Leave a rate blank to use IRD's published rate. Fill it in when IRD publishes this year's
           figures, or when your accountant gives you a different rate.
         </p>
-        <h3 className="mb-3 text-base font-bold text-admin-text">Home office</h3>
+        <h3 className="mb-3 text-base font-semibold text-admin-text">Home office</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {homeFields(defaults).map((spec) => renderField(spec))}
         </div>
 
         <div className="mt-5 rounded-md bg-admin-bg px-4 py-3">
-          <p className="text-[0.9375rem] font-bold text-admin-text">
+          <p className="text-[0.9375rem] font-semibold text-admin-text">
             Home office claim: {formatNZD(claim.amount)}
           </p>
           <p className="mt-0.5 text-sm text-admin-text-secondary">
@@ -372,7 +372,7 @@ export function HomeOfficeForm({
           </p>
         </div>
 
-        <h3 className="mt-6 mb-3 text-base font-bold text-admin-text">Car</h3>
+        <h3 className="mt-6 mb-3 text-base font-semibold text-admin-text">Car</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {carFields(defaults, fuel).map((spec) =>
             renderField(spec, spec.key === "totalVehicleKm" ? kmWarning : undefined),

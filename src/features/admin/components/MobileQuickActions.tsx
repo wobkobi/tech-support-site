@@ -1,7 +1,8 @@
 "use client";
 // src/features/admin/components/MobileQuickActions.tsx
-// Round + button pinned bottom-right on every admin page below lg, opening a short list
-// of shortcuts from QUICK_ACTIONS (shared with the desktop top bar). It rides above a
+// Round + button pinned bottom-right below lg, opening a short list of shortcuts from
+// QUICK_ACTIONS (shared with the desktop top bar and the phone tab bar). It shows only on
+// pages with their own phone action bar, which hides AdminTabBar (globals.css). It rides above a
 // phone action bar through --phone-bar-h (globals.css), the same variable that lifts the
 // toast stack; that height already includes the home indicator, so the larger of the two
 // is used rather than their sum.

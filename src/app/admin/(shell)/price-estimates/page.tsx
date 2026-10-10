@@ -8,6 +8,7 @@ import { Card } from "@/features/admin/components/ui/Card";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { formatMins } from "@/features/business/lib/business";
 import { requireAdminAuth } from "@/shared/lib/auth";
@@ -100,11 +101,11 @@ export default async function AdminPriceEstimatesPage({
         }
       />
 
-      <div className="mb-6 grid grid-cols-3 gap-3">
+      <StatStrip label="Estimate totals" className="mb-6 grid-cols-3">
         {stats.map((s) => (
           <StatCard key={s.label} label={s.label} value={s.value} />
         ))}
-      </div>
+      </StatStrip>
 
       <Card padding="none">
         <div className="p-4 sm:p-6">

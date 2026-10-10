@@ -81,7 +81,7 @@ export function DeductionsBreakdown({
 
       {anyExcluded && (
         <>
-          <h3 className="mt-5 mb-1 text-base font-bold text-admin-text">Not counted</h3>
+          <h3 className="mt-5 mb-1 text-base font-semibold text-admin-text">Not counted</h3>
           <ul className="divide-y divide-admin-border">
             {excludedFuel > 0 && (
               <WorkingRow

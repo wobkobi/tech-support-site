@@ -103,7 +103,7 @@ export function AccountantSummary({
   const { unclaimedKm } = result.deductions;
 
   return (
-    <Card className="mb-8">
+    <Card>
       <CardHeader
         title="Accountant summary"
         description={summaryDescription(view.filedAt !== null, unreadable, fyLabel)}
@@ -115,8 +115,8 @@ export function AccountantSummary({
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {RETURN_FIGURES.map((figure) => (
           <div key={figure.key} className="rounded-md border border-admin-border px-4 py-3">
-            <dt className="text-sm font-bold text-admin-muted">{figure.box}</dt>
-            <dd className="mt-1 text-lg font-extrabold text-admin-text tabular-nums">
+            <dt className="text-sm font-medium text-admin-muted">{figure.box}</dt>
+            <dd className="mt-1 text-lg font-semibold text-admin-text tabular-nums">
               {formatNZD(result.ir[figure.key])}
             </dd>
             <dd className="text-sm text-admin-text-secondary">{figure.label}</dd>
@@ -124,7 +124,7 @@ export function AccountantSummary({
         ))}
       </dl>
 
-      <h3 className="mt-6 mb-3 text-base font-extrabold text-admin-text">Asset schedule</h3>
+      <h3 className="mt-6 mb-3 text-base font-semibold text-admin-text">Asset schedule</h3>
       {result.assets.length === 0 ? (
         <p className="text-[0.9375rem] text-admin-text-secondary">No assets in use this year.</p>
       ) : (
@@ -135,7 +135,7 @@ export function AccountantSummary({
               const note = rowNote(row, asset);
               return (
                 <li key={row.assetId} className="rounded-md border border-admin-border p-3">
-                  <p className="font-bold text-admin-text">{asset?.name ?? row.assetId}</p>
+                  <p className="font-semibold text-admin-text">{asset?.name ?? row.assetId}</p>
                   <p className="text-sm text-admin-text-secondary">{asset?.classLabel ?? ""}</p>
                   <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[0.9375rem]">
                     <dt className="text-admin-muted">Opening value</dt>
@@ -143,7 +143,7 @@ export function AccountantSummary({
                     <dt className="text-admin-muted">Depreciation</dt>
                     <dd className="text-right tabular-nums">{formatNZD(row.depreciation)}</dd>
                     <dt className="text-admin-muted">Deductible</dt>
-                    <dd className="text-right font-bold tabular-nums">
+                    <dd className="text-right font-semibold tabular-nums">
                       {formatNZD(row.deductible)}
                     </dd>
                     <dt className="text-admin-muted">Closing value</dt>
@@ -172,7 +172,7 @@ export function AccountantSummary({
                   return (
                     <tr key={row.assetId} className={ROW_CLS}>
                       <td className={TD_CLS}>
-                        <span className="block font-bold">{asset?.name ?? row.assetId}</span>
+                        <span className="block font-semibold">{asset?.name ?? row.assetId}</span>
                         <span className="block text-sm text-admin-text-secondary">
                           {asset?.classLabel ?? ""}
                           {note ? ` - ${note}` : ""}
@@ -184,7 +184,7 @@ export function AccountantSummary({
                       <td className={cn(TD_CLS, "text-right tabular-nums")}>
                         {formatNZD(row.depreciation)}
                       </td>
-                      <td className={cn(TD_CLS, "text-right font-bold tabular-nums")}>
+                      <td className={cn(TD_CLS, "text-right font-semibold tabular-nums")}>
                         {formatNZD(row.deductible)}
                       </td>
                       <td className={cn(TD_CLS, "text-right tabular-nums")}>
@@ -199,7 +199,7 @@ export function AccountantSummary({
         </>
       )}
 
-      <h3 className="mt-6 mb-2 text-base font-extrabold text-admin-text">Trips</h3>
+      <h3 className="mt-6 mb-2 text-base font-semibold text-admin-text">Trips</h3>
       <p className="text-[0.9375rem] text-admin-text-secondary">
         {tripCount === 0
           ? "No business trips logged this year."

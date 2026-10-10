@@ -47,7 +47,7 @@ export function SocialPostedList({
       onToggle={(e) => onToggle(e.currentTarget.open)}
       className="group rounded-lg border border-admin-border bg-admin-surface"
     >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-lg font-extrabold text-admin-text">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-base font-semibold text-admin-text">
         <span>
           Posted
           {posted.length > 0 && (

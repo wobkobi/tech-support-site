@@ -59,7 +59,7 @@ export function PostPreviewPanel({
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-extrabold text-admin-text">Preview</h2>
+        <h2 className="text-base font-semibold text-admin-text">Preview</h2>
         {enabled.length > 1 && (
           <div
             role="tablist"

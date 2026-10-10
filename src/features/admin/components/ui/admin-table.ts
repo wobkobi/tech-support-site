@@ -3,13 +3,14 @@
 // income, expenses) renders the same header band, row dividers and cell padding.
 
 /** The `<table>` itself. */
-export const TABLE_CLS = "w-full text-[0.9375rem]";
+export const TABLE_CLS = "w-full text-[0.9375rem] tabular-nums";
 
-/** The `<thead>`: a grey band with a rule underneath. */
-export const THEAD_CLS = "border-b border-admin-border bg-admin-bg";
+/** The `<thead>`: a faint band with a rule underneath. */
+export const THEAD_CLS = "border-b border-admin-border bg-admin-bg/60";
 
 /** A header cell. */
-export const TH_CLS = "px-4 py-3 text-left text-sm font-bold text-admin-muted";
+export const TH_CLS =
+  "px-4 py-2.5 text-left text-sm font-semibold whitespace-nowrap text-admin-muted";
 
 /** The `<tbody>`: hairline rules between rows. */
 export const TBODY_CLS = "divide-y divide-admin-border";

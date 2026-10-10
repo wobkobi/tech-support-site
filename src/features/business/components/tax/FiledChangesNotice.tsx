@@ -64,7 +64,7 @@ export function FiledChangesNotice({
   }
   return (
     <Notice tone="warn" className="mb-6">
-      <p className="font-bold">Live figures no longer match what was filed</p>
+      <p className="font-semibold">Live figures no longer match what was filed</p>
       <p className="mt-1">
         These figures have changed since {fyLabel} was filed. If the changes are right, your
         accountant would need to amend the return:
@@ -75,7 +75,7 @@ export function FiledChangesNotice({
             key={change.key}
             className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2"
           >
-            <span className="font-bold">{change.label}</span>
+            <span className="font-semibold">{change.label}</span>
             <span className="tabular-nums">
               {formatValue(change.filed, change.unit)} filed,{" "}
               {formatValue(change.live, change.unit)} now ({formatDifference(change)})

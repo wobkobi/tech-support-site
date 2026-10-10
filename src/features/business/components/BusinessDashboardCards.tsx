@@ -13,6 +13,7 @@
 // labels show only once registered.
 
 import { StatCard, type StatTone } from "@/features/admin/components/ui/StatCard";
+import { lastCardSpan, StatStrip } from "@/features/admin/components/ui/StatStrip";
 import {
   BreakdownModal,
   type BreakdownData,
@@ -387,17 +388,20 @@ export function BusinessDashboardCards({
       <p className="mb-2 text-sm font-semibold tracking-wide text-admin-muted uppercase">
         Showing: {scope.label}
       </p>
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {cards.map((c) => (
+      <StatStrip label={`Totals for ${scope.label}`} className="mb-6 grid-cols-2 sm:grid-cols-4">
+        {cards.map((c, i) => (
           <StatCard
             key={c.label}
             label={c.label}
             value={c.value}
             tone={c.tone}
             onClick={() => setActive(c.breakdown)}
+            className={
+              i === cards.length - 1 ? lastCardSpan(cards.length, { base: 2, sm: 4 }) : undefined
+            }
           />
         ))}
-      </div>
+      </StatStrip>
 
       {active && <BreakdownModal data={active} onClose={() => setActive(null)} />}
     </>

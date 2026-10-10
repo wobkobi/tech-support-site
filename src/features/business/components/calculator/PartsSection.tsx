@@ -43,7 +43,7 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
           type="button"
           onClick={onToggle}
           aria-expanded={show}
-          className="flex flex-1 items-center justify-between text-left text-lg font-extrabold text-admin-text"
+          className="flex flex-1 items-center justify-between text-left text-lg font-semibold text-admin-text"
         >
           Parts / materials
           <span className="text-sm text-admin-muted">{show ? "▲" : "▼"}</span>

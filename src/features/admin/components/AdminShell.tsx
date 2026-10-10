@@ -1,10 +1,13 @@
 "use client";
 // src/features/admin/components/AdminShell.tsx
 // Client frame around every admin page: owns the phone drawer and the desktop sidebar's
-// collapsed state, and lays out AdminSidebar beside the AdminTopBar + #main column.
+// collapsed state, and lays out AdminSidebar beside the AdminTopBar + #main column, with
+// the phone AdminTabBar and its QuickActionsSheet.
 
 import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
+import { AdminTabBar } from "@/features/admin/components/AdminTabBar";
 import { AdminTopBar } from "@/features/admin/components/AdminTopBar";
+import { QuickActionsSheet } from "@/features/admin/components/QuickActionsSheet";
 import { SIDEBAR_COLLAPSED, SIDEBAR_COOKIE } from "@/features/admin/lib/sidebar-cookie";
 import { cn } from "@/shared/lib/cn";
 import { usePathname } from "next/navigation";
@@ -25,7 +28,8 @@ interface AdminShellProps {
  * Admin chrome: sidebar (drawer below lg), sticky top bar and the padded main
  * column. The drawer closes on navigation, on Escape, and when the window widens
  * to lg (where the sidebar is always shown). Opening it focuses its close button;
- * dismissing it returns focus to the top bar's menu button.
+ * dismissing it returns focus to whichever button opened it (the phone bar's Menu, or
+ * the top bar's menu button on pages with their own action bar).
  * @param props - Component props.
  * @param props.initialCollapsed - Saved collapsed state from the {@link SIDEBAR_COOKIE} cookie.
  * @param props.children - The active admin page.
@@ -43,10 +47,21 @@ export function AdminShell({ initialCollapsed, children }: AdminShellProps): Rea
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerOpenerRef = useRef<HTMLElement | null>(null);
+  const [quick, setQuick] = useState<{ open: boolean; stamp: string }>({
+    open: false,
+    stamp: "",
+  });
 
-  /** Opens the drawer, anchored to the current pathname. */
+  /** Opens the drawer, anchored to the current pathname, noting which button opened it. */
   function openDrawer(): void {
+    drawerOpenerRef.current = document.activeElement as HTMLElement | null;
     setDrawer({ open: true, pathname });
+  }
+
+  /** Opens the quick actions sheet with a fresh stamp, so a repeat pick reopens a form. */
+  function openQuick(): void {
+    setQuick({ open: true, stamp: String(Date.now()) });
   }
 
   /**
@@ -55,7 +70,7 @@ export function AdminShell({ initialCollapsed, children }: AdminShellProps): Rea
    */
   function closeDrawer(returnFocus: boolean): void {
     setDrawer({ open: false, pathname });
-    if (returnFocus) menuButtonRef.current?.focus();
+    if (returnFocus) (drawerOpenerRef.current ?? menuButtonRef.current)?.focus();
   }
 
   /** Flips the desktop sidebar and saves the choice for the next server render. */
@@ -111,11 +126,23 @@ export function AdminShell({ initialCollapsed, children }: AdminShellProps): Rea
           menuButtonRef={menuButtonRef}
         />
         {/* The root layout's skip link targets #main. Below lg, pb-28 keeps the end
-            of every page clear of the + button. */}
-        <main id="main" className="px-4 pt-6 pb-28 sm:px-6 lg:pt-8 lg:pb-8 print:p-0">
-          {children}
+            of every page clear of the bottom bar. Pages sit in a centred column so
+            wide screens don't stretch tables and panels edge to edge. */}
+        <main id="main" className="px-4 pt-5 pb-28 sm:px-6 lg:pt-8 lg:pb-10 print:p-0">
+          <div className="mx-auto w-full max-w-328 print:max-w-none">{children}</div>
         </main>
       </div>
+      <AdminTabBar
+        onOpenQuick={openQuick}
+        quickOpen={quick.open}
+        onOpenMenu={openDrawer}
+        menuOpen={drawerOpen}
+      />
+      <QuickActionsSheet
+        open={quick.open}
+        onClose={() => setQuick((q) => ({ ...q, open: false }))}
+        stamp={quick.stamp}
+      />
     </div>
   );
 }

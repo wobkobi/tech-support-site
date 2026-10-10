@@ -9,6 +9,7 @@ import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { InfoRow } from "@/features/admin/components/ui/InfoRow";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { formatNZD } from "@/features/business/lib/business";
 import { ContactDetailActions } from "@/features/contacts/components/ContactDetailActions";
@@ -130,12 +131,12 @@ export default async function ContactDetailPage({
         }
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatStrip label="Totals for this contact" className="mb-6 grid-cols-2 lg:grid-cols-4">
         <StatCard label="Bookings" value={totals.bookings} />
         <StatCard label="Invoices" value={totals.invoices} />
         <StatCard label="Billed" value={formatNZD(totals.incomeTotal)} tone="success" />
         <StatCard label="Reviews" value={totals.reviews} />
-      </div>
+      </StatStrip>
 
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-6">
         {/* Left: interaction timeline */}

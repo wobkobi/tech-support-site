@@ -7,7 +7,17 @@
 // (shell)/layout.tsx), which the login page sits outside.
 
 import type { Metadata } from "next";
+import { IBM_Plex_Sans } from "next/font/google";
 import type React from "react";
+
+// Body and figures face for the admin only: plainer than Exo at dense sizes, with even
+// digits for money columns. Headings keep Exo (see the .app-admin rules in globals.css).
+const plex = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-plex",
+});
 
 export const metadata: Metadata = {
   referrer: "no-referrer",
@@ -27,5 +37,5 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }): React.ReactElement {
-  return <div className="app-admin">{children}</div>;
+  return <div className={`app-admin ${plex.variable}`}>{children}</div>;
 }

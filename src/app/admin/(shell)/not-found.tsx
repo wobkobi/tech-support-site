@@ -14,7 +14,7 @@ export default function AdminNotFound(): React.ReactElement {
   return (
     <>
       <div className="mx-auto max-w-md py-16 text-center">
-        <p className="text-5xl font-extrabold text-russian-violet">404</p>
+        <p className="text-5xl font-bold text-russian-violet">404</p>
         <h1 className="mt-3 text-xl font-bold text-russian-violet">Page not found</h1>
         <p className="mt-2 text-sm text-admin-muted">
           That admin page or record does not exist or has been removed.

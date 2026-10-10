@@ -112,7 +112,7 @@ export function FiledYearControls({
   }
 
   return (
-    <div className="mb-6 flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       {filedAtIso !== null ? (
         <StatusPill tone="success">Filed on {formatDateShort(filedAtIso)}</StatusPill>
       ) : (

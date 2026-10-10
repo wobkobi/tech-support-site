@@ -35,7 +35,7 @@ export default async function AdminLoginPage({
   return (
     <div className="flex min-h-screen items-center justify-center bg-admin-bg p-6">
       <Card className="w-full max-w-sm sm:p-6">
-        <h1 className="text-xl font-extrabold text-russian-violet">Admin sign-in</h1>
+        <h1 className="text-xl font-bold text-russian-violet">Admin sign-in</h1>
         <p className="mt-1 text-sm text-admin-muted">
           Enter the admin secret to access the operator panel.
         </p>
