@@ -1,9 +1,9 @@
 // src/app/api/business/tax-years/[fyKey]/route.ts
 // Admin per-FY tax record endpoint. PUT upserts the TaxYear row for one FY key: the home
 // office floor areas and whole-house costs, that year's IRD square-metre and kilometre
-// rates, and the car's total km for the year. A filed year is refused so its figures stay
-// frozen. POST `{ action: "file" | "unfile" }` saves the year's figures as a snapshot or
-// releases them.
+// rates, the car's total km and the ACC levy rate for the year. A filed year is refused
+// so its figures stay frozen. POST `{ action: "file" | "unfile" }` saves the year's
+// figures as a snapshot or releases them.
 
 import { fileTaxYear, unfileTaxYear } from "@/features/business/lib/tax/filing.server";
 import { resolveFinancialYear } from "@/features/business/lib/tax/view.server";
@@ -17,7 +17,10 @@ import { NextRequest, NextResponse } from "next/server";
 /** Shown for a malformed key, or one outside the business start to the current FY. */
 const UNKNOWN_FY_ERROR = "Unknown financial year";
 
-/** TaxYear fields this route writes. Null clears a value (rates then fall back to IRD's). */
+/**
+ * TaxYear fields this route writes. Null clears a value (the km and m² rates then fall
+ * back to IRD's, the ACC rate to the Settings one).
+ */
 const EDITABLE_FIELDS = [
   "officeSqm",
   "houseSqm",
@@ -25,6 +28,7 @@ const EDITABLE_FIELDS = [
   "kmTier1",
   "kmTier2",
   "totalVehicleKm",
+  "accRate",
   "mortgageInterestOrRent",
   "rates",
 ] as const;
@@ -39,12 +43,19 @@ const FIELD_LABELS: Record<EditableField, string> = {
   kmTier1: "Tier 1 kilometre rate",
   kmTier2: "Tier 2 kilometre rate",
   totalVehicleKm: "total km the car travelled",
+  accRate: "ACC levy rate",
   mortgageInterestOrRent: "mortgage interest or rent",
   rates: "council rates",
 };
 
 /** Shown for a zero, negative or non-numeric total km. */
 const TOTAL_KM_ERROR = "Enter the car's total km, or leave it blank";
+
+/**
+ * Highest ACC rate (as a fraction) the route accepts. The levy has been under 2% for
+ * years, so anything near this is a percent typed where the fraction belongs.
+ */
+const MAX_ACC_RATE = 0.2;
 
 /**
  * PUT /api/business/tax-years/[fyKey] - Creates or updates one FY's TaxYear record.
@@ -96,7 +107,7 @@ export async function PUT(
     if (field === "totalVehicleKm" && (parsed === null || parsed === 0)) {
       return noStore(errorResponse(TOTAL_KM_ERROR, 400));
     }
-    if (parsed === null) {
+    if (parsed === null || (field === "accRate" && parsed > MAX_ACC_RATE)) {
       return noStore(errorResponse(`Invalid ${FIELD_LABELS[field]}`, 400));
     }
     data[field] = parsed;

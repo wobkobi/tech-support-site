@@ -1166,6 +1166,14 @@ function checkTaxYear(): void {
     [r.acc, r.kiwiSaver, r.totalToSetAside, r.provisionalWarning],
     [440.41, 754.98, 3232.49, false],
   );
+  // The year's own ACC rate (2025-26's 1.67%) wins over Settings' 1.75%: 25,166.16 x
+  // 0.0167 = 420.2749 > 420.27. Set aside 2,792.08 + 420.27 = 3,212.35.
+  const ownAcc = computeTaxYear({ ...input, year: { ...input.year, accRate: 0.0167 } });
+  expectEqual(
+    "the year's own ACC rate wins over Settings",
+    [ownAcc.acc, ownAcc.totalToSetAside],
+    [420.27, 3212.35],
+  );
   // Box 52 = 1,133.34 + 345 + 320. Box 54 = car 4,500 + meter 345 + laptop 2,000.
   expectEqual("IR3 / IR10 figures", r.ir, {
     ir3NetIncome: 25166.16,

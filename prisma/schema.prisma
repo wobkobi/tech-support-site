@@ -1260,6 +1260,8 @@ model TaxYear {
   kmTier2                Float?
   // The car's total km for the FY, read from the odometer; sets the km Tier 1 split.
   totalVehicleKm         Float?
+  // The year's ACC levy rate as a fraction (2025-26 was 0.0167); null uses the Settings rate.
+  accRate                Float?
   // Whole-house mortgage interest or rent, and council rates, for the year.
   mortgageInterestOrRent Float?
   rates                  Float?

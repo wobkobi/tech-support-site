@@ -42,6 +42,7 @@ const TAX_YEAR_SELECT = {
   kmTier1: true,
   kmTier2: true,
   totalVehicleKm: true,
+  accRate: true,
   mortgageInterestOrRent: true,
   rates: true,
   filedAt: true,
@@ -110,7 +111,8 @@ export function kmRatesFor(ird: IrdYearRates, fuel: VehicleFuel): KmTierRates {
 /**
  * A year's inputs: what the TaxYear record stores, with any blank rate taken from IRD's
  * published rates for that year (or the latest year before it) and the settings' fuel type.
- * An unset total vehicle km stays null (the km claim then skips the Tier 1 scaling).
+ * An unset total vehicle km stays null (the km claim then skips the Tier 1 scaling), and
+ * an unset ACC rate stays null (the maths then uses the Settings rate).
  * @param fyKey - FY key, e.g. "2026-27".
  * @param stored - The year's TaxYear row, if one exists.
  * @param fuel - settings.tax.vehicleFuel.
@@ -130,6 +132,7 @@ export function yearRecordFor(
     kmTier1: stored?.kmTier1 ?? km.tier1,
     kmTier2: stored?.kmTier2 ?? km.tier2,
     totalVehicleKm: stored?.totalVehicleKm ?? null,
+    accRate: stored?.accRate ?? null,
     mortgageInterestOrRent: stored?.mortgageInterestOrRent ?? null,
     rates: stored?.rates ?? null,
   };

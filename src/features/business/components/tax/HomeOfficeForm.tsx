@@ -1,8 +1,8 @@
 "use client";
 // src/features/business/components/tax/HomeOfficeForm.tsx
-// Home office, IRD rate and car total km inputs for one financial year. Saves through
-// PUT /api/business/tax-years/[fyKey], then refreshes the server page so the estimate
-// recomputes. A filed year shows the values read-only.
+// Home office, IRD rate, car total km and ACC rate inputs for one financial year. Saves
+// through PUT /api/business/tax-years/[fyKey], then refreshes the server page so the
+// estimate recomputes. A filed year shows the values read-only.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -27,6 +27,8 @@ export interface TaxYearFormValues {
   kmTier2: number | null;
   /** Every km the car travelled in the FY, business and private. */
   totalVehicleKm: number | null;
+  /** The year's ACC levy rate as a fraction; null uses the Settings rate. */
+  accRate: number | null;
   mortgageInterestOrRent: number | null;
   rates: number | null;
 }
@@ -35,11 +37,13 @@ type FieldKey = keyof TaxYearFormValues;
 type Draft = Record<FieldKey, string>;
 type FieldErrors = Partial<Record<FieldKey, string>>;
 
-/** IRD's published rates for the year, shown as hints and placeholders. */
+/** IRD's published rates for the year, and the Settings ACC rate, shown as hints and placeholders. */
 interface RateDefaults {
   sqmRate: number;
   kmTier1: number;
   kmTier2: number;
+  /** Settings ACC rate as a fraction. */
+  accRate: number;
 }
 
 /** One input: its key, label, help line and placeholder. */
@@ -76,10 +80,24 @@ const FIELD_KEYS: readonly FieldKey[] = [
   "kmTier1",
   "kmTier2",
   "totalVehicleKm",
+  "accRate",
 ];
 
+/** Highest ACC percent the form accepts; the route refuses the same as a fraction. */
+const MAX_ACC_PCT = 20;
+
 /**
- * Draft strings for the inputs: blank for a value that isn't set.
+ * A fraction as the percent the ACC input shows, to 4 decimals so 1.67% stays 1.67.
+ * @param fraction - Rate as a fraction, e.g. 0.0167.
+ * @returns The percent, e.g. 1.67.
+ */
+function toPct(fraction: number): number {
+  return Math.round(fraction * 1_000_000) / 10_000;
+}
+
+/**
+ * Draft strings for the inputs: blank for a value that isn't set. The ACC rate is stored
+ * as a fraction and typed as a percent.
  * @param values - Saved values.
  * @returns Input text per field.
  */
@@ -87,7 +105,7 @@ function toDraft(values: TaxYearFormValues): Draft {
   const draft = {} as Draft;
   for (const key of FIELD_KEYS) {
     const value = values[key];
-    draft[key] = value === null ? "" : String(value);
+    draft[key] = value === null ? "" : String(key === "accRate" ? toPct(value) : value);
   }
   return draft;
 }
@@ -113,6 +131,15 @@ function parseDraft(draft: Draft): { values: TaxYearFormValues; errors: FieldErr
     }
     if (!Number.isFinite(n) || n < 0) {
       errors[key] = "Enter a number of 0 or more, or leave it blank.";
+      continue;
+    }
+    if (key === "accRate") {
+      if (n > MAX_ACC_PCT) {
+        errors[key] = `Enter the rate as a percent, e.g. 1.67, or leave it blank.`;
+        continue;
+      }
+      // Back to a fraction, rounded so an unchanged 1.67 compares equal to the saved 0.0167.
+      values[key] = Math.round((n / 100) * 1_000_000) / 1_000_000;
       continue;
     }
     values[key] = n;
@@ -215,13 +242,30 @@ function carFields(defaults: RateDefaults, fuel: string): FieldSpec[] {
 }
 
 /**
+ * The year's ACC levy rate input.
+ * @param defaults - Rates for the year, including the Settings ACC rate.
+ * @returns Field specs.
+ */
+function accFields(defaults: RateDefaults): FieldSpec[] {
+  const settingsPct = toPct(defaults.accRate);
+  return [
+    {
+      key: "accRate",
+      label: "ACC levy rate (%)",
+      hint: `Leave blank for the rate in Settings: ${settingsPct}%. The levy changes each April, so set a past year's own rate (2025-26 was 1.67%).`,
+      placeholder: String(settingsPct),
+    },
+  ];
+}
+
+/**
  * Home office form card.
  * @param props - Component props.
  * @param props.fyKey - FY key the record belongs to, e.g. "2026-27".
  * @param props.fyLabel - FY display label.
  * @param props.filed - True when the year is filed (inputs locked).
  * @param props.initial - Saved values (null = not set).
- * @param props.defaults - IRD's published rates for the year.
+ * @param props.defaults - IRD's published rates for the year, and the Settings ACC rate.
  * @param props.fuel - Readable vehicle fuel type for the km rate hints.
  * @param props.claim - Home office claim the estimate worked out from the saved values.
  * @param props.businessKm - Business km the FY's km claim counts.
@@ -343,8 +387,8 @@ export function HomeOfficeForm({
   return (
     <Card>
       <CardHeader
-        title="Home office and car"
-        description={`${fyLabel}. The office is claimed on IRD's square-metre rate, plus its share of mortgage interest or rent and rates. The car is claimed on IRD's kilometre rates.`}
+        title="Home office, car and ACC"
+        description={`${fyLabel}. The office is claimed on IRD's square-metre rate, plus its share of mortgage interest or rent and rates. The car is claimed on IRD's kilometre rates. ACC is worked out on this year's levy rate.`}
       />
       {filed && (
         <Notice tone="info" className="mb-4">
@@ -353,8 +397,9 @@ export function HomeOfficeForm({
       )}
       <form onSubmit={handleSubmit} noValidate>
         <p className="mb-5 text-sm text-admin-muted">
-          Leave a rate blank to use IRD's published rate. Fill it in when IRD publishes this year's
-          figures, or when your accountant gives you a different rate.
+          Leave a rate blank to use IRD's published rate (for ACC, the rate in Settings). Fill it in
+          when IRD publishes this year's figures, or when your accountant gives you a different
+          rate.
         </p>
         <h3 className="mb-3 text-base font-semibold text-admin-text">Home office</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -377,6 +422,11 @@ export function HomeOfficeForm({
           {carFields(defaults, fuel).map((spec) =>
             renderField(spec, spec.key === "totalVehicleKm" ? kmWarning : undefined),
           )}
+        </div>
+
+        <h3 className="mt-6 mb-3 text-base font-semibold text-admin-text">ACC</h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {accFields(defaults).map((spec) => renderField(spec))}
         </div>
 
         {!filed && (

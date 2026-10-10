@@ -183,7 +183,12 @@ export default async function TaxPage({
       <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="flex min-w-0 flex-col gap-6 lg:col-span-8">
           <DeductionsBreakdown result={result} gst={input.gst} filed={filed} />
-          <IncomeTaxWorkings result={result} settings={input.settings} filed={filed} />
+          <IncomeTaxWorkings
+            result={result}
+            settings={input.settings}
+            accRate={input.year.accRate ?? input.settings.acc}
+            filed={filed}
+          />
           <HomeOfficeForm
             // Remount per FY so a half-typed draft never carries into another year.
             key={fyKey}
@@ -197,6 +202,7 @@ export default async function TaxPage({
               kmTier1: record?.kmTier1 ?? null,
               kmTier2: record?.kmTier2 ?? null,
               totalVehicleKm: record?.totalVehicleKm ?? null,
+              accRate: record?.accRate ?? null,
               mortgageInterestOrRent: record?.mortgageInterestOrRent ?? null,
               rates: record?.rates ?? null,
             }}
@@ -204,6 +210,7 @@ export default async function TaxPage({
               sqmRate: irdDefaults.sqmRate,
               kmTier1: kmDefaults.tier1,
               kmTier2: kmDefaults.tier2,
+              accRate: input.settings.acc,
             }}
             fuel={fuelLabel(input.settings.vehicleFuel)}
             claim={result.homeOffice}

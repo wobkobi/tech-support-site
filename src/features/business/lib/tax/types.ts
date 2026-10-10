@@ -155,6 +155,11 @@ export interface TaxYearRecordInput {
    * share; missing, the first 14,000 business km are Tier 1.
    */
   totalVehicleKm?: number | null;
+  /**
+   * The year's ACC levy rate as a fraction. The levy changes each April, so a past year
+   * keeps its own rate; missing or null uses `settings.acc`.
+   */
+  accRate?: number | null;
   /** Mortgage interest or rent for the year (whole house). */
   mortgageInterestOrRent: number | null;
   /** Council rates for the year (whole house). */

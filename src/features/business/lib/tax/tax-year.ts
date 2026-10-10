@@ -220,7 +220,7 @@ export function computeTaxYear(input: TaxYearInput): TaxYearResult {
   const incomeTax = incomeTaxOnBrackets(taxable, settings.brackets);
   const ietc = independentEarnerCredit(taxable, settings.ietc);
   const residualIncomeTax = roundCents(Math.max(0, incomeTax - ietc));
-  const acc = roundCents(taxable * settings.acc);
+  const acc = roundCents(taxable * (input.year.accRate ?? settings.acc));
   const kiwiSaver = roundCents(taxable * settings.kiwiSaver);
 
   return {

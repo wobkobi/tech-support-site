@@ -24,6 +24,8 @@ interface IncomeTaxWorkingsProps {
   result: TaxYearResult;
   /** Live tax settings (brackets, IETC, ACC, KiwiSaver). */
   settings: TaxRulesSettings;
+  /** The ACC rate this year's estimate uses: the year's own rate, else the Settings one. */
+  accRate: number;
   /** True when the result is a filed year's saved figures, worked out on the settings then. */
   filed: boolean;
 }
@@ -48,19 +50,21 @@ function ietcNote(ietc: TaxRulesSettings["ietc"]): string {
  * @param props - Component props.
  * @param props.result - computeTaxYear output for the FY.
  * @param props.settings - Live tax settings, used for the labels of a year not yet filed.
+ * @param props.accRate - The ACC rate the estimate uses, for the label of a year not yet filed.
  * @param props.filed - True when the result is a filed year's saved figures.
  * @returns The card.
  */
 export function IncomeTaxWorkings({
   result,
   settings,
+  accRate: yearAccRate,
   filed,
 }: IncomeTaxWorkingsProps): React.ReactElement {
   // A filed year keeps its saved income tax, so the live band rows only show while
   // the brackets in Settings still give that total.
   const showBands = !filed || bracketsMatchFiled(result, settings.brackets);
   const bands = bandBreakdown(result.taxable, settings.brackets).filter((b) => b.taxedAmount > 0);
-  const accRate = filed ? filedRateLabel(result.acc, result.taxable) : formatRatePct(settings.acc);
+  const accRate = filed ? filedRateLabel(result.acc, result.taxable) : formatRatePct(yearAccRate);
   const kiwiSaverRate = filed
     ? filedRateLabel(result.kiwiSaver, result.taxable)
     : formatRatePct(settings.kiwiSaver);
