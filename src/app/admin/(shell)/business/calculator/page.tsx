@@ -6,11 +6,18 @@
 // calculator" action) prefills the job from that calendar event's corrected times plus
 // its booking's client details, and links the saved invoice back to both.
 // `?eventIds=a,b,c` bills several of the day's events as one job, each event keeping its
-// own time slot so the gaps between them go unbilled.
+// own time slot so the gaps between them go unbilled. `?reissue=<invoiceId>` rebuilds a
+// voided invoice: its events prefill as above, and its client, lines and notes seed the
+// form, so the promo is priced again rather than copied.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { CalculatorView } from "@/features/business/components/CalculatorView";
 import { buildEventPrefill } from "@/features/business/lib/event-prefill.server";
+import {
+  type ReissuePrefill,
+  reissueEventIds,
+  reissuePrefill,
+} from "@/features/business/lib/invoice-reissue";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { getActivePromo } from "@/features/business/lib/promos";
 import type { RateConfig, TaskTemplate } from "@/features/business/types/business";
@@ -43,18 +50,36 @@ function parseEventIds(params: { eventId?: string; eventIds?: string }): string[
 }
 
 /**
+ * Loads a voided invoice to re-issue. Anything else (a live invoice, a quote, a bad id)
+ * gives null, and the calculator loads as normal.
+ * @param id - The `reissue` param.
+ * @returns The prefill plus the invoice's billed events, or null.
+ */
+async function loadReissue(
+  id: string | undefined,
+): Promise<{ prefill: ReissuePrefill; eventIds: string[] } | null> {
+  if (!id || !/^[a-f\d]{24}$/i.test(id)) return null;
+  const invoice = await prisma.invoice.findUnique({ where: { id } });
+  if (!invoice || invoice.status !== "VOIDED" || invoice.isQuote === true) return null;
+  return { prefill: reissuePrefill(invoice), eventIds: reissueEventIds(invoice) };
+}
+
+/**
  * Job calculator page with AI parsing, time tracking, and rate management.
  * @param props - Page props.
- * @param props.searchParams - Optional `eventId` (schedule's "Bill in calculator") or `eventIds` (merged job).
+ * @param props.searchParams - Optional `eventId` (schedule's "Bill in calculator"), `eventIds` (merged job) or `reissue` (a voided invoice's id).
  * @returns Calculator page element
  */
 export default async function CalculatorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ eventId?: string; eventIds?: string }>;
+  searchParams: Promise<{ eventId?: string; eventIds?: string; reissue?: string }>;
 }): Promise<React.ReactElement> {
   await requireAdminAuth();
-  const eventIds = parseEventIds(await searchParams);
+  const params = await searchParams;
+  const reissue = await loadReissue(params.reissue);
+  // A re-issue bills the voided invoice's own events; it ignores any event params.
+  const eventIds = reissue ? reissue.eventIds : parseEventIds(params);
   const [identity, policy, rateRows, templateRows, promo, eventPrefill] = await Promise.all([
     getIdentity(),
     getPolicy(),
@@ -115,7 +140,13 @@ export default async function CalculatorPage({
             navigation remounts the view - the prefill lands via useState
             initialisers, which never re-run on a prop change alone. */}
         <CalculatorView
-          key={eventIds.length > 0 ? eventIds.join(",") : "blank"}
+          key={
+            reissue
+              ? `reissue:${params.reissue}`
+              : eventIds.length > 0
+                ? eventIds.join(",")
+                : "blank"
+          }
           identity={identity}
           pricing={pricing}
           cancellation={policy.CANCELLATION}
@@ -123,6 +154,7 @@ export default async function CalculatorPage({
           initialTaskTemplates={initialTaskTemplates}
           initialPromo={promo}
           eventPrefill={eventPrefill}
+          reissue={reissue?.prefill ?? null}
         />
       </Suspense>
     </>

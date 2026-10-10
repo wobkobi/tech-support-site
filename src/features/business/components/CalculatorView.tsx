@@ -19,6 +19,7 @@ import { JobSettingsStrip } from "@/features/business/components/calculator/JobS
 import { NotesSection } from "@/features/business/components/calculator/NotesSection";
 import { PartsSection } from "@/features/business/components/calculator/PartsSection";
 import { PhoneTotalBar } from "@/features/business/components/calculator/PhoneTotalBar";
+import { ReissueBanner } from "@/features/business/components/calculator/ReissueBanner";
 
 import { SaveActions } from "@/features/business/components/calculator/SaveActions";
 import { TaskTimeWarning } from "@/features/business/components/calculator/TaskTimeWarning";
@@ -59,6 +60,7 @@ import {
   toggleTaskModifierLine,
   updateTaskField,
 } from "@/features/business/lib/calculator-helpers";
+import type { ReissuePrefill } from "@/features/business/lib/invoice-reissue";
 import { fitTasksToWindow } from "@/features/business/lib/parse-hydrate";
 import { calcTravelCharge, type CancellationPolicy } from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
@@ -103,6 +105,8 @@ interface CalculatorViewProps {
   initialPromo: ActivePromo | null;
   /** Job prefill from a schedule event ("Bill in calculator"); null on a normal load. */
   eventPrefill: EventPrefill | null;
+  /** What a voided invoice being re-issued carries over; null on a normal load. */
+  reissue: ReissuePrefill | null;
 }
 
 // The prefill shapes live in the shared business types so the event picker
@@ -120,6 +124,7 @@ export type { EventPrefill, EventPrefillSlot } from "@/features/business/types/b
  * @param props.initialTaskTemplates - Server-resolved task templates.
  * @param props.initialPromo - Server-resolved active promo, or null.
  * @param props.eventPrefill - Schedule-event job prefill, or null on a normal load.
+ * @param props.reissue - Voided invoice being re-issued, or null on a normal load.
  * @returns The rendered calculator view element.
  */
 export function CalculatorView({
@@ -130,6 +135,7 @@ export function CalculatorView({
   initialTaskTemplates,
   initialPromo,
   eventPrefill,
+  reissue,
 }: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
 
@@ -201,7 +207,7 @@ export function CalculatorView({
   const [parts, setParts] = useState<PartLine[]>([]);
   const [showParts, setShowParts] = useState(false);
   const [showTaxonomyModal, setShowTaxonomyModal] = useState(false);
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(() => reissue?.notes ?? "");
   // Paid in cash on the day: invoices save as paid, income entries record Cash.
   const [paidCash, setPaidCash] = useState(false);
   // Part of the bill handed over on the day: shown on the invoice, recorded in income.
@@ -220,11 +226,16 @@ export function CalculatorView({
     return () => io.disconnect();
   }, []);
   // Client details
-  const [clientName, setClientName] = useState(() => eventPrefill?.clientName ?? "");
+  // A re-issue's own client details fill in when no calendar event backs it.
+  const [clientName, setClientName] = useState(
+    () => eventPrefill?.clientName ?? reissue?.clientName ?? "",
+  );
   // Normalised on seed as well as on typing: a Booking row written before
   // emails were normalised can still carry capitals, and the invoice preview
   // must show exactly what gets saved.
-  const [clientEmail, setClientEmail] = useState(() => normaliseEmail(eventPrefill?.clientEmail));
+  const [clientEmail, setClientEmail] = useState(() =>
+    normaliseEmail(eventPrefill?.clientEmail ?? reissue?.clientEmail),
+  );
   // Address-to state mirrors the InvoiceBuilder's segmented control so the
   // operator picks Name/Company/Custom once and the choice rides through to
   // the invoice without re-picking.
@@ -301,7 +312,11 @@ export function CalculatorView({
 
   // Job date drives the holiday + promo lookup so a past job is priced by what
   // applied THEN, not today. Persisted in the draft; defaults to today (NZ).
-  const [jobDate, setJobDate] = useState<string>(() => eventPrefill?.jobDate ?? todayISO());
+  // A re-issue with no event falls back to the voided invoice's issue date, so the promo is
+  // priced for when the job was billed.
+  const [jobDate, setJobDate] = useState<string>(
+    () => eventPrefill?.jobDate ?? reissue?.issueDate ?? todayISO(),
+  );
 
   // The job's earliest start, so a time-of-day promo is judged at the real start
   // rather than the lookup's midday default. HH:MM strings sort as times.
@@ -413,7 +428,7 @@ export function CalculatorView({
     // Restore the saved draft after mount (localStorage is client-only). An event prefill
     // is a deliberate fresh billing task and outranks any draft; a non-meaningful draft
     // (just auto-seeded times) reseeds "now" rather than restoring stale timestamps.
-    const draft = eventPrefill ? null : loadDraft();
+    const draft = eventPrefill || reissue ? null : loadDraft();
     if (draft && isMeaningfulDraft(draft)) {
       draftLoadedRef.current = true;
       /* eslint-disable react-hooks/set-state-in-effect -- one-shot restore from
@@ -454,7 +469,9 @@ export function CalculatorView({
     try {
       const handoff = sessionStorage.getItem(AI_INPUT_HANDOFF_KEY);
       if (handoff) sessionStorage.removeItem(AI_INPUT_HANDOFF_KEY);
-      const carried = handoff ?? (eventPrefill ? (loadDraft()?.aiInput ?? "") : "");
+      // A re-issue seeds the voided invoice's lines instead of any saved draft text.
+      const carried =
+        handoff ?? (reissue ? reissue.jobText : eventPrefill ? (loadDraft()?.aiInput ?? "") : "");
       if (carried) {
         setAiInput(carried);
       }
@@ -469,12 +486,10 @@ export function CalculatorView({
         // A job billed from the schedule arrives as typed text, with no contact
         // picked, so the Name/Company switch never showed. Pick the Google contact
         // whose email the booking used, when the booking's name is theirs too.
-        const email = normaliseEmail(eventPrefill?.clientEmail);
+        const seeded = eventPrefill ?? reissue;
+        const email = normaliseEmail(seeded?.clientEmail);
         const match = email ? d.contacts.find((c) => normaliseEmail(c.email) === email) : undefined;
-        if (
-          match &&
-          match.name.trim().toLowerCase() === eventPrefill?.clientName.trim().toLowerCase()
-        ) {
+        if (match && match.name.trim().toLowerCase() === seeded?.clientName.trim().toLowerCase()) {
           setPickedContactName(match.name);
           setPickedContactCompany(match.company?.trim() || null);
           setPickedContactGoogleId(match.id || null);
@@ -722,7 +737,7 @@ export function CalculatorView({
     // Billing a booked job: the prefill is a server prop keyed by eventId, so
     // state resets alone can't remove the banner - drop the query param and
     // let the remount start truly blank.
-    if (eventPrefill) router.replace("/admin/business/calculator");
+    if (eventPrefill || reissue) router.replace("/admin/business/calculator");
   }
 
   /**
@@ -811,6 +826,8 @@ export function CalculatorView({
         skipPromo={skipPromo}
         onSkipPromoChange={setSkipPromo}
       />
+
+      {reissue && <ReissueBanner reissue={reissue} fromEvent={eventPrefill !== null} />}
 
       {draftRestoredAt !== null && (
         <DraftRestoredBanner

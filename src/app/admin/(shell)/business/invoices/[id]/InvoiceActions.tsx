@@ -1,7 +1,8 @@
 "use client";
 // src/app/admin/(shell)/business/invoices/[id]/InvoiceActions.tsx
 // Action buttons + modals for the invoice detail page: save PDF, open Drive PDF, record
-// payment (via PaymentDialog), send-to-client, void, and delete-draft. Below lg, an
+// payment (via PaymentDialog), send-to-client, void, re-issue a voided invoice (rebuilt in
+// the calculator, so the promo is priced again), and delete-draft. Below lg, an
 // invoice still awaiting payment pins Mark as paid and Send to the screen bottom. The
 // send flow opens a preview modal with an editable email body/greeting plus the automatic
 // review ask checkbox; the void flow previews the notification and warns
@@ -11,15 +12,18 @@
 // SendInvoiceModal.tsx and VoidInvoiceModal.tsx.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { adminButtonClass } from "@/features/admin/components/ui/button-classes";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import {
   type LikelyIncome,
   PaymentDialog,
 } from "@/features/business/components/invoice/PaymentDialog";
+import { reissueHref } from "@/features/business/lib/invoice-reissue";
 import { cn } from "@/shared/lib/cn";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
@@ -330,6 +334,12 @@ export function InvoiceActions({
           <AdminButton variant="secondary" onClick={voidFlow.resendVoidNotification} busy={voiding}>
             Resend void notification
           </AdminButton>
+        )}
+        {/* Nothing is saved until the calculator saves, so no confirm is needed. */}
+        {isVoided && !isQuote && (
+          <Link href={reissueHref(invoiceId)} className={adminButtonClass({})}>
+            Re-issue in calculator
+          </Link>
         )}
         {isOverdue && !isPaid && !isVoided && clientEmail && (
           <AdminButton
