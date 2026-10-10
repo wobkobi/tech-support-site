@@ -1,7 +1,7 @@
 "use client";
 // src/features/business/components/calculator/TaskTimeWarning.tsx
 
-import { explicitRoundingAllowanceMins, hourlyTaskMinutes } from "@/features/business/lib/business";
+import { hourlyTaskMinutes, taskWindowMismatch } from "@/features/business/lib/business";
 import type { TaskLine } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -10,7 +10,7 @@ interface TaskTimeWarningProps {
   tasks: TaskLine[];
   windowMin: number;
   minBillableMins: number;
-  /** Live billing increment; sizes the pinned-task overshoot allowance. */
+  /** Live billing increment: the grid the window is judged on. */
   snapMins?: number;
   onFix: () => void;
 }
@@ -18,13 +18,13 @@ interface TaskTimeWarningProps {
 /**
  * Inline banner shown above the tasks panel when hourly task minutes don't
  * match the listed job window, or when a short job sits below the minimum
- * billable time. Stays hidden when everything lines up so the panel doesn't
- * carry a permanent strip of UI in the steady state.
+ * billable time; {@link taskWindowMismatch} decides which. Stays hidden when everything
+ * lines up so the panel doesn't carry a permanent strip of UI in the steady state.
  * @param props - Component props.
  * @param props.tasks - Current task lines (hourly + flat).
  * @param props.windowMin - Job window in minutes (`durationMins`).
  * @param props.minBillableMins - Minimum billable labour minutes; below this the floor banner shows.
- * @param props.snapMins - Live billing increment sizing the pinned-task overshoot allowance.
+ * @param props.snapMins - Live billing increment: the grid the window is judged on.
  * @param props.onFix - Handler that fits tasks to the window, either way, and floors to the minimum.
  * @returns Warning element, or null when totals already match.
  */
@@ -35,13 +35,13 @@ export function TaskTimeWarning({
   snapMins,
   onFix,
 }: TaskTimeWarningProps): React.ReactElement | null {
+  const mismatch = taskWindowMismatch(tasks, windowMin, minBillableMins, snapMins);
+  if (!mismatch) return null;
   const taskMin = hourlyTaskMinutes(tasks);
-  if (taskMin === 0) return null;
 
   // Sub-minimum job: whole-job labour sits under the billable floor, so offer to bill at
-  // the minimum (Fix floors the tasks). Checked before the window comparison - a short job
-  // usually has taskMin == windowMin, which the drift tolerance below would swallow.
-  if (taskMin < minBillableMins) {
+  // the minimum (Fix floors the tasks).
+  if (mismatch === "floor") {
     return (
       <div
         role="status"
@@ -61,21 +61,7 @@ export function TaskTimeWarning({
     );
   }
 
-  if (windowMin <= 0) return null;
-  // Explicit durations round UP to the snap grid, so their sum can top the
-  // raw window by one step per pinned task without being an over-estimate.
-  // Suppress that expected overshoot - Fix never rescales pinned tasks.
-  const overshoot = taskMin - windowMin;
-  if (overshoot > 0 && overshoot <= explicitRoundingAllowanceMins(tasks, snapMins)) return null;
-  // Tolerance: qty rounds to 2 dp (0.6-min granularity), so a 3-task split can sit ~1.5
-  // min off windowMin and still be correct after collapseToWindow. Without it the banner
-  // reads "Tasks total 215 min - listed window is 215 min" off a 214.8 vs 215 float.
-  if (Math.abs(taskMin - windowMin) < 2) return null;
-  const over = taskMin > windowMin;
-  // Billing to the minimum floor legitimately exceeds a shorter worked window,
-  // so a floored job (taskMin at the minimum, window below it) isn't an
-  // over-estimate - only flag "over" when the tasks also clear the floor.
-  if (over && taskMin <= minBillableMins) return null;
+  const over = mismatch === "over";
   return (
     <div
       role="status"

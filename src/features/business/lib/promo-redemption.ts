@@ -143,3 +143,27 @@ export async function releaseBookingRedemptions(bookingId: string): Promise<void
     console.error("[promos] Failed to release booking redemptions:", err);
   }
 }
+
+/**
+ * Releases the redemption a voided invoice settled, since a void means the discount was
+ * never really given. A row that came from a booking goes back to its booking-time state
+ * (no invoice, no value), so a re-issued invoice for the same job settles it again and
+ * the job still counts once. A row the invoice created on its own is deleted.
+ *
+ * Bookkeeping only: it never throws, because a void must not fail over analytics.
+ * @param invoiceId - The voided invoice.
+ * @returns Promise that resolves once the writes have been attempted.
+ */
+export async function releaseInvoiceRedemptions(invoiceId: string): Promise<void> {
+  try {
+    await prisma.promoRedemption.updateMany({
+      where: { invoiceId, bookingId: { not: null } },
+      data: { invoiceId: null, discountValue: null },
+    });
+    await prisma.promoRedemption.deleteMany({
+      where: { invoiceId, OR: [{ bookingId: null }, { bookingId: { isSet: false } }] },
+    });
+  } catch (err) {
+    console.error("[promos] Failed to release invoice redemptions:", err);
+  }
+}

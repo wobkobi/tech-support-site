@@ -33,10 +33,13 @@ export interface LineAmountInput {
  *
  * Lines carrying `minutes` group by unit price. A group's total is its summed minutes at
  * that rate, rounded once; each line takes its floored cents, then the leftover cents go
- * one apiece to the lines that lost the largest fraction (earliest first on a tie), so
- * the split above prints $58.34, $58.33 and $33.33. Every other line, and a timed line
- * alone at its rate, rounds on its own. Worked out from qty, unitPrice and minutes only,
- * so a saved invoice re-totals to the cents it was printed with.
+ * one apiece to the lines that lost the largest fraction. On a tie the bigger line takes
+ * the cent (then the earlier one), where it reads as rounding: 5 min + 3:05 at $100/hr
+ * prints $8.33 + $308.34, not an $8.34 nobody could check. The split above prints
+ * $58.34, $58.33 and $33.33. A timed line is always priced from its minutes, the time
+ * the invoice prints, so a line alone at its rate matches one in a group. Lines without
+ * minutes round qty x unitPrice on their own. Worked out from qty, unitPrice and minutes
+ * only, so a saved invoice re-totals to the cents it was printed with.
  * @param lines - Line items or task lines, in display order.
  * @returns Each line's total in dollars, in the same order.
  */
@@ -48,7 +51,6 @@ export function splitLineTotals(lines: readonly LineAmountInput[]): number[] {
     byRate.set(l.unitPrice, [...(byRate.get(l.unitPrice) ?? []), i]);
   });
   for (const [rate, idx] of byRate) {
-    if (idx.length < 2) continue;
     const exact = idx.map((i) => (lines[i]!.minutes! * rate * 100) / 60);
     const totalMins = idx.reduce((s, i) => s + lines[i]!.minutes!, 0);
     const target = Math.round((totalMins * rate * 100) / 60);
@@ -56,14 +58,15 @@ export function splitLineTotals(lines: readonly LineAmountInput[]): number[] {
     const floors = exact.map((x) => Math.floor(x + 1e-9));
     let leftover = target - floors.reduce((s, x) => s + x, 0);
     // Fractions within float noise of each other are a tie (a third of a cent computes
-    // as .33333333333348 on one line and .333333333333 on another), so the earlier line
-    // wins rather than whichever the noise favours.
+    // as .33333333333348 on one line and .333333333333 on another), so the tie-break
+    // decides rather than whichever the noise favours: bigger line, then earlier.
     const fraction = exact.map((x, k) => x - floors[k]!);
     const order = idx
       .map((_, k) => k)
       .sort((a, b) => {
         const d = fraction[b]! - fraction[a]!;
-        return Math.abs(d) > 1e-6 ? d : a - b;
+        if (Math.abs(d) > 1e-6) return d;
+        return exact[b]! - exact[a]! || a - b;
       });
     for (const k of order) {
       if (leftover <= 0) break;
@@ -75,6 +78,20 @@ export function splitLineTotals(lines: readonly LineAmountInput[]): number[] {
     });
   }
   return cents.map((c) => c / 100);
+}
+
+/**
+ * The same items with every `lineTotal` re-derived by {@link splitLineTotals}. Run on any
+ * line items about to be stored or rendered, so the printed Total column always adds up to
+ * the subtotal - whatever totals the sender worked out.
+ * @param items - Line items in display order.
+ * @returns The items with their split line totals.
+ */
+export function withSplitLineTotals<T extends LineAmountInput>(
+  items: readonly T[],
+): (T & { lineTotal: number })[] {
+  const totals = splitLineTotals(items);
+  return items.map((item, i) => ({ ...item, lineTotal: totals[i]! }));
 }
 
 /**

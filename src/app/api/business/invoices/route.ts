@@ -6,7 +6,11 @@
 // writes back the matching Sheets counter, then renders the PDF and uploads it to Drive.
 
 import { completeBilledBookings } from "@/features/booking/lib/complete-billed-bookings.server";
-import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
+import {
+  calcInvoiceTotals,
+  isValidLineItem,
+  withSplitLineTotals,
+} from "@/features/business/lib/business";
 import {
   parseAlreadyPaid,
   syncAlreadyPaidIncome,
@@ -139,6 +143,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!lineItems.every(isValidLineItem)) {
     return errorResponse("Invalid line item", 400);
   }
+  // Line totals are re-derived here, never trusted from the body, so the stored lines
+  // always add up to the stored subtotal under the shared cent split.
+  const lines = withSplitLineTotals(lineItems);
 
   // Default issue + due dates server-side so the calculator's direct-save path
   // doesn't need to send them. Operators can still override either by sending
@@ -202,7 +209,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // price reductions), so they sum into one argument but persist as separate fields.
   const { GST_REGISTERED } = await getPolicy();
   const { subtotal, gstAmount, total } = calcInvoiceTotals(
-    lineItems,
+    lines,
     discount + unsuccessfulDiscountValue,
     GST_REGISTERED,
   );
@@ -227,7 +234,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           clientEmail: normaliseEmail(clientEmail),
           issueDate: issueDateValue,
           dueDate: dueDateValue,
-          lineItems,
+          lineItems: lines,
           gst: gstAmount > 0,
           subtotal,
           gstAmount,

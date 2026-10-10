@@ -9,6 +9,7 @@ import {
   enforceMinBillable,
   jobToLineItems,
   TASK_TIMING_FALLBACK,
+  taskLineTotals,
   timeDiffMins,
   type TaskTimingConfig,
 } from "@/features/business/lib/business";
@@ -116,10 +117,32 @@ export interface ParsedWindow {
 }
 
 /**
+ * The parsed ranges left over once every slot is matched off, i.e. a later visit
+ * ("printer Friday, 1:46 pm to 2:05 pm") sent alongside a merged booking. Empty unless
+ * every slot comes back: missing slots mean the description restated the times and the
+ * window was never sent, so nothing in the reply sits on top of it.
+ * @param ranges - The parse reply's ranges.
+ * @param slots - The merged booking's slots.
+ * @returns The ranges beyond the slots.
+ */
+function rangesBeyondSlots(
+  ranges: readonly ParsedRange[],
+  slots: readonly WindowSlot[],
+): ParsedRange[] {
+  const left = [...ranges];
+  for (const slot of slots) {
+    const i = left.findIndex((r) => r.startTime === slot.startTime && r.endTime === slot.endTime);
+    if (i === -1) return [];
+    left.splice(i, 1);
+  }
+  return left;
+}
+
+/**
  * Works out the billable window from a parse. Prefers the per-range list, then a
  * start/end pair, then a bare duration anchored to the booked slot (or to `now`).
  * A merged job keeps its slots - they come from several corrected calendar windows,
- * exact and not reconstructable from free text.
+ * exact and not reconstructable from free text - plus any later visit on another day.
  * @param result - The parse response.
  * @param slots - Known windows (booked slots or typed times); empty when none.
  * @param now - Current NZ wall-clock HH:MM, the anchor when no booked slot exists.
@@ -150,6 +173,19 @@ export function parsedWindow(
     result.startTime && !result.endTime ? clockMins(openEnd) - clockMins(result.startTime) : 0;
   if (merged) {
     windowMins += slots.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
+    // The later visit shows on the Time card after the slots. Not marked stated, so the
+    // next parse sends the booking's slots again and reads the visit back off the text.
+    const later = rangesBeyondSlots(
+      (result.ranges ?? []).map((r) => ({ startTime: r.startTime, endTime: r.endTime })),
+      slots,
+    );
+    if (later.length > 0) {
+      timeRanges = [
+        ...slots.map((s) => ({ startTime: s.startTime, endTime: s.endTime })),
+        ...later,
+      ];
+      windowMins += later.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
+    }
   } else if (result.ranges && result.ranges.length > 0) {
     timeRanges = result.ranges.map((r) => ({ startTime: r.startTime, endTime: r.endTime }));
     stated = true;
@@ -403,15 +439,6 @@ function sameAddressKey(address: string | null | undefined): string {
 }
 
 /**
- * A task's line total, rounded to the cent the way jobToLineItems rounds it.
- * @param t - The task line.
- * @returns qty x unit price, to the cent.
- */
-function taskLineTotal(t: TaskLine): number {
-  return Math.round(t.qty * t.unitPrice * 100) / 100;
-}
-
-/**
  * Turns a parse straight into invoice line items, for editing an existing invoice where
  * there is no calculator state to hydrate.
  *
@@ -483,10 +510,17 @@ export function parsedJobToLineItems(
     pricing.minTravelCharge,
     pricing.minBillableMins,
   );
-  // Same floor jobToLineItems applied, so these line totals are the ones just built.
-  const billed = enforceMinBillable(fit.tasks, pricing.minBillableMins).filter(isHourlyTask);
-  const labour = billed.reduce((s, t) => s + taskLineTotal(t), 0);
-  const failed = billed.filter((t) => t.unsuccessful).reduce((s, t) => s + taskLineTotal(t), 0);
+  // Same floor and cent split jobToLineItems applied, so these line totals are the ones
+  // just built (a lone per-line round could differ from the shared split by a cent).
+  const floored = enforceMinBillable(fit.tasks, pricing.minBillableMins);
+  const totals = taskLineTotals(floored);
+  let labour = 0;
+  let failed = 0;
+  for (const [i, t] of floored.entries()) {
+    if (!isHourlyTask(t)) continue;
+    labour += totals[i]!;
+    if (t.unsuccessful) failed += totals[i]!;
+  }
   const promoShare =
     labour > 0 ? (Math.min(Math.max(0, promoDiscount), labour) * failed) / labour : 0;
   const cut = 1 - (pricing.unsuccessfulFactor ?? 0.5);

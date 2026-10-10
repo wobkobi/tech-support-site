@@ -58,6 +58,7 @@ export {
   nextInvoiceNumber,
   splitGstInclusive,
   splitLineTotals,
+  withSplitLineTotals,
   type LineAmountInput,
 } from "@/features/business/lib/invoice-maths";
 export {
@@ -67,7 +68,9 @@ export {
   hourlyTaskMinutes,
   TASK_TIMING_FALLBACK,
   taskMinutes,
+  taskWindowMismatch,
   type TaskTimingConfig,
+  type TaskWindowMismatch,
 } from "@/features/business/lib/task-timing";
 
 /**

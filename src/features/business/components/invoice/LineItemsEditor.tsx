@@ -1,12 +1,12 @@
 "use client";
 // src/features/business/components/invoice/LineItemsEditor.tsx
 // Editable list of invoice line items: description, qty, unit price, with every row's
-// `lineTotal` re-derived through splitLineTotals as the operator types, adds or removes a
+// `lineTotal` re-derived through withSplitLineTotals as the operator types, adds or removes a
 // row. Purely controlled - the parent owns the array and validates it (mirroring
 // isValidLineItem) before persisting.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { formatNZD, splitLineTotals } from "@/features/business/lib/business";
+import { formatNZD, withSplitLineTotals } from "@/features/business/lib/business";
 import type { LineItem } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -24,17 +24,6 @@ interface LineItemsEditorProps {
 
 const INPUT_CLS =
   "rounded-lg border border-admin-border-strong bg-admin-surface px-2.5 py-2 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
-
-/**
- * Re-derives every row's line total. Timed rows at one rate share their cents (see
- * splitLineTotals), so an edit to one row can move a cent on another.
- * @param items - Rows after the edit.
- * @returns The rows with their line totals.
- */
-function withLineTotals(items: LineItem[]): LineItem[] {
-  const totals = splitLineTotals(items);
-  return items.map((item, i) => ({ ...item, lineTotal: totals[i]! }));
-}
 
 /**
  * Parses a numeric input value, treating blank/garbage as 0.
@@ -66,7 +55,7 @@ export function LineItemsEditor({
    */
   function updateRow(idx: number, patch: Partial<LineItem>): void {
     onChange(
-      withLineTotals(
+      withSplitLineTotals(
         items.map((item, i) => {
           if (i !== idx) return item;
           const merged = { ...item, ...patch };
@@ -139,7 +128,7 @@ export function LineItemsEditor({
           </span>
           <button
             type="button"
-            onClick={() => onChange(withLineTotals(items.filter((_, i) => i !== idx)))}
+            onClick={() => onChange(withSplitLineTotals(items.filter((_, i) => i !== idx)))}
             disabled={disabled}
             aria-label={`Remove line ${idx + 1}`}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-admin-faint hover:bg-admin-bg hover:text-coquelicot-600 disabled:opacity-50"

@@ -214,6 +214,11 @@ function main(): void {
     "TV setup 4:30-5:30\nPrinter Friday, 1:46-2:05pm",
   );
   expectEqual(
+    "a digit-led line after a named-day visit is not on that day: sent as-is",
+    buildParseInput("Printer Friday, 1:46-2:05pm\n9:00-9:45 visit", wednesday),
+    "Printer Friday, 1:46-2:05pm\n9:00-9:45 visit",
+  );
+  expectEqual(
     "re-parse does not send the later visit twice",
     buildParseInput(laterVisit, [
       ...wednesday,
@@ -284,6 +289,43 @@ function main(): void {
   expectEqual(
     "merged booking keeps its slots",
     parsedWindow(reply({ durationMins: 90 }), twoSlots, "16:00"),
+    { timeRanges: null, stated: false, windowMins: 120, followUpMins: 0 },
+  );
+  expectEqual(
+    "merged booking bills a later visit on top of its slots",
+    parsedWindow(
+      reply({
+        durationMins: 139,
+        ranges: [
+          { startTime: "09:00", endTime: "10:00", durationMins: 60 },
+          { startTime: "14:00", endTime: "15:00", durationMins: 60 },
+          { startTime: "13:46", endTime: "14:05", durationMins: 19 },
+        ],
+      }),
+      twoSlots,
+      "16:00",
+    ),
+    {
+      timeRanges: [
+        { startTime: "09:00", endTime: "10:00" },
+        { startTime: "14:00", endTime: "15:00" },
+        { startTime: "13:46", endTime: "14:05" },
+      ],
+      stated: false,
+      windowMins: 139,
+      followUpMins: 0,
+    },
+  );
+  expectEqual(
+    "merged booking with restated times keeps only its slots",
+    parsedWindow(
+      reply({
+        durationMins: 80,
+        ranges: [{ startTime: "09:00", endTime: "10:20", durationMins: 80 }],
+      }),
+      twoSlots,
+      "16:00",
+    ),
     { timeRanges: null, stated: false, windowMins: 120, followUpMins: 0 },
   );
   expectEqual(

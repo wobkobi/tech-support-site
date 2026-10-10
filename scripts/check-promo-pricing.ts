@@ -1031,9 +1031,14 @@ function main(): void {
   });
   const thirds = [timed(35, 100), timed(35, 100), timed(20, 100)];
   expectEqual(
-    "the leftover cent goes to the first line",
+    "the leftover cent goes to the first of the biggest lines",
     splitLineTotals(thirds),
     [58.34, 58.33, 33.33],
+  );
+  expectEqual(
+    "a tied cent lands on the big line, not a 5-min one",
+    splitLineTotals([timed(5, 100), timed(185, 100)]),
+    [8.33, 308.34],
   );
   expectEqual(
     "the subtotal is the whole time at the rate",

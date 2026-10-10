@@ -5,7 +5,11 @@
 // DELETE removes DRAFT invoices only; SENT/PAID/VOIDED are audit-protected.
 // Field-changing paths re-sync the PDF to Drive.
 
-import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
+import {
+  calcInvoiceTotals,
+  isValidLineItem,
+  withSplitLineTotals,
+} from "@/features/business/lib/business";
 import {
   parseAlreadyPaid,
   syncAlreadyPaidIncome,
@@ -13,6 +17,7 @@ import {
 import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { parseAmount, parseDate, parseObjectId } from "@/features/business/lib/validation";
+import type { LineItem } from "@/features/business/types/business";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
@@ -188,6 +193,10 @@ export async function PATCH(
     ) {
       return errorResponse("Invalid line item", 400);
     }
+    // Line totals are re-derived, never trusted from the body, so the stored lines
+    // always add up to the stored subtotal under the shared cent split.
+    const lines =
+      lineItems !== undefined ? withSplitLineTotals(lineItems as LineItem[]) : undefined;
     // A cleared <input type="date"> submits "", not undefined, so it reaches
     // this branch. Parse both dates up front: an unparseable one has to 400
     // here, because Prisma rejects an Invalid Date and would 500 the update.
@@ -227,7 +236,7 @@ export async function PATCH(
     // discount from the total charged.
     const preservedDiscount = (current.promoDiscount ?? 0) + unsuccessfulDiscount;
     const { subtotal, gstAmount, total } = calcInvoiceTotals(
-      lineItems ?? [],
+      lines ?? [],
       preservedDiscount,
       GST_REGISTERED,
     );
@@ -239,8 +248,8 @@ export async function PATCH(
         ...(clientEmail !== undefined && { clientEmail: normaliseEmail(clientEmail) }),
         ...(issueDateValue && { issueDate: issueDateValue }),
         ...(dueDateValue && { dueDate: dueDateValue }),
-        ...(lineItems !== undefined && {
-          lineItems,
+        ...(lines !== undefined && {
+          lineItems: lines,
           subtotal,
           gstAmount,
           total,

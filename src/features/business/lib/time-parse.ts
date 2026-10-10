@@ -268,14 +268,18 @@ function walkRanges(input: string): RangeWalk {
   const intervals: RangeWalk["intervals"] = [];
   const statedWeekdays: (number | null)[] = [];
   const taskLine: RangeWalk["taskLine"] = [];
-  let day = 0;
+  // `buckets` counts every day opened; `headerDay`/`weekday` are the day the last header
+  // opened, which carries onto the lines under it.
+  let buckets = 0;
+  let headerDay = 0;
   let weekday: number | null = null;
   for (const rawLine of input.split("\n")) {
     const line = normaliseTimeLine(rawLine.trim());
     // A header opens the next day before its own ranges are read, so
     // "Tue 4 Aug, 9-11am" lands on the day it names rather than the one before.
     if (DAY_HEADER_RE.test(line)) {
-      day += 1;
+      buckets += 1;
+      headerDay = buckets;
       weekday = headerWeekday(line);
     }
     const timeLine = /^\d/.test(line) || WEEKDAY_LEAD_RE.test(line);
@@ -283,17 +287,22 @@ function walkRanges(input: string): RangeWalk {
     const prose = timeLine ? [] : matches.filter((m) => isProseRange(line, m));
     const named = prose.length > 0 ? line.match(PROSE_WEEKDAY_RE)?.[1] : undefined;
     const namedDay = named ? WEEKDAY_ABBREVS.indexOf(named.slice(0, 3).toLowerCase()) : null;
-    // Naming the day already open stays in it; any other day is a separate visit.
+    // Naming the day already open stays in it; any other day is a separate visit. That
+    // visit is this line only: a digit-led line after it belongs to the header above
+    // again, not to the day the prose named.
+    let day = headerDay;
+    let lineWeekday = weekday;
     if (namedDay !== null && namedDay !== weekday) {
-      day += 1;
-      weekday = namedDay;
+      buckets += 1;
+      day = buckets;
+      lineWeekday = namedDay;
     }
     for (const match of matches) {
       const billable = timeLine || (namedDay !== null && prose.includes(match));
       const read = billable ? readRange(line, match) : null;
       if (read) intervals.push({ day, ...read });
       if (read && !timeLine) taskLine.push(read);
-      if (read || isProseRange(line, match)) statedWeekdays.push(weekday);
+      if (read || isProseRange(line, match)) statedWeekdays.push(lineWeekday);
     }
   }
   return { intervals, statedWeekdays, taskLine };
