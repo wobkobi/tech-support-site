@@ -121,7 +121,7 @@ export function EditContactButton({ onClick }: { onClick: () => void }): React.R
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-admin-muted transition-colors hover:bg-admin-bg hover:text-russian-violet"
+      className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-admin-muted transition-colors hover:bg-admin-bg hover:text-russian-violet pointer-coarse:size-11"
       aria-label="Edit contact details"
     >
       ✎

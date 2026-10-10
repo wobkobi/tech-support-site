@@ -104,7 +104,7 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "-mx-(--card-pad,0px) mb-4 flex items-center justify-between gap-3 border-b border-admin-border px-(--card-pad-x,0px) py-3.5 first:-mt-(--card-pad,0px)",
+        "-mx-(--card-pad,0px) mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-admin-border px-(--card-pad-x,0px) py-3.5 first:-mt-(--card-pad,0px)",
         className,
       )}
     >
@@ -112,7 +112,8 @@ export function CardHeader({
         <h2 className="text-base font-semibold text-admin-text">{title}</h2>
         {description && <p className="mt-0.5 text-sm text-admin-muted">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {/* Wraps under a long title on phones rather than squeezing it into a sliver. */}
+      {actions && <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>}
     </div>
   );
 }

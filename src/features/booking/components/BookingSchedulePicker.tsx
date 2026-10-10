@@ -171,12 +171,12 @@ export function BookingSchedulePicker({
                   onClick={() => onDaySelect(day)}
                   className={cn(
                     "w-full rounded-lg border px-3 py-3 text-base font-medium whitespace-nowrap",
-                    !day.hasAnySlots && "cursor-not-allowed opacity-50",
+                    !day.hasAnySlots && "cursor-not-allowed line-through",
                     selectedDay?.dateKey === day.dateKey
                       ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
                       : day.hasAnySlots
                         ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                        : "border-seasalt-200/40 bg-white/20 text-rich-black/60",
+                        : "border-dashed border-seasalt-300 bg-seasalt-100 text-rich-black/55",
                     day.isToday && day.hasAnySlots && "ring-2 ring-coquelicot-500/50 ring-offset-1",
                   )}
                 >
@@ -225,12 +225,12 @@ export function BookingSchedulePicker({
                       }}
                       className={cn(
                         "min-h-11 rounded-lg border px-4 py-2.5 text-base font-medium",
-                        !available && "cursor-not-allowed opacity-40",
+                        !available && "cursor-not-allowed line-through",
                         isSelected
                           ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
                           : available
                             ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                            : "border-seasalt-200/40 bg-white/30 text-rich-black/60",
+                            : "border-dashed border-seasalt-300 bg-seasalt-100 text-rich-black/55",
                       )}
                     >
                       {window.label}
@@ -254,12 +254,12 @@ export function BookingSchedulePicker({
                         onClick={() => onMinuteSelect(minute)}
                         className={cn(
                           "min-h-11 rounded-lg border px-4 py-2 text-base font-medium",
-                          !available && "cursor-not-allowed opacity-40",
+                          !available && "cursor-not-allowed line-through",
                           selectedMinute === minute
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
                             : available
                               ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                              : "border-seasalt-200/40 bg-white/30 text-rich-black/60",
+                              : "border-dashed border-seasalt-300 bg-seasalt-100 text-rich-black/55",
                         )}
                       >
                         {subSlotLabel(activeWindow.startHour, minute)}

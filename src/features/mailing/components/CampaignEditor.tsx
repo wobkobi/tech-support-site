@@ -567,7 +567,10 @@ export function CampaignEditor({
       </div>
 
       {editable && (
-        <div className="sticky bottom-0 z-10 flex flex-col gap-2 rounded-lg border border-admin-border bg-admin-surface py-3 pr-20 pl-4 shadow-sm sm:flex-row sm:items-center sm:justify-between lg:pr-4">
+        <div
+          data-phone-bar="sticky"
+          className="sticky bottom-0 z-10 flex flex-col gap-2 rounded-lg border border-admin-border bg-admin-surface py-3 pr-20 pl-4 shadow-sm sm:flex-row sm:items-center sm:justify-between lg:pr-4"
+        >
           <p className="text-sm text-admin-muted">
             {sendBlocked ??
               (initial.isPreset

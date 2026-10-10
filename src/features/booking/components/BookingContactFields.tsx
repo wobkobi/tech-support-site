@@ -159,7 +159,7 @@ export function BookingEmailField({
           update it.
         </p>
       )}
-      {contactHint && <p className="text-sm text-rich-black/70">{contactHint}</p>}
+      {contactHint && <p className="text-base text-rich-black/70">{contactHint}</p>}
       {emailSuggestion && (
         <div
           ref={promptRef}
@@ -245,7 +245,7 @@ export function BookingPhoneField({
         )}
       />
       {required && (
-        <p className="text-sm text-rich-black/70">
+        <p className="text-base text-rich-black/70">
           Needed so I can contact you on arrival (running late, gate codes, etc.).
         </p>
       )}

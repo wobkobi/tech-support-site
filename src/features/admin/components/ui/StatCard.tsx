@@ -101,7 +101,8 @@ export function StatCard({
       <p
         className={cn(
           "mt-0.5 leading-tight font-semibold tracking-tight tabular-nums",
-          lg ? "text-[1.625rem] sm:text-[1.875rem]" : "text-2xl",
+          // Scales down on narrow phones so a five-figure amount fits a half-width tile.
+          lg ? "text-[clamp(1.25rem,6.5vw,1.625rem)] sm:text-[1.875rem]" : "text-2xl",
           valueToneClass(tone),
         )}
       >

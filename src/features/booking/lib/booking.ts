@@ -512,7 +512,7 @@ export function buildAvailableDays(
     ];
 
     const dayLabel = `${shortDayNames[dayOfWeek]} ${dayUTC.getUTCDate()} ${monthNames[dayUTC.getUTCMonth()]}`;
-    const fullLabel = `${dayNames[dayOfWeek]}, ${monthNames[dayUTC.getUTCMonth()]} ${dayUTC.getUTCDate()}`;
+    const fullLabel = `${dayNames[dayOfWeek]} ${dayUTC.getUTCDate()} ${monthNames[dayUTC.getUTCMonth()]}`;
 
     const timeWindows: TimeWindow[] = [];
 

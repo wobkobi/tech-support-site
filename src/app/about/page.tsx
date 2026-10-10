@@ -84,7 +84,7 @@ export default async function AboutPage(): Promise<React.ReactElement> {
           width={400}
           height={400}
           preload
-          className="w-full max-w-[18rem] rounded-lg object-cover"
+          className="mx-auto w-full max-w-[18rem] rounded-lg object-cover md:mx-0"
         />
         <div>
           <p className="text-sm font-bold tracking-[0.06em] text-moonstone-700 uppercase">

@@ -221,7 +221,7 @@ export function ScheduleFindTimes(): React.ReactElement {
                 title={
                   slot.driveNote ? `${slot.driveNote} from your previous job` : "Book this time"
                 }
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-russian-violet/10 px-3 py-1 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-russian-violet/10 px-3 py-1 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20 pointer-coarse:min-h-11"
               >
                 {slot.dayLabel} · {slot.timeLabel}
                 {slot.driveNote && (

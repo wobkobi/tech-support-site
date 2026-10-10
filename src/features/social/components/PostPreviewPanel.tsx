@@ -76,7 +76,7 @@ export function PostPreviewPanel({
                   aria-selected={p === shownPreview}
                   onClick={() => onPreviewOn(p)}
                   className={cn(
-                    "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors",
+                    "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors pointer-coarse:min-h-11",
                     p === shownPreview
                       ? "bg-admin-surface text-admin-text shadow-sm"
                       : "text-admin-muted hover:text-admin-text",

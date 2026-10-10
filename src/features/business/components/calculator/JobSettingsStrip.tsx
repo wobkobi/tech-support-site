@@ -99,7 +99,7 @@ export function JobSettingsStrip({
             maxLength={32}
             autoComplete="off"
             spellCheck={false}
-            className="w-32 tracking-wider uppercase"
+            className="w-auto max-w-32 min-w-0 flex-1 tracking-wider uppercase"
           />
           <AdminButton
             variant="secondary"

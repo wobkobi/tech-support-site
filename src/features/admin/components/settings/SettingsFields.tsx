@@ -322,7 +322,7 @@ export function ToggleField({
         aria-checked={value}
         onClick={() => onChange(!value)}
         className={cn(
-          "relative inline-flex h-7 w-12 items-center rounded-full transition-colors",
+          "relative inline-flex h-7 w-12 items-center rounded-full transition-colors after:absolute after:-inset-2 after:content-['']",
           value ? "bg-russian-violet" : "bg-admin-border-strong",
         )}
       >

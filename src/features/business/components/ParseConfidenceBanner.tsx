@@ -65,7 +65,7 @@ export function ParseConfidenceBanner({
           onClick={onDismiss}
           aria-label="Dismiss"
           className={cn(
-            "-m-2 inline-flex size-8 shrink-0 items-center justify-center text-base leading-none opacity-60 hover:opacity-90",
+            "-m-2 inline-flex size-8 shrink-0 items-center justify-center text-base leading-none opacity-60 hover:opacity-90 pointer-coarse:size-11",
             text,
           )}
         >

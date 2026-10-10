@@ -116,7 +116,7 @@ export function CompleteEventsPanel({
               <li key={b.id} className="flex items-center justify-between gap-3 px-5 py-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-admin-text">{b.name}</p>
-                  <p className="text-sm text-admin-muted">
+                  <p className="text-sm wrap-anywhere text-admin-muted">
                     {formatDateShort(b.startAt)}
                     {b.email ? ` · ${b.email}` : " · no email"}
                   </p>

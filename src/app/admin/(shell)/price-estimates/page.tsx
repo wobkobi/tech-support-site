@@ -90,7 +90,7 @@ export default async function AdminPriceEstimatesPage({
           <Link
             href={toggleHref}
             className={cn(
-              "inline-flex h-9 items-center rounded-full border px-3 text-sm font-semibold transition-colors select-none",
+              "inline-flex h-9 items-center rounded-full border px-3 text-sm font-semibold transition-colors select-none pointer-coarse:min-h-11",
               includeDev
                 ? "border-coquelicot-500/40 bg-coquelicot-500/10 text-coquelicot-600 hover:bg-coquelicot-500/20"
                 : "border-admin-border bg-admin-surface text-admin-muted hover:bg-admin-bg",

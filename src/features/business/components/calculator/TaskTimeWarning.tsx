@@ -53,7 +53,7 @@ export function TaskTimeWarning({
         <button
           type="button"
           onClick={onFix}
-          className="rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-medium text-sky-900 hover:bg-sky-100"
+          className="inline-flex min-h-9 items-center rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-sm font-medium text-sky-900 hover:bg-sky-100 pointer-coarse:min-h-11"
         >
           Fix - bill the minimum
         </button>
@@ -81,7 +81,7 @@ export function TaskTimeWarning({
         type="button"
         onClick={onFix}
         className={cn(
-          "rounded-lg border bg-white px-3 py-1.5 text-xs font-medium",
+          "inline-flex min-h-9 items-center rounded-lg border bg-white px-3 py-1.5 text-sm font-medium pointer-coarse:min-h-11",
           over
             ? "border-amber-300 text-amber-900 hover:bg-amber-100"
             : "border-sky-300 text-sky-900 hover:bg-sky-100",

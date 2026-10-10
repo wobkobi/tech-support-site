@@ -12,7 +12,7 @@ import { cn } from "@/shared/lib/cn";
  */
 export function adminChipClass(active: boolean): string {
   return cn(
-    "h-9 rounded-full border px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+    "h-9 rounded-full border px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:min-h-11",
     active
       ? "border-russian-violet bg-russian-violet text-white"
       : "border-admin-border-strong bg-admin-surface text-admin-text-secondary hover:border-russian-violet",
@@ -31,7 +31,7 @@ export const SEGMENTED_GROUP_CLS =
  */
 export function segmentedButtonClass(active: boolean): string {
   return cn(
-    "h-9 rounded-md px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+    "h-9 rounded-md px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11",
     active ? "bg-russian-violet text-white" : "text-admin-text-secondary hover:bg-admin-surface",
   );
 }

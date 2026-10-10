@@ -192,7 +192,7 @@ async function InvoiceRail({
 
         {incomeEntries.length > 0 && (
           <div className="mt-3 border-t border-admin-border pt-3">
-            <p className="mb-1 text-xs font-semibold text-admin-muted uppercase">Linked income</p>
+            <p className="mb-1 text-sm font-semibold text-admin-muted uppercase">Linked income</p>
             {incomeEntries.map((e) => (
               <div key={e.id} className="flex justify-between gap-3 text-sm">
                 <span className="text-admin-text-secondary">
@@ -212,7 +212,7 @@ async function InvoiceRail({
             {booking ? (
               <>
                 {booking.name}
-                <span className="block text-xs font-normal text-admin-muted">
+                <span className="block text-sm font-normal text-admin-muted">
                   {formatDateShort(booking.startAt)} · #{booking.id.slice(-6)}
                 </span>
               </>
@@ -228,11 +228,11 @@ async function InvoiceRail({
               >
                 {contact.name}
                 {contact.company && (
-                  <span className="block text-xs font-normal text-admin-muted">
+                  <span className="block text-sm font-normal text-admin-muted">
                     {contact.company}
                   </span>
                 )}
-                <span className="block text-xs font-normal text-admin-muted">
+                <span className="block text-sm font-normal text-admin-muted">
                   {contact.email || contact.phone || "no details"}
                 </span>
               </Link>

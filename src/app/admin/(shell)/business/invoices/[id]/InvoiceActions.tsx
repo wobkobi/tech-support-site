@@ -382,7 +382,7 @@ export function InvoiceActions({
               busy={converting}
               className="max-lg:flex-1"
             >
-              Convert to invoice
+              Convert<span className="max-sm:hidden"> to invoice</span>
             </AdminButton>
           )}
           {!isVoided && (
@@ -392,7 +392,9 @@ export function InvoiceActions({
               aria-label={!clientEmail ? "Add a client email to enable sending" : undefined}
               className={cn(showPhoneBar && "max-lg:flex-1")}
             >
-              {alreadySent ? "Re-send to client" : "Send to client"}
+              {/* Short labels on phones, where two of these share the bar. */}
+              {alreadySent ? "Re-send" : "Send"}
+              <span className="max-sm:hidden">&nbsp;to client</span>
             </AdminButton>
           )}
         </div>

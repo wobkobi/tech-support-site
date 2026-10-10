@@ -434,7 +434,7 @@ export default async function BookingPage(): Promise<React.ReactElement> {
               Want to check the prices first?{" "}
               <Link
                 href="/pricing"
-                className="font-semibold text-russian-violet underline underline-offset-2 hover:opacity-80"
+                className="font-semibold whitespace-nowrap text-russian-violet underline underline-offset-2 hover:opacity-80"
               >
                 See pricing
               </Link>

@@ -92,7 +92,7 @@ function ToastCard({
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss"
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded-md opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-current"
+        className="inline-flex size-9 shrink-0 items-center justify-center rounded-md opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-current pointer-coarse:size-11"
       >
         <FaXmark className="size-4" aria-hidden="true" />
       </button>

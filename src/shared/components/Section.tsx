@@ -120,7 +120,7 @@ export function SectionHeading({
       <h2
         id={id}
         className={cn(
-          "text-[1.6875rem] leading-tight font-extrabold sm:text-[2.125rem]",
+          "text-[1.6875rem] leading-tight font-extrabold text-balance sm:text-[2.125rem]",
           onDark ? "text-white" : "text-rich-black",
         )}
       >

@@ -77,7 +77,10 @@ export function BookingAddressFields({
                   revealed on demand below so nobody types their street
                   number into it by mistake. */}
               <div className="flex flex-col gap-1">
-                <label htmlFor="booking-address" className="text-sm font-medium text-rich-black/80">
+                <label
+                  htmlFor="booking-address"
+                  className="text-base font-medium text-rich-black/80"
+                >
                   Street address
                 </label>
                 <AddressAutocomplete
@@ -132,7 +135,7 @@ export function BookingAddressFields({
                       <FaCheck className="h-4 w-4" aria-hidden /> Address verified
                     </p>
                   ) : (
-                    <p className="text-sm text-slate-600">
+                    <p className="text-base text-slate-600">
                       Pick a suggestion from the dropdown to verify your address.
                     </p>
                   ))}
@@ -186,7 +189,7 @@ export function BookingAddressFields({
                       "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
                     )}
                   />
-                  <p id="booking-unit-hint" className="text-sm text-slate-600">
+                  <p id="booking-unit-hint" className="text-base text-slate-600">
                     Only for apartments, units or flats - leave blank for a house.
                   </p>
                   {unitMatchesStreetNumber(unit, address) && (

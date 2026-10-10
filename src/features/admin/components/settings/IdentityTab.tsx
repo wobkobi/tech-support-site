@@ -301,7 +301,7 @@ export function IdentityTab({ initial, defaults, bookableSchedule }: Props): Rea
                 })
               }
               className={cn(
-                "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors",
+                "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors after:absolute after:-inset-2 after:content-['']",
                 published ? "bg-russian-violet" : "bg-admin-border-strong",
               )}
             >

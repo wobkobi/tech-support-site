@@ -286,7 +286,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps): React.ReactE
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Search" size="lg">
+    <Modal open={open} onClose={onClose} title="Search" size="lg" placement="top">
       {/* Pinned while results scroll; the negative margins cover the body padding so
           rows slide under it cleanly. */}
       <div className="sticky top-0 z-10 -mx-5 -mt-4 bg-admin-surface px-5 pt-4 pb-3">

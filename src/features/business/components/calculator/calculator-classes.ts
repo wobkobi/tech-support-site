@@ -24,7 +24,7 @@ export function toggleChipClass(
   activeCls = "border-russian-violet/40 bg-russian-violet/10 text-russian-violet",
 ): string {
   return cn(
-    "h-8 rounded-full border px-2.5 text-sm font-medium transition-colors",
+    "h-8 rounded-full border px-2.5 text-sm font-medium transition-colors pointer-coarse:min-h-11 pointer-coarse:px-3.5",
     active
       ? activeCls
       : "border-admin-border bg-admin-surface text-admin-text-secondary hover:border-admin-border-strong",

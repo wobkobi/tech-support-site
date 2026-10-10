@@ -40,7 +40,7 @@ export function PostPaneTabs({
           aria-selected={pane === k}
           onClick={() => onSwitch(k)}
           className={cn(
-            "inline-flex h-10 items-center justify-center gap-2 rounded-md text-[0.9375rem] font-semibold transition-colors",
+            "inline-flex h-10 items-center justify-center gap-2 rounded-md text-[0.9375rem] font-semibold transition-colors pointer-coarse:min-h-11",
             pane === k
               ? "bg-russian-violet text-white"
               : "text-admin-muted hover:bg-admin-bg hover:text-admin-text",

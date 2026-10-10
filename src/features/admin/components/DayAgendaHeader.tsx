@@ -164,7 +164,7 @@ export function DayAgendaHeader({
             onClick={onOpenDatePicker}
             aria-label="Pick a date"
             className={cn(
-              "inline-flex h-9 max-w-full items-center gap-1.5 rounded-md px-3 text-base font-bold hover:bg-admin-bg",
+              "inline-flex h-9 max-w-full items-center gap-1.5 rounded-md px-3 text-base font-bold hover:bg-admin-bg pointer-coarse:h-11",
               isToday ? "text-russian-violet" : "text-admin-text",
             )}
           >
@@ -181,7 +181,7 @@ export function DayAgendaHeader({
               <button
                 type="button"
                 onClick={onToday}
-                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-admin-border-strong bg-admin-surface px-3 font-semibold text-admin-text hover:border-russian-violet"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-admin-border-strong bg-admin-surface px-3 font-semibold text-admin-text hover:border-russian-violet pointer-coarse:h-11"
               >
                 <FaCalendarDay className="h-3.5 w-3.5" />
                 Today

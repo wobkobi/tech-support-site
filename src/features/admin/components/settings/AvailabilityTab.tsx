@@ -185,7 +185,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                   aria-labelledby={`${uid}-day-${index}`}
                   onClick={() => setDay(index, { enabled: !d.enabled })}
                   className={cn(
-                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors after:absolute after:-inset-2.5 after:content-['']",
                     d.enabled ? "bg-russian-violet" : "bg-admin-border-strong",
                   )}
                 >
@@ -389,7 +389,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                 aria-labelledby={`morningGuards ${uid}-guard-${gi}`}
                 onClick={() => setGuard(gi, { enabled: !g.enabled })}
                 className={cn(
-                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors after:absolute after:-inset-2.5 after:content-['']",
                   g.enabled ? "bg-russian-violet" : "bg-admin-border-strong",
                 )}
               >
