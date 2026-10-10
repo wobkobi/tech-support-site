@@ -4,12 +4,16 @@
 // can add manual entries (parking, ferry), all lumped into a single "Round-trip travel"
 // invoice line, and store runs (client > store > back mid-job), each billed on its own
 // line. Looked-up entries show a step-by-step breakdownTravelCharge (there/back > raw >
-// rounded > final).
+// rounded > final). A Drove / Walked toggle says whether saving the invoice logs a trip.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import {
+  SEGMENTED_GROUP_CLS,
+  segmentedButtonClass,
+} from "@/features/admin/components/ui/chip-classes";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
@@ -27,6 +31,12 @@ interface Props {
   onJobAddressChange: (value: string) => void;
   /** Fired when a Places suggestion is picked (full formatted address). */
   onAddressSelected: (formattedAddress: string) => void;
+  /** Whether to offer Drove / Walked (hidden for a remote job, which logs no trip). */
+  showTripMode: boolean;
+  /** True when you walked, so saving the invoice logs no trip. */
+  walked: boolean;
+  /** Sets drove (false) or walked (true). */
+  onWalkedChange: (walked: boolean) => void;
   travelEntries: TravelEntry[];
   onTravelEntriesChange: React.Dispatch<React.SetStateAction<TravelEntry[]>>;
   lookingUpTravel: boolean;
@@ -48,6 +58,9 @@ interface Props {
  * @param props.jobAddress - Current address text.
  * @param props.onJobAddressChange - Address change handler.
  * @param props.onAddressSelected - Fired when a Places suggestion is picked.
+ * @param props.showTripMode - Whether to offer the Drove / Walked toggle.
+ * @param props.walked - True when you walked, so no trip is logged.
+ * @param props.onWalkedChange - Sets drove or walked.
  * @param props.travelEntries - All travel charges (auto + manual).
  * @param props.onTravelEntriesChange - Replaces the entries array.
  * @param props.lookingUpTravel - True while a lookup is in flight.
@@ -60,6 +73,9 @@ export function TravelSection({
   jobAddress,
   onJobAddressChange,
   onAddressSelected,
+  showTripMode,
+  walked,
+  onWalkedChange,
   travelEntries,
   onTravelEntriesChange,
   lookingUpTravel,
@@ -170,6 +186,32 @@ export function TravelSection({
           {lookingUpTravel ? "..." : "Look up"}
         </AdminButton>
       </div>
+
+      {showTripMode && jobAddress.trim() && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div role="group" aria-label="How you got there" className={SEGMENTED_GROUP_CLS}>
+            <button
+              type="button"
+              aria-pressed={!walked}
+              className={segmentedButtonClass(!walked)}
+              onClick={() => onWalkedChange(false)}
+            >
+              Drove
+            </button>
+            <button
+              type="button"
+              aria-pressed={walked}
+              className={segmentedButtonClass(walked)}
+              onClick={() => onWalkedChange(true)}
+            >
+              Walked
+            </button>
+          </div>
+          <p className="text-sm text-admin-muted">
+            {walked ? "No trip is logged." : "Saving the invoice logs the trip."}
+          </p>
+        </div>
+      )}
 
       {travelEntries.length > 0 && (
         <div className="space-y-2">

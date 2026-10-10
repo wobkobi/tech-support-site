@@ -297,6 +297,12 @@ export function CalculatorView({
 
   // Travel lookup
   const [jobAddress, setJobAddress] = useState(() => eventPrefill?.jobAddress ?? "");
+  // Drove or walked, for the trip an invoice save logs. null follows the address: a job in
+  // your own suburb (the base address's locality) counts as walked, anywhere else as driven.
+  const [walkedChoice, setWalkedChoice] = useState<boolean | null>(null);
+  const homeLocality = identity.baseAddress.locality.trim().toLowerCase();
+  const walked =
+    walkedChoice ?? (homeLocality.length > 0 && jobAddress.toLowerCase().includes(homeLocality));
   const [lookingUpTravel, setLookingUpTravel] = useState(false);
 
   // Contacts
@@ -406,6 +412,26 @@ export function CalculatorView({
     setParts,
   });
 
+  // Where you drove, for the trip an invoice save logs: any job with an address, travel
+  // charged or not, except a walk, a remote event or a cancellation that bills no round trip.
+  const tripAddress =
+    jobAddress.trim() &&
+    !walked &&
+    eventPrefill?.meetingType !== "remote" &&
+    (!cancelMode || includeCancelTravel)
+      ? jobAddress.trim()
+      : null;
+
+  /**
+   * Edits the job address. A new address goes back to the suburb default for drove or
+   * walked, since a choice made for the old address may not hold for the new one.
+   * @param value - Address text.
+   */
+  function changeJobAddress(value: string): void {
+    setJobAddress(value);
+    setWalkedChoice(null);
+  }
+
   // A cancellation fee is a flat charge, not labour: no holiday uplift on it, and no
   // promo, which would also spend a redemption on a job that never happened.
   const pricedPromo = cancelMode ? null : activePromo;
@@ -417,7 +443,7 @@ export function CalculatorView({
    * @param formattedAddress - The selected address.
    */
   function handleAddressSelected(formattedAddress: string): void {
-    setJobAddress(formattedAddress);
+    changeJobAddress(formattedAddress);
     setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
   }
 
@@ -665,7 +691,7 @@ export function CalculatorView({
     eventPrefill,
     pickedContactGoogleId,
     jobDate,
-    jobAddress,
+    tripAddress,
     paidCash,
     alreadyPaid,
     setTaskTemplates,
@@ -710,7 +736,7 @@ export function CalculatorView({
     setTimesSet(false);
     setFollowUpMins(0);
     setTravelEntries([]);
-    setJobAddress("");
+    changeJobAddress("");
     setTasks([]);
     setParts([]);
     setShowParts(false);
@@ -972,8 +998,11 @@ export function CalculatorView({
           {(!cancelMode || includeCancelTravel) && (
             <TravelSection
               jobAddress={jobAddress}
-              onJobAddressChange={setJobAddress}
+              onJobAddressChange={changeJobAddress}
               onAddressSelected={handleAddressSelected}
+              showTripMode={eventPrefill?.meetingType !== "remote"}
+              walked={walked}
+              onWalkedChange={setWalkedChoice}
               travelEntries={travelEntries}
               onTravelEntriesChange={setTravelEntries}
               lookingUpTravel={lookingUpTravel}

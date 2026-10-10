@@ -3,8 +3,8 @@
 // POST creates one: validates line items, allocates the next TTP-YYYY-XXXX number (or
 // Q-YYYY-XXXX from the quote counter when `isQuote`), computes totals via
 // calcInvoiceTotals (promo + unsuccessful-work discounts reduce the taxable amount),
-// writes back the matching Sheets counter, logs the job's trip when the invoice bills
-// travel, then renders the PDF and uploads it to Drive.
+// writes back the matching Sheets counter, logs the job's trip when you drove there,
+// then renders the PDF and uploads it to Drive.
 
 import { completeBilledBookings } from "@/features/booking/lib/complete-billed-bookings.server";
 import {
@@ -119,8 +119,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     alreadyPaid,
     alreadyPaidMethod,
     alreadyPaidDate,
-    // Sent by the calculator when the invoice bills travel: the job address and NZ day,
-    // so the job's trip is logged at Google's round-trip km.
+    // Sent by the calculator when you drove to the job, travel charged or not: the job
+    // address and NZ day, so the job's trip is logged at Google's round-trip km.
     trip,
   } = body as {
     clientName?: string;

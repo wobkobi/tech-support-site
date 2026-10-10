@@ -131,7 +131,7 @@ export async function driveRoundTripKm(address: string): Promise<RoundTripKmResu
 }
 
 /**
- * Logs the trip for a job an invoice just billed with travel, at Google's round-trip km.
+ * Logs the trip for a job an invoice just billed that you drove to, at Google's round-trip km.
  * One trip per job: a trip already linked to the booking or to any of the billed events
  * counts, so re-billing a job (a voided invoice re-issued) never logs a second. Never
  * throws; the invoice is already saved, so a failure only comes back as a status.
