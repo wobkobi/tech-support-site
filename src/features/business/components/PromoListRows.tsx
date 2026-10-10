@@ -349,6 +349,7 @@ export function PromoListRows({
                 {p.kind === "automatic" && status === "active" && (
                   <AdminButton
                     variant="outline"
+                    className="max-md:hidden"
                     busy={emailingId === p.id}
                     disabled={emailingId !== null}
                     onClick={() => onEmail(p)}
@@ -359,6 +360,7 @@ export function PromoListRows({
                 {p.kind === "automatic" && status === "active" && (
                   <AdminButton
                     variant="secondary"
+                    className="max-md:hidden"
                     busy={postingId === p.id}
                     disabled={postingId !== null}
                     onClick={() => onPost(p)}

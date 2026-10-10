@@ -95,7 +95,11 @@ export function TasksSection({
         className="mb-0 items-center"
         actions={
           <div className="flex items-center gap-3">
-            <button type="button" onClick={onManageTags} className={TEXT_ACTION_CLS}>
+            <button
+              type="button"
+              onClick={onManageTags}
+              className={cn(TEXT_ACTION_CLS, "max-md:hidden")}
+            >
               Manage tags
             </button>
             {tasks.length > 0 && (

@@ -505,7 +505,7 @@ export default async function AdminReviewsPage({
           </Card>
 
           {linkHistory.length > 0 && (
-            <Card>
+            <Card className="max-md:hidden">
               <CardHeader title="Link history" />
               <ReviewLinkHistoryTable entries={linkHistory} />
             </Card>

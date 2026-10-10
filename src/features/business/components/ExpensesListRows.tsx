@@ -89,7 +89,10 @@ function AssetLink({
 }): React.ReactElement | null {
   if (!linked && expenseTaxBasis(entry, gst) <= threshold) return null;
   return (
-    <Link href={`/admin/business/assets?fromExpense=${entry.id}`} className={className}>
+    <Link
+      href={`/admin/business/assets?fromExpense=${entry.id}`}
+      className={cn(className, "max-md:hidden")}
+    >
       {linked ? "View asset" : "Turn into an asset"}
     </Link>
   );
