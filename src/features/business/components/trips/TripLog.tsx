@@ -1,8 +1,9 @@
 "use client";
 // src/features/business/components/trips/TripLog.tsx
 // The FY's trip log: a table from md up with a km total, stacked cards on phones. Rows
-// logged from a job carry a "From a job" tag, and rows dated when no km-rate vehicle was
-// on the asset register carry a "Not claimed" tag; edit and delete hand the row to TripsView.
+// logged from a job carry a "From a job" tag, and rows that earn no km claim carry a tag
+// saying why (before the km-rate car, or no km-rate vehicle that day); edit and delete
+// hand the row to TripsView.
 
 import {
   ROW_CLS,
@@ -22,12 +23,18 @@ import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
 import { FaPlus } from "react-icons/fa6";
 
+/**
+ * Why a trip earns no km claim: dated before the first km-rate vehicle went into service
+ * (a borrowed or shared car, expected), or on a day with no km-rate vehicle after that.
+ */
+export type UnclaimedReason = "beforeVehicle" | "noVehicle";
+
 /** Props for {@link TripLog}. */
 interface TripLogProps {
   /** Trips in the FY, newest first. */
   trips: readonly TripRow[];
-  /** Ids of trips dated when no km-rate vehicle was on the register (not claimed). */
-  outsideIds: ReadonlySet<string>;
+  /** Trips that earn no km claim, by id, with the reason each one shows. */
+  unclaimed: ReadonlyMap<string, UnclaimedReason>;
   /** FY display label for the empty state. */
   fyLabel: string;
   /** Opens the add dialog. */
@@ -39,29 +46,35 @@ interface TripLogProps {
 }
 
 /**
- * Status pills for one trip: "From a job" when it was logged from a booking, and "Not
- * claimed" when no km-rate vehicle was on the asset register that day, so its km earn
- * nothing. The words carry the meaning; the colour only backs them up.
+ * Status pills for one trip: "From a job" when it was logged from a booking, and a "Not
+ * claimed" pill when its km earn nothing. A trip before the km-rate car is expected, so
+ * it gets a neutral pill; a gap after it is a warning. The words carry the meaning; the
+ * colour only backs them up.
  * @param props - Component props.
  * @param props.trip - The trip.
- * @param props.outside - Whether the trip is outside every km-rate vehicle period.
+ * @param props.unclaimed - Why the trip earns no km claim, or undefined when it does.
  * @param props.className - Extra classes (spacing differs between table and card).
  * @returns The pills, or null when the trip has neither.
  */
 function TripTags({
   trip,
-  outside,
+  unclaimed,
   className,
 }: {
   trip: TripRow;
-  outside: boolean;
+  unclaimed: UnclaimedReason | undefined;
   className?: string;
 }): React.ReactElement | null {
-  if (!trip.bookingId && !outside) return null;
+  if (!trip.bookingId && !unclaimed) return null;
   return (
     <span className={cn("flex flex-wrap gap-1.5", className)}>
       {trip.bookingId && <StatusPill tone="info">From a job</StatusPill>}
-      {outside && <StatusPill tone="warning">Not claimed: no km-rate vehicle</StatusPill>}
+      {unclaimed === "beforeVehicle" && (
+        <StatusPill tone="neutral">Not claimed: before your km-rate car</StatusPill>
+      )}
+      {unclaimed === "noVehicle" && (
+        <StatusPill tone="warning">Not claimed: no km-rate vehicle</StatusPill>
+      )}
     </span>
   );
 }
@@ -108,7 +121,7 @@ function RowActions({
  * The trip log card.
  * @param props - Component props.
  * @param props.trips - Trips in the FY.
- * @param props.outsideIds - Trips with no km-rate vehicle on their date.
+ * @param props.unclaimed - Trips that earn no km claim, with the reason.
  * @param props.fyLabel - FY display label.
  * @param props.onAdd - Opens the add dialog.
  * @param props.onEdit - Opens the edit dialog.
@@ -117,7 +130,7 @@ function RowActions({
  */
 export function TripLog({
   trips,
-  outsideIds,
+  unclaimed,
   fyLabel,
   onAdd,
   onEdit,
@@ -169,7 +182,7 @@ export function TripLog({
                     <td className={cn(TD_CLS, "whitespace-nowrap")}>{formatDateShort(t.date)}</td>
                     <td className={TD_CLS}>
                       <p className="font-semibold text-admin-text">{t.purpose}</p>
-                      <TripTags trip={t} outside={outsideIds.has(t.id)} className="mt-1.5" />
+                      <TripTags trip={t} unclaimed={unclaimed.get(t.id)} className="mt-1.5" />
                       {t.notes && <p className="mt-0.5 text-sm text-admin-muted">{t.notes}</p>}
                     </td>
                     <td className={cn(TD_CLS, "text-right whitespace-nowrap tabular-nums")}>
@@ -206,7 +219,7 @@ export function TripLog({
                     {formatKm(t.km)}
                   </p>
                 </div>
-                <TripTags trip={t} outside={outsideIds.has(t.id)} className="mt-1.5" />
+                <TripTags trip={t} unclaimed={unclaimed.get(t.id)} className="mt-1.5" />
                 {t.notes && <p className="mt-1 text-sm text-admin-muted">{t.notes}</p>}
                 <div className="mt-2">
                   <RowActions trip={t} onEdit={onEdit} onDelete={onDelete} />

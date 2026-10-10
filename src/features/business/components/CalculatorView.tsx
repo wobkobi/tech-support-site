@@ -665,6 +665,7 @@ export function CalculatorView({
     eventPrefill,
     pickedContactGoogleId,
     jobDate,
+    jobAddress,
     paidCash,
     alreadyPaid,
     setTaskTemplates,

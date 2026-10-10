@@ -3,7 +3,8 @@
 // POST creates one: validates line items, allocates the next TTP-YYYY-XXXX number (or
 // Q-YYYY-XXXX from the quote counter when `isQuote`), computes totals via
 // calcInvoiceTotals (promo + unsuccessful-work discounts reduce the taxable amount),
-// writes back the matching Sheets counter, then renders the PDF and uploads it to Drive.
+// writes back the matching Sheets counter, logs the job's trip when the invoice bills
+// travel, then renders the PDF and uploads it to Drive.
 
 import { completeBilledBookings } from "@/features/booking/lib/complete-billed-bookings.server";
 import {
@@ -29,14 +30,20 @@ import {
   releaseBookingRedemptions,
   settlePromoRedemption,
 } from "@/features/business/lib/promo-redemption";
+import type { AutoTripResult } from "@/features/business/lib/trips";
+import { autoLogJobTrip } from "@/features/business/lib/trips.server";
 import { parseAmount, parseDate, parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { parseDateKey } from "@/shared/lib/date-format";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
+
+/** Same cap as the booking address field. */
+const MAX_TRIP_ADDRESS_LEN = 250;
 
 /**
  * GET /api/business/invoices - Returns all invoices ordered by creation date descending.
@@ -112,6 +119,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     alreadyPaid,
     alreadyPaidMethod,
     alreadyPaidDate,
+    // Sent by the calculator when the invoice bills travel: the job address and NZ day,
+    // so the job's trip is logged at Google's round-trip km.
+    trip,
   } = body as {
     clientName?: string;
     clientEmail?: string;
@@ -133,6 +143,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     alreadyPaid?: number | null;
     alreadyPaidMethod?: string | null;
     alreadyPaidDate?: string | null;
+    trip?: { address?: unknown; date?: unknown } | null;
   };
 
   if (!clientName || !clientEmail || !Array.isArray(lineItems)) {
@@ -195,6 +206,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!prepaid.ok) return errorResponse(prepaid.error, 400);
   const prepaidDate = alreadyPaidDate ? parseDate(alreadyPaidDate) : undefined;
   if (prepaidDate === null) return errorResponse("Invalid already-paid date", 400);
+  // A bad trip request only skips the trip; it never blocks the invoice.
+  const tripAddress = typeof trip?.address === "string" ? trip.address.trim() : "";
+  const tripDate = parseDateKey(trip?.date);
+  const tripRequest =
+    !isQuote && tripAddress && tripAddress.length <= MAX_TRIP_ADDRESS_LEN && tripDate
+      ? { address: tripAddress, date: tripDate }
+      : null;
 
   // De-duplicated so a repeated id cannot make a single-event job look merged.
   const mergedEventIds = Array.from(
@@ -312,6 +330,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // One trip per job, logged once the invoice is saved; absent from the reply when the
+  // calculator asked for none.
+  let tripResult: AutoTripResult | undefined;
+  if (tripRequest) {
+    tripResult = await autoLogJobTrip({
+      bookingId: billedBookingId,
+      calendarEventIds:
+        mergedEventIds.length > 0
+          ? mergedEventIds
+          : invoice.calendarEventId
+            ? [invoice.calendarEventId]
+            : [],
+      address: tripRequest.address,
+      date: tripRequest.date,
+      clientName: invoice.clientName,
+      invoiceNumber: invoice.number,
+    });
+  }
+
   // Record the part payment in income now, so marking the invoice paid later only
   // records the balance.
   let incomeSheetWarning = false;
@@ -339,7 +376,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   return NextResponse.json(
-    { ok: true, invoice, sheetSyncWarning, incomeSheetWarning },
+    { ok: true, invoice, sheetSyncWarning, incomeSheetWarning, trip: tripResult },
     { status: 201 },
   );
 }

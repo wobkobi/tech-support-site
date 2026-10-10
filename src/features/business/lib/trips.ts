@@ -14,7 +14,7 @@ import { nzDayStartUtc } from "@/shared/lib/timezone-utils";
 export const MAX_TRIP_KM = 2000;
 
 /** Longest purpose line, matching the other ledger text fields. */
-const MAX_PURPOSE_LEN = 200;
+export const MAX_PURPOSE_LEN = 200;
 
 /** Longest notes field. */
 const MAX_NOTES_LEN = 1000;
@@ -70,6 +70,25 @@ export interface TripApiResponse {
   trip?: TripRow;
   error?: string;
 }
+
+/** Body of the Google km reply (POST /api/business/trips/distance). */
+export interface TripDistanceApiResponse {
+  ok: boolean;
+  /** Round-trip driving km from the base address, one decimal. */
+  km?: number;
+  error?: string;
+}
+
+/**
+ * What saving an invoice did about the job's trip: logged one (with its Google km), found
+ * one already logged for the job, or could not log one (Google found no route, or the
+ * lookup or write failed). Absent from the reply when no trip was asked for.
+ */
+export type AutoTripResult =
+  | { status: "logged"; km: number }
+  | { status: "exists" }
+  | { status: "no_route" }
+  | { status: "failed" };
 
 /** Body of the trips list reply (GET /api/business/trips). */
 export interface TripListApiResponse {

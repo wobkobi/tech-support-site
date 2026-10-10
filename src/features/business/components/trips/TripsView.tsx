@@ -8,15 +8,17 @@
 
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { FiledYearWarning } from "@/features/business/components/tax/FiledYearWarning";
 import { TripFormModal } from "@/features/business/components/trips/TripFormModal";
-import { TripLog } from "@/features/business/components/trips/TripLog";
+import { TripLog, type UnclaimedReason } from "@/features/business/components/trips/TripLog";
 import { TripSuggestions } from "@/features/business/components/trips/TripSuggestions";
 import { formatNZD, todayISO } from "@/features/business/lib/business-format";
 import type { FiledYearRef } from "@/features/business/lib/tax/snapshot";
 import type { KmVehiclePeriod } from "@/features/business/lib/tax/types";
 import {
+  beforeKmVehicles,
   inKmVehiclePeriod,
   KM_TIER1_LIMIT,
   kmClaim,
@@ -132,10 +134,23 @@ export function TripsView({
   const claim = kmClaim(split.claimableKm, rates, totalVehicleKm);
   // Without the car's total km, the first KM_TIER1_LIMIT business km stand in for Tier 1.
   const needsTotalKm = totalVehicleKm === null && claim.businessKm > 0;
-  const outsideIds = new Set(
-    trips.filter((t) => !inKmVehiclePeriod(t.date, kmPeriods)).map((t) => t.id),
-  );
-  const claimedTrips = trips.length - outsideIds.size;
+  // Unclaimed trips before the first km-rate car were in a car never on the register (a
+  // shared or borrowed one), which is expected; a gap after it needs the vehicle added.
+  const unclaimed = new Map<string, UnclaimedReason>();
+  let beforeVehicleKm = 0;
+  let noVehicleKm = 0;
+  for (const t of trips) {
+    if (inKmVehiclePeriod(t.date, kmPeriods)) continue;
+    if (beforeKmVehicles(t.date, kmPeriods)) {
+      unclaimed.set(t.id, "beforeVehicle");
+      beforeVehicleKm += t.km;
+    } else {
+      unclaimed.set(t.id, "noVehicle");
+      noVehicleKm += t.km;
+    }
+  }
+  const firstKmDay = kmPeriods.map((p) => p.from).sort()[0];
+  const claimedTrips = trips.length - unclaimed.size;
 
   /** Opens the dialog for a new trip. */
   function openAdd(): void {
@@ -378,7 +393,7 @@ export function TripsView({
   return (
     <>
       <div className="mb-6">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatStrip label="Kilometre claim" className="grid-cols-2 lg:grid-cols-4">
           <StatCard
             label="Business km"
             value={formatKm(claim.businessKm)}
@@ -399,7 +414,7 @@ export function TripsView({
             sub={`At ${formatNZD(rates.tier2)}/km`}
           />
           <StatCard label="Km claim" value={formatNZD(claim.amount)} tone="success" sub={fyLabel} />
-        </div>
+        </StatStrip>
         {needsTotalKm && (
           <p className="mt-2 text-sm text-admin-text-secondary">
             Enter the car&apos;s total km for the year on the Tax page so the Tier 1 split is right.
@@ -407,9 +422,18 @@ export function TripsView({
         )}
       </div>
 
-      {split.outsideKm > 0 && (
+      {beforeVehicleKm > 0 && firstKmDay && (
+        <Notice onGrey className="mb-6">
+          {formatKm(beforeVehicleKm)} logged before your kilometre-rate car went into service on{" "}
+          {formatDateShort(firstKmDay)}. Those trips were in a car that isn&apos;t on the asset
+          register, so they aren&apos;t claimed at km rates. Fuel you paid for then counts as an
+          expense instead.
+        </Notice>
+      )}
+
+      {noVehicleKm > 0 && (
         <Notice tone="warn" onGrey className="mb-6">
-          {formatKm(split.outsideKm)} logged on days with no kilometre-rate vehicle on the asset
+          {formatKm(noVehicleKm)} logged on days with no kilometre-rate vehicle on the asset
           register. Add the vehicle on the{" "}
           <Link
             href="/admin/business/assets"
@@ -460,7 +484,7 @@ export function TripsView({
 
       <TripLog
         trips={trips}
-        outsideIds={outsideIds}
+        unclaimed={unclaimed}
         fyLabel={fyLabel}
         onAdd={openAdd}
         onEdit={openEdit}

@@ -1,18 +1,27 @@
 "use client";
 // src/features/business/components/trips/TripFormModal.tsx
-// Add or edit one trip: date, round-trip km, purpose and notes. Saves through the trips
-// API and hands the stored row back. The parent mounts it per trip (keyed), so the form
+// Add or edit one trip: date, round-trip km, purpose and notes, with an address box that
+// fills the km from Google Maps (round trip from the base address; the address itself is
+// not saved). Saves through the trips API and hands the stored row back. The parent mounts it per trip (keyed), so the form
 // starts from that trip's values without an effect.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
+import { ADMIN_CONTROL_CLS } from "@/features/admin/components/ui/field-classes";
 import { Modal } from "@/features/admin/components/ui/Modal";
+import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { FiledYearWarning } from "@/features/business/components/tax/FiledYearWarning";
 import type { FiledYearRef } from "@/features/business/lib/tax/snapshot";
-import { MAX_TRIP_KM, type TripApiResponse, type TripRow } from "@/features/business/lib/trips";
+import {
+  MAX_TRIP_KM,
+  type TripApiResponse,
+  type TripDistanceApiResponse,
+  type TripRow,
+} from "@/features/business/lib/trips";
 import { Notice } from "@/shared/components/Notice";
+import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useId, useRef, useState } from "react";
 
@@ -78,6 +87,10 @@ export function TripFormModal({
   const [form, setForm] = useState<TripForm>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Lookup only: the address is not part of the trip, so it is left out of `dirty`.
+  const [address, setAddress] = useState("");
+  const [lookingUp, setLookingUp] = useState(false);
+  const [lookup, setLookup] = useState<{ ok: boolean; text: string } | null>(null);
   const dirty =
     form.date !== initial.date ||
     form.km !== initial.km ||
@@ -91,6 +104,38 @@ export function TripFormModal({
    */
   function setField(field: keyof TripForm, value: string): void {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  /**
+   * Fills the km from Google Maps: the round trip from the base address to `to`.
+   * @param to - Address to look up; defaults to what is in the address box.
+   */
+  async function lookUpKm(to: string = address): Promise<void> {
+    const trimmed = to.trim();
+    if (!trimmed || lookingUp) return;
+    setLookingUp(true);
+    setLookup(null);
+    try {
+      const res = await fetch("/api/business/trips/distance", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ address: trimmed }),
+      });
+      const d = (await res.json()) as TripDistanceApiResponse;
+      if (d.ok && d.km !== undefined) {
+        setField("km", String(d.km));
+        setLookup({ ok: true, text: `Google Maps: ${d.km} km there and back.` });
+      } else {
+        setLookup({ ok: false, text: d.error ?? "Couldn't get the km from Google." });
+      }
+    } catch {
+      setLookup({
+        ok: false,
+        text: "Couldn't reach Google. Check your connection, or type the km.",
+      });
+    } finally {
+      setLookingUp(false);
+    }
   }
 
   /**
@@ -152,6 +197,55 @@ export function TripFormModal({
           ]}
           className="sm:col-span-2"
         />
+        <AdminField
+          label="Where to"
+          htmlFor={`${idBase}-address`}
+          optional
+          hint="Fills the km from Google Maps, there and back from your base address. Not saved with the trip."
+          className="sm:col-span-2"
+        >
+          <div className="flex gap-2 max-sm:flex-col">
+            <div className="min-w-0 flex-1">
+              <AddressAutocomplete
+                id={`${idBase}-address`}
+                value={address}
+                onChange={setAddress}
+                // Picking a suggestion is a clear ask, so look it up straight away.
+                onPlaceSelected={(place) => void lookUpKm(place.formattedAddress)}
+                onKeyDown={(e) => {
+                  // Enter looks the address up instead of submitting the trip.
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void lookUpKm();
+                  }
+                }}
+                placeholder="Street address"
+                maxLength={250}
+                inputClassName={ADMIN_CONTROL_CLS}
+              />
+            </div>
+            <AdminButton
+              variant="secondary"
+              onClick={() => void lookUpKm()}
+              busy={lookingUp}
+              disabled={!address.trim()}
+              className="shrink-0"
+            >
+              Get km from Google
+            </AdminButton>
+          </div>
+          {lookup && (
+            <p
+              role="status"
+              className={cn(
+                "mt-2 text-sm",
+                lookup.ok ? "text-admin-text-secondary" : "text-coquelicot-700",
+              )}
+            >
+              {lookup.text}
+            </p>
+          )}
+        </AdminField>
         <AdminField label="Date" htmlFor={`${idBase}-date`} required>
           <AdminInput
             id={`${idBase}-date`}

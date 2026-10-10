@@ -1224,20 +1224,24 @@ model Asset {
 // One business trip in the km log (/admin/business/trips), claimed at IRD kilometre
 // rates. Site-only; one round trip per job.
 model Trip {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
   // NZ ledger date of the trip.
-  date      DateTime
+  date            DateTime
   // Business kilometres for the whole trip (there and back).
-  km        Float
-  purpose   String
-  // Booking the trip was for, when it came from "Jobs without a trip".
-  bookingId String?  @db.ObjectId
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  km              Float
+  purpose         String
+  // Booking the trip was for, when it came from "Jobs without a trip" or an invoice.
+  bookingId       String?  @db.ObjectId
+  // First calendar event of the invoiced job the trip was logged from, so a job with no
+  // Booking row (a bare calendar entry) still gets only one trip.
+  calendarEventId String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([date])
   @@index([bookingId])
+  @@index([calendarEventId])
 }
 
 // Per-financial-year inputs for the Tax page plus the filed snapshot. Blank rate fields

@@ -2,7 +2,8 @@
 // src/features/business/hooks/use-calculator-save.ts
 // Save paths for the job calculator: invoice / save & send / quote via the invoices API
 // (with the add-to-contacts gate and contactId backfill), marking a paid-in-full invoice
-// paid, sending any already-paid amount, and the direct income entry.
+// paid, sending any already-paid amount, asking for the job's trip when travel is
+// billed, and the direct income entry.
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { validateEmail } from "@/features/booking/lib/booking";
@@ -20,6 +21,7 @@ import {
 import { clearDraft } from "@/features/business/lib/calculator-draft";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import type { ActivePromo } from "@/features/business/lib/promos";
+import type { AutoTripResult } from "@/features/business/lib/trips";
 import type {
   EventPrefill,
   JobCalculation,
@@ -51,8 +53,10 @@ interface UseCalculatorSaveArgs {
   pickedContactGoogleId: string | null;
   /** New name for the picked contact, set when the operator edited it and kept the box ticked. */
   renameContactTo: string | null;
-  /** Job date the income entry is recorded against. */
+  /** Job date the income entry is recorded against, and the logged trip's date. */
   jobDate: string;
+  /** Job address, where the logged trip drives to. */
+  jobAddress: string;
   /** "Paid in cash" ticked: an invoice saves as paid, an income entry records Cash. */
   paidCash: boolean;
   /** Already paid box: part of the bill handed over on the day. */
@@ -95,7 +99,8 @@ interface UseCalculatorSave {
  * @param args.eventPrefill - Schedule-event prefill, or null.
  * @param args.pickedContactGoogleId - Google id of the picked contact, or null.
  * @param args.renameContactTo - New name for the picked contact on invoice save, or null.
- * @param args.jobDate - Job date for the income entry.
+ * @param args.jobDate - Job date for the income entry and the logged trip.
+ * @param args.jobAddress - Job address the logged trip drives to.
  * @param args.paidCash - Whether the client paid in cash on the day.
  * @param args.alreadyPaid - Amount and method handed over on the day, if any.
  * @param args.setTaskTemplates - Task template setter, refreshed as templates save.
@@ -113,6 +118,7 @@ export function useCalculatorSave({
   pickedContactGoogleId,
   renameContactTo,
   jobDate,
+  jobAddress,
   paidCash,
   alreadyPaid,
   setTaskTemplates,
@@ -397,6 +403,11 @@ export function useCalculatorSave({
               alreadyPaidMethod: alreadyPaid.method,
               alreadyPaidDate: jobDate,
             }),
+          // Billing travel means you drove there (a late cancel only keeps travel when
+          // you did), so the server logs the job's trip at Google's round-trip km.
+          ...(!quote &&
+            totals.travelTotal > 0 &&
+            jobAddress.trim() && { trip: { address: jobAddress.trim(), date: jobDate } }),
           // issueDate, dueDate, number all defaulted server-side.
         }),
       });
@@ -406,9 +417,20 @@ export function useCalculatorSave({
             invoice: { id: string };
             sheetSyncWarning?: boolean;
             incomeSheetWarning?: boolean;
+            trip?: AutoTripResult;
           }
         | { error: string };
       if ("error" in d) throw new Error(d.error);
+      if (d.trip?.status === "logged") {
+        toast(`Trip logged: ${d.trip.km} km there and back.`, { tone: "success" });
+      } else if (d.trip?.status === "no_route" || d.trip?.status === "failed") {
+        toast(
+          d.trip.status === "no_route"
+            ? "Invoice saved, but Google couldn't find a route for the trip. Add it on the Trips page."
+            : "Invoice saved, but the trip didn't log. Add it on the Trips page.",
+          { tone: "warning" },
+        );
+      }
       if (d.sheetSyncWarning) {
         toast(
           quote

@@ -1,7 +1,8 @@
 // src/features/business/lib/tax/vehicle.ts
 // IRD kilometre-rate vehicle claim. The rate covers fuel, running costs and
 // depreciation, so a km-rate vehicle is never depreciated. Fuel rows are left out, and
-// trips earn the rate, only on days a km-rate vehicle is in service. Tier 1 covers the
+// trips earn the rate, only on days a km-rate vehicle is in service (trips before the
+// first one went in used a car that was never on the register). Tier 1 covers the
 // business share of the first 14,000 km the vehicle travels in total (business and
 // private); without a total, the first 14,000 business km stand in for it.
 
@@ -81,6 +82,23 @@ export function inKmVehiclePeriod(
 ): boolean {
   const day = ledgerDay(date).toISOString();
   return periods.some((p) => day >= p.from && (p.to === null || day < p.to));
+}
+
+/**
+ * Whether a ledger date falls before the first km-rate vehicle went into service, so
+ * any trip that day was in a car that was never on the register (a borrowed or shared
+ * car). False when the register has no km-rate vehicle at all.
+ * @param date - ISO string or Date.
+ * @param periods - From {@link kmVehiclePeriods}.
+ * @returns True when the NZ day is earlier than every period's start.
+ */
+export function beforeKmVehicles(
+  date: string | Date,
+  periods: readonly KmVehiclePeriod[],
+): boolean {
+  if (periods.length === 0) return false;
+  const day = ledgerDay(date).toISOString();
+  return periods.every((p) => day < p.from);
 }
 
 /**
