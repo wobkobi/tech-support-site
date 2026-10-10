@@ -31,6 +31,50 @@ export function explicitRoundingAllowanceMins(
   return tasks.filter((t) => t.baseRateId != null && t.isExplicit).length * snapMins;
 }
 
+/** What the calculator's task-time banner flags, from {@link taskWindowMismatch}. */
+export type TaskWindowMismatch = "floor" | "over" | "under";
+
+/**
+ * Whether the tasks disagree with the job window enough to offer a Fix, and which way.
+ *
+ * The window is judged on the billing grid, the total Fix fits to, so a 79-min window
+ * billed as 80 min of tasks is a match, not a minute over. Explicit tasks round UP to
+ * the grid and Fix never moves them, so an overshoot inside
+ * {@link explicitRoundingAllowanceMins} is let through - but only when every task is
+ * pinned. With a floating task present, Fix shrinks it to absorb the overshoot: moving
+ * a 10:00 start to 10:05 on a job with one stated task must still be flagged.
+ * @param tasks - Current task lines (hourly + flat).
+ * @param windowMin - Job window in minutes (slot sum plus follow-up).
+ * @param minBillableMins - Minimum billable labour minutes.
+ * @param snapMins - Live billing increment in minutes; defaults to the code fallback.
+ * @returns "floor" for a job under the minimum, "over" or "under" against the window, or
+ * null when the tasks already fit.
+ */
+export function taskWindowMismatch(
+  tasks: TaskLine[],
+  windowMin: number,
+  minBillableMins: number,
+  snapMins: number = TASK_TIMING_FALLBACK.snapMins,
+): TaskWindowMismatch | null {
+  const taskMin = hourlyTaskMinutes(tasks);
+  if (taskMin === 0) return null;
+  // Checked before the window: a short job usually has taskMin == windowMin.
+  if (taskMin < minBillableMins) return "floor";
+  if (windowMin <= 0) return null;
+  const snap = snapMins > 0 ? snapMins : TASK_TIMING_FALLBACK.snapMins;
+  const gridWindow = Math.round(windowMin / snap) * snap;
+  // A window under half an increment rounds to nothing, which Fix leaves alone.
+  if (gridWindow <= 0) return null;
+  const gap = taskMin - gridWindow;
+  // Tolerance: a legacy qty at 2 dp sits up to ~1.5 min off after a 3-task split.
+  if (Math.abs(gap) < 2) return null;
+  // Billing at the minimum floor legitimately exceeds a shorter window.
+  if (gap > 0 && taskMin <= minBillableMins) return null;
+  const canAbsorb = tasks.some((t) => t.baseRateId != null && !t.isExplicit && !t.isShort);
+  if (gap > 0 && !canAbsorb && gap <= explicitRoundingAllowanceMins(tasks, snap)) return null;
+  return gap > 0 ? "over" : "under";
+}
+
 /**
  * Live task-timing values threaded in from pricing settings. Every consumer
  * reads the operator's settings; {@link TASK_TIMING_FALLBACK} is the in-code

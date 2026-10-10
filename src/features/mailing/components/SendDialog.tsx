@@ -8,7 +8,8 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { callApi } from "@/features/mailing/lib/api-client";
@@ -17,7 +18,7 @@ import type { Recipient } from "@/features/mailing/lib/recipients";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { nextSendTime, type QuietHours } from "@/shared/lib/quiet-hours";
 import { fromNzInputValue, toNzInputValue } from "@/shared/lib/timezone-utils";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useId, useMemo, useState } from "react";
 
 /** Send straight away, or hand to the scheduled-send cron. */
 export type SendMode = "now" | "schedule";
@@ -84,6 +85,7 @@ export function SendDialog({
   const [query, setQuery] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<SubmitKind | null>(null);
+  const whenId = useId();
 
   // Reset to the button that opened it each time it opens.
   const [prevOpen, setPrevOpen] = useState(open);
@@ -254,13 +256,14 @@ export function SendDialog({
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap gap-4 text-sm">
+        <div className="flex flex-wrap gap-4 text-[0.9375rem] text-admin-text">
           <label className="flex items-center gap-2">
             <input
               type="radio"
               name="send-mode"
               checked={mode === "now"}
               onChange={() => setMode("now")}
+              className="size-4 accent-russian-violet"
             />
             Send now
           </label>
@@ -270,6 +273,7 @@ export function SendDialog({
               name="send-mode"
               checked={mode === "schedule"}
               onChange={() => setMode("schedule")}
+              className="size-4 accent-russian-violet"
             />
             Send later
           </label>
@@ -284,30 +288,30 @@ export function SendDialog({
         )}
 
         {mode === "schedule" && (
-          <label className="flex flex-col gap-1 text-sm font-medium text-admin-text">
-            When (NZ time)
-            <input
+          <AdminField label="When (NZ time)" htmlFor={whenId}>
+            <AdminInput
+              id={whenId}
               type="datetime-local"
               value={when}
               onChange={(e) => setWhen(e.target.value)}
-              className={`${ADMIN_INPUT_CLS} max-w-xs`}
+              className="max-w-xs"
             />
             {scheduleMovedTo && (
-              <span className="font-normal text-amber-800">
+              <p className="mt-1 text-sm text-amber-800">
                 That&apos;s inside quiet hours ({hourLabel(quiet.startHour)} to{" "}
                 {hourLabel(quiet.endHour)}), so it&apos;ll go at{" "}
                 {formatDateTimeShort(scheduleMovedTo)}.
-              </span>
+              </p>
             )}
-          </label>
+          </AdminField>
         )}
 
         <div>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-admin-text">
+            <p className="text-sm font-bold text-admin-text">
               Who gets it{subscribed !== null && ` - ${count} of ${subscribed.length}`}
               {campaign.audience === "site_reviewers" && (
-                <span className="block text-xs font-normal text-admin-muted">
+                <span className="block text-sm font-normal text-admin-muted">
                   Only people who left a review on the site. Anyone who stopped review asks is left
                   off.
                 </span>
@@ -322,13 +326,13 @@ export function SendDialog({
               </AdminButton>
             </div>
           </div>
-          <input
+          <AdminInput
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search name or email"
             aria-label="Search recipients"
-            className={`${ADMIN_INPUT_CLS} mb-2`}
+            className="mb-2"
           />
           {loadError && <p className="text-sm text-red-700">{loadError}</p>}
           {subscribed === null && !loadError && (

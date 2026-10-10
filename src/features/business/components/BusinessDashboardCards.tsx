@@ -7,14 +7,20 @@
 //
 // Past-FY scopes hide the "This month" cards, since the current calendar month falls
 // outside the FY window and would always show zero.
+//
+// Income and expense figures are on the GST basis the page computes per row (basisAmount,
+// gstClaimable): incl. GST while not registered, so the GST card and the "(excl. GST)"
+// labels show only once registered.
 
 import { StatCard, type StatTone } from "@/features/admin/components/ui/StatCard";
+import { lastCardSpan, StatStrip } from "@/features/admin/components/ui/StatStrip";
 import {
   BreakdownModal,
   type BreakdownData,
   type BreakdownRow,
 } from "@/features/business/components/BreakdownModal";
 import { formatNZD } from "@/features/business/lib/business";
+import type { TaxEstimateSummary } from "@/features/business/lib/tax/workings";
 import { formatDateSlash } from "@/shared/lib/date-format";
 import type React from "react";
 import { useState } from "react";
@@ -25,7 +31,10 @@ export interface IncomeRow {
   date: string; // ISO
   customer: string;
   description: string;
+  /** GST-inclusive amount, as received. */
   amount: number;
+  /** What the row counts as income: `amount` while unregistered or dated before registration, else excl. GST. */
+  basisAmount: number;
 }
 
 /** Expense entry payload passed in from the server component (already scope-filtered). */
@@ -34,8 +43,11 @@ export interface ExpenseRow {
   date: string; // ISO
   supplier: string;
   description: string;
-  amountExcl: number;
   gstAmount: number;
+  /** What the row costs for profit: incl. GST while unregistered or dated before registration, else excl. */
+  basisAmount: number;
+  /** GST claimed back on the row: its gstAmount once registered on its date, else 0. */
+  gstClaimable: number;
 }
 
 /** Invoice payload passed in from the server component (already scope-filtered). */
@@ -53,6 +65,8 @@ interface DashboardScope {
   label: string;
   isAllTime: boolean;
   isCurrentFy: boolean;
+  /** GST registered (pricing setting); shows the GST card and the "(excl. GST)" labels. */
+  gstRegistered: boolean;
 }
 
 interface Props {
@@ -62,6 +76,10 @@ interface Props {
   invoices: InvoiceRow[];
   monthStartISO: string;
   monthEndISO: string;
+  /** Tax page estimate for the same scope (FYs summed for all time), or null with no FYs. */
+  taxEstimate: TaxEstimateSummary | null;
+  /** Tax page link for the same scope. */
+  taxHref: string;
 }
 
 /**
@@ -77,17 +95,17 @@ function incomeRows(entries: IncomeRow[]): BreakdownRow[] {
       date: formatDateSlash(e.date),
       label: e.customer,
       sublabel: e.description,
-      amount: e.amount,
+      amount: e.basisAmount,
     }));
 }
 
 /**
  * Builds the BreakdownRow list for expense entries.
  * @param entries - Expense entries to map.
- * @param field - Which numeric field to display (excl. GST or GST amount).
+ * @param field - Which numeric field to display (GST-basis cost or GST claimable).
  * @returns Modal rows.
  */
-function expenseRows(entries: ExpenseRow[], field: "amountExcl" | "gstAmount"): BreakdownRow[] {
+function expenseRows(entries: ExpenseRow[], field: "basisAmount" | "gstClaimable"): BreakdownRow[] {
   return entries
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -95,7 +113,7 @@ function expenseRows(entries: ExpenseRow[], field: "amountExcl" | "gstAmount"): 
       date: formatDateSlash(e.date),
       label: e.supplier,
       sublabel: e.description,
-      amount: field === "amountExcl" ? e.amountExcl : e.gstAmount,
+      amount: e[field],
     }));
 }
 
@@ -111,21 +129,21 @@ function inRange<T extends { date: string }>(entries: T[], startISO: string, end
 }
 
 /**
- * Sums the `amount` field of an income list.
+ * Sums an income list on the GST basis (`basisAmount`).
  * @param rows - Income rows.
  * @returns Sum.
  */
 function sumIncome(rows: IncomeRow[]): number {
-  return rows.reduce((s, r) => s + r.amount, 0);
+  return rows.reduce((s, r) => s + r.basisAmount, 0);
 }
 
 /**
  * Sums a chosen numeric field across an expense list.
  * @param rows - Expense rows.
- * @param field - "amountExcl" or "gstAmount".
+ * @param field - "basisAmount" or "gstClaimable".
  * @returns Sum.
  */
-function sumExpense(rows: ExpenseRow[], field: "amountExcl" | "gstAmount"): number {
+function sumExpense(rows: ExpenseRow[], field: "basisAmount" | "gstClaimable"): number {
   return rows.reduce((s, r) => s + r[field], 0);
 }
 
@@ -138,6 +156,8 @@ function sumExpense(rows: ExpenseRow[], field: "amountExcl" | "gstAmount"): numb
  * @param props.invoices - Invoice rows in scope.
  * @param props.monthStartISO - ISO start of the active month.
  * @param props.monthEndISO - ISO end of the active month.
+ * @param props.taxEstimate - Tax page estimate for the same scope, or null.
+ * @param props.taxHref - Tax page link for the same scope.
  * @returns Cards section.
  */
 export function BusinessDashboardCards({
@@ -147,24 +167,27 @@ export function BusinessDashboardCards({
   invoices,
   monthStartISO,
   monthEndISO,
+  taxEstimate,
+  taxHref,
 }: Props): React.ReactElement {
   const [active, setActive] = useState<BreakdownData | null>(null);
 
   const totalIncome = sumIncome(income);
-  const totalExpensesExcl = sumExpense(expenses, "amountExcl");
-  const totalGst = sumExpense(expenses, "gstAmount");
-  const profit = totalIncome - totalExpensesExcl;
-  // Income-tax reserve is 20% of PROFIT (not raw income) - matches NZ sole-trader
-  // Tax Planner. Clamp to >= 0 so a loss year doesn't show a negative reserve.
-  const taxReserve = Math.max(0, profit) * 0.2;
+  const totalExpensesBasis = sumExpense(expenses, "basisAmount");
+  const totalGst = sumExpense(expenses, "gstClaimable");
+  const profit = totalIncome - totalExpensesBasis;
+  const taxToSetAside = taxEstimate?.totalToSetAside ?? 0;
   const monthIncome = inRange(income, monthStartISO, monthEndISO);
   const monthExpenses = inRange(expenses, monthStartISO, monthEndISO);
 
   const showThisMonthCards = scope.isAllTime || scope.isCurrentFy;
   // Card titles read more naturally as "Income" / "Expenses" inside an FY
   // scope, but stay as "Total income" / "Total expenses" in the all-time view.
-  const incomePrefix = scope.isAllTime ? "Total income" : "Income";
-  const expensesPrefix = scope.isAllTime ? "Total expenses (excl. GST)" : "Expenses (excl. GST)";
+  // "(excl. GST)" only while registered: unregistered income and expenses count with their
+  // GST in.
+  const gstSuffix = scope.gstRegistered ? " (excl. GST)" : "";
+  const incomePrefix = (scope.isAllTime ? "Total income" : "Income") + gstSuffix;
+  const expensesPrefix = (scope.isAllTime ? "Total expenses" : "Expenses") + gstSuffix;
 
   /** All-income breakdown shown when the income card is clicked. */
   const totalIncomeBreakdown: BreakdownData = {
@@ -174,11 +197,11 @@ export function BusinessDashboardCards({
     viewAll: { label: "View all income", href: `/admin/business/income` },
   };
 
-  /** All-expense (excl. GST) breakdown for the expenses card. */
+  /** All-expense breakdown (GST basis) for the expenses card. */
   const totalExpensesBreakdown: BreakdownData = {
     title: expensesPrefix,
-    rows: expenseRows(expenses, "amountExcl"),
-    total: { label: "Total", value: formatNZD(totalExpensesExcl) },
+    rows: expenseRows(expenses, "basisAmount"),
+    total: { label: "Total", value: formatNZD(totalExpensesBasis) },
     viewAll: { label: "View all expenses", href: `/admin/business/expenses` },
   };
 
@@ -187,21 +210,69 @@ export function BusinessDashboardCards({
     title: "Profit",
     calculation: [
       { label: incomePrefix, value: formatNZD(totalIncome) },
-      { label: expensesPrefix, value: formatNZD(totalExpensesExcl), subtract: true },
+      { label: expensesPrefix, value: formatNZD(totalExpensesBasis), subtract: true },
     ],
     total: { label: "Profit", value: formatNZD(profit) },
   };
 
-  /** Calculation walk-through for "Tax reserve (20%)". Profit-based, clamped at 0. */
-  const taxReserveBreakdown: BreakdownData = {
-    title: "Tax reserve (20%)",
-    calculation: [
-      { label: incomePrefix, value: formatNZD(totalIncome) },
-      { label: expensesPrefix, value: formatNZD(totalExpensesExcl), subtract: true },
-      { label: "Profit", value: formatNZD(profit) },
-      { label: "Tax rate", value: "20%" },
-    ],
-    total: { label: "Tax reserve", value: formatNZD(taxReserve) },
+  /**
+   * Calculation walk-through for "Tax to set aside", from the Tax page's estimate. Its
+   * income and deductions are the tax figures (depreciation, km claim, home office and
+   * exclusions applied), so they can differ from the Income and Expenses cards.
+   * All time adds up finished FY figures, and a loss FY's taxable profit is $0, so on All
+   * time the income and deductions are listed as plain totals rather than subtracted into
+   * taxable.
+   */
+  const taxBreakdown: BreakdownData = {
+    title: "Tax to set aside",
+    note:
+      taxEstimate && scope.isAllTime
+        ? "Each financial year is worked out on its own, then the years are added up. A year that made a loss has $0 taxable profit, so the taxable profit here isn't the income less the deductions."
+        : undefined,
+    calculation: taxEstimate
+      ? [
+          ...(scope.isAllTime
+            ? [
+                {
+                  label: "Income for tax, each year added up",
+                  value: formatNZD(taxEstimate.income),
+                },
+                {
+                  label: "Tax deductions, each year added up",
+                  value: formatNZD(taxEstimate.deductions),
+                },
+                {
+                  label: "Taxable profit, each year added up (a loss year counts as $0)",
+                  value: formatNZD(taxEstimate.taxable),
+                },
+              ]
+            : [
+                { label: "Income for tax", value: formatNZD(taxEstimate.income) },
+                {
+                  label: "Tax deductions",
+                  value: formatNZD(taxEstimate.deductions),
+                  subtract: true,
+                },
+                {
+                  label: "Taxable profit (never below $0)",
+                  value: formatNZD(taxEstimate.taxable),
+                },
+              ]),
+          { label: "Income tax on the NZ brackets", value: formatNZD(taxEstimate.incomeTax) },
+          {
+            label: "Independent earner tax credit",
+            value: formatNZD(taxEstimate.ietc),
+            subtract: true,
+          },
+          {
+            label: "Income tax after the credit",
+            value: formatNZD(taxEstimate.residualIncomeTax),
+          },
+          { label: "ACC levies", value: formatNZD(taxEstimate.acc) },
+        ]
+      : [],
+    total: { label: "Tax to set aside", value: formatNZD(taxToSetAside) },
+    viewAll: { label: "Open tax page", href: taxHref },
   };
 
   /** This-month income breakdown. */
@@ -215,15 +286,18 @@ export function BusinessDashboardCards({
   /** This-month expense breakdown. */
   const monthExpensesBreakdown: BreakdownData = {
     title: "This month expenses",
-    rows: expenseRows(monthExpenses, "amountExcl"),
-    total: { label: "Total", value: formatNZD(sumExpense(monthExpenses, "amountExcl")) },
+    rows: expenseRows(monthExpenses, "basisAmount"),
+    total: { label: "Total", value: formatNZD(sumExpense(monthExpenses, "basisAmount")) },
     viewAll: { label: "View all expenses", href: `/admin/business/expenses` },
   };
 
-  /** GST claimable breakdown - shows the GST amount per expense entry. */
+  /** GST claimable breakdown - the GST claimed back per expense, rows with none left out. */
   const gstBreakdown: BreakdownData = {
     title: "GST claimable",
-    rows: expenseRows(expenses, "gstAmount"),
+    rows: expenseRows(
+      expenses.filter((e) => e.gstClaimable !== 0),
+      "gstClaimable",
+    ),
     total: { label: "Total GST", value: formatNZD(totalGst) },
     viewAll: { label: "View all expenses", href: `/admin/business/expenses` },
   };
@@ -258,7 +332,7 @@ export function BusinessDashboardCards({
     },
     {
       label: expensesPrefix,
-      value: formatNZD(totalExpensesExcl),
+      value: formatNZD(totalExpensesBasis),
       tone: "default",
       breakdown: totalExpensesBreakdown,
     },
@@ -269,10 +343,10 @@ export function BusinessDashboardCards({
       breakdown: profitBreakdown,
     },
     {
-      label: "Tax reserve (20%)",
-      value: formatNZD(taxReserve),
+      label: "Tax to set aside",
+      value: formatNZD(taxToSetAside),
       tone: "warning",
-      breakdown: taxReserveBreakdown,
+      breakdown: taxBreakdown,
     },
     ...(showThisMonthCards
       ? [
@@ -284,18 +358,23 @@ export function BusinessDashboardCards({
           },
           {
             label: "This month expenses",
-            value: formatNZD(sumExpense(monthExpenses, "amountExcl")),
+            value: formatNZD(sumExpense(monthExpenses, "basisAmount")),
             tone: "default" as StatTone,
             breakdown: monthExpensesBreakdown,
           },
         ]
       : []),
-    {
-      label: "GST claimable",
-      value: formatNZD(totalGst),
-      tone: "info",
-      breakdown: gstBreakdown,
-    },
+    // Nothing is claimable while unregistered, so the card would only ever read $0.00.
+    ...(scope.gstRegistered
+      ? [
+          {
+            label: "GST claimable",
+            value: formatNZD(totalGst),
+            tone: "info" as StatTone,
+            breakdown: gstBreakdown,
+          },
+        ]
+      : []),
     {
       label: "Invoices",
       value: String(invoices.length),
@@ -306,20 +385,23 @@ export function BusinessDashboardCards({
 
   return (
     <>
-      <p className="mb-2 text-xs font-semibold tracking-wide text-admin-muted uppercase">
+      <p className="mb-2 text-sm font-semibold tracking-wide text-admin-muted uppercase">
         Showing: {scope.label}
       </p>
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {cards.map((c) => (
+      <StatStrip label={`Totals for ${scope.label}`} className="mb-6 grid-cols-2 sm:grid-cols-4">
+        {cards.map((c, i) => (
           <StatCard
             key={c.label}
             label={c.label}
             value={c.value}
             tone={c.tone}
             onClick={() => setActive(c.breakdown)}
+            className={
+              i === cards.length - 1 ? lastCardSpan(cards.length, { base: 2, sm: 4 }) : undefined
+            }
           />
         ))}
-      </div>
+      </StatStrip>
 
       {active && <BreakdownModal data={active} onClose={() => setActive(null)} />}
     </>

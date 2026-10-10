@@ -6,6 +6,8 @@
 // booking-window rules (notice, same-day cutoff, caps) are reflected, not just the raw
 // hours.
 
+import { Card } from "@/features/admin/components/ui/Card";
+import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
 import { buildAvailableDays, hourLabel } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
 import type { AvailabilitySettings } from "@/shared/lib/settings/types";
@@ -58,10 +60,8 @@ export function AvailabilityPreview({ config }: Props): React.ReactElement {
   }, [config]);
 
   return (
-    <div className="mt-6 rounded-lg border border-admin-border bg-admin-bg p-4">
-      <h3 className="text-xs font-bold tracking-wide text-russian-violet uppercase">
-        Live preview
-      </h3>
+    <Card className="mt-6 bg-admin-bg">
+      <h3 className={ADMIN_EYEBROW_CLS}>Live preview</h3>
 
       {!config.acceptingBookings && (
         <p className="mt-2 text-sm text-amber-700">
@@ -69,29 +69,34 @@ export function AvailabilityPreview({ config }: Props): React.ReactElement {
         </p>
       )}
 
-      <div className="mt-3 grid grid-cols-7 gap-1">
+      {/* 14px hours don't fit a seventh-width cell on phones, so two columns there and
+          all seven from md, where each cell has room. */}
+      <div className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-4 md:grid-cols-7">
         {DAY_ORDER.map(({ index, name }) => {
           const d = config.schedule[index];
           const open = d.enabled;
           return (
             <div
               key={index}
-              className={cn("rounded-md p-2 text-center", open ? "bg-emerald-50" : "bg-admin-bg")}
+              className={cn(
+                "rounded-md p-2 text-center",
+                open ? "bg-green-50" : "bg-admin-surface",
+              )}
             >
-              <p className="text-xs font-semibold text-admin-text">{name}</p>
+              <p className="text-sm font-semibold text-admin-text">{name}</p>
               {open ? (
                 <>
-                  <p className="text-[11px] text-emerald-700">
+                  <p className="text-sm text-green-700">
                     {fmtHour(d.open)}-{fmtHour(d.close)}
                   </p>
                   {d.break && (
-                    <p className="text-[11px] text-admin-faint">
+                    <p className="text-sm text-admin-faint">
                       break {fmtHour(d.break.start)}-{fmtHour(d.break.end)}
                     </p>
                   )}
                 </>
               ) : (
-                <p className="text-[11px] text-admin-faint">Closed</p>
+                <p className="text-sm text-admin-faint">Closed</p>
               )}
             </div>
           );
@@ -105,6 +110,6 @@ export function AvailabilityPreview({ config }: Props): React.ReactElement {
             : `No bookable days in the next ${config.maxAdvanceDays} days with these settings.`}
         </p>
       )}
-    </div>
+    </Card>
   );
 }

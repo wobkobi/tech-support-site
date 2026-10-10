@@ -9,6 +9,10 @@
 // effect.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { ADMIN_CHECKBOX_CLS } from "@/features/admin/components/ui/field-classes";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { formatNZD, todayISO } from "@/features/business/lib/business";
@@ -16,7 +20,7 @@ import { INCOME_METHODS } from "@/features/business/lib/constants";
 import { reminderChasedPaidInvoice } from "@/features/business/lib/invoice-apology";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 /** The minimal invoice shape the dialog needs. */
 interface PaymentDialogInvoice {
@@ -59,9 +63,6 @@ interface PaymentDialogProps {
   onClose: (recorded: boolean) => void;
 }
 
-const INPUT_CLS =
-  "w-full rounded-lg border border-admin-border-strong px-3 py-2 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
-
 /**
  * Payment-recording dialog. Submits POST /api/business/invoices/[id]/pay.
  * @param props - Component props.
@@ -80,6 +81,7 @@ export function PaymentDialog({
   onClose,
 }: PaymentDialogProps): React.ReactElement {
   const { toast } = useToast();
+  const id = useId();
   const alreadyPaid = invoice.status === "PAID";
   // A matched row is the payment the operator is recording, so its date and method
   // are the starting point. Ledger rows sit at UTC midnight, so the ISO day is the NZ day.
@@ -175,37 +177,38 @@ export function PaymentDialog({
           <span className="font-semibold text-admin-text">{formatNZD(invoice.balance)}</span>
         </p>
 
-        <label className="flex flex-col gap-1">
-          <span className="font-medium text-admin-text">Payment date</span>
-          <input
+        <AdminField label="Payment date" htmlFor={`${id}-date`}>
+          <AdminInput
+            id={`${id}-date`}
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className={INPUT_CLS}
           />
-        </label>
+        </AdminField>
 
-        <label className="flex flex-col gap-1">
-          <span className="font-medium text-admin-text">Method</span>
-          <select value={method} onChange={(e) => setMethod(e.target.value)} className={INPUT_CLS}>
+        <AdminField label="Method" htmlFor={`${id}-method`}>
+          <AdminSelect
+            id={`${id}-method`}
+            value={method}
+            onChange={(e) => setMethod(e.target.value)}
+          >
             {INCOME_METHODS.map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>
             ))}
-          </select>
-        </label>
+          </AdminSelect>
+        </AdminField>
 
-        <label className="flex flex-col gap-1">
-          <span className="font-medium text-admin-text">Reference (optional)</span>
-          <input
+        <AdminField label="Reference (optional)" htmlFor={`${id}-ref`}>
+          <AdminInput
+            id={`${id}-ref`}
             type="text"
             value={reference}
             onChange={(e) => setReference(e.target.value)}
             placeholder="e.g. bank ref, cheque no."
-            className={INPUT_CLS}
           />
-        </label>
+        </AdminField>
 
         {likelyIncome && (
           <label className="flex items-start gap-2 rounded-lg border border-admin-border bg-admin-bg p-3">
@@ -213,7 +216,7 @@ export function PaymentDialog({
               type="checkbox"
               checked={adoptLikely}
               onChange={(e) => setAdoptLikely(e.target.checked)}
-              className="mt-0.5"
+              className={ADMIN_CHECKBOX_CLS}
             />
             <span>
               <span className="font-medium text-admin-text">
@@ -234,12 +237,12 @@ export function PaymentDialog({
               type="checkbox"
               checked={createIncome}
               onChange={(e) => setCreateIncome(e.target.checked)}
-              className="mt-0.5"
+              className={ADMIN_CHECKBOX_CLS}
             />
             <span>
               <span className="font-medium text-admin-text">Record income entry</span>
               {alreadyPaid && (
-                <span className="mt-0.5 block text-xs text-admin-muted">
+                <span className="mt-0.5 block text-sm text-admin-muted">
                   {hasLinkedIncome
                     ? "Already linked to a ledger entry; leave unticked to just refresh its date/method."
                     : "Already marked paid; leave unticked unless the income was never recorded, to avoid a duplicate row."}
@@ -255,7 +258,7 @@ export function PaymentDialog({
               type="checkbox"
               checked={sendApology}
               onChange={(e) => setSendApology(e.target.checked)}
-              className="mt-0.5"
+              className={ADMIN_CHECKBOX_CLS}
             />
             <span>
               <span className="font-medium text-admin-text">Apologise for the reminder</span>

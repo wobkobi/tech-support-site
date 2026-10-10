@@ -4,6 +4,7 @@
 // rate config into line items, supports AI parsing of a plain-English job description,
 // and renders a live invoice preview.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
@@ -11,10 +12,14 @@ import { TaxonomyManageModal } from "@/features/business/components/TaxonomyMana
 import { CancelFeeSection } from "@/features/business/components/calculator/CancelFeeSection";
 import { ClientPickerSection } from "@/features/business/components/calculator/ClientPickerSection";
 import { DescribeJobSection } from "@/features/business/components/calculator/DescribeJobSection";
+import { DraftRestoredBanner } from "@/features/business/components/calculator/DraftRestoredBanner";
 import { EventPickerSection } from "@/features/business/components/calculator/EventPickerSection";
 import { JobDetailsSection } from "@/features/business/components/calculator/JobDetailsSection";
 import { JobSettingsStrip } from "@/features/business/components/calculator/JobSettingsStrip";
+import { NotesSection } from "@/features/business/components/calculator/NotesSection";
 import { PartsSection } from "@/features/business/components/calculator/PartsSection";
+import { PhoneTotalBar } from "@/features/business/components/calculator/PhoneTotalBar";
+import { ReissueBanner } from "@/features/business/components/calculator/ReissueBanner";
 
 import { SaveActions } from "@/features/business/components/calculator/SaveActions";
 import { TaskTimeWarning } from "@/features/business/components/calculator/TaskTimeWarning";
@@ -32,9 +37,6 @@ import {
 } from "@/features/business/lib/already-paid-input";
 import {
   calcJobTotal,
-  collapseToWindow,
-  enforceMinBillable,
-  formatNZD,
   jobToLineItems,
   timeDiffMins,
   todayISO,
@@ -47,7 +49,6 @@ import {
   isPlaceholderHour,
   loadDraft,
   saveDraft,
-  timeAgo,
 } from "@/features/business/lib/calculator-draft";
 import {
   addDaysISO,
@@ -59,6 +60,8 @@ import {
   toggleTaskModifierLine,
   updateTaskField,
 } from "@/features/business/lib/calculator-helpers";
+import type { ReissuePrefill } from "@/features/business/lib/invoice-reissue";
+import { fitTasksToWindow } from "@/features/business/lib/parse-hydrate";
 import { calcTravelCharge, type CancellationPolicy } from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
 import type {
@@ -73,7 +76,6 @@ import type {
   TravelEntry,
 } from "@/features/business/types/business";
 import { matchedByCompanyOnly } from "@/features/contacts/lib/contact-search";
-import { cn } from "@/shared/lib/cn";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import { nzNowTime } from "@/shared/lib/timezone-utils";
@@ -103,6 +105,8 @@ interface CalculatorViewProps {
   initialPromo: ActivePromo | null;
   /** Job prefill from a schedule event ("Bill in calculator"); null on a normal load. */
   eventPrefill: EventPrefill | null;
+  /** What a voided invoice being re-issued carries over; null on a normal load. */
+  reissue: ReissuePrefill | null;
 }
 
 // The prefill shapes live in the shared business types so the event picker
@@ -120,6 +124,7 @@ export type { EventPrefill, EventPrefillSlot } from "@/features/business/types/b
  * @param props.initialTaskTemplates - Server-resolved task templates.
  * @param props.initialPromo - Server-resolved active promo, or null.
  * @param props.eventPrefill - Schedule-event job prefill, or null on a normal load.
+ * @param props.reissue - Voided invoice being re-issued, or null on a normal load.
  * @returns The rendered calculator view element.
  */
 export function CalculatorView({
@@ -130,6 +135,7 @@ export function CalculatorView({
   initialTaskTemplates,
   initialPromo,
   eventPrefill,
+  reissue,
 }: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
 
@@ -201,7 +207,7 @@ export function CalculatorView({
   const [parts, setParts] = useState<PartLine[]>([]);
   const [showParts, setShowParts] = useState(false);
   const [showTaxonomyModal, setShowTaxonomyModal] = useState(false);
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(() => reissue?.notes ?? "");
   // Paid in cash on the day: invoices save as paid, income entries record Cash.
   const [paidCash, setPaidCash] = useState(false);
   // Part of the bill handed over on the day: shown on the invoice, recorded in income.
@@ -220,11 +226,16 @@ export function CalculatorView({
     return () => io.disconnect();
   }, []);
   // Client details
-  const [clientName, setClientName] = useState(() => eventPrefill?.clientName ?? "");
+  // A re-issue's own client details fill in when no calendar event backs it.
+  const [clientName, setClientName] = useState(
+    () => eventPrefill?.clientName ?? reissue?.clientName ?? "",
+  );
   // Normalised on seed as well as on typing: a Booking row written before
   // emails were normalised can still carry capitals, and the invoice preview
   // must show exactly what gets saved.
-  const [clientEmail, setClientEmail] = useState(() => normaliseEmail(eventPrefill?.clientEmail));
+  const [clientEmail, setClientEmail] = useState(() =>
+    normaliseEmail(eventPrefill?.clientEmail ?? reissue?.clientEmail),
+  );
   // Address-to state mirrors the InvoiceBuilder's segmented control so the
   // operator picks Name/Company/Custom once and the choice rides through to
   // the invoice without re-picking.
@@ -286,6 +297,12 @@ export function CalculatorView({
 
   // Travel lookup
   const [jobAddress, setJobAddress] = useState(() => eventPrefill?.jobAddress ?? "");
+  // Drove or walked, for the trip an invoice save logs. null follows the address: a job in
+  // your own suburb (the base address's locality) counts as walked, anywhere else as driven.
+  const [walkedChoice, setWalkedChoice] = useState<boolean | null>(null);
+  const homeLocality = identity.baseAddress.locality.trim().toLowerCase();
+  const walked =
+    walkedChoice ?? (homeLocality.length > 0 && jobAddress.toLowerCase().includes(homeLocality));
   const [lookingUpTravel, setLookingUpTravel] = useState(false);
 
   // Contacts
@@ -301,7 +318,11 @@ export function CalculatorView({
 
   // Job date drives the holiday + promo lookup so a past job is priced by what
   // applied THEN, not today. Persisted in the draft; defaults to today (NZ).
-  const [jobDate, setJobDate] = useState<string>(() => eventPrefill?.jobDate ?? todayISO());
+  // A re-issue with no event falls back to the voided invoice's issue date, so the promo is
+  // priced for when the job was billed.
+  const [jobDate, setJobDate] = useState<string>(
+    () => eventPrefill?.jobDate ?? reissue?.issueDate ?? todayISO(),
+  );
 
   // The job's earliest start, so a time-of-day promo is judged at the real start
   // rather than the lookup's midday default. HH:MM strings sort as times.
@@ -391,6 +412,26 @@ export function CalculatorView({
     setParts,
   });
 
+  // Where you drove, for the trip an invoice save logs: any job with an address, travel
+  // charged or not, except a walk, a remote event or a cancellation that bills no round trip.
+  const tripAddress =
+    jobAddress.trim() &&
+    !walked &&
+    eventPrefill?.meetingType !== "remote" &&
+    (!cancelMode || includeCancelTravel)
+      ? jobAddress.trim()
+      : null;
+
+  /**
+   * Edits the job address. A new address goes back to the suburb default for drove or
+   * walked, since a choice made for the old address may not hold for the new one.
+   * @param value - Address text.
+   */
+  function changeJobAddress(value: string): void {
+    setJobAddress(value);
+    setWalkedChoice(null);
+  }
+
   // A cancellation fee is a flat charge, not labour: no holiday uplift on it, and no
   // promo, which would also spend a redemption on a job that never happened.
   const pricedPromo = cancelMode ? null : activePromo;
@@ -402,7 +443,7 @@ export function CalculatorView({
    * @param formattedAddress - The selected address.
    */
   function handleAddressSelected(formattedAddress: string): void {
-    setJobAddress(formattedAddress);
+    changeJobAddress(formattedAddress);
     setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
   }
 
@@ -413,7 +454,7 @@ export function CalculatorView({
     // Restore the saved draft after mount (localStorage is client-only). An event prefill
     // is a deliberate fresh billing task and outranks any draft; a non-meaningful draft
     // (just auto-seeded times) reseeds "now" rather than restoring stale timestamps.
-    const draft = eventPrefill ? null : loadDraft();
+    const draft = eventPrefill || reissue ? null : loadDraft();
     if (draft && isMeaningfulDraft(draft)) {
       draftLoadedRef.current = true;
       /* eslint-disable react-hooks/set-state-in-effect -- one-shot restore from
@@ -454,7 +495,9 @@ export function CalculatorView({
     try {
       const handoff = sessionStorage.getItem(AI_INPUT_HANDOFF_KEY);
       if (handoff) sessionStorage.removeItem(AI_INPUT_HANDOFF_KEY);
-      const carried = handoff ?? (eventPrefill ? (loadDraft()?.aiInput ?? "") : "");
+      // A re-issue seeds the voided invoice's lines instead of any saved draft text.
+      const carried =
+        handoff ?? (reissue ? reissue.jobText : eventPrefill ? (loadDraft()?.aiInput ?? "") : "");
       if (carried) {
         setAiInput(carried);
       }
@@ -469,12 +512,10 @@ export function CalculatorView({
         // A job billed from the schedule arrives as typed text, with no contact
         // picked, so the Name/Company switch never showed. Pick the Google contact
         // whose email the booking used, when the booking's name is theirs too.
-        const email = normaliseEmail(eventPrefill?.clientEmail);
+        const seeded = eventPrefill ?? reissue;
+        const email = normaliseEmail(seeded?.clientEmail);
         const match = email ? d.contacts.find((c) => normaliseEmail(c.email) === email) : undefined;
-        if (
-          match &&
-          match.name.trim().toLowerCase() === eventPrefill?.clientName.trim().toLowerCase()
-        ) {
+        if (match && match.name.trim().toLowerCase() === seeded?.clientName.trim().toLowerCase()) {
           setPickedContactName(match.name);
           setPickedContactCompany(match.company?.trim() || null);
           setPickedContactGoogleId(match.id || null);
@@ -650,6 +691,7 @@ export function CalculatorView({
     eventPrefill,
     pickedContactGoogleId,
     jobDate,
+    tripAddress,
     paidCash,
     alreadyPaid,
     setTaskTemplates,
@@ -694,7 +736,7 @@ export function CalculatorView({
     setTimesSet(false);
     setFollowUpMins(0);
     setTravelEntries([]);
-    setJobAddress("");
+    changeJobAddress("");
     setTasks([]);
     setParts([]);
     setShowParts(false);
@@ -722,7 +764,7 @@ export function CalculatorView({
     // Billing a booked job: the prefill is a server prop keyed by eventId, so
     // state resets alone can't remove the banner - drop the query param and
     // let the remount start truly blank.
-    if (eventPrefill) router.replace("/admin/business/calculator");
+    if (eventPrefill || reissue) router.replace("/admin/business/calculator");
   }
 
   /**
@@ -812,20 +854,14 @@ export function CalculatorView({
         onSkipPromoChange={setSkipPromo}
       />
 
-      {/* Draft-restored banner sits above the grid so the Discard action is
-          visible without scrolling on mobile, where cached values otherwise
-          look like a mystery pre-filled form. */}
+      {reissue && <ReissueBanner reissue={reissue} fromEvent={eventPrefill !== null} />}
+
       {draftRestoredAt !== null && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
-          <span>Draft restored - last edited {timeAgo(draftRestoredAt, mountedAt)}.</span>
-          <button
-            type="button"
-            onClick={resetFormState}
-            className="font-semibold text-blue-700 hover:underline"
-          >
-            Discard
-          </button>
-        </div>
+        <DraftRestoredBanner
+          draftRestoredAt={draftRestoredAt}
+          mountedAt={mountedAt}
+          onDiscard={resetFormState}
+        />
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -924,10 +960,16 @@ export function CalculatorView({
                 windowMin={durationMins}
                 minBillableMins={pricing.minBillableMins}
                 snapMins={pricing.taskTiming?.snapMins}
-                onFix={() => {
-                  const collapsed = collapseToWindow(tasks, durationMins, pricing.taskTiming);
-                  setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
-                }}
+                onFix={() =>
+                  setTasks(
+                    fitTasksToWindow(
+                      tasks,
+                      durationMins,
+                      pricing.taskTiming,
+                      pricing.minBillableMins,
+                    ).tasks,
+                  )
+                }
               />
               <TasksSection
                 tasks={tasks}
@@ -956,8 +998,11 @@ export function CalculatorView({
           {(!cancelMode || includeCancelTravel) && (
             <TravelSection
               jobAddress={jobAddress}
-              onJobAddressChange={setJobAddress}
+              onJobAddressChange={changeJobAddress}
               onAddressSelected={handleAddressSelected}
+              showTripMode={eventPrefill?.meetingType !== "remote"}
+              walked={walked}
+              onWalkedChange={setWalkedChoice}
               travelEntries={travelEntries}
               onTravelEntriesChange={setTravelEntries}
               lookingUpTravel={lookingUpTravel}
@@ -978,33 +1023,20 @@ export function CalculatorView({
             />
           )}
 
-          {/* Notes */}
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-            <label className="mb-1 block text-xs font-medium text-slate-600">Notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
-            />
-          </div>
+          <NotesSection notes={notes} onNotesChange={setNotes} />
 
           {/* Early cancel entry. Parked at the bottom: billing a job that never
               happened is the rare case, so it stays out of the normal flow. */}
           {!cancelMode && (
-            <button
-              type="button"
-              onClick={enterCancelMode}
-              className="rounded-lg border border-coquelicot-500/40 px-3 py-1.5 text-sm font-semibold text-coquelicot-600 transition-colors hover:bg-coquelicot-500/10"
-            >
+            <AdminButton variant="danger" onClick={enterCancelMode}>
               Make early cancel
-            </button>
+            </AdminButton>
           )}
         </div>
 
         {/* RIGHT column - live invoice preview (replaces the legacy Summary
             panel - same totals, just inside the actual invoice layout). */}
-        <div ref={finishRef} className="min-w-0 scroll-mt-16 space-y-4">
+        <div ref={finishRef} className="min-w-0 space-y-4">
           {/* Client - moved above the preview so it stays in reach without
               scrolling past the full A4-sized invoice render. */}
           <ClientPickerSection
@@ -1089,30 +1121,13 @@ export function CalculatorView({
         </div>
       </div>
 
-      {/* Phone total bar. Below lg the preview, and the total in it, sits under
-          every section, so the running figure stays pinned here while the job
-          is built, with a jump down to the client and save buttons. It stays
-          hidden until the job has a total, so an empty calculator isn't
-          topped by a $0.00 bar. */}
-      <div
-        data-phone-bar={showTotalBar ? "sticky" : undefined}
-        className={cn(
-          "sticky bottom-0 z-10 -mx-4 mt-4 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:-mx-6 sm:px-6 lg:hidden",
-          !showTotalBar && "hidden",
-        )}
-      >
-        <p className="text-sm text-slate-600">
-          Total{" "}
-          <span className="text-lg font-bold text-russian-violet">{formatNZD(totals.total)}</span>
-        </p>
-        <button
-          type="button"
-          onClick={() => finishRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-          className="rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
-        >
-          Client &amp; save
-        </button>
-      </div>
+      <PhoneTotalBar
+        show={showTotalBar}
+        total={totals.total}
+        onJumpToFinish={() =>
+          finishRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+      />
     </>
   );
 }

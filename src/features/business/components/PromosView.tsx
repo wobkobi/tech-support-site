@@ -1,331 +1,44 @@
 "use client";
 // src/features/business/components/PromosView.tsx
-// Admin promo CRUD - form-on-top + table-below + overlap warning.
+// Admin promo CRUD - form-on-top + table-below + overlap warning. Holds all the list and
+// form state; PromoForm and PromoListRows render the markup.
 
 import type { PromoRow } from "@/app/admin/(shell)/promos/page";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { Card } from "@/features/admin/components/ui/Card";
+import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
-import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
+import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { PromoAdvancedOptions } from "@/features/business/components/PromoAdvancedOptions";
 import {
-  PromoPricePreview,
-  type PromoPreviewRates,
-} from "@/features/business/components/PromoPricePreview";
-import { formatNZD } from "@/features/business/lib/business";
+  findOverlaps,
+  getStatus,
+  type PromoStats,
+  type PromoStatus,
+} from "@/features/business/components/promo-list-helpers";
+import { PromoForm } from "@/features/business/components/PromoForm";
+import { PromoListRows } from "@/features/business/components/PromoListRows";
+import type { PromoPreviewRates } from "@/features/business/components/PromoPricePreview";
 import {
   advancedChips,
-  AMOUNT_LABEL,
   DISCOUNT_TYPE,
   discountColumns,
   emptyForm,
-  endIsoToInclusiveDate,
   endOfDayISO,
   formFromPromo,
-  previewPromo,
-  PROMO_INPUT_CLASS,
-  promoTypeOf,
   startOfDayISO,
   toDateInput,
   toMinuteOfDay,
   type FormState,
-  type PromoType,
 } from "@/features/business/lib/promo-form";
-import {
-  describeRecurringWindow,
-  pickWinningPromo,
-  summariseForBanner,
-} from "@/features/business/lib/promos";
 import { callApi } from "@/features/mailing/lib/api-client";
 import { cn } from "@/shared/lib/cn";
-import { formatDateShort } from "@/shared/lib/date-format";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useRef, useState } from "react";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
 import { FaPlus } from "react-icons/fa6";
 
-type Status = "active" | "upcoming" | "expired" | "disabled";
-
-/**
- * Lifecycle bucket for a promo right now.
- * @param p - Promo row.
- * @param now - Reference time.
- * @returns Status badge value.
- */
-function getStatus(p: PromoRow, now: Date = new Date()): Status {
-  if (!p.isActive) return "disabled";
-  const start = new Date(p.startAt);
-  const end = new Date(p.endAt);
-  if (now < start) return "upcoming";
-  if (now >= end) return "expired";
-  return "active";
-}
-
-/**
- * StatusPill tone for a promo lifecycle status.
- * @param status - Lifecycle status.
- * @returns The pill tone.
- */
-function statusTone(status: Status): StatusTone {
-  switch (status) {
-    case "active":
-      return "success";
-    case "upcoming":
-      return "info";
-    case "expired":
-      return "neutral";
-    case "disabled":
-      return "warning";
-  }
-}
-
-/**
- * Title-cases a status for display.
- * @param status - Lifecycle status.
- * @returns Capitalised label.
- */
-function statusLabel(status: Status): string {
-  return status[0]!.toUpperCase() + status.slice(1);
-}
-
-/**
- * True when two promo date ranges overlap (half-open).
- * @param a - First promo.
- * @param b - Second promo.
- * @returns Whether they overlap.
- */
-function rangesOverlap(a: PromoRow, b: PromoRow): boolean {
-  const aStart = new Date(a.startAt).getTime();
-  const aEnd = new Date(a.endAt).getTime();
-  const bStart = new Date(b.startAt).getTime();
-  const bEnd = new Date(b.endAt).getTime();
-  if (aStart >= bEnd || bStart >= aEnd) return false;
-  // Sharing a date range is not competing if they run on different days. A
-  // Tuesday promo and a Thursday one never meet, and warning about them would
-  // train the operator to ignore the warning that matters.
-  if (a.activeWeekdays.length > 0 && b.activeWeekdays.length > 0) {
-    return a.activeWeekdays.some((d) => b.activeWeekdays.includes(d));
-  }
-  return true;
-}
-
-/**
- * IDs of active promos whose ranges overlap each other.
- *
- * Compared within a kind only. A code promo and an automatic one can share a
- * window without competing - a valid code always wins, and only for whoever
- * entered it - so pairing them would raise a warning about nothing.
- * @param promos - All promos.
- * @returns Set of overlapping IDs.
- */
-function findOverlaps(promos: PromoRow[]): { ids: Set<string>; winners: Map<string, string> } {
-  const ids = new Set<string>();
-  const winners = new Map<string, string>();
-  const active = promos.filter((p) => p.isActive);
-  for (let i = 0; i < active.length; i++) {
-    for (let j = i + 1; j < active.length; j++) {
-      const a = active[i]!;
-      const b = active[j]!;
-      if (a.kind !== b.kind) continue;
-      if (!rangesOverlap(a, b)) continue;
-      ids.add(a.id);
-      ids.add(b.id);
-      // Resolved through the shared selector, and on createdAt rather than
-      // startAt, so the warning can never name a different winner than the
-      // query that actually picks the promo.
-      const winner = pickWinningPromo([
-        {
-          id: a.id,
-          priority: a.priority,
-          createdAt: new Date(a.createdAt),
-        },
-        {
-          id: b.id,
-          priority: b.priority,
-          createdAt: new Date(b.createdAt),
-        },
-      ]);
-      if (winner) {
-        winners.set(a.id, winner.id);
-        winners.set(b.id, winner.id);
-      }
-    }
-  }
-  return { ids, winners };
-}
-
-/** Redemption totals for one promo, as returned by the stats endpoint. */
-interface PromoStats {
-  redemptions: number;
-  totalDiscount: number;
-  unvaluedRedemptions: number;
-  lastRedeemedAt: string | null;
-}
-
-/**
- * One-line usage summary for a promo.
- *
- * Reports rows with no recorded value separately rather than counting them as
- * zero: a promo redeemed before value tracking would otherwise read as "$0
- * discounted", which looks like a promo nobody benefited from.
- * @param stats - Totals for this promo, or undefined when it has none.
- * @returns A sentence describing usage.
- */
-function usageNote(stats: PromoStats | undefined): string {
-  if (!stats || stats.redemptions === 0) return "Not used yet.";
-  const times = `Used ${stats.redemptions} time${stats.redemptions === 1 ? "" : "s"}`;
-  if (stats.unvaluedRedemptions === stats.redemptions) {
-    return `${times} - discount value not recorded.`;
-  }
-  const money = formatNZD(stats.totalDiscount);
-  if (stats.unvaluedRedemptions > 0) {
-    return `${times} - ${money} discounted (${stats.unvaluedRedemptions} before value tracking).`;
-  }
-  return `${times} - ${money} discounted.`;
-}
-
-/**
- * Phrase for a promo caught in an overlap: which promo actually wins, or that
- * this one does. Empty when the promo overlaps nothing.
- * @param promo - The promo being rendered.
- * @param winners - Winning promo id per overlapping promo id.
- * @param all - Every promo, for resolving the winner's title.
- * @returns A sentence, or an empty string when there is no clash.
- */
-function overlapNote(promo: PromoRow, winners: Map<string, string>, all: PromoRow[]): string {
-  const winnerId = winners.get(promo.id);
-  if (!winnerId) return "";
-  if (winnerId === promo.id) return "Overlaps another promo - this one wins.";
-  const winner = all.find((p) => p.id === winnerId);
-  return `Overlaps another promo - ${winner ? winner.title : "the other"} wins.`;
-}
-
-/**
- * Short operator-facing description of what a promo does, used by both the
- * table and the mobile card so the two cannot drift.
- * @param p - Stored promo row.
- * @returns A phrase like "$60.00/hr" or "Free travel".
- */
-function describeDiscount(p: PromoRow): string {
-  switch (promoTypeOf(p)) {
-    case "flat":
-      return p.flatHourlyRate !== null ? `${formatNZD(p.flatHourlyRate)}/hr` : "-";
-    case "percent":
-      return p.percentDiscount !== null ? `${Math.round(p.percentDiscount * 100)}% off` : "-";
-    case "fixed":
-      return p.fixedAmount !== null ? `${formatNZD(p.fixedAmount)} off` : "-";
-    case "travel":
-      if (p.travelPercent === null) return "-";
-      return p.travelPercent === 0
-        ? "Free travel"
-        : `${Math.round((1 - p.travelPercent) * 100)}% off travel`;
-  }
-}
-
-/** Props for {@link PromoStatsBlock}. */
-interface PromoStatsBlockProps {
-  /** The promo being reported on. */
-  promo: PromoRow;
-  /** Its redemption totals, or undefined when it has none. */
-  stats: PromoStats | undefined;
-}
-
-/**
- * Usage detail for one promo: how often it was redeemed, what it gave away, and
- * how much of its cap is left.
- *
- * Deliberately answers only what the redemption rows can support. Whether the
- * promo caused the bookings is not knowable from this data, and a number
- * implying it were would be worse than no number.
- * @param props - Component props.
- * @param props.promo - The promo being reported on.
- * @param props.stats - Its redemption totals.
- * @returns The stats block.
- */
-function PromoStatsBlock({ promo, stats }: PromoStatsBlockProps): React.ReactElement {
-  const used = stats?.redemptions ?? 0;
-  const rows: [string, string][] = [["Redemptions", String(used)]];
-
-  if (promo.maxRedemptions != null) {
-    const left = Math.max(0, promo.maxRedemptions - used);
-    rows.push([
-      "Cap",
-      `${used} of ${promo.maxRedemptions} used, ${left} left${left === 0 ? " - the promo will no longer apply" : ""}`,
-    ]);
-  }
-  if (promo.perCustomerLimit != null) {
-    rows.push(["Per customer", `${promo.perCustomerLimit} max`]);
-  }
-
-  // Unvalued rows are called out rather than counted as zero: a redemption
-  // recorded before the value was tracked is not a discount of nothing.
-  if (used > 0) {
-    const valued = used - (stats?.unvaluedRedemptions ?? 0);
-    rows.push([
-      "Discount given",
-      valued > 0
-        ? `${formatNZD(stats?.totalDiscount ?? 0)} across ${valued} of them`
-        : "not recorded on any of them",
-    ]);
-    if (stats?.lastRedeemedAt) {
-      rows.push(["Last used", formatDateShort(stats.lastRedeemedAt)]);
-    }
-  }
-
-  return (
-    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-lg bg-admin-bg px-3 py-2 text-xs">
-      {rows.map(([label, value]) => (
-        <React.Fragment key={label}>
-          <dt className="text-admin-faint">{label}</dt>
-          <dd className="text-admin-text">{value}</dd>
-        </React.Fragment>
-      ))}
-    </dl>
-  );
-}
-
-/** Props for {@link PromoChips}. */
-interface PromoChipsProps {
-  /** The promo the chips describe. */
-  promo: PromoRow;
-}
-
-/**
- * Marks everything that narrows a promo below "applies to everyone, always".
- *
- * Without these a restricted promo reads as broken in the list: it says Active
- * while the banner stays silent or the discount only lands on some jobs, which
- * is correct but looks like a bug.
- * @param props - Component props.
- * @param props.promo - The promo the chips describe.
- * @returns The chip row, or null when nothing narrows the promo.
- */
-function PromoChips({ promo }: PromoChipsProps): React.ReactElement | null {
-  const chips: string[] = [];
-  if (promo.kind === "code" && promo.code) chips.push(`Code only: ${promo.code}`);
-  // Shared with the customer-facing banner so the operator reads the same
-  // wording the customer will.
-  const window = describeRecurringWindow(promo);
-  if (window) chips.push(window);
-  if (promo.tiers.length > 0) chips.push(`${promo.tiers.length} spend tiers`);
-  else if (promo.minSpend != null) chips.push(`Jobs over $${promo.minSpend}`);
-  if (promo.newCustomersOnly) chips.push("New customers only");
-  if (promo.maxRedemptions != null) chips.push(`${promo.maxRedemptions} uses total`);
-  if (promo.perCustomerLimit != null) chips.push(`${promo.perCustomerLimit} per customer`);
-  if (chips.length === 0) return null;
-
-  return (
-    <span className="mt-1 flex flex-wrap gap-1">
-      {chips.map((chip) => (
-        <span
-          key={chip}
-          className="rounded bg-admin-bg px-1.5 py-0.5 text-xs font-semibold text-admin-muted"
-        >
-          {chip}
-        </span>
-      ))}
-    </span>
-  );
-}
 interface Props {
   /** Initial server-fetched promo list. */
   initial: PromoRow[];
@@ -362,7 +75,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
 
   const { ids: overlaps, winners: overlapWinners } = findOverlaps(promos);
   const [stats, setStats] = useState<Record<string, PromoStats>>({});
-  const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<PromoStatus | "all">("all");
   // Ids whose stats block is open. Collapsed by default so the list stays
   // scannable when most promos have nothing interesting to report.
   const [openStats, setOpenStats] = useState<Set<string>>(new Set());
@@ -630,207 +343,24 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
         </AdminButton>
       )}
 
-      {/* Inline form */}
-      <form
-        ref={formRef}
+      <PromoForm
+        form={form}
+        setForm={setForm}
+        editingId={editingId}
+        busy={busy}
+        error={error}
+        formOpen={formOpen}
+        advancedOpen={advancedOpen}
+        onAdvancedOpenChange={setAdvancedOpen}
+        formRef={formRef}
         onSubmit={(e) => void handleSubmit(e)}
-        className={cn(
-          "scroll-mt-16 space-y-3 rounded-xl border border-admin-border bg-admin-surface p-4 shadow-sm sm:p-5",
-          !formOpen && "max-lg:hidden",
-        )}
-      >
-        <h2 className="text-sm font-semibold text-russian-violet">
-          {editingId ? "Edit promo" : "New promo"}
-        </h2>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-admin-muted">Title</span>
-            <input
-              type="text"
-              required
-              value={form.title}
-              onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-              placeholder="e.g. Soft launch"
-              className={PROMO_INPUT_CLASS}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-admin-muted">Description (optional)</span>
-            <input
-              type="text"
-              value={form.description}
-              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-              placeholder="Shown on the pricing page"
-              className={PROMO_INPUT_CLASS}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-admin-muted">Starts</span>
-            <input
-              type="date"
-              required
-              value={form.startDate}
-              onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))}
-              className={PROMO_INPUT_CLASS}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-admin-muted">Ends (inclusive)</span>
-            <input
-              type="date"
-              required
-              value={form.endDate}
-              onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))}
-              className={PROMO_INPUT_CLASS}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-admin-muted">Type</span>
-            <select
-              value={form.type}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, type: e.target.value as PromoType, amount: "" }))
-              }
-              className={PROMO_INPUT_CLASS}
-            >
-              <option value="flat">Flat $/hr</option>
-              <option value="percent">% off the job</option>
-              <option value="fixed">$ off the job</option>
-              <option value="travel">% off travel</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-admin-muted">{AMOUNT_LABEL[form.type]}</span>
-            <input
-              type="number"
-              required
-              min="0"
-              step="0.01"
-              // A travel discount may be the full 100%; a job discount of 100%
-              // would be a free job, which is a mistake rather than an offer.
-              max={form.type === "percent" ? 99 : form.type === "travel" ? 100 : undefined}
-              value={form.amount}
-              onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
-              placeholder={form.type === "flat" ? "50" : form.type === "fixed" ? "20" : "20"}
-              className={PROMO_INPUT_CLASS}
-            />
-          </label>
-        </div>
-
-        <div className="flex flex-wrap items-start gap-4">
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-admin-muted">Who gets it</span>
-            <select
-              value={form.kind}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, kind: e.target.value as "automatic" | "code" }))
-              }
-              className={cn(PROMO_INPUT_CLASS, "w-56")}
-            >
-              <option value="automatic">Everyone (automatic)</option>
-              <option value="code">Only with a code</option>
-            </select>
-            <span className="text-xs text-admin-faint">
-              {form.kind === "code"
-                ? "Never shown on the banner or the pricing page - only someone with the code gets it."
-                : "Applies to every visitor and shows on the site-wide banner."}
-            </span>
-          </label>
-
-          {form.kind === "code" && (
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-admin-muted">Code</span>
-              <input
-                type="text"
-                required
-                value={form.code}
-                // Uppercased as it is typed, because that is how it is stored
-                // and compared - what the operator sees is what a customer
-                // has to enter.
-                onChange={(e) => setForm((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
-                placeholder="SPRING25"
-                maxLength={32}
-                autoComplete="off"
-                spellCheck={false}
-                className={cn(PROMO_INPUT_CLASS, "w-48 tracking-wider uppercase")}
-              />
-              <span className="text-xs text-admin-faint">
-                Letters, numbers and dashes. 3 to 32 characters.
-              </span>
-            </label>
-          )}
-        </div>
-
-        <PromoAdvancedOptions
-          form={form}
-          setForm={setForm}
-          open={advancedOpen}
-          onOpenChange={setAdvancedOpen}
-        />
-
-        <label className="flex items-center gap-2 text-sm text-admin-muted">
-          <input
-            type="checkbox"
-            checked={form.isActive}
-            onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))}
-            className="h-4 w-4"
-          />
-          Active (uncheck to keep the promo on file but pause it)
-        </label>
-
-        {error && (
-          <p className="rounded bg-coquelicot-500/10 px-3 py-2 text-sm text-coquelicot-500">
-            {error}
-          </p>
-        )}
-
-        {/* Rendered by summariseForBanner, the same function the real banner
-            calls, so the preview cannot drift from what ships. Across four
-            discount types plus tiers, a spend floor and a weekday restriction,
-            the wording is no longer obvious from the fields above. */}
-        {(() => {
-          const preview = previewPromo(form);
-          if (!preview) return null;
-          return (
-            <div className="rounded-xl border border-admin-border bg-admin-bg px-4 py-3">
-              <p className="text-xs font-medium text-admin-muted">Customers will see</p>
-              <p className="mt-1 text-sm font-semibold text-admin-text">
-                ⚡ {summariseForBanner(preview)}
-              </p>
-              {form.kind === "code" && (
-                <p className="mt-1 text-sm text-admin-faint">
-                  Not on the banner - a code promo is only ever shown to someone who enters
-                  {form.code ? ` ${form.code}` : " the code"}.
-                </p>
-              )}
-            </div>
-          );
-        })()}
-
-        {(() => {
-          const preview = previewPromo(form);
-          return preview ? <PromoPricePreview promo={preview} rates={rates} /> : null;
-        })()}
-
-        <div className="flex gap-2">
-          <AdminButton type="submit" busy={busy}>
-            {editingId ? "Update promo" : "Create promo"}
-          </AdminButton>
-          <AdminButton
-            type="button"
-            variant="secondary"
-            onClick={resetForm}
-            className={cn(!editingId && "lg:hidden")}
-          >
-            Cancel
-          </AdminButton>
-        </div>
-      </form>
+        onCancel={resetForm}
+        rates={rates}
+      />
 
       {/* Overlap warning */}
       {overlaps.size > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <strong>Heads up:</strong> {overlaps.size} active promos have overlapping date ranges.
           Only one applies at a time - the highest priority wins, then the newer one. Each row below
           names which promo actually wins. Consider disabling or shortening one to avoid surprise
@@ -838,236 +368,64 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
         </div>
       )}
 
-      {/* Status filter. Counts come from the full list, so a zero is visible
-          rather than the tab simply being absent. */}
-      {promos.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {(["all", "active", "upcoming", "expired", "disabled"] as const).map((key) => {
-            const count = key === "all" ? promos.length : (statusCounts[key] ?? 0);
-            const selected = statusFilter === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => setStatusFilter(key)}
-                className={cn(
-                  "rounded-lg border px-3 py-1.5 text-xs font-medium capitalize",
-                  selected
-                    ? "border-admin-text bg-admin-text text-admin-surface"
-                    : "border-admin-border bg-admin-surface text-admin-muted hover:bg-admin-bg",
-                )}
-              >
-                {key} ({count})
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Promo list */}
-      {promos.length === 0 ? (
-        <p className="rounded-xl border border-admin-border bg-admin-surface p-6 text-sm text-admin-faint">
-          No promos yet. Create one above to surface an offer in the site banner, pricing wizard,
-          and admin calculator.
-        </p>
-      ) : visiblePromos.length === 0 ? (
-        <p className="rounded-xl border border-admin-border bg-admin-surface p-6 text-sm text-admin-faint">
-          No {statusFilter} promos. Pick another filter to see the rest.
-        </p>
-      ) : (
-        <>
-          {/* Desktop: table */}
-          <div className="hidden overflow-hidden rounded-xl border border-admin-border bg-admin-surface shadow-sm sm:block">
-            <table className="w-full text-sm">
-              <thead className="bg-admin-bg text-xs text-admin-muted uppercase">
-                <tr>
-                  <th className="px-4 py-2 text-left">Title</th>
-                  <th className="px-4 py-2 text-left">Period</th>
-                  <th className="px-4 py-2 text-left">Type</th>
-                  <th className="px-4 py-2 text-left">Status</th>
-                  <th className="px-4 py-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-admin-border">
-                {visiblePromos.map((p) => {
-                  const status = getStatus(p);
-                  const overlapping = overlaps.has(p.id);
-                  return (
-                    <tr key={p.id} className={cn(overlapping && "bg-amber-50/50")}>
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-admin-text">{p.title}</p>
-                        {p.description && (
-                          <p className="text-xs text-admin-faint">{p.description}</p>
-                        )}
-                        <PromoChips promo={p} />
-                        <button
-                          type="button"
-                          onClick={() => toggleStats(p.id)}
-                          aria-expanded={openStats.has(p.id)}
-                          className="text-left text-xs text-admin-muted underline decoration-dotted hover:text-admin-text"
-                        >
-                          {usageNote(stats[p.id])}
-                        </button>
-                        {openStats.has(p.id) && <PromoStatsBlock promo={p} stats={stats[p.id]} />}
-                        {overlapping && (
-                          <p className="text-sm font-medium text-amber-700">
-                            {overlapNote(p, overlapWinners, promos)}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-admin-muted">
-                        {formatDateShort(p.startAt)} -{" "}
-                        {formatDateShort(endIsoToInclusiveDate(p.endAt))}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-admin-text">{describeDiscount(p)}</td>
-                      <td className="px-4 py-3">
-                        <StatusPill tone={statusTone(status)}>{statusLabel(status)}</StatusPill>
-                      </td>
-                      <td className="px-4 py-3 text-right text-xs">
-                        <div className="flex justify-end gap-3">
-                          {/* Code promos are never advertised, so only a running
-                              automatic one can be emailed or posted. */}
-                          {p.kind === "automatic" && status === "active" && (
-                            <button
-                              onClick={() => void emailPromo(p)}
-                              disabled={emailingId !== null}
-                              className="font-semibold text-russian-violet hover:underline disabled:opacity-60"
-                            >
-                              {emailingId === p.id ? "Opening..." : "Email it"}
-                            </button>
-                          )}
-                          {p.kind === "automatic" && status === "active" && (
-                            <button
-                              onClick={() => void postPromo(p)}
-                              disabled={postingId !== null}
-                              className="font-semibold text-russian-violet hover:underline disabled:opacity-60"
-                            >
-                              {postingId === p.id ? "Opening..." : "Post it"}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => void toggleActive(p)}
-                            className="text-admin-muted hover:text-admin-text"
-                          >
-                            {p.isActive ? "Disable" : "Enable"}
-                          </button>
-                          <button
-                            onClick={() => startEdit(p)}
-                            className="text-admin-muted hover:text-admin-text"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => startDuplicate(p)}
-                            className="text-admin-muted hover:text-admin-text"
-                          >
-                            Duplicate
-                          </button>
-                          <button
-                            onClick={() => setConfirmDelete(p)}
-                            className="text-coquelicot-500 hover:text-coquelicot-400"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile: stacked cards */}
-          <div className="space-y-3 sm:hidden">
-            {visiblePromos.map((p) => {
-              const status = getStatus(p);
-              const overlapping = overlaps.has(p.id);
+      <div>
+        {/* Status filter. Counts come from the full list, so a zero is visible
+            rather than the tab simply being absent. */}
+        {promos.length > 0 && (
+          <ListToolbar
+            filters={(["all", "active", "upcoming", "expired", "disabled"] as const).map((key) => {
+              const count = key === "all" ? promos.length : (statusCounts[key] ?? 0);
+              const selected = statusFilter === key;
               return (
-                <div
-                  key={p.id}
-                  className={cn(
-                    "rounded-xl border border-admin-border bg-admin-surface p-4 shadow-sm",
-                    overlapping && "border-amber-300 bg-amber-50/40",
-                  )}
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setStatusFilter(key)}
+                  className={cn(adminChipClass(selected), "capitalize")}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-base font-semibold text-admin-text">{p.title}</p>
-                      {p.description && (
-                        <p className="mt-0.5 text-sm text-admin-muted">{p.description}</p>
-                      )}
-                      <PromoChips promo={p} />
-                      <button
-                        type="button"
-                        onClick={() => toggleStats(p.id)}
-                        aria-expanded={openStats.has(p.id)}
-                        className="mt-0.5 text-left text-sm text-admin-muted underline decoration-dotted"
-                      >
-                        {usageNote(stats[p.id])}
-                      </button>
-                      {openStats.has(p.id) && <PromoStatsBlock promo={p} stats={stats[p.id]} />}
-                      {overlapping && (
-                        <p className="mt-0.5 text-sm font-medium text-amber-700">
-                          {overlapNote(p, overlapWinners, promos)}
-                        </p>
-                      )}
-                    </div>
-                    <StatusPill tone={statusTone(status)} className="shrink-0">
-                      {statusLabel(status)}
-                    </StatusPill>
-                  </div>
-
-                  <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-                    <dt className="text-admin-faint">Period</dt>
-                    <dd className="text-admin-text">
-                      {formatDateShort(p.startAt)} -{" "}
-                      {formatDateShort(endIsoToInclusiveDate(p.endAt))}
-                    </dd>
-                    <dt className="text-admin-faint">Type</dt>
-                    <dd className="text-admin-text">{describeDiscount(p)}</dd>
-                  </dl>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {p.kind === "automatic" && status === "active" && (
-                      <AdminButton
-                        busy={emailingId === p.id}
-                        disabled={emailingId !== null}
-                        onClick={() => void emailPromo(p)}
-                      >
-                        Email this promo
-                      </AdminButton>
-                    )}
-                    {p.kind === "automatic" && status === "active" && (
-                      <AdminButton
-                        variant="secondary"
-                        busy={postingId === p.id}
-                        disabled={postingId !== null}
-                        onClick={() => void postPromo(p)}
-                      >
-                        Post this promo
-                      </AdminButton>
-                    )}
-                    <AdminButton variant="secondary" onClick={() => void toggleActive(p)}>
-                      {p.isActive ? "Disable" : "Enable"}
-                    </AdminButton>
-                    <AdminButton variant="secondary" onClick={() => startEdit(p)}>
-                      Edit
-                    </AdminButton>
-                    <AdminButton variant="secondary" onClick={() => startDuplicate(p)}>
-                      Duplicate
-                    </AdminButton>
-                    <AdminButton variant="danger" onClick={() => setConfirmDelete(p)}>
-                      Delete
-                    </AdminButton>
-                  </div>
-                </div>
+                  {key} ({count})
+                </button>
               );
             })}
-          </div>
-        </>
-      )}
+          />
+        )}
+
+        {/* Promo list */}
+        {promos.length === 0 ? (
+          <Card padding="none">
+            <EmptyState
+              title="No promos yet."
+              body="Create one above to surface an offer in the site banner, pricing wizard, and admin calculator."
+            />
+          </Card>
+        ) : visiblePromos.length === 0 ? (
+          <Card padding="none">
+            <EmptyState
+              title={`No ${statusFilter} promos.`}
+              body="Pick another filter to see the rest."
+            />
+          </Card>
+        ) : (
+          <PromoListRows
+            visiblePromos={visiblePromos}
+            promos={promos}
+            overlaps={overlaps}
+            overlapWinners={overlapWinners}
+            stats={stats}
+            openStats={openStats}
+            onToggleStats={toggleStats}
+            emailingId={emailingId}
+            postingId={postingId}
+            onEmail={(p) => void emailPromo(p)}
+            onPost={(p) => void postPromo(p)}
+            onToggleActive={(p) => void toggleActive(p)}
+            onEdit={startEdit}
+            onDuplicate={startDuplicate}
+            onDelete={setConfirmDelete}
+          />
+        )}
+      </div>
 
       <ConfirmDialog
         open={confirmDelete !== null}

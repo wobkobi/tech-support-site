@@ -10,10 +10,12 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { ADMIN_META_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import { formatMins } from "@/features/business/lib/business";
-import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { isPastEditWindow } from "@/shared/lib/edit-window";
 import { fromNzInputValue, toNzInputValue } from "@/shared/lib/timezone-utils";
@@ -34,12 +36,6 @@ interface BookingTimesCardProps {
   /** Hours after the end before the past-edit lock closes the window. */
   lockHours: number;
 }
-
-const INPUT_CLS = cn(
-  "w-full rounded-lg border border-admin-border-strong bg-admin-surface px-3 py-2 text-sm text-admin-text",
-  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet",
-);
-const LABEL_CLS = "text-xs font-semibold text-admin-muted uppercase";
 
 /**
  * Editable appointment times card.
@@ -134,15 +130,15 @@ export function BookingTimesCard({
           )}
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className={LABEL_CLS}>Start</span>
+          <span className={ADMIN_META_LABEL_CLS}>Start</span>
           <span className="text-sm text-admin-text">{formatDateTimeShort(startAt)}</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className={LABEL_CLS}>Finish</span>
+          <span className={ADMIN_META_LABEL_CLS}>Finish</span>
           <span className="text-sm text-admin-text">{formatDateTimeShort(endAt)}</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className={LABEL_CLS}>On site</span>
+          <span className={ADMIN_META_LABEL_CLS}>On site</span>
           <span className="text-sm text-admin-text">{formatMins(spanMins)}</span>
         </div>
         {locked && status !== "cancelled" && (
@@ -171,26 +167,24 @@ export function BookingTimesCard({
             This records what actually happened. No email is sent.
           </p>
         )}
-        <label className="flex flex-col gap-1">
-          <span className={LABEL_CLS}>Start</span>
-          <input
+        <AdminField label="Start" htmlFor={`edit-start-${id}`}>
+          <AdminInput
+            id={`edit-start-${id}`}
             type="datetime-local"
-            className={INPUT_CLS}
             value={form.start}
             onChange={(e) => setForm((f) => ({ ...f, start: e.target.value }))}
             disabled={saving}
           />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className={LABEL_CLS}>Finish</span>
-          <input
+        </AdminField>
+        <AdminField label="Finish" htmlFor={`edit-end-${id}`}>
+          <AdminInput
+            id={`edit-end-${id}`}
             type="datetime-local"
-            className={INPUT_CLS}
             value={form.end}
             onChange={(e) => setForm((f) => ({ ...f, end: e.target.value }))}
             disabled={saving}
           />
-        </label>
+        </AdminField>
         <div className="flex flex-wrap gap-2">
           <AdminButton
             onClick={() => void save()}

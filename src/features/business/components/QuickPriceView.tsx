@@ -1,3 +1,4 @@
+"use client";
 // src/features/business/components/QuickPriceView.tsx
 // On-site quick price: an address and a start/end time priced as one Standard labour line
 // plus auto travel. Runs through calcJobTotal and lookupAutoTravel, the same pair the job
@@ -6,14 +7,19 @@
 // income: the amount received (which can differ from the total) by Bank, Cash, or split
 // across both as two rows, the same way an invoice's already-paid part and its balance are.
 
-"use client";
-
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
-import { Card } from "@/features/admin/components/ui/Card";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import {
+  SEGMENTED_GROUP_CLS,
+  segmentedButtonClass,
+} from "@/features/admin/components/ui/chip-classes";
+import { ADMIN_INPUT_CLS, ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { QuickTodaysJobs, QuickTotalCard } from "@/features/business/components/QuickPriceCards";
 import { AlreadyPaidField } from "@/features/business/components/invoice/AlreadyPaidField";
 import {
   EMPTY_ALREADY_PAID,
@@ -24,7 +30,6 @@ import {
 import {
   calcJobTotal,
   effectiveHourlyRate,
-  formatMins,
   formatMoneyCompact,
   formatNZD,
   timeDiffMins,
@@ -32,7 +37,6 @@ import {
 } from "@/features/business/lib/business";
 import { lookupAutoTravel } from "@/features/business/lib/calculator-helpers";
 import { buildIncomeDescription } from "@/features/business/lib/invoice-maths";
-import { bankParticulars } from "@/features/business/lib/payment-fields";
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
 import type {
@@ -334,50 +338,12 @@ export function QuickPriceView({
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-4">
       {events.length > 0 && (
-        <Card>
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-russian-violet">Today&apos;s jobs</h2>
-            {prefill && (
-              <Link
-                href="/admin/business/quick?eventId=none"
-                className="text-sm font-medium text-admin-text-secondary underline underline-offset-2"
-              >
-                Clear
-              </Link>
-            )}
-          </div>
-          <div className="mt-2 flex flex-col gap-1">
-            {events.map((ev) => {
-              const active = ev.id === prefill?.eventId;
-              return (
-                <Link
-                  key={ev.id}
-                  href={`/admin/business/quick?eventId=${encodeURIComponent(ev.id)}`}
-                  aria-current={active ? "true" : undefined}
-                  className={cn(
-                    "flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-base",
-                    active
-                      ? "border-russian-violet/40 bg-russian-violet/5 font-medium"
-                      : "border-admin-border hover:bg-admin-bg",
-                  )}
-                >
-                  <span className="min-w-0 truncate">{ev.summary}</span>
-                  <span className="shrink-0 text-sm text-admin-text-secondary">
-                    {ev.start}-{ev.end}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </Card>
+        <QuickTodaysJobs events={events} activeEventId={prefill?.eventId ?? null} />
       )}
 
-      <Card>
+      <Card className="text-admin-text">
         <div className="flex flex-col gap-4">
-          <div>
-            <label htmlFor="quick-address" className="mb-1 block text-sm font-medium">
-              Address
-            </label>
+          <AdminField label="Address" htmlFor="quick-address">
             <div className="flex gap-2">
               <div className="flex-1">
                 <AddressAutocomplete
@@ -414,42 +380,39 @@ export function QuickPriceView({
               </AdminButton>
             </div>
             {travelNote && <p className="mt-1 text-sm text-coquelicot-700">{travelNote}</p>}
-          </div>
+          </AdminField>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="quick-start" className="mb-1 block text-sm font-medium">
-                Start
-              </label>
+            <AdminField label="Start" htmlFor="quick-start">
               {/* min-w-0 + appearance-none: iOS Safari gives time inputs an intrinsic
                   width wider than a phone's half column, so they spill out of the card. */}
-              <input
+              <AdminInput
                 id="quick-start"
                 type="time"
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
-                className={cn(ADMIN_INPUT_CLS, "block min-w-0 appearance-none")}
+                className="block min-w-0 appearance-none"
               />
-            </div>
+            </AdminField>
             <div>
               <div className="mb-1 flex items-baseline justify-between gap-2">
-                <label htmlFor="quick-end" className="text-sm font-medium">
+                <label htmlFor="quick-end" className={cn(ADMIN_LABEL_CLS, "mb-0")}>
                   End
                 </label>
                 <button
                   type="button"
                   onClick={() => setEnd(nzNowTime())}
-                  className="text-sm font-medium text-russian-violet underline underline-offset-2"
+                  className="text-sm font-medium text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
                 >
                   Now
                 </button>
               </div>
-              <input
+              <AdminInput
                 id="quick-end"
                 type="time"
                 value={end}
                 onChange={(e) => setEnd(e.target.value)}
-                className={cn(ADMIN_INPUT_CLS, "block min-w-0 appearance-none")}
+                className="block min-w-0 appearance-none"
               />
               {prefill && end !== prefill.bookedEnd && (
                 <p className="mt-1 text-sm text-admin-text-secondary">
@@ -469,100 +432,25 @@ export function QuickPriceView({
         </div>
       </Card>
 
-      <Card>
-        <p className="text-sm text-admin-text-secondary">Total to pay</p>
-        <p className="mt-1 text-5xl font-bold tracking-tight text-russian-violet">
-          {formatNZD(totals.total)}
-        </p>
+      <QuickTotalCard
+        totals={totals}
+        billedMins={billedMins}
+        hourlyRate={hourlyRate}
+        travel={travel}
+        noTravel={noTravel}
+        onToggleNoTravel={() => setNoTravel((v) => !v)}
+        driveMins={driveMins}
+        lookingUp={lookingUp}
+        holidayName={holidayName}
+        promo={promo}
+        bankAccount={bankAccount}
+        clientName={prefill?.clientName ?? null}
+      />
 
-        <dl className="mt-4 flex flex-col gap-2 border-t border-admin-border pt-4 text-base">
-          <div className="flex justify-between gap-3">
-            <dt>
-              Time
-              {billedMins > 0 && (
-                <span className="text-admin-text-secondary">
-                  {" "}
-                  - {formatMins(billedMins)} at {formatNZD(hourlyRate)}/hr
-                </span>
-              )}
-            </dt>
-            <dd>{billedMins > 0 ? formatNZD(totals.tasksTotal) : "Enter a start time"}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="min-w-0">
-              Travel
-              {noTravel ? (
-                <span className="text-admin-text-secondary"> - not charged</span>
-              ) : (
-                driveMins > 0 && (
-                  <span className="text-admin-text-secondary"> - {driveMins} min round trip</span>
-                )
-              )}
-              {(travel || noTravel) && (
-                <button
-                  type="button"
-                  onClick={() => setNoTravel((v) => !v)}
-                  className="ml-2 text-sm font-medium text-russian-violet underline underline-offset-2"
-                >
-                  {noTravel ? "Add back" : "No travel"}
-                </button>
-              )}
-            </dt>
-            <dd className="shrink-0">
-              {noTravel
-                ? formatNZD(0)
-                : travel
-                  ? formatNZD(totals.travelTotal)
-                  : lookingUp
-                    ? "Looking up..."
-                    : "-"}
-            </dd>
-          </div>
-          {totals.holidaySurcharge > 0 && (
-            <div className="flex justify-between gap-3">
-              <dt>{holidayName ?? "Public holiday"} surcharge</dt>
-              <dd>{formatNZD(totals.holidaySurcharge)}</dd>
-            </div>
-          )}
-          {totals.promoDiscount > 0 && promo && (
-            <div className="flex justify-between gap-3 text-moonstone-700">
-              <dt>{promo.title}</dt>
-              <dd>-{formatNZD(totals.promoDiscount)}</dd>
-            </div>
-          )}
-          {totals.gstAmount > 0 && (
-            <div className="flex justify-between gap-3 text-admin-text-secondary">
-              <dt>Includes GST</dt>
-              <dd>{formatNZD(totals.gstAmount)}</dd>
-            </div>
-          )}
-        </dl>
-
-        {bankAccount && (
-          <div className="mt-4 border-t border-admin-border pt-4">
-            <p className="text-sm text-admin-text-secondary">Bank transfer to</p>
-            <p className="mt-1 font-mono text-xl font-semibold tracking-wide select-all">
-              {bankAccount}
-            </p>
-            {prefill?.clientName && (
-              <p className="mt-1 text-sm text-admin-text-secondary">
-                Particulars:{" "}
-                <span className="font-mono font-semibold text-admin-text select-all">
-                  {bankParticulars(prefill.clientName)}
-                </span>
-              </p>
-            )}
-          </div>
-        )}
-      </Card>
-
-      <Card>
-        <h2 className="text-sm font-semibold text-russian-violet">Add to income</h2>
-        <div className="mt-3 flex flex-col gap-3">
-          <div>
-            <label htmlFor="quick-customer" className="mb-1 block text-sm font-medium">
-              Customer
-            </label>
+      <Card className="text-admin-text">
+        <CardHeader title="Add to income" className="mb-3" />
+        <div className="flex flex-col gap-3">
+          <AdminField label="Customer" htmlFor="quick-customer">
             <ContactNameInput
               id="quick-customer"
               value={customer}
@@ -572,19 +460,16 @@ export function QuickPriceView({
               disabled={locked}
               className={ADMIN_INPUT_CLS}
             />
-          </div>
-          <div>
-            <label htmlFor="quick-received" className="mb-1 block text-sm font-medium">
-              Amount received
-            </label>
-            <input
+          </AdminField>
+          <AdminField label="Amount received" htmlFor="quick-received">
+            <AdminInput
               id="quick-received"
               type="text"
               inputMode="decimal"
               value={received ?? totals.total.toFixed(2)}
               onChange={(e) => setReceived(e.target.value)}
               disabled={locked}
-              className={cn(ADMIN_INPUT_CLS, "w-32")}
+              className="w-32"
             />
             {received !== null && (
               <p className="mt-1 text-sm text-admin-text-secondary">
@@ -597,27 +482,30 @@ export function QuickPriceView({
                   <button
                     type="button"
                     onClick={() => setReceived(null)}
-                    className="font-medium text-russian-violet underline underline-offset-2"
+                    className="font-medium text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
                   >
                     Use total
                   </button>
                 )}
               </p>
             )}
-          </div>
+          </AdminField>
           <div>
-            <span className="mb-1 block text-sm font-medium">Paid by</span>
-            <div className="flex gap-2">
+            <span className={ADMIN_LABEL_CLS}>Paid by</span>
+            {/* Segmented toggle, the same look as the schedule's Short/Long switch. */}
+            <div className={SEGMENTED_GROUP_CLS}>
               {PAID_BY.map((m) => (
-                <AdminButton
+                <button
                   key={m}
+                  type="button"
                   aria-label={paidBy === m ? `Paid by ${m} (selected)` : `Paid by ${m}`}
-                  variant={paidBy === m ? "primary" : "secondary"}
+                  aria-pressed={paidBy === m}
                   disabled={locked}
                   onClick={() => setPaidBy(m)}
+                  className={segmentedButtonClass(paidBy === m)}
                 >
                   {m}
-                </AdminButton>
+                </button>
               ))}
             </div>
           </div>

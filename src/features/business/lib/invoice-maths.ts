@@ -17,6 +17,83 @@ export function calcGstFromInclusive(amountIncl: number, gstRate: number): numbe
   return Math.round(((amountIncl * gstRate) / (1 + gstRate)) * 100) / 100;
 }
 
+/** The fields {@link splitLineTotals} prices a line from. */
+export interface LineAmountInput {
+  qty: number;
+  unitPrice: number;
+  /** Billed minutes on a timed (hourly) line; absent or null on flat, part and travel lines. */
+  minutes?: number | null;
+}
+
+/**
+ * Line totals in dollars, rounded so each rate's timed lines add up to that rate's whole
+ * time billed at once. Rounding every line on its own drifts on splits like thirds: 35,
+ * 35 and 20 min at $100/hr print $58.33, $58.33 and $33.33, which is $149.99 for 90
+ * minutes that cost $150.00.
+ *
+ * Lines carrying `minutes` group by unit price. A group's total is its summed minutes at
+ * that rate, rounded once; each line takes its floored cents, then the leftover cents go
+ * one apiece to the lines that lost the largest fraction. On a tie the bigger line takes
+ * the cent (then the earlier one), where it reads as rounding: 5 min + 3:05 at $100/hr
+ * prints $8.33 + $308.34, not an $8.34 nobody could check. The split above prints
+ * $58.34, $58.33 and $33.33. A timed line is always priced from its minutes, the time
+ * the invoice prints, so a line alone at its rate matches one in a group. Lines without
+ * minutes round qty x unitPrice on their own. Worked out from qty, unitPrice and minutes
+ * only, so a saved invoice re-totals to the cents it was printed with.
+ * @param lines - Line items or task lines, in display order.
+ * @returns Each line's total in dollars, in the same order.
+ */
+export function splitLineTotals(lines: readonly LineAmountInput[]): number[] {
+  const cents = lines.map((l) => Math.round(l.qty * l.unitPrice * 100));
+  const byRate = new Map<number, number[]>();
+  lines.forEach((l, i) => {
+    if (l.minutes == null) return;
+    byRate.set(l.unitPrice, [...(byRate.get(l.unitPrice) ?? []), i]);
+  });
+  for (const [rate, idx] of byRate) {
+    const exact = idx.map((i) => (lines[i]!.minutes! * rate * 100) / 60);
+    const totalMins = idx.reduce((s, i) => s + lines[i]!.minutes!, 0);
+    const target = Math.round((totalMins * rate * 100) / 60);
+    // The epsilon keeps float noise (5833.9999999) from flooring a whole cent away.
+    const floors = exact.map((x) => Math.floor(x + 1e-9));
+    let leftover = target - floors.reduce((s, x) => s + x, 0);
+    // Fractions within float noise of each other are a tie (a third of a cent computes
+    // as .33333333333348 on one line and .333333333333 on another), so the tie-break
+    // decides rather than whichever the noise favours: bigger line, then earlier.
+    const fraction = exact.map((x, k) => x - floors[k]!);
+    const order = idx
+      .map((_, k) => k)
+      .sort((a, b) => {
+        const d = fraction[b]! - fraction[a]!;
+        if (Math.abs(d) > 1e-6) return d;
+        return exact[b]! - exact[a]! || a - b;
+      });
+    for (const k of order) {
+      if (leftover <= 0) break;
+      floors[k] = floors[k]! + 1;
+      leftover--;
+    }
+    idx.forEach((i, k) => {
+      cents[i] = floors[k]!;
+    });
+  }
+  return cents.map((c) => c / 100);
+}
+
+/**
+ * The same items with every `lineTotal` re-derived by {@link splitLineTotals}. Run on any
+ * line items about to be stored or rendered, so the printed Total column always adds up to
+ * the subtotal - whatever totals the sender worked out.
+ * @param items - Line items in display order.
+ * @returns The items with their split line totals.
+ */
+export function withSplitLineTotals<T extends LineAmountInput>(
+  items: readonly T[],
+): (T & { lineTotal: number })[] {
+  const totals = splitLineTotals(items);
+  return items.map((item, i) => ({ ...item, lineTotal: totals[i]! }));
+}
+
 /**
  * Splits a GST-inclusive amount into its GST component and GST-exclusive base.
  * Both ledger writers and the subscription recorders need the pair, and deriving
@@ -46,18 +123,14 @@ export function splitGstInclusive(
  * @returns Subtotal (gross), GST amount, and total (post-discount, post-GST).
  */
 export function calcInvoiceTotals(
-  lineItems: { qty: number; unitPrice: number }[],
+  lineItems: readonly LineAmountInput[],
   promoDiscount = 0,
   gstRegistered: boolean = GST_REGISTERED,
 ): { subtotal: number; gstAmount: number; total: number } {
-  // Round EACH line before summing, matching the lineTotal jobToLineItems stores and the
-  // PDF prints. Summing unrounded lets the Total column disagree with the Subtotal under
-  // it: two 35-min lines at $65/hr print $37.92 each but sum to $75.83, not $75.84.
+  // Sum the same per-line cents jobToLineItems stores and the PDF prints, so the Total
+  // column always adds up to the Subtotal under it.
   const subtotal =
-    Math.round(
-      lineItems.reduce((sum, item) => sum + Math.round(item.qty * item.unitPrice * 100) / 100, 0) *
-        100,
-    ) / 100;
+    Math.round(splitLineTotals(lineItems).reduce((sum, line) => sum + line, 0) * 100) / 100;
   const taxableAmount = Math.max(0, Math.round((subtotal - promoDiscount) * 100) / 100);
   const gstAmount = gstRegistered ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {

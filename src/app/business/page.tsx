@@ -265,7 +265,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
           {retainerTiers.map((tier) => (
             <RuledBlock key={tier.name} title={tier.name} className="flex flex-col">
               <p className="mb-1 text-2xl font-extrabold">{tier.fromPrice}</p>
-              <p className="mb-3 text-seasalt-700">{tier.tagline}</p>
+              <p className="mb-3 text-pretty text-seasalt-700">{tier.tagline}</p>
               <TickList className="flex-1 content-start">
                 {tier.inclusions.map((inc) => (
                   <TickItem key={inc}>{inc}</TickItem>

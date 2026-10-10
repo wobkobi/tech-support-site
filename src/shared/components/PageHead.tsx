@@ -65,7 +65,7 @@ export function PageHead({
                 ))}
               </ol>
             </nav>
-            <h1 className="text-[1.875rem] leading-tight font-extrabold text-rich-black sm:text-[2.5rem]">
+            <h1 className="text-[1.875rem] leading-tight font-extrabold text-balance text-rich-black sm:text-[2.5rem]">
               {title}
             </h1>
             {intro && <div className="mt-3 text-lg sm:text-[1.1875rem]">{intro}</div>}

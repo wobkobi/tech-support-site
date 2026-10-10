@@ -11,9 +11,11 @@
 // Run with: npm run check:promo-pricing
 
 import {
+  calcInvoiceTotals,
   calcJobTotal,
   computeJobPromoDiscount,
   formatMoneyCompact,
+  splitLineTotals,
 } from "@/features/business/lib/business";
 import { DEFAULT_RATE_ROWS, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
 import { validateDiscount, validateKind } from "@/features/business/lib/promo-validation";
@@ -1008,6 +1010,50 @@ function main(): void {
     calcJobTotal(failedJob(fixedLines, true), promo("fixed_amount", 30), NO_FLOOR)
       .unsuccessfulDiscount,
     135,
+  );
+
+  // Timed lines at one rate share their cents: rounded alone, 35 + 35 + 20 min at
+  // $100/hr printed $58.33 + $58.33 + $33.33 = $149.99 for 90 minutes worth $150.
+  console.log("\nline totals split cents across timed lines\n");
+  /**
+   * A timed line item as jobToLineItems emits one.
+   * @param mins - Billed minutes.
+   * @param rate - Hourly rate.
+   * @returns The line's qty, unit price and minutes.
+   */
+  const timed = (
+    mins: number,
+    rate: number,
+  ): { qty: number; unitPrice: number; minutes: number } => ({
+    qty: mins / 60,
+    unitPrice: rate,
+    minutes: mins,
+  });
+  const thirds = [timed(35, 100), timed(35, 100), timed(20, 100)];
+  expectEqual(
+    "the leftover cent goes to the first of the biggest lines",
+    splitLineTotals(thirds),
+    [58.34, 58.33, 33.33],
+  );
+  expectEqual(
+    "a tied cent lands on the big line, not a 5-min one",
+    splitLineTotals([timed(5, 100), timed(185, 100)]),
+    [8.33, 308.34],
+  );
+  expectEqual(
+    "the subtotal is the whole time at the rate",
+    calcInvoiceTotals(thirds).subtotal,
+    150,
+  );
+  expectEqual(
+    "two 35-min lines at $65/hr total 70 min, not two rounded halves",
+    splitLineTotals([timed(35, 65), timed(35, 65)]),
+    [37.92, 37.91],
+  );
+  expectEqual(
+    "lines without minutes and lone timed lines round on their own",
+    splitLineTotals([timed(35, 65), { qty: 1, unitPrice: 10 }, timed(20, 55)]),
+    [37.92, 10, 18.33],
   );
 
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);

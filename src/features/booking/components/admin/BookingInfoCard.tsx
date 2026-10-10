@@ -10,8 +10,15 @@
 // route and contact backfill both read.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
+import {
+  ADMIN_INPUT_CLS,
+  ADMIN_LINK_CLS,
+  ADMIN_META_LABEL_CLS,
+} from "@/features/admin/components/ui/field-classes";
 import { FieldError } from "@/features/admin/components/ui/FieldError";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import {
   type ContactFieldErrors,
   checkContactFields,
@@ -45,8 +52,6 @@ interface BookingInfoCardProps {
   accessNotes: string | null;
 }
 
-const LABEL_CLS = "text-xs font-semibold text-admin-muted uppercase";
-
 /**
  * A read-only label/value row.
  * @param props - Component props.
@@ -63,7 +68,7 @@ function Row({
 }): React.ReactElement {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className={LABEL_CLS}>{label}</span>
+      <span className={ADMIN_META_LABEL_CLS}>{label}</span>
       <span className="text-sm wrap-break-word text-admin-text">{children}</span>
     </div>
   );
@@ -189,13 +194,13 @@ export function BookingInfoCard({
         </div>
         <Row label="Name">{name}</Row>
         <Row label="Email">
-          <a href={`mailto:${email}`} className="text-blue-500 hover:text-blue-700">
+          <a href={`mailto:${email}`} className={ADMIN_LINK_CLS}>
             {email}
           </a>
         </Row>
         <Row label="Phone">
           {phone ? (
-            <a href={`tel:${phone}`} className="text-blue-500 hover:text-blue-700">
+            <a href={`tel:${phone}`} className={ADMIN_LINK_CLS}>
               {phone}
             </a>
           ) : (
@@ -209,7 +214,7 @@ export function BookingInfoCard({
               href={mapsSearchUrl(initialAddress)}
               target="_blank"
               rel="noopener noreferrer"
-              className="whitespace-nowrap text-blue-500 hover:text-blue-700"
+              className={cn(ADMIN_LINK_CLS, "whitespace-nowrap")}
             >
               Maps ↗
             </a>
@@ -234,13 +239,10 @@ export function BookingInfoCard({
   return (
     <div className="flex flex-col gap-3">
       <h2 className="text-base font-bold text-admin-text">Edit customer</h2>
-      <div className="flex flex-col gap-1">
-        <label htmlFor={fieldIds.name} className={LABEL_CLS}>
-          Name
-        </label>
-        <input
+      <AdminField label="Name" htmlFor={fieldIds.name}>
+        <AdminInput
           id={fieldIds.name}
-          className={cn(ADMIN_INPUT_CLS, errors.name && "border-coquelicot-500/60")}
+          className={cn(errors.name && "border-coquelicot-500/60")}
           value={form.name}
           onChange={(e) => setField("name", e.target.value)}
           aria-invalid={errors.name ? true : undefined}
@@ -249,11 +251,8 @@ export function BookingInfoCard({
           disabled={saving}
         />
         <FieldError id={`${fieldIds.name}-error`} message={errors.name} />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor={fieldIds.email} className={LABEL_CLS}>
-          Email
-        </label>
+      </AdminField>
+      <AdminField label="Email" htmlFor={fieldIds.email}>
         <EmailInput
           id={fieldIds.email}
           value={form.email}
@@ -264,11 +263,8 @@ export function BookingInfoCard({
           className={ADMIN_INPUT_CLS}
           disabled={saving}
         />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor={fieldIds.phone} className={LABEL_CLS}>
-          Phone
-        </label>
+      </AdminField>
+      <AdminField label="Phone" htmlFor={fieldIds.phone}>
         <PhoneInput
           id={fieldIds.phone}
           value={form.phone}
@@ -279,43 +275,35 @@ export function BookingInfoCard({
           className={ADMIN_INPUT_CLS}
           disabled={saving}
         />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor={`edit-address-${id}`} className={LABEL_CLS}>
-          Address
-        </label>
+      </AdminField>
+      <AdminField label="Address" htmlFor={`edit-address-${id}`}>
         <AddressAutocomplete
           id={`edit-address-${id}`}
           value={form.address}
           onChange={(v: string) => setField("address", v)}
           placeholder="Leave blank for a remote job"
+          inputClassName={ADMIN_INPUT_CLS}
         />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor={`edit-notes-${id}`} className={LABEL_CLS}>
-          Notes
-        </label>
-        <textarea
+      </AdminField>
+      <AdminField label="Notes" htmlFor={`edit-notes-${id}`}>
+        <AdminTextarea
           id={`edit-notes-${id}`}
-          className={cn(ADMIN_INPUT_CLS, "min-h-25 resize-y")}
+          className="min-h-25"
           value={form.notes}
           onChange={(e) => setField("notes", e.target.value)}
           disabled={saving}
         />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor={`edit-access-notes-${id}`} className={LABEL_CLS}>
-          Visit notes
-        </label>
-        <textarea
+      </AdminField>
+      <AdminField label="Visit notes" htmlFor={`edit-access-notes-${id}`}>
+        <AdminTextarea
           id={`edit-access-notes-${id}`}
-          className={cn(ADMIN_INPUT_CLS, "min-h-20 resize-y")}
+          className="min-h-20"
           value={form.accessNotes}
           onChange={(e) => setField("accessNotes", e.target.value)}
           placeholder="Parking, directions, gate codes, pets"
           disabled={saving}
         />
-      </div>
+      </AdminField>
       <div className="flex flex-wrap gap-2">
         <AdminButton onClick={() => void save()} busy={saving}>
           Save changes

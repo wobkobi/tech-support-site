@@ -300,7 +300,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
 
         <h3 className="mb-3 text-xl font-bold">Full details</h3>
         <p className="mb-4 text-seasalt-700">
-          The fine print, in plain English. Click any section to expand.
+          The fine print, in plain English. Tap or click any section to open it.
         </p>
 
         <div className="max-w-180">

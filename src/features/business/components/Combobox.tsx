@@ -5,6 +5,7 @@
 // opens on focus and closes on blur, Escape, or outside-click. Suggestions guide without
 // restricting, so the operator is never limited to a fixed enum.
 
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -123,7 +124,7 @@ export function Combobox({
 
   return (
     <div ref={wrapperRef} className={cn("relative", className)}>
-      <input
+      <AdminInput
         type="text"
         role="combobox"
         aria-autocomplete="list"
@@ -142,16 +143,13 @@ export function Combobox({
           setHighlight(0);
         }}
         onKeyDown={onKeyDown}
-        className={cn(
-          "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs",
-          inputClassName,
-        )}
+        className={inputClassName}
       />
       {open && options.length > 0 && (
         <ul
           id={listId}
           role="listbox"
-          className="absolute top-full right-0 left-0 z-20 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg"
+          className="absolute top-full right-0 left-0 z-20 mt-1 max-h-56 overflow-y-auto rounded-lg border border-admin-border bg-admin-surface py-1 text-sm shadow-lg"
         >
           {options.map((opt, i) => (
             <li
@@ -167,8 +165,8 @@ export function Combobox({
               }}
               className={cn(
                 "cursor-pointer px-3 py-2",
-                i === highlight ? "bg-slate-100" : "bg-white",
-                opt.isCreate ? "font-semibold text-russian-violet" : "text-slate-700",
+                i === highlight ? "bg-admin-bg" : "bg-admin-surface",
+                opt.isCreate ? "font-semibold text-russian-violet" : "text-admin-text",
               )}
             >
               {opt.label}

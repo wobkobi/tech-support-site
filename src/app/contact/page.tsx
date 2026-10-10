@@ -92,7 +92,7 @@ export default async function ContactPage(): Promise<React.ReactElement> {
             aria-labelledby="area-heading"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
           >
-            <div className="flex items-start gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
               <div className="grid size-12 shrink-0 place-items-center rounded-lg border border-moonstone-500/30 bg-moonstone-400/10 sm:size-14">
                 <FaMapLocationDot
                   className="h-6 w-6 text-moonstone-400 sm:h-7 sm:w-7"

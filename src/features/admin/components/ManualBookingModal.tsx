@@ -6,6 +6,11 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { FieldError } from "@/features/admin/components/ui/FieldError";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
@@ -18,7 +23,7 @@ import {
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { combineUnitAndAddress, splitUnitFromAddress } from "@/features/booking/lib/booking";
 import { EmailInput } from "@/shared/components/EmailInput";
-import { Field } from "@/shared/components/Field";
+import { Notice } from "@/shared/components/Notice";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
@@ -237,18 +242,17 @@ export function ManualBookingModal({
     >
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Start" htmlFor="mb-start" required>
-            <input
+          <AdminField label="Start" htmlFor="mb-start" required>
+            <AdminInput
               id="mb-start"
               type="datetime-local"
               value={startAtLocal}
               onChange={(e) => setStartAtLocal(e.target.value)}
               required
-              className={textInputClasses}
             />
-          </Field>
-          <Field label="Duration" htmlFor="mb-duration">
-            <select
+          </AdminField>
+          <AdminField label="Duration" htmlFor="mb-duration">
+            <AdminSelect
               id="mb-duration"
               value={durationMinutes}
               onChange={(e) => {
@@ -256,21 +260,20 @@ export function ManualBookingModal({
                 setDurationManuallySet(true);
                 setEstimateHint(null);
               }}
-              className={textInputClasses}
             >
               <option value={60}>1 hour</option>
               <option value={120}>2 hours</option>
-            </select>
+            </AdminSelect>
             {estimating && (
               <p className="mt-1 text-sm text-admin-faint">Estimating from notes...</p>
             )}
             {!estimating && estimateHint && (
               <p className="mt-1 text-sm text-admin-muted">{estimateHint}</p>
             )}
-          </Field>
+          </AdminField>
         </div>
 
-        <Field label="Customer name" htmlFor="mb-name" required>
+        <AdminField label="Customer name" htmlFor="mb-name" required>
           <div
             ref={nameWrapRef}
             className="relative"
@@ -280,7 +283,7 @@ export function ManualBookingModal({
               }
             }}
           >
-            <input
+            <AdminInput
               ref={nameRef}
               id="mb-name"
               type="text"
@@ -296,7 +299,7 @@ export function ManualBookingModal({
               maxLength={100}
               aria-invalid={fieldErrors.name ? true : undefined}
               aria-describedby={fieldErrors.name ? "mb-name-error" : undefined}
-              className={cn(textInputClasses, fieldErrors.name && "border-coquelicot-500/60")}
+              className={cn(fieldErrors.name && "border-coquelicot-500/60")}
             />
             {nameListOpen &&
               contacts.length > 0 &&
@@ -335,9 +338,9 @@ export function ManualBookingModal({
                         }}
                         className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-admin-bg"
                       >
-                        <span className="text-sm font-medium text-admin-text">{c.name}</span>
-                        {c.address && <span className="text-xs text-admin-muted">{c.address}</span>}
-                        <span className="text-xs text-admin-faint">
+                        <span className="text-sm font-semibold text-admin-text">{c.name}</span>
+                        {c.address && <span className="text-sm text-admin-muted">{c.address}</span>}
+                        <span className="text-sm text-admin-faint">
                           {[c.email, c.phone ? formatNZPhone(c.phone) : null]
                             .filter(Boolean)
                             .join(" · ") || "No contact info"}
@@ -349,10 +352,10 @@ export function ManualBookingModal({
               })()}
           </div>
           <FieldError id="mb-name-error" message={fieldErrors.name} />
-        </Field>
+        </AdminField>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Phone" htmlFor="mb-phone" optional>
+          <AdminField label="Phone" htmlFor="mb-phone" optional>
             <PhoneInput
               id="mb-phone"
               value={phone}
@@ -361,9 +364,10 @@ export function ManualBookingModal({
                 clearFieldError("phone");
               }}
               error={fieldErrors.phone}
+              className={ADMIN_INPUT_CLS}
             />
-          </Field>
-          <Field label="Email" htmlFor="mb-email" required>
+          </AdminField>
+          <AdminField label="Email" htmlFor="mb-email" required>
             <EmailInput
               id="mb-email"
               value={email}
@@ -374,16 +378,17 @@ export function ManualBookingModal({
               error={fieldErrors.email}
               required
               maxLength={320}
+              className={ADMIN_INPUT_CLS}
             />
-          </Field>
+          </AdminField>
         </div>
 
         {/* Stack below sm: the unit input + address autocomplete can't both
               shrink to fit three tracks on a narrow phone, and this modal is
               fixed-position so the page-level overflow clip doesn't contain it. */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Field label="Apt / Unit" htmlFor="mb-unit" optional>
-            <input
+          <AdminField label="Apt / Unit" htmlFor="mb-unit" optional>
+            <AdminInput
               id="mb-unit"
               type="text"
               value={unit}
@@ -391,33 +396,32 @@ export function ManualBookingModal({
               autoComplete="off"
               maxLength={20}
               placeholder="12"
-              className={textInputClasses}
             />
-          </Field>
+          </AdminField>
           <div className="sm:col-span-2">
-            <Field label="Address" htmlFor="mb-address" optional>
+            <AdminField label="Address" htmlFor="mb-address" optional>
               <AddressAutocomplete
                 id="mb-address"
                 value={address}
                 onChange={setAddress}
                 placeholder="Street address"
                 maxLength={250}
+                inputClassName={ADMIN_INPUT_CLS}
               />
-            </Field>
+            </AdminField>
           </div>
         </div>
 
-        <Field label="Notes" htmlFor="mb-notes" optional>
-          <textarea
+        <AdminField label="Notes" htmlFor="mb-notes" optional>
+          <AdminTextarea
             id="mb-notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             onBlur={() => void estimateFromNotes()}
             rows={3}
             maxLength={2000}
-            className={cn(textInputClasses, "resize-y")}
           />
-        </Field>
+        </AdminField>
 
         <AdminCheckbox
           checked={sendConfirmation}
@@ -426,12 +430,9 @@ export function ManualBookingModal({
         />
 
         {error && (
-          <p
-            role="alert"
-            className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-          >
+          <Notice tone="warn" role="alert" className="px-4 py-3 text-[0.9375rem]">
             {error}
-          </p>
+          </Notice>
         )}
       </form>
     </Modal>
@@ -440,8 +441,3 @@ export function ManualBookingModal({
 
 /** DOM ids of the checked fields, for focusing the first bad one. */
 const FIELD_IDS = { name: "mb-name", email: "mb-email", phone: "mb-phone" };
-
-const textInputClasses = cn(
-  "w-full rounded-md border border-admin-border-strong bg-admin-surface px-3 py-2 text-sm text-admin-text",
-  "focus:border-russian-violet focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-);

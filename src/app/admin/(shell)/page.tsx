@@ -1,30 +1,37 @@
 // src/app/admin/(shell)/page.tsx
-// Admin dashboard. Runs a batch of parallel Prisma queries for booking, review, contact,
-// invoice, and income stats, then renders what needs doing first (the next job with Call
-// and Maps, upcoming bookings, events to complete, pending reviews, retainers due), then
-// the stat cards, then the review-link form, recent activity and system status. Counts
-// link to the list filtered to what they count (?status=held), and rows to their record.
+// Admin dashboard. Loads everything through loadDashboardData, then renders the header
+// (date, bookings today), on phones the next job and quick action tiles first, the KPI
+// strip (revenue with a 12-month sparkline, outstanding, bookings today, pending reviews),
+// alerts for overdue invoices and held bookings, the work column (upcoming bookings, the
+// income vs expenses chart, events to complete) beside the next job, pending reviews,
+// retainers due and the review-link form, the running totals strip, then recent activity
+// and system status. Counts link to the list filtered to what they count (?status=held),
+// and rows to their record.
 
+import { BarChart } from "@/features/admin/components/charts/BarChart";
+import { incomeExpenseSeries } from "@/features/admin/components/charts/series";
+import { Sparkline } from "@/features/admin/components/charts/Sparkline";
 import { CompleteEventsPanel } from "@/features/admin/components/CompleteEventsPanel";
+import { DashboardAlerts } from "@/features/admin/components/dashboard/DashboardAlerts";
+import { NextJobPanel } from "@/features/admin/components/dashboard/NextJobPanel";
+import { PendingReviewsPanel } from "@/features/admin/components/dashboard/PendingReviewsPanel";
+import { RecentActivityPanel } from "@/features/admin/components/dashboard/RecentActivityPanel";
+import { RetainersDuePanel } from "@/features/admin/components/dashboard/RetainersDuePanel";
+import { SystemStatusPanel } from "@/features/admin/components/dashboard/SystemStatusPanel";
+import { UpcomingBookingsPanel } from "@/features/admin/components/dashboard/UpcomingBookingsPanel";
+import { QuickActionTiles } from "@/features/admin/components/QuickActionsSheet";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { Card } from "@/features/admin/components/ui/Card";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
-import { StatusPill } from "@/features/admin/components/ui/StatusPill";
-import { mapsSearchUrl, meetingTypeFromNotes } from "@/features/booking/lib/booking";
-import { balanceDue, formatNZD } from "@/features/business/lib/business";
-import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
+import { lastCardSpan, StatStrip } from "@/features/admin/components/ui/StatStrip";
+import { loadDashboardData } from "@/features/admin/lib/dashboard-data";
+import { formatNZD } from "@/features/business/lib/business";
 import { SendReviewLinkForm } from "@/features/reviews/components/admin/SendReviewLinkForm";
 import { requireAdminAuth } from "@/shared/lib/auth";
-import { cn } from "@/shared/lib/cn";
-import { formatDateShort, formatDateTimeShort } from "@/shared/lib/date-format";
-import { toE164NZ } from "@/shared/lib/normalise-phone";
-import { prisma } from "@/shared/lib/prisma";
-import { nzDateKey, nzDateParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
+import { NZ_TZ } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
-import Link from "next/link";
 import type React from "react";
-import { FaCaretRight } from "react-icons/fa6";
 
 export const dynamic = "force-dynamic";
 
@@ -33,360 +40,57 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/** One count in the Today strip, linked to the list it counts. */
-const SNAPSHOT_LINK =
-  "rounded text-sm text-admin-text-secondary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet";
+/** Header date, e.g. "Saturday 10 October", in NZ time whatever the server's zone. */
+const TODAY_FORMAT = new Intl.DateTimeFormat("en-NZ", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  timeZone: NZ_TZ,
+});
 
-/**
- * A titled list-panel card for the dashboard grid: header (title + optional
- * count badge + optional "view all" link) over a list or an empty state.
- * @param props - Panel props.
- * @param props.title - Panel heading.
- * @param props.badge - Optional node beside the title (e.g. a count pill).
- * @param props.action - Optional right-aligned link.
- * @param props.action.label - Link text.
- * @param props.action.href - Link destination.
- * @param props.empty - Text shown when there are no rows.
- * @param props.children - The list element, or null to show the empty state.
- * @param props.className - Extra classes for the card (e.g. a grid span).
- * @returns Panel element.
- */
-function Panel({
-  title,
-  badge,
-  action,
-  empty,
-  children,
-  className,
-}: {
-  title: string;
-  badge?: React.ReactNode;
-  action?: { label: string; href: string };
-  empty: string;
-  children: React.ReactNode | null;
-  className?: string;
-}): React.ReactElement {
-  return (
-    <Card padding="none" className={className}>
-      <div className="flex items-center justify-between gap-3 border-b border-admin-border px-5 py-4">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-admin-text">
-          {title}
-          {badge}
-        </h2>
-        {action && (
-          <Link
-            href={action.href}
-            className="inline-flex items-center gap-1 text-xs text-admin-muted hover:text-russian-violet"
-          >
-            {action.label}
-            <FaCaretRight className="h-3 w-3" aria-hidden />
-          </Link>
-        )}
-      </div>
-      {children ?? <p className="px-5 py-6 text-sm text-admin-faint">{empty}</p>}
-    </Card>
-  );
+/** One stat card's content and target. */
+interface DashboardStat {
+  label: string;
+  value: number | string;
+  sub?: string;
+  href: string;
+  urgent: boolean;
+  trend?: React.ReactNode;
 }
 
 /**
- * Admin dashboard page showing stat cards and live data panels.
+ * Admin dashboard page showing stat cards, alerts, live data panels and the income chart.
  * @returns Dashboard page element.
  */
 export default async function AdminPage(): Promise<React.ReactElement> {
   await requireAdminAuth("/admin");
 
-  const now = new Date();
-  // Build "today"/"this month" boundaries on NZ midnight, not the server's UTC
-  // midnight (Vercel runs in UTC, 12-13h behind NZ), so counts match the
-  // operator's calendar day rather than sliding a booking into the wrong day.
-  const [nzYear, nzMonth, nzDay] = nzDateParts(now);
-  const todayStart = nzMidnightUtc(nzYear, nzMonth, nzDay);
-  const todayEnd = nzMidnightUtc(nzYear, nzMonth, nzDay + 1);
-  const monthStart = nzMidnightUtc(nzYear, nzMonth, 1);
-
-  // --- Parallel dashboard queries ---
-  const [
+  const data = await loadDashboardData(new Date());
+  const {
+    todayKey,
+    monthRevenue,
+    outstandingTotal,
+    outstandingInvoices,
+    overdueInvoices,
     pendingCount,
     approvedCount,
-    heldCount,
     confirmedCount,
+    heldCount,
     contactCount,
     unsyncedCount,
-    upcomingBookings,
-    pendingReviews,
-    recentContacts,
-    pastConfirmedBookings,
-    contactsWithReviewSent,
-    unsentContacts,
-    bookingsWithReviewSent,
-    todaysBookings,
-    monthIncome,
-    outstandingInvoices,
-    recentInvoices,
-    latestCacheEntry,
-    retainerContacts,
-    invoicesWithReviewSent,
-    reviewAskOptOuts,
-  ] = await Promise.all([
-    prisma.review.count({ where: { status: "pending" } }),
-    prisma.review.count({ where: { status: "approved" } }),
-    prisma.booking.count({ where: { status: "held" } }),
-    prisma.booking.count({ where: { status: "confirmed" } }),
-    prisma.contact.count({ where: { deletedAt: null } }),
-    // MongoDB gotcha: contacts created before googleContactId existed in the
-    // schema have no field at all, so `null` alone misses them. `isSet: false`
-    // covers that case so the unsynced count is accurate.
-    prisma.contact.count({
-      where: {
-        OR: [{ googleContactId: null }, { googleContactId: { isSet: false } }],
-        deletedAt: null,
-      },
-    }),
-    prisma.booking.findMany({
-      where: { status: "confirmed", startAt: { gte: now } },
-      orderBy: { startAt: "asc" },
-      take: 6,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        startAt: true,
-        endAt: true,
-        address: true,
-        meetingType: true,
-        notes: true,
-      },
-    }),
-    prisma.review.findMany({
-      where: { status: "pending" },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      select: {
-        id: true,
-        text: true,
-        firstName: true,
-        lastName: true,
-        isAnonymous: true,
-        createdAt: true,
-      },
-    }),
-    prisma.contact.findMany({
-      where: { deletedAt: null },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      select: { id: true, name: true, email: true, phone: true, createdAt: true },
-    }),
-    prisma.booking.findMany({
-      where: { status: "confirmed", startAt: { lt: now } },
-      orderBy: { startAt: "desc" },
-      take: 10,
-      select: { id: true, name: true, email: true, startAt: true, reviewSentAt: true },
-    }),
-    prisma.contact.findMany({
-      where: { reviewLinkSentAt: { not: null }, deletedAt: null },
-      select: { email: true, phone: true },
-    }),
-    // Suggestion candidates: only contacts never stamped as sent. Excluding the rest
-    // DB-side (they were filtered below anyway) keeps the scan proportional to real
-    // candidates. isSet covers pre-field rows.
-    prisma.contact.findMany({
-      where: {
-        deletedAt: null,
-        OR: [{ reviewLinkSentAt: null }, { reviewLinkSentAt: { isSet: false } }],
-      },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, email: true, phone: true, address: true },
-    }),
-    prisma.booking.findMany({
-      where: { reviewSentAt: { not: null } },
-      select: { email: true, phone: true },
-    }),
-    // Today's confirmed bookings - drives the "today snapshot" bar.
-    prisma.booking.findMany({
-      where: { status: "confirmed", startAt: { gte: todayStart, lt: todayEnd } },
-      orderBy: { startAt: "asc" },
-      select: { id: true, name: true, startAt: true, endAt: true },
-    }),
-    // This-month income (server-side sum).
-    prisma.incomeEntry.aggregate({
-      where: { date: { gte: monthStart } },
-      _sum: { amount: true },
-    }),
-    // Outstanding (DRAFT or SENT). Overdue flagged separately on the card.
-    // Quotes ride on DRAFT/SENT but aren't money owed - excluded.
-    prisma.invoice.findMany({
-      where: { status: { in: ["DRAFT", "SENT"] }, ...NOT_A_QUOTE_FILTER },
-      orderBy: { dueDate: "asc" },
-      select: {
-        id: true,
-        number: true,
-        total: true,
-        alreadyPaid: true,
-        dueDate: true,
-        status: true,
-        clientName: true,
-      },
-    }),
-    // Recent invoices (any status) - feeds the activity timeline.
-    prisma.invoice.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 8,
-      select: {
-        id: true,
-        number: true,
-        clientName: true,
-        total: true,
-        status: true,
-        isQuote: true,
-        createdAt: true,
-      },
-    }),
-    // Newest cache row > calendar freshness for system status.
-    prisma.calendarEventCache.findFirst({
-      orderBy: { fetchedAt: "desc" },
-      select: { fetchedAt: true },
-    }),
-    // Retainer clients - feeds the "Retainers due" panel. isSet guards rows
-    // created before the field existed (MongoDB gotcha, as above).
-    prisma.contact.findMany({
-      where: { deletedAt: null, retainerTier: { isSet: true, not: null } },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, retainerTier: true, retainerPrice: true },
-    }),
-    // Review asks sent from an invoice (automatic or Send now) count as asked too.
-    prisma.invoice.findMany({
-      where: { reviewLinkSentAt: { not: null } },
-      select: { contactId: true, clientEmail: true },
-    }),
-    // Anyone who stopped review asks, or unsubscribed from email, isn't suggested.
-    Promise.all([
-      prisma.reviewAskOptOut.findMany({ select: { email: true, contactId: true } }),
-      prisma.emailOptOut.findMany({ select: { email: true, contactId: true } }),
-    ]).then(([a, b]) => [...a, ...b]),
-  ]);
+  } = data;
 
-  // --- Retainers due this month ---
-  // Invoiced = an invoice linked by contactId, issued this month, with a line item
-  // mentioning "retainer". The text match runs in JS: lineItems is an embedded composite
-  // type and the Mongo connector can't regex-filter composite string content.
-  let retainersDue: typeof retainerContacts = [];
-  if (retainerContacts.length > 0) {
-    const monthInvoices = await prisma.invoice.findMany({
-      where: {
-        contactId: { in: retainerContacts.map((r) => r.id) },
-        issueDate: { gte: monthStart },
-        status: { not: "VOIDED" },
-        // A QUOTE for a retainer must not count as invoiced.
-        ...NOT_A_QUOTE_FILTER,
-      },
-      select: { contactId: true, lineItems: true },
-    });
-    const invoicedIds = new Set(
-      monthInvoices
-        .filter((inv) => inv.lineItems.some((li) => /retainer/i.test(li.description)))
-        .map((inv) => inv.contactId),
-    );
-    retainersDue = retainerContacts.filter((r) => !invoicedIds.has(r.id));
-  }
-
-  // --- Review-link coverage ---
-  const sentEmails = new Set<string>([
-    ...contactsWithReviewSent.flatMap((c) => (c.email ? [c.email.toLowerCase()] : [])),
-    ...bookingsWithReviewSent.flatMap((b) => (b.email ? [b.email.toLowerCase()] : [])),
-    ...invoicesWithReviewSent.flatMap((i) => (i.clientEmail ? [i.clientEmail.toLowerCase()] : [])),
-    ...reviewAskOptOuts.map((o) => o.email.toLowerCase()),
-  ]);
-  const skipIds = new Set<string>([
-    ...invoicesWithReviewSent.flatMap((i) => (i.contactId ? [i.contactId] : [])),
-    ...reviewAskOptOuts.flatMap((o) => (o.contactId ? [o.contactId] : [])),
-  ]);
-  const sentPhones = new Set<string>([
-    ...contactsWithReviewSent.flatMap((c) => (c.phone ? [toE164NZ(c.phone)] : [])),
-    ...bookingsWithReviewSent.flatMap((b) => (b.phone ? [toE164NZ(b.phone)] : [])),
-  ]);
-  // The set diff still matters for cross-record coverage: an unsent contact
-  // sharing an email/phone with a sent contact, booking or invoice is already
-  // covered, and opted-out addresses ride in the same sets.
-  const contactsWithoutReviewLinks = unsentContacts.filter((c) => {
-    if (skipIds.has(c.id)) return false;
-    if (c.email && sentEmails.has(c.email.toLowerCase())) return false;
-    if (c.phone && sentPhones.has(toE164NZ(c.phone))) return false;
-    return true;
-  });
-
-  // --- Derived KPIs for the dashboard sections ---
-  const monthRevenue = monthIncome._sum.amount ?? 0;
-  // Money handed over on the day is already in, so only the balance is outstanding.
-  const outstandingTotal = outstandingInvoices.reduce((s, inv) => s + balanceDue(inv), 0);
-  const overdueInvoices = outstandingInvoices.filter(
-    (inv) => inv.status === "SENT" && inv.dueDate < now,
-  );
-  const todayKey = nzDateKey(now);
-
-  // --- Next job ---
-  // Remote jobs get no Maps button; an unknown meeting type with an address still does.
-  const [nextJob, ...laterBookings] = upcomingBookings;
-  const nextJobAddress =
-    nextJob && (nextJob.meetingType ?? meetingTypeFromNotes(nextJob.notes)) !== "remote"
-      ? nextJob.address || null
-      : null;
-
-  // --- Unified activity feed: merge recent events across tables and sort by time ---
-  type ActivityKind = "booking" | "review" | "contact" | "invoice";
-  interface ActivityEvent {
-    kind: ActivityKind;
-    timestamp: Date;
-    title: string;
-    detail: string;
-    href: string;
-  }
-  const activity: ActivityEvent[] = [
-    ...upcomingBookings.map((b) => ({
-      kind: "booking" as const,
-      timestamp: b.startAt,
-      title: `Booking: ${b.name}`,
-      detail: `${formatDateTimeShort(b.startAt.toISOString())}`,
-      href: `/admin/bookings/${b.id}`,
-    })),
-    ...pendingReviews.map((r) => ({
-      kind: "review" as const,
-      timestamp: r.createdAt,
-      title: `Review pending`,
-      detail: r.text.length > 60 ? r.text.slice(0, 60) + "..." : r.text,
-      href: "/admin/reviews",
-    })),
-    ...recentContacts.map((c) => ({
-      kind: "contact" as const,
-      timestamp: c.createdAt,
-      title: `New contact: ${c.name}`,
-      detail: c.email ?? c.phone ?? "no contact info",
-      href: `/admin/contacts/${c.id}`,
-    })),
-    ...recentInvoices.map((inv) => ({
-      kind: "invoice" as const,
-      timestamp: inv.createdAt,
-      title: `${inv.isQuote ? "Quote" : "Invoice"} ${inv.number}: ${inv.clientName}`,
-      detail: `${inv.isQuote ? "Quote" : inv.status.charAt(0) + inv.status.slice(1).toLowerCase()} - ${formatNZD(inv.total)}`,
-      href: `/admin/business/invoices/${inv.id}`,
-    })),
-  ]
-    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-    .slice(0, 10);
-
-  // --- System status freshness ---
-  // Use the `now` captured at the top of this request to keep render pure.
-  const calendarLastRefreshMs = latestCacheEntry?.fetchedAt
-    ? now.getTime() - latestCacheEntry.fetchedAt.getTime()
-    : null;
-
-  // --- Stat cards ---
-  const stats = [
+  // --- KPI row: the money and today's workload ---
+  const kpis: DashboardStat[] = [
     {
       label: "Revenue this month",
       value: formatNZD(monthRevenue),
+      // Money received: once registered the chart below counts income excl. GST, so say
+      // which side this figure is on.
+      sub: data.gstRegistered ? "Incl. GST" : undefined,
       href: `/admin/business`,
       urgent: false,
+      trend: <Sparkline values={data.revenueTrend} />,
     },
     {
       label: "Outstanding",
@@ -401,17 +105,21 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       urgent: overdueInvoices.length > 0,
     },
     {
+      label: "Bookings today",
+      value: data.todaysBookings.length,
+      href: `/admin/bookings?from=${todayKey}&to=${todayKey}`,
+      urgent: false,
+    },
+    {
       label: "Pending reviews",
       value: pendingCount,
       href: `/admin/reviews`,
       urgent: pendingCount > 0,
     },
-    {
-      label: "Approved reviews",
-      value: approvedCount,
-      href: `/admin/reviews`,
-      urgent: false,
-    },
+  ];
+
+  // --- Secondary stats: running totals, below the chart ---
+  const secondaryStats: DashboardStat[] = [
     {
       label: "Confirmed bookings",
       value: confirmedCount,
@@ -425,6 +133,12 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       urgent: heldCount > 0,
     },
     {
+      label: "Approved reviews",
+      value: approvedCount,
+      href: `/admin/reviews`,
+      urgent: false,
+    },
+    {
       label: "Total contacts",
       value: contactCount,
       href: `/admin/contacts`,
@@ -436,303 +150,127 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       href: `/admin/contacts?sync=unsynced`,
       urgent: unsyncedCount > 0,
     },
-  ] as { label: string; value: number | string; sub?: string; href: string; urgent: boolean }[];
+  ];
+
+  const todayCount = data.todaysBookings.length;
+  /**
+   * The next job panel, shared by the phone copy (top of the page) and the desktop copy
+   * (top of the side column).
+   * @param className - Classes that hide the copy at the other size.
+   * @returns The panel element.
+   */
+  const nextJobPanel = (className: string): React.ReactElement => (
+    <NextJobPanel
+      nextJob={data.nextJob}
+      nextJobAddress={data.nextJobAddress}
+      className={className}
+    />
+  );
 
   return (
     <>
-      <PageHeader title="Dashboard" />
+      <PageHeader
+        title="Dashboard"
+        description={`${TODAY_FORMAT.format(new Date())} · ${todayCount} booking${todayCount === 1 ? "" : "s"} today`}
+        actions={
+          // Phones reach these through the bottom bar's + and the tiles below.
+          <div className="flex gap-2 max-lg:hidden">
+            <AdminButton variant="secondary" href="/admin/business/quick">
+              Quick price
+            </AdminButton>
+            <AdminButton href="/admin/business/calculator">New invoice</AdminButton>
+          </div>
+        }
+      />
 
-      {/* Today's snapshot - pinned at the top so the morning glance is instant. */}
-      <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-russian-violet/20 bg-linear-to-r from-russian-violet/5 to-admin-surface px-5 py-4">
-        <p className="text-sm font-semibold text-russian-violet">Today</p>
-        <Link href={`/admin/bookings?from=${todayKey}&to=${todayKey}`} className={SNAPSHOT_LINK}>
-          <span className="font-bold text-russian-violet">{todaysBookings.length}</span> booking
-          {todaysBookings.length === 1 ? "" : "s"}
-        </Link>
-        <Link href="/admin/reviews" className={SNAPSHOT_LINK}>
-          <span
-            className={cn(
-              "font-bold",
-              pendingCount > 0 ? "text-coquelicot-600" : "text-russian-violet",
-            )}
-          >
-            {pendingCount}
-          </span>{" "}
-          review{pendingCount === 1 ? "" : "s"} to approve
-        </Link>
-        {overdueInvoices.length > 0 && (
-          <Link href="/admin/business/invoices?status=overdue" className={SNAPSHOT_LINK}>
-            <span className="font-bold text-coquelicot-600">{overdueInvoices.length}</span> overdue
-            invoice{overdueInvoices.length === 1 ? "" : "s"}
-          </Link>
-        )}
-        {heldCount > 0 && (
-          <Link href="/admin/bookings?status=held" className={SNAPSHOT_LINK}>
-            <span className="font-bold text-coquelicot-600">{heldCount}</span> held booking
-            {heldCount === 1 ? "" : "s"} to action
-          </Link>
-        )}
+      {/* Phone: the next job and the shortcuts come before any figures. */}
+      <div className="mb-4 flex flex-col gap-4 lg:hidden">
+        {nextJobPanel("")}
+        <nav aria-label="Quick actions">
+          <QuickActionTiles stamp="dashboard" />
+        </nav>
       </div>
 
-      {/* What needs doing comes first: the next jobs, then anything waiting on a
-          decision. Stats and history sit below. */}
-      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Upcoming bookings */}
-        <Panel
-          title="Upcoming bookings"
-          action={{ label: "View all", href: "/admin/bookings" }}
-          empty="No upcoming confirmed bookings."
-        >
-          {!nextJob ? null : (
-            <>
-              {/* Next job: the calls a morning needs, one tap each. */}
-              <div className="border-b border-admin-border bg-russian-violet/5 px-5 py-4">
-                <p className="text-xs font-semibold text-russian-violet">Next job</p>
-                <p className="mt-1 font-semibold wrap-break-word text-admin-text">{nextJob.name}</p>
-                <p className="text-sm text-admin-text-secondary">
-                  {formatDateTimeShort(nextJob.startAt.toISOString())}
-                </p>
-                <p className="text-sm wrap-break-word text-admin-muted">
-                  {nextJobAddress ?? "Remote"}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {nextJob.phone && (
-                    <AdminButton variant="secondary" href={`tel:${nextJob.phone}`}>
-                      Call
-                    </AdminButton>
-                  )}
-                  {nextJobAddress && (
-                    <AdminButton variant="secondary" href={mapsSearchUrl(nextJobAddress)}>
-                      Maps ↗
-                    </AdminButton>
-                  )}
-                  <AdminButton variant="secondary" href={`/admin/bookings/${nextJob.id}`}>
-                    Open
-                  </AdminButton>
-                </div>
-              </div>
-              {laterBookings.length > 0 && (
-                <ul className="divide-y divide-admin-border">
-                  {laterBookings.map((b) => (
-                    <li key={b.id}>
-                      <Link
-                        href={`/admin/bookings/${b.id}`}
-                        className="flex items-start justify-between gap-3 px-5 py-3 transition-colors hover:bg-admin-bg"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-admin-text">{b.name}</p>
-                          <p className="truncate text-xs text-admin-faint">
-                            {b.email}
-                            {b.phone ? ` · ${b.phone}` : ""}
-                          </p>
-                        </div>
-                        <p className="shrink-0 text-right text-xs text-admin-muted">
-                          {formatDateTimeShort(b.startAt.toISOString())}
-                        </p>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-        </Panel>
-
-        <CompleteEventsPanel
-          pastConfirmedBookings={pastConfirmedBookings.map((b) => ({
-            id: b.id,
-            name: b.name,
-            email: b.email,
-            startAt: b.startAt.toISOString(),
-            reviewSentAt: b.reviewSentAt ? b.reviewSentAt.toISOString() : null,
-          }))}
-        />
-
-        {/* Pending reviews */}
-        <Panel
-          title="Pending reviews"
-          badge={
-            pendingReviews.length > 0 ? (
-              <StatusPill tone="critical">{pendingCount}</StatusPill>
-            ) : undefined
-          }
-          action={{ label: "Review all", href: "/admin/reviews" }}
-          empty="No reviews pending approval."
-          // Full width when there is no retainers panel to sit beside it.
-          className={retainerContacts.length === 0 ? "lg:col-span-2" : undefined}
-        >
-          {pendingReviews.length === 0 ? null : (
-            <ul className="divide-y divide-admin-border">
-              {pendingReviews.map((r) => {
-                const name = r.isAnonymous
-                  ? "Anonymous"
-                  : [r.firstName, r.lastName].filter(Boolean).join(" ") || "Unknown";
-                return (
-                  <li key={r.id}>
-                    <Link
-                      href="/admin/reviews"
-                      className="block px-5 py-3 transition-colors hover:bg-admin-bg"
-                    >
-                      <div className="mb-1 flex items-center justify-between gap-3">
-                        <p className="text-xs font-medium text-admin-text-secondary">{name}</p>
-                        <p className="shrink-0 text-xs text-admin-faint">
-                          {formatDateShort(r.createdAt.toISOString())}
-                        </p>
-                      </div>
-                      <p className="line-clamp-2 text-xs text-admin-muted">{r.text}</p>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Panel>
-
-        {/* Retainers due - retainer clients with no "retainer" invoice issued
-            this month. Hidden entirely until at least one retainer client exists. */}
-        {retainerContacts.length > 0 && (
-          <Panel
-            title="Retainers due"
-            badge={
-              retainersDue.length > 0 ? (
-                <StatusPill tone="warning">{retainersDue.length}</StatusPill>
-              ) : undefined
-            }
-            action={{ label: "New invoice", href: "/admin/business/calculator" }}
-            empty="All retainers invoiced this month."
-          >
-            {retainersDue.length === 0 ? null : (
-              <ul className="divide-y divide-admin-border">
-                {retainersDue.map((r) => (
-                  <li key={r.id}>
-                    <Link
-                      href={`/admin/contacts/${r.id}`}
-                      className="flex items-start justify-between gap-3 px-5 py-3 transition-colors hover:bg-admin-bg"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-admin-text">{r.name}</p>
-                        <p className="truncate text-xs text-admin-faint">{r.retainerTier}</p>
-                      </div>
-                      <p className="shrink-0 text-right text-xs text-admin-muted">
-                        {r.retainerPrice !== null ? formatNZD(r.retainerPrice) : ""}
-                      </p>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-        )}
-      </div>
-
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {stats.map((s) => (
+      <StatStrip label="Today and this month" className="mb-6 grid-cols-2 lg:grid-cols-4">
+        {kpis.map((s) => (
           <StatCard
             key={s.label}
             label={s.label}
             value={s.value}
             sub={s.sub}
             href={s.href}
+            trend={s.trend}
+            size="lg"
             tone={s.urgent ? "critical" : "violet"}
           />
         ))}
+      </StatStrip>
+
+      <DashboardAlerts overdueCount={overdueInvoices.length} heldCount={heldCount} />
+
+      {/* What needs doing comes first: upcoming work and the chart on the left, the next
+          job and anything waiting on a decision on the right. History sits below. */}
+      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-8">
+          <UpcomingBookingsPanel laterBookings={data.laterBookings} />
+          <BarChart
+            title="Income vs expenses"
+            description="Last 12 months"
+            series={incomeExpenseSeries(data.gstRegistered)}
+            groups={data.incomeExpenseGroups}
+            groupHeading="Month"
+            differenceLabel="Profit"
+            emptyText="No income or expenses recorded in the last 12 months."
+          />
+          <CompleteEventsPanel
+            pastConfirmedBookings={data.pastConfirmedBookings.map((b) => ({
+              id: b.id,
+              name: b.name,
+              email: b.email,
+              startAt: b.startAt.toISOString(),
+              reviewSentAt: b.reviewSentAt ? b.reviewSentAt.toISOString() : null,
+            }))}
+          />
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-4">
+          {nextJobPanel("max-lg:hidden")}
+          <PendingReviewsPanel pendingReviews={data.pendingReviews} pendingCount={pendingCount} />
+          {/* Hidden entirely until at least one retainer client exists. */}
+          {data.retainerContacts.length > 0 && (
+            <RetainersDuePanel retainersDue={data.retainersDue} />
+          )}
+          <Card>
+            <CardHeader title="Send review link" />
+            <SendReviewLinkForm contactSuggestions={data.contactsWithoutReviewLinks} defaultOpen />
+          </Card>
+        </div>
       </div>
 
+      <StatStrip label="Running totals" className="mb-6 grid-cols-2 lg:grid-cols-5">
+        {secondaryStats.map((s, i) => (
+          <StatCard
+            key={s.label}
+            label={s.label}
+            value={s.value}
+            href={s.href}
+            tone={s.urgent ? "critical" : "violet"}
+            className={
+              i === secondaryStats.length - 1
+                ? lastCardSpan(secondaryStats.length, { base: 2, lg: 5 })
+                : undefined
+            }
+          />
+        ))}
+      </StatStrip>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <h2 className="mb-4 text-sm font-semibold text-admin-text">Send review link</h2>
-          <SendReviewLinkForm contactSuggestions={contactsWithoutReviewLinks} defaultOpen />
-        </Card>
-
-        {/* Recent activity - unified timeline of bookings, reviews, contacts, invoices. */}
-        <Panel title="Recent activity" empty="No activity yet.">
-          {activity.length === 0 ? null : (
-            <ul className="divide-y divide-admin-border">
-              {activity.map((e, i) => (
-                <li key={`${e.kind}:${i}:${e.timestamp.getTime()}`}>
-                  <Link
-                    href={e.href}
-                    className="flex items-start gap-3 px-5 py-3 transition-colors hover:bg-admin-bg"
-                  >
-                    <span
-                      className={cn(
-                        "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                        e.kind === "booking" && "bg-moonstone-400/15 text-moonstone-700",
-                        e.kind === "review" && "bg-yellow-500/15 text-yellow-600",
-                        e.kind === "contact" && "bg-admin-border text-admin-muted",
-                        e.kind === "invoice" && "bg-russian-violet/15 text-russian-violet",
-                      )}
-                      aria-hidden="true"
-                    >
-                      {e.kind === "booking"
-                        ? "B"
-                        : e.kind === "review"
-                          ? "R"
-                          : e.kind === "contact"
-                            ? "C"
-                            : "I"}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium wrap-break-word text-admin-text">
-                        {e.title}
-                      </p>
-                      <p className="truncate text-xs text-admin-faint">{e.detail}</p>
-                    </div>
-                    <p className="shrink-0 text-xs text-admin-faint">
-                      {formatDateShort(e.timestamp.toISOString())}
-                    </p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-
-        {/* System status - quick view of how fresh the various sync sources are. */}
-        <Panel
-          title="System status"
-          action={{ label: "Settings", href: "/admin/settings" }}
-          empty=""
-        >
-          <ul className="divide-y divide-admin-border text-sm">
-            <li className="flex items-center justify-between px-5 py-3">
-              <span className="text-admin-text-secondary">Calendar cache</span>
-              <span
-                className={cn(
-                  "text-xs",
-                  calendarLastRefreshMs === null
-                    ? "font-medium text-coquelicot-600"
-                    : calendarLastRefreshMs > 30 * 60 * 1000
-                      ? "text-yellow-600"
-                      : "text-admin-muted",
-                )}
-              >
-                {calendarLastRefreshMs === null
-                  ? "never refreshed"
-                  : `refreshed ${Math.round(calendarLastRefreshMs / 60000)} min ago`}
-              </span>
-            </li>
-            <li className="flex items-center justify-between px-5 py-3">
-              <span className="text-admin-text-secondary">Latest invoice</span>
-              <span className="text-xs text-admin-muted">
-                {recentInvoices[0]
-                  ? `${recentInvoices[0].number} (${formatDateShort(recentInvoices[0].createdAt.toISOString())})`
-                  : "none yet"}
-              </span>
-            </li>
-            <li className="flex items-center justify-between px-5 py-3">
-              <span className="text-admin-text-secondary">Unsynced contacts</span>
-              <span
-                className={cn(
-                  "text-xs",
-                  unsyncedCount > 0 ? "text-yellow-600" : "text-admin-muted",
-                )}
-              >
-                {unsyncedCount === 0 ? "all synced" : `${unsyncedCount} pending`}
-              </span>
-            </li>
-          </ul>
-        </Panel>
+        <RecentActivityPanel activity={data.activity} />
+        <SystemStatusPanel
+          calendarLastRefreshMs={data.calendarLastRefreshMs}
+          latestInvoice={data.recentInvoices[0]}
+          unsyncedCount={unsyncedCount}
+        />
       </div>
     </>
   );

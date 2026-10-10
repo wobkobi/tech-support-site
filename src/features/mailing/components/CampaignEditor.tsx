@@ -8,27 +8,29 @@
 // the body has an Add menu for placeholders, links, buttons and contact details.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { Card, CardHeader } from "@/features/admin/components/ui/Card";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
+import { Card } from "@/features/admin/components/ui/Card";
+import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { InsertMenu, type InsertGroup } from "@/features/admin/components/ui/InsertMenu";
-import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import {
+  CampaignPreviewCard,
+  type CampaignPreview,
+} from "@/features/mailing/components/CampaignPreviewCard";
+import { CampaignSendsCard } from "@/features/mailing/components/CampaignSendsCard";
+import { CampaignStatusBanner } from "@/features/mailing/components/CampaignStatusBanner";
 import { SendDialog, type SendMode } from "@/features/mailing/components/SendDialog";
 import { callApi } from "@/features/mailing/lib/api-client";
 import { AUDIENCE_OPTIONS, type CampaignAudience } from "@/features/mailing/lib/audience";
 import type { CampaignRow } from "@/features/mailing/lib/campaign-row";
-import {
-  BLANK_TEMPLATE_ID,
-  matchTemplate,
-  switchTemplate,
-  type Template,
-} from "@/features/mailing/lib/templates";
-import { cn } from "@/shared/lib/cn";
-import { formatDateTimeShort } from "@/shared/lib/date-format";
+import { matchTemplate, switchTemplate, type Template } from "@/features/mailing/lib/templates";
 import type { QuietHours } from "@/shared/lib/quiet-hours";
 import { shrinkImage } from "@/shared/lib/resize-image";
 import { useRouter } from "next/navigation";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 
 /** One recipient's copy of a sent email. */
 export interface SendRow {
@@ -51,12 +53,6 @@ type SaveState = "saved" | "saving" | "unsaved" | "error";
 
 const AUTOSAVE_MS = 800;
 const PREVIEW_MS = 500;
-
-const SEND_PILL: Record<SendRow["status"], { tone: StatusTone; label: string }> = {
-  pending: { tone: "neutral", label: "Waiting" },
-  sent: { tone: "success", label: "Sent" },
-  failed: { tone: "critical", label: "Failed" },
-};
 
 /** Formatting shortcuts in the helper strip: text to insert and where the cursor lands. */
 const SNIPPETS: { label: string; title: string; before: string; after: string; line?: boolean }[] =
@@ -126,12 +122,13 @@ export function CampaignEditor({
   const saved = useRef<Content>(content);
   const saving = useRef<Promise<boolean> | null>(null);
 
-  const [preview, setPreview] = useState<{ html: string; subject: string; problems: string[] }>();
+  const [preview, setPreview] = useState<CampaignPreview>();
   const [width, setWidth] = useState<"desktop" | "phone">("desktop");
   const [busy, setBusy] = useState<string | null>(null);
   const [dialog, setDialog] = useState<SendMode | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const fieldId = useId();
 
   /**
    * Writes whatever changed since the last save.
@@ -385,7 +382,7 @@ export function CampaignEditor({
 
   return (
     <div className="flex flex-col gap-6">
-      <StatusBanner
+      <CampaignStatusBanner
         campaign={initial}
         busy={busy}
         onCancelSchedule={() => void cancelSchedule()}
@@ -408,48 +405,54 @@ export function CampaignEditor({
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>
           <div className="flex flex-col gap-4">
-            <Field label={initial.isPreset ? "Preset name" : "Name (only you see this)"}>
-              <input
+            <AdminField
+              label={initial.isPreset ? "Preset name" : "Name (only you see this)"}
+              htmlFor={`${fieldId}-name`}
+            >
+              <AdminInput
+                id={`${fieldId}-name`}
                 value={content.name}
                 onChange={(e) => setField("name", e.target.value)}
                 disabled={!editable}
                 maxLength={120}
-                className={ADMIN_INPUT_CLS}
               />
-            </Field>
-            <Field label="Subject">
-              <input
+            </AdminField>
+            <AdminField label="Subject" htmlFor={`${fieldId}-subject`}>
+              <AdminInput
+                id={`${fieldId}-subject`}
                 value={content.subject}
                 onChange={(e) => setField("subject", e.target.value)}
                 disabled={!editable}
                 maxLength={200}
-                className={ADMIN_INPUT_CLS}
               />
-            </Field>
-            <Field label="Preview text (shows after the subject in most inboxes)">
-              <input
+            </AdminField>
+            <AdminField
+              label="Preview text (shows after the subject in most inboxes)"
+              htmlFor={`${fieldId}-preheader`}
+            >
+              <AdminInput
+                id={`${fieldId}-preheader`}
                 value={content.preheader}
                 onChange={(e) => setField("preheader", e.target.value)}
                 disabled={!editable}
                 maxLength={200}
-                className={ADMIN_INPUT_CLS}
               />
-            </Field>
+            </AdminField>
 
-            <Field label="Who it goes to">
-              <select
+            <AdminField label="Who it goes to" htmlFor={`${fieldId}-audience`}>
+              <AdminSelect
+                id={`${fieldId}-audience`}
                 value={audience}
                 onChange={(e) => void changeAudience(e.target.value as CampaignAudience)}
                 disabled={!editable}
-                className={ADMIN_INPUT_CLS}
               >
                 {AUDIENCE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>
                 ))}
-              </select>
-            </Field>
+              </AdminSelect>
+            </AdminField>
 
             {promoId && (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm">
@@ -471,7 +474,9 @@ export function CampaignEditor({
             )}
 
             <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-admin-text">Email</span>
+              <label htmlFor={`${fieldId}-body`} className={ADMIN_LABEL_CLS}>
+                Email
+              </label>
               {editable && (
                 <div className="flex flex-wrap gap-1.5">
                   {SNIPPETS.map((s) => (
@@ -514,13 +519,14 @@ export function CampaignEditor({
                   </div>
                 </div>
               )}
-              <textarea
+              <AdminTextarea
                 ref={bodyRef}
+                id={`${fieldId}-body`}
                 value={content.body}
                 onChange={(e) => setField("body", e.target.value)}
                 disabled={!editable}
                 rows={18}
-                className={cn(ADMIN_INPUT_CLS, "font-mono text-sm leading-relaxed")}
+                className="font-mono text-sm leading-relaxed"
               />
               {editable && (
                 <details className="text-sm text-admin-text-secondary">
@@ -549,74 +555,22 @@ export function CampaignEditor({
           </div>
         </Card>
 
-        <Card>
-          <CardHeader
-            title="Preview"
-            description={preview ? `Subject: ${preview.subject}` : "Loading..."}
-            actions={
-              <div className="flex gap-1">
-                {(["desktop", "phone"] as const).map((w) => (
-                  <AdminButton
-                    key={w}
-                    size="xs"
-                    variant={width === w ? "primary" : "secondary"}
-                    onClick={() => setWidth(w)}
-                  >
-                    {w === "desktop" ? "Desktop" : "Phone"}
-                  </AdminButton>
-                ))}
-              </div>
-            }
-          />
-          {editable && templates.length > 0 && (
-            <div className="mt-3 flex flex-col gap-1">
-              <label className="flex flex-col gap-1 text-sm font-medium text-admin-text">
-                Template
-                <select
-                  value={templateId ?? ""}
-                  onChange={(e) => applyTemplate(e.target.value)}
-                  className={ADMIN_INPUT_CLS}
-                >
-                  {templateId === null && (
-                    <option value="" disabled>
-                      Pick a template
-                    </option>
-                  )}
-                  {templates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.id === BLANK_TEMPLATE_ID ? "Blank" : t.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className="text-sm text-admin-muted">
-                Fields you&apos;ve changed stay as they are; the rest follow the template.
-              </p>
-            </div>
-          )}
-          {preview && preview.problems.length > 0 && (
-            <ul className="mt-3 list-disc rounded-lg border border-amber-300 bg-amber-50 py-2 pr-3 pl-7 text-sm text-amber-900">
-              {preview.problems.map((p) => (
-                <li key={p}>{p}</li>
-              ))}
-            </ul>
-          )}
-          <div className="mt-3 flex justify-center rounded-lg bg-admin-bg p-2">
-            <iframe
-              srcDoc={preview?.html ?? ""}
-              title="Email preview"
-              sandbox=""
-              className={cn(
-                "h-[70vh] rounded-lg border border-admin-border bg-white",
-                width === "desktop" ? "w-full" : "w-93.75 max-w-full",
-              )}
-            />
-          </div>
-        </Card>
+        <CampaignPreviewCard
+          preview={preview}
+          width={width}
+          onWidth={setWidth}
+          showTemplates={editable && templates.length > 0}
+          templates={templates}
+          templateId={templateId}
+          onTemplate={applyTemplate}
+        />
       </div>
 
       {editable && (
-        <div className="sticky bottom-0 z-10 flex flex-col gap-2 rounded-xl border border-admin-border bg-admin-surface py-3 pr-20 pl-4 shadow-sm sm:flex-row sm:items-center sm:justify-between lg:pr-4">
+        <div
+          data-phone-bar="sticky"
+          className="sticky bottom-0 z-10 flex flex-col gap-2 rounded-lg border border-admin-border bg-admin-surface py-3 pr-20 pl-4 shadow-sm sm:flex-row sm:items-center sm:justify-between lg:pr-4"
+        >
           <p className="text-sm text-admin-muted">
             {sendBlocked ??
               (initial.isPreset
@@ -651,34 +605,13 @@ export function CampaignEditor({
       )}
 
       {sends.length > 0 && (
-        <Card>
-          <CardHeader
-            title="Who it went to"
-            description={`${sends.filter((s) => s.status === "sent").length} sent, ${failedCount} failed`}
-            actions={
-              failedCount > 0 && initial.status !== "sending" ? (
-                <AdminButton busy={busy === "retry"} onClick={() => void retryFailed()}>
-                  Retry failed
-                </AdminButton>
-              ) : undefined
-            }
-          />
-          <ul className="mt-3 max-h-112 divide-y divide-admin-border overflow-y-auto rounded-lg border border-admin-border">
-            {sends.map((s) => (
-              <li
-                key={s.id}
-                className="flex flex-col gap-1 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-admin-text">{s.name}</p>
-                  <p className="truncate text-sm text-admin-muted">{s.email}</p>
-                  {s.error && <p className="text-sm text-red-700">{s.error}</p>}
-                </div>
-                <StatusPill tone={SEND_PILL[s.status].tone}>{SEND_PILL[s.status].label}</StatusPill>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <CampaignSendsCard
+          sends={sends}
+          failedCount={failedCount}
+          status={initial.status}
+          retrying={busy === "retry"}
+          onRetry={() => void retryFailed()}
+        />
       )}
 
       {!initial.isPreset && dialog && (
@@ -694,99 +627,6 @@ export function CampaignEditor({
           }}
         />
       )}
-    </div>
-  );
-}
-
-/**
- * Labelled form field.
- * @param props - Component props.
- * @param props.label - Field label.
- * @param props.children - The input.
- * @returns Field element.
- */
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <label className="flex flex-col gap-1 text-sm font-medium text-admin-text">
-      {label}
-      {children}
-    </label>
-  );
-}
-
-/**
- * Explains a locked email: scheduled, sending, sent or failed.
- * @param props - Component props.
- * @param props.campaign - The email.
- * @param props.busy - Which action is running.
- * @param props.onCancelSchedule - Cancels a schedule.
- * @param props.onRefresh - Reloads the page data.
- * @returns Banner element, or null for drafts and presets.
- */
-function StatusBanner({
-  campaign,
-  busy,
-  onCancelSchedule,
-  onRefresh,
-}: {
-  campaign: CampaignRow;
-  busy: string | null;
-  onCancelSchedule: () => void;
-  onRefresh: () => void;
-}): React.ReactElement | null {
-  if (campaign.isPreset || campaign.status === "draft") return null;
-  const box =
-    "flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm";
-
-  if (campaign.status === "scheduled") {
-    return (
-      <div className={cn(box, "border-sky-300 bg-sky-50 text-sky-900")}>
-        <span>
-          Sends {campaign.scheduledAt ? formatDateTimeShort(campaign.scheduledAt) : "soon"}. Cancel
-          the schedule to make changes.
-        </span>
-        <AdminButton
-          size="sm"
-          variant="secondary"
-          busy={busy === "unschedule"}
-          onClick={onCancelSchedule}
-        >
-          Cancel schedule
-        </AdminButton>
-      </div>
-    );
-  }
-  if (campaign.status === "sending") {
-    return (
-      <div className={cn(box, "border-amber-300 bg-amber-50 text-amber-900")}>
-        <span>Sending now. Anything left over is picked up automatically within 15 minutes.</span>
-        <AdminButton size="sm" variant="secondary" onClick={onRefresh}>
-          Refresh
-        </AdminButton>
-      </div>
-    );
-  }
-  return (
-    <div
-      className={cn(
-        box,
-        campaign.status === "sent"
-          ? "border-emerald-300 bg-emerald-50 text-emerald-900"
-          : "border-red-300 bg-red-50 text-red-900",
-      )}
-    >
-      <span>
-        {campaign.status === "sent" ? "Sent" : "Nothing went out"}
-        {campaign.sentAt && ` ${formatDateTimeShort(campaign.sentAt)}`} - {campaign.sentCount} sent
-        {campaign.failedCount > 0 && `, ${campaign.failedCount} failed`}. Duplicate it from the
-        Mailing page to send something similar.
-      </span>
     </div>
   );
 }

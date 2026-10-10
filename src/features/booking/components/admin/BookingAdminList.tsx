@@ -8,9 +8,24 @@
 // The status, search and date range live in the URL (?status=held&q=...), so Back from
 // a booking and the dashboard's deep links land on the same view.
 
+import {
+  ROW_CLS,
+  TABLE_CLS,
+  TBODY_CLS,
+  TD_CLS,
+  TH_CLS,
+  THEAD_CLS,
+} from "@/features/admin/components/ui/admin-table";
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { SEGMENTED_GROUP_CLS } from "@/features/admin/components/ui/chip-classes";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
+import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
+import { SortableTh } from "@/features/admin/components/ui/SortableTh";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
@@ -52,10 +67,6 @@ type SortDir = "asc" | "desc";
 
 /** Rows per "Show more" batch. */
 const BATCH = 25;
-
-/** Shared classes for the search and date inputs. */
-const INPUT_CLS =
-  "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none";
 
 /**
  * Natural date order for a status bucket: work still ahead (confirmed, held)
@@ -230,7 +241,8 @@ export function BookingAdminList({
     return (
       <>
         {b.status === "confirmed" && (
-          <button
+          <AdminButton
+            variant="secondary"
             onClick={() => {
               setPending({
                 id: b.id,
@@ -239,13 +251,13 @@ export function BookingAdminList({
               });
             }}
             disabled={isBusy}
-            className="rounded-lg bg-green-500/20 px-2.5 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-500/30 disabled:opacity-50 max-md:min-h-9"
           >
             Complete
-          </button>
+          </AdminButton>
         )}
         {reviewable && (
-          <button
+          <AdminButton
+            variant="secondary"
             onClick={() =>
               setPending({
                 id: b.id,
@@ -254,17 +266,13 @@ export function BookingAdminList({
               })
             }
             disabled={isBusy}
-            className="rounded-lg bg-moonstone-400/15 px-2.5 py-1.5 text-xs font-medium text-moonstone-700 transition-colors hover:bg-moonstone-400/25 disabled:opacity-50 max-md:min-h-9"
           >
             {b.reviewSentAt ? "Resend review" : "Send review"}
-          </button>
+          </AdminButton>
         )}
-        <Link
-          href={`/admin/bookings/${b.id}`}
-          className="inline-flex items-center rounded-lg bg-russian-violet/10 px-2.5 py-1.5 text-xs font-medium text-russian-violet transition-colors select-none hover:bg-russian-violet/20 max-md:min-h-9"
-        >
+        <AdminButton variant="secondary" href={`/admin/bookings/${b.id}`}>
           View
-        </Link>
+        </AdminButton>
       </>
     );
   }
@@ -279,7 +287,7 @@ export function BookingAdminList({
     if (!b.calendarEventMissingAt || b.status === "cancelled") return null;
     return (
       <span
-        className="mt-1 block text-xs font-medium text-coquelicot-700"
+        className="mt-1 block text-sm font-semibold text-coquelicot-700"
         title="The Google Calendar event was deleted. Reminder emails are paused until this booking is cancelled or re-booked."
       >
         no calendar event
@@ -313,8 +321,7 @@ export function BookingAdminList({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Summary StatCards. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <StatStrip label="Booking totals" className="grid-cols-2 sm:grid-cols-4">
         <StatCard label="Upcoming confirmed" value={stats.upcoming} tone="default" />
         <StatCard label="Completed this month" value={stats.completedThisMonth} tone="success" />
         <StatCard
@@ -323,101 +330,103 @@ export function BookingAdminList({
           tone={stats.cancelledThisMonth > 0 ? "critical" : "default"}
         />
         <StatCard label="Held" value={stats.held} tone={stats.held > 0 ? "warning" : "default"} />
-      </div>
+      </StatStrip>
 
-      {/* Filters + search. */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="inline-flex flex-wrap rounded-lg border border-slate-200 bg-slate-100 p-0.5">
-          {FILTERS.map((f) => {
-            const label = f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1);
-            const count = f === "all" ? bookings.length : counts[f];
-            const isActive = filter === f;
-            return (
-              <button
-                key={f}
-                onClick={() => selectFilter(f)}
-                aria-pressed={isActive}
+      {/* Status buckets. */}
+      <div className={cn(SEGMENTED_GROUP_CLS, "flex-wrap self-start")}>
+        {FILTERS.map((f) => {
+          const label = f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1);
+          const count = f === "all" ? bookings.length : counts[f];
+          const isActive = filter === f;
+          return (
+            <button
+              key={f}
+              onClick={() => selectFilter(f)}
+              aria-pressed={isActive}
+              className={cn(
+                "h-9 rounded-md px-3 text-sm font-semibold transition-colors",
+                isActive
+                  ? "bg-admin-surface text-russian-violet shadow-sm"
+                  : "text-admin-muted hover:text-admin-text",
+              )}
+            >
+              {label}{" "}
+              <span
                 className={cn(
-                  "rounded-md px-3 py-1.5 text-xs font-medium transition-colors max-sm:min-h-9",
-                  isActive
-                    ? "bg-white text-russian-violet shadow-sm"
-                    : "text-slate-500 hover:text-slate-700",
+                  "font-normal",
+                  isActive ? "text-russian-violet/70" : "text-admin-muted",
                 )}
               >
-                {label}{" "}
-                <span className={cn(isActive ? "text-russian-violet/60" : "text-slate-400")}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <input
+      {/* Search and the start-date range. */}
+      <ListToolbar
+        className="mb-0"
+        search={
+          <AdminInput
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search name, email, phone"
-            className={cn(INPUT_CLS, "w-full sm:w-56")}
+            className="h-10"
           />
-          {/* One unit, so "to" can't wrap away from the dates it joins. On a
-              phone the pair shares the row; from sm up each keeps its width. */}
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              aria-label="From date"
-              className={cn(INPUT_CLS, "min-w-0 flex-1 sm:flex-none")}
-            />
-            <span className="text-xs text-slate-400">to</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              aria-label="To date"
-              className={cn(INPUT_CLS, "min-w-0 flex-1 sm:flex-none")}
-            />
-          </div>
-          {searchActive && (
-            <button
-              onClick={clearSearch}
-              className="text-xs font-medium text-slate-500 underline hover:text-slate-700"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-      </div>
+        }
+        filters={
+          <>
+            {/* One unit, so "to" can't wrap away from the dates it joins. On a
+                phone the pair shares the row; from sm up each keeps its width. */}
+            <div className="flex w-full items-center gap-2 sm:w-auto">
+              <AdminInput
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                aria-label="From date"
+                className="h-10 min-w-0 flex-1 sm:w-44 sm:flex-none"
+              />
+              <span className="text-sm text-admin-muted">to</span>
+              <AdminInput
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                aria-label="To date"
+                className="h-10 min-w-0 flex-1 sm:w-44 sm:flex-none"
+              />
+            </div>
+            {searchActive && (
+              <AdminButton variant="ghost" onClick={clearSearch}>
+                Clear
+              </AdminButton>
+            )}
+          </>
+        }
+      />
 
       {filtered.length === 0 ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-400">
-          <p>No bookings found.</p>
-          {searchActive ? (
-            <button
-              onClick={clearSearch}
-              className="font-medium text-russian-violet underline underline-offset-2"
-            >
-              Clear the search
-            </button>
-          ) : (
-            filter !== "all" && (
-              <button
-                onClick={() => selectFilter("all")}
-                className="font-medium text-russian-violet underline underline-offset-2"
-              >
+        <EmptyState
+          title="No bookings found."
+          action={
+            searchActive ? (
+              <AdminButton variant="secondary" onClick={clearSearch}>
+                Clear the search
+              </AdminButton>
+            ) : filter !== "all" ? (
+              <AdminButton variant="secondary" onClick={() => selectFilter("all")}>
                 Show all bookings
-              </button>
-            )
-          )}
-        </div>
+              </AdminButton>
+            ) : undefined
+          }
+        />
       ) : (
         <>
           {/* Phone cards: the five-column table needs about 640px. */}
           <ul className="flex flex-col gap-2 md:hidden">
             {pager.visible.map((b) => (
-              <li key={b.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+              <li key={b.id} className="rounded-lg border border-admin-border bg-admin-surface p-3">
                 <div className="flex items-start justify-between gap-2">
                   <Link
                     href={`/admin/bookings/${b.id}`}
@@ -427,17 +436,19 @@ export function BookingAdminList({
                   </Link>
                   <StatusPill tone={STATUS_TONE[b.status]}>{b.status}</StatusPill>
                 </div>
-                <p className="mt-1 text-sm text-slate-600">{formatDateTimeShort(b.startAt)}</p>
+                <p className="mt-1 text-sm text-admin-text-secondary">
+                  {formatDateTimeShort(b.startAt)}
+                </p>
                 {b.phone && (
                   <a
                     href={`tel:${b.phone}`}
-                    className="text-sm text-slate-500 hover:text-slate-700"
+                    className="text-sm text-admin-muted hover:text-admin-text"
                   >
                     {b.phone}
                   </a>
                 )}
                 {b.quotedLow != null && b.quotedHigh != null && (
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm text-admin-muted">
                     Quoted {formatQuotedRange(b.quotedLow, b.quotedHigh, b.quotedTravel)}
                   </p>
                 )}
@@ -446,61 +457,71 @@ export function BookingAdminList({
               </li>
             ))}
           </ul>
-          <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-160 text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-                  <SortHeader
+          <div className="hidden overflow-x-auto rounded-lg border border-admin-border md:block">
+            <table className={cn(TABLE_CLS, "min-w-160")}>
+              <thead className={THEAD_CLS}>
+                <tr>
+                  <SortableTh
                     label="Customer"
                     active={sortKey === "name"}
                     dir={sortDir}
-                    onClick={() => toggleSort("name")}
+                    onSort={() => toggleSort("name")}
                   />
-                  <SortHeader
+                  <SortableTh
                     label="When"
                     active={sortKey === "start"}
                     dir={sortDir}
-                    onClick={() => toggleSort("start")}
+                    onSort={() => toggleSort("start")}
                   />
-                  <SortHeader
+                  <SortableTh
                     label="Status"
                     active={sortKey === "status"}
                     dir={sortDir}
-                    onClick={() => toggleSort("status")}
+                    onSort={() => toggleSort("status")}
                   />
-                  <th className="px-3 py-2 font-semibold">Quoted</th>
-                  <th className="px-3 py-2 text-right font-semibold">Actions</th>
+                  <th className={TH_CLS}>Quoted</th>
+                  <th className={cn(TH_CLS, "text-right")}>Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className={TBODY_CLS}>
                 {pager.visible.map((b) => {
                   return (
-                    <tr key={b.id} className="border-b border-slate-100 last:border-0">
-                      <td className="px-3 py-3 align-top">
+                    <tr key={b.id} className={ROW_CLS}>
+                      <td className={cn(TD_CLS, "align-top")}>
                         <Link
                           href={`/admin/bookings/${b.id}`}
                           className="font-semibold text-russian-violet hover:underline"
                         >
                           {b.name}
                         </Link>
-                        <div className="text-xs break-all text-slate-500">{b.email}</div>
-                        {b.phone && <div className="text-xs text-slate-500">{b.phone}</div>}
+                        <div className="text-sm break-all text-admin-muted">{b.email}</div>
+                        {b.phone && <div className="text-sm text-admin-muted">{b.phone}</div>}
                       </td>
-                      <td className="px-3 py-3 align-top whitespace-nowrap text-slate-600">
+                      <td
+                        className={cn(
+                          TD_CLS,
+                          "align-top whitespace-nowrap text-admin-text-secondary",
+                        )}
+                      >
                         {formatDateTimeShort(b.startAt)}
                       </td>
-                      <td className="px-3 py-3 align-top">
+                      <td className={cn(TD_CLS, "align-top")}>
                         <StatusPill tone={STATUS_TONE[b.status]}>{b.status}</StatusPill>
                         {renderMissingEvent(b)}
                       </td>
-                      <td className="px-3 py-3 align-top whitespace-nowrap text-slate-600">
+                      <td
+                        className={cn(
+                          TD_CLS,
+                          "align-top whitespace-nowrap text-admin-text-secondary",
+                        )}
+                      >
                         {b.quotedLow != null && b.quotedHigh != null ? (
                           formatQuotedRange(b.quotedLow, b.quotedHigh, b.quotedTravel)
                         ) : (
-                          <span className="text-slate-300">-</span>
+                          <span className="text-admin-muted">-</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-right align-top">
+                      <td className={cn(TD_CLS, "text-right align-top")}>
                         <div className="flex flex-wrap justify-end gap-2">{renderActions(b)}</div>
                       </td>
                     </tr>
@@ -533,41 +554,5 @@ export function BookingAdminList({
         onCancel={() => busyId === null && setPending(null)}
       />
     </div>
-  );
-}
-
-/**
- * A sortable table header cell.
- * @param props - Component props.
- * @param props.label - Column label.
- * @param props.active - Whether this column is the active sort.
- * @param props.dir - Current sort direction.
- * @param props.onClick - Click handler to toggle/select the sort.
- * @returns The header cell element.
- */
-function SortHeader({
-  label,
-  active,
-  dir,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  dir: SortDir;
-  onClick: () => void;
-}): React.ReactElement {
-  return (
-    <th className="px-3 py-2 font-semibold">
-      <button
-        onClick={onClick}
-        className={cn(
-          "inline-flex items-center gap-1 transition-colors hover:text-slate-700",
-          active && "text-russian-violet",
-        )}
-      >
-        {label}
-        <span className="text-[0.65rem]">{active ? (dir === "asc" ? "▲" : "▼") : ""}</span>
-      </button>
-    </th>
   );
 }

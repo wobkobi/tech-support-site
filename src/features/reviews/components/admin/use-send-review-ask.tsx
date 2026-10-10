@@ -143,7 +143,7 @@ export function useSendReviewAsk(onSent?: (target: ReviewAskTarget) => void): Se
           <iframe
             srcDoc={state.html}
             title="Email preview"
-            className="h-[60vh] w-full rounded-lg border border-slate-200"
+            className="h-[60vh] w-full rounded-lg border border-admin-border"
             sandbox="allow-same-origin"
           />
         ) : (
@@ -170,7 +170,7 @@ export function useSendReviewAsk(onSent?: (target: ReviewAskTarget) => void): Se
           </>
         }
       >
-        <p className="text-sm leading-relaxed whitespace-pre-line text-slate-700">
+        <p className="text-sm leading-relaxed whitespace-pre-line text-admin-text">
           {state.kind === "sms" && state.text !== null ? state.text : "Writing the text..."}
         </p>
       </Modal>

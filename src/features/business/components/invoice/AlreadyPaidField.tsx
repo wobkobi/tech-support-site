@@ -4,7 +4,10 @@
 // by the calculator and the invoice edit page. The method never shows on the invoice; it
 // only decides how the income entry is recorded.
 
-import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import {
+  SEGMENTED_GROUP_CLS,
+  segmentedButtonClass,
+} from "@/features/admin/components/ui/chip-classes";
 import {
   ALREADY_PAID_METHODS,
   alreadyPaidAmount,
@@ -27,6 +30,8 @@ interface Props {
   coversNote: string;
   /** Field label; defaults to "Already paid". */
   label?: string;
+  /** Classes for the label, so it matches the surrounding form's labels. */
+  labelClassName?: string;
   /** Words before the remaining amount; defaults to "Balance due". */
   balanceLabel?: string;
   /** What `total` is called in the over-the-amount warning; defaults to "the total". */
@@ -43,6 +48,7 @@ interface Props {
  * @param props.inputClassName - Classes for the amount input.
  * @param props.coversNote - Hint shown when the amount covers the whole total.
  * @param props.label - Field label; defaults to "Already paid".
+ * @param props.labelClassName - Classes for the label; defaults to a plain medium-weight label.
  * @param props.balanceLabel - Words before the remaining amount; defaults to "Balance due".
  * @param props.totalName - What `total` is called in the over-the-amount warning.
  * @returns The field element.
@@ -55,6 +61,7 @@ export function AlreadyPaidField({
   inputClassName,
   coversNote,
   label = "Already paid",
+  labelClassName = "block text-sm font-medium",
   balanceLabel = "Balance due",
   totalName = "the total",
 }: Props): React.ReactElement {
@@ -65,7 +72,7 @@ export function AlreadyPaidField({
 
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-sm font-medium">
+      <label htmlFor={id} className={labelClassName}>
         {label}
       </label>
       <div className="flex flex-wrap items-center gap-2">
@@ -79,18 +86,21 @@ export function AlreadyPaidField({
           disabled={disabled}
           className={cn(inputClassName, "w-28 flex-none")}
         />
-        <div className="flex gap-2">
+        {/* Segmented toggle, the same look as the schedule's Short/Long switch, so the
+            selected method never reads as a second coquelicot primary beside Save. */}
+        <div className={SEGMENTED_GROUP_CLS}>
           {ALREADY_PAID_METHODS.map((m) => (
-            <AdminButton
+            <button
               key={m}
-              size="sm"
+              type="button"
               aria-label={value.method === m ? `Paid by ${m} (selected)` : `Paid by ${m}`}
-              variant={value.method === m ? "primary" : "secondary"}
+              aria-pressed={value.method === m}
               disabled={disabled}
               onClick={() => onChange({ ...value, method: m })}
+              className={segmentedButtonClass(value.method === m)}
             >
               {m}
-            </AdminButton>
+            </button>
           ))}
         </div>
       </div>

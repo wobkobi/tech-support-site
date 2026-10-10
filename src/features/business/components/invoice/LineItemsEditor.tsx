@@ -1,12 +1,13 @@
 "use client";
 // src/features/business/components/invoice/LineItemsEditor.tsx
-// Editable list of invoice line items: description, qty, unit price, with `lineTotal`
-// auto-derived (qty x unitPrice, rounded to cents) as the operator types. Add/remove
-// rows. Purely controlled - the parent owns the array and validates it (mirroring
+// Editable list of invoice line items: description, qty, unit price, with every row's
+// `lineTotal` re-derived through withSplitLineTotals as the operator types, adds or removes a
+// row. Purely controlled - the parent owns the array and validates it (mirroring
 // isValidLineItem) before persisting.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { formatNZD } from "@/features/business/lib/business";
+import { REMOVE_ROW_CLS } from "@/features/business/components/calculator/calculator-classes";
+import { formatNZD, withSplitLineTotals } from "@/features/business/lib/business";
 import type { LineItem } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -24,16 +25,6 @@ interface LineItemsEditorProps {
 
 const INPUT_CLS =
   "rounded-lg border border-admin-border-strong bg-admin-surface px-2.5 py-2 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
-
-/**
- * Rounds a derived line total to cents.
- * @param qty - Quantity.
- * @param unitPrice - Unit price.
- * @returns qty x unitPrice, rounded to 2dp.
- */
-function deriveLineTotal(qty: number, unitPrice: number): number {
-  return Math.round(qty * unitPrice * 100) / 100;
-}
 
 /**
  * Parses a numeric input value, treating blank/garbage as 0.
@@ -65,29 +56,28 @@ export function LineItemsEditor({
    */
   function updateRow(idx: number, patch: Partial<LineItem>): void {
     onChange(
-      items.map((item, i) => {
-        if (i !== idx) return item;
-        const merged = { ...item, ...patch };
-        // This editor works in decimal quantities. A hand-typed qty on a row
-        // that carried billed minutes has to rewrite them, or the stale minutes
-        // would keep printing the old h:mm while the total moved.
-        const minutes =
-          patch.qty !== undefined && merged.minutes != null
-            ? Math.round(merged.qty * 60)
-            : merged.minutes;
-        return {
-          ...merged,
-          ...(minutes != null && { minutes }),
-          lineTotal: deriveLineTotal(merged.qty, merged.unitPrice),
-        };
-      }),
+      withSplitLineTotals(
+        items.map((item, i) => {
+          if (i !== idx) return item;
+          const merged = { ...item, ...patch };
+          // This editor works in decimal quantities. A hand-typed qty on a row
+          // that carried billed minutes has to rewrite them, or the stale minutes
+          // would keep printing the old h:mm while the total moved.
+          const minutes =
+            patch.qty !== undefined && merged.minutes != null
+              ? Math.round(merged.qty * 60)
+              : merged.minutes;
+          return { ...merged, ...(minutes != null && { minutes }) };
+        }),
+      ),
     );
   }
 
   return (
     <div className="space-y-2">
-      {/* Column headers (sm+ only; the mobile rows carry inline labels). */}
-      <div className="hidden gap-2 px-1 text-xs font-semibold text-admin-muted sm:grid sm:grid-cols-[1fr_5rem_7rem_6rem_2rem]">
+      {/* Column headers (sm+ only; the phone rows carry their own labels). Keep the
+          columns in step with the row grid below. */}
+      <div className="hidden gap-2 px-1 text-sm font-semibold text-admin-muted sm:grid sm:grid-cols-[1fr_5rem_7rem_6rem_2.75rem]">
         <span>Description</span>
         <span className="text-right">Qty</span>
         <span className="text-right">Unit price</span>
@@ -104,7 +94,7 @@ export function LineItemsEditor({
       {items.map((item, idx) => (
         <div
           key={idx}
-          className="grid grid-cols-[1fr_2rem] items-center gap-2 sm:grid-cols-[1fr_5rem_7rem_6rem_2rem]"
+          className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_2.75rem] items-end gap-2 sm:grid-cols-[1fr_5rem_7rem_6rem_2.75rem] sm:items-center"
         >
           <input
             type="text"
@@ -112,38 +102,44 @@ export function LineItemsEditor({
             onChange={(e) => updateRow(idx, { description: e.target.value })}
             placeholder="Description"
             disabled={disabled}
-            className={cn("col-span-2 sm:col-span-1", INPUT_CLS)}
+            className={cn("col-span-4 sm:col-span-1", INPUT_CLS)}
             aria-label={`Line ${idx + 1} description`}
           />
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.25"
-            value={item.qty}
-            onChange={(e) => updateRow(idx, { qty: parseNum(e.target.value) })}
-            disabled={disabled}
-            className={cn("text-right", INPUT_CLS)}
-            aria-label={`Line ${idx + 1} quantity`}
-          />
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            value={item.unitPrice}
-            onChange={(e) => updateRow(idx, { unitPrice: parseNum(e.target.value) })}
-            disabled={disabled}
-            className={cn("text-right", INPUT_CLS)}
-            aria-label={`Line ${idx + 1} unit price`}
-          />
-          <span className="px-1 text-right text-sm font-semibold whitespace-nowrap text-admin-text">
+          <label className="flex min-w-0 flex-col gap-1">
+            <span className="text-sm font-semibold text-admin-muted sm:hidden">Qty</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.25"
+              value={item.qty}
+              onChange={(e) => updateRow(idx, { qty: parseNum(e.target.value) })}
+              disabled={disabled}
+              className={cn("text-right", INPUT_CLS)}
+              aria-label={`Line ${idx + 1} quantity`}
+            />
+          </label>
+          <label className="flex min-w-0 flex-col gap-1">
+            <span className="text-sm font-semibold text-admin-muted sm:hidden">Unit price</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              value={item.unitPrice}
+              onChange={(e) => updateRow(idx, { unitPrice: parseNum(e.target.value) })}
+              disabled={disabled}
+              className={cn("text-right", INPUT_CLS)}
+              aria-label={`Line ${idx + 1} unit price`}
+            />
+          </label>
+          <span className="flex h-10 items-center justify-end px-1 text-sm font-semibold whitespace-nowrap text-admin-text">
             {formatNZD(item.lineTotal)}
           </span>
           <button
             type="button"
-            onClick={() => onChange(items.filter((_, i) => i !== idx))}
+            onClick={() => onChange(withSplitLineTotals(items.filter((_, i) => i !== idx)))}
             disabled={disabled}
             aria-label={`Remove line ${idx + 1}`}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-admin-faint hover:bg-admin-bg hover:text-coquelicot-600 disabled:opacity-50"
+            className={REMOVE_ROW_CLS}
           >
             <FaXmark className="h-4 w-4" aria-hidden />
           </button>

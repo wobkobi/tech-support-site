@@ -9,7 +9,12 @@
 // match what customers can actually book.
 
 import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
-import { cn } from "@/shared/lib/cn";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { Card } from "@/features/admin/components/ui/Card";
+import {
+  SEGMENTED_GROUP_CLS,
+  segmentedButtonClass,
+} from "@/features/admin/components/ui/chip-classes";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
@@ -138,22 +143,17 @@ export function ScheduleFindTimes(): React.ReactElement {
       : [];
 
   return (
-    <div className="mb-3 rounded-lg border border-slate-200 bg-white p-3">
+    <Card padding="sm" className="mb-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="text-sm font-semibold text-slate-700">Next open times</span>
+        <span className="text-sm font-bold text-admin-text">Next open times</span>
 
-        <div className="inline-flex rounded-lg border border-slate-200 p-0.5">
+        <div className={SEGMENTED_GROUP_CLS}>
           {(["short", "long"] as const).map((d) => (
             <button
               key={d}
               type="button"
               onClick={() => setDuration(d)}
-              className={cn(
-                "rounded-md px-3 py-1 text-sm font-semibold transition-colors",
-                duration === d
-                  ? "bg-russian-violet text-white"
-                  : "text-slate-600 hover:bg-slate-100",
-              )}
+              className={segmentedButtonClass(duration === d)}
             >
               {d === "short" ? "Short" : "Long"}
             </button>
@@ -161,7 +161,7 @@ export function ScheduleFindTimes(): React.ReactElement {
         </div>
 
         <div ref={addressWrapRef} className="relative w-full sm:w-auto">
-          <input
+          <AdminInput
             type="text"
             value={address}
             onChange={(e) => {
@@ -173,10 +173,10 @@ export function ScheduleFindTimes(): React.ReactElement {
               setContactsOpen(true);
             }}
             placeholder="Customer address (optional)"
-            className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm placeholder:text-slate-400 sm:w-56"
+            className="h-10 sm:w-56"
           />
           {contactMatches.length > 0 && (
-            <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg sm:w-72">
+            <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-admin-border bg-admin-surface py-1 shadow-lg sm:w-72">
               {contactMatches.map((c) => (
                 <li key={c.id}>
                   <button
@@ -185,10 +185,10 @@ export function ScheduleFindTimes(): React.ReactElement {
                       setAddress(c.address ?? "");
                       setContactsOpen(false);
                     }}
-                    className="block w-full px-3 py-1.5 text-left text-sm hover:bg-slate-100"
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-admin-bg"
                   >
-                    <span className="font-medium text-slate-700">{c.name}</span>
-                    <span className="block truncate text-xs text-slate-400">{c.address}</span>
+                    <span className="font-semibold text-admin-text">{c.name}</span>
+                    <span className="block truncate text-sm text-admin-muted">{c.address}</span>
                   </button>
                 </li>
               ))}
@@ -199,10 +199,10 @@ export function ScheduleFindTimes(): React.ReactElement {
         {/* Full row on a phone, so the times start at the left edge instead of
             wrapping into whatever space the address input leaves. */}
         <div className="flex basis-full flex-wrap items-center gap-1.5 sm:flex-1 sm:basis-auto">
-          {loading && <span className="text-sm text-slate-400">Finding...</span>}
+          {loading && <span className="text-sm text-admin-muted">Finding...</span>}
           {!loading && error && <span className="text-sm text-red-600">{error}</span>}
           {!loading && !error && slots?.length === 0 && (
-            <span className="text-sm text-slate-400">
+            <span className="text-sm text-admin-muted">
               {debouncedAddress
                 ? "No times that fit the drive."
                 : "No openings in the next few weeks."}
@@ -221,11 +221,11 @@ export function ScheduleFindTimes(): React.ReactElement {
                 title={
                   slot.driveNote ? `${slot.driveNote} from your previous job` : "Book this time"
                 }
-                className="inline-flex items-center gap-1.5 rounded-md bg-russian-violet/10 px-2.5 py-1 text-sm font-medium text-russian-violet hover:bg-russian-violet/20"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-russian-violet/10 px-3 py-1 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20 pointer-coarse:min-h-11"
               >
                 {slot.dayLabel} · {slot.timeLabel}
                 {slot.driveNote && (
-                  <span className="text-xs font-normal text-russian-violet/70">
+                  <span className="text-sm font-normal text-russian-violet/80">
                     ({slot.driveNote})
                   </span>
                 )}
@@ -244,6 +244,6 @@ export function ScheduleFindTimes(): React.ReactElement {
           }}
         />
       )}
-    </div>
+    </Card>
   );
 }

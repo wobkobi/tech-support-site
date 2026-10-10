@@ -1,25 +1,29 @@
 "use client";
 // src/features/admin/components/AdminSidebar.tsx
-// Admin navigation sidebar. Fixed on the left at lg+; below lg it collapses behind a
-// hamburger and slides in as a drawer over a backdrop, auto-closing on navigation. Auth
+// Admin navigation sidebar, controlled by AdminShell. Fixed on the left at lg+, where it
+// can collapse to an icon rail; below lg it slides in as a drawer over a backdrop. Auth
 // rides the admin session cookie, so no token threads through the hrefs.
 
+import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
+import { useDialogKeys } from "@/features/admin/hooks/use-dialog-keys";
+import { signOut } from "@/features/admin/lib/sign-out";
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type React from "react";
-import { useState } from "react";
+import { useRef } from "react";
 import {
   FaAddressBook,
   FaArrowRightFromBracket,
   FaArrowTrendUp,
   FaArrowUpRightFromSquare,
-  FaBars,
   FaBell,
+  FaBoxesStacked,
   FaBriefcase,
   FaCalculator,
   FaCalendarDays,
   FaCalendarWeek,
+  FaCar,
   FaEnvelope,
   FaFileInvoiceDollar,
   FaGaugeHigh,
@@ -28,6 +32,7 @@ import {
   FaMagnifyingGlassDollar,
   FaReceipt,
   FaRoute,
+  FaScaleBalanced,
   FaShareNodes,
   FaStar,
   FaTags,
@@ -45,6 +50,9 @@ type AdminPage =
   | "business"
   | "business-income"
   | "business-expenses"
+  | "business-tax"
+  | "business-assets"
+  | "business-trips"
   | "business-invoices"
   | "business-calculator"
   | "business-quick"
@@ -59,6 +67,8 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   path: string;
+  /** Left out of the phone menu: a desk job, not done on a phone. The page still opens from a link. */
+  desktopOnly?: boolean;
 }
 
 // Ordered by how often each page is opened: the day's jobs first, then the
@@ -109,11 +119,13 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 // Overview heads the group; the rest follow the billing flow: price the job,
-// invoice it, then the ledger it lands in.
+// invoice it, then the ledger it lands in and the tax on it, then the gear the
+// business owns and the km it drives.
 const BUSINESS_NAV_ITEMS: NavItem[] = [
   {
     page: "business",
     label: "Overview",
+    desktopOnly: true,
     icon: <FaBriefcase className="shrink-0" />,
     path: "/admin/business",
   },
@@ -147,6 +159,26 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
     icon: <FaReceipt className="shrink-0" />,
     path: "/admin/business/expenses",
   },
+  {
+    page: "business-tax",
+    label: "Tax",
+    icon: <FaScaleBalanced className="shrink-0" />,
+    path: "/admin/business/tax",
+    desktopOnly: true,
+  },
+  {
+    page: "business-assets",
+    label: "Assets",
+    icon: <FaBoxesStacked className="shrink-0" />,
+    path: "/admin/business/assets",
+    desktopOnly: true,
+  },
+  {
+    page: "business-trips",
+    label: "Trips",
+    icon: <FaCar className="shrink-0" />,
+    path: "/admin/business/trips",
+  },
 ];
 
 const PROMOS_NAV_ITEM: NavItem = {
@@ -161,6 +193,7 @@ const MAILING_NAV_ITEM: NavItem = {
   label: "Mailing list",
   icon: <FaEnvelope className="shrink-0" />,
   path: "/admin/mailing",
+  desktopOnly: true,
 };
 
 const SOCIAL_NAV_ITEM: NavItem = {
@@ -168,6 +201,7 @@ const SOCIAL_NAV_ITEM: NavItem = {
   label: "Social posts",
   icon: <FaShareNodes className="shrink-0" />,
   path: "/admin/social",
+  desktopOnly: true,
 };
 
 const NOTIFICATIONS_NAV_ITEM: NavItem = {
@@ -183,6 +217,18 @@ const SETTINGS_NAV_ITEM: NavItem = {
   icon: <FaGear className="shrink-0" />,
   path: "/admin/settings",
 };
+
+/** The occasional tools listed under the divider, in order. */
+const TOOL_NAV_ITEMS: NavItem[] = [
+  PROMOS_NAV_ITEM,
+  MAILING_NAV_ITEM,
+  SOCIAL_NAV_ITEM,
+  NOTIFICATIONS_NAV_ITEM,
+  SETTINGS_NAV_ITEM,
+];
+
+/** Every nav path, for {@link activeNavPath}. */
+const ALL_NAV_PATHS = [...NAV_ITEMS, ...BUSINESS_NAV_ITEMS, ...TOOL_NAV_ITEMS].map((i) => i.path);
 
 /**
  * The nav path that best matches the current pathname: exact for the dashboard
@@ -203,195 +249,205 @@ function activeNavPath(pathname: string, paths: string[]): string | null {
 }
 
 /**
- * Admin navigation sidebar. On `lg+` (≥1024px) it stays fixed on the left at
- * all times. Below `lg` it collapses behind a hamburger button and slides in
- * as a drawer over a backdrop, so phone-width admin pages get the full
- * viewport for content. The drawer auto-closes when the user navigates to a
- * different route. The active item is derived from the current pathname. Auth
- * is carried by the admin session cookie - no token threading through hrefs.
+ * Classes for one sidebar row (nav link or footer action). The active row's
+ * moonstone rule is a pseudo-element, so the label does not shift when it
+ * appears. Collapsed rows centre the icon; the collapse only applies at lg+,
+ * so the phone drawer always shows full labels.
+ * @param active - Whether the row is the current page.
+ * @param collapsed - Whether the desktop sidebar is collapsed to icons.
+ * @returns Class string.
+ */
+function rowClasses(active: boolean, collapsed: boolean): string {
+  return cn(
+    "relative flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[0.9375rem] font-semibold transition-colors select-none",
+    active
+      ? "bg-white/10 text-white before:absolute before:inset-y-2 before:left-0 before:w-0.75 before:rounded-r-sm before:bg-moonstone-400"
+      : "text-white/75 hover:bg-white/10 hover:text-white",
+    collapsed && "lg:justify-center lg:px-0",
+  );
+}
+
+/**
+ * Row label. Collapsed at lg+ it stays in the accessibility tree (sr-only) so the
+ * row keeps its accessible name while only the icon shows.
+ * @param props - Component props.
+ * @param props.collapsed - Whether the desktop sidebar is collapsed to icons.
+ * @param props.children - Label text.
+ * @returns The label element.
+ */
+function RowLabel({
+  collapsed,
+  children,
+}: {
+  collapsed: boolean;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return <span className={cn("whitespace-nowrap", collapsed && "lg:sr-only")}>{children}</span>;
+}
+
+/** Props for {@link AdminSidebar}. */
+interface AdminSidebarProps {
+  /** Whether the phone drawer is open (below lg). */
+  drawerOpen: boolean;
+  /** Closes the drawer; `returnFocus` sends focus back to the top bar's menu button. */
+  onDrawerClose: (returnFocus: boolean) => void;
+  /** Whether the desktop sidebar is collapsed to an icon rail (lg+ only). */
+  collapsed: boolean;
+  /** The drawer's close button, focused by AdminShell when the drawer opens. */
+  closeButtonRef: React.Ref<HTMLButtonElement>;
+}
+
+/**
+ * Admin navigation sidebar. On `lg+` (>=1024px) it stays fixed on the left,
+ * full width or collapsed to icons. Below `lg` it is a drawer that slides in
+ * over a backdrop; Escape, the close button or the backdrop dismiss it, and
+ * Tab stays inside it while open. Following a link closes it too. The active
+ * item is derived from the current pathname.
+ * @param props - Component props.
+ * @param props.drawerOpen - Whether the phone drawer is open.
+ * @param props.onDrawerClose - Closes the drawer, optionally returning focus to the menu button.
+ * @param props.collapsed - Whether the desktop sidebar is collapsed to icons.
+ * @param props.closeButtonRef - Ref for the drawer's close button.
  * @returns Sidebar element with mobile drawer behaviour.
  */
-export function AdminSidebar(): React.ReactElement {
+export function AdminSidebar({
+  drawerOpen,
+  onDrawerClose,
+  collapsed,
+  closeButtonRef,
+}: AdminSidebarProps): React.ReactElement {
   const pathname = usePathname();
   const router = useRouter();
-  const active = activeNavPath(
-    pathname,
-    [
-      ...NAV_ITEMS,
-      ...BUSINESS_NAV_ITEMS,
-      PROMOS_NAV_ITEM,
-      MAILING_NAV_ITEM,
-      SOCIAL_NAV_ITEM,
-      NOTIFICATIONS_NAV_ITEM,
-      SETTINGS_NAV_ITEM,
-    ].map((i) => i.path),
-  );
-  // Pairing the drawer state with the pathname auto-closes it on navigation
-  // without a setState-in-effect (which the React lint rule rejects).
-  const [state, setState] = useState<{ open: boolean; pathname: string }>({
-    open: false,
-    pathname,
-  });
-  const open = state.open && state.pathname === pathname;
-  /**
-   * Open or close the drawer, anchoring the state to the current pathname so
-   * subsequent navigations auto-close it without a setState-in-effect.
-   * @param next - Target open state.
-   * @returns void
-   */
-  const setOpen = (next: boolean): void => setState({ open: next, pathname });
+  const asideRef = useRef<HTMLElement>(null);
+  const active = activeNavPath(pathname, ALL_NAV_PATHS);
+
+  useDialogKeys(asideRef, drawerOpen, () => onDrawerClose(true));
 
   /**
-   * Signs the operator out by clearing the session cookie on the server, then
-   * navigates to /admin/login. Errors are swallowed - the cookie either
-   * clears or the redirect itself ends the session client-side.
+   * Renders one nav link with the active styling and the collapsed tooltip.
+   * @param item - The nav item.
+   * @param item.page - Page key, used as the React key.
+   * @param item.label - Visible label, also the collapsed tooltip.
+   * @param item.icon - Leading icon.
+   * @param item.path - Link target, compared against the active path.
+   * @param item.desktopOnly - Hide the link on phones.
+   * @returns The link element.
    */
-  async function handleSignOut(): Promise<void> {
-    try {
-      await fetch("/api/admin/logout", {
-        method: "POST",
-        credentials: "same-origin",
-      });
-    } catch {
-      /* ignore - redirect still happens */
-    }
-    router.push("/admin/login");
-    router.refresh();
+  function navLink({ page, label, icon, path, desktopOnly }: NavItem): React.ReactElement {
+    const isActive = active === path;
+    return (
+      <Link
+        key={page}
+        href={path}
+        onClick={() => onDrawerClose(false)}
+        aria-current={isActive ? "page" : undefined}
+        title={collapsed ? label : undefined}
+        className={cn(rowClasses(isActive, collapsed), desktopOnly && "max-md:hidden")}
+      >
+        {icon}
+        <RowLabel collapsed={collapsed}>{label}</RowLabel>
+      </Link>
+    );
   }
 
   return (
     <>
-      {/* Mobile top bar - only rendered below lg. A solid bar rather than a floating
-          button, so scrolled content passes under it instead of colliding with it. */}
-      <div className="fixed inset-x-0 top-0 z-30 flex h-14 items-center border-b border-admin-border bg-admin-surface px-3 lg:hidden print:hidden">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Open menu"
-          aria-expanded={open}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-russian-violet text-white"
-        >
-          <FaBars className="text-base" />
-        </button>
-      </div>
-
       {/* Mobile backdrop - visible only when drawer is open. */}
       <div
-        onClick={() => setOpen(false)}
+        onClick={() => onDrawerClose(true)}
         aria-hidden
         className={cn(
           "fixed inset-0 z-30 bg-black/40 transition-opacity lg:hidden print:hidden",
-          open ? "opacity-100" : "pointer-events-none opacity-0",
+          drawerOpen ? "opacity-100" : "pointer-events-none opacity-0",
         )}
       />
 
       <aside
+        ref={asideRef}
+        id="admin-sidebar"
+        data-open={drawerOpen || undefined}
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-56 flex-col bg-russian-violet lg:translate-x-0 print:hidden",
-          // `.app-admin-drawer` (globals.css) owns the translate transition.
+          "fixed inset-y-0 left-0 z-40 flex w-56 flex-col overflow-hidden bg-russian-violet lg:translate-x-0 print:hidden",
+          // `.app-admin-drawer` (globals.css) owns the translate and width transitions,
+          // and below lg hides the closed drawer (no data-open) so Tab skips it.
           "app-admin-drawer",
-          open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          collapsed && "lg:w-16",
+          drawerOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
-        {/* Brand */}
-        <div className="flex items-start justify-between border-b border-white/10 px-5 py-5">
+        {/* Brand. Collapsed, only the eyebrow stays. */}
+        <div
+          className={cn(
+            "flex items-center justify-between border-b border-white/10 px-5 py-4",
+            collapsed && "lg:justify-center lg:px-0",
+          )}
+        >
           <div>
-            <p className="text-xs font-semibold tracking-widest text-white/40 uppercase">Admin</p>
-            <p className="mt-0.5 text-sm font-bold text-white">To the Point</p>
+            <p className={cn(ADMIN_EYEBROW_CLS, "text-moonstone-300")}>Admin</p>
+            <p
+              className={cn(
+                "mt-0.5 text-base font-extrabold whitespace-nowrap text-white",
+                collapsed && "lg:hidden",
+              )}
+            >
+              To the Point
+            </p>
           </div>
           {/* Close button - only rendered below lg. */}
           <button
+            ref={closeButtonRef}
             type="button"
-            onClick={() => setOpen(false)}
+            onClick={() => onDrawerClose(true)}
             aria-label="Close menu"
-            className="inline-flex h-8 w-8 items-center justify-center rounded text-white/60 hover:bg-white/10 hover:text-white lg:hidden"
+            className="-mr-3 inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/75 hover:bg-white/10 hover:text-white lg:hidden"
           >
-            <FaXmark />
+            <FaXmark aria-hidden />
           </button>
         </div>
 
         {/* Nav */}
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
-          {NAV_ITEMS.map(({ page, label, icon, path }) => (
-            <Link
-              key={page}
-              href={path}
-              onClick={() => setOpen(false)}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors select-none",
-                active === path
-                  ? "bg-white/15 text-white"
-                  : "text-white/60 hover:bg-white/10 hover:text-white/90",
-              )}
-            >
-              {icon}
-              {label}
-            </Link>
-          ))}
+        <nav aria-label="Admin" className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
+          {NAV_ITEMS.map(navLink)}
 
-          <p className="mt-4 mb-1 px-3 text-xs font-semibold tracking-widest text-white/30 uppercase">
+          {/* Collapsed, the heading is read by screen readers only and a rule marks the group. */}
+          <p
+            className={cn(
+              ADMIN_EYEBROW_CLS,
+              "mt-4 mb-1 px-3 text-moonstone-300",
+              collapsed && "lg:sr-only",
+            )}
+          >
             Business
           </p>
-          {BUSINESS_NAV_ITEMS.map(({ page, label, icon, path }) => (
-            <Link
-              key={page}
-              href={path}
-              onClick={() => setOpen(false)}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors select-none",
-                active === path
-                  ? "bg-white/15 text-white"
-                  : "text-white/60 hover:bg-white/10 hover:text-white/90",
-              )}
-            >
-              {icon}
-              {label}
-            </Link>
-          ))}
+          {collapsed && (
+            <div aria-hidden className="my-2 hidden border-t border-white/10 lg:block" />
+          )}
+          {BUSINESS_NAV_ITEMS.map(navLink)}
 
           <div className="my-2 border-t border-white/10" />
 
-          {[
-            PROMOS_NAV_ITEM,
-            MAILING_NAV_ITEM,
-            SOCIAL_NAV_ITEM,
-            NOTIFICATIONS_NAV_ITEM,
-            SETTINGS_NAV_ITEM,
-          ].map(({ page, label, icon, path }) => (
-            <Link
-              key={page}
-              href={path}
-              onClick={() => setOpen(false)}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors select-none",
-                active === path
-                  ? "bg-white/15 text-white"
-                  : "text-white/60 hover:bg-white/10 hover:text-white/90",
-              )}
-            >
-              {icon}
-              {label}
-            </Link>
-          ))}
+          {TOOL_NAV_ITEMS.map(navLink)}
         </nav>
 
         {/* Footer - link back to the public site + sign-out trigger. */}
         <div className="flex flex-col gap-1 border-t border-white/10 px-3 py-3">
           <Link
             href="/"
-            onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors select-none hover:bg-white/10 hover:text-white/90"
+            onClick={() => onDrawerClose(false)}
+            title={collapsed ? "Back to site" : undefined}
+            className={rowClasses(false, collapsed)}
           >
             <FaArrowUpRightFromSquare className="shrink-0" />
-            Back to site
+            <RowLabel collapsed={collapsed}>Back to site</RowLabel>
           </Link>
           <button
             type="button"
-            onClick={() => void handleSignOut()}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors select-none hover:bg-white/10 hover:text-white/90"
+            onClick={() => void signOut(router)}
+            title={collapsed ? "Sign out" : undefined}
+            className={rowClasses(false, collapsed)}
           >
             <FaArrowRightFromBracket className="shrink-0" />
-            Sign out
+            <RowLabel collapsed={collapsed}>Sign out</RowLabel>
           </button>
         </div>
       </aside>

@@ -1,7 +1,7 @@
 // src/app/api/business/invoices/[id]/void/route.ts
 // Admin endpoint that voids an invoice. POST flips status to VOIDED and stamps voidedAt
 // (idempotent for already-voided invoices, preserving the original timestamp),
-// regenerates the PDF with the VOID watermark, optionally emails the client a void
+// releases the promo redemption the invoice settled, regenerates the PDF with the VOID watermark, optionally emails the client a void
 // notice, counts linked income entries for the operator warning, and re-syncs the stamped
 // PDF to Drive. Email and Drive sync are best-effort; the status change is authoritative
 // and never rolls back.
@@ -12,6 +12,7 @@ import {
   toInvoiceEmailPayload,
 } from "@/features/business/lib/invoice-email-request";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
+import { releaseInvoiceRedemptions } from "@/features/business/lib/promo-redemption";
 import { sendVoidNotification } from "@/features/reviews/lib/email-invoice";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -58,6 +59,10 @@ export async function POST(
         where: { id },
         data: { status: "VOIDED", voidedAt: voidedAt ?? new Date() },
       });
+  // A voided invoice gave no discount, so its promo use stops counting toward the
+  // promo's cap, the customer's limit and the stats. Runs on a repeat void too, which
+  // tidies invoices voided before this release existed.
+  await releaseInvoiceRedemptions(id);
 
   // Count linked income entries so the UI can warn the operator about manual
   // reversal. PAID > VOIDED is the common case; DRAFT/SENT > VOIDED would

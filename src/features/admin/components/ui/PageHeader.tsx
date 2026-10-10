@@ -1,8 +1,8 @@
 // src/features/admin/components/ui/PageHeader.tsx
-// Standard admin page header: optional breadcrumbs, a title, an optional description, and
-// a right-aligned actions slot. Replaces the copy-pasted
-// `<h1 class="mb-6 text-2xl font-extrabold text-russian-violet">`. Server-safe.
+// Standard admin page header: optional breadcrumbs, an optional moonstone eyebrow, a
+// title, an optional description, and a right-aligned actions slot. Server-safe.
 
+import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import type React from "react";
@@ -23,6 +23,8 @@ interface PageHeaderProps {
   description?: React.ReactNode;
   /** Optional breadcrumb trail above the title. */
   breadcrumbs?: Breadcrumb[];
+  /** Optional small uppercase label above the title (e.g. the section name). */
+  eyebrow?: string;
   /** Optional right-aligned actions (primary buttons etc.). */
   actions?: React.ReactNode;
   className?: string;
@@ -34,6 +36,7 @@ interface PageHeaderProps {
  * @param props.title - Page title.
  * @param props.description - Optional supporting description.
  * @param props.breadcrumbs - Optional breadcrumb trail.
+ * @param props.eyebrow - Optional small uppercase label above the title.
  * @param props.actions - Optional right-aligned actions.
  * @param props.className - Extra classes.
  * @returns The header element.
@@ -42,6 +45,7 @@ export function PageHeader({
   title,
   description,
   breadcrumbs,
+  eyebrow,
   actions,
   className,
 }: PageHeaderProps): React.ReactElement {
@@ -69,10 +73,15 @@ export function PageHeader({
           </ol>
         </nav>
       )}
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-extrabold text-russian-violet">{title}</h1>
-          {description && <p className="mt-1 text-sm text-admin-text-secondary">{description}</p>}
+          {eyebrow && <p className={ADMIN_EYEBROW_CLS}>{eyebrow}</p>}
+          <h1 className="text-2xl leading-tight font-bold text-balance text-admin-text sm:text-[1.625rem]">
+            {title}
+          </h1>
+          {description && (
+            <p className="mt-1 max-w-3xl text-[0.9375rem] text-admin-muted">{description}</p>
+          )}
         </div>
         {/* No shrink-0: once the row wraps below the title it must be able to
             narrow to the page, or its buttons stay on one line and run off a phone. */}

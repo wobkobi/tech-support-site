@@ -3,6 +3,13 @@
 // Form for sending a review link to a past client via email or SMS.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import {
+  ADMIN_EYEBROW_CLS,
+  ADMIN_INPUT_CLS,
+  ADMIN_LINK_CLS,
+} from "@/features/admin/components/ui/field-classes";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { EmailInput } from "@/shared/components/EmailInput";
@@ -236,12 +243,14 @@ export function SendReviewLinkForm({
     <div>
       {!defaultOpen && (
         <button
+          type="button"
+          aria-expanded={open}
           onClick={() => {
             setOpen((v) => !v);
             resetState();
             clearFields();
           }}
-          className="w-full text-left text-sm font-semibold text-russian-violet hover:underline"
+          className={cn("w-full text-left text-[0.9375rem]", ADMIN_LINK_CLS)}
         >
           {open ? "Hide form" : "+ Send review link to past client"}
         </button>
@@ -253,25 +262,26 @@ export function SendReviewLinkForm({
           {contactSuggestions.length > 0 && (
             <div
               ref={pickerRef}
-              className="relative flex flex-col gap-1"
+              className="relative"
               onBlur={(e) => {
                 if (!pickerRef.current?.contains(e.relatedTarget)) setListOpen(false);
               }}
             >
-              <label className="text-xs font-medium text-slate-500">Pick an existing contact</label>
-              <input
-                type="search"
-                placeholder="Search by name, address or email…"
-                value={contactSearch}
-                onFocus={() => setListOpen(true)}
-                onChange={(e) => {
-                  setContactSearch(e.target.value);
-                  setListOpen(true);
-                }}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
-              />
+              <AdminField label="Pick an existing contact" htmlFor="srl-contact-search">
+                <AdminInput
+                  id="srl-contact-search"
+                  type="search"
+                  placeholder="Search by name, address or email…"
+                  value={contactSearch}
+                  onFocus={() => setListOpen(true)}
+                  onChange={(e) => {
+                    setContactSearch(e.target.value);
+                    setListOpen(true);
+                  }}
+                />
+              </AdminField>
               {listOpen && (
-                <div className="absolute top-full z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                <div className="absolute top-full z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-admin-border bg-admin-surface shadow-lg">
                   {contactSuggestions
                     .filter((c) => {
                       const q = contactSearch.toLowerCase();
@@ -294,11 +304,15 @@ export function SendReviewLinkForm({
                           setContactSearch("");
                           setListOpen(false);
                         }}
-                        className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-slate-50"
+                        className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-admin-bg"
                       >
-                        <span className="text-sm font-medium text-slate-800">{c.name}</span>
-                        {c.address && <span className="text-xs text-slate-500">{c.address}</span>}
-                        <span className="text-xs text-slate-400">
+                        <span className="text-[0.9375rem] font-medium text-admin-text">
+                          {c.name}
+                        </span>
+                        {c.address && (
+                          <span className="text-sm text-admin-text-secondary">{c.address}</span>
+                        )}
+                        <span className="text-sm text-admin-muted">
                           {[c.email, c.phone].filter(Boolean).join(" · ") || "No contact info"}
                         </span>
                       </button>
@@ -313,7 +327,7 @@ export function SendReviewLinkForm({
                       c.phone?.includes(q)
                     );
                   }).length === 0 && (
-                    <p className="px-3 py-2.5 text-xs text-slate-400">No contacts found</p>
+                    <p className="px-3 py-2.5 text-sm text-admin-muted">No contacts found</p>
                   )}
                 </div>
               )}
@@ -330,11 +344,12 @@ export function SendReviewLinkForm({
                   setMode(m);
                   resetState();
                 }}
+                aria-pressed={mode === m}
                 className={cn(
-                  "rounded-lg border px-4 py-1.5 text-xs font-semibold transition-colors",
+                  "h-10 rounded-md border px-4 text-sm font-semibold transition-colors",
                   mode === m
                     ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                    : "border-slate-200 bg-white text-slate-500 hover:border-slate-300",
+                    : "border-admin-border-strong bg-admin-surface text-admin-text-secondary hover:border-russian-violet",
                 )}
               >
                 {m === "email" ? "📧 Email" : "💬 SMS"}
@@ -348,14 +363,13 @@ export function SendReviewLinkForm({
           {mode === "email" && (
             <form onSubmit={handlePreview} className="flex flex-col gap-3">
               <div className="flex flex-col gap-2">
-                <input
+                <AdminInput
                   type="text"
                   autoComplete="off"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Full name"
                   required
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
                 />
                 <EmailInput
                   id="srl-email"
@@ -364,16 +378,17 @@ export function SendReviewLinkForm({
                   placeholder="Email address"
                   autoComplete="off"
                   required
-                  className="rounded-lg"
+                  className={ADMIN_INPUT_CLS}
                 />
               </div>
-              <button
+              <AdminButton
                 type="submit"
+                variant="outline"
                 disabled={loading}
-                className="self-start rounded-lg bg-moonstone-400 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-300 disabled:cursor-not-allowed disabled:opacity-50"
+                className="self-start"
               >
                 {loading ? "Loading preview..." : "Preview email"}
-              </button>
+              </AdminButton>
             </form>
           )}
 
@@ -399,7 +414,7 @@ export function SendReviewLinkForm({
             <iframe
               srcDoc={previewHtml ?? ""}
               title="Email preview"
-              className="h-[60vh] w-full rounded-lg border border-slate-200"
+              className="h-[60vh] w-full rounded-lg border border-admin-border"
               sandbox="allow-same-origin"
             />
           </Modal>
@@ -408,14 +423,13 @@ export function SendReviewLinkForm({
           {mode === "sms" && (
             <form onSubmit={handleSmsSubmit} className="flex flex-col gap-3">
               <div className="flex flex-col gap-2">
-                <input
+                <AdminInput
                   type="text"
                   autoComplete="off"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Full name"
                   required
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
                 />
                 <PhoneInput
                   id="srl-phone"
@@ -424,42 +438,43 @@ export function SendReviewLinkForm({
                   autoComplete="off"
                   required
                   hideError
-                  className="rounded-lg"
+                  className={ADMIN_INPUT_CLS}
                 />
               </div>
               {phoneInput && (
                 <p
                   className={cn(
-                    "-mt-1 text-xs",
-                    phoneValid ? "text-slate-400" : "text-coquelicot-600",
+                    "-mt-1 text-sm",
+                    phoneValid ? "text-admin-muted" : "text-coquelicot-600",
                   )}
                 >
                   {phoneValid ? `Stored as: ${phoneE164}` : "Invalid phone number"}
                 </p>
               )}
-              <button
+              <AdminButton
                 type="submit"
+                variant="outline"
                 disabled={loading || (!!phoneInput && !phoneValid)}
-                className="self-start rounded-lg bg-moonstone-400 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-300 disabled:cursor-not-allowed disabled:opacity-50"
+                className="self-start"
               >
                 {loading ? "Generating..." : "Generate text"}
-              </button>
+              </AdminButton>
             </form>
           )}
 
           {/* Asked before - say when, and let the operator send it again anyway */}
           {existing && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="mb-2 text-sm font-semibold text-slate-700">
+            <div className="rounded-lg border border-admin-border bg-admin-bg p-3">
+              <p className="mb-2 text-sm font-semibold text-admin-text">
                 {existing.askedAt
                   ? `Already asked on ${formatDateShort(existing.askedAt)}.`
                   : "Already asked before."}
               </p>
-              <p className="mb-3 text-xs break-all text-slate-500">{existing.url}</p>
+              <p className="mb-3 text-sm break-all text-admin-muted">{existing.url}</p>
               <div className="flex flex-wrap items-center gap-2">
                 <AdminButton
-                  size="sm"
                   busy={loading}
+                  size="xs"
                   onClick={() => void (mode === "email" ? handleSend(true) : generateSms(true))}
                 >
                   {mode === "email" ? "Send again" : "Write the text again"}
@@ -471,18 +486,12 @@ export function SendReviewLinkForm({
 
           {/* SMS copy box */}
           {smsText && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-                Copy and send from your phone
-              </p>
-              <p className="mb-3 text-sm leading-relaxed text-slate-700">{smsText}</p>
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="rounded-lg bg-moonstone-400 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-moonstone-300"
-              >
+            <div className="rounded-lg border border-admin-border bg-admin-bg p-3">
+              <p className={cn("mb-2", ADMIN_EYEBROW_CLS)}>Copy and send from your phone</p>
+              <p className="mb-3 text-sm leading-relaxed text-admin-text">{smsText}</p>
+              <AdminButton variant="outline" onClick={handleCopy} size="xs">
                 {copied ? "Copied!" : "Copy message"}
-              </button>
+              </AdminButton>
             </div>
           )}
         </div>

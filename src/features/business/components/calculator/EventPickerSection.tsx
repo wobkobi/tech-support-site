@@ -5,6 +5,9 @@
 // day's neighbouring events as a merge, via findMergeSuggestions. Merging keeps one time
 // slot per event, so the gaps between them are never billed.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { ADMIN_CHECKBOX_CLS } from "@/features/admin/components/ui/field-classes";
 import { minsToHoursLabel } from "@/features/business/lib/business";
 import {
   findMergeSuggestions,
@@ -223,9 +226,11 @@ export function EventPickerSection({
   // merge is undone by unticking rather than starting over.
   const pickerList = (
     <div className="mt-3 max-h-64 space-y-1 overflow-y-auto">
-      {events === null && <p className="text-sm text-slate-400">Loading events…</p>}
+      {events === null && <p className="text-sm text-admin-muted">Loading events…</p>}
       {events !== null && events.length === 0 && (
-        <p className="text-sm text-slate-400">No booking-calendar events in the last two weeks.</p>
+        <p className="text-sm text-admin-muted">
+          No booking-calendar events in the last two weeks.
+        </p>
       )}
       {(events ?? []).map((ev) => {
         const billed = billedIds.includes(ev.id);
@@ -237,7 +242,7 @@ export function EventPickerSection({
               "cursor-pointer",
               billed
                 ? "border-russian-violet/30 bg-russian-violet/5"
-                : "border-slate-100 hover:border-russian-violet/30 hover:bg-russian-violet/5",
+                : "border-admin-border hover:border-russian-violet/30 hover:bg-russian-violet/5",
             )}
           >
             <span className="flex min-w-0 flex-1 items-center gap-2">
@@ -245,11 +250,11 @@ export function EventPickerSection({
                 type="checkbox"
                 checked={billed}
                 onChange={() => toggleEvent(ev.id)}
-                className="h-3.5 w-3.5 shrink-0"
+                className="h-4 w-4 shrink-0 accent-russian-violet"
               />
-              <span className="truncate font-medium text-slate-700">{ev.summary}</span>
+              <span className="truncate font-medium text-admin-text">{ev.summary}</span>
             </span>
-            <span className="shrink-0 text-xs text-slate-500">
+            <span className="shrink-0 text-sm text-admin-muted">
               {EVENT_STAMP.format(new Date(ev.start))}
             </span>
           </label>
@@ -260,11 +265,11 @@ export function EventPickerSection({
             onClick={() => onBillEvents([ev.id])}
             className={cn(
               rowClasses,
-              "border-slate-100 hover:border-russian-violet/30 hover:bg-russian-violet/5",
+              "border-admin-border hover:border-russian-violet/30 hover:bg-russian-violet/5",
             )}
           >
-            <span className="truncate font-medium text-slate-700">{ev.summary}</span>
-            <span className="shrink-0 text-xs text-slate-500">
+            <span className="truncate font-medium text-admin-text">{ev.summary}</span>
+            <span className="shrink-0 text-sm text-admin-muted">
               {EVENT_STAMP.format(new Date(ev.start))}
             </span>
           </button>
@@ -275,19 +280,18 @@ export function EventPickerSection({
 
   if (!prefill) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-russian-violet">Bill a calendar event</h2>
-          <button
-            type="button"
-            onClick={togglePicker}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-          >
-            {pickerOpen ? "Hide" : "Pick a recent event"}
-          </button>
-        </div>
+      <Card>
+        <CardHeader
+          title="Bill a calendar event"
+          className="mb-0 items-center"
+          actions={
+            <AdminButton variant="secondary" size="xs" onClick={togglePicker}>
+              {pickerOpen ? "Hide" : "Pick a recent event"}
+            </AdminButton>
+          }
+        />
         {pickerOpen && pickerList}
-      </div>
+      </Card>
     );
   }
 
@@ -304,9 +308,9 @@ export function EventPickerSection({
   const unbilledGap = gapMinutesBetween(timeRanges);
 
   return (
-    <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-5">
+    <Card className="space-y-2 text-sm">
       <div className="flex items-start justify-between gap-2">
-        <p className="min-w-0 text-slate-600">
+        <p className="min-w-0 text-admin-text-secondary">
           <span className="font-semibold text-russian-violet">
             {merged ? `Billing ${prefill.slots.length} events as one job:` : "Billing booked job:"}
           </span>{" "}
@@ -320,50 +324,42 @@ export function EventPickerSection({
               {" · "}
               <a
                 href={`/admin/bookings/${prefill.bookingId}`}
-                className="font-medium text-russian-violet underline hover:opacity-80"
+                className="font-medium text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
               >
                 View booking ↗
               </a>
             </>
           )}
         </p>
-        <button
-          type="button"
-          onClick={togglePicker}
-          className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-        >
+        <AdminButton variant="secondary" size="xs" className="shrink-0" onClick={togglePicker}>
           {pickerOpen ? "Hide" : "Change event"}
-        </button>
+        </AdminButton>
       </div>
 
       {pickerOpen && pickerList}
 
       {merged && unbilledGap > 0 && (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-admin-muted">
           {minsToHoursLabel(unbilledGap)} between visits is not billed - each event is its own slot.
         </p>
       )}
 
       {drifted && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-amber-700">
+          <span className="text-sm text-amber-700">
             Differs from the event {prefill.slots.length > 1 ? "windows" : "window"} (
             {prefill.jobDate}, {prefill.slots.map((s) => `${s.startTime}-${s.endTime}`).join(" + ")}
             ).
           </span>
-          <button
-            type="button"
-            onClick={onResetToEventTimes}
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-russian-violet hover:bg-slate-50"
-          >
+          <AdminButton variant="secondary" size="xs" onClick={onResetToEventTimes}>
             Reset to event times
-          </button>
+          </AdminButton>
         </div>
       )}
 
       {suggestions.length > 0 && (
         <div className="mt-3 space-y-2 rounded-lg border border-russian-violet/20 bg-russian-violet/5 p-3">
-          <p className="text-xs font-semibold text-russian-violet">
+          <p className="text-sm font-semibold text-russian-violet">
             {suggestions.length === 1
               ? "Another event that day looks like the same job"
               : `${suggestions.length} more events that day look like the same job`}
@@ -371,34 +367,34 @@ export function EventPickerSection({
           {suggestions.map((s) => (
             <label
               key={s.event.id}
-              className="flex cursor-pointer items-start gap-2 text-xs text-slate-700"
+              className="flex cursor-pointer items-start gap-2 text-sm text-admin-text"
             >
               <input
                 type="checkbox"
                 checked={isTicked(s.event.id, s.preselected)}
                 onChange={(e) => setTicked((prev) => ({ ...prev, [s.event.id]: e.target.checked }))}
-                className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                className={ADMIN_CHECKBOX_CLS}
               />
               <span className="min-w-0">
                 <span className="font-medium">{s.event.summary}</span>{" "}
-                <span className="text-slate-500">
+                <span className="text-admin-muted">
                   {EVENT_STAMP.format(new Date(s.event.start))} · {s.reason}
                 </span>
               </span>
             </label>
           ))}
-          <button
-            type="button"
+          <AdminButton
+            variant="outline"
+            size="xs"
             disabled={chosen.length === 0}
             onClick={() => onBillEvents([...billedIds, ...chosen.map((s) => s.event.id)])}
-            className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40"
           >
             {chosen.length <= 1
               ? "Bill together"
               : `Bill all ${chosen.length + billedIds.length} together`}
-          </button>
+          </AdminButton>
         </div>
       )}
-    </div>
+    </Card>
   );
 }

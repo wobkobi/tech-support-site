@@ -200,8 +200,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Close the untrusted USER DATA block before any server-supplied trusted
     // annotations so the model knows where operator-controlled text ends.
     let userContent = `${context}${input.trim()}\n--- END USER DATA ---`;
+    // The model miscounts a mid-sentence range ("1:46 pm to 2:05 pm" pinned as 15 or 5
+    // min) and, told of it separately, bills it again as outside work. So the total itself
+    // names the minutes it already holds. Server-formatted times only: this note sits
+    // outside the untrusted block, so the operator's own wording never goes in it.
+    const taskLineNote =
+      rangeStats.taskLineRanges.length > 0
+        ? ` (already includes, from ranges written on a task's own line - see SECOND-VISIT RANGE: ${rangeStats.taskLineRanges
+            .map((r) => `${r.startTime}-${r.endTime} = ${r.durationMins} min`)
+            .join("; ")})`
+        : "";
     if (precomputed !== null) {
-      userContent += `\n\n[Pre-computed on-site session total from the stated ranges: ${precomputed} min — use this as the base for durationMins; ADD explicitly-stated durations for work done outside these ranges per BILLING rule 1]`;
+      userContent += `\n\n[Pre-computed on-site session total from the stated ranges: ${precomputed} min${taskLineNote} — use this as the base for durationMins; ADD explicitly-stated durations for work done outside these ranges per BILLING rule 1]`;
     }
     if (Object.keys(safeAnswers).length > 0) {
       const clarifications = Object.entries(safeAnswers)

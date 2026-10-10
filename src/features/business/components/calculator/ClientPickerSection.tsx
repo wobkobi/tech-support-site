@@ -6,6 +6,11 @@
 // it to Custom and offers to rename the contact too. "Clear" resets so the operator can
 // search again.
 
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
+import { ADMIN_CHECKBOX_CLS, ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { TEXT_ACTION_CLS } from "@/features/business/components/calculator/calculator-classes";
 import type { GoogleContact } from "@/features/business/types/business";
 import { filterContacts } from "@/features/contacts/lib/contact-search";
 import { EmailInput } from "@/shared/components/EmailInput";
@@ -122,22 +127,21 @@ export function ClientPickerSection({
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-russian-violet">Client</h2>
-        {pickedContactName && (
-          <button
-            type="button"
-            onClick={onClearContact}
-            className="text-xs text-slate-500 underline hover:text-russian-violet"
-          >
-            x Clear
-          </button>
-        )}
-      </div>
+    <Card className="space-y-3">
+      <CardHeader
+        title="Client"
+        className="mb-0 items-center"
+        actions={
+          pickedContactName && (
+            <button type="button" onClick={onClearContact} className={TEXT_ACTION_CLS}>
+              x Clear
+            </button>
+          )
+        }
+      />
       {pickedContactName && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-slate-600">Address to:</span>
+          <span className="text-sm font-medium text-admin-text-secondary">Address to:</span>
           {(["name", "company", "custom"] as const).map((mode) => {
             const disabled = mode === "company" && !pickedContactCompany;
             const active = addressMode === mode;
@@ -149,13 +153,8 @@ export function ClientPickerSection({
                 disabled={disabled}
                 onClick={() => onAddressModeChange(mode)}
                 title={disabled ? "Picked contact has no company" : undefined}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                  active
-                    ? "border-russian-violet/40 bg-russian-violet/10 text-russian-violet"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                  disabled && "cursor-not-allowed opacity-40 hover:border-slate-200",
-                )}
+                aria-pressed={active}
+                className={adminChipClass(active)}
               >
                 {label}
               </button>
@@ -164,7 +163,7 @@ export function ClientPickerSection({
         </div>
       )}
       <div className="relative">
-        <input
+        <AdminInput
           type="text"
           placeholder="Name"
           value={clientName}
@@ -181,10 +180,9 @@ export function ClientPickerSection({
             blurTimerRef.current = setTimeout(() => setFocused(false), 150);
           }}
           onKeyDown={onKeyDown}
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
         />
         {suggestions.length > 0 && (
-          <div className="absolute top-full right-0 left-0 z-20 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+          <div className="absolute top-full right-0 left-0 z-20 mt-1 overflow-hidden rounded-md border border-admin-border bg-admin-surface shadow-lg">
             {suggestions.map((c, i) => {
               const active = i === highlight;
               return (
@@ -199,17 +197,15 @@ export function ClientPickerSection({
                   }}
                   onMouseEnter={() => setHighlight(i)}
                   className={cn(
-                    "block w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-b-0",
-                    active ? "bg-russian-violet/10" : "hover:bg-slate-50",
+                    "block w-full border-b border-admin-border px-3 py-2 text-left text-sm last:border-b-0",
+                    active ? "bg-russian-violet/10" : "hover:bg-admin-bg",
                   )}
                 >
-                  <span className="font-medium text-rich-black">{c.name || c.email}</span>
+                  <span className="font-medium text-admin-text">{c.name || c.email}</span>
                   {c.email && c.name && (
-                    <span className="ml-2 text-xs text-rich-black/50">{c.email}</span>
+                    <span className="ml-2 text-sm text-admin-muted">{c.email}</span>
                   )}
-                  {c.company && (
-                    <span className="ml-2 text-xs text-rich-black/40">{c.company}</span>
-                  )}
+                  {c.company && <span className="ml-2 text-sm text-admin-muted">{c.company}</span>}
                 </button>
               );
             })}
@@ -217,12 +213,12 @@ export function ClientPickerSection({
         )}
       </div>
       {renameOffer && (
-        <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
+        <label className="flex cursor-pointer items-start gap-2 text-sm text-admin-text-secondary">
           <input
             type="checkbox"
             checked={renameContact}
             onChange={(e) => onRenameContactChange(e.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0 accent-russian-violet"
+            className={ADMIN_CHECKBOX_CLS}
           />
           <span>
             Also change the contact from {pickedContactName} to {renameOffer} when the invoice saves
@@ -234,8 +230,8 @@ export function ClientPickerSection({
         placeholder="Email"
         value={clientEmail}
         onChange={onClientEmailChange}
-        className="rounded-lg border-slate-200"
+        className={ADMIN_INPUT_CLS}
       />
-    </div>
+    </Card>
   );
 }

@@ -4,7 +4,13 @@
 // flagging zero-length or cross-midnight slots. A follow-up minutes field adds work done
 // outside the slots (a call after the visit, a remote fix later) on top of the slot sum.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
+import { REMOVE_ROW_CLS } from "@/features/business/components/calculator/calculator-classes";
 import { minsToHoursLabel, timeDiffMins } from "@/features/business/lib/business";
 import type { ParsedRange } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
@@ -102,19 +108,22 @@ export function JobDetailsSection({
   const hasEntry = multi || followUpMins > 0 || timeRanges.some((r) => r.startTime || r.endTime);
 
   return (
-    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-russian-violet">Time</h2>
-        {hasEntry && (
-          <SectionClearButton
-            onClear={() => {
-              onTimeRangesChange([{ startTime: "", endTime: "" }]);
-              onFollowUpMinsChange(0);
-            }}
-            label="time"
-          />
-        )}
-      </div>
+    <Card className="space-y-4">
+      <CardHeader
+        title="Time"
+        className="mb-0 items-center"
+        actions={
+          hasEntry && (
+            <SectionClearButton
+              onClear={() => {
+                onTimeRangesChange([{ startTime: "", endTime: "" }]);
+                onFollowUpMinsChange(0);
+              }}
+              label="time"
+            />
+          )
+        }
+      />
 
       <div className="space-y-2">
         {timeRanges.map((range, index) => {
@@ -124,32 +133,32 @@ export function JobDetailsSection({
               <div className="flex items-end gap-2">
                 <div className="flex-1">
                   {index === 0 && (
-                    <label className="mb-1 block text-xs font-medium text-slate-500">Start</label>
+                    <label htmlFor="time-slot-0-start" className={ADMIN_LABEL_CLS}>
+                      Start
+                    </label>
                   )}
-                  <input
+                  <AdminInput
+                    id={`time-slot-${index}-start`}
                     type="time"
                     value={range.startTime}
                     onChange={(e) => patchRange(index, { startTime: e.target.value })}
                     aria-invalid={issue?.tone === "warn"}
-                    className={cn(
-                      "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                      issue?.tone === "warn" && "border-amber-400",
-                    )}
+                    className={cn(issue?.tone === "warn" && "border-amber-400")}
                   />
                 </div>
                 <div className="flex-1">
                   {index === 0 && (
-                    <label className="mb-1 block text-xs font-medium text-slate-500">End</label>
+                    <label htmlFor="time-slot-0-end" className={ADMIN_LABEL_CLS}>
+                      End
+                    </label>
                   )}
-                  <input
+                  <AdminInput
+                    id={`time-slot-${index}-end`}
                     type="time"
                     value={range.endTime}
                     onChange={(e) => patchRange(index, { endTime: e.target.value })}
                     aria-invalid={issue?.tone === "warn"}
-                    className={cn(
-                      "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                      issue?.tone === "warn" && "border-amber-400",
-                    )}
+                    className={cn(issue?.tone === "warn" && "border-amber-400")}
                   />
                 </div>
                 <button
@@ -157,7 +166,7 @@ export function JobDetailsSection({
                   onClick={() => removeRange(index)}
                   disabled={!multi}
                   aria-label={`Remove time slot ${index + 1}`}
-                  className="rounded-lg border border-red-200 bg-white px-2 py-2 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 disabled:hover:bg-white"
+                  className={REMOVE_ROW_CLS}
                 >
                   ×
                 </button>
@@ -165,8 +174,8 @@ export function JobDetailsSection({
               {issue && (
                 <p
                   className={cn(
-                    "text-xs",
-                    issue.tone === "warn" ? "text-amber-600" : "text-slate-400 italic",
+                    "text-sm",
+                    issue.tone === "warn" ? "text-amber-700" : "text-admin-muted italic",
                   )}
                 >
                   {issue.text}
@@ -175,20 +184,30 @@ export function JobDetailsSection({
             </div>
           );
         })}
-        <button
-          type="button"
-          onClick={addRange}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-        >
+        <AdminButton variant="secondary" size="xs" onClick={addRange}>
           + Add time slot
-        </button>
+        </AdminButton>
       </div>
 
-      <div>
-        <label htmlFor="follow-up-mins" className="mb-1 block text-xs font-medium text-slate-500">
-          Follow-up time (mins)
-        </label>
-        <input
+      <AdminField
+        label="Follow-up time (mins)"
+        htmlFor="follow-up-mins"
+        hint={
+          <>
+            Work done outside the slots - a call after the visit, a remote fix later.
+            <span className="mt-1 block">
+              Total {minsToHoursLabel(durationMins)}
+              {followUpMins > 0 && sumRangesMin > 0 && (
+                <span className="ml-1 italic">
+                  (slots {minsToHoursLabel(sumRangesMin)} + follow-up{" "}
+                  {minsToHoursLabel(followUpMins)})
+                </span>
+              )}
+            </span>
+          </>
+        }
+      >
+        <AdminInput
           id="follow-up-mins"
           type="number"
           min="0"
@@ -201,20 +220,8 @@ export function JobDetailsSection({
             onFollowUpMinsChange(Number.isNaN(v) || v < 0 ? 0 : v);
           }}
           placeholder="0"
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
         />
-        <p className="mt-1 text-sm text-slate-400">
-          Work done outside the slots - a call after the visit, a remote fix later.
-        </p>
-        <p className="mt-1 text-xs text-slate-400">
-          Total {minsToHoursLabel(durationMins)}
-          {followUpMins > 0 && sumRangesMin > 0 && (
-            <span className="ml-1 text-slate-300 italic">
-              (slots {minsToHoursLabel(sumRangesMin)} + follow-up {minsToHoursLabel(followUpMins)})
-            </span>
-          )}
-        </p>
-      </div>
-    </div>
+      </AdminField>
+    </Card>
   );
 }

@@ -18,6 +18,9 @@ import { useEffect, useId, useRef, useState } from "react";
 /** Dialog width. */
 type ModalSize = "sm" | "md" | "lg";
 
+/** Where the dialog sits: centred, or a bottom sheet on phones that centres from sm. */
+type ModalPlacement = "centre" | "sheet" | "top";
+
 /** Props for {@link Modal}. */
 interface ModalProps {
   /** Whether the dialog is shown. */
@@ -34,6 +37,12 @@ interface ModalProps {
   size?: ModalSize;
   /** Unsaved input: a backdrop tap, Escape or the close button asks before discarding. */
   dirty?: boolean;
+  /**
+   * "sheet" pins the dialog to the bottom edge below sm, within thumb reach; "top" pins it
+   * to the top below sm, so a typing dialog stays above the phone keyboard (defaults to
+   * "centre").
+   */
+  placement?: ModalPlacement;
   children: React.ReactNode;
 }
 
@@ -63,6 +72,7 @@ function sizeClass(size: ModalSize): string {
  * @param props.footer - Optional footer content.
  * @param props.size - Dialog width.
  * @param props.dirty - Whether dismissing would throw away unsaved input.
+ * @param props.placement - Centred, a bottom sheet on phones, or pinned to the top on phones.
  * @param props.children - Dialog body.
  * @returns The dialog element, or null when closed.
  */
@@ -74,6 +84,7 @@ export function Modal({
   footer,
   size = "md",
   dirty = false,
+  placement = "centre",
   children,
 }: ModalProps): React.ReactElement | null {
   const titleId = useId();
@@ -129,7 +140,14 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden"
+      className={cn(
+        "fixed inset-0 z-50 flex justify-center bg-black/50 p-4 print:hidden",
+        placement === "sheet"
+          ? "items-end sm:items-center"
+          : placement === "top"
+            ? "items-start sm:items-center"
+            : "items-center",
+      )}
       onClick={requestClose}
       role="dialog"
       aria-modal="true"
@@ -141,13 +159,13 @@ export function Modal({
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "flex max-h-[85vh] w-full flex-col overflow-hidden rounded-xl border border-admin-border bg-admin-surface shadow-xl outline-none",
+          "flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-lg border border-admin-border bg-admin-surface shadow-xl outline-none",
           sizeClass(size),
         )}
       >
         <div className="flex items-start justify-between gap-3 border-b border-admin-border px-5 py-4">
           <div className="min-w-0">
-            <h2 id={titleId} className="text-lg font-bold text-russian-violet">
+            <h2 id={titleId} className="text-lg font-semibold text-admin-text">
               {title}
             </h2>
             {description && (
@@ -162,7 +180,7 @@ export function Modal({
             type="button"
             onClick={requestClose}
             aria-label="Close"
-            className="-my-2 -mr-3 inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-2xl leading-none text-admin-muted transition-colors hover:bg-admin-bg hover:text-admin-text"
+            className="-my-2 -mr-3 inline-flex size-11 shrink-0 items-center justify-center rounded-md text-2xl leading-none text-admin-muted transition-colors hover:bg-admin-bg hover:text-admin-text"
           >
             &times;
           </button>
@@ -173,9 +191,9 @@ export function Modal({
         {confirmingDiscard ? (
           <div
             ref={discardBarRef}
-            className="flex flex-wrap items-center justify-end gap-2 border-t border-amber-200 bg-amber-50 px-5 py-3"
+            className="flex flex-wrap items-center justify-end gap-2 border-t border-l-4 border-admin-border border-l-coquelicot-600 bg-coquelicot-50 px-5 py-3"
           >
-            <p role="alert" className="mr-auto text-sm font-medium text-amber-900">
+            <p role="alert" className="mr-auto text-sm font-bold text-coquelicot-800">
               Discard what you&apos;ve entered?
             </p>
             <AdminButton variant="secondary" onClick={() => setConfirmingDiscard(false)}>

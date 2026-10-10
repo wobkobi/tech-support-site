@@ -129,7 +129,7 @@ export function BookingTimeline(props: BookingTimelineProps): React.ReactElement
           <div className="pb-3">
             <p className="text-sm font-medium text-admin-text">{step.label}</p>
             {(step.hasDate || step.detail) && (
-              <p className="text-xs text-admin-muted">
+              <p className="text-sm text-admin-muted">
                 {step.hasDate
                   ? step.date
                     ? formatDateTimeShort(step.date)

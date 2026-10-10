@@ -3,8 +3,8 @@
 // Client button that POSTs to the travel recalculation API, then shows the cached-event
 // count or an error and refreshes the route.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useCallback, useState } from "react";
@@ -47,18 +47,15 @@ export function RecalculateButton(): React.ReactElement {
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <button
-        onClick={() => void run()}
+      <AdminButton
+        type="button"
+        variant="primary"
+        busy={recalculating}
         disabled={recalculating}
-        className={cn(
-          "rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
-          recalculating
-            ? "cursor-not-allowed bg-admin-bg text-admin-faint"
-            : "bg-russian-violet text-white hover:bg-russian-violet/90",
-        )}
+        onClick={() => void run()}
       >
         {recalculating ? "Recalculating…" : "Recalculate travel times"}
-      </button>
+      </AdminButton>
       {result && <p className="text-sm text-admin-muted">{result}</p>}
     </div>
   );

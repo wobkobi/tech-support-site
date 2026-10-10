@@ -16,6 +16,8 @@ import {
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
+import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
+import { ADMIN_EYEBROW_CLS, ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { hourLabel } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
@@ -42,11 +44,7 @@ interface Props {
  * @returns Heading element.
  */
 function SectionHeading({ children }: { children: React.ReactNode }): React.ReactElement {
-  return (
-    <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
-      {children}
-    </h3>
-  );
+  return <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>{children}</h3>;
 }
 
 /**
@@ -165,7 +163,7 @@ export function IdentityTab({ initial, defaults, bookableSchedule }: Props): Rea
             fetchDetails
             aria-label="Base address"
             placeholder="Start typing the base address..."
-            inputClassName="w-full rounded-lg border border-admin-border-strong px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            inputClassName={ADMIN_INPUT_CLS}
             onChange={(v) => setAddr({ line: v })}
             onPlaceSelected={(p) =>
               setAddr({
@@ -273,13 +271,12 @@ export function IdentityTab({ initial, defaults, bookableSchedule }: Props): Rea
           meta={m.servedSuburbs}
           customised={draft.servedSuburbs.join("\n") !== defaults.servedSuburbs.join("\n")}
         >
-          <textarea
+          <AdminTextarea
             id="servedSuburbs"
             value={draft.servedSuburbs.join("\n")}
             rows={12}
             placeholder={"Central Auckland:\nPonsonby\nGrey Lynn\n\nNorth Shore:\nTakapuna"}
             onChange={(e) => set({ servedSuburbs: e.target.value.split("\n") })}
-            className="w-full rounded-lg border border-admin-border-strong px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
           />
         </FieldShell>
       </div>
@@ -304,7 +301,7 @@ export function IdentityTab({ initial, defaults, bookableSchedule }: Props): Rea
                 })
               }
               className={cn(
-                "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors",
+                "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors after:absolute after:-inset-2 after:content-['']",
                 published ? "bg-russian-violet" : "bg-admin-border-strong",
               )}
             >
@@ -356,14 +353,14 @@ export function IdentityTab({ initial, defaults, bookableSchedule }: Props): Rea
           error={fieldErrors.emailSignature}
           customised={draft.emailSignature !== defaults.emailSignature}
         >
-          <textarea
+          <AdminTextarea
             id="emailSignature"
             value={draft.emailSignature}
             rows={5}
             spellCheck={false}
             placeholder={"**{name}** · Owner / Technician\n{phone} · {email}"}
             onChange={(e) => set({ emailSignature: e.target.value })}
-            className="w-full rounded-lg border border-admin-border-strong px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            className="font-mono text-sm"
           />
         </FieldShell>
       </div>

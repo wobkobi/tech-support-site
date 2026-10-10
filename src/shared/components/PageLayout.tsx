@@ -57,7 +57,9 @@ export interface FrostedSectionProps {
 }
 
 /**
- * Frosted glass content section.
+ * Frosted glass content section. On phones the frame drops away and the content sits on
+ * the page gutter, so the cards inside line up with the redesigned pages instead of
+ * nesting a frame inside a card inside the screen edge.
  * @param props - Component props.
  * @param props.children - Section content.
  * @param props.maxWidth - Optional max width override.
@@ -71,10 +73,10 @@ export function FrostedSection({
 }: FrostedSectionProps): React.ReactElement {
   return (
     <div
-      className={cn("mx-auto w-full px-2 py-4 sm:px-6 sm:py-8 md:px-8 md:py-10", className)}
+      className={cn("mx-auto w-full px-4 py-4 sm:px-6 sm:py-8 md:px-8 md:py-10", className)}
       style={{ maxWidth }}
     >
-      <div className="rounded-2xl border border-seasalt-200/40 bg-white/60 p-3 shadow-lg backdrop-blur-md sm:p-6 md:p-8">
+      <div className="sm:rounded-2xl sm:border sm:border-seasalt-200/40 sm:bg-white/60 sm:p-6 sm:shadow-lg sm:backdrop-blur-md md:p-8">
         {children}
       </div>
     </div>

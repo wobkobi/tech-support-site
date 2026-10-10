@@ -5,9 +5,17 @@
 // TaskTemplate. Modifier chips nudge the effective hourly rate; TaskTotalsRow renders the
 // shared qty/price/total strip.
 
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import {
+  REMOVE_ROW_CLS,
+  TEXT_ACTION_CLS,
+  toggleChipClass,
+} from "@/features/business/components/calculator/calculator-classes";
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
 import { Combobox } from "@/features/business/components/Combobox";
-import { composeDescription, formatNZD } from "@/features/business/lib/business";
+import { composeDescription, formatNZD, taskLineTotals } from "@/features/business/lib/business";
 import { collectTaxonomyTags } from "@/features/business/lib/task-taxonomy";
 import type { RateConfig, TaskLine, TaskTemplate } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
@@ -78,23 +86,28 @@ export function TasksSection({
   modifierRates,
   flatRates,
 }: Props): React.ReactElement {
+  // The invoice's cents, not each row rounded alone: timed rows at one rate share them.
+  const lineTotals = taskLineTotals(tasks);
   return (
-    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-russian-violet">Tasks</h2>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onManageTags}
-            className="text-xs font-medium text-slate-500 underline hover:text-slate-700"
-          >
-            Manage tags
-          </button>
-          {tasks.length > 0 && (
-            <SectionClearButton onClear={() => onTasksChange(() => [])} label="tasks" />
-          )}
-        </div>
-      </div>
+    <Card className="space-y-3">
+      <CardHeader
+        title="Tasks"
+        className="mb-0 items-center"
+        actions={
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onManageTags}
+              className={cn(TEXT_ACTION_CLS, "max-md:hidden")}
+            >
+              Manage tags
+            </button>
+            {tasks.length > 0 && (
+              <SectionClearButton onClear={() => onTasksChange(() => [])} label="tasks" />
+            )}
+          </div>
+        }
+      />
       {tasks.map((task, idx) => {
         // Flat-rate rows (e.g. Travel) keep their old single-line look;
         // task rows use the device + action combobox layout.
@@ -108,27 +121,28 @@ export function TasksSection({
         return (
           <div
             key={idx}
-            className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 sm:bg-white"
+            className="rounded-lg border border-admin-border bg-admin-bg p-3 sm:bg-admin-surface"
           >
             {isFlatRate ? (
               /* Flat-rate row (Travel etc.): rate dropdown + qty/price/total/delete inline. */
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <select
+                <AdminSelect
                   value={`rate:${task.rateConfigId}`}
                   onChange={(e) => onUpdateTask(idx, "rateConfigId", e.target.value.slice(5))}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:w-40 sm:py-2 sm:text-xs"
+                  className="sm:w-40"
                 >
                   {flatRates.map((r) => (
                     <option key={r.id} value={`rate:${r.id}`}>
                       {r.label}
                     </option>
                   ))}
-                </select>
-                <p className="truncate text-sm text-slate-600 sm:flex-1 sm:text-xs sm:text-slate-500">
+                </AdminSelect>
+                <p className="truncate text-sm text-admin-text-secondary sm:flex-1">
                   {task.description}
                 </p>
                 <TaskTotalsRow
                   task={task}
+                  lineTotal={lineTotals[idx]!}
                   onQty={(v) => onUpdateTask(idx, "qty", v)}
                   onPrice={(v) => onUpdateTask(idx, "unitPrice", v)}
                   onDelete={() => onTasksChange((p) => p.filter((_, i) => i !== idx))}
@@ -210,7 +224,7 @@ export function TasksSection({
                     placeholder="Action"
                     ariaLabel="Action"
                   />
-                  <input
+                  <AdminInput
                     type="text"
                     value={task.details ?? ""}
                     onChange={(e) => {
@@ -230,24 +244,23 @@ export function TasksSection({
                     }}
                     placeholder="Details (optional)"
                     aria-label="Details"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs"
                   />
                 </div>
                 <p
                   className={cn(
-                    "truncate rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700 sm:py-1.5 sm:text-xs",
-                    !composed && "text-slate-400 italic",
+                    "truncate rounded-md bg-admin-bg px-3 py-2 text-sm text-admin-text sm:py-1.5",
+                    !composed && "text-admin-muted italic",
                   )}
                   title={composed || "Pick device + action"}
                 >
                   {composed || "Pick device + action"}
                 </p>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <select
+                  <AdminSelect
                     value={task.baseRateId ?? ""}
                     onChange={(e) => onSetTaskBase(idx, e.target.value || null)}
                     aria-label="Base rate"
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+                    className="w-auto"
                   >
                     <option value="">No base</option>
                     {baseRates.map((r) => (
@@ -255,7 +268,7 @@ export function TasksSection({
                         {r.label} ({formatNZD(r.ratePerHour ?? 0)}/hr)
                       </option>
                     ))}
-                  </select>
+                  </AdminSelect>
                   {modifierRates.map((m) => {
                     const active = task.modifierIds?.includes(m.id) ?? false;
                     let chipLabel: string;
@@ -273,12 +286,7 @@ export function TasksSection({
                         type="button"
                         onClick={() => onToggleTaskModifier(idx, m.id)}
                         aria-pressed={active}
-                        className={cn(
-                          "rounded-full border px-2 py-1 text-xs font-medium transition-colors",
-                          active
-                            ? "border-russian-violet/40 bg-russian-violet/10 text-russian-violet"
-                            : "border-slate-200 bg-white text-slate-500 hover:border-slate-300",
-                        )}
+                        className={toggleChipClass(active)}
                       >
                         {chipLabel}
                       </button>
@@ -295,21 +303,20 @@ export function TasksSection({
                     }
                     aria-pressed={task.unsuccessful ?? false}
                     title="Mark this task as not finished (half-price labour)"
-                    className={cn(
-                      "rounded-full border px-2 py-1 text-xs font-medium transition-colors",
-                      task.unsuccessful
-                        ? "border-amber-300 bg-amber-50 text-amber-700"
-                        : "border-slate-200 bg-white text-slate-500 hover:border-slate-300",
+                    className={toggleChipClass(
+                      task.unsuccessful ?? false,
+                      "border-amber-300 bg-amber-50 text-amber-700",
                     )}
                   >
                     Didn&apos;t finish
                   </button>
-                  <span className="ml-auto text-xs font-semibold text-slate-700">
+                  <span className="ml-auto text-sm font-semibold text-admin-text">
                     = {formatNZD(task.unitPrice)}/hr
                   </span>
                 </div>
                 <TaskTotalsRow
                   task={task}
+                  lineTotal={lineTotals[idx]!}
                   spread
                   onQty={(v) => onUpdateTask(idx, "qty", v)}
                   onPrice={(v) => onUpdateTask(idx, "unitPrice", v)}
@@ -321,12 +328,13 @@ export function TasksSection({
         );
       })}
       <button
+        type="button"
         onClick={onAddTask}
-        className="inline-flex h-11 items-center text-sm text-slate-500 underline hover:text-russian-violet sm:h-auto sm:text-xs"
+        className={cn(TEXT_ACTION_CLS, "inline-flex h-11 items-center sm:h-auto")}
       >
         + Add task
       </button>
-    </div>
+    </Card>
   );
 }
 
@@ -351,6 +359,7 @@ function hoursFromHM(h: number, m: number): number {
  * unchanged.
  * @param props - Component props.
  * @param props.task - The task line to render controls for.
+ * @param props.lineTotal - The line's total as the invoice prints it.
  * @param props.onQty - Called with the new decimal qty when hrs/mins/qty change.
  * @param props.onPrice - Called when the operator edits the $/unit input.
  * @param props.onDelete - Called when the × button is pressed.
@@ -359,12 +368,14 @@ function hoursFromHM(h: number, m: number): number {
  */
 function TaskTotalsRow({
   task,
+  lineTotal,
   onQty,
   onPrice,
   onDelete,
   spread = false,
 }: {
   task: TaskLine;
+  lineTotal: number;
   onQty: (v: number) => void;
   onPrice: (v: number) => void;
   onDelete: () => void;
@@ -375,8 +386,8 @@ function TaskTotalsRow({
   const totalMins = Math.round(task.qty * 60);
   const hrs = Math.floor(totalMins / 60);
   const mins = totalMins % 60;
-  const numInput =
-    "number-input-clean w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs";
+  // Laid over AdminInput: tighter padding and right-aligned figures for the narrow boxes.
+  const numInput = "number-input-clean px-2 text-right";
   return (
     <div
       className={cn(
@@ -389,10 +400,10 @@ function TaskTotalsRow({
       {spread ? (
         <>
           <label className="flex flex-col gap-0.5 sm:contents">
-            <span className="text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden">
+            <span className="text-sm font-medium tracking-wide text-admin-muted uppercase sm:hidden">
               Hrs
             </span>
-            <input
+            <AdminInput
               type="number"
               min="0"
               step="1"
@@ -403,12 +414,12 @@ function TaskTotalsRow({
               className={cn(numInput, "sm:w-14")}
             />
           </label>
-          <span className="hidden text-xs text-slate-400 sm:inline">hr</span>
+          <span className="hidden text-sm text-admin-muted sm:inline">hr</span>
           <label className="flex flex-col gap-0.5 sm:contents">
-            <span className="text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden">
+            <span className="text-sm font-medium tracking-wide text-admin-muted uppercase sm:hidden">
               Min
             </span>
-            <input
+            <AdminInput
               type="number"
               min="0"
               max="59"
@@ -424,14 +435,14 @@ function TaskTotalsRow({
               className={cn(numInput, "sm:w-14")}
             />
           </label>
-          <span className="hidden text-xs text-slate-400 sm:inline">min</span>
+          <span className="hidden text-sm text-admin-muted sm:inline">min</span>
         </>
       ) : (
         <label className="flex flex-col gap-0.5 sm:contents">
-          <span className="text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden">
+          <span className="text-sm font-medium tracking-wide text-admin-muted uppercase sm:hidden">
             Qty
           </span>
-          <input
+          <AdminInput
             type="number"
             min="0"
             step="1"
@@ -444,10 +455,10 @@ function TaskTotalsRow({
         </label>
       )}
       <label className="flex flex-col gap-0.5 sm:contents">
-        <span className="text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden">
+        <span className="text-sm font-medium tracking-wide text-admin-muted uppercase sm:hidden">
           {spread ? "$/hr" : "$/unit"}
         </span>
-        <input
+        <AdminInput
           type="number"
           min="0"
           step="0.01"
@@ -455,25 +466,20 @@ function TaskTotalsRow({
           value={task.unitPrice || ""}
           onChange={(e) => onPrice(parseFloat(e.target.value) || 0)}
           aria-label="Unit price"
-          className="number-input-clean w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:w-24 sm:py-2 sm:text-xs"
+          className={cn(numInput, "sm:w-24")}
         />
       </label>
-      {spread && <span className="hidden text-xs text-slate-400 sm:inline">$/hr</span>}
+      {spread && <span className="hidden text-sm text-admin-muted sm:inline">$/hr</span>}
       <span
         className={cn(
-          "self-end text-right text-sm font-semibold text-slate-700 sm:w-24 sm:self-center sm:text-xs",
+          "self-end text-right text-sm font-semibold text-admin-text sm:w-24 sm:self-center",
           spread && "sm:ml-auto",
         )}
         aria-label="Line total"
       >
-        {formatNZD(task.lineTotal)}
+        {formatNZD(lineTotal)}
       </span>
-      <button
-        type="button"
-        onClick={onDelete}
-        aria-label="Remove task"
-        className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-slate-400 hover:bg-red-50 hover:text-red-500 sm:h-9 sm:w-9 sm:rounded-lg sm:text-lg sm:hover:bg-red-50"
-      >
+      <button type="button" onClick={onDelete} aria-label="Remove task" className={REMOVE_ROW_CLS}>
         ×
       </button>
     </div>

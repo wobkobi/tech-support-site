@@ -5,8 +5,10 @@
 // the asks decided in the last two weeks. Skip and Send now act on one invoice.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { ADMIN_META_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { apiFetch } from "@/shared/lib/api-client";
+import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
@@ -93,8 +95,8 @@ export function ReviewAskQueue({
       <div className="flex shrink-0 gap-1.5">
         {showSkip && (
           <AdminButton
-            size="xs"
             variant="ghost"
+            size="xs"
             busy={busy === `${invoiceId}:skip`}
             disabled={busy !== null}
             onClick={() => void act(invoiceId, "skip")}
@@ -103,8 +105,8 @@ export function ReviewAskQueue({
           </AdminButton>
         )}
         <AdminButton
-          size="xs"
           variant="secondary"
+          size="xs"
           busy={busy === `${invoiceId}:send`}
           disabled={busy !== null}
           onClick={() => void act(invoiceId, "send")}
@@ -118,7 +120,7 @@ export function ReviewAskQueue({
   return (
     <div className="flex flex-col gap-5">
       <section>
-        <h3 className="mb-2 text-xs font-semibold text-admin-muted uppercase">Coming up</h3>
+        <h3 className={cn("mb-2", ADMIN_META_LABEL_CLS)}>Coming up</h3>
         {!enabled ? (
           <p className="text-sm text-admin-muted">
             Automatic review asks are off. Turn them on in Settings &gt; Reviews.
@@ -131,12 +133,10 @@ export function ReviewAskQueue({
               <li key={row.invoiceId} className="flex items-start justify-between gap-3 py-2">
                 <div className="min-w-0 text-sm">
                   <p className="truncate font-medium text-admin-text">{row.name}</p>
-                  <p className="text-xs text-admin-muted">
+                  <p className="text-admin-muted">
                     {row.number} · {row.when}
                   </p>
-                  {row.warning && (
-                    <p className="text-xs text-coquelicot-700">Will skip: {row.warning}</p>
-                  )}
+                  {row.warning && <p className="text-coquelicot-700">Will skip: {row.warning}</p>}
                 </div>
                 {actions(row.invoiceId, true)}
               </li>
@@ -147,13 +147,13 @@ export function ReviewAskQueue({
 
       {recent.length > 0 && (
         <section>
-          <h3 className="mb-2 text-xs font-semibold text-admin-muted uppercase">Last 14 days</h3>
+          <h3 className={cn("mb-2", ADMIN_META_LABEL_CLS)}>Last 14 days</h3>
           <ul className="divide-y divide-admin-border">
             {recent.map((row) => (
               <li key={row.invoiceId} className="flex items-start justify-between gap-3 py-2">
                 <div className="min-w-0 text-sm">
                   <p className="truncate font-medium text-admin-text">{row.name}</p>
-                  <p className="text-xs text-admin-muted">
+                  <p className="text-admin-muted">
                     {row.number} · {OUTCOME_LABEL[row.outcome]} {row.date}
                     {row.detail ? ` · ${row.detail}` : ""}
                   </p>

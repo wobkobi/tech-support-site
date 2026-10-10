@@ -4,8 +4,8 @@
 // phone or reply, and put back someone who unsubscribed by mistake.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { callApi } from "@/features/mailing/lib/api-client";
 import type { Recipient } from "@/features/mailing/lib/recipients";
@@ -86,12 +86,12 @@ export function SubscribersPanel({
         <summary className="cursor-pointer text-sm font-semibold text-russian-violet">
           Show everyone
         </summary>
-        <input
+        <AdminInput
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search name or email"
-          className={`${ADMIN_INPUT_CLS} mt-3`}
+          className="mt-3"
           aria-label="Search subscribers"
         />
         <div className="mt-3 grid gap-4 md:grid-cols-2">
@@ -140,7 +140,7 @@ function SubscriberList({
 }): React.ReactElement {
   return (
     <div>
-      <h3 className="mb-2 text-sm font-semibold text-admin-text">{heading}</h3>
+      <h3 className="mb-2 text-sm font-bold text-admin-text">{heading}</h3>
       {rows.length === 0 ? (
         <p className="text-sm text-admin-muted">Nobody.</p>
       ) : (

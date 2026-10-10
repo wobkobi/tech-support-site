@@ -5,11 +5,14 @@
 // when linked income entries would be left behind.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { ADMIN_CHECKBOX_CLS, ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { formatNZD } from "@/features/business/lib/business";
 import { DEFAULT_VOID_EMAIL_BODY } from "@/features/business/lib/invoice-email-defaults";
-import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useCallback, useState } from "react";
@@ -44,11 +47,6 @@ export interface InvoiceVoidFlow {
   closeVoidModal: () => void;
 }
 
-const INPUT_CLS = cn(
-  "w-full rounded-lg border border-admin-border-strong px-3 py-2 text-sm text-admin-text",
-  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet",
-);
-const FIELD_LABEL_CLS = "mb-2 block text-xs font-semibold text-admin-muted uppercase";
 /** Static JSON request headers - module-scoped so it's a stable useCallback dep. */
 const headers = { "Content-Type": "application/json" };
 
@@ -363,7 +361,7 @@ export function VoidInvoiceModal({
               checked={voidSendNotification}
               onChange={(e) => setVoidSendNotification(e.target.checked)}
               disabled={voiding}
-              className="mt-0.5"
+              className={ADMIN_CHECKBOX_CLS}
             />
             <span>
               Send notification email to <strong>{clientEmail}</strong>
@@ -372,40 +370,40 @@ export function VoidInvoiceModal({
 
           {voidSendNotification && (
             <>
-              <label htmlFor="void-greeting-name" className={FIELD_LABEL_CLS}>
-                Greeting (the person you&apos;re emailing)
-              </label>
-              <input
-                id="void-greeting-name"
-                type="text"
-                value={voidGreetingName}
-                onChange={(e) => setVoidGreetingName(e.target.value)}
-                onBlur={() => void loadVoidPreview()}
-                placeholder={
-                  voidPreview?.defaultGreeting
-                    ? `Leave blank to greet ${voidPreview.defaultGreeting}`
-                    : `${clientName?.trim().split(" ")[0] || "First name"} (leave blank to use the first word of the client name)`
-                }
-                disabled={voiding}
-                className={cn(INPUT_CLS, "mb-4")}
-              />
-              <label htmlFor="void-custom-body" className={FIELD_LABEL_CLS}>
-                Message
-              </label>
-              <textarea
-                id="void-custom-body"
-                rows={5}
-                value={voidCustomBody}
-                onChange={(e) => setVoidCustomBody(e.target.value)}
-                onBlur={() => void loadVoidPreview()}
-                disabled={voiding}
-                className={cn(INPUT_CLS, "mb-4 resize-y")}
-              />
-              <p className={FIELD_LABEL_CLS}>Subject</p>
+              <AdminField
+                label="Greeting (the person you're emailing)"
+                htmlFor="void-greeting-name"
+                className="mb-4"
+              >
+                <AdminInput
+                  id="void-greeting-name"
+                  type="text"
+                  value={voidGreetingName}
+                  onChange={(e) => setVoidGreetingName(e.target.value)}
+                  onBlur={() => void loadVoidPreview()}
+                  placeholder={
+                    voidPreview?.defaultGreeting
+                      ? `Leave blank to greet ${voidPreview.defaultGreeting}`
+                      : `${clientName?.trim().split(" ")[0] || "First name"} (leave blank to use the first word of the client name)`
+                  }
+                  disabled={voiding}
+                />
+              </AdminField>
+              <AdminField label="Message" htmlFor="void-custom-body" className="mb-4">
+                <AdminTextarea
+                  id="void-custom-body"
+                  rows={5}
+                  value={voidCustomBody}
+                  onChange={(e) => setVoidCustomBody(e.target.value)}
+                  onBlur={() => void loadVoidPreview()}
+                  disabled={voiding}
+                />
+              </AdminField>
+              <p className={ADMIN_LABEL_CLS}>Subject</p>
               <p className="mb-4 text-sm font-medium text-admin-text">
                 {voidPreview?.subject ?? `Invoice ${invoiceNumber} - voided`}
               </p>
-              <p className={FIELD_LABEL_CLS}>Body</p>
+              <p className={ADMIN_LABEL_CLS}>Body</p>
               <div className="rounded-lg border border-admin-border bg-admin-bg p-2">
                 {voidPreviewLoading && !voidPreview ? (
                   <p className="p-6 text-center text-sm text-admin-muted">Loading preview...</p>
@@ -414,7 +412,7 @@ export function VoidInvoiceModal({
                     title="Void notification email preview"
                     srcDoc={voidPreview.html}
                     sandbox="allow-same-origin"
-                    className="h-105 w-full rounded bg-white"
+                    className="h-105 w-full rounded bg-admin-surface"
                   />
                 ) : null}
               </div>

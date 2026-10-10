@@ -3,6 +3,9 @@
 // Dashboard panel listing past confirmed bookings still to be completed. Completing only
 // changes the status; the review ask goes out on its own a few days after the invoice.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { Card } from "@/features/admin/components/ui/Card";
+import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { useRouter } from "next/navigation";
@@ -90,25 +93,21 @@ export function CompleteEventsPanel({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-5 py-4">
-        <h2 className="text-sm font-semibold text-slate-700">
+    <Card padding="none">
+      <div className="border-b border-admin-border px-5 py-4">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-admin-text">
           Complete events
-          {bookings.length > 0 && (
-            <span className="ml-2 rounded-full bg-coquelicot-500/15 px-2 py-0.5 text-xs font-semibold text-coquelicot-600">
-              {bookings.length}
-            </span>
-          )}
+          {bookings.length > 0 && <StatusPill tone="critical">{bookings.length}</StatusPill>}
         </h2>
-        <p className="mt-0.5 text-sm text-slate-400">
+        <p className="mt-0.5 text-sm text-admin-muted">
           Past confirmed bookings waiting to be marked complete
         </p>
       </div>
 
       {bookings.length === 0 ? (
-        <p className="px-5 py-6 text-sm text-slate-400">No events waiting to be completed.</p>
+        <p className="px-5 py-6 text-sm text-admin-faint">No events waiting to be completed.</p>
       ) : (
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-admin-border">
           {bookings.map((b) => {
             const isDone = done.has(b.id);
             const isRunning = completing === b.id;
@@ -116,33 +115,33 @@ export function CompleteEventsPanel({
             return (
               <li key={b.id} className="flex items-center justify-between gap-3 px-5 py-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-700">{b.name}</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="truncate text-sm font-semibold text-admin-text">{b.name}</p>
+                  <p className="text-sm wrap-anywhere text-admin-muted">
                     {formatDateShort(b.startAt)}
                     {b.email ? ` · ${b.email}` : " · no email"}
                   </p>
                   {err && <p className="text-sm text-coquelicot-600">{err}</p>}
                 </div>
                 {isDone ? (
-                  <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-moonstone-700">
+                  <span className="inline-flex shrink-0 items-center gap-1 text-sm font-bold text-moonstone-700">
                     Done
                     <FaCheck className="h-3 w-3" aria-hidden />
                   </span>
                 ) : (
-                  <button
-                    type="button"
+                  <AdminButton
+                    variant="outline"
                     disabled={isRunning}
                     onClick={() => handleComplete(b.id)}
-                    className="shrink-0 rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50"
+                    className="shrink-0"
                   >
                     {isRunning ? "Working…" : "Mark complete"}
-                  </button>
+                  </AdminButton>
                 )}
               </li>
             );
           })}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }

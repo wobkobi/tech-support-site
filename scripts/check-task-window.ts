@@ -4,7 +4,11 @@
 // down, and a parse that falls short of the window is grown to meet it.
 // Run with: npm run check:task-window
 
-import { collapseToWindow, TASK_TIMING_FALLBACK } from "@/features/business/lib/business";
+import {
+  collapseToWindow,
+  TASK_TIMING_FALLBACK,
+  taskWindowMismatch,
+} from "@/features/business/lib/business";
 import type { TaskLine } from "@/features/business/types/business";
 
 let failures = 0;
@@ -196,6 +200,27 @@ function main(): void {
       timing,
     ).tasks.filter((t) => t.rateConfigId === "travel").length,
     1,
+  );
+
+  // The calculator's Fix banner: whether a Time card edit leaves the tasks off the window.
+  console.log("\ntask-time banner\n");
+  const stated = [task("TV setup", 30), task("Printer setup", 30), task("MacBook", 20, "explicit")];
+  expectEqual("a 79-min window billed as 80 is a match", taskWindowMismatch(stated, 79, 30), null);
+  expectEqual(
+    "start moved 5 min later with a stated task present still flags over",
+    taskWindowMismatch(stated, 75, 30),
+    "over",
+  );
+  expectEqual("end moved 5 min later flags under", taskWindowMismatch(stated, 85, 30), "under");
+  expectEqual(
+    "all-stated tasks rounded up past the window stay quiet, Fix can't move them",
+    taskWindowMismatch([task("A", 15, "explicit"), task("B", 15, "explicit")], 24, 30),
+    null,
+  );
+  expectEqual(
+    "a job under the minimum asks to bill the minimum",
+    taskWindowMismatch([task("Quick fix", 20)], 20, 30),
+    "floor",
   );
 
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);

@@ -58,7 +58,7 @@ function toastToneClass(tone: ToastTone): string {
     case "info":
       return "border-admin-border-strong bg-admin-surface text-admin-text";
     case "success":
-      return "border-emerald-200 bg-emerald-50 text-emerald-800";
+      return "border-green-200 bg-green-50 text-green-800";
     case "warning":
       return "border-amber-200 bg-amber-50 text-amber-900";
     case "error":
@@ -92,7 +92,7 @@ function ToastCard({
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss"
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded-md opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-current"
+        className="inline-flex size-9 shrink-0 items-center justify-center rounded-md opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-current pointer-coarse:size-11"
       >
         <FaXmark className="size-4" aria-hidden="true" />
       </button>

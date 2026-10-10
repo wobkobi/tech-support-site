@@ -148,8 +148,8 @@ export function BookingEmailField({
         maxLength={BOOKING_FIELD_LIMITS.email}
         errorMessages={{ invalid: "Please enter a valid email address." }}
         className={cn(
-          "border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-          "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30",
+          "w-full rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
+          "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
           "disabled:cursor-not-allowed disabled:text-rich-black/70",
         )}
       />
@@ -159,7 +159,7 @@ export function BookingEmailField({
           update it.
         </p>
       )}
-      {contactHint && <p className="text-sm text-rich-black/70">{contactHint}</p>}
+      {contactHint && <p className="text-base text-rich-black/70">{contactHint}</p>}
       {emailSuggestion && (
         <div
           ref={promptRef}
@@ -239,13 +239,13 @@ export function BookingPhoneField({
         maxLength={BOOKING_FIELD_LIMITS.phone}
         errorMessages={{ invalid: "Please enter a valid phone number." }}
         className={cn(
-          "border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-          "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30",
+          "w-full rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
+          "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
           "sm:max-w-sm",
         )}
       />
       {required && (
-        <p className="text-sm text-rich-black/70">
+        <p className="text-base text-rich-black/70">
           Needed so I can contact you on arrival (running late, gate codes, etc.).
         </p>
       )}

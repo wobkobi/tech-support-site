@@ -5,6 +5,8 @@
 // real dollars while the operator edits. Mirrors the Availability/Pricing preview
 // affordances.
 
+import { Card } from "@/features/admin/components/ui/Card";
+import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
 import { priceRangeFor } from "@/features/business/lib/estimate-range";
 import type { EstimateConfidence, EstimatorSettings } from "@/shared/lib/settings/types";
 import type React from "react";
@@ -31,10 +33,8 @@ export function EstimatorPreview({
   estimator: EstimatorSettings;
 }): React.ReactElement {
   return (
-    <div className="mt-8 rounded-lg border border-admin-border p-4">
-      <p className="text-xs font-bold tracking-wide text-russian-violet uppercase">
-        Worked example
-      </p>
+    <Card className="mt-8">
+      <p className={ADMIN_EYEBROW_CLS}>Worked example</p>
       <p className="mt-1 text-sm text-admin-muted">
         A {SAMPLE_MINS / 60}-hour job at ${SAMPLE_RATE}/hr, priced at each confidence level with the
         settings above. Illustrative only.
@@ -53,7 +53,7 @@ export function EstimatorPreview({
               key={key}
               className="rounded-lg border border-admin-border bg-admin-surface p-3 text-center"
             >
-              <p className="text-xs text-admin-muted">{label}</p>
+              <p className="text-sm text-admin-muted">{label}</p>
               <p className="mt-1 text-base font-bold text-russian-violet">
                 ${low} - ${high}
               </p>
@@ -61,6 +61,6 @@ export function EstimatorPreview({
           );
         })}
       </div>
-    </div>
+    </Card>
   );
 }

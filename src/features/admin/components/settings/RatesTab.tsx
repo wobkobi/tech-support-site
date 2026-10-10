@@ -6,7 +6,10 @@
 // /api/business/rates routes; rates aren't a settings group, so there's no save bar.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { DEFAULT_RATE_ROWS } from "@/features/business/lib/pricing-policy";
 import type { RateConfig } from "@/features/business/types/business";
@@ -390,8 +393,6 @@ export function RatesTab({ initialRates }: Props): React.ReactElement {
   }
 
   const deleting = rates.find((r) => r.id === confirmDeleteId);
-  const inputCls =
-    "rounded-lg border border-admin-border-strong bg-admin-surface px-2.5 py-1.5 text-sm text-admin-text focus:ring-2 focus:ring-russian-violet/30 focus:outline-none";
 
   return (
     <div>
@@ -404,9 +405,7 @@ export function RatesTab({ initialRates }: Props): React.ReactElement {
         if (rows.length === 0) return null;
         return (
           <section key={kind} className="mb-5">
-            <h3 className="text-xs font-bold tracking-wide text-russian-violet uppercase">
-              {title}
-            </h3>
+            <h3 className={ADMIN_EYEBROW_CLS}>{title}</h3>
             <p className="mt-0.5 text-sm text-admin-muted">{blurb}</p>
             <div className="mt-2 divide-y divide-admin-border rounded-lg border border-admin-border">
               {rows.map((r) => {
@@ -433,62 +432,67 @@ export function RatesTab({ initialRates }: Props): React.ReactElement {
                             {r.label}
                           </p>
                         ) : (
-                          <input
+                          <AdminInput
                             aria-label="Rate name"
                             value={row.label}
                             onChange={(e) => editRow(r, { label: e.target.value })}
-                            className={cn(inputCls, "w-full")}
                           />
                         )}
                         {note && <p className="text-sm leading-snug text-admin-faint">{note}</p>}
                       </div>
                       <span className="flex items-center gap-1 text-sm text-admin-muted">
                         <span className={cn(kind === "percent" && "invisible")}>$</span>
-                        <input
+                        <AdminInput
                           aria-label={`${r.label} amount`}
                           type="number"
                           inputMode="decimal"
                           step="any"
                           value={row.amount}
                           onChange={(e) => editRow(r, { amount: e.target.value })}
-                          className={cn(inputCls, "w-24 text-right")}
+                          className="w-24 text-right"
                         />
                         <span>{kind === "percent" ? "%" : kind === "flat" ? "" : "/hr"}</span>
                       </span>
                       <span className="text-sm text-admin-faint">
                         {effectiveLabel(kind, row.amount, base)}
                       </span>
-                      <span className="flex items-center justify-end gap-2">
+                      <span className="flex flex-wrap items-center justify-end gap-2 gap-y-1">
                         {kind === "hourly" &&
                           (r.isDefault ? (
-                            <span className="rounded-full bg-russian-violet/10 px-2 py-0.5 text-xs font-semibold text-russian-violet">
+                            <span className="rounded-full bg-russian-violet/10 px-2.5 py-0.5 text-sm font-bold text-russian-violet">
                               Base
                             </span>
                           ) : (
                             <AdminButton
-                              size="xs"
                               variant="ghost"
+                              size="xs"
                               disabled={savingId === r.id}
                               onClick={() => void makeBase(r)}
                             >
                               Make base
                             </AdminButton>
                           ))}
+                        {/* Outline, not primary: a row Save can sit beside the danger
+                            Delete, and Add rate stays the tab's one primary. */}
                         {dirty && (
                           <>
-                            <AdminButton size="xs" type="submit" busy={savingId === r.id}>
+                            <AdminButton
+                              variant="outline"
+                              type="submit"
+                              size="xs"
+                              busy={savingId === r.id}
+                            >
                               Save
                             </AdminButton>
-                            <AdminButton size="xs" variant="ghost" onClick={() => undoRow(r.id)}>
+                            <AdminButton variant="ghost" size="xs" onClick={() => undoRow(r.id)}>
                               Undo
                             </AdminButton>
                           </>
                         )}
                         {!builtIn && !r.isDefault && (
                           <AdminButton
+                            variant="danger"
                             size="xs"
-                            variant="ghost"
-                            className="text-coquelicot-600"
                             onClick={() => setConfirmDeleteId(r.id)}
                           >
                             Delete
@@ -506,9 +510,7 @@ export function RatesTab({ initialRates }: Props): React.ReactElement {
 
       {/* Add a rate */}
       <section className="mb-5">
-        <h3 className="text-xs font-bold tracking-wide text-russian-violet uppercase">
-          Add a rate
-        </h3>
+        <h3 className={ADMIN_EYEBROW_CLS}>Add a rate</h3>
         <form
           className="mt-2 flex flex-wrap items-center gap-2"
           onSubmit={(e) => {
@@ -516,28 +518,28 @@ export function RatesTab({ initialRates }: Props): React.ReactElement {
             void addRate();
           }}
         >
-          <select
+          <AdminSelect
             aria-label="Kind of rate"
             value={newRate.kind}
             onChange={(e) => setNewRate((p) => ({ ...p, kind: e.target.value as RateKind }))}
-            className={inputCls}
+            className="w-auto"
           >
             {(Object.keys(KIND_LABELS) as RateKind[]).map((k) => (
               <option key={k} value={k}>
                 {KIND_LABELS[k]}
               </option>
             ))}
-          </select>
-          <input
+          </AdminSelect>
+          <AdminInput
             aria-label="New rate name"
             placeholder="Name, e.g. Urgent same-day"
             value={newRate.label}
             onChange={(e) => setNewRate((p) => ({ ...p, label: e.target.value }))}
-            className={cn(inputCls, "min-w-48 flex-1")}
+            className="w-auto min-w-48 flex-1"
           />
           <span className="flex items-center gap-1 text-sm text-admin-muted">
             <span className={cn(newRate.kind === "percent" && "invisible")}>$</span>
-            <input
+            <AdminInput
               aria-label="New rate amount"
               type="number"
               inputMode="decimal"
@@ -547,7 +549,7 @@ export function RatesTab({ initialRates }: Props): React.ReactElement {
               }
               value={newRate.amount}
               onChange={(e) => setNewRate((p) => ({ ...p, amount: e.target.value }))}
-              className={cn(inputCls, "w-24 text-right")}
+              className="w-24 text-right"
             />
             <span>{newRate.kind === "percent" ? "%" : newRate.kind === "flat" ? "" : "/hr"}</span>
           </span>

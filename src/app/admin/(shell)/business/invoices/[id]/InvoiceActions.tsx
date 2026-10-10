@@ -1,7 +1,8 @@
 "use client";
 // src/app/admin/(shell)/business/invoices/[id]/InvoiceActions.tsx
 // Action buttons + modals for the invoice detail page: save PDF, open Drive PDF, record
-// payment (via PaymentDialog), send-to-client, void, and delete-draft. Below lg, an
+// payment (via PaymentDialog), send-to-client, void, re-issue a voided invoice (rebuilt in
+// the calculator, so the promo is priced again), and delete-draft. Below lg, an
 // invoice still awaiting payment pins Mark as paid and Send to the screen bottom. The
 // send flow opens a preview modal with an editable email body/greeting plus the automatic
 // review ask checkbox; the void flow previews the notification and warns
@@ -11,14 +12,18 @@
 // SendInvoiceModal.tsx and VoidInvoiceModal.tsx.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { adminButtonClass } from "@/features/admin/components/ui/button-classes";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import {
   type LikelyIncome,
   PaymentDialog,
 } from "@/features/business/components/invoice/PaymentDialog";
+import { reissueHref } from "@/features/business/lib/invoice-reissue";
 import { cn } from "@/shared/lib/cn";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
@@ -60,10 +65,6 @@ interface InvoiceActionsProps {
   isQuote?: boolean;
 }
 
-const INPUT_CLS = cn(
-  "w-full rounded-lg border border-admin-border-strong px-3 py-2 text-sm text-admin-text",
-  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet",
-);
 /** Static JSON request headers. */
 const headers = { "Content-Type": "application/json" };
 
@@ -334,6 +335,12 @@ export function InvoiceActions({
             Resend void notification
           </AdminButton>
         )}
+        {/* Nothing is saved until the calculator saves, so no confirm is needed. */}
+        {isVoided && !isQuote && (
+          <Link href={reissueHref(invoiceId)} className={adminButtonClass({})}>
+            Re-issue in calculator
+          </Link>
+        )}
         {isOverdue && !isPaid && !isVoided && clientEmail && (
           <AdminButton
             variant="secondary"
@@ -375,7 +382,7 @@ export function InvoiceActions({
               busy={converting}
               className="max-lg:flex-1"
             >
-              Convert to invoice
+              Convert<span className="max-sm:hidden"> to invoice</span>
             </AdminButton>
           )}
           {!isVoided && (
@@ -385,7 +392,9 @@ export function InvoiceActions({
               aria-label={!clientEmail ? "Add a client email to enable sending" : undefined}
               className={cn(showPhoneBar && "max-lg:flex-1")}
             >
-              {alreadySent ? "Re-send to client" : "Send to client"}
+              {/* Short labels on phones, where two of these share the bar. */}
+              {alreadySent ? "Re-send" : "Send"}
+              <span className="max-sm:hidden">&nbsp;to client</span>
             </AdminButton>
           )}
         </div>
@@ -458,7 +467,7 @@ export function InvoiceActions({
           onChange={(e) => setNotesDraft(e.target.value)}
           disabled={notesSaving}
           placeholder="Optional note shown on the invoice."
-          className={cn(INPUT_CLS, "resize-y")}
+          className={cn(ADMIN_INPUT_CLS, "resize-y")}
         />
       </Modal>
 

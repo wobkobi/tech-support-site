@@ -1,4 +1,6 @@
 // src/features/business/components/calculator/SectionClearButton.tsx
+// Per-card "Clear" link for the calculator's section headers.
+
 import type React from "react";
 
 interface Props {
@@ -23,7 +25,7 @@ export function SectionClearButton({ onClear, label }: Props): React.ReactElemen
       type="button"
       onClick={onClear}
       aria-label={`Clear ${label}`}
-      className="shrink-0 text-xs font-medium text-slate-500 underline hover:text-red-600"
+      className="shrink-0 text-sm font-medium text-admin-muted underline underline-offset-2 hover:text-coquelicot-700"
     >
       Clear
     </button>

@@ -6,7 +6,12 @@
 // so importers keep one path. Shared by the calculator, invoice, ledger, and admin
 // booking views.
 
-import { calcGstFromInclusive, calcInvoiceTotals } from "@/features/business/lib/invoice-maths";
+import {
+  calcGstFromInclusive,
+  calcInvoiceTotals,
+  splitLineTotals,
+  type LineAmountInput,
+} from "@/features/business/lib/invoice-maths";
 import {
   BILLING_INCREMENT_MINS,
   GST_RATE,
@@ -26,6 +31,7 @@ import type {
   JobCalculation,
   LineItem,
   RateConfig,
+  TaskLine,
   TravelEntry,
 } from "@/features/business/types/business";
 import { timeParts } from "@/shared/lib/timezone-utils";
@@ -51,6 +57,9 @@ export {
   isValidLineItem,
   nextInvoiceNumber,
   splitGstInclusive,
+  splitLineTotals,
+  withSplitLineTotals,
+  type LineAmountInput,
 } from "@/features/business/lib/invoice-maths";
 export {
   collapseToWindow,
@@ -59,7 +68,9 @@ export {
   hourlyTaskMinutes,
   TASK_TIMING_FALLBACK,
   taskMinutes,
+  taskWindowMismatch,
   type TaskTimingConfig,
+  type TaskWindowMismatch,
 } from "@/features/business/lib/task-timing";
 
 /**
@@ -192,6 +203,23 @@ export function effectiveHourlyRate(
 }
 
 /**
+ * Task line totals in dollars, split by {@link splitLineTotals}. A task counts as timed
+ * on exactly the condition {@link jobToLineItems} uses to put `minutes` on its line item,
+ * so the calculator's totals and the saved invoice's re-total split the same cents.
+ * @param tasks - Task lines, in display order.
+ * @returns Each task's line total, in the same order.
+ */
+export function taskLineTotals(tasks: readonly TaskLine[]): number[] {
+  return splitLineTotals(
+    tasks.map((t): LineAmountInput => ({
+      qty: t.qty,
+      unitPrice: t.unitPrice,
+      ...(t.minutes != null && isHourlyTask(t) && { minutes: t.minutes }),
+    })),
+  );
+}
+
+/**
  * Converts a job calculation into a flat array of invoice line items.
  * Emits one row per task, one row per part, and a single Travel row summed
  * from `travelEntries`. Mirrors {@link calcJobTotal}'s {@link MIN_TRAVEL_CHARGE}
@@ -214,8 +242,10 @@ export function jobToLineItems(
   // can uplift exactly that, never travel or parts.
   let labourTotal = 0;
 
-  for (const task of enforceMinBillable(job.tasks, minBillableMins)) {
-    const lineTotal = Math.round(task.qty * task.unitPrice * 100) / 100;
+  const tasks = enforceMinBillable(job.tasks, minBillableMins);
+  const lineTotals = taskLineTotals(tasks);
+  for (const [i, task] of tasks.entries()) {
+    const lineTotal = lineTotals[i]!;
     items.push({
       description: task.description,
       qty: task.qty,
@@ -425,22 +455,20 @@ function jobPromoBreakdown(
    */
   const isDiscounted = (t: (typeof job.tasks)[number]): boolean =>
     (t.baseRateId != null || t.rateConfigId == null) && !isBusinessTask(t);
-  /**
-   * A task's line total, rounded as jobToLineItems and calcJobTotal round it. A raw
-   * sum discounts a base the invoice never prints, landing the promo a cent off.
-   * @param t - The task line.
-   * @returns The line total in dollars.
-   */
-  const lineOf = (t: (typeof job.tasks)[number]): number =>
-    Math.round(t.qty * t.unitPrice * 100) / 100;
+  // Line totals in the cents jobToLineItems and calcJobTotal print. A raw sum discounts a
+  // base the invoice never shows, landing the promo a cent off.
+  const lineTotals = taskLineTotals(job.tasks);
   /**
    * Each task's share from a per-line rule, 0 for lines the promo skips.
    * @param rule - The discount on one discounted line, given the task and its line total.
    * @returns Shares in `job.tasks` order.
    */
   const shares = (rule: (t: (typeof job.tasks)[number], line: number) => number): number[] =>
-    job.tasks.map((t) => (isDiscounted(t) ? rule(t, lineOf(t)) : 0));
-  const labourSubtotal = job.tasks.filter(isDiscounted).reduce((s, t) => s + lineOf(t), 0);
+    job.tasks.map((t, i) => (isDiscounted(t) ? rule(t, lineTotals[i]!) : 0));
+  const labourSubtotal = job.tasks.reduce(
+    (s, t, i) => (isDiscounted(t) ? s + lineTotals[i]! : s),
+    0,
+  );
   if (labourSubtotal <= 0) return none;
 
   if (promo.flatHourlyRate !== null) {
@@ -528,10 +556,10 @@ export function calcJobTotal(
   // labour-derived figure below (tasks total, holiday uplift, promo and
   // unsuccessful discounts) agrees with the floored invoice lines.
   const job = { ...jobIn, tasks: enforceMinBillable(jobIn.tasks, pricing.minBillableMins) };
-  // Round each task line before summing, exactly as jobToLineItems does: this preview and
-  // the saved invoice must land on the same cent, and summing unrounded quoted $75.83 for
-  // a job whose invoice then read $75.84.
-  const tasksTotal = job.tasks.reduce((s, t) => s + Math.round(t.qty * t.unitPrice * 100) / 100, 0);
+  // Sum the per-line cents jobToLineItems prints: this preview and the saved invoice must
+  // land on the same cent.
+  const lineTotals = taskLineTotals(job.tasks);
+  const tasksTotal = lineTotals.reduce((s, line) => s + line, 0);
   const partsTotal = job.parts.reduce((s, p) => s + p.cost, 0);
   const { tripTotal, total: travelTotal } = splitTravel(job.travelEntries, pricing.minTravelCharge);
   // Public-holiday surcharge uplifts labour only (hourly task lines), never
@@ -540,9 +568,10 @@ export function calcJobTotal(
   // Per-line rounding again: jobToLineItems accumulates its labour running
   // total from the ROUNDED lineTotals, so the surcharge must be derived from
   // the same base or the surcharge line itself drifts a cent.
-  const hourlyTasksTotal = job.tasks
-    .filter(isHourlyTask)
-    .reduce((s, t) => s + Math.round(t.qty * t.unitPrice * 100) / 100, 0);
+  const hourlyTasksTotal = job.tasks.reduce(
+    (s, t, i) => (isHourlyTask(t) ? s + lineTotals[i]! : s),
+    0,
+  );
   const holidaySurcharge =
     holidayUplift > 0 ? Math.round(hourlyTasksTotal * holidayUplift * 100) / 100 : 0;
   const subtotal =
@@ -570,7 +599,7 @@ export function calcJobTotal(
   const unsuccessfulBase = job.tasks.reduce(
     (s, t, i) =>
       isHourlyTask(t) && (job.unsuccessful || t.unsuccessful)
-        ? s + Math.round(t.qty * t.unitPrice * 100) / 100 - (promoByTask[i] ?? 0)
+        ? s + lineTotals[i]! - (promoByTask[i] ?? 0)
         : s,
     0,
   );

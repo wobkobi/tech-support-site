@@ -4,6 +4,9 @@
 // navigates back to the requested `next` path on success. Generic error on failure so a
 // wrong password can't be distinguished from a rate-limited one (defence-in-depth).
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useRef, useState } from "react";
@@ -80,9 +83,9 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
         tabIndex={-1}
         style={{ position: "absolute", left: "-9999px", width: 1, height: 1 }}
       />
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-semibold text-slate-600">Admin secret</span>
-        <input
+      <AdminField label="Admin secret" htmlFor="admin-secret">
+        <AdminInput
+          id="admin-secret"
           ref={secretRef}
           type="password"
           name="password"
@@ -92,21 +95,16 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
           disabled={busy}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
         />
-      </label>
+      </AdminField>
       {error && (
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
           {error}
         </p>
       )}
-      <button
-        type="submit"
-        disabled={busy}
-        className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-      >
+      <AdminButton type="submit" busy={busy} className="h-11">
         {busy ? "Signing in..." : "Sign in"}
-      </button>
+      </AdminButton>
     </form>
   );
 }

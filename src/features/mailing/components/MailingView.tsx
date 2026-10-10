@@ -4,8 +4,21 @@
 // presets, and the subscribers panel. New email opens a blank draft straight in the
 // editor, where the template dropdown swaps between presets.
 
+import {
+  ROW_CLS,
+  TABLE_CLS,
+  TBODY_CLS,
+  TD_CLS,
+  TH_CLS,
+  THEAD_CLS,
+} from "@/features/admin/components/ui/admin-table";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminTabs } from "@/features/admin/components/ui/AdminTabs";
+import { Card } from "@/features/admin/components/ui/Card";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
+import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
+import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { SubscribersPanel } from "@/features/mailing/components/SubscribersPanel";
@@ -57,6 +70,16 @@ function dateLabel(c: CampaignRow): string {
   if (c.sentAt) return `Sent ${formatDateTimeShort(c.sentAt)}`;
   if (c.scheduledAt) return `Sends ${formatDateTimeShort(c.scheduledAt)}`;
   return `Edited ${formatDateTimeShort(c.updatedAt)}`;
+}
+
+/**
+ * The sent / failed tally after the date, for an email that has gone out.
+ * @param c - Campaign row.
+ * @returns The " - N sent, M failed" suffix, or "" before sending.
+ */
+function tallyLabel(c: CampaignRow): string {
+  if (c.status !== "sent" && c.status !== "failed") return "";
+  return ` - ${c.sentCount} sent${c.failedCount > 0 ? `, ${c.failedCount} failed` : ""}`;
 }
 
 /**
@@ -136,128 +159,191 @@ export function MailingView({
     setDeleting(null);
   }
 
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="tablist" aria-label="Email stage" className="flex flex-wrap gap-2">
-          {TABS.map((t) => {
-            const active = t.key === tab;
-            const count = rows.filter((r) => tabOf(r) === t.key).length;
-            return (
-              <button
-                key={t.key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setTab(t.key)}
-                className={cn(
-                  "rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors select-none",
-                  active
-                    ? "border-russian-violet bg-russian-violet text-white"
-                    : "border-admin-border bg-admin-surface text-admin-muted hover:border-russian-violet/50 hover:text-russian-violet",
-                )}
-              >
-                {t.label}
-                {count > 0 && <span className="ml-1.5 opacity-70">{count}</span>}
-              </button>
-            );
-          })}
-        </div>
-        {tab === "presets" ? (
+  const showStatus = tab !== "presets";
+
+  /**
+   * The buttons for one row, shared by the phone list and the desktop table.
+   * @param row - Campaign row.
+   * @returns The row's action buttons.
+   */
+  function rowActions(row: CampaignRow): React.ReactElement {
+    return (
+      <>
+        {row.isPreset ? (
           <AdminButton
-            busy={busyId === "new-preset"}
-            onClick={() => void createAndOpen({ source: "blank", asPreset: true }, "new-preset")}
+            size="xs"
+            variant="outline"
+            busy={busyId === `use-${row.id}`}
+            onClick={() =>
+              void createAndOpen({ source: "copy", sourceId: row.id }, `use-${row.id}`)
+            }
           >
-            <FaPlus className="h-3 w-3" aria-hidden /> New preset
+            Use
           </AdminButton>
         ) : (
-          <AdminButton
-            busy={busyId === "blank"}
-            onClick={() => void createAndOpen({ source: "blank" }, "blank")}
-          >
-            <FaPlus className="h-3 w-3" aria-hidden /> New email
+          <>
+            <AdminButton
+              size="xs"
+              variant="secondary"
+              busy={busyId === `copy-${row.id}`}
+              onClick={() =>
+                void createAndOpen({ source: "copy", sourceId: row.id }, `copy-${row.id}`)
+              }
+            >
+              Duplicate
+            </AdminButton>
+            <AdminButton
+              size="xs"
+              variant="secondary"
+              busy={busyId === `preset-${row.id}`}
+              onClick={() => void saveAsPreset(row)}
+            >
+              Save as preset
+            </AdminButton>
+          </>
+        )}
+        {row.status !== "sending" && (
+          <AdminButton size="xs" variant="danger" onClick={() => setDeleting(row)}>
+            Delete
           </AdminButton>
         )}
-      </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <ListToolbar
+        className="mb-0"
+        filters={
+          <AdminTabs
+            aria-label="Email stage"
+            active={tab}
+            onSelect={setTab}
+            tabs={TABS.map((t) => {
+              const count = rows.filter((r) => tabOf(r) === t.key).length;
+              return {
+                key: t.key,
+                label: t.label,
+                badge:
+                  count > 0 ? (
+                    <span className="font-semibold text-admin-muted">{count}</span>
+                  ) : undefined,
+              };
+            })}
+          />
+        }
+        actions={
+          tab === "presets" ? (
+            <AdminButton
+              busy={busyId === "new-preset"}
+              onClick={() => void createAndOpen({ source: "blank", asPreset: true }, "new-preset")}
+            >
+              <FaPlus className="h-3 w-3" aria-hidden /> New preset
+            </AdminButton>
+          ) : (
+            <AdminButton
+              busy={busyId === "blank"}
+              onClick={() => void createAndOpen({ source: "blank" }, "blank")}
+            >
+              <FaPlus className="h-3 w-3" aria-hidden /> New email
+            </AdminButton>
+          )
+        }
+      />
 
       {visible.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-admin-border bg-admin-surface px-4 py-8 text-center text-sm text-admin-muted">
-          {tab === "drafts" && "No drafts. Start one with New email."}
-          {tab === "scheduled" && "Nothing scheduled."}
-          {tab === "sent" && "Nothing sent yet."}
-          {tab === "presets" && "No presets. Save any email as a preset to reuse it."}
-        </p>
+        <Card padding="none">
+          <EmptyState
+            title={
+              <>
+                {tab === "drafts" && "No drafts. Start one with New email."}
+                {tab === "scheduled" && "Nothing scheduled."}
+                {tab === "sent" && "Nothing sent yet."}
+                {tab === "presets" && "No presets. Save any email as a preset to reuse it."}
+              </>
+            }
+          />
+        </Card>
       ) : (
-        <ul className="flex flex-col divide-y divide-admin-border rounded-xl border border-admin-border bg-admin-surface">
-          {visible.map((row) => {
-            const pill = STATUS_PILL[row.status];
-            return (
-              <li
-                key={row.id}
-                className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link
-                      href={`/admin/mailing/${row.id}`}
-                      className="font-semibold text-admin-text hover:text-russian-violet hover:underline"
-                    >
-                      {row.name}
-                    </Link>
-                    {!row.isPreset && <StatusPill tone={pill.tone}>{pill.label}</StatusPill>}
+        <Card padding="none" className="overflow-hidden">
+          {/* Phones: one stacked row per email. */}
+          <ul className="flex flex-col divide-y divide-admin-border md:hidden">
+            {visible.map((row) => {
+              const pill = STATUS_PILL[row.status];
+              return (
+                <li
+                  key={row.id}
+                  className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        href={`/admin/mailing/${row.id}`}
+                        className={cn("text-sm", ADMIN_LINK_CLS)}
+                      >
+                        {row.name}
+                      </Link>
+                      {!row.isPreset && <StatusPill tone={pill.tone}>{pill.label}</StatusPill>}
+                    </div>
+                    <p className="truncate text-sm text-admin-text-secondary">
+                      {row.subject || <span className="italic">No subject yet</span>}
+                    </p>
+                    <p className="text-sm text-admin-muted">
+                      {dateLabel(row)}
+                      {tallyLabel(row)}
+                    </p>
                   </div>
-                  <p className="truncate text-sm text-admin-text-secondary">
-                    {row.subject || <span className="italic">No subject yet</span>}
-                  </p>
-                  <p className="text-sm text-admin-muted">
-                    {dateLabel(row)}
-                    {(row.status === "sent" || row.status === "failed") &&
-                      ` - ${row.sentCount} sent${row.failedCount > 0 ? `, ${row.failedCount} failed` : ""}`}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-wrap gap-2">
-                  {row.isPreset ? (
-                    <AdminButton
-                      size="sm"
-                      busy={busyId === `use-${row.id}`}
-                      onClick={() =>
-                        void createAndOpen({ source: "copy", sourceId: row.id }, `use-${row.id}`)
-                      }
-                    >
-                      Use
-                    </AdminButton>
-                  ) : (
-                    <>
-                      <AdminButton
-                        size="sm"
-                        variant="secondary"
-                        busy={busyId === `copy-${row.id}`}
-                        onClick={() =>
-                          void createAndOpen({ source: "copy", sourceId: row.id }, `copy-${row.id}`)
-                        }
+                  <div className="flex flex-wrap gap-2">{rowActions(row)}</div>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* From md: the data-table kit. */}
+          <table className={cn(TABLE_CLS, "max-md:hidden")}>
+            <thead className={THEAD_CLS}>
+              <tr>
+                <th className={TH_CLS}>Name</th>
+                {showStatus && <th className={TH_CLS}>Status</th>}
+                <th className={TH_CLS}>Date</th>
+                <th className={cn(TH_CLS, "text-right")}>Actions</th>
+              </tr>
+            </thead>
+            <tbody className={TBODY_CLS}>
+              {visible.map((row) => {
+                const pill = STATUS_PILL[row.status];
+                return (
+                  <tr key={row.id} className={ROW_CLS}>
+                    <td className={cn(TD_CLS, "max-w-0 align-top")}>
+                      <Link
+                        href={`/admin/mailing/${row.id}`}
+                        className={cn("text-sm", ADMIN_LINK_CLS)}
                       >
-                        Duplicate
-                      </AdminButton>
-                      <AdminButton
-                        size="sm"
-                        variant="secondary"
-                        busy={busyId === `preset-${row.id}`}
-                        onClick={() => void saveAsPreset(row)}
-                      >
-                        Save as preset
-                      </AdminButton>
-                    </>
-                  )}
-                  {row.status !== "sending" && (
-                    <AdminButton size="sm" variant="ghost" onClick={() => setDeleting(row)}>
-                      Delete
-                    </AdminButton>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                        {row.name}
+                      </Link>
+                      <p className="truncate text-sm text-admin-text-secondary">
+                        {row.subject || <span className="italic">No subject yet</span>}
+                      </p>
+                    </td>
+                    {showStatus && (
+                      <td className={cn(TD_CLS, "align-top")}>
+                        {!row.isPreset && <StatusPill tone={pill.tone}>{pill.label}</StatusPill>}
+                      </td>
+                    )}
+                    <td className={cn(TD_CLS, "align-top text-sm text-admin-muted")}>
+                      {dateLabel(row)}
+                      {tallyLabel(row)}
+                    </td>
+                    <td className={cn(TD_CLS, "align-top")}>
+                      <div className="flex flex-wrap justify-end gap-2">{rowActions(row)}</div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
       )}
 
       <SubscribersPanel initialSubscribed={subscribed} initialUnsubscribed={unsubscribed} />

@@ -145,8 +145,9 @@ export function BookingSubmitBar({
   return (
     <div
       className={cn(
-        "sticky bottom-0 -mx-5 flex flex-wrap items-center gap-4 border-t",
-        "border-seasalt-200/80 bg-seasalt/90 px-5 py-3 backdrop-blur-md",
+        // Bleeds to the form card's edges on phones: the negative margin matches CARD's p-4.
+        "sticky bottom-0 -mx-4 flex flex-wrap items-center gap-4 border-t",
+        "border-seasalt-200/80 bg-seasalt/90 px-4 py-3 backdrop-blur-md",
         "sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none",
       )}
     >

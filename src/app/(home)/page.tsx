@@ -55,6 +55,10 @@ const getApprovedReviews = unstable_cache(
 /** The home page shows at most this many quotes; the full list lives on /reviews. */
 const HOME_REVIEW_LIMIT = 3;
 
+// For a text link standing on its own line: a 44px row, so it is easy to tap. Not on
+// TEXT_LINK itself, which also sits inside running paragraphs.
+const TAP_LINK = "inline-flex min-h-11 items-center";
+
 /** Short ticked points under the hero buttons. */
 const HERO_POINTS: ReadonlyArray<string> = [
   "Same-day appointments",
@@ -163,7 +167,7 @@ export default async function Home(): Promise<React.ReactElement> {
                 Call {phone}
               </Button>
             </div>
-            <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-base font-semibold">
+            <ul className="mt-6 flex flex-col gap-2 text-base font-semibold sm:flex-row sm:flex-wrap sm:gap-x-5">
               {HERO_POINTS.map((point) => (
                 <li key={point} className="flex items-center gap-2">
                   <FaCheck className="h-4 w-4 text-moonstone-500" aria-hidden />
@@ -210,7 +214,7 @@ export default async function Home(): Promise<React.ReactElement> {
             whether it&apos;s worth spending money on - including when it isn&apos;t.
           </p>
           <p className="mt-5">
-            <Link href="/about" className={TEXT_LINK}>
+            <Link href="/about" className={cn(TEXT_LINK, TAP_LINK)}>
               More about me
             </Link>
           </p>
@@ -244,7 +248,7 @@ export default async function Home(): Promise<React.ReactElement> {
           ))}
         </ul>
         <p className="mt-7">
-          <Link href="/services" className={TEXT_LINK}>
+          <Link href="/services" className={cn(TEXT_LINK, TAP_LINK)}>
             See all services and what&apos;s included
           </Link>
         </p>
@@ -299,16 +303,16 @@ export default async function Home(): Promise<React.ReactElement> {
               className="mb-0"
             />
             {/* Google first: reviews are moving there, site reviews stay until that switch. */}
-            <span className="flex flex-wrap gap-x-6 gap-y-2">
+            <span className="flex flex-wrap gap-x-6">
               <a
                 href={GOOGLE_BUSINESS_PROFILE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={TEXT_LINK}
+                className={cn(TEXT_LINK, TAP_LINK)}
               >
                 See my reviews on Google
               </a>
-              <Link href="/reviews" className={TEXT_LINK}>
+              <Link href="/reviews" className={cn(TEXT_LINK, TAP_LINK)}>
                 Read all reviews
               </Link>
             </span>
@@ -324,7 +328,7 @@ export default async function Home(): Promise<React.ReactElement> {
             <h2 id="flyer-heading" className="text-xl font-extrabold">
               Know someone who needs tech help?
             </h2>
-            <p className="text-base text-seasalt-700">
+            <p className="mt-1.5 text-base text-seasalt-700">
               Download the flyer to share with neighbours or pin to a noticeboard.
             </p>
           </div>

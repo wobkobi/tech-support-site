@@ -5,9 +5,10 @@
 // automatic asks, "Who you can ask" (every contact with their ask status), the send form
 // and the link history; reviews left on the site sit in the side column for approval.
 
-import { Card } from "@/features/admin/components/ui/Card";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewApprovalList";
 import {
   ReviewAskPeople,
@@ -455,7 +456,7 @@ export default async function AdminReviewsPage({
         description="Ask past clients for a Google review. Approve anything left on your site."
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatStrip label="Review totals" className="mb-6 grid-cols-2 lg:grid-cols-4">
         <StatCard label="Ready to ask" value={readyCount} sub="not asked lately" />
         <StatCard label="Links sent" value={sentLast30.length} sub="last 30 days" />
         <StatCard
@@ -474,12 +475,12 @@ export default async function AdminReviewsPage({
           sub={pending.length > 0 ? "waiting on you" : "all caught up"}
           tone={pending.length > 0 ? "warning" : "default"}
         />
-      </div>
+      </StatStrip>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
           <Card>
-            <h2 className="mb-4 text-sm font-semibold text-russian-violet">Automatic asks</h2>
+            <CardHeader title="Automatic asks" />
             <ReviewAskQueue
               enabled={reviewSettings.reviewAskEnabled}
               upcoming={upcomingAsks}
@@ -488,15 +489,15 @@ export default async function AdminReviewsPage({
           </Card>
 
           <Card>
-            <h2 className="mb-1 text-sm font-semibold text-russian-violet">Who you can ask</h2>
-            <p className="mb-4 text-xs text-admin-muted">
-              Everyone in your contacts. The ask leads with your Google review link.
-            </p>
+            <CardHeader
+              title="Who you can ask"
+              description="Everyone in your contacts. The ask leads with your Google review link."
+            />
             <ReviewAskPeople people={askPeople} gapDays={reviewSettings.reviewAskGapDays} />
           </Card>
 
           <Card>
-            <h2 className="mb-4 text-sm font-semibold text-russian-violet">Send to someone new</h2>
+            <CardHeader title="Send to someone new" />
             <SendReviewLinkForm
               prefill={prefillContact ?? undefined}
               defaultOpen={prefillContact !== null}
@@ -504,8 +505,8 @@ export default async function AdminReviewsPage({
           </Card>
 
           {linkHistory.length > 0 && (
-            <Card>
-              <h2 className="mb-4 text-sm font-semibold text-russian-violet">Link history</h2>
+            <Card className="max-md:hidden">
+              <CardHeader title="Link history" />
               <ReviewLinkHistoryTable entries={linkHistory} />
             </Card>
           )}
@@ -513,10 +514,10 @@ export default async function AdminReviewsPage({
 
         <div className="flex flex-col gap-6">
           <Card flushOnPhone>
-            <h2 className="mb-1 text-sm font-semibold text-russian-violet">Reviews on your site</h2>
-            <p className="mb-4 text-xs text-admin-muted">
-              {approved.length} approved and showing on the site.
-            </p>
+            <CardHeader
+              title="Reviews on your site"
+              description={`${approved.length} approved and showing on the site.`}
+            />
             <ReviewApprovalList
               pending={pending}
               approved={approved}

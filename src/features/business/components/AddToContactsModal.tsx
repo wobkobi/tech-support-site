@@ -9,7 +9,8 @@
 // rather than a contact named after the company.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { looksLikeBusinessName } from "@/features/business/lib/payment-fields";
@@ -153,33 +154,29 @@ export function AddToContactsModal({
                 " isn't in your contacts yet. Add them so you can send review links and pre-fill future invoices?"
               }
             </p>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-admin-muted">Name</span>
-              <input
+            <AdminField label="Name" htmlFor="add-contact-name">
+              <AdminInput
+                id="add-contact-name"
                 type="text"
                 value={personName}
                 onChange={(e) => setPersonName(e.target.value)}
                 placeholder="The person you deal with"
                 disabled={saving}
-                className={ADMIN_INPUT_CLS}
               />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-admin-muted">
-                Company (optional)
-              </span>
-              <input
+            </AdminField>
+            <AdminField label="Company (optional)" htmlFor="add-contact-company">
+              <AdminInput
+                id="add-contact-company"
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="Business they invoice under"
                 disabled={saving}
-                className={ADMIN_INPUT_CLS}
               />
-            </label>
+            </AdminField>
           </>
         )}
-        <p className="text-xs text-admin-muted">{email}</p>
+        <p className="text-sm text-admin-muted">{email}</p>
         {error && <p className="text-sm text-coquelicot-500">{error}</p>}
       </div>
     </Modal>

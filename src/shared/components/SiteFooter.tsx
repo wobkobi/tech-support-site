@@ -43,7 +43,9 @@ const PROFILES: ReadonlyArray<{ label: string; href: string }> = [
   { label: "Google", href: GOOGLE_BUSINESS_PROFILE_URL },
 ];
 
-const LINK = "hover:text-white hover:underline";
+// Touch screens get 44px rows, so the stacked links are easy to hit with a finger.
+const LINK =
+  "hover:text-white hover:underline pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center";
 
 /** Props for {@link SiteFooter}. */
 export interface SiteFooterProps {
@@ -88,7 +90,7 @@ export function SiteFooter({ phone, phoneTel, email }: SiteFooterProps): React.R
             <h2 id="footer-services" className="mb-3 text-base font-bold text-white">
               Services
             </h2>
-            <ul className="grid gap-2">
+            <ul className="grid gap-2 pointer-coarse:gap-0">
               {SERVICE_LINKS.map((l) => (
                 <li key={l.href}>
                   <Link href={l.href} className={LINK}>
@@ -102,7 +104,7 @@ export function SiteFooter({ phone, phoneTel, email }: SiteFooterProps): React.R
             <h2 id="footer-company" className="mb-3 text-base font-bold text-white">
               Company
             </h2>
-            <ul className="grid gap-2">
+            <ul className="grid gap-2 pointer-coarse:gap-0">
               {COMPANY_LINKS.map((l) => (
                 <li key={l.href}>
                   <Link href={l.href} className={LINK}>
@@ -114,7 +116,7 @@ export function SiteFooter({ phone, phoneTel, email }: SiteFooterProps): React.R
           </nav>
           <div>
             <h2 className="mb-3 text-base font-bold text-white">Get in touch</h2>
-            <ul className="grid gap-2">
+            <ul className="grid gap-2 pointer-coarse:gap-0">
               <li>
                 <a href={phoneTel} className={cn(LINK, "font-bold text-white")}>
                   {phone}
@@ -130,7 +132,7 @@ export function SiteFooter({ phone, phoneTel, email }: SiteFooterProps): React.R
                   Book online
                 </Link>
               </li>
-              <li className="flex flex-wrap gap-x-2">
+              <li className="flex flex-wrap gap-x-2 pointer-coarse:gap-x-3">
                 {PROFILES.map((p, i) => (
                   <span key={p.href} className="flex gap-x-2">
                     {i > 0 && <span aria-hidden="true">&middot;</span>}

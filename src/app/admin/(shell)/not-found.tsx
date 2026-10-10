@@ -1,6 +1,6 @@
 // src/app/admin/(shell)/not-found.tsx
 // Admin-styled 404 for /admin/* routes. Keeps the operator inside the admin shell
-// (sidebar + slate chrome) instead of dropping to the public root 404, so a missing
+// (sidebar + top bar) instead of dropping to the public root 404, so a missing
 // invoice/record still has the nav to recover from.
 
 import Link from "next/link";
@@ -14,9 +14,9 @@ export default function AdminNotFound(): React.ReactElement {
   return (
     <>
       <div className="mx-auto max-w-md py-16 text-center">
-        <p className="text-5xl font-extrabold text-russian-violet">404</p>
+        <p className="text-5xl font-bold text-russian-violet">404</p>
         <h1 className="mt-3 text-xl font-bold text-russian-violet">Page not found</h1>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-admin-muted">
           That admin page or record does not exist or has been removed.
         </p>
         <Link

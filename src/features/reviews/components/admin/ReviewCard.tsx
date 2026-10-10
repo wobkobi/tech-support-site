@@ -2,11 +2,12 @@
 // src/features/reviews/components/admin/ReviewCard.tsx
 // Single review card with approve/revoke/delete actions.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { Card } from "@/features/admin/components/ui/Card";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
-import { SOFT_CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
@@ -105,54 +106,56 @@ export function ReviewCard({
   const isTest = `${row.firstName ?? ""} ${row.lastName ?? ""}`.toLowerCase().includes("test");
 
   return (
-    <div className={cn(SOFT_CARD, "flex flex-col gap-3")}>
+    <Card padding="sm" className="flex flex-col gap-3 sm:p-4">
       {/* Header row */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-semibold text-russian-violet">{formatReviewerName(row)}</span>
         {row.verified && <StatusPill tone="success">Verified</StatusPill>}
-        <span className="ml-auto shrink-0 text-xs text-slate-400">
+        <span className="ml-auto shrink-0 text-sm text-admin-muted">
           {formatDateShort(row.createdAt)}
         </span>
       </div>
 
       {/* Review text */}
-      <p className="leading-relaxed text-slate-700">{row.text}</p>
+      <p className="text-base leading-relaxed text-admin-text">{row.text}</p>
 
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Test reviews get a quick delete; both delete paths open the confirm. */}
         {isTest && (
-          <button
+          <AdminButton
+            variant="danger"
             onClick={() => setConfirmOpen(true)}
             disabled={loading !== null}
-            className="rounded-lg bg-red-500/20 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50"
+            size="xs"
           >
             {loading === "delete" ? "Deleting…" : "Delete"}
-          </button>
+          </AdminButton>
         )}
         {onApprove && (
-          <button
-            onClick={() => patch("approve")}
+          <AdminButton
+            variant="outline"
+            onClick={() => void patch("approve")}
             disabled={loading !== null}
-            className="rounded-lg bg-moonstone-400 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-moonstone-300 disabled:cursor-not-allowed disabled:opacity-50"
+            size="xs"
           >
             {loading === "approve" ? "Approving…" : "Approve"}
-          </button>
+          </AdminButton>
         )}
 
         {/* More actions menu (Revoke + Delete) */}
         <div ref={menuRef} className="relative ml-auto">
-          <button
-            type="button"
+          <AdminButton
+            variant="secondary"
             onClick={() => setMenuOpen((v) => !v)}
             disabled={loading !== null}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+            size="xs"
             aria-label="More actions"
           >
             ⋯
-          </button>
+          </AdminButton>
           {menuOpen && (
-            <div className="absolute right-0 z-10 mt-1 flex min-w-32 flex-col rounded-lg border border-slate-200 bg-white shadow-lg">
+            <div className="absolute right-0 z-10 mt-1 flex min-w-32 flex-col rounded-lg border border-admin-border bg-admin-surface shadow-lg">
               {onRevoke && (
                 <button
                   type="button"
@@ -161,7 +164,7 @@ export function ReviewCard({
                     void patch("revoke");
                   }}
                   disabled={loading !== null}
-                  className="rounded-t-lg px-4 py-2 text-left text-sm font-medium text-slate-800 transition-colors hover:bg-slate-100 disabled:opacity-50"
+                  className="rounded-t-lg px-4 py-2 text-left text-sm font-medium text-admin-text transition-colors hover:bg-admin-bg disabled:opacity-50"
                 >
                   {loading === "revoke" ? "Revoking…" : "Revoke"}
                 </button>
@@ -195,6 +198,6 @@ export function ReviewCard({
         onConfirm={() => void remove()}
         onCancel={() => setConfirmOpen(false)}
       />
-    </div>
+    </Card>
   );
 }

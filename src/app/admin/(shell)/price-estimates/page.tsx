@@ -5,8 +5,10 @@
 // are purged after 30 days.
 
 import { Card } from "@/features/admin/components/ui/Card";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { formatMins } from "@/features/business/lib/business";
 import { requireAdminAuth } from "@/shared/lib/auth";
@@ -88,7 +90,7 @@ export default async function AdminPriceEstimatesPage({
           <Link
             href={toggleHref}
             className={cn(
-              "rounded-full border px-3 py-1 text-xs font-semibold transition-colors select-none",
+              "inline-flex h-9 items-center rounded-full border px-3 text-sm font-semibold transition-colors select-none pointer-coarse:min-h-11",
               includeDev
                 ? "border-coquelicot-500/40 bg-coquelicot-500/10 text-coquelicot-600 hover:bg-coquelicot-500/20"
                 : "border-admin-border bg-admin-surface text-admin-muted hover:bg-admin-bg",
@@ -99,30 +101,28 @@ export default async function AdminPriceEstimatesPage({
         }
       />
 
-      <div className="mb-6 grid grid-cols-3 gap-3">
+      <StatStrip label="Estimate totals" className="mb-6 grid-cols-3">
         {stats.map((s) => (
           <StatCard key={s.label} label={s.label} value={s.value} />
         ))}
-      </div>
+      </StatStrip>
 
       <Card padding="none">
         <div className="p-4 sm:p-6">
           {logs.length === 0 ? (
-            <p className="py-8 text-center text-sm text-admin-faint">
-              No price estimates logged yet.
-            </p>
+            <EmptyState title="No price estimates logged yet." />
           ) : (
             <ul className="divide-y divide-admin-border">
               {logs.map((log) => (
                 <li key={log.id} className="py-4">
                   <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="flex items-center gap-2 text-xs text-admin-faint">
+                    <p className="flex items-center gap-2 text-sm text-admin-faint">
                       {formatDateTimeShort(log.createdAt.toISOString())}
                       {log.environment !== "production" && (
                         <StatusPill tone="critical">{log.environment}</StatusPill>
                       )}
                     </p>
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
                       <StatusPill tone={log.aiCategory === "complex" ? "critical" : "info"}>
                         {log.aiCategory}
                       </StatusPill>
@@ -148,7 +148,7 @@ export default async function AdminPriceEstimatesPage({
                       {log.aiTasks.map((task, i) => (
                         <span
                           key={`${log.id}-task-${i}`}
-                          className="rounded-md bg-admin-bg px-2 py-0.5 text-xs text-admin-muted"
+                          className="rounded-md bg-admin-bg px-2 py-0.5 text-sm text-admin-muted"
                         >
                           {task.label}: {formatMins(task.mins)}
                         </span>
@@ -156,7 +156,7 @@ export default async function AdminPriceEstimatesPage({
                     </div>
                   )}
 
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-admin-faint">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-admin-faint">
                     {log.address && (
                       <span>
                         <span className="font-medium text-admin-muted">Address:</span> {log.address}

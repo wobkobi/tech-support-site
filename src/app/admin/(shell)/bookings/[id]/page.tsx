@@ -8,6 +8,7 @@
 // instrumented.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { InfoRow } from "@/features/admin/components/ui/InfoRow";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
@@ -18,7 +19,9 @@ import { BookingTimesCard } from "@/features/booking/components/admin/BookingTim
 import { meetingTypeFromNotes } from "@/features/booking/lib/booking";
 import { formatMins, formatNZD } from "@/features/business/lib/business";
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
+import { Notice } from "@/shared/components/Notice";
 import { requireAdminAuth } from "@/shared/lib/auth";
+import { cn } from "@/shared/lib/cn";
 import { formatDateShort, formatDateTimeShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
 import { ServerTimer } from "@/shared/lib/server-timing";
@@ -54,7 +57,7 @@ const DURATION_LABEL: Record<string, string> = { short: "Short job", long: "Long
  */
 function Chip({ children }: { children: React.ReactNode }): React.ReactElement {
   return (
-    <span className="rounded-full border border-admin-border bg-admin-surface px-2.5 py-0.5 text-xs font-medium text-admin-text-secondary">
+    <span className="rounded-full border border-admin-border bg-admin-surface px-2.5 py-0.5 text-sm font-semibold text-admin-text-secondary">
       {children}
     </span>
   );
@@ -172,7 +175,7 @@ export default async function BookingDetailPage({
           email crons are holding off. Sits above everything: it means a job the
           site still thinks is on has been called off in Calendar. */}
       {booking.calendarEventMissingAt && booking.status !== "cancelled" && (
-        <div className="mb-4 rounded-lg border border-coquelicot-200 bg-coquelicot-50 p-4 text-sm text-admin-text">
+        <Notice tone="warn" onGrey className="mb-4 text-[0.9375rem] text-admin-text">
           <p className="font-semibold text-coquelicot-700">This booking has no calendar event.</p>
           <p className="mt-1">
             The event was deleted in Google Calendar on{" "}
@@ -180,7 +183,7 @@ export default async function BookingDetailPage({
             {booking.status}. Reminder emails are paused until it&apos;s sorted - cancel the booking
             if the job isn&apos;t happening, or re-book it if it is.
           </p>
-        </div>
+        </Notice>
       )}
 
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-6">
@@ -271,7 +274,7 @@ export default async function BookingDetailPage({
                         {booking.quotedTasksAtBooking.map((task, i) => (
                           <span
                             key={`quoted-task-${i}`}
-                            className="rounded-md bg-admin-bg px-2 py-0.5 text-xs text-admin-muted"
+                            className="rounded-md bg-admin-bg px-2 py-0.5 text-sm text-admin-muted"
                           >
                             {task.label}: {formatMins(task.mins)}
                           </span>
@@ -326,10 +329,7 @@ export default async function BookingDetailPage({
             <dl className="space-y-2 text-sm">
               <InfoRow label="Contact">
                 {contact ? (
-                  <Link
-                    href={`/admin/contacts/${contact.id}`}
-                    className="text-blue-500 hover:text-blue-700"
-                  >
+                  <Link href={`/admin/contacts/${contact.id}`} className={ADMIN_LINK_CLS}>
                     {contact.name}
                   </Link>
                 ) : (
@@ -344,13 +344,13 @@ export default async function BookingDetailPage({
                       <li key={inv.id} className="flex items-center justify-between gap-2">
                         <Link
                           href={`/admin/business/invoices/${inv.id}`}
-                          className="font-mono text-blue-500 hover:text-blue-700"
+                          className={cn("font-mono", ADMIN_LINK_CLS)}
                         >
                           {inv.number}
                         </Link>
                         <span className="flex items-center gap-2">
                           <span className="text-admin-text-secondary">{formatNZD(inv.total)}</span>
-                          <span className="text-xs text-admin-muted">{inv.status}</span>
+                          <span className="text-sm text-admin-muted">{inv.status}</span>
                         </span>
                       </li>
                     ))}
@@ -361,10 +361,10 @@ export default async function BookingDetailPage({
               </div>
               <InfoRow label="Review">
                 {review ? (
-                  <Link href="/admin/reviews" className="text-blue-500 hover:text-blue-700">
+                  <Link href="/admin/reviews" className={ADMIN_LINK_CLS}>
                     {review.status}
                     {review.verified ? " · verified" : ""}
-                    <span className="block text-xs font-normal text-admin-muted">
+                    <span className="block text-sm font-normal text-admin-muted">
                       {formatDateShort(review.createdAt)}
                     </span>
                   </Link>

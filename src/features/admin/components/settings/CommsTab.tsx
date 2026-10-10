@@ -13,6 +13,8 @@ import { SettingsFooter } from "@/features/admin/components/settings/SettingsFoo
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
+import { cn } from "@/shared/lib/cn";
 import { COMMS_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { CommsSettings } from "@/shared/lib/settings/types";
 import type React from "react";
@@ -60,9 +62,7 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
 
   return (
     <SettingsTabBody changed={form.changedPaths}>
-      <h3 className="text-xs font-bold tracking-wide text-russian-violet uppercase">
-        Which emails send
-      </h3>
+      <h3 className={ADMIN_EYEBROW_CLS}>Which emails send</h3>
       <div className="mt-2 divide-y divide-admin-border">
         <ToggleField
           id="notifyConfirmation"
@@ -84,9 +84,7 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           last-one-off guard exists to stop the customer going dark, and turning
           every push off is a legitimate choice. Devices are enrolled separately
           on /admin/notifications - these only gate what gets sent. */}
-      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
-        Which push notifications you get
-      </h3>
+      <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Which push notifications you get</h3>
       <div className="mt-2 divide-y divide-admin-border">
         <ToggleField
           id="pushOnBooking"
@@ -111,9 +109,7 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
         />
       </div>
 
-      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
-        Timings
-      </h3>
+      <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Timings</h3>
       <div className="mt-2 divide-y divide-admin-border">
         <NumberField
           id="reminderLeadHours"
@@ -136,9 +132,7 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
         />
       </div>
 
-      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
-        Quiet hours
-      </h3>
+      <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Quiet hours</h3>
       <div className="mt-2 divide-y divide-admin-border">
         <ToggleField
           id="quietHoursEnabled"
@@ -169,9 +163,7 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
         />
       </div>
 
-      <h3 className="mt-5 text-xs font-bold tracking-wide text-russian-violet uppercase">
-        Overdue invoice reminders
-      </h3>
+      <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Overdue invoice reminders</h3>
       <div className="mt-2 divide-y divide-admin-border">
         <ToggleField
           id="invoiceRemindersEnabled"

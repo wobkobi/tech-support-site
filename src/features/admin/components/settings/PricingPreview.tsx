@@ -4,6 +4,8 @@
 // billing rounding, surcharge, and GST status as the plain-English lines a customer or
 // invoice would reflect, so the abstract numbers have a concrete meaning before saving.
 
+import { Card } from "@/features/admin/components/ui/Card";
+import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
 import type { PricingSettings } from "@/shared/lib/settings/types";
 import type React from "react";
 
@@ -66,15 +68,13 @@ export function PricingPreview({ config }: Props): React.ReactElement {
   );
 
   return (
-    <div className="mt-6 rounded-lg border border-admin-border bg-admin-bg p-4">
-      <h3 className="text-xs font-bold tracking-wide text-russian-violet uppercase">
-        Live preview
-      </h3>
+    <Card className="mt-6 bg-admin-bg">
+      <h3 className={ADMIN_EYEBROW_CLS}>Live preview</h3>
       <ul className="mt-2 space-y-1 text-sm text-admin-text-secondary">
         {lines.map((line) => (
           <li key={line}>{line}</li>
         ))}
       </ul>
-    </div>
+    </Card>
   );
 }

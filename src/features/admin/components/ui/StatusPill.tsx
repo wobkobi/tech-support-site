@@ -11,21 +11,22 @@ import type React from "react";
 export type StatusTone = "neutral" | "info" | "success" | "warning" | "critical" | "violet";
 
 /**
- * Light-tint background + saturated text for each tone. Critical uses the brand
- * coquelicot; violet uses the #5a2a82 that matches the PDF VOID watermark.
+ * Light-tint background + dark text for each tone, from the public palette where one
+ * fits. Critical uses the brand coquelicot; violet uses the #5a2a82 that matches the
+ * PDF VOID watermark.
  * @param tone - The pill tone.
  * @returns Class string.
  */
 function toneClasses(tone: StatusTone): string {
   switch (tone) {
     case "neutral":
-      return "bg-slate-100 text-slate-600";
+      return "bg-seasalt-100 text-seasalt-800";
     case "info":
-      return "bg-blue-100 text-blue-700";
+      return "bg-moonstone-100 text-moonstone-800";
     case "success":
-      return "bg-emerald-100 text-emerald-700";
+      return "bg-green-100 text-green-800";
     case "warning":
-      return "bg-amber-100 text-amber-800";
+      return "bg-amber-100 text-amber-900";
     case "critical":
       return "bg-coquelicot-100 text-coquelicot-700";
     case "violet":
@@ -55,7 +56,7 @@ export function StatusPill({ tone, children, className }: StatusPillProps): Reac
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap",
+        "inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-bold whitespace-nowrap",
         toneClasses(tone),
         className,
       )}

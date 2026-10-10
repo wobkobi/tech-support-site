@@ -4,8 +4,12 @@
 // to the rate editor in Settings), the holiday chip, and the resolved promo with its
 // per-job skip toggle.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { Card } from "@/features/admin/components/ui/Card";
+import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
-import Link from "next/link";
+import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
 interface Props {
@@ -54,22 +58,19 @@ export function JobSettingsStrip({
   onSkipPromoChange,
 }: Props): React.ReactElement {
   return (
-    <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+    <Card padding="none" className="mb-4 flex flex-col gap-3 px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
         <div className="flex items-center gap-2">
           {/* Matching label widths line the two boxes up when they stack on a phone. */}
-          <label
-            htmlFor="job-date"
-            className="shrink-0 text-sm font-semibold text-slate-700 max-sm:w-22"
-          >
+          <label htmlFor="job-date" className={cn(ADMIN_LABEL_CLS, "mb-0 shrink-0 max-sm:w-22")}>
             Job date
           </label>
-          <input
+          <AdminInput
             id="job-date"
             type="date"
             value={jobDate}
             onChange={(e) => onJobDateChange(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            className="w-auto"
           />
         </div>
 
@@ -80,11 +81,11 @@ export function JobSettingsStrip({
         <div className="flex items-center gap-2">
           <label
             htmlFor="calc-promo-code"
-            className="shrink-0 text-sm font-semibold text-slate-700 max-sm:w-22"
+            className={cn(ADMIN_LABEL_CLS, "mb-0 shrink-0 max-sm:w-22")}
           >
             Promo code
           </label>
-          <input
+          <AdminInput
             id="calc-promo-code"
             value={promoCodeInput}
             onChange={(e) => onPromoCodeInputChange(e.target.value.toUpperCase())}
@@ -98,16 +99,15 @@ export function JobSettingsStrip({
             maxLength={32}
             autoComplete="off"
             spellCheck={false}
-            className="w-32 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm tracking-wider uppercase focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            className="w-auto max-w-32 min-w-0 flex-1 tracking-wider uppercase"
           />
-          <button
-            type="button"
+          <AdminButton
+            variant="secondary"
             onClick={onApplyPromoCode}
             disabled={promoCodeInput.trim() === promoCode}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
           >
             Apply
-          </button>
+          </AdminButton>
         </div>
 
         {/* The full clear lives up here rather than under the save buttons: it
@@ -115,22 +115,16 @@ export function JobSettingsStrip({
             the end, and destructive styling keeps it from reading as a fifth
             way to save. */}
         <div className="ml-auto flex gap-2">
-          <button
-            onClick={onClearForm}
-            className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
-          >
+          <AdminButton variant="danger" size="xs" onClick={onClearForm}>
             Clear form
-          </button>
-          <Link
-            href="/admin/settings?tab=rates"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-          >
+          </AdminButton>
+          <AdminButton variant="secondary" size="xs" href="/admin/settings?tab=rates">
             Manage rates
-          </Link>
+          </AdminButton>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+      <div className="flex flex-wrap items-center gap-2 text-sm text-admin-muted">
         <span>The job date sets which promo and public-holiday rate apply.</span>
         {holiday.name && (
           <span className="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-800">
@@ -153,25 +147,25 @@ export function JobSettingsStrip({
           <div className="flex items-center gap-2 text-sm text-amber-800">
             <span aria-hidden="true">⚡</span>
             <span className="font-semibold">Promo: {activePromo.title}</span>
-            <span className="text-xs text-amber-700">({summariseForBanner(activePromo)})</span>
+            <span className="text-sm text-amber-700">({summariseForBanner(activePromo)})</span>
             {activePromo.code && (
-              <span className="rounded bg-amber-200 px-1.5 py-0.5 text-xs font-semibold tracking-wider">
+              <span className="rounded bg-amber-200 px-1.5 py-0.5 text-sm font-semibold tracking-wider">
                 {activePromo.code}
               </span>
             )}
-            {skipPromo && <span className="text-xs italic">- skipped for this job</span>}
+            {skipPromo && <span className="text-sm italic">- skipped for this job</span>}
           </div>
-          <label className="flex items-center gap-2 text-xs text-amber-800">
+          <label className="flex items-center gap-2 text-sm text-amber-800">
             <input
               type="checkbox"
               checked={skipPromo}
               onChange={(e) => onSkipPromoChange(e.target.checked)}
-              className="h-3.5 w-3.5"
+              className="h-4 w-4 accent-russian-violet"
             />
             Skip promo for this job
           </label>
         </div>
       )}
-    </div>
+    </Card>
   );
 }

@@ -5,7 +5,10 @@
 // line items and the unsuccessful-work discount for them. The promo discount is kept.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
+import { Card } from "@/features/admin/components/ui/Card";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
 import {
@@ -26,7 +29,6 @@ import type {
   ParseJobQuestion,
   ParseJobResponse,
 } from "@/features/business/types/business";
-import { cn } from "@/shared/lib/cn";
 import { nzNowTime } from "@/shared/lib/timezone-utils";
 import type React from "react";
 import { useState } from "react";
@@ -153,10 +155,11 @@ export function InvoiceAiBox({
   const busy = parsing || disabled;
 
   return (
-    <div className="rounded-xl border border-admin-border bg-admin-surface p-4">
+    <Card>
+      {/* A real label for the textarea, sized like the calculator's CardHeader title. */}
       <label
         htmlFor="invoice-ai-input"
-        className="mb-1 block text-sm font-semibold text-russian-violet"
+        className="mb-1 block text-lg font-semibold text-admin-text"
       >
         Describe the job
       </label>
@@ -169,7 +172,7 @@ export function InvoiceAiBox({
         already on this invoice stays as it is. The unsuccessful-work discount is worked out again
         from the new lines.
       </p>
-      <textarea
+      <AdminTextarea
         id="invoice-ai-input"
         value={input}
         onChange={(e) => {
@@ -182,12 +185,12 @@ export function InvoiceAiBox({
         rows={5}
         disabled={busy}
         placeholder={JOB_DESCRIPTION_PLACEHOLDER}
-        className={cn(ADMIN_INPUT_CLS, "resize-y")}
       />
       {error && <p className="mt-1 text-sm text-coquelicot-700">{error}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
         <AdminButton
           type="button"
+          variant="outline"
           onClick={() => void parse()}
           disabled={busy || !input.trim()}
           busy={parsing}
@@ -227,9 +230,9 @@ export function InvoiceAiBox({
           </p>
           <div className="space-y-3">
             {questions.map((q) => (
-              <label key={q.id} className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">{q.question}</span>
-                <input
+              <AdminField key={q.id} label={q.question} htmlFor={`invoice-clarify-${q.id}`}>
+                <AdminInput
+                  id={`invoice-clarify-${q.id}`}
                   type="text"
                   placeholder={q.hint}
                   value={answers[q.id] ?? ""}
@@ -242,14 +245,14 @@ export function InvoiceAiBox({
                     }
                   }}
                   disabled={busy}
-                  className={ADMIN_INPUT_CLS}
                 />
-              </label>
+              </AdminField>
             ))}
           </div>
           <div className="mt-3 flex gap-2">
             <AdminButton
               type="button"
+              variant="outline"
               onClick={() => void parse(answers)}
               disabled={busy}
               busy={parsing}
@@ -269,6 +272,6 @@ export function InvoiceAiBox({
           </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 }

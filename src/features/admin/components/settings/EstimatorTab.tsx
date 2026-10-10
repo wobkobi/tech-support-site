@@ -11,6 +11,7 @@ import { NumberField, SettingsTabBody } from "@/features/admin/components/settin
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
+import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
 import { ESTIMATOR_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { EstimatorSettings } from "@/shared/lib/settings/types";
 import type React from "react";
@@ -63,7 +64,7 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
 
       {/* Price range width - the confidence-scaled band the public estimator shows. */}
       <div className="mt-8">
-        <h3 className="text-lg font-semibold text-russian-violet">Estimate range width</h3>
+        <h3 className={ADMIN_EYEBROW_CLS}>Estimate range width</h3>
         <p className="mt-1 text-sm text-admin-muted">
           How wide the customer-facing price range is, set by how clearly the job was described.
           Percentages are of the estimate; vaguer jobs get a wider, lower range so they read
@@ -141,7 +142,7 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
 
       {/* Estimate limits + multi-task stacking + the advertised low-end floor. */}
       <div className="mt-8">
-        <h3 className="text-lg font-semibold text-russian-violet">Limits &amp; stacking</h3>
+        <h3 className={ADMIN_EYEBROW_CLS}>Limits &amp; stacking</h3>
         <p className="mt-1 text-sm text-admin-muted">
           The ceiling on any single estimate, how much extra tasks add to a multi-task visit, and
           the floor under the advertised low price.

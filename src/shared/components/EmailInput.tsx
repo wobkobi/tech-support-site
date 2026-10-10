@@ -29,7 +29,11 @@ interface EmailInputProps {
   error?: string | null;
   /** Wording overrides for blur errors. */
   errorMessages?: { invalid?: string; tooLong?: string };
-  /** Extra Tailwind classes appended to the default input styles. */
+  /**
+   * Input classes that REPLACE the default styles (the default focus ring would
+   * otherwise switch off a caller's outline-based focus style). The error border
+   * is still applied on top.
+   */
   className?: string;
   /** Skip rendering the inline error <p>. */
   hideError?: boolean;
@@ -62,7 +66,7 @@ const DEFAULT_INPUT_CLASSES = cn(
  * @param props.autoComplete - autocomplete token; defaults to "email".
  * @param props.error - Externally-controlled error; overrides the internal blur error when supplied.
  * @param props.errorMessages - Per-form wording overrides for blur errors.
- * @param props.className - Extra Tailwind classes appended to the default input styles.
+ * @param props.className - Input classes that replace the default styles.
  * @param props.hideError - Skip rendering the inline error paragraph.
  * @param props.inputRef - Ref forwarded to the underlying input element.
  * @param props.disabled - HTML disabled attribute.
@@ -168,7 +172,10 @@ export function EmailInput({
         placeholder={placeholder}
         autoComplete={autoComplete}
         disabled={disabled}
-        className={cn(DEFAULT_INPUT_CLASSES, activeError && "border-coquelicot-500/60", className)}
+        className={cn(
+          className ?? DEFAULT_INPUT_CLASSES,
+          activeError && "border-coquelicot-500/60",
+        )}
       />
       {!hideError && activeError && (
         <p id={describedBy} role="alert" className="mt-1 text-sm text-error">

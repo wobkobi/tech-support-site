@@ -4,6 +4,7 @@
 // `defaults.ts` and DB overrides merge on top in `get-settings.ts`. Optional rules use
 // `null`/`0` to mean "off" - see the disable-semantics table in the settings plan.
 
+import type { IetcConfig, TaxBracket, VehicleFuel } from "@/features/business/lib/tax/types";
 import type { Weekday } from "@/shared/lib/timezone-utils";
 
 /** One weekday's bookable window. See {@link Weekday} for the key numbering. */
@@ -105,6 +106,11 @@ interface RescheduleSettings {
 export interface PricingSettings {
   /** When true invoices show GST; requires a GST number to be set. */
   gstRegistered: boolean;
+  /**
+   * Date GST registration took effect ("YYYY-MM-DD"); "" = from the business start.
+   * Expenses dated before it count GST-inclusive for profit and tax.
+   */
+  gstRegisteredFrom: string;
   /** Minimum billable time floor (minutes). 0 = no floor. */
   minBillableMins: number;
   /** Round-to-nearest billable step (minutes); shared with the AI parser snap. */
@@ -245,12 +251,22 @@ export interface EstimatorSettings {
 }
 
 export interface TaxSettings {
-  /** Income-tax reserve rate (fraction). */
-  incomeTax: number;
   /** ACC levy estimate (fraction). */
   acc: number;
   /** KiwiSaver contribution rate (fraction). */
   kiwiSaver: number;
+  /** Income-tax bands, lowest first; the last band has `upTo: null`. */
+  brackets: TaxBracket[];
+  /** Independent earner tax credit. */
+  ietc: IetcConfig;
+  /** Bought items at or under this (NZD, on the GST basis) are written off in full. */
+  lowValueThreshold: number;
+  /** Residual income tax above this (NZD) means provisional tax the next year. */
+  provisionalThreshold: number;
+  /** Fuel type that picks the IRD kilometre rates. */
+  vehicleFuel: VehicleFuel;
+  /** Business-use percent (0-100) per expense category; a missing category counts as 100. */
+  categoryBusinessUse: Record<string, number>;
 }
 
 export interface CommsSettings {

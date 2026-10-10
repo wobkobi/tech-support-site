@@ -1,6 +1,13 @@
 "use client";
 // src/features/business/components/calculator/CancelFeeSection.tsx
+// Early-cancel form: the fee reason, the booking and cancel times, and the policy verdict.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
+import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import type { CancelMeetingType, CancellationReason } from "@/features/business/lib/pricing-policy";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -64,8 +71,6 @@ const MEETING_TYPES: { value: CancelMeetingType; label: string }[] = [
   { value: "in-person", label: "In person" },
   { value: "remote", label: "Remote" },
 ];
-
-const CHIP_BASE = "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors";
 
 /**
  * Renders a policy window in hours. The windows are settings, so a value of 1
@@ -146,23 +151,19 @@ export function CancelFeeSection({
 }: CancelFeeSectionProps): React.ReactElement {
   const noShow = reason === "no-show";
   const remote = meetingType === "remote";
-  const inputClass =
-    "rounded-lg border border-slate-300 px-3 py-2 text-base text-slate-700 focus:border-russian-violet focus:outline-none";
-
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-coquelicot-500/30 bg-coquelicot-500/5 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-lg font-bold text-russian-violet">Early cancel</h2>
-        <button
-          type="button"
-          onClick={onExit}
-          className="ml-auto rounded-lg px-2.5 py-1 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
-        >
-          Back to job calculator
-        </button>
-      </div>
+    <Card className="flex flex-col gap-4 border-coquelicot-500/30 bg-coquelicot-500/5">
+      <CardHeader
+        title="Early cancel"
+        className="mb-0 items-center"
+        actions={
+          <AdminButton variant="ghost" size="xs" onClick={onExit}>
+            Back to job calculator
+          </AdminButton>
+        }
+      />
 
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-admin-text-secondary">
         Bills the call-out fee instead of job work. Nothing was done on site, so the task list and
         parts are cleared.
       </p>
@@ -170,19 +171,15 @@ export function CancelFeeSection({
       {/* Reason + meeting type */}
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <p className="mb-1 text-sm font-medium text-slate-600">Reason</p>
-          <div className="flex flex-wrap gap-1">
+          <p className={ADMIN_LABEL_CLS}>Reason</p>
+          <div className="flex flex-wrap gap-1.5">
             {REASONS.map((r) => (
               <button
                 key={r.value}
                 type="button"
                 onClick={() => onReasonChange(r.value)}
-                className={cn(
-                  CHIP_BASE,
-                  reason === r.value
-                    ? "bg-russian-violet text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-                )}
+                aria-pressed={reason === r.value}
+                className={adminChipClass(reason === r.value)}
               >
                 {r.label}
               </button>
@@ -190,19 +187,15 @@ export function CancelFeeSection({
           </div>
         </div>
         <div>
-          <p className="mb-1 text-sm font-medium text-slate-600">Was it</p>
-          <div className="flex flex-wrap gap-1">
+          <p className={ADMIN_LABEL_CLS}>Was it</p>
+          <div className="flex flex-wrap gap-1.5">
             {MEETING_TYPES.map((m) => (
               <button
                 key={m.value}
                 type="button"
                 onClick={() => onMeetingTypeChange(m.value)}
-                className={cn(
-                  CHIP_BASE,
-                  meetingType === m.value
-                    ? "bg-russian-violet text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-                )}
+                aria-pressed={meetingType === m.value}
+                className={adminChipClass(meetingType === m.value)}
               >
                 {m.label}
               </button>
@@ -213,48 +206,44 @@ export function CancelFeeSection({
 
       {/* Booking start */}
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-slate-600">Booking date</span>
-          <input
+        <AdminField label="Booking date" htmlFor="cancel-booking-date">
+          <AdminInput
+            id="cancel-booking-date"
             type="date"
             value={bookingDate}
             onChange={(e) => onBookingDateChange(e.target.value)}
-            className={inputClass}
           />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-slate-600">Booking start time</span>
-          <input
+        </AdminField>
+        <AdminField label="Booking start time" htmlFor="cancel-booking-time">
+          <AdminInput
+            id="cancel-booking-time"
             type="time"
             value={bookingTime}
             onChange={(e) => onBookingTimeChange(e.target.value)}
-            className={inputClass}
           />
-        </label>
+        </AdminField>
       </div>
 
       {/* When they called it off. A no-show never called, so there is no notice
           to measure and these inputs would only mislead. */}
       {!noShow && (
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium text-slate-600">They cancelled on</span>
-            <input
+          <AdminField label="They cancelled on" htmlFor="cancel-at-date">
+            <AdminInput
+              id="cancel-at-date"
               type="date"
               value={cancelledAtDate}
               onChange={(e) => onCancelledAtDateChange(e.target.value)}
-              className={inputClass}
             />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium text-slate-600">At</span>
-            <input
+          </AdminField>
+          <AdminField label="At" htmlFor="cancel-at-time">
+            <AdminInput
+              id="cancel-at-time"
               type="time"
               value={cancelledAtTime}
               onChange={(e) => onCancelledAtTimeChange(e.target.value)}
-              className={inputClass}
             />
-          </label>
+          </AdminField>
         </div>
       )}
 
@@ -313,13 +302,13 @@ export function CancelFeeSection({
           bill something the published policy does not say, so it is shown rather
           than typed - the fee follows the times and the settings. To let one go,
           don't send the invoice; to bend one, edit the saved draft. */}
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-admin-text-secondary">
         <span className="font-medium">Fee:</span>{" "}
         {fee > 0 ? `$${fee} (from your cancellation policy)` : "none"}
       </p>
 
       {!remote && (
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-admin-text-secondary">
           <span className="font-medium">Round trip:</span>{" "}
           {!hasTravel
             ? "no travel figure on this job - look one up below if you drove."
@@ -328,6 +317,6 @@ export function CancelFeeSection({
               : "not billed. It is parked, so it comes back if the times change."}
         </p>
       )}
-    </div>
+    </Card>
   );
 }

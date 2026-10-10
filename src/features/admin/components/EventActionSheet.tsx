@@ -4,19 +4,24 @@
 // booking card in DayAgendaView: view details, complete, cancel, no-show, reschedule,
 // bill in calculator, resend review email, delete (test bookings only). Mutations route
 // through the shared useBookingActions hook, with toasts from the global admin toaster.
+// Built on the kit Modal in its sheet placement: pinned to the bottom edge on phones,
+// centred from sm.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { adminButtonClass } from "@/features/admin/components/ui/button-classes";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
-import { useDialogKeys } from "@/features/admin/hooks/use-dialog-keys";
+import { Modal } from "@/features/admin/components/ui/Modal";
 import type {
   BookingStatus,
   WeekEvent,
   WeekEventBooking,
 } from "@/features/admin/lib/schedule-types";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
+import { cn } from "@/shared/lib/cn";
 import { isPastEditWindow } from "@/shared/lib/edit-window";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 /** Which mutation a pending confirmation will run once accepted. */
 type PendingTarget =
@@ -34,6 +39,23 @@ interface PendingAction {
   tone: "default" | "danger";
   target: PendingTarget;
 }
+
+/** Full-width sheet action height: a 44px finger target on every screen. */
+const SHEET_BUTTON_CLS = "h-11 w-full";
+
+/**
+ * Amber warning tint laid over the secondary variant for Mark no-show, so it stands apart
+ * from the neutral cancel when the sheet is used one-handed on a job.
+ */
+const SHEET_NO_SHOW_CLS =
+  "border-amber-300 bg-amber-100 text-amber-900 hover:border-amber-500 hover:bg-amber-200";
+
+/**
+ * Plain links styled as the secondary AdminButton at sheet size. They stay native anchors
+ * because Reschedule opens a new tab and the others do a full page load, which the
+ * AdminButton link form (a client-side Next Link) would change.
+ */
+const SHEET_LINK_CLS = cn(adminButtonClass({ variant: "secondary" }), SHEET_BUTTON_CLS);
 
 interface EventActionSheetProps {
   /**
@@ -74,18 +96,6 @@ export function EventActionSheet({
   const [pending, setPending] = useState<PendingAction | null>(null);
   // Ticked by default: a no-show is normally chased for the call-out fee.
   const [draftInvoice, setDraftInvoice] = useState(true);
-
-  const panelRef = useRef<HTMLDivElement>(null);
-  // Escape closes and Tab stays in the sheet. While a confirm dialog is open
-  // over it, that dialog takes the keys instead.
-  useDialogKeys(panelRef, true, onClose);
-
-  // Move focus into the sheet, and back to the opener when it unmounts.
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    panelRef.current?.focus();
-    return () => opener?.focus?.();
-  }, []);
 
   const booking = event.booking;
   const status: BookingStatus = booking.status;
@@ -204,159 +214,140 @@ export function EventActionSheet({
     );
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Actions for ${booking.name}`}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
-      onClick={onClose}
+    <Modal
+      open
+      onClose={onClose}
+      placement="sheet"
+      title={
+        // The hidden prefix keeps the dialog's accessible name "Actions for <name>".
+        <span className="block truncate">
+          <span className="sr-only">Actions for </span>
+          {booking.name}
+        </span>
+      }
+      description={<span className="block truncate">{event.title}</span>}
     >
-      <div
-        ref={panelRef}
-        tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg rounded-xl bg-admin-surface p-4 shadow-xl outline-none"
-      >
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-admin-text">{booking.name}</p>
-            <p className="truncate text-xs text-admin-muted">{event.title}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="-my-1.5 -mr-2 inline-flex size-11 shrink-0 items-center justify-center rounded-md text-xl text-admin-muted hover:bg-admin-bg hover:text-admin-text"
+      <div className="flex flex-col gap-2">
+        <a href={`/admin/bookings/${booking.id}`} className={SHEET_LINK_CLS}>
+          View details
+        </a>
+
+        {isEditLocked && isOpen && (
+          <p className="px-1 text-center text-sm text-admin-faint">
+            Cancelling locks {lockHours}h after a booking ends. Completing stays open.
+          </p>
+        )}
+
+        {isConfirmed && (
+          <AdminButton
+            variant="outline"
+            onClick={handleComplete}
+            disabled={busy}
+            className={SHEET_BUTTON_CLS}
           >
-            ×
-          </button>
-        </div>
+            Mark completed
+          </AdminButton>
+        )}
 
-        <div className="flex flex-col gap-2">
-          <a
-            href={`/admin/bookings/${booking.id}`}
-            className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet/10 px-4 text-sm font-semibold text-russian-violet select-none hover:bg-russian-violet/20"
+        {isConfirmed && isPast && (
+          <AdminButton
+            variant="secondary"
+            onClick={handleNoShow}
+            disabled={busy || isEditLocked}
+            className={cn(SHEET_BUTTON_CLS, SHEET_NO_SHOW_CLS)}
           >
-            View details
-          </a>
+            Mark no-show
+          </AdminButton>
+        )}
 
-          {isEditLocked && isOpen && (
-            <p className="px-1 text-center text-sm text-admin-faint">
-              Cancelling locks {lockHours}h after a booking ends. Completing stays open.
-            </p>
-          )}
-
-          {isConfirmed && (
-            <button
-              type="button"
-              onClick={handleComplete}
-              disabled={busy}
-              className="inline-flex h-11 items-center justify-center rounded-lg bg-green-500/20 px-4 text-sm font-semibold text-green-700 hover:bg-green-500/30 disabled:opacity-50"
-            >
-              Mark completed
-            </button>
-          )}
-
-          {isConfirmed && isPast && (
-            <button
-              type="button"
-              onClick={handleNoShow}
+        {isOpen && (
+          <>
+            <AdminButton
+              variant="secondary"
+              onClick={() => handleCancel("operator")}
               disabled={busy || isEditLocked}
-              className="inline-flex h-11 items-center justify-center rounded-lg bg-amber-500/20 px-4 text-sm font-semibold text-amber-700 hover:bg-amber-500/30 disabled:opacity-50"
+              className={SHEET_BUTTON_CLS}
             >
-              Mark no-show
-            </button>
-          )}
-
-          {isOpen && (
-            <>
-              <button
-                type="button"
-                onClick={() => handleCancel("operator")}
-                disabled={busy || isEditLocked}
-                className="inline-flex h-11 items-center justify-center rounded-lg bg-admin-border px-4 text-sm font-semibold text-admin-text hover:bg-admin-border-strong disabled:opacity-50"
-              >
-                Cancel - my call
-              </button>
-              <button
-                type="button"
-                onClick={() => handleCancel("on-behalf")}
-                disabled={busy || isEditLocked}
-                className="inline-flex h-11 items-center justify-center rounded-lg bg-red-500/20 px-4 text-sm font-semibold text-red-600 hover:bg-red-500/30 disabled:opacity-50"
-              >
-                Cancel - for customer
-              </button>
-              {new Date(event.startAt).getTime() > renderedAt && (
-                <a
-                  href={`/booking/edit?token=${booking.cancelToken}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet/10 px-4 text-sm font-semibold text-russian-violet select-none hover:bg-russian-violet/20"
-                >
-                  Reschedule
-                </a>
-              )}
-            </>
-          )}
-
-          {(isConfirmed || isCompleted) && (
-            <>
-              {/* Deep-link into the calculator with the event's (operator-corrected)
-                  times, client, and address pre-filled - see calculator/page.tsx. */}
+              Cancel - my call
+            </AdminButton>
+            <AdminButton
+              variant="danger"
+              onClick={() => handleCancel("on-behalf")}
+              disabled={busy || isEditLocked}
+              className={SHEET_BUTTON_CLS}
+            >
+              Cancel - for customer
+            </AdminButton>
+            {new Date(event.startAt).getTime() > renderedAt && (
               <a
-                href={`/admin/business/calculator?eventId=${encodeURIComponent(event.id)}`}
-                className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet/10 px-4 text-sm font-semibold text-russian-violet select-none hover:bg-russian-violet/20"
+                href={`/booking/edit?token=${booking.cancelToken}`}
+                target="_blank"
+                rel="noreferrer"
+                className={SHEET_LINK_CLS}
               >
-                Bill in calculator
+                Reschedule
               </a>
-              <button
-                type="button"
-                onClick={handleResendReview}
-                disabled={busy}
-                className="inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-400/15 px-4 text-sm font-semibold text-moonstone-700 hover:bg-moonstone-400/25 disabled:opacity-50"
-              >
-                Send review email
-              </button>
-            </>
-          )}
+            )}
+          </>
+        )}
 
-          {isTestBooking && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={busy}
-              className="inline-flex h-11 items-center justify-center rounded-lg bg-red-500/20 px-4 text-sm font-semibold text-red-600 hover:bg-red-500/30 disabled:opacity-50"
+        {(isConfirmed || isCompleted) && (
+          <>
+            {/* Deep-link into the calculator with the event's (operator-corrected)
+                times, client, and address pre-filled - see calculator/page.tsx. */}
+            <a
+              href={`/admin/business/calculator?eventId=${encodeURIComponent(event.id)}`}
+              className={SHEET_LINK_CLS}
             >
-              Delete booking
-            </button>
-          )}
-        </div>
+              Bill in calculator
+            </a>
+            <AdminButton
+              variant="secondary"
+              onClick={handleResendReview}
+              disabled={busy}
+              className={SHEET_BUTTON_CLS}
+            >
+              Send review email
+            </AdminButton>
+          </>
+        )}
 
-        {/* Sits inside the stop-propagation container so dialog clicks don't
-            bubble to the sheet backdrop and close it mid-confirm. */}
-        <ConfirmDialog
-          open={pending !== null}
-          title={pending?.title ?? ""}
-          body={confirmBody}
-          confirmLabel={pending?.confirmLabel}
-          tone={pending?.tone}
-          busy={busy}
-          onConfirm={() => {
-            const target = pending?.target;
-            setPending(null);
-            if (!target) return;
-            void act(() => {
-              if (target.kind === "complete") {
-                return actions.completeBooking(booking.id);
-              }
-              if (target.kind === "cancel") return actions.cancelBooking(booking.id, target.mode);
-              if (target.kind === "no-show") return actions.markNoShow(booking.id, draftInvoice);
-              return actions.deleteBooking(booking.id);
-            });
-          }}
-          onCancel={() => setPending(null)}
-        />
+        {isTestBooking && (
+          <AdminButton
+            variant="danger"
+            onClick={handleDelete}
+            disabled={busy}
+            className={SHEET_BUTTON_CLS}
+          >
+            Delete booking
+          </AdminButton>
+        )}
       </div>
-    </div>
+
+      {/* Sits inside the Modal panel, whose click handler stops propagation, so
+          dialog clicks don't bubble to the sheet backdrop and close it mid-confirm. */}
+      <ConfirmDialog
+        open={pending !== null}
+        title={pending?.title ?? ""}
+        body={confirmBody}
+        confirmLabel={pending?.confirmLabel}
+        tone={pending?.tone}
+        busy={busy}
+        onConfirm={() => {
+          const target = pending?.target;
+          setPending(null);
+          if (!target) return;
+          void act(() => {
+            if (target.kind === "complete") {
+              return actions.completeBooking(booking.id);
+            }
+            if (target.kind === "cancel") return actions.cancelBooking(booking.id, target.mode);
+            if (target.kind === "no-show") return actions.markNoShow(booking.id, draftInvoice);
+            return actions.deleteBooking(booking.id);
+          });
+        }}
+        onCancel={() => setPending(null)}
+      />
+    </Modal>
   );
 }

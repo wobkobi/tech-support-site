@@ -6,6 +6,7 @@
 // change event), and hid every contact who had reviewed, so a wrong link could
 // never be moved to the right person.
 
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -146,7 +147,7 @@ export function ContactPicker({
 
   return (
     <div ref={wrapperRef} className="relative">
-      <input
+      <AdminInput
         type="text"
         role="combobox"
         // The picker only mounts on an explicit click, so focus is what the operator just asked for.
@@ -164,16 +165,15 @@ export function ContactPicker({
           setHighlight(0);
         }}
         onKeyDown={onKeyDown}
-        className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none disabled:opacity-50"
       />
       <ul
         ref={listRef}
         id={listId}
         role="listbox"
-        className="absolute top-full right-0 left-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+        className="absolute top-full right-0 left-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-lg border border-admin-border bg-admin-surface py-1 shadow-lg"
       >
         {options.length === 0 ? (
-          <li className="px-3 py-2 text-xs text-slate-400">No contacts found.</li>
+          <li className="px-3 py-2 text-sm text-admin-muted">No contacts found.</li>
         ) : (
           options.map((opt, i) => (
             <li
@@ -190,17 +190,19 @@ export function ContactPicker({
               }}
               className={cn(
                 "cursor-pointer px-3 py-2",
-                i === highlight ? "bg-slate-100" : "bg-white",
-                opt.id === null ? "text-coquelicot-600" : "text-slate-700",
+                i === highlight ? "bg-admin-bg" : "bg-admin-surface",
+                opt.id === null ? "text-coquelicot-600" : "text-admin-text",
               )}
             >
-              <span className={cn("text-sm", opt.isCurrent && "font-semibold")}>{opt.label}</span>
-              {opt.hint && <span className="ml-2 text-xs text-slate-400">{opt.hint}</span>}
+              <span className={cn("text-[0.9375rem]", opt.isCurrent && "font-semibold")}>
+                {opt.label}
+              </span>
+              {opt.hint && <span className="ml-2 text-sm text-admin-muted">{opt.hint}</span>}
             </li>
           ))
         )}
         {total > MAX_RESULTS && (
-          <li className="px-3 py-2 text-xs text-slate-400">
+          <li className="px-3 py-2 text-sm text-admin-muted">
             {total - MAX_RESULTS} more - keep typing to narrow it down.
           </li>
         )}

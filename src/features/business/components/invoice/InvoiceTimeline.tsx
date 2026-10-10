@@ -165,7 +165,7 @@ export function InvoiceTimeline({
           </div>
           <div className="pb-3">
             <p className="text-sm font-medium text-admin-text">{step.label}</p>
-            <p className="text-xs text-admin-muted">
+            <p className="text-sm text-admin-muted">
               {step.date ? formatDateShort(step.date) : "date not recorded"}
               {step.detail ? ` · ${step.detail}` : ""}
             </p>

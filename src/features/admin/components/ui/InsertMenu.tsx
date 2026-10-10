@@ -171,7 +171,7 @@ export function InsertMenu({
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => (open ? close() : setOpen(true))}
-        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-admin-border-strong bg-admin-surface px-3 text-sm font-semibold text-admin-text transition-colors hover:bg-admin-bg disabled:opacity-60"
+        className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-admin-border-strong bg-admin-surface px-3 text-sm font-semibold text-admin-text transition-colors hover:bg-admin-bg disabled:opacity-60 pointer-coarse:min-h-11"
       >
         <FaPlus aria-hidden className="size-3" />
         {label}
@@ -184,7 +184,7 @@ export function InsertMenu({
       {open && (
         <div
           className={cn(
-            "absolute top-full z-30 mt-1 flex max-h-112 w-80 max-w-[calc(100vw-2rem)] flex-col rounded-xl border border-admin-border bg-admin-surface shadow-lg",
+            "absolute top-full z-30 mt-1 flex max-h-112 w-80 max-w-[calc(100vw-2rem)] flex-col rounded-lg border border-admin-border bg-admin-surface shadow-lg",
             align === "right" ? "right-0" : "left-0",
           )}
         >
@@ -201,7 +201,7 @@ export function InsertMenu({
               placeholder="Search"
               aria-label="Search what to add"
               aria-controls={menuId}
-              className="h-9 w-full rounded-lg bg-admin-bg pr-2.5 pl-8 text-sm text-admin-text placeholder:text-admin-muted focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+              className="h-9 w-full rounded-lg bg-admin-bg pr-2.5 pl-8 text-sm text-admin-text placeholder:text-admin-muted focus:ring-2 focus:ring-russian-violet/30 focus:outline-none pointer-coarse:h-11"
             />
           </div>
           <div ref={menuRef} id={menuId} role="menu" className="overflow-y-auto p-1.5">
@@ -223,7 +223,9 @@ export function InsertMenu({
                       onClick={() => pick(item)}
                       className={cn(
                         "rounded-lg text-left text-admin-text transition-colors hover:bg-admin-bg focus-visible:bg-admin-bg focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
-                        g.compact ? "size-9 text-center text-lg" : "px-2.5 py-1.5 text-sm",
+                        g.compact
+                          ? "size-9 text-center text-lg pointer-coarse:size-11"
+                          : "px-2.5 py-1.5 text-sm pointer-coarse:min-h-11",
                       )}
                     >
                       {g.compact ? (

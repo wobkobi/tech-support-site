@@ -6,6 +6,7 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
+import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
@@ -82,12 +83,12 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
 
   if (rows.length === 0) {
     return (
-      <Card className="text-center">
-        <p className="text-sm font-medium text-admin-text">No conflicts to review.</p>
-        <p className="mt-1 text-sm text-admin-faint">
-          All contact fields are in sync between the site and Google Contacts.
-        </p>
-        <div className="mt-4 flex justify-center">{backLink}</div>
+      <Card padding="none">
+        <EmptyState
+          title="No conflicts to review."
+          body="All contact fields are in sync between the site and Google Contacts."
+          action={backLink}
+        />
       </Card>
     );
   }
@@ -117,7 +118,7 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
                       {c.contactName}
                     </Link>
                     {c.contactEmail && (
-                      <p className="truncate text-xs text-admin-faint">{c.contactEmail}</p>
+                      <p className="truncate text-sm text-admin-faint">{c.contactEmail}</p>
                     )}
                   </div>
                   <StatusPill tone="warning">{c.field}</StatusPill>
@@ -125,7 +126,7 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div className="rounded-lg border border-admin-border bg-admin-bg p-3">
-                    <p className="mb-1 text-xs font-semibold text-admin-faint uppercase">
+                    <p className="mb-1 text-sm font-semibold text-admin-faint uppercase">
                       Site value
                     </p>
                     <p className="text-sm font-medium text-admin-text">
@@ -140,7 +141,7 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
                     </AdminButton>
                   </div>
                   <div className="rounded-lg border border-admin-border bg-admin-bg p-3">
-                    <p className="mb-1 text-xs font-semibold text-admin-faint uppercase">
+                    <p className="mb-1 text-sm font-semibold text-admin-faint uppercase">
                       Google value
                     </p>
                     <p className="text-sm font-medium text-admin-text">
@@ -157,7 +158,7 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
                   </div>
                 </div>
 
-                <p className="mt-3 text-xs text-admin-faint">
+                <p className="mt-3 text-sm text-admin-faint">
                   Detected {formatDateTimeShort(c.createdAt)}
                 </p>
               </Card>
