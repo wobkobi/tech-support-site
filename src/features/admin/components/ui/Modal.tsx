@@ -119,14 +119,17 @@ export function Modal({
   // focus out of the field in use.
   useEffect(() => {
     if (!open) return;
-    // While open: lock body scroll and move focus into the dialog (restored to
-    // the trigger on close).
+    // While open: lock page scroll and move focus into the dialog (restored to
+    // the trigger on close). The lock goes on <html>, the page's scroller: body
+    // overflow does not reach the viewport while html has overflow-x set, so a
+    // hidden body only clips its own box instead of stopping the scroll.
+    const root = document.documentElement;
     const prevFocus = document.activeElement as HTMLElement | null;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const prevOverflow = root.style.overflow;
+    root.style.overflow = "hidden";
     dialogRef.current?.focus();
     return () => {
-      document.body.style.overflow = prevOverflow;
+      root.style.overflow = prevOverflow;
       prevFocus?.focus?.();
     };
   }, [open]);

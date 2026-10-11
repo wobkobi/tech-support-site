@@ -54,7 +54,7 @@ export function PageHead({
                     {i < crumbs.length - 1 ? (
                       <Link
                         href={c.path}
-                        className="underline underline-offset-[3px] hover:text-coquelicot-700"
+                        className="underline underline-offset-[3px] hover:text-coquelicot-700 pointer-coarse:-my-3 pointer-coarse:py-3"
                       >
                         {c.name}
                       </Link>

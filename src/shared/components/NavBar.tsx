@@ -69,9 +69,7 @@ export function NavBar({ phone, phoneTel }: NavBarProps): React.ReactElement | n
   const menuOpen = menuState.open && menuState.pathname === pathname;
 
   const panelRef = useRef<HTMLElement | null>(null);
-  const focusBeforeMenuRef = useRef<HTMLElement | null>(null);
-  const scrollLockRef = useRef(0);
-  const bodyLockedRef = useRef(false);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const closeMenu = useCallback((): void => {
     setMenuState({ open: false, pathname });
@@ -84,10 +82,16 @@ export function NavBar({ phone, phoneTel }: NavBarProps): React.ReactElement | n
   // Focus trap, Escape to close, and focus restore for the open panel.
   useEffect(() => {
     if (!menuOpen) return;
-    focusBeforeMenuRef.current = document.activeElement as HTMLElement | null;
     const panel = panelRef.current;
     if (!panel) return;
-    panel.querySelectorAll<HTMLElement>(FOCUSABLE)[0]?.focus();
+    const menuButton = menuButtonRef.current;
+    // Fit the panel between the header's bottom edge and the bottom of the screen. The
+    // header sits lower while the promo banner above it is still in view, so a fixed
+    // calc would push the last links off a short phone.
+    const headerBottom = panel.parentElement?.getBoundingClientRect().bottom ?? 0;
+    panel.style.maxHeight = `${Math.max(0, window.innerHeight - headerBottom)}px`;
+    // preventScroll keeps the page where it is; every focus move in the menu uses it.
+    panel.querySelectorAll<HTMLElement>(FOCUSABLE)[0]?.focus({ preventScroll: true });
 
     /**
      * Panel-scoped key handler: Escape closes, Tab cycles within the panel.
@@ -105,50 +109,47 @@ export function NavBar({ phone, phoneTel }: NavBarProps): React.ReactElement | n
       if (!first || !last) return;
       if (e.shiftKey && document.activeElement === first) {
         e.preventDefault();
-        last.focus();
+        last.focus({ preventScroll: true });
       } else if (!e.shiftKey && document.activeElement === last) {
         e.preventDefault();
-        first.focus();
+        first.focus({ preventScroll: true });
       }
     };
 
     document.addEventListener("keydown", handleKey);
     return () => {
       document.removeEventListener("keydown", handleKey);
-      focusBeforeMenuRef.current?.focus();
+      // Return to the Menu button itself, not whatever had focus before: Safari doesn't
+      // focus a button on tap, so that would be the page body.
+      menuButton?.focus({ preventScroll: true });
     };
   }, [menuOpen, closeMenu]);
 
-  // Lock body scroll while the panel is open, and flag it on <body> so the
-  // phone bar (globals.css) hides instead of stacking under the panel.
+  // Lock page scroll while the panel is open, and flag it on <body> so the phone bar
+  // (globals.css) hides instead of stacking under the panel. The lock is overflow on
+  // <html>, which keeps the viewport as the scroller. Pinning <body> with position:
+  // fixed would shift it up by the scroll offset and carry the sticky header (and the
+  // panel inside it) off the top of the screen.
   useEffect(() => {
+    if (!menuOpen) return;
+    const root = document.documentElement;
     const body = document.body;
-    body.toggleAttribute("data-nav-open", menuOpen);
-
-    if (menuOpen) {
-      scrollLockRef.current = window.scrollY;
-      body.style.overflow = "hidden";
-      body.style.position = "fixed";
-      body.style.width = "100%";
-      body.style.top = `-${scrollLockRef.current}px`;
-      bodyLockedRef.current = true;
-    } else if (bodyLockedRef.current) {
-      body.style.overflow = "";
-      body.style.position = "";
-      body.style.width = "";
-      body.style.top = "";
-      window.scrollTo({ top: scrollLockRef.current });
-      bodyLockedRef.current = false;
-    }
-
-    return () => {
-      body.removeAttribute("data-nav-open");
-      body.style.overflow = "";
-      body.style.position = "";
-      body.style.width = "";
-      body.style.top = "";
+    body.setAttribute("data-nav-open", "");
+    root.style.overflow = "hidden";
+    // Widening to xl (a tablet turned landscape) hides the panel, so close the menu
+    // too, or the page would stay locked with nothing open.
+    const wide = window.matchMedia("(min-width: 80rem)");
+    /** Closes the menu once the window widens to xl. */
+    const closeIfWide = (): void => {
+      if (wide.matches) closeMenu();
     };
-  }, [menuOpen]);
+    wide.addEventListener("change", closeIfWide);
+    return () => {
+      wide.removeEventListener("change", closeIfWide);
+      body.removeAttribute("data-nav-open");
+      root.style.overflow = "";
+    };
+  }, [menuOpen, closeMenu]);
 
   if (isPrintRoute(pathname)) return null;
   if (HIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
@@ -206,6 +207,7 @@ export function NavBar({ phone, phoneTel }: NavBarProps): React.ReactElement | n
             Book now
           </Button>
           <button
+            ref={menuButtonRef}
             type="button"
             onClick={toggleMenu}
             aria-expanded={menuOpen}
@@ -217,12 +219,21 @@ export function NavBar({ phone, phoneTel }: NavBarProps): React.ReactElement | n
         </div>
       </div>
 
+      {/* The panel and its backdrop hang below the header, over the page, so opening the
+          menu moves nothing; tapping the dimmed page closes it. */}
+      {menuOpen && (
+        <div
+          aria-hidden
+          onClick={closeMenu}
+          className="absolute inset-x-0 top-full h-dvh bg-rich-black/40 xl:hidden"
+        />
+      )}
       <nav
         id="site-menu"
         ref={panelRef}
         aria-label="Site menu"
         hidden={!menuOpen}
-        className="max-h-[calc(100dvh-5rem)] overflow-y-auto border-t border-seasalt-100 bg-white xl:hidden"
+        className="absolute inset-x-0 top-full overflow-y-auto overscroll-contain border-t border-seasalt-100 bg-white shadow-lg xl:hidden"
       >
         <ul className={cn(CONTAINER, "py-2")}>
           {NAV_ITEMS.map((item) => {
