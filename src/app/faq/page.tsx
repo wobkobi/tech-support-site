@@ -22,11 +22,13 @@ import {
   promoForRateCard,
   promoTravelFactor,
 } from "@/features/business/lib/promos";
-import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
-import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
+import { ClosingCta } from "@/shared/components/ClosingCta";
+import { Disclosure } from "@/shared/components/Disclosure";
+import { PageHead } from "@/shared/components/PageHead";
+import { PageShell } from "@/shared/components/PageLayout";
 import { PromoPrice } from "@/shared/components/PromoPrice";
 import { renderEmphasised } from "@/shared/components/renderEmphasised";
-import { cn } from "@/shared/lib/cn";
+import { Section, TEXT_LINK } from "@/shared/components/Section";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -397,83 +399,40 @@ export default async function FaqPage(): Promise<React.ReactElement> {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
-      <BreadcrumbJsonLd
+      <PageHead
         crumbs={[
           { name: "Home", path: "/" },
           { name: "FAQ", path: "/faq" },
         ]}
+        title="Frequently asked questions"
+        intro={
+          <p>
+            Quick answers to common questions. Don&apos;t see yours?{" "}
+            <Link href="/contact" className={TEXT_LINK}>
+              Get in touch
+            </Link>
+            .
+          </p>
+        }
       />
-      <FrostedSection>
-        <div className="flex flex-col gap-6 sm:gap-8">
-          <section aria-labelledby="faq-heading" className={cn(CARD, "animate-fade-in")}>
-            <h1
-              id="faq-heading"
-              className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
-            >
-              Frequently asked questions
-            </h1>
-            <p className="text-base text-rich-black/80 sm:text-lg">
-              Quick answers to common questions. Don't see yours?{" "}
-              <Link href="/contact" className={linkStyle}>
-                Get in touch
-              </Link>
-              .
-            </p>
-          </section>
 
-          <section
-            aria-label="FAQ list"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
-          >
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-              {[faqItems.filter((_, i) => i % 2 === 0), faqItems.filter((_, i) => i % 2 !== 0)].map(
-                (col, colIdx) => (
-                  <div key={colIdx} className="flex flex-1 flex-col gap-4">
-                    {col.map((item) => (
-                      <details key={item.question} className={cn(SOFT_CARD, "group")}>
-                        <summary
-                          className={cn(
-                            "flex cursor-pointer items-center justify-between gap-3 text-base font-semibold text-rich-black select-text sm:text-lg",
-                            "list-none [&::-webkit-details-marker]:hidden",
-                          )}
-                        >
-                          <span>{item.question}</span>
-                          <span
-                            className="shrink-0 text-lg text-moonstone-400 transition-transform duration-200 group-open:rotate-180"
-                            aria-hidden
-                          >
-                            ▾
-                          </span>
-                        </summary>
-                        <div className="mt-3 text-base text-rich-black/90 sm:text-lg">
-                          {item.answer}
-                        </div>
-                      </details>
-                    ))}
-                  </div>
-                ),
-              )}
-            </div>
-          </section>
-
-          <section
-            aria-label="Next steps"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
-          >
-            <p className="text-base text-rich-black sm:text-lg">
-              Ready to get started?{" "}
-              <Link href="/booking" className={linkStyle}>
-                Book online
-              </Link>{" "}
-              or{" "}
-              <Link href="/contact" className={linkStyle}>
-                contact me
-              </Link>{" "}
-              to discuss your needs.
-            </p>
-          </section>
+      {/* One column so the questions read straight down, not left-right then down. */}
+      <Section aria-label="FAQ list">
+        <div className="max-w-180">
+          {faqItems.map((item) => (
+            <Disclosure key={item.question} title={item.question}>
+              {item.answer}
+            </Disclosure>
+          ))}
         </div>
-      </FrostedSection>
+      </Section>
+
+      <ClosingCta
+        title="Still got a question?"
+        line="Call or text me, or book online and add it to your notes."
+        phone={settings.identity.phone}
+        phoneTel={settings.identity.phoneTel}
+      />
     </PageShell>
   );
 }

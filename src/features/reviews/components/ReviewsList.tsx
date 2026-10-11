@@ -85,9 +85,9 @@ export function ReviewsList({ reviews }: { reviews: PublicReview[] }): React.Rea
       {/* Two balanced masonry columns (see splitReviewsIntoColumns). On mobile both
           <ul>s collapse via display:contents into one flex column, where the CSS
           `order` (date index) restores a single newest-first list. */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
         {[columns.left, columns.right].map((column, columnIndex) => (
-          <ul key={columnIndex} className="contents sm:flex sm:flex-1 sm:flex-col sm:gap-4">
+          <ul key={columnIndex} className="contents sm:flex sm:flex-1 sm:flex-col sm:gap-6">
             {column.map(({ review: r, order }) => {
               const clampable = r.text.length > CLAMP_CHARS && hash !== `#review-${r.id}`;
               const open = expanded.has(r.id);
@@ -97,16 +97,16 @@ export function ReviewsList({ reviews }: { reviews: PublicReview[] }): React.Rea
                   key={r.id}
                   id={`review-${r.id}`}
                   style={{ order }}
-                  className="flex flex-col rounded-lg border-2 border-seasalt-200/60 bg-white/80 p-4 sm:p-5"
+                  className="flex flex-col gap-4 rounded-lg border border-seasalt-100 bg-white p-6"
                 >
                   <p
                     id={textId}
                     className={cn(
-                      "text-base text-rich-black sm:text-lg",
+                      "text-[1.0625rem]",
                       clampable && !open && "line-clamp-6 sm:line-clamp-none",
                     )}
                   >
-                    {r.text}
+                    &ldquo;{r.text}&rdquo;
                   </p>
                   {clampable && (
                     <button
@@ -114,18 +114,14 @@ export function ReviewsList({ reviews }: { reviews: PublicReview[] }): React.Rea
                       aria-expanded={open}
                       aria-controls={textId}
                       onClick={() => toggle(r.id)}
-                      className="inline-flex min-h-11 items-center self-start text-base font-semibold text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800 sm:hidden"
+                      className="-mt-4 inline-flex min-h-11 items-center self-start text-base font-bold text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800 sm:hidden"
                     >
                       {open ? "Show less" : "Read more"}
                     </button>
                   )}
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pt-3">
-                    <span className="text-sm text-rich-black/60">
-                      {formatDateShort(r.createdAt)}
-                    </span>
-                    <span className="text-base font-semibold text-russian-violet sm:text-lg">
-                      - {formatReviewerName(r)}
-                    </span>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="font-bold">{formatReviewerName(r)}</span>
+                    <span className="text-sm text-seasalt-700">{formatDateShort(r.createdAt)}</span>
                   </div>
                 </li>
               );
@@ -138,7 +134,7 @@ export function ReviewsList({ reviews }: { reviews: PublicReview[] }): React.Rea
         <div className="mt-6 flex justify-center">
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
             onClick={() => setVisibleCount((n) => n + BATCH_SIZE)}
           >
             Show {Math.min(remaining, BATCH_SIZE)} more

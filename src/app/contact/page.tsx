@@ -1,15 +1,15 @@
 // src/app/contact/page.tsx
 // Contact page: how to get in touch.
 
-import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
-import { Bullet } from "@/shared/components/Bullet";
-import { Button } from "@/shared/components/Button";
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { ClosingCta } from "@/shared/components/ClosingCta";
+import { PageHead } from "@/shared/components/PageHead";
+import { PageShell } from "@/shared/components/PageLayout";
+import { RuledBlock, RuledGrid } from "@/shared/components/RuledGrid";
+import { Section, SectionHeading } from "@/shared/components/Section";
+import { TickItem, TickList } from "@/shared/components/TickList";
 import { getIdentity } from "@/shared/lib/business-identity.server";
-import { cn } from "@/shared/lib/cn";
 import type { Metadata } from "next";
 import type React from "react";
-import { FaEnvelope, FaMapLocationDot, FaPhone } from "react-icons/fa6";
 
 /**
  * Contact page metadata, with the live phone and email from the identity settings.
@@ -29,6 +29,14 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+/** Details that help with a quick, accurate quote. */
+const WHAT_TO_INCLUDE: ReadonlyArray<string> = [
+  "What's happening or what you want to achieve",
+  "Which devices are involved (e.g., laptop, phone, printer)",
+  "Whether it's for home or business",
+  "Your availability (mornings, evenings, weekends)",
+];
+
 /**
  * Contact page component.
  * @returns React element for the contact page.
@@ -37,138 +45,77 @@ export default async function ContactPage(): Promise<React.ReactElement> {
   const identity = await getIdentity();
   return (
     <PageShell>
-      <BreadcrumbJsonLd
+      <PageHead
         crumbs={[
           { name: "Home", path: "/" },
           { name: "Contact", path: "/contact" },
         ]}
+        title="Get in touch"
+        intro={
+          <p>
+            Have a tech problem or question? Call or email and I&apos;ll help you figure it out.
+          </p>
+        }
+        note={<p>I usually respond within a few hours during business days.</p>}
+        action={null}
       />
-      <FrostedSection>
-        <div className="flex flex-col gap-6 sm:gap-8">
-          {/* Hero Section */}
-          <section
-            aria-labelledby="contact-heading"
-            className={cn(CARD, "animate-fade-in text-center")}
-          >
-            <h1
-              id="contact-heading"
-              className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
+
+      <Section aria-label="Ways to reach me">
+        <RuledGrid cols={2}>
+          <RuledBlock title="Call or text">
+            <a
+              href={identity.phoneTel}
+              className="block py-2 text-2xl font-extrabold text-russian-violet hover:text-coquelicot-700"
             >
-              Get in touch
-            </h1>
-
-            <p className="mx-auto mb-8 max-w-2xl text-base text-rich-black sm:text-lg">
-              Have a tech problem or question? Call or email and I'll help you figure it out.
-            </p>
-
-            <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              <Button
-                href={identity.phoneTel}
-                variant="secondary"
-                size="lg"
-                className="w-full sm:w-auto"
-              >
-                <FaPhone className="h-6 w-6" aria-hidden />
-                {identity.phone}
-              </Button>
-              <Button
-                href={`mailto:${identity.email}`}
-                variant="tertiary"
-                size="lg"
-                className="w-full sm:w-auto"
-              >
-                <FaEnvelope className="h-6 w-6" aria-hidden />
-                Email me
-              </Button>
-            </div>
-
-            <p className="mx-auto mt-6 max-w-xl text-base text-rich-black/70 sm:text-lg">
-              I usually respond within a few hours during business days.
-            </p>
-          </section>
-
-          {/* Service Area */}
-          <section
-            aria-labelledby="area-heading"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
-          >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
-              <div className="grid size-12 shrink-0 place-items-center rounded-lg border border-moonstone-500/30 bg-moonstone-400/10 sm:size-14">
-                <FaMapLocationDot
-                  className="h-6 w-6 text-moonstone-400 sm:h-7 sm:w-7"
-                  aria-hidden
-                />
-              </div>
-              <div>
-                <h2
-                  id="area-heading"
-                  className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl"
-                >
-                  Service area
-                </h2>
-                <p className="mb-3 text-base text-rich-black sm:text-lg">
-                  On-site visits across Auckland.
-                </p>
-                <p className="text-base text-rich-black/80 sm:text-lg">
-                  A lot of software and account problems I can sort out remotely, so there's no
-                  travel to pay for.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* What to Include */}
-          <section
-            aria-labelledby="details-heading"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
-          >
-            <h2
-              id="details-heading"
-              className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
+              {identity.phone}
+            </a>
+            <p className="text-seasalt-700">The quickest way to reach me.</p>
+          </RuledBlock>
+          <RuledBlock title="Email">
+            <a
+              href={`mailto:${identity.email}`}
+              className="block py-2 text-xl font-extrabold break-all text-russian-violet hover:text-coquelicot-700 sm:text-2xl"
             >
-              What to include when you contact me
-            </h2>
-
-            <p className="mb-4 text-base text-rich-black sm:text-lg">
-              A few details help me give you a quick, accurate quote:
+              {identity.email}
+            </a>
+            <p className="text-seasalt-700">
+              Good for photos of an error message or a longer question.
             </p>
+          </RuledBlock>
+        </RuledGrid>
+      </Section>
 
-            <ul className="space-y-2.5 text-base text-rich-black sm:text-lg">
-              <li className="flex gap-3">
-                <Bullet />
-                <span>What's happening or what you want to achieve</span>
-              </li>
-              <li className="flex gap-3">
-                <Bullet />
-                <span>Which devices are involved (e.g., laptop, phone, printer)</span>
-              </li>
-              <li className="flex gap-3">
-                <Bullet />
-                <span>Whether it's for home or business</span>
-              </li>
-              <li className="flex gap-3">
-                <Bullet />
-                <span>Your availability (mornings, evenings, weekends)</span>
-              </li>
-            </ul>
+      <Section tone="grey" aria-labelledby="area-heading">
+        <SectionHeading title="Service area" id="area-heading" />
+        <p>On-site visits across Auckland.</p>
+        <p className="mt-3">
+          A lot of software and account problems I can sort out remotely, so there&apos;s no travel
+          to pay for.
+        </p>
+      </Section>
 
-            <p className="mt-4 text-base text-rich-black/80 sm:text-lg">
-              Feel free to include screenshots or photos if they help explain the issue.
-            </p>
-          </section>
+      <Section aria-labelledby="details-heading">
+        <SectionHeading
+          title="What to include when you contact me"
+          id="details-heading"
+          lead="A few details help me give you a quick, accurate quote:"
+        />
+        <TickList>
+          {WHAT_TO_INCLUDE.map((line) => (
+            <TickItem key={line}>{line}</TickItem>
+          ))}
+        </TickList>
+        <p className="mt-6">
+          Feel free to include screenshots or photos if they help explain the issue.
+        </p>
+      </Section>
 
-          {/* CTA */}
-          <section
-            aria-label="Ready to get started"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300 text-center")}
-          >
-            <p className="mb-4 text-base text-rich-black sm:text-lg">Prefer to book directly?</p>
-            <Button href="/booking" variant="primary" size="md">
-              Book an appointment
-            </Button>
-          </section>
-        </div>
-      </FrostedSection>
+      <ClosingCta
+        title="Prefer to book directly?"
+        line="Pick a time online in a couple of minutes."
+        phone={identity.phone}
+        phoneTel={identity.phoneTel}
+      />
     </PageShell>
   );
 }

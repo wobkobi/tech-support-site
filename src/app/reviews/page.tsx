@@ -3,9 +3,13 @@
 
 import { ReviewScrollHandler } from "@/features/reviews/components/ReviewScrollHandler";
 import { ReviewsList, type PublicReview } from "@/features/reviews/components/ReviewsList";
-import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
-import { cn } from "@/shared/lib/cn";
+import { Button } from "@/shared/components/Button";
+import { ClosingCta } from "@/shared/components/ClosingCta";
+import { PageHead } from "@/shared/components/PageHead";
+import { PageShell } from "@/shared/components/PageLayout";
+import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
+import { getIdentity } from "@/shared/lib/business-identity.server";
+import { GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -28,25 +32,26 @@ export const metadata: Metadata = {
 // Long fallback avoids waking a cold DB on a fixed timer.
 export const revalidate = 86400;
 
-const linkStyle = "text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800";
-
 /**
  * Reviews page component.
  * @returns Reviews page element.
  */
 export default async function ReviewsPage(): Promise<React.ReactElement> {
-  const rows = await prisma.review.findMany({
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      text: true,
-      firstName: true,
-      lastName: true,
-      isAnonymous: true,
-      createdAt: true,
-    },
-    where: { status: "approved" },
-  });
+  const [rows, identity] = await Promise.all([
+    prisma.review.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        text: true,
+        firstName: true,
+        lastName: true,
+        isAnonymous: true,
+        createdAt: true,
+      },
+      where: { status: "approved" },
+    }),
+    getIdentity(),
+  ]);
 
   const normalisedRows: PublicReview[] = rows.map((r) => ({
     ...r,
@@ -60,68 +65,51 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
   return (
     <PageShell>
       <ReviewScrollHandler />
-      <BreadcrumbJsonLd
+      <PageHead
         crumbs={[
           { name: "Home", path: "/" },
           { name: "Reviews", path: "/reviews" },
         ]}
-      />
-      <FrostedSection>
-        <div className="flex flex-col gap-6 sm:gap-8">
-          <section aria-labelledby="reviews-heading" className={cn(CARD, "animate-fade-in")}>
-            <h1
-              id="reviews-heading"
-              className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
-            >
-              What clients say
-            </h1>
-            <p className="text-base text-rich-black/80 sm:text-lg">
-              Feedback from people I've helped.
-            </p>
-          </section>
-
-          {rows.length === 0 ? (
-            <section
-              aria-labelledby="no-reviews-heading"
-              className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
-            >
-              <h2
-                id="no-reviews-heading"
-                className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl"
-              >
-                No reviews yet
-              </h2>
-              <p className="text-base text-rich-black/70 sm:text-lg">
-                Be the first!{" "}
-                <Link href="/booking" className={linkStyle}>
-                  Book an appointment
-                </Link>{" "}
-                and you'll get a review link after your visit.
-              </p>
-            </section>
-          ) : (
-            <section
-              aria-label="Client reviews"
-              className="animate-slide-up animate-fill-both animate-delay-100"
-            >
-              <ReviewsList reviews={normalisedRows} />
-            </section>
-          )}
-
-          <section
-            aria-label="Leave a review"
-            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
+        title="What clients say"
+        intro={<p>Feedback from people I&apos;ve helped.</p>}
+        action={
+          <Button
+            href={GOOGLE_BUSINESS_PROFILE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="outline"
           >
-            <p className="text-base text-rich-black sm:text-lg">
-              Had an appointment? You'll receive a review link by email after your visit. Or{" "}
-              <Link href="/booking" className={linkStyle}>
-                book now
-              </Link>{" "}
-              to get started.
-            </p>
-          </section>
-        </div>
-      </FrostedSection>
+            See my reviews on Google
+          </Button>
+        }
+      />
+
+      {rows.length === 0 ? (
+        <Section aria-labelledby="no-reviews-heading">
+          <SectionHeading title="No reviews yet" id="no-reviews-heading" />
+          <p>
+            Be the first!{" "}
+            <Link href="/booking" className={TEXT_LINK}>
+              Book an appointment
+            </Link>{" "}
+            and you&apos;ll get a review link after your visit.
+          </p>
+        </Section>
+      ) : (
+        <Section aria-label="Client reviews">
+          <ReviewsList reviews={normalisedRows} />
+          <p className="mt-8 text-seasalt-700">
+            Had an appointment? You&apos;ll receive a review link by email after your visit.
+          </p>
+        </Section>
+      )}
+
+      <ClosingCta
+        title="Something not working?"
+        line="Book online in a couple of minutes, or give me a call."
+        phone={identity.phone}
+        phoneTel={identity.phoneTel}
+      />
     </PageShell>
   );
 }
