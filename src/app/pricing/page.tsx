@@ -32,6 +32,7 @@ import {
   summariseForBanner,
 } from "@/features/business/lib/promos";
 import { ClosingCta } from "@/shared/components/ClosingCta";
+import { Disclosure } from "@/shared/components/Disclosure";
 import { Notice } from "@/shared/components/Notice";
 import { PageHead } from "@/shared/components/PageHead";
 import { PageShell } from "@/shared/components/PageLayout";
@@ -46,7 +47,6 @@ import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
-import { FaCaretDown } from "react-icons/fa6";
 
 // ISR with tag-based purge: admin rate / promo edits bust the rate-config /
 // active-promo tags, which invalidates this page immediately; the 5-minute
@@ -79,11 +79,6 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // Accordion row, summary and body classes for the "Full details" rows. Rows share the border,
 // padding and focus ring of the Business and FAQ page accordions.
-const ACCORDION_DETAILS = "group border-b border-seasalt-100 first:border-t";
-const ACCORDION_SUMMARY =
-  "flex cursor-pointer list-none items-center justify-between gap-4 rounded py-4 text-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet [&::-webkit-details-marker]:hidden";
-const ACCORDION_BODY = "space-y-3 pb-5 text-base whitespace-pre-line text-rich-black";
-const CHEVRON = "h-4 w-4 shrink-0 text-moonstone-700 transition-[rotate] group-open:rotate-180";
 
 /**
  * Pricing page; fetches live rates + the active promo server-side so a single
@@ -305,128 +300,79 @@ export default async function PricingPage(): Promise<React.ReactElement> {
         </p>
 
         <div className="max-w-180">
-          <details className={ACCORDION_DETAILS}>
-            <summary className={ACCORDION_SUMMARY}>
-              <span>Rate modifiers</span>
-              <FaCaretDown className={CHEVRON} aria-hidden />
-            </summary>
-            <div className={ACCORDION_BODY}>
-              <p>
-                The hourly rate is the starting point. These modifiers can stack on top depending on
-                the job:
-              </p>
-              <ul className="space-y-2">
-                {pricing.modifiers.map((mod) => (
-                  <li key={mod.label} className="flex flex-col">
-                    <span>
-                      <strong>{mod.label}</strong> ({mod.deltaDescription} ={" "}
-                      <PromoPrice
-                        discounted={
-                          promoModifierRate(baseRate, mod.effectiveRate, mod.kind, pricedPromo) !==
-                          mod.effectiveRate
-                        }
-                        className="font-bold"
-                      >
-                        {formatMoneyCompact(
-                          promoModifierRate(baseRate, mod.effectiveRate, mod.kind, pricedPromo),
-                        )}
-                        /hr
-                      </PromoPrice>
-                      ) - {mod.description}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </details>
+          <Disclosure title="Rate modifiers" bodyClassName="whitespace-pre-line">
+            <p>
+              The hourly rate is the starting point. These modifiers can stack on top depending on
+              the job:
+            </p>
+            <ul className="space-y-2">
+              {pricing.modifiers.map((mod) => (
+                <li key={mod.label} className="flex flex-col">
+                  <span>
+                    <strong>{mod.label}</strong> ({mod.deltaDescription} ={" "}
+                    <PromoPrice
+                      discounted={
+                        promoModifierRate(baseRate, mod.effectiveRate, mod.kind, pricedPromo) !==
+                        mod.effectiveRate
+                      }
+                      className="font-bold"
+                    >
+                      {formatMoneyCompact(
+                        promoModifierRate(baseRate, mod.effectiveRate, mod.kind, pricedPromo),
+                      )}
+                      /hr
+                    </PromoPrice>
+                    ) - {mod.description}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Disclosure>
 
-          <details className={ACCORDION_DETAILS}>
-            <summary className={ACCORDION_SUMMARY}>
-              <span>Travel</span>
-              <FaCaretDown className={CHEVRON} aria-hidden />
-            </summary>
-            <div className={ACCORDION_BODY}>
-              {renderEmphasised(travelCopy(displayTravelRate, displayMinTravel))}
-            </div>
-          </details>
+          <Disclosure title="Travel" bodyClassName="whitespace-pre-line">
+            {renderEmphasised(travelCopy(displayTravelRate, displayMinTravel))}
+          </Disclosure>
 
-          <details className={ACCORDION_DETAILS}>
-            <summary className={ACCORDION_SUMMARY}>
-              <span>Minimum charge</span>
-              <FaCaretDown className={CHEVRON} aria-hidden />
-            </summary>
-            <div className={ACCORDION_BODY}>
-              {renderEmphasised(
-                minimumsCopy(policy.MIN_BILLABLE_MINS, policy.BILLING_INCREMENT_MINS),
-              )}
-            </div>
-          </details>
+          <Disclosure title="Minimum charge" bodyClassName="whitespace-pre-line">
+            {renderEmphasised(
+              minimumsCopy(policy.MIN_BILLABLE_MINS, policy.BILLING_INCREMENT_MINS),
+            )}
+          </Disclosure>
 
-          <details className={ACCORDION_DETAILS}>
-            <summary className={ACCORDION_SUMMARY}>
-              <span>Parts</span>
-              <FaCaretDown className={CHEVRON} aria-hidden />
-            </summary>
-            <div className={ACCORDION_BODY}>{renderEmphasised(partsCopy())}</div>
-          </details>
+          <Disclosure title="Parts" bodyClassName="whitespace-pre-line">
+            {renderEmphasised(partsCopy())}
+          </Disclosure>
 
-          <details className={ACCORDION_DETAILS}>
-            <summary className={ACCORDION_SUMMARY}>
-              <span>Cancellation</span>
-              <FaCaretDown className={CHEVRON} aria-hidden />
-            </summary>
-            <div className={ACCORDION_BODY}>
-              {renderEmphasised(cancellationCopy(policy.CANCELLATION))}
-            </div>
-          </details>
+          <Disclosure title="Cancellation" bodyClassName="whitespace-pre-line">
+            {renderEmphasised(cancellationCopy(policy.CANCELLATION))}
+          </Disclosure>
 
-          <details className={ACCORDION_DETAILS}>
-            <summary className={ACCORDION_SUMMARY}>
-              <span>Unsuccessful work</span>
-              <FaCaretDown className={CHEVRON} aria-hidden />
-            </summary>
-            <div className={ACCORDION_BODY}>
-              {renderEmphasised(
-                unsuccessfulWorkCopy(policy.UNSUCCESSFUL_WORK_FACTOR, policy.NO_FIX_FREE_MINS),
-              )}
-            </div>
-          </details>
+          <Disclosure title="Unsuccessful work" bodyClassName="whitespace-pre-line">
+            {renderEmphasised(
+              unsuccessfulWorkCopy(policy.UNSUCCESSFUL_WORK_FACTOR, policy.NO_FIX_FREE_MINS),
+            )}
+          </Disclosure>
 
           {/* A 0-day window means no stated guarantee, so the section is hidden. */}
           {policy.WORKMANSHIP_WINDOW_DAYS > 0 && (
-            <details className={ACCORDION_DETAILS}>
-              <summary className={ACCORDION_SUMMARY}>
-                <span>Workmanship guarantee</span>
-                <FaCaretDown className={CHEVRON} aria-hidden />
-              </summary>
-              <div className={ACCORDION_BODY}>
-                {renderEmphasised(workmanshipCopy(policy.WORKMANSHIP_WINDOW_DAYS))}
-              </div>
-            </details>
+            <Disclosure title="Workmanship guarantee" bodyClassName="whitespace-pre-line">
+              {renderEmphasised(workmanshipCopy(policy.WORKMANSHIP_WINDOW_DAYS))}
+            </Disclosure>
           )}
 
-          <details className={ACCORDION_DETAILS}>
-            <summary className={ACCORDION_SUMMARY}>
-              <span>
-                {policy.WEEKEND_UPLIFT > 0 ? "Weekends and public holidays" : "Public holidays"}
-              </span>
-              <FaCaretDown className={CHEVRON} aria-hidden />
-            </summary>
-            <div className={ACCORDION_BODY}>
-              {policy.WEEKEND_UPLIFT > 0 && (
-                <p>{renderEmphasised(weekendCopy(policy.WEEKEND_UPLIFT))}</p>
-              )}
-              <p>{renderEmphasised(publicHolidayCopy(policy.PUBLIC_HOLIDAY_UPLIFT))}</p>
-            </div>
-          </details>
+          <Disclosure
+            title={policy.WEEKEND_UPLIFT > 0 ? "Weekends and public holidays" : "Public holidays"}
+            bodyClassName="whitespace-pre-line"
+          >
+            {policy.WEEKEND_UPLIFT > 0 && (
+              <p>{renderEmphasised(weekendCopy(policy.WEEKEND_UPLIFT))}</p>
+            )}
+            <p>{renderEmphasised(publicHolidayCopy(policy.PUBLIC_HOLIDAY_UPLIFT))}</p>
+          </Disclosure>
 
-          <details className={ACCORDION_DETAILS}>
-            <summary className={ACCORDION_SUMMARY}>
-              <span>GST</span>
-              <FaCaretDown className={CHEVRON} aria-hidden />
-            </summary>
-            <div className={ACCORDION_BODY}>{renderEmphasised(gstCopy(policy.GST_REGISTERED))}</div>
-          </details>
+          <Disclosure title="GST" bodyClassName="whitespace-pre-line">
+            {renderEmphasised(gstCopy(policy.GST_REGISTERED))}
+          </Disclosure>
         </div>
       </Section>
 

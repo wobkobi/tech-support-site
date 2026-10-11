@@ -8,6 +8,7 @@ import { formatMoneyCompact } from "@/features/business/lib/business";
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { Button } from "@/shared/components/Button";
 import { ClosingCta } from "@/shared/components/ClosingCta";
+import { Disclosure } from "@/shared/components/Disclosure";
 import { PageHead } from "@/shared/components/PageHead";
 import { PageShell } from "@/shared/components/PageLayout";
 import { PixelEvent } from "@/shared/components/PixelEvent";
@@ -18,7 +19,7 @@ import { getIdentity } from "@/shared/lib/business-identity.server";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
 import type React from "react";
-import { FaCaretDown, FaPhone } from "react-icons/fa6";
+import { FaPhone } from "react-icons/fa6";
 
 // ISR so rate edits propagate via the rate-config tag purge instead of
 // requiring a redeploy.
@@ -149,10 +150,6 @@ const businessFaq: ReadonlyArray<{ q: string; a: string }> = [
 ];
 
 // Accordion row and summary classes. Keep in step with the FAQ page rows.
-const FAQ_ROW = "group border-b border-seasalt-100 first:border-t";
-const FAQ_SUMMARY =
-  "flex cursor-pointer list-none items-start justify-between gap-4 rounded py-4 text-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet [&::-webkit-details-marker]:hidden";
-
 const siteUrl = getSiteUrl();
 
 /**
@@ -296,16 +293,9 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
         <SectionHeading id="bfaq-heading" title="Common questions" />
         <div className="max-w-180">
           {businessFaq.map((item) => (
-            <details key={item.q} className={FAQ_ROW}>
-              <summary className={FAQ_SUMMARY}>
-                <h3 className="text-lg font-bold">{item.q}</h3>
-                <FaCaretDown
-                  className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-700 transition-[rotate] group-open:rotate-180"
-                  aria-hidden
-                />
-              </summary>
-              <p className="pb-4 text-seasalt-700">{item.a}</p>
-            </details>
+            <Disclosure key={item.q} title={item.q} titleAs="h3">
+              <p>{item.a}</p>
+            </Disclosure>
           ))}
         </div>
       </Section>
