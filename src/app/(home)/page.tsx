@@ -13,6 +13,7 @@ import { GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { SERVICE_AREAS } from "@/shared/lib/service-areas";
+import { serviceHref } from "@/shared/lib/service-pages";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import { unstable_cache } from "next/cache";
@@ -240,7 +241,7 @@ export default async function Home(): Promise<React.ReactElement> {
         <ul className="mt-8 grid border-t border-seasalt-200 sm:grid-cols-2 lg:grid-cols-4">
           {SERVICE_AREAS.map(({ slug, label, blurb }) => (
             <li key={slug} className="border-b border-seasalt-200">
-              <Link href={`/services#${slug}`} className="group block py-3.5 sm:py-4.5 sm:pr-4.5">
+              <Link href={serviceHref(slug)} className="group block py-3.5 sm:py-4.5 sm:pr-4.5">
                 <b className="block text-lg group-hover:text-coquelicot-700">{label}</b>
                 <span className="text-base text-seasalt-700">{blurb}</span>
               </Link>

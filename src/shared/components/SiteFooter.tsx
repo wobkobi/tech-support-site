@@ -22,7 +22,7 @@ const HIDDEN_PREFIXES: ReadonlyArray<string> = ["/admin"];
 
 const SERVICE_LINKS: ReadonlyArray<{ label: string; href: string }> = [
   { label: "Computers & laptops", href: "/services#computers-laptops" },
-  { label: "Wi-Fi & internet", href: "/services#wifi-internet" },
+  { label: "Wi-Fi & internet", href: "/services/wifi-internet" },
   { label: "Phones & tablets", href: "/services#phones-tablets" },
   { label: "Business IT support", href: "/business" },
   { label: "All services", href: "/services" },

@@ -9,13 +9,16 @@ import { PageHead } from "@/shared/components/PageHead";
 import { PageShell } from "@/shared/components/PageLayout";
 import { PixelEvent } from "@/shared/components/PixelEvent";
 import { RuledBlock, RuledGrid } from "@/shared/components/RuledGrid";
-import { Section, SectionHeading } from "@/shared/components/Section";
+import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
 import { TickItem, TickList } from "@/shared/components/TickList";
+import { cn } from "@/shared/lib/cn";
 import { servedSuburbGroups } from "@/shared/lib/served-suburbs";
 import { SERVICE_AREAS } from "@/shared/lib/service-areas";
+import { SERVICE_PAGES, hasServicePage } from "@/shared/lib/service-pages";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
+import Link from "next/link";
 import type React from "react";
 import { Fragment } from "react";
 
@@ -126,6 +129,14 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
                   </TickItem>
                 ))}
               </TickList>
+              {hasServicePage(slug) && (
+                <Link
+                  href={`/services/${slug}`}
+                  className={cn(TEXT_LINK, "mt-3 inline-flex min-h-11 items-center")}
+                >
+                  {SERVICE_PAGES[slug].linkText}
+                </Link>
+              )}
             </RuledBlock>
           ))}
         </RuledGrid>
