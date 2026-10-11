@@ -240,9 +240,8 @@ export function CalculatorView({
   const [clientEmail, setClientEmail] = useState(() =>
     normaliseEmail(eventPrefill?.clientEmail ?? reissue?.clientEmail),
   );
-  // Address-to state mirrors the InvoiceBuilder's segmented control so the
-  // operator picks Name/Company/Custom once and the choice rides through to
-  // the invoice without re-picking.
+  // Address-to state: the operator picks Name/Company/Custom once and the
+  // choice rides through to the invoice without re-picking.
   const [pickedContactName, setPickedContactName] = useState<string | null>(null);
   const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(null);
   const [pickedContactGoogleId, setPickedContactGoogleId] = useState<string | null>(null);

@@ -153,7 +153,7 @@ export async function PATCH(
 
 /**
  * DELETE /api/admin/reviews/[id]
- * Permanently deletes a review. Authenticated via X-Admin-Secret header.
+ * Permanently deletes a review. Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @param params - Route segment params wrapper.
  * @param params.params - Promise resolving to the route segment containing the review ID.

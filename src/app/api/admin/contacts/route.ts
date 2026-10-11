@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * GET /api/admin/contacts
  * Returns all contacts ordered by newest first.
- * Requires X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns JSON with contacts array.
  */

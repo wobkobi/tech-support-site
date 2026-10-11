@@ -77,9 +77,6 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// Accordion row, summary and body classes for the "Full details" rows. Rows share the border,
-// padding and focus ring of the Business and FAQ page accordions.
-
 /**
  * Pricing page; fetches live rates + the active promo server-side so a single
  * rate change in the admin UI propagates without a deploy.

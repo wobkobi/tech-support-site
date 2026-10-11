@@ -280,7 +280,7 @@ export interface TravelChargeBreakdown {
  * Step-by-step travel-charge math. Single source of truth for both
  * {@link calcTravelCharge} and the operator-side breakdown display, so the
  * displayed math always matches what's billed. Callers with only one leg
- * figure pass it for both, reproducing the old symmetric doubling. Returns
+ * figure pass it for both, which doubles the one-way drive. Returns
  * zeros for no travel (remote, or geocoded to origin).
  * @param thereMins - Outbound drive time in minutes.
  * @param backMins - Return drive time in minutes; pass thereMins again when no separate figure exists.

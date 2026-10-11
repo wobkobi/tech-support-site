@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * POST /api/admin/contacts/sync
  * Full two-way sync: dedup/merge locally, push every contact to Google, then pull
- * Google contacts back in. Requires X-Admin-Secret header.
+ * Google contacts back in. Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns JSON with importedCount and syncedCount on success, or error on failure.
  */

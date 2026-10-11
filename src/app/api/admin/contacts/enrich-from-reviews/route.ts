@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * POST /api/admin/contacts/enrich-from-reviews
  * Returns a name conflict per Contact whose reviewer display name differs from
- * the stored name. Requires X-Admin-Secret header.
+ * the stored name. Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns JSON with a conflicts array for manual resolution.
  */

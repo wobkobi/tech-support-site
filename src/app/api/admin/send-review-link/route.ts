@@ -26,7 +26,7 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * POST /api/admin/send-review-link
  * Sends a review link to a past client via email or SMS and stamps the state
- * onto their Contact row. Authenticated via X-Admin-Secret header.
+ * onto their Contact row. Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - The incoming request.
  * @returns JSON with reviewUrl (and `existing: true` plus `askedAt` when they were
  * already asked and `resend` wasn't set). The SMS path also returns the ready-to-send

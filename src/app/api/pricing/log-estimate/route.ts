@@ -71,8 +71,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!description) return errorResponse("description required", 400);
 
   const aiEstimatedMins = Math.max(0, Math.round(Number(body.aiEstimatedMins) || 0));
-  // The "complex" tier was removed; every estimate logs as standard now. The
-  // enum + column stay so historical rows still read.
+  // There is no "complex" tier, so every estimate logs as standard. The enum +
+  // column stay so older rows still read.
   const aiCategory: AiEstimateCategory = AiEstimateCategory.standard;
   const aiExplanation =
     typeof body.aiExplanation === "string" ? body.aiExplanation.trim().slice(0, 400) : "";

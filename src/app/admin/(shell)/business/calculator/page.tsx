@@ -107,8 +107,8 @@ export default async function CalculatorPage({
     },
   };
 
-  // Flatten Dates to the ISO strings the client types expect (matches what
-  // the JSON API routes previously returned).
+  // Flatten Dates to the ISO strings the client types expect (the same shape
+  // the JSON API routes return).
   const initialRates: RateConfig[] = rateRows.map((r) => ({
     id: r.id,
     label: r.label,

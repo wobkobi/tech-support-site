@@ -84,7 +84,7 @@ enum AiEstimateCategory {
 }
 
 // Channel used to send a contact their review link. Set on Contact when an
-// admin clicks "Send a review link" (formerly a ReviewRequest row).
+// admin clicks "Send a review link".
 enum ReviewLinkMode {
   email
   sms
@@ -307,16 +307,15 @@ model Contact {
   // Google changed iff current etag != lastGoogleEtag.
   lastSyncedAt          DateTime?
   lastGoogleEtag        String?
-  // Review-link send tracking. Stamped by the admin "Send a review link" flow
-  // (formerly stored on the per-send ReviewRequest model). The most-recent send
-  // wins - we no longer track historical sends.
+  // Review-link send tracking. Stamped by the admin "Send a review link" flow.
+  // Only the most recent send is kept; there is no per-send history.
   reviewLinkSentAt      DateTime?
   reviewLinkSentMode    ReviewLinkMode?
   reviewLinkSubmittedAt DateTime?
   // Soft-delete marker. Set by the admin delete action; every reader (list,
   // sync, maintenance matchers, backfill) excludes rows where this is non-null.
-  // Soft (not hard) delete because backfillContacts would otherwise re-create
-  // the contact from its still-present booking on the next admin page load.
+  // Soft (not hard) delete because backfillContactsFromBookings would otherwise
+  // re-create the contact from its still-present booking on the next sync.
   deletedAt             DateTime?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
@@ -451,7 +450,7 @@ model RateConfig {
   // because legacy rows created before this field existed don't carry the
   // value - Prisma cannot coerce a missing Mongo field to a non-nullable
   // DateTime at read time. @updatedAt still stamps every write, so any
-  // operator edit or the seed-handler's migration backfill fills it in.
+  // operator edit or the GET /api/business/rates backfill fills it in.
   updatedAt    DateTime? @updatedAt
 }
 
@@ -542,8 +541,8 @@ model Invoice {
   reviewAskNote        String?
   reviewAskDecidedAt   DateTime?
   reviewAskAttempts    Int?
-  // Stamped when send-email promotes DRAFT>SENT - a real timestamp, unlike the
-  // updatedAt proxy the route returned before. Null on legacy SENT rows.
+  // Stamped when send-email promotes DRAFT>SENT - a real send time, not
+  // updatedAt standing in for one. Null on legacy SENT rows.
   sentAt               DateTime?
   // Payment record, stamped by POST /pay when the invoice becomes PAID.
   // paymentMethod is an INCOME_METHODS value; paymentReference is an optional
@@ -631,8 +630,8 @@ model ExpenseEntry {
   @@index([sheetRowKey])
 }
 
-// Singleton-ish key/value store for small pieces of cross-app config that
-// previously lived in the Google Sheet SETTINGS tab (e.g. the invoice counter).
+// Key/value store for small cross-app state: the admin settings groups
+// (`settings:<group>`), run locks, seed markers and small caches.
 model Setting {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   key       String   @unique

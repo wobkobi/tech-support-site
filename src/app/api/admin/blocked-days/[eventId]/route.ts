@@ -2,7 +2,7 @@
 // Admin endpoint to unblock a day. A multi-day block is ONE all-day "Busy" event spanning
 // the range, so unblocking a single day must trim or split that event: an edge day
 // shortens it, a middle day splits it, the last remaining day deletes it. Without `?date`
-// (legacy callers) the whole event is deleted.
+// the whole event is deleted.
 
 import {
   deleteBookingEvent,
@@ -89,8 +89,8 @@ export async function DELETE(
   }
 
   try {
-    // No specific day (legacy caller), or the event isn't a readable all-day
-    // block, or the day sits outside the block: delete the whole event.
+    // No specific day, or the event isn't a readable all-day block, or the day
+    // sits outside the block: delete the whole event.
     const range = removedDay ? await getBlockedDayRange(eventId) : null;
     if (
       !removedDay ||

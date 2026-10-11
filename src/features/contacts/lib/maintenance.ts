@@ -157,8 +157,8 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
   // Carry the review-link history across. Not a blank-fill like the rest: the
   // later ask is the one the send cooldown and the "already asked" picker gate
   // must see, so the newer timestamp wins and brings its own mode. Dropping it
-  // loses the ask with the row, which is what made an invoice-era reviewer
-  // resurface in the link history as "Legacy".
+  // loses the ask with the row, and an invoice-era reviewer then resurfaces
+  // in the link history as "Legacy".
   if (
     dup.reviewLinkSentAt &&
     (!keeper.reviewLinkSentAt || dup.reviewLinkSentAt > keeper.reviewLinkSentAt)

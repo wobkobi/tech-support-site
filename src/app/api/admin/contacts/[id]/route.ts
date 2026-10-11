@@ -39,7 +39,7 @@ interface ContactPatchBody {
  * Updates a contact's name, phone, address, and/or retainer arrangement in the
  * local DB, then best-effort syncs the updated contact to Google Contacts
  * (retainer fields stay local - the Google mapping doesn't carry them).
- * Requires X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request with optional name, phone, address fields.
  * @param params - Route parameters containing the contact ID.
  * @param params.params - Promise resolving to the dynamic route params object.
@@ -182,11 +182,11 @@ export async function PATCH(
 /**
  * DELETE /api/admin/contacts/[id]
  * Soft-deletes a contact by stamping `deletedAt`. Soft (not hard) delete because
- * backfillContacts would otherwise re-create the contact from its still-present
- * booking on the next admin page load; the stamped row suppresses that. Removes
+ * backfillContactsFromBookings would otherwise re-create the contact from its
+ * still-present booking on the next sync; the stamped row suppresses that. Removes
  * the linked Google contact best-effort, unless `?deleteGoogle=false` asks to
  * leave it - dropping the local row is not always meant to wipe the phone entry.
- * Requires X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @param params - Route parameters containing the contact ID.
  * @param params.params - Promise resolving to the dynamic route params object.

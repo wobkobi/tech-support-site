@@ -74,9 +74,9 @@ export {
 } from "@/features/business/lib/task-timing";
 
 /**
- * Minimum travel cost (NZD) below which a calculated travel charge is
- * skipped rather than added to the invoice - a sub-$10 line item looks petty.
- * The travelInfo is still surfaced in the UI so the operator can add it manually.
+ * Fallback floor (NZD) for an auto-calculated trip: a non-zero trip that works
+ * out below this is charged at the minimum instead (see {@link splitTravel}).
+ * The live value comes from pricing settings.
  */
 export const MIN_TRAVEL_CHARGE = 10;
 

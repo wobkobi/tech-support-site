@@ -340,7 +340,7 @@ export async function importFromGoogleContacts(): Promise<number> {
             // and its email-bearing Google twin can't drift into two rows.
             if (emailEntry && !existing.email && renameTrusted) updates.email = emailEntry;
             // Writing the E.164 form back also repairs a number stored in
-            // domestic form, which is what made the row unmatchable on import.
+            // domestic form, which the import cannot match.
             if (phone && phone !== existing.phone) updates.phone = phone;
             // Add, never replace: contact merges also write altEmails, and
             // setting the list here would discard what a merge folded in. An

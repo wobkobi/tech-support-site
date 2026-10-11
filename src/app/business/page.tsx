@@ -149,7 +149,6 @@ const businessFaq: ReadonlyArray<{ q: string; a: string }> = [
   },
 ];
 
-// Accordion row and summary classes. Keep in step with the FAQ page rows.
 const siteUrl = getSiteUrl();
 
 /**

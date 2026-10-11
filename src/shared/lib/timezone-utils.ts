@@ -220,7 +220,7 @@ export function toNzInputValue(input: Date | string): string {
  */
 export function fromNzInputValue(local: string): Date {
   const [datePart, timePart] = local.split("T");
-  // Without both halves the old code threw an unnamed TypeError on .split of
+  // Without both halves the next .split throws an unnamed TypeError on
   // undefined; say which value was wrong instead.
   if (datePart === undefined || timePart === undefined) {
     throw new Error(`fromNzInputValue expects "YYYY-MM-DDTHH:MM", received "${local}"`);

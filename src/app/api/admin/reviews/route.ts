@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * POST /api/admin/reviews
  * Creates a new pre-approved review (operator path for past client reviews).
- * Authenticated via X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns JSON with the created review.
  */

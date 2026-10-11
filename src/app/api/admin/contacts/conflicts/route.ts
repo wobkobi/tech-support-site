@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * GET /api/admin/contacts/conflicts
  * Returns unresolved ContactConflict rows joined with their contact name/email.
- * Requires X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns JSON `{ ok, conflicts }` or an error.
  */
