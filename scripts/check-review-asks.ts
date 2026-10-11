@@ -230,7 +230,7 @@ function main(): void {
   );
   expectEqual(
     "invoice to a company address falls back",
-    pickReviewAskAddress("accounts@68ltd.co.nz", contact),
+    pickReviewAskAddress("accounts@company.example", contact),
     "sam@example.com",
   );
   expectEqual(

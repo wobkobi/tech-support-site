@@ -35,15 +35,15 @@ function main(): void {
 
   expectList("primary only", mergeEmails(["a@x.co.nz"], [], "a@x.co.nz"), ["a@x.co.nz"]);
 
-  // The case that started this: Google holds both, the site imported one.
+  // Google holds both addresses, the site imported only one.
   expectList(
     "google's extra address is kept",
     mergeEmails(
-      ["bryan.leyland@icloud.com"],
-      ["bryan.leyland@icloud.com", "bryan.leyland@gmail.com"],
-      "bryan.leyland@icloud.com",
+      ["pat.lee@example.com"],
+      ["pat.lee@example.com", "pat.lee@example.net"],
+      "pat.lee@example.com",
     ),
-    ["bryan.leyland@icloud.com", "bryan.leyland@gmail.com"],
+    ["pat.lee@example.com", "pat.lee@example.net"],
   );
 
   // The push direction: an address the site knows must not be dropped from

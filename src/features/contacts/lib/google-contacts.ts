@@ -169,7 +169,7 @@ export async function importGoogleContactByEmail(
  *
  * Matching happens in memory against normalised keys rather than in the query.
  * A Mongo equality filter only matches the stored string exactly, so a contact
- * saved as "Tina0261@outlook.com" or "0210311047" never matched Google's
+ * saved as "Pat.Lee@Example.com" or "0210000000" never matched Google's
  * lowercased email or E.164 phone and was re-created as a duplicate on every
  * single run.
  * @returns The number of contacts created or updated (skipped rows not counted).
