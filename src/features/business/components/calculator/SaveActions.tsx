@@ -19,6 +19,7 @@ interface Props {
   savingInvoice: boolean;
   saveSendMode: boolean;
   saveQuoteMode: boolean;
+  quoteMode: boolean;
   savingIncome: boolean;
   parsing: boolean;
   subtotal: number;
@@ -40,6 +41,8 @@ interface Props {
  * @param props.savingInvoice - True while an invoice/quote save is in flight.
  * @param props.saveSendMode - True when the in-flight save is a "Save & send".
  * @param props.saveQuoteMode - True when the in-flight save is a "Save as quote".
+ * @param props.quoteMode - Opened from "New quote": Save quote leads, with Save as invoice
+ * instead under it, and the payment boxes, Save & send and the income save are left out.
  * @param props.savingIncome - True while an income save is in flight.
  * @param props.parsing - True while an AI parse is in flight (blocks invoice saves).
  * @param props.subtotal - Job subtotal; zero disables the income save.
@@ -58,6 +61,7 @@ export function SaveActions({
   savingInvoice,
   saveSendMode,
   saveQuoteMode,
+  quoteMode,
   savingIncome,
   parsing,
   subtotal,
@@ -75,6 +79,36 @@ export function SaveActions({
   // More than the total means the job or the amount is wrong, and saving would book the
   // extra as paid against nothing. A quote ignores Already paid, so it can still save.
   const overpaid = Math.round((prepaid - total) * 100) > 0;
+  if (quoteMode) {
+    return (
+      <div className="space-y-2">
+        {saveInvoiceError && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+            {saveInvoiceError}
+          </p>
+        )}
+        <AdminButton
+          variant="primary"
+          className="w-full"
+          onClick={() => onSaveInvoice(false, true)}
+          disabled={savingInvoice || parsing}
+          suppressHydrationWarning
+          title="Save as a Q-numbered quote - convert it to an invoice once the client accepts."
+        >
+          {savingInvoice && saveQuoteMode ? "Saving..." : "Save quote"}
+        </AdminButton>
+        <AdminButton
+          variant="outline"
+          className="w-full"
+          onClick={() => onSaveInvoice(false)}
+          disabled={savingInvoice || parsing || overpaid}
+          suppressHydrationWarning
+        >
+          {savingInvoice && !saveQuoteMode ? "Saving..." : "Save as invoice instead"}
+        </AdminButton>
+      </div>
+    );
+  }
   return (
     <div className="space-y-2">
       {incomeError && (

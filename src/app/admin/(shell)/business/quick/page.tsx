@@ -1,9 +1,9 @@
 // src/app/admin/(shell)/business/quick/page.tsx
 // Quick price page for settling up on site: address plus start/end time in, one total out,
 // for a customer paying cash or by bank transfer on the spot. Priced as a job done today,
-// so the rates, promo and public-holiday uplift are resolved for now. Today's booking
-// calendar is matched too: the job in progress (or `?eventId=`) prefills the address,
-// times and frozen travel through the calculator's own buildEventPrefill.
+// so the rates, promo and date surcharge (public holiday or weekend) are resolved for now.
+// Today's booking calendar is matched too: the job in progress (or `?eventId=`) prefills
+// the address, times and frozen travel through the calculator's own buildEventPrefill.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import {
@@ -12,7 +12,7 @@ import {
   type QuickPrefill,
 } from "@/features/business/components/QuickPriceView";
 import { buildEventPrefill } from "@/features/business/lib/event-prefill.server";
-import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
+import { calcTravelCharge, dateSurcharge } from "@/features/business/lib/pricing-policy";
 import { getPolicy, lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { resolvePromo } from "@/features/business/lib/promos";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
@@ -31,6 +31,7 @@ import {
   nzDateKey,
   nzMidnightUtc,
   nzNowTime,
+  nzWeekday,
 } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import type React from "react";
@@ -234,7 +235,10 @@ export default async function QuickPricePage({
         key={prefill?.eventId ?? "blank"}
         rates={rates}
         promo={promo}
-        holidayName={holiday?.name ?? null}
+        surcharge={dateSurcharge(holiday?.name ?? null, nzWeekday(now), {
+          publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
+          weekendUplift: policy.WEEKEND_UPLIFT,
+        })}
         bankAccount={identity.bankAccount}
         initialEnd={nzNowTime()}
         events={events}
@@ -245,7 +249,7 @@ export default async function QuickPricePage({
           travelRatePerHour: policy.TRAVEL_RATE_PER_HOUR,
           minBillableMins: policy.MIN_BILLABLE_MINS,
           billingIncrementMins: policy.BILLING_INCREMENT_MINS,
-          holidayUplift: holiday ? policy.PUBLIC_HOLIDAY_UPLIFT : 0,
+          unsuccessfulFactor: policy.UNSUCCESSFUL_WORK_FACTOR,
         }}
       />
     </>

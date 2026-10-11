@@ -16,6 +16,7 @@ import {
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
 import { Combobox } from "@/features/business/components/Combobox";
 import { composeDescription, formatNZD, taskLineTotals } from "@/features/business/lib/business";
+import { unsuccessfulShareLabel } from "@/features/business/lib/pricing-policy";
 import { collectTaxonomyTags } from "@/features/business/lib/task-taxonomy";
 import type { RateConfig, TaskLine, TaskTemplate } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
@@ -38,6 +39,8 @@ interface Props {
   baseRates: RateConfig[];
   modifierRates: RateConfig[];
   flatRates: RateConfig[];
+  /** Share of the labour still charged on an unfinished task (0.5 = half price). */
+  unsuccessfulFactor: number;
 }
 
 /**
@@ -57,7 +60,7 @@ function tagSuggestions(templates: TaskTemplate[], key: "device" | "action"): st
  * Tasks list - the core of the job calculator. Each row is either a flat-rate
  * line (Travel etc.) with a rate dropdown + qty/price/total, or a regular task
  * with device + action comboboxes that auto-look up a saved template for
- * pricing. Modifier chips (urgent, weekend, etc.) toggle on each row to nudge
+ * pricing. Modifier chips (Business, Remote, etc.) toggle on each row to nudge
  * the effective hourly rate.
  * @param props - Component props.
  * @param props.tasks - The current task list.
@@ -71,6 +74,7 @@ function tagSuggestions(templates: TaskTemplate[], key: "device" | "action"): st
  * @param props.baseRates - Base hourly rates available in the rate dropdown.
  * @param props.modifierRates - Modifier chips shown next to the base dropdown.
  * @param props.flatRates - Flat-rate options used for flat-rate rows.
+ * @param props.unsuccessfulFactor - Labour share charged on an unfinished task, for the chip's tooltip.
  * @returns Tasks section element.
  */
 export function TasksSection({
@@ -85,6 +89,7 @@ export function TasksSection({
   baseRates,
   modifierRates,
   flatRates,
+  unsuccessfulFactor,
 }: Props): React.ReactElement {
   // The invoice's cents, not each row rounded alone: timed rows at one rate share them.
   const lineTotals = taskLineTotals(tasks);
@@ -302,7 +307,7 @@ export function TasksSection({
                       )
                     }
                     aria-pressed={task.unsuccessful ?? false}
-                    title="Mark this task as not finished (half-price labour)"
+                    title={`Mark this task as not finished (${unsuccessfulShareLabel(unsuccessfulFactor)})`}
                     className={toggleChipClass(
                       task.unsuccessful ?? false,
                       "border-amber-300 bg-amber-50 text-amber-700",

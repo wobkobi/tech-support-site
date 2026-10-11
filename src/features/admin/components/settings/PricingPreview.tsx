@@ -48,6 +48,11 @@ export function PricingPreview({ config }: Props): React.ReactElement {
       `Public-holiday labour carries a +${Math.round(config.publicHolidayUplift * 100)}% surcharge.`,
     );
   }
+  if (config.weekendUplift > 0) {
+    lines.push(
+      `Weekend labour carries a +${Math.round(config.weekendUplift * 100)}% surcharge (a public holiday takes its own instead).`,
+    );
+  }
   if (config.minTravelCharge > 0) {
     lines.push(`Any travel bills at least $${config.minTravelCharge}.`);
   }

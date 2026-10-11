@@ -14,11 +14,12 @@ import {
   toAlreadyPaidMethod,
 } from "@/features/business/lib/already-paid-input";
 import { buildEventPrefill } from "@/features/business/lib/event-prefill.server";
+import { dateSurcharge } from "@/features/business/lib/pricing-policy";
 import { getPolicy, lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
-import { nzDateKey } from "@/shared/lib/timezone-utils";
+import { nzDateKey, nzWeekday } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import type React from "react";
@@ -64,7 +65,8 @@ export default async function EditInvoicePage({
   ]);
   const jobDate = prefill?.jobDate ?? nzDateKey(invoice.issueDate);
   // UTC midnight is midday in NZ, so the key's own NZ date is the one looked up.
-  const holiday = await lookupPublicHoliday(new Date(`${jobDate}T00:00:00Z`)).catch(() => null);
+  const jobDay = new Date(`${jobDate}T00:00:00Z`);
+  const holiday = await lookupPublicHoliday(jobDay).catch(() => null);
   const aiContext: InvoiceAiContext = {
     slots: prefill?.slots ?? [],
     jobDate,
@@ -79,7 +81,10 @@ export default async function EditInvoicePage({
       minBillableMins: policy.MIN_BILLABLE_MINS,
       travelRatePerHour: policy.TRAVEL_RATE_PER_HOUR,
       minTravelCharge: policy.MIN_TRAVEL_CHARGE,
-      holidayUplift: holiday ? policy.PUBLIC_HOLIDAY_UPLIFT : 0,
+      surcharge: dateSurcharge(holiday?.name ?? null, nzWeekday(jobDay), {
+        publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
+        weekendUplift: policy.WEEKEND_UPLIFT,
+      }),
       unsuccessfulFactor: policy.UNSUCCESSFUL_WORK_FACTOR,
     },
     promoDiscount: invoice.promoDiscount ?? 0,

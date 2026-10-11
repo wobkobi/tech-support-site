@@ -14,6 +14,7 @@ import {
   publicHolidayCopy,
   travelCopy,
   unsuccessfulWorkCopy,
+  weekendCopy,
   workmanshipCopy,
 } from "@/features/business/lib/pricing-policy";
 import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
@@ -406,11 +407,16 @@ export default async function PricingPage(): Promise<React.ReactElement> {
 
           <details className={ACCORDION_DETAILS}>
             <summary className={ACCORDION_SUMMARY}>
-              <span>Public holidays</span>
+              <span>
+                {policy.WEEKEND_UPLIFT > 0 ? "Weekends and public holidays" : "Public holidays"}
+              </span>
               <FaCaretDown className={CHEVRON} aria-hidden />
             </summary>
             <div className={ACCORDION_BODY}>
-              {renderEmphasised(publicHolidayCopy(policy.PUBLIC_HOLIDAY_UPLIFT))}
+              {policy.WEEKEND_UPLIFT > 0 && (
+                <p>{renderEmphasised(weekendCopy(policy.WEEKEND_UPLIFT))}</p>
+              )}
+              <p>{renderEmphasised(publicHolidayCopy(policy.PUBLIC_HOLIDAY_UPLIFT))}</p>
             </div>
           </details>
 

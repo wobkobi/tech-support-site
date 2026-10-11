@@ -78,6 +78,7 @@ export const DEFAULT_SETTINGS: Settings = {
     minTaskMins: 5,
     maxJobMins: 480,
     publicHolidayUplift: 0.25,
+    weekendUplift: 0.1,
     minTravelCharge: 10,
     travelRatePerHour: 40,
     unsuccessfulWorkFactor: 0.5,

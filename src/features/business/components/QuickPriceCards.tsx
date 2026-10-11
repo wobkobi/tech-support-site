@@ -7,6 +7,7 @@ import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import type { QuickEvent } from "@/features/business/components/QuickPriceView";
 import { type calcJobTotal, formatMins, formatNZD } from "@/features/business/lib/business";
 import { bankParticulars } from "@/features/business/lib/payment-fields";
+import type { DateSurcharge } from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
 import type { TravelEntry } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
@@ -78,7 +79,7 @@ interface TotalCardProps {
   onToggleNoTravel: () => void;
   driveMins: number;
   lookingUp: boolean;
-  holidayName: string | null;
+  surcharge: DateSurcharge | null;
   promo: ActivePromo | null;
   bankAccount: string;
   clientName: string | null;
@@ -95,7 +96,7 @@ interface TotalCardProps {
  * @param props.onToggleNoTravel - Drops travel from the total or adds it back.
  * @param props.driveMins - Round-trip drive minutes.
  * @param props.lookingUp - True while a travel lookup is in flight.
- * @param props.holidayName - Today's public holiday name, or null.
+ * @param props.surcharge - Today's labour surcharge (public holiday or weekend), or null.
  * @param props.promo - Automatic promo applied, or null.
  * @param props.bankAccount - Account number for bank transfers; empty hides the section.
  * @param props.clientName - Seeded client name for the bank particulars, or null.
@@ -110,7 +111,7 @@ export function QuickTotalCard({
   onToggleNoTravel,
   driveMins,
   lookingUp,
-  holidayName,
+  surcharge,
   promo,
   bankAccount,
   clientName,
@@ -165,16 +166,31 @@ export function QuickTotalCard({
                   : "-"}
           </dd>
         </div>
-        {totals.holidaySurcharge > 0 && (
+        {totals.surchargeTotal > 0 && (
           <div className="flex justify-between gap-3">
-            <dt>{holidayName ?? "Public holiday"} surcharge</dt>
-            <dd>{formatNZD(totals.holidaySurcharge)}</dd>
+            <dt>
+              {surcharge?.reason ?? "Date"} surcharge
+              {surcharge && (
+                <span className="text-admin-text-secondary">
+                  {" "}
+                  - labour +{Math.round(surcharge.uplift * 100)}%
+                </span>
+              )}
+            </dt>
+            <dd>{formatNZD(totals.surchargeTotal)}</dd>
           </div>
         )}
         {totals.promoDiscount > 0 && promo && (
           <div className="flex justify-between gap-3 text-moonstone-700">
             <dt>{promo.title}</dt>
             <dd>-{formatNZD(totals.promoDiscount)}</dd>
+          </div>
+        )}
+        {/* Same wording as the calculator preview and the invoice PDF. */}
+        {totals.unsuccessfulDiscount > 0 && (
+          <div className="flex justify-between gap-3">
+            <dt>Unsuccessful-visit discount (labour only)</dt>
+            <dd>-{formatNZD(totals.unsuccessfulDiscount)}</dd>
           </div>
         )}
         {totals.gstAmount > 0 && (

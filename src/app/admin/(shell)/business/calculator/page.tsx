@@ -67,19 +67,21 @@ async function loadReissue(
 /**
  * Job calculator page with AI parsing, time tracking, and rate management.
  * @param props - Page props.
- * @param props.searchParams - Optional `eventId` (schedule's "Bill in calculator"), `eventIds` (merged job) or `reissue` (a voided invoice's id).
+ * @param props.searchParams - Optional `eventId` (schedule's "Bill in calculator"), `eventIds` (merged job), `reissue` (a voided invoice's id) or `quote=1` (the "New quote" shortcut).
  * @returns Calculator page element
  */
 export default async function CalculatorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ eventId?: string; eventIds?: string; reissue?: string }>;
+  searchParams: Promise<{ eventId?: string; eventIds?: string; reissue?: string; quote?: string }>;
 }): Promise<React.ReactElement> {
   await requireAdminAuth();
   const params = await searchParams;
   const reissue = await loadReissue(params.reissue);
   // A re-issue bills the voided invoice's own events; it ignores any event params.
   const eventIds = reissue ? reissue.eventIds : parseEventIds(params);
+  // A re-issue replaces a voided invoice, so it is never a quote.
+  const quoteMode = params.quote === "1" && !reissue;
   const [identity, policy, rateRows, templateRows, promo, eventPrefill] = await Promise.all([
     getIdentity(),
     getPolicy(),
@@ -132,8 +134,12 @@ export default async function CalculatorPage({
   return (
     <>
       <PageHeader
-        title="Job calculator"
-        description="Parse a job with AI or build it by hand, then save it as an invoice or income."
+        title={quoteMode ? "New quote" : "Job calculator"}
+        description={
+          quoteMode
+            ? "Parse the job with AI or build it by hand, then save it as a quote for the client."
+            : "Parse a job with AI or build it by hand, then save it as an invoice or income."
+        }
       />
       <Suspense>
         {/* Keyed by the event set so the in-page picker's client-side
@@ -143,9 +149,7 @@ export default async function CalculatorPage({
           key={
             reissue
               ? `reissue:${params.reissue}`
-              : eventIds.length > 0
-                ? eventIds.join(",")
-                : "blank"
+              : `${eventIds.length > 0 ? eventIds.join(",") : "blank"}${quoteMode ? ":quote" : ""}`
           }
           identity={identity}
           pricing={pricing}
@@ -155,6 +159,7 @@ export default async function CalculatorPage({
           initialPromo={promo}
           eventPrefill={eventPrefill}
           reissue={reissue?.prefill ?? null}
+          quoteMode={quoteMode}
         />
       </Suspense>
     </>

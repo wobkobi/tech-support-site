@@ -17,6 +17,7 @@ import {
   jobToLineItems,
   type calcJobTotal,
   type JobPricing,
+  type LabourSurcharge,
 } from "@/features/business/lib/business";
 import { clearDraft } from "@/features/business/lib/calculator-draft";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
@@ -41,8 +42,8 @@ interface UseCalculatorSaveArgs {
   job: JobCalculation;
   /** Totals computed from {@link UseCalculatorSaveArgs.job}. */
   totals: ReturnType<typeof calcJobTotal>;
-  /** Public-holiday labour uplift for the job date. */
-  holidayUplift: number;
+  /** Labour surcharge for the job date (public holiday or weekend), or null. */
+  surcharge: LabourSurcharge | null;
   /** Live pricing; only the travel and billable minimums feed the line items. */
   pricing: Pick<JobPricing, "minTravelCharge" | "minBillableMins">;
   activePromo: ActivePromo | null;
@@ -95,7 +96,7 @@ interface UseCalculatorSave {
  * @param args - Calculator state the save paths read.
  * @param args.job - The assembled job.
  * @param args.totals - Totals for the job.
- * @param args.holidayUplift - Public-holiday labour uplift.
+ * @param args.surcharge - Labour surcharge for the job date, or null.
  * @param args.pricing - Live travel and billable minimums.
  * @param args.activePromo - Promo resolved for the job date, or null.
  * @param args.skipPromo - Whether the promo is skipped for this job.
@@ -113,7 +114,7 @@ interface UseCalculatorSave {
 export function useCalculatorSave({
   job,
   totals,
-  holidayUplift,
+  surcharge,
   pricing,
   activePromo,
   skipPromo,
@@ -365,7 +366,7 @@ export function useCalculatorSave({
       await saveTaskTemplates(tasks);
       const lineItems = jobToLineItems(
         job,
-        holidayUplift,
+        surcharge,
         pricing.minTravelCharge,
         pricing.minBillableMins,
       );

@@ -39,6 +39,9 @@ export const BILLING_INCREMENT_MINS = 5;
 /** Multiplier applied to labour on NZ public holidays. Travel and parts are not uplifted. */
 const PUBLIC_HOLIDAY_UPLIFT = 0.25;
 
+/** Multiplier applied to labour on an NZ Saturday or Sunday. Travel and parts are not uplifted. */
+const WEEKEND_UPLIFT = 0.1;
+
 /** Fallback fraction charged for an unsuccessful visit (0.5 = half price). */
 const UNSUCCESSFUL_WORK_FACTOR = 0.5;
 /** Fallback grace period (minutes) covered free at the start of a visit returning to finish an unfixed job. */
@@ -610,6 +613,72 @@ export function publicHolidayCopy(uplift: number = PUBLIC_HOLIDAY_UPLIFT): strin
 }
 
 /**
+ * Short wording for the labour share an unsuccessful visit still charges, for the
+ * calculator's "Didn't finish" chip and Quick price's "Couldn't fix it" box.
+ * @param factor - Charged fraction of the labour (0.5 = half).
+ * @returns "half-price labour", "no labour charge", or e.g. "labour at 40%".
+ */
+export function unsuccessfulShareLabel(factor: number): string {
+  if (factor <= 0) return "no labour charge";
+  if (factor === 0.5) return "half-price labour";
+  return `labour at ${Math.round(factor * 100)}%`;
+}
+
+/**
+ * Weekend surcharge text, shown with the public-holiday copy.
+ * @param uplift - Surcharge multiplier (defaults to the module constant).
+ * @returns Copy describing the weekend surcharge.
+ */
+export function weekendCopy(uplift: number = WEEKEND_UPLIFT): string {
+  return (
+    `Saturday and Sunday appointments carry a **${Math.round(uplift * 100)}% surcharge** on labour. ` +
+    `A public holiday that falls on a weekend takes the public-holiday surcharge instead - ` +
+    `the two never add together. **Travel and parts are unchanged.**`
+  );
+}
+
+/** A date-based labour surcharge: a public holiday or a weekend. */
+export interface DateSurcharge {
+  /** Why it applies, for the calculator strip: the holiday's name, or "Weekend". */
+  reason: string;
+  /** Invoice-line wording without the percent, e.g. "Weekend surcharge". */
+  label: string;
+  /** Labour uplift as a fraction (0.1 = +10%). */
+  uplift: number;
+}
+
+/**
+ * The labour surcharge for a job's date. A public holiday wins over a weekend, so a
+ * holiday Saturday bills the holiday surcharge alone and the two never stack. A holiday
+ * set to 0% bills normal rates even on a weekend.
+ * @param holidayName - The NZ public holiday on the job date, or null.
+ * @param weekday - NZ weekday of the job, 0 = Sunday through 6 = Saturday.
+ * @param uplifts - Live surcharge fractions from the pricing settings.
+ * @param uplifts.publicHolidayUplift - Public-holiday labour uplift (0 = off).
+ * @param uplifts.weekendUplift - Weekend labour uplift (0 = off).
+ * @returns The surcharge to apply, or null when none does.
+ */
+export function dateSurcharge(
+  holidayName: string | null,
+  weekday: number,
+  uplifts: { publicHolidayUplift: number; weekendUplift: number },
+): DateSurcharge | null {
+  if (holidayName !== null) {
+    return uplifts.publicHolidayUplift > 0
+      ? {
+          reason: holidayName,
+          label: "Public holiday surcharge",
+          uplift: uplifts.publicHolidayUplift,
+        }
+      : null;
+  }
+  if ((weekday === 0 || weekday === 6) && uplifts.weekendUplift > 0) {
+    return { reason: "Weekend", label: "Weekend surcharge", uplift: uplifts.weekendUplift };
+  }
+  return null;
+}
+
+/**
  * GST disclosure text. Reads either the flag default or an explicit override.
  * @param registered - GST-registration state (defaults to the module constant).
  * @returns Copy describing the GST stance.
@@ -639,6 +708,7 @@ export interface Policy {
   MIN_TASK_MINS: number;
   MAX_JOB_MINS: number;
   PUBLIC_HOLIDAY_UPLIFT: number;
+  WEEKEND_UPLIFT: number;
   UNSUCCESSFUL_WORK_FACTOR: number;
   NO_FIX_FREE_MINS: number;
   WORKMANSHIP_WINDOW_DAYS: number;

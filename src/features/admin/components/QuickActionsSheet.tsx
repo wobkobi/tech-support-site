@@ -1,7 +1,7 @@
 "use client";
 // src/features/admin/components/QuickActionsSheet.tsx
-// Bottom sheet opened by the phone bar's +: the QUICK_ACTIONS shortcuts as four large
-// tiles. Also exports QuickActionTiles, the same tiles inline on the phone dashboard.
+// Bottom sheet opened by the phone bar's +: the QUICK_ACTIONS shortcuts as large tiles.
+// Also exports QuickActionTiles, the same tiles inline on the phone dashboard.
 
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { QUICK_ACTIONS, quickActionHref } from "@/features/admin/lib/quick-actions";
@@ -15,7 +15,7 @@ interface QuickActionTilesProps {
   stamp: string;
   /** Called after a tile is tapped (the sheet closes itself). */
   onPick?: () => void;
-  /** "lg" for the sheet's two-by-two grid, "md" for the dashboard's single row. */
+  /** "lg" for the sheet's two-column grid, "md" for the dashboard's compact rows. */
   size?: "md" | "lg";
   className?: string;
 }
@@ -36,16 +36,21 @@ export function QuickActionTiles({
   className,
 }: QuickActionTilesProps): React.ReactElement {
   const lg = size === "lg";
+  const count = QUICK_ACTIONS.length;
   return (
-    <ul
-      className={cn(
-        "grid gap-2",
-        lg ? "grid-cols-2" : "grid-cols-4 max-[22rem]:grid-cols-2",
-        className,
-      )}
-    >
-      {QUICK_ACTIONS.map((a) => (
-        <li key={a.label}>
+    <ul className={cn("grid gap-2", lg ? "grid-cols-2" : "grid-cols-6 sm:grid-cols-5", className)}>
+      {QUICK_ACTIONS.map((a, i) => (
+        <li
+          key={a.label}
+          className={cn(
+            // Sheet: an odd last tile spans both columns instead of sitting alone.
+            lg && i === count - 1 && count % 2 === 1 && "col-span-2",
+            // Dashboard on a phone: six columns lay the five tiles out as 3 + 2, each
+            // wide enough for a two-word label; one row of five from sm.
+            !lg && (i < 3 ? "col-span-2" : "col-span-3"),
+            !lg && "sm:col-span-1",
+          )}
+        >
           <Link
             href={quickActionHref(a, stamp)}
             onClick={onPick}

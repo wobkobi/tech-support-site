@@ -142,6 +142,16 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
           onChange={(v) => setTop({ publicHolidayUplift: (v ?? 0) / 100 })}
         />
         <NumberField
+          id="weekendUplift"
+          meta={m.weekendUplift}
+          value={Math.round(draft.weekendUplift * 100)}
+          min={0}
+          step={1}
+          error={fieldErrors.weekendUplift}
+          customised={draft.weekendUplift !== defaults.weekendUplift}
+          onChange={(v) => setTop({ weekendUplift: (v ?? 0) / 100 })}
+        />
+        <NumberField
           id="minTravelCharge"
           meta={m.minTravelCharge}
           value={draft.minTravelCharge}

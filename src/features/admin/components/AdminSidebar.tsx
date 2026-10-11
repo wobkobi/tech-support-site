@@ -9,7 +9,7 @@ import { useDialogKeys } from "@/features/admin/hooks/use-dialog-keys";
 import { signOut } from "@/features/admin/lib/sign-out";
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
 import { useRef } from "react";
 import {
@@ -26,6 +26,7 @@ import {
   FaCar,
   FaEnvelope,
   FaFileInvoiceDollar,
+  FaFileSignature,
   FaGaugeHigh,
   FaGear,
   FaHandHoldingDollar,
@@ -54,6 +55,7 @@ type AdminPage =
   | "business-assets"
   | "business-trips"
   | "business-invoices"
+  | "business-quotes"
   | "business-calculator"
   | "business-quick"
   | "promos"
@@ -148,6 +150,12 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
     path: "/admin/business/invoices",
   },
   {
+    page: "business-quotes",
+    label: "Quotes",
+    icon: <FaFileSignature className="shrink-0" />,
+    path: "/admin/business/invoices?status=quote",
+  },
+  {
     page: "business-income",
     label: "Income",
     icon: <FaArrowTrendUp className="shrink-0" />,
@@ -231,19 +239,37 @@ const TOOL_NAV_ITEMS: NavItem[] = [
 const ALL_NAV_PATHS = [...NAV_ITEMS, ...BUSINESS_NAV_ITEMS, ...TOOL_NAV_ITEMS].map((i) => i.path);
 
 /**
- * The nav path that best matches the current pathname: exact for the dashboard
- * ("/admin"), otherwise the longest path that is a prefix of the pathname (so
- * `/admin/business/invoices/[id]/edit` still highlights Invoices, not Overview).
+ * The nav path that best matches the current URL: exact for the dashboard ("/admin"),
+ * otherwise the longest path that is a prefix of the pathname (so
+ * `/admin/business/invoices/[id]/edit` still highlights Invoices, not Overview). A path
+ * with a query (Quotes is the invoice list at `?status=quote`) matches only its own page
+ * with every one of its params set, and then beats the bare path.
  * @param pathname - The current pathname from usePathname.
+ * @param search - The current query from useSearchParams.
  * @param paths - All nav-item paths.
  * @returns The best-matching path, or null when none match.
  */
-function activeNavPath(pathname: string, paths: string[]): string | null {
+function activeNavPath(pathname: string, search: URLSearchParams, paths: string[]): string | null {
   let best: string | null = null;
+  let bestScore = -1;
   for (const p of paths) {
-    const matches =
-      p === "/admin" ? pathname === "/admin" : pathname === p || pathname.startsWith(`${p}/`);
-    if (matches && (best === null || p.length > best.length)) best = p;
+    const [base = p, query] = p.split("?");
+    let matches: boolean;
+    if (query) {
+      const wanted = new URLSearchParams(query);
+      matches =
+        pathname === base &&
+        [...wanted].every(([key, value]) => search.get(key)?.toLowerCase() === value);
+    } else {
+      matches =
+        p === "/admin" ? pathname === "/admin" : pathname === p || pathname.startsWith(`${p}/`);
+    }
+    // A query match outranks the same path without one.
+    const score = base.length + (query ? 1 : 0);
+    if (matches && score > bestScore) {
+      best = p;
+      bestScore = score;
+    }
   }
   return best;
 }
@@ -319,7 +345,8 @@ export function AdminSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const asideRef = useRef<HTMLElement>(null);
-  const active = activeNavPath(pathname, ALL_NAV_PATHS);
+  const searchParams = useSearchParams();
+  const active = activeNavPath(pathname, searchParams, ALL_NAV_PATHS);
 
   useDialogKeys(asideRef, drawerOpen, () => onDrawerClose(true));
 
@@ -406,7 +433,10 @@ export function AdminSidebar({
         </div>
 
         {/* Nav */}
-        <nav aria-label="Admin" className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
+        <nav
+          aria-label="Admin"
+          className="flex flex-1 flex-col gap-1 overflow-y-auto overscroll-contain px-3 py-4"
+        >
           {NAV_ITEMS.map(navLink)}
 
           {/* Collapsed, the heading is read by screen readers only and a rule marks the group. */}
