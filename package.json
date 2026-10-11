@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.91.0",
+  "version": "4.92.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -24,6 +24,7 @@
     "check:emails-merge": "tsx scripts/check-contact-emails.ts",
     "check:gst-basis": "tsx scripts/check-gst-basis.ts",
     "check:invoice-recipient": "tsx scripts/check-invoice-recipient.ts",
+    "check:job-modifiers": "tsx scripts/check-job-modifiers.ts",
     "check:mailing": "tsx --conditions=react-server scripts/check-mailing.ts",
     "check:monthly": "tsx scripts/check-monthly-buckets.ts",
     "check:promo-pricing": "tsx scripts/check-promo-pricing.ts",

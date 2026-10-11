@@ -369,6 +369,7 @@ export function CalculatorView({
     jobAddress,
     timeRanges,
     timesSet,
+    billedToCompany: addressMode === "company",
     setFollowUpMins,
     setTimeRanges,
     setTimesSet,

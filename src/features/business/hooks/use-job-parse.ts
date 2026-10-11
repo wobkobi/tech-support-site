@@ -46,6 +46,8 @@ interface UseJobParseArgs {
   timeRanges: ParsedRange[];
   /** Whether those ranges are real times rather than a placeholder or the booking's own. */
   timesSet: boolean;
+  /** Whether the invoice is addressed to the picked contact's company. */
+  billedToCompany: boolean;
   setFollowUpMins: React.Dispatch<React.SetStateAction<number>>;
   setTimeRanges: React.Dispatch<React.SetStateAction<ParsedRange[]>>;
   setTimesSet: React.Dispatch<React.SetStateAction<boolean>>;
@@ -88,6 +90,7 @@ interface UseJobParse {
  * @param args.jobAddress - Current job address (travel fallback).
  * @param args.timeRanges - The Time card's ranges.
  * @param args.timesSet - Whether the Time card's ranges are real times.
+ * @param args.billedToCompany - Whether the invoice is addressed to the contact's company.
  * @param args.setFollowUpMins - Follow-up minutes setter.
  * @param args.setTimeRanges - Time slots setter.
  * @param args.setTimesSet - Setter for whether the Time card's ranges are real times.
@@ -107,6 +110,7 @@ export function useJobParse({
   jobAddress,
   timeRanges,
   timesSet,
+  billedToCompany,
   setFollowUpMins,
   setTimeRanges,
   setTimesSet,
@@ -272,6 +276,9 @@ export function useJobParse({
       if (fallbackDestination && eventPrefill?.meetingType !== "remote") {
         body.fallbackDestination = fallbackDestination;
       }
+      // The route adds Remote to a remote booking's tasks and Business to a company's.
+      if (eventPrefill?.meetingType) body.meetingType = eventPrefill.meetingType;
+      if (billedToCompany) body.billedToCompany = true;
       if (answers && Object.keys(answers).length > 0) body.answers = answers;
       const res = await fetch("/api/business/parse-job", {
         method: "POST",
