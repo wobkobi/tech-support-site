@@ -135,6 +135,7 @@ export default async function Home(): Promise<React.ReactElement> {
           loading="eager"
           fetchPriority="high"
           sizes="100vw"
+          quality={60}
           className="-z-20 object-cover object-[50%_60%] md:object-[70%_58%]"
         />
         <div

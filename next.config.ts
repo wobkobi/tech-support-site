@@ -63,10 +63,14 @@ const nextConfig: NextConfig = {
       // All APIs polyfilled here are natively supported by our browserslist targets
       // (Chrome 93+, Firefox 92+, Safari 15.4+, Edge 93+). Replacing with an empty
       // module removes ~14 KiB of flagged-but-never-executed legacy JS from the bundle.
+      // Next's client entry pulls the file in by a relative path
+      // (client/app-globals.js: require("../build/polyfills/polyfill-module")), and
+      // aliases match the request string, so the relative form needs its own key.
       "next/dist/build/polyfills/polyfill-module": path.resolve(
         __dirname,
         "src/empty-polyfills.js",
       ),
+      "../build/polyfills/polyfill-module": path.resolve(__dirname, "src/empty-polyfills.js"),
     },
   },
 
@@ -112,6 +116,9 @@ const nextConfig: NextConfig = {
 
   images: {
     formats: ["image/avif", "image/webp"],
+    // 60 serves the home hero (darkened behind an overlay, so the lower quality
+    // doesn't show); 75 is the default for every other image.
+    qualities: [60, 75],
   },
 
   experimental: {
