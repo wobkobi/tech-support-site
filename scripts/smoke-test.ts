@@ -154,15 +154,15 @@ const IGNORE_CONSOLE_GLOBAL = ["connect.facebook.net", "vercel.live", "tags.tiqc
 
 /**
  * Pages auto-discovery can't produce. A path that matches no route must answer a real
- * 404 with the themed not-found page, not a 200 soft-404 or a crash. The message line
- * is randomised, so only the fixed heading and button copy are asserted.
+ * 404 with the themed not-found page, not a 200 soft-404 or a crash. The requested path
+ * is asserted too: it is read client-side, so it proves hydration finished cleanly.
  */
 const EXTRA_PAGES: ReadonlyArray<PageSpec> = [
   {
     path: "/smoke-test-missing-page",
     name: "404 page",
     expectStatus: 404,
-    mustContain: ["Well, this is awkward", "Take me home"],
+    mustContain: ["Page not found", "Back to home", "/smoke-test-missing-page"],
   },
   // The review-ask stop page is a [token] route; "preview" is its no-op token.
   {
