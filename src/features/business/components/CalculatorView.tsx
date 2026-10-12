@@ -300,12 +300,15 @@ export function CalculatorView({
 
   // Travel lookup
   const [jobAddress, setJobAddress] = useState(() => eventPrefill?.jobAddress ?? "");
-  // Drove or walked, for the trip an invoice save logs. null follows the address: a job in
-  // your own suburb (the base address's locality) counts as walked, anywhere else as driven.
+  // Drove or walked, for the trip an invoice save logs. null follows the job: travel charged
+  // to the client (anything but a store run) means you drove, wherever it was. Otherwise a job
+  // in your own suburb (the base address's locality) counts as walked, anywhere else as driven.
   const [walkedChoice, setWalkedChoice] = useState<boolean | null>(null);
   const homeLocality = identity.baseAddress.locality.trim().toLowerCase();
+  const travelCharged = travelEntries.some((e) => e.kind !== "storeRun" && e.cost > 0);
   const walked =
-    walkedChoice ?? (homeLocality.length > 0 && jobAddress.toLowerCase().includes(homeLocality));
+    walkedChoice ??
+    (!travelCharged && homeLocality.length > 0 && jobAddress.toLowerCase().includes(homeLocality));
   const [lookingUpTravel, setLookingUpTravel] = useState(false);
 
   // Contacts

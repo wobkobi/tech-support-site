@@ -1,9 +1,11 @@
 "use client";
 // src/features/business/components/trips/TripFormModal.tsx
-// Add or edit one trip: date, round-trip km, purpose and notes, with an address box that
-// fills the km from Google Maps (round trip from the base address; the address itself is
-// not saved). Saves through the trips API and hands the stored row back. The parent mounts it per trip (keyed), so the form
-// starts from that trip's values without an effect.
+// Add or edit one trip: who it was to, where (the address is saved with the trip), date,
+// round-trip km, purpose and notes. Picking a saved contact fills the address from their
+// contact and looks up the km from Google Maps (round trip from the base address); an
+// address can also be typed or picked from Places. Saves through the trips API and hands
+// the stored row back. The parent mounts it per trip (keyed), so the form starts from that
+// trip's values without an effect.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -15,15 +17,19 @@ import AddressAutocomplete from "@/features/booking/components/AddressAutocomple
 import { FiledYearWarning } from "@/features/business/components/tax/FiledYearWarning";
 import type { FiledYearRef } from "@/features/business/lib/tax/snapshot";
 import {
+  MAX_DESTINATION_LEN,
   MAX_TRIP_KM,
   type TripApiResponse,
+  type TripContact,
   type TripDistanceApiResponse,
   type TripRow,
 } from "@/features/business/lib/trips";
+import type { GoogleContact } from "@/features/business/types/business";
+import { ContactNameInput } from "@/features/contacts/components/ContactNameInput";
 import { Notice } from "@/shared/components/Notice";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
-import { useId, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
 /** Props for {@link TripFormModal}. */
 interface TripFormModalProps {
@@ -31,6 +37,8 @@ interface TripFormModalProps {
   trip: TripRow | null;
   /** Date a new trip starts on (YYYY-MM-DD). */
   defaultDate: string;
+  /** Saved contacts the "Who" box searches. */
+  contacts: readonly TripContact[];
   /** Called after a successful save with the stored row. */
   onSaved: (trip: TripRow) => void;
   /** Closes the dialog without saving. */
@@ -44,6 +52,9 @@ interface TripForm {
   date: string;
   km: string;
   purpose: string;
+  destination: string;
+  /** Picked contact, or "" when none is. */
+  contactId: string;
   notes: string;
 }
 
@@ -59,9 +70,11 @@ function initialForm(trip: TripRow | null, defaultDate: string): TripForm {
         date: trip.date.slice(0, 10),
         km: String(trip.km),
         purpose: trip.purpose,
+        destination: trip.destination ?? "",
+        contactId: trip.contactId ?? "",
         notes: trip.notes ?? "",
       }
-    : { date: defaultDate, km: "", purpose: "", notes: "" };
+    : { date: defaultDate, km: "", purpose: "", destination: "", contactId: "", notes: "" };
 }
 
 /**
@@ -69,6 +82,7 @@ function initialForm(trip: TripRow | null, defaultDate: string): TripForm {
  * @param props - Component props.
  * @param props.trip - Trip being edited, or null to add one.
  * @param props.defaultDate - Date a new trip starts on.
+ * @param props.contacts - Saved contacts the "Who" box searches.
  * @param props.onSaved - Called with the stored row after a save.
  * @param props.onClose - Closes the dialog.
  * @param props.filedYears - Filed years the edit forms warn about.
@@ -77,25 +91,25 @@ function initialForm(trip: TripRow | null, defaultDate: string): TripForm {
 export function TripFormModal({
   trip,
   defaultDate,
+  contacts,
   onSaved,
   onClose,
   filedYears,
 }: TripFormModalProps): React.ReactElement {
   const idBase = useId();
   const formRef = useRef<HTMLFormElement>(null);
+  const contactById = useMemo(() => new Map(contacts.map((c) => [c.id, c])), [contacts]);
+  const searchable = useMemo<GoogleContact[]>(() => [...contacts], [contacts]);
   const [initial] = useState(() => initialForm(trip, defaultDate));
   const [form, setForm] = useState<TripForm>(initial);
+  // The "Who" box text. Only the picked contact's id is saved; a contact deleted since
+  // the trip was logged shows blank.
+  const [who, setWho] = useState(() => contactById.get(initial.contactId)?.name ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Lookup only: the address is not part of the trip, so it is left out of `dirty`.
-  const [address, setAddress] = useState("");
   const [lookingUp, setLookingUp] = useState(false);
   const [lookup, setLookup] = useState<{ ok: boolean; text: string } | null>(null);
-  const dirty =
-    form.date !== initial.date ||
-    form.km !== initial.km ||
-    form.purpose !== initial.purpose ||
-    form.notes !== initial.notes;
+  const dirty = (Object.keys(initial) as (keyof TripForm)[]).some((k) => form[k] !== initial[k]);
 
   /**
    * Updates one field.
@@ -107,10 +121,51 @@ export function TripFormModal({
   }
 
   /**
+   * Picks a contact: links it, fills the address from their contact, starts the purpose
+   * when it is blank, and looks the km up straight away. A contact with no saved address
+   * keeps whatever address is already typed.
+   * @param picked - The contact chosen in the "Who" box.
+   */
+  function pickContact(picked: GoogleContact): void {
+    const c = contactById.get(picked.id);
+    if (!c) return;
+    setWho(c.name);
+    setForm((prev) => ({
+      ...prev,
+      contactId: c.id,
+      destination: c.address || prev.destination,
+      purpose: prev.purpose.trim() ? prev.purpose : `Job: ${c.name}`,
+    }));
+    if (!c.address) {
+      setLookup({
+        ok: false,
+        text: `No address saved for ${c.name}. Type where you went.`,
+      });
+      return;
+    }
+    void lookUpKm(
+      c.address,
+      c.addressUnverified ? `${c.name}'s saved address isn't verified, so check it.` : undefined,
+    );
+  }
+
+  /**
+   * Tracks the "Who" box. Typing away from the picked contact's name unlinks it, so a
+   * trip is never tied to someone it no longer names.
+   * @param text - Box text as typed.
+   */
+  function changeWho(text: string): void {
+    setWho(text);
+    const linked = contactById.get(form.contactId);
+    if (linked && text !== linked.name) setField("contactId", "");
+  }
+
+  /**
    * Fills the km from Google Maps: the round trip from the base address to `to`.
    * @param to - Address to look up; defaults to what is in the address box.
+   * @param note - Extra line after the km, such as an unverified-address warning.
    */
-  async function lookUpKm(to: string = address): Promise<void> {
+  async function lookUpKm(to: string = form.destination, note?: string): Promise<void> {
     const trimmed = to.trim();
     if (!trimmed || lookingUp) return;
     setLookingUp(true);
@@ -124,7 +179,10 @@ export function TripFormModal({
       const d = (await res.json()) as TripDistanceApiResponse;
       if (d.ok && d.km !== undefined) {
         setField("km", String(d.km));
-        setLookup({ ok: true, text: `Google Maps: ${d.km} km there and back.` });
+        setLookup({
+          ok: note === undefined,
+          text: `Google Maps: ${d.km} km there and back.${note ? ` ${note}` : ""}`,
+        });
       } else {
         setLookup({ ok: false, text: d.error ?? "Couldn't get the km from Google." });
       }
@@ -198,18 +256,35 @@ export function TripFormModal({
           className="sm:col-span-2"
         />
         <AdminField
+          label="Who"
+          htmlFor={`${idBase}-who`}
+          optional
+          hint="Pick a contact to fill in their address and the km."
+          className="sm:col-span-2"
+        >
+          <ContactNameInput
+            id={`${idBase}-who`}
+            value={who}
+            onChange={changeWho}
+            onPick={pickContact}
+            contacts={searchable}
+            placeholder="Search your contacts"
+            className={ADMIN_CONTROL_CLS}
+          />
+        </AdminField>
+        <AdminField
           label="Where to"
           htmlFor={`${idBase}-address`}
           optional
-          hint="Fills the km from Google Maps, there and back from your base address. Not saved with the trip."
+          hint="Saved with the trip. Google works out the km there and back from your base address."
           className="sm:col-span-2"
         >
           <div className="flex gap-2 max-sm:flex-col">
             <div className="min-w-0 flex-1">
               <AddressAutocomplete
                 id={`${idBase}-address`}
-                value={address}
-                onChange={setAddress}
+                value={form.destination}
+                onChange={(v) => setField("destination", v)}
                 // Picking a suggestion is a clear ask, so look it up straight away.
                 onPlaceSelected={(place) => void lookUpKm(place.formattedAddress)}
                 onKeyDown={(e) => {
@@ -220,7 +295,7 @@ export function TripFormModal({
                   }
                 }}
                 placeholder="Street address"
-                maxLength={250}
+                maxLength={MAX_DESTINATION_LEN}
                 inputClassName={ADMIN_CONTROL_CLS}
               />
             </div>
@@ -228,7 +303,7 @@ export function TripFormModal({
               variant="secondary"
               onClick={() => void lookUpKm()}
               busy={lookingUp}
-              disabled={!address.trim()}
+              disabled={!form.destination.trim()}
               className="shrink-0"
             >
               Get km from Google

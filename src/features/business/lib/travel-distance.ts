@@ -3,6 +3,8 @@
 // base address > destination at the departure time, destination > base address at the
 // return time, both traffic-aware. Used by /api/pricing/travel-time (public estimator +
 // calculator), the parse-job route, the booking snapshot, and the late-cancel invoice.
+// lookupRoundTripDistance asks with no departure time instead, so the trips log gets the
+// same km for an address whenever it looks one up.
 // lookupStoreRun times a mid-job client > store > client detour the same way.
 // Never throws - returns a discriminated status so the caller can decide whether to skip
 // the travel charge or surface an error.
@@ -59,29 +61,33 @@ type LegResult = { status: "ok"; data: DriveDistance } | { status: "no_match" | 
 const DEFAULT_JOB_DURATION_MS = 60 * 60 * 1000;
 
 /**
- * One Distance Matrix call for a single leg, traffic-aware.
- * best_guess model: Google's most-likely duration for that departure time.
+ * One Distance Matrix call for a single leg. With a departure time it is traffic-aware
+ * on the best_guess model: Google's most-likely duration for that departure time.
  * (Pessimistic was trialled and over-quoted rush-hour legs by ~50%; free-flow
  * with no departure_time under-quoted. best_guess tracked real trips closest.)
+ * Without one, Google routes on typical conditions with no traffic, so the same
+ * address always gives the same route and distance.
  * @param origin - Leg origin address.
  * @param destination - Leg destination address.
  * @param apiKey - Google Maps server key.
- * @param departMs - Epoch ms departure; caller has already clamped it to the future.
+ * @param departMs - Epoch ms departure, already clamped to the future; null for no traffic.
  * @returns One leg's duration + distance, or a failure status.
  */
 async function lookupLeg(
   origin: string,
   destination: string,
   apiKey: string,
-  departMs: number,
+  departMs: number | null,
 ): Promise<LegResult> {
   const url = new URL("https://maps.googleapis.com/maps/api/distancematrix/json");
   url.searchParams.set("origins", origin);
   url.searchParams.set("destinations", destination);
   url.searchParams.set("key", apiKey);
   url.searchParams.set("units", "metric");
-  url.searchParams.set("departure_time", Math.floor(departMs / 1000).toString());
-  url.searchParams.set("traffic_model", "best_guess");
+  if (departMs !== null) {
+    url.searchParams.set("departure_time", Math.floor(departMs / 1000).toString());
+    url.searchParams.set("traffic_model", "best_guess");
+  }
 
   try {
     const res = await fetch(url.toString());
@@ -113,10 +119,51 @@ async function lookupLeg(
 }
 
 /**
+ * The base address, the server Maps key and the destination as Google is sent it, or
+ * the status a lookup returns when one is missing.
+ * @param destination - Free-text destination address.
+ * @returns The lookup inputs, or a failure status.
+ */
+async function roundTripInputs(
+  destination: string,
+): Promise<
+  | { status: "ok"; origin: string; apiKey: string; fullDestination: string }
+  | { status: "misconfig" | "no_match" }
+> {
+  // Travel origin is the unified business base address (defaults to HOME_ADDRESS env).
+  const origin = (await getIdentity()).baseAddress.line || process.env.HOME_ADDRESS;
+  // Server-only key, no fallback to GOOGLE_MAPS_API_KEY: next.config.ts
+  // publishes that one to the browser, so falling back would spend a publicly
+  // readable key on server-side quota.
+  const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY;
+  if (!origin || !apiKey) return { status: "misconfig" };
+
+  const trimmed = destination.trim().slice(0, 100);
+  if (!trimmed) return { status: "no_match" };
+  return { status: "ok", origin, apiKey, fullDestination: `${trimmed}, New Zealand` };
+}
+
+/**
+ * Combines two leg results. Outbound failure keeps its own status, and a failed return
+ * leg mirrors the outbound figures - the symmetric assumption the single-lookup doubling
+ * made, so a flaky second call can never quote worse.
+ * @param there - Base > destination leg.
+ * @param back - Destination > base leg.
+ * @returns The round trip, or the outbound leg's failure status.
+ */
+function roundTripFrom(there: LegResult, back: LegResult): DriveRoundTripResult {
+  if (there.status !== "ok") return { status: there.status };
+  return {
+    status: "ok",
+    data: { there: there.data, back: back.status === "ok" ? back.data : there.data },
+  };
+}
+
+/**
  * Looks up both legs of the drive between the business base address and the
  * given destination. Appends ", New Zealand" to the destination string so the
  * Distance Matrix API resolves NZ addresses reliably. Always traffic-aware:
- * each leg quotes Google's pessimistic prediction at its own departure time.
+ * each leg quotes Google's best_guess prediction at its own departure time.
  * A missing or past `departAt` means "leaving about now"; a missing
  * `returnAt` defaults to one billable hour after departure (the estimators'
  * fallback job length) and is clamped to never precede the outbound leg.
@@ -134,18 +181,9 @@ export async function lookupDriveRoundTrip(
   departAt?: Date,
   returnAt?: Date,
 ): Promise<DriveRoundTripResult> {
-  // Travel origin is the unified business base address (defaults to HOME_ADDRESS env).
-  const origin = (await getIdentity()).baseAddress.line || process.env.HOME_ADDRESS;
-  // Server-only key, no fallback to GOOGLE_MAPS_API_KEY: next.config.ts
-  // publishes that one to the browser, so falling back would spend a publicly
-  // readable key on server-side quota.
-  const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY;
-  if (!origin || !apiKey) return { status: "misconfig" };
-
-  const trimmed = destination.trim().slice(0, 100);
-  if (!trimmed) return { status: "no_match" };
-
-  const fullDestination = `${trimmed}, New Zealand`;
+  const inputs = await roundTripInputs(destination);
+  if (inputs.status !== "ok") return inputs;
+  const { origin, apiKey, fullDestination } = inputs;
 
   // Distance Matrix only accepts a future departure_time, and without one Google omits
   // duration_in_traffic entirely, silently degrading the quote to free-flow times. Clamp
@@ -159,18 +197,26 @@ export async function lookupDriveRoundTrip(
     lookupLeg(origin, fullDestination, apiKey, departMs),
     lookupLeg(fullDestination, origin, apiKey, returnMs),
   ]);
+  return roundTripFrom(there, back);
+}
 
-  // Outbound failure keeps its own status - same semantics as the old
-  // single-leg lookup, so callers' error handling is unchanged.
-  if (there.status !== "ok") return { status: there.status };
-
-  return {
-    status: "ok",
-    data: {
-      there: there.data,
-      back: back.status === "ok" ? back.data : there.data,
-    },
-  };
+/**
+ * Round-trip driving distance between the business base address and the destination,
+ * with no departure time and so no traffic. Google then routes on typical conditions,
+ * so an address gives the same km whenever it is looked up - what a km log for the IRD
+ * rate needs. The durations are free-flow, so this is not for quoting drive time.
+ * @param destination - Free-text destination address (1-100 chars).
+ * @returns Discriminated result, the same statuses as {@link lookupDriveRoundTrip}.
+ */
+export async function lookupRoundTripDistance(destination: string): Promise<DriveRoundTripResult> {
+  const inputs = await roundTripInputs(destination);
+  if (inputs.status !== "ok") return inputs;
+  const { origin, apiKey, fullDestination } = inputs;
+  const [there, back] = await Promise.all([
+    lookupLeg(origin, fullDestination, apiKey, null),
+    lookupLeg(fullDestination, origin, apiKey, null),
+  ]);
+  return roundTripFrom(there, back);
 }
 
 /**
@@ -195,9 +241,5 @@ export async function lookupStoreRun(from: string, store: string): Promise<Drive
     lookupLeg(fullOrigin, fullStop, apiKey, departMs),
     lookupLeg(fullStop, fullOrigin, apiKey, departMs),
   ]);
-  if (there.status !== "ok") return { status: there.status };
-  return {
-    status: "ok",
-    data: { there: there.data, back: back.status === "ok" ? back.data : there.data },
-  };
+  return roundTripFrom(there, back);
 }

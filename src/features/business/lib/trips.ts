@@ -19,6 +19,9 @@ export const MAX_PURPOSE_LEN = 200;
 /** Longest notes field. */
 const MAX_NOTES_LEN = 1000;
 
+/** Longest destination address, the same cap as the booking address field. */
+export const MAX_DESTINATION_LEN = 250;
+
 /** One logged trip as the API and page hand it to the client. */
 export interface TripRow {
   id: string;
@@ -27,9 +30,29 @@ export interface TripRow {
   /** Round-trip business km. */
   km: number;
   purpose: string;
+  /** Address driven to, as at the trip, or null when none was recorded. */
+  destination: string | null;
+  /** Contact the trip was to, or null. */
+  contactId: string | null;
   /** The booking this trip was logged from, or null for a manual trip. */
   bookingId: string | null;
   notes: string | null;
+}
+
+/**
+ * A saved contact the trip form can pick, so its address fills the destination. Shaped
+ * as a GoogleContact (blank strings, not nulls) so the shared contact search ranks it.
+ */
+export interface TripContact {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  /** Saved address, or "" when the contact has none. */
+  address: string;
+  /** True when the address import could not confirm the address. */
+  addressUnverified: boolean;
 }
 
 /** A job in the FY with no trip logged yet, offered on the trips page. */
@@ -38,7 +61,12 @@ export interface TripSuggestion {
   /** NZ day of the job as YYYY-MM-DD, used as the trip's ledger date. */
   date: string;
   name: string;
+  /** Where the job was: the booking's address, else its contact's saved address. */
   address: string | null;
+  /** True when {@link TripSuggestion.address} came from the contact, not the booking. */
+  addressFromContact: boolean;
+  /** Contact matched to the booking by email, or null. */
+  contactId: string | null;
   /** Booked drive time there and back in minutes, or null when the booking stored none. */
   travelMins: number | null;
   /**
@@ -57,6 +85,8 @@ export interface TripInput {
   date: Date;
   km: number;
   purpose: string;
+  destination: string | null;
+  contactId: string | null;
   notes: string | null;
   bookingId: string | null;
 }
@@ -118,6 +148,8 @@ export interface TripCandidate {
   calendarEventMissingAt: Date | null;
   travelMinsAtBooking: number | null;
   travelMinsBackAtBooking: number | null;
+  /** Live contact matched to the booking by email, or null. */
+  contact: { id: string; address: string | null } | null;
 }
 
 /** Everything {@link suggestTrips} needs besides the bookings. */
@@ -150,10 +182,10 @@ export function parseKm(value: unknown): number | null {
 }
 
 /**
- * Validates a trips API body. Checks run in field order (date, km, purpose, notes,
- * booking) and the first failure's message is returned for the form to show.
- * `bookingId` goes through parseObjectId: an unchecked object there would reach a Prisma
- * `where` as an operator, and a malformed id would 500 the write.
+ * Validates a trips API body. Checks run in field order (date, km, purpose, destination,
+ * notes, contact, booking) and the first failure's message is returned for the form to
+ * show. `contactId` and `bookingId` go through parseObjectId: an unchecked object there
+ * would reach a Prisma `where` as an operator, and a malformed id would 500 the write.
  * @param body - Parsed JSON body.
  * @returns The validated fields, or the first error.
  */
@@ -182,6 +214,14 @@ export function parseTripInput(body: unknown): TripInputResult {
     };
   }
 
+  let destination: string | null = null;
+  if (b.destination !== undefined && b.destination !== null) {
+    if (typeof b.destination !== "string" || b.destination.length > MAX_DESTINATION_LEN) {
+      return { ok: false, error: `The address can be up to ${MAX_DESTINATION_LEN} characters` };
+    }
+    destination = b.destination.trim() || null;
+  }
+
   let notes: string | null = null;
   if (b.notes !== undefined && b.notes !== null) {
     if (typeof b.notes !== "string" || b.notes.length > MAX_NOTES_LEN) {
@@ -193,13 +233,19 @@ export function parseTripInput(body: unknown): TripInputResult {
     notes = b.notes.trim() || null;
   }
 
+  let contactId: string | null = null;
+  if (b.contactId !== undefined && b.contactId !== null && b.contactId !== "") {
+    contactId = parseObjectId(b.contactId);
+    if (!contactId) return { ok: false, error: "Invalid contact id" };
+  }
+
   let bookingId: string | null = null;
   if (b.bookingId !== undefined && b.bookingId !== null && b.bookingId !== "") {
     bookingId = parseObjectId(b.bookingId);
     if (!bookingId) return { ok: false, error: "Invalid booking id" };
   }
 
-  return { ok: true, value: { date, km, purpose, notes, bookingId } };
+  return { ok: true, value: { date, km, purpose, destination, contactId, notes, bookingId } };
 }
 
 /**
@@ -209,6 +255,8 @@ export function parseTripInput(body: unknown): TripInputResult {
  * @param trip.date - Ledger date.
  * @param trip.km - Round-trip km.
  * @param trip.purpose - Purpose line.
+ * @param trip.destination - Address driven to, or null.
+ * @param trip.contactId - Linked contact, or null.
  * @param trip.bookingId - Linked booking, or null.
  * @param trip.notes - Notes, or null.
  * @returns The serialisable row.
@@ -218,6 +266,8 @@ export function toTripRow(trip: {
   date: Date;
   km: number;
   purpose: string;
+  destination: string | null;
+  contactId: string | null;
   bookingId: string | null;
   notes: string | null;
 }): TripRow {
@@ -226,6 +276,8 @@ export function toTripRow(trip: {
     date: trip.date.toISOString(),
     km: trip.km,
     purpose: trip.purpose,
+    destination: trip.destination,
+    contactId: trip.contactId,
     bookingId: trip.bookingId,
     notes: trip.notes,
   };
@@ -313,21 +365,17 @@ export function addressKey(address: string): string {
 }
 
 /**
- * Round-trip km per address from trips already logged against bookings, the latest trip
- * per address winning. Trips without a booking, or whose booking has no address, are
- * skipped.
- * @param trips - Logged trips with their booking link and ISO date.
- * @param addressById - Booking address by booking id.
+ * Round-trip km per address from trips already logged, the latest trip per address
+ * winning. Trips with no known address are skipped.
+ * @param trips - Logged trips with the address driven to and their ISO date.
  * @returns Km by {@link addressKey}.
  */
 export function kmByAddressFrom(
-  trips: readonly { bookingId: string | null; km: number; date: string }[],
-  addressById: ReadonlyMap<string, string | null>,
+  trips: readonly { address: string | null; km: number; date: string }[],
 ): Map<string, number> {
   const latest = new Map<string, { km: number; date: string }>();
   for (const t of trips) {
-    if (!t.bookingId) continue;
-    const address = addressById.get(t.bookingId);
+    const address = t.address?.trim();
     if (!address) continue;
     const key = addressKey(address);
     const prev = latest.get(key);
@@ -378,14 +426,20 @@ export function suggestTrips(
     if (!isInWindow(dayIso, ctx.startISO, ctx.endISO)) continue;
     const there = b.travelMinsAtBooking;
     const name = b.name.trim();
+    // A booking with no address of its own falls back to where its contact lives.
+    const bookingAddress = b.address?.trim() || null;
+    const contactAddress = b.contact?.address?.trim() || null;
+    const address = bookingAddress ?? contactAddress;
     out.push({
       bookingId: b.id,
       date: dayIso.slice(0, 10),
       name,
-      address: b.address,
+      address,
+      addressFromContact: bookingAddress === null && contactAddress !== null,
+      contactId: b.contact?.id ?? null,
       // Legacy rows have no return leg; it mirrors the outbound, as the booking code does.
       travelMins: there === null ? null : there + (b.travelMinsBackAtBooking ?? there),
-      suggestedKm: b.address ? (ctx.kmByAddress.get(addressKey(b.address)) ?? null) : null,
+      suggestedKm: address ? (ctx.kmByAddress.get(addressKey(address)) ?? null) : null,
       purpose: `Job: ${name}${b.noShow ? " (no-show)" : ""}`,
       noShow: b.noShow,
     });

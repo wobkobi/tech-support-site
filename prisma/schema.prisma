@@ -1229,6 +1229,11 @@ model Trip {
   // Business kilometres for the whole trip (there and back).
   km              Float
   purpose         String
+  // Address driven to, kept as it was on the day so a contact moving later never
+  // rewrites where an old trip went.
+  destination     String?
+  // Contact the trip was to, when picked in the trip form or logged from an invoice.
+  contactId       String?  @db.ObjectId
   // Booking the trip was for, when it came from "Jobs without a trip" or an invoice.
   bookingId       String?  @db.ObjectId
   // First calendar event of the invoiced job the trip was logged from, so a job with no

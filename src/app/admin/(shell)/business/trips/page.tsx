@@ -15,7 +15,11 @@ import { kmVehiclePeriods } from "@/features/business/lib/tax/vehicle";
 import { loadFiledResult, loadFiledYears } from "@/features/business/lib/tax/view.server";
 import { fuelLabel } from "@/features/business/lib/tax/workings";
 import { pickFy } from "@/features/business/lib/trips";
-import { loadTripSuggestions, loadTrips } from "@/features/business/lib/trips.server";
+import {
+  loadTripContacts,
+  loadTripSuggestions,
+  loadTrips,
+} from "@/features/business/lib/trips.server";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import type { Metadata } from "next";
 import type React from "react";
@@ -65,9 +69,10 @@ export default async function TripsPage({
   }
   const fyKey = fyKeyOf(fy.label);
 
-  const [trips, suggestions, taxInputs, filedYears, filedResult] = await Promise.all([
+  const [trips, suggestions, contacts, taxInputs, filedYears, filedResult] = await Promise.all([
     loadTrips({ start: fy.start, end: fy.end }),
     loadTripSuggestions(fy, now),
+    loadTripContacts(),
     loadTaxInputs(fy, now),
     loadFiledYears(now),
     loadFiledResult(fyKey),
@@ -108,6 +113,7 @@ export default async function TripsPage({
         endISO={fy.end.toISOString()}
         initialTrips={trips}
         initialSuggestions={suggestions}
+        contacts={contacts}
         rates={{ tier1: taxInputs.year.kmTier1, tier2: taxInputs.year.kmTier2 }}
         totalVehicleKm={taxInputs.year.totalVehicleKm ?? null}
         kmPeriods={kmVehiclePeriods(taxInputs.assets)}
