@@ -14,6 +14,7 @@ import {
   GOOGLE_BUSINESS_PROFILE_URL,
   INSTAGRAM_URL,
 } from "@/shared/lib/business-profiles";
+import { SITE_OPEN_GRAPH } from "@/shared/lib/open-graph";
 import { servedSuburbGroups } from "@/shared/lib/served-suburbs";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
@@ -46,28 +47,21 @@ export const metadata: Metadata = {
     template: "%s | To the Point Tech",
   },
   description:
-    "Computer repairs and IT help at your home or business, anywhere in Auckland. PCs, Macs, Wi-Fi, phones and printers. Same-day, evening and weekend visits.",
+    "Computer repairs and IT help at your home or business, anywhere in Auckland. PCs, Macs, Wi-Fi, phones and printers. Same-day and weekend visits.",
   applicationName: "To the Point Tech",
   authors: [{ name: "Harrison Raynes" }],
   creator: "Harrison Raynes",
   publisher: "To the Point Tech",
   category: "Technology",
   openGraph: {
-    type: "website",
-    locale: "en_NZ",
-    siteName: "To the Point Tech",
+    ...SITE_OPEN_GRAPH,
     title: "Computer Repairs & IT Support Auckland | To the Point Tech",
     description:
       "Friendly computer and IT support across Auckland. On-site and remote help, transparent pricing, no jargon.",
-    // og:image is served route-wide by the file-based src/app/opengraph-image.jpg.
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "Computer Repairs & IT Support Auckland | To the Point Tech",
-    description:
-      "Friendly computer and IT support across Auckland. On-site and remote help, transparent pricing, no jargon.",
-    images: ["/og-1200x630.jpg"],
-  },
+  // Card type only: no page overrides `twitter`, so a title/description/image here
+  // would repeat the home page's on every page. X falls back to each page's og:* tags.
+  twitter: { card: "summary_large_image" },
   robots: {
     index: true,
     follow: true,
@@ -147,7 +141,7 @@ export default async function RootLayout({
   const telephone = identity.phoneTel.replace(/^tel:/, "");
   // Which days appear still tracks the real schedule; only the times are
   // overridable, so the advertised listing can be narrower than the hours the
-  // booking form offers (evening slots stay bookable, just not advertised).
+  // booking form offers (later slots stay bookable, just not advertised).
   // Listed Monday-first, which is how the hours read to a customer.
   const published = identity.publishedHours;
   const advertisedOrder: readonly Weekday[] = [1, 2, 3, 4, 5, 6, 0];
@@ -173,14 +167,14 @@ export default async function RootLayout({
     "@context": "https://schema.org",
     "@type": ["LocalBusiness", "ProfessionalService"],
     "@id": `${siteUrl}#business`,
+    // No `legalName`: a sole trader's legal name is the owner's own, not the trading name.
     name: "To the Point Tech",
-    legalName: "To the Point Tech",
     alternateName: ["To the Point Tech Auckland", "To the Point IT Support"],
     url: siteUrl,
     image: `${siteUrl}/og-1200x630.jpg`,
     logo: `${siteUrl}/assets/logo-mark-512.png`,
     description:
-      "Friendly computer and IT support across Auckland. On-site and remote help with PCs, Macs, Wi-Fi, phones, printers, smart TVs, and small-business IT. Same-day, evening and weekend appointments.",
+      "Friendly computer and IT support across Auckland. On-site and remote help with PCs, Macs, Wi-Fi, phones, printers, smart TVs, and small-business IT. Same-day and weekend appointments, evenings by arrangement.",
     slogan: "Clear explanations, no jargon, solutions that actually work.",
     telephone,
     email: identity.email,
@@ -213,7 +207,8 @@ export default async function RootLayout({
         containedInPlace: { "@type": "AdministrativeArea", name: identity.homeRegion },
       })),
     ],
-    serviceArea: { "@type": "GeoCircle", geoMidpoint, geoRadius },
+    // No `serviceArea`: schema.org superseded it with `areaServed`, which already
+    // carries the same GeoCircle above.
     openingHoursSpecification,
     contactPoint: [
       {

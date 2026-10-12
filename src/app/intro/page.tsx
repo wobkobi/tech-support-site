@@ -42,7 +42,7 @@ const introText =
   "I grew up in Point Chev. I fix what’s broken, explain what went wrong in plain English, and won’t sell you anything you don’t need.";
 
 /** Proof line. Typographic rather than chips, so nothing reads as a button. */
-const proofLine = "No jargon · Fair pricing · Evenings & weekends";
+const proofLine = "No jargon · Fair pricing · Weekends too";
 
 // Lead with the six most recognisable areas rather than all twelve: the full set
 // turns into a wall of small text at feed size. SERVICE_AREAS is ordered by

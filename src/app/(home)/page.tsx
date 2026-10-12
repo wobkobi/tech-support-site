@@ -63,7 +63,7 @@ const TAP_LINK = "inline-flex min-h-11 items-center";
 /** Short ticked points under the hero buttons. */
 const HERO_POINTS: ReadonlyArray<string> = [
   "Same-day appointments",
-  "Evenings & weekends",
+  "Weekends too",
   "Remote support",
 ];
 

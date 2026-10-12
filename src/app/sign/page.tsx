@@ -51,7 +51,7 @@ const SERVICES: SignService[] = [
 ];
 
 /** The home hero's availability line, trimmed to two items so each stays large. */
-const AVAILABILITY = ["Same day appointments", "Evening & weekend hours"] as const;
+const AVAILABILITY = ["Same day appointments", "Weekends too"] as const;
 
 /**
  * Yard sign page for PDF export.

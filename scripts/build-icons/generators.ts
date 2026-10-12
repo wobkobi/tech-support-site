@@ -482,11 +482,13 @@ export async function buildManifest(): Promise<void> {
   const webManifest = {
     name: "To the Point Tech",
     short_name: "ToThePoint",
-    description: "Local tech support in Point Chevalier, Auckland",
+    description: "Computer repairs and IT help at your home or business, anywhere in Auckland",
     start_url: "/",
     display: "standalone",
     background_color: PALETTE.seasalt500,
-    theme_color: PALETTE.russianViolet500,
+    // Matches the light themeColor in src/app/layout.tsx viewport, so an installed app
+    // and the browser tab use the same bar colour.
+    theme_color: PALETTE.seasalt500,
     icons: [
       { src: "/android-chrome-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/android-chrome-256x256.png", sizes: "256x256", type: "image/png", purpose: "any" },

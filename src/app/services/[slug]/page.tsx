@@ -16,6 +16,7 @@ import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section"
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
 import { cn } from "@/shared/lib/cn";
+import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { prisma } from "@/shared/lib/prisma";
 import { SERVICE_AREAS } from "@/shared/lib/service-areas";
 import { SERVICE_PAGES, SERVICE_PAGE_SLUGS, hasServicePage } from "@/shared/lib/service-pages";
@@ -72,11 +73,11 @@ export async function generateMetadata({ params }: ServicePageProps): Promise<Me
     title: page.metaTitle,
     description: page.metaDescription,
     alternates: { canonical: path },
-    openGraph: {
-      title: `${page.metaTitle} - To the Point Tech`,
+    openGraph: pageOpenGraph({
+      title: page.metaTitle,
       description: page.metaDescription,
       url: path,
-    },
+    }),
   };
 }
 

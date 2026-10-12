@@ -12,6 +12,7 @@ import { RuledBlock, RuledGrid } from "@/shared/components/RuledGrid";
 import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { cn } from "@/shared/lib/cn";
+import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { servedSuburbGroups } from "@/shared/lib/served-suburbs";
 import { SERVICE_AREAS } from "@/shared/lib/service-areas";
 import { SERVICE_PAGES, hasServicePage } from "@/shared/lib/service-pages";
@@ -25,17 +26,15 @@ import { Fragment } from "react";
 // ISR so rate edits propagate via the rate-config tag purge without a redeploy.
 export const revalidate = 3600;
 
+const TITLE = "Computer Repairs & Tech Help in Auckland";
+const DESCRIPTION =
+  "Computer and laptop repairs, Wi-Fi, virus removal, data recovery, smart TVs, printers and tech help for seniors, at your home anywhere in Auckland.";
+
 export const metadata: Metadata = {
-  title: "Computer Repairs & Tech Help in Auckland",
-  description:
-    "Computer and laptop repairs, Wi-Fi, virus removal, data recovery, smart TVs, printers and tech help for seniors, at your home anywhere in Auckland.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/services" },
-  openGraph: {
-    title: "Computer Repairs & Tech Help Services - To the Point Tech",
-    description:
-      "Computer repair, Wi-Fi setup, data recovery, smart home, printers, email and more across Auckland.",
-    url: "/services",
-  },
+  openGraph: pageOpenGraph({ title: TITLE, description: DESCRIPTION, url: "/services" }),
 };
 
 const siteUrl = getSiteUrl();

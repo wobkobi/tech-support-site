@@ -29,21 +29,21 @@ import { PageShell } from "@/shared/components/PageLayout";
 import { PromoPrice } from "@/shared/components/PromoPrice";
 import { renderEmphasised } from "@/shared/components/renderEmphasised";
 import { Section, TEXT_LINK } from "@/shared/components/Section";
+import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
 
+const TITLE = "FAQ - Tech Support Questions Answered";
+const DESCRIPTION =
+  "Answers on tech support in Auckland: areas covered, remote help, pricing, devices, booking, cancellations and what happens if I can't fix it.";
+
 export const metadata: Metadata = {
-  title: "FAQ - Tech Support Questions Answered",
-  description:
-    "Answers on tech support in Auckland: areas covered, remote help, pricing, devices, booking, cancellations and what happens if I can't fix it.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/faq" },
-  openGraph: {
-    title: "FAQ - To the Point Tech",
-    description: "Common questions about tech support, service areas, pricing and remote help.",
-    url: "/faq",
-  },
+  openGraph: pageOpenGraph({ title: TITLE, description: DESCRIPTION, url: "/faq" }),
 };
 
 // ISR with tag-based purge: rate and settings edits bust their cache tags,

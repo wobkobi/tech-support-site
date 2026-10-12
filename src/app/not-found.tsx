@@ -1,67 +1,94 @@
 // src/app/not-found.tsx
-// Themed 404 page. Matches site styling.
-
-"use client";
+// 404 page. Uses the inner pages' grey head band and ruled sections, with its own head:
+// an "Error 404" label, the requested address and a large decorative 404.
 
 import { Button } from "@/shared/components/Button";
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { PageShell } from "@/shared/components/PageLayout";
+import { RuledBlock, RuledGrid } from "@/shared/components/RuledGrid";
+import { CONTAINER, Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
+import type { Metadata } from "next";
+import Link from "next/link";
 import type React from "react";
-import { useState } from "react";
-import { FaHouse } from "react-icons/fa6";
+import { RequestedPath } from "./RequestedPath";
 
-const MESSAGES = [
-  "This page seems to have wandered off like a Wi-Fi signal at the worst possible moment.",
-  "Looks like this page went offline. Have you tried turning it off and on again?",
-  "This page is buffering… indefinitely.",
-  "Page not found. It's probably hiding in the same place as your TV remote.",
-  "This page crashed harder than a Windows update at the worst time.",
-  "Last seen heading towards the recycle bin.",
-  "This page has gone the way of Internet Explorer - fondly remembered by no one.",
-  "Like Bluetooth headphones at 2%, this page has quietly given up.",
-  "This URL is about as useful as a printer at 3am.",
-  "This page has as many bars as your phone in the kitchen.",
-  "Even Google can't find this one. And they find everything.",
-  "This page went to get milk and never came back.",
+// Without this the tab shows the home page title. Next adds noindex itself.
+export const metadata: Metadata = { title: "Page not found" };
+
+/** Main pages offered as a way back in. */
+const NEXT_STEPS: ReadonlyArray<{ href: string; label: string; blurb: string }> = [
+  { href: "/services", label: "Services", blurb: "What I can help with." },
+  { href: "/pricing", label: "Pricing", blurb: "My rates and what's included." },
+  { href: "/booking", label: "Book a visit", blurb: "Pick a time that suits you." },
+  { href: "/contact", label: "Contact", blurb: "Call, text or email me." },
 ];
 
 /**
  * 404 UI for missing routes.
  * @returns Not Found page element.
  */
-export default function NotFound(): React.ReactElement {
-  const [message] = useState(() => MESSAGES[Math.floor(Math.random() * MESSAGES.length)]);
+export default async function NotFound(): Promise<React.ReactElement> {
+  const identity = await getIdentity();
 
   return (
     <PageShell>
-      <FrostedSection maxWidth="56rem">
-        <div className="flex flex-col gap-6 sm:gap-8">
-          <section className={cn(CARD, "text-center")}>
-            <div className="mb-4 text-8xl font-extrabold text-coquelicot-500 sm:text-9xl">404</div>
-
-            <h1 className="mb-4 text-3xl font-extrabold text-russian-violet sm:text-4xl md:text-5xl">
-              Well, this is awkward...
-            </h1>
-
-            <p
-              suppressHydrationWarning
-              className="mb-6 text-base text-rich-black sm:text-lg md:text-xl"
-            >
-              {message}
+      {/* Same band as PageHead, minus the breadcrumb: a missing page has no place in the trail. */}
+      <header className="border-b border-seasalt-100 bg-seasalt py-9 sm:pt-10 sm:pb-11">
+        <div className={cn(CONTAINER, "flex items-end justify-between gap-8")}>
+          <div className="max-w-180">
+            <p className="mb-2.5 text-sm font-bold tracking-[0.06em] text-moonstone-700 uppercase">
+              Error 404
             </p>
-
-            <div className="flex flex-wrap items-center justify-center gap-3">
+            <h1 className="text-[1.875rem] leading-tight font-extrabold text-balance text-rich-black sm:text-[2.5rem]">
+              Page not found
+            </h1>
+            <p className="mt-3 text-lg sm:text-[1.1875rem]">
+              There&apos;s no page at <RequestedPath />. It may have moved, or the link may have a
+              typo.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
               <Button href="/" variant="primary">
-                <FaHouse className="h-5 w-5" aria-hidden />
-                Take me home
+                Back to home
               </Button>
               <Button href="/contact" variant="ghost">
-                Report this issue
+                Contact me
               </Button>
             </div>
-          </section>
+          </div>
+          <span
+            aria-hidden="true"
+            className="hidden text-[9rem] leading-[0.8] font-extrabold text-seasalt-200 select-none md:block lg:text-[11rem]"
+          >
+            404
+          </span>
         </div>
-      </FrostedSection>
+      </header>
+
+      <Section aria-labelledby="next-heading">
+        <SectionHeading title="Where to next" id="next-heading" />
+        <RuledGrid cols={4}>
+          {NEXT_STEPS.map((s) => (
+            <RuledBlock
+              key={s.href}
+              title={
+                <Link href={s.href} className={cn(TEXT_LINK, "inline-flex min-h-11 items-center")}>
+                  {s.label}
+                </Link>
+              }
+            >
+              <p className="text-seasalt-700">{s.blurb}</p>
+            </RuledBlock>
+          ))}
+        </RuledGrid>
+        <p className="mt-10">
+          Looking for something specific? Call or text me on{" "}
+          <a href={identity.phoneTel} className={TEXT_LINK}>
+            {identity.phone}
+          </a>
+          .
+        </p>
+      </Section>
     </PageShell>
   );
 }
