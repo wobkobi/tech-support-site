@@ -43,6 +43,7 @@ import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section"
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { renderEmphasised } from "@/shared/components/renderEmphasised";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -59,21 +60,27 @@ export const revalidate = 300;
  */
 export async function generateMetadata(): Promise<Metadata> {
   const [promo, pricing] = await Promise.all([getActivePromo(), getPublicPricing()]);
-  const rateBlurb = promo
-    ? `Limited offer: ${summariseForBanner(promo)}.`
+  // Fixed end date: search results and share cards outlive the week a relative
+  // "this Friday" was written in.
+  const promoSummary = promo ? summariseForBanner(promo, { fixedDate: true }) : null;
+  const rateBlurb = promoSummary
+    ? `Limited offer: ${promoSummary}.`
     : `$${pricing.baseRate}/hr for every job - no complex-work surcharge.`;
+  // A promo title drops the brand suffix so the offer fits Google's ~60-char cut.
+  const title = promoSummary
+    ? `Computer Repair Prices Auckland - ${promoSummary}`
+    : `Computer Repair Prices Auckland - ${pricing.baseRate}/hr`;
+  const description = `Computer repair and tech support prices in Auckland. ${rateBlurb} No hidden fees, no upselling.`;
   return {
-    // A promo title drops the brand suffix so the offer fits Google's ~60-char cut.
-    title: promo
-      ? { absolute: `Computer Repair Prices Auckland - ${summariseForBanner(promo)}` }
-      : `Computer Repair Prices Auckland - $${pricing.baseRate}/hr`,
-    description: `Computer repair and tech support prices in Auckland. ${rateBlurb} No hidden fees, no upselling.`,
+    title: promoSummary ? { absolute: title } : title,
+    description,
     alternates: { canonical: "/pricing" },
-    openGraph: {
-      title: "Pricing - To the Point Tech",
-      description: `Simple, transparent rates. ${rateBlurb}`,
+    openGraph: pageOpenGraph({
+      title,
+      description,
       url: "/pricing",
-    },
+      absoluteTitle: !!promoSummary,
+    }),
   };
 }
 

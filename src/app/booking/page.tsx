@@ -20,6 +20,7 @@ import { PhoneLink } from "@/shared/components/PhoneLink";
 import { PixelEvent } from "@/shared/components/PixelEvent";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
+import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
@@ -28,16 +29,15 @@ import type React from "react";
 import { Suspense } from "react";
 import { FaCalendarCheck, FaClock, FaEnvelopeOpenText, FaListCheck } from "react-icons/fa6";
 
+const TITLE = "Book Tech Support in Auckland";
+const DESCRIPTION =
+  "Book an on-site or remote tech support appointment in Auckland. Same-day and weekend slots, with an instant calendar invite.";
+
 export const metadata: Metadata = {
-  title: "Book Tech Support in Auckland",
-  description:
-    "Book an on-site or remote tech support appointment in Auckland. Same-day, evening and weekend slots, with an instant calendar invite.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/booking" },
-  openGraph: {
-    title: "Book an Appointment - To the Point Tech",
-    description: "Same-day, evening and weekend tech support appointments across Auckland.",
-    url: "/booking",
-  },
+  openGraph: pageOpenGraph({ title: TITLE, description: DESCRIPTION, url: "/booking" }),
 };
 
 // Always render fresh - slot availability is time-sensitive and ISR can serve

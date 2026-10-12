@@ -8,6 +8,7 @@ import { RuledBlock, RuledGrid } from "@/shared/components/RuledGrid";
 import { Section, SectionHeading } from "@/shared/components/Section";
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { pageOpenGraph } from "@/shared/lib/open-graph";
 import type { Metadata } from "next";
 import type React from "react";
 
@@ -17,15 +18,13 @@ import type React from "react";
  */
 export async function generateMetadata(): Promise<Metadata> {
   const { phone, email } = await getIdentity();
+  const title = "Contact - Local Tech Support in Auckland";
+  const description = `Call ${phone} or email ${email} for friendly tech support across Auckland. Same-day and weekend appointments available.`;
   return {
-    title: "Contact - Local Tech Support in Auckland",
-    description: `Call ${phone} or email ${email} for friendly tech support across Auckland. Same-day, evening and weekend appointments available.`,
+    title,
+    description,
     alternates: { canonical: "/contact" },
-    openGraph: {
-      title: "Contact - To the Point Tech",
-      description: "Reach out by phone or email for tech help across Auckland.",
-      url: "/contact",
-    },
+    openGraph: pageOpenGraph({ title, description, url: "/contact" }),
   };
 }
 

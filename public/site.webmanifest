@@ -1,11 +1,11 @@
 {
   "name": "To the Point Tech",
   "short_name": "ToThePoint",
-  "description": "Local tech support in Point Chevalier, Auckland",
+  "description": "Computer repairs and IT help at your home or business, anywhere in Auckland",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f6f7f8",
-  "theme_color": "#0c0a3e",
+  "theme_color": "#f6f7f8",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",

@@ -8,19 +8,19 @@ import { PageShell } from "@/shared/components/PageLayout";
 import { Section, TEXT_LINK } from "@/shared/components/Section";
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { pageOpenGraph } from "@/shared/lib/open-graph";
 import type { Metadata } from "next";
 import type React from "react";
 
+const TITLE = "Privacy Policy";
+const DESCRIPTION =
+  "How To the Point Tech collects, uses and protects your information, the analytics and advertising tools I use, and your rights under the NZ Privacy Act 2020.";
+
 export const metadata: Metadata = {
-  title: "Privacy Policy",
-  description:
-    "How To the Point Tech collects, uses and protects your information, the analytics and advertising tools I use, and your rights under the NZ Privacy Act 2020.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/privacy" },
-  openGraph: {
-    title: "Privacy Policy - To the Point Tech",
-    description: "What I collect, how I use it, and your privacy choices.",
-    url: "/privacy",
-  },
+  openGraph: pageOpenGraph({ title: TITLE, description: DESCRIPTION, url: "/privacy" }),
 };
 
 /** Date this policy was last reviewed; shown to visitors in the header. */

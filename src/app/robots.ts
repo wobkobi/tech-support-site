@@ -23,7 +23,8 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/api/"],
       },
     ],
+    // No `host`: it is a Yandex-only directive that Googlebot ignores and Search
+    // Console flags as an ignored rule. The canonical host comes from per-page canonicals.
     sitemap: `${siteUrl}/sitemap.xml`,
-    host: siteUrl,
   };
 }

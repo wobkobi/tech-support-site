@@ -10,22 +10,22 @@ import { PageShell } from "@/shared/components/PageLayout";
 import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
+import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
 
+const TITLE = "Reviews - What Auckland Clients Say";
+const DESCRIPTION =
+  "Real reviews from Auckland clients who have used To the Point Tech for computer repair, Wi-Fi setup, virus removal, smart home, and small-business IT support.";
+
 export const metadata: Metadata = {
   // The layout template appends "| To the Point Tech", so the brand isn't repeated here.
-  title: "Reviews - What Auckland Clients Say",
-  description:
-    "Real reviews from Auckland clients who have used To the Point Tech for computer repair, Wi-Fi setup, virus removal, smart home, and small-business IT support.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/reviews" },
-  openGraph: {
-    title: "Reviews - To the Point Tech",
-    description: "Feedback from clients across Auckland.",
-    url: "/reviews",
-  },
+  openGraph: pageOpenGraph({ title: TITLE, description: DESCRIPTION, url: "/reviews" }),
 };
 
 // Rely on on-demand revalidation (triggered by admin approve/delete/submit).

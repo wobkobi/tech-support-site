@@ -86,9 +86,9 @@ export interface SocialSpec {
 }
 
 export const SOCIAL_SPECS: SocialSpec[] = [
-  // Open Graph (Facebook, LinkedIn, Discord, etc.). Also copied to
-  // src/app/opengraph-image.jpg, which Next serves as og:image on every
-  // route; the public/ copy stays for twitter.images and JSON-LD.
+  // Open Graph (Facebook, LinkedIn, Discord, etc.). Every page's og:image and the
+  // LocalBusiness JSON-LD image point at this public/ file via SITE_OPEN_GRAPH in
+  // src/shared/lib/open-graph.ts.
   {
     name: "og-1200x630",
     width: 1200,
@@ -96,7 +96,6 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     blur: 25,
     logoScale: 0.85,
     quality: 90,
-    copyTo: "src/app/opengraph-image.jpg",
   },
   // Twitter/X Card
   {

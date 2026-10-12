@@ -16,6 +16,7 @@ import { RuledBlock, RuledGrid } from "@/shared/components/RuledGrid";
 import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
 import type React from "react";
@@ -25,17 +26,15 @@ import { FaPhone } from "react-icons/fa6";
 // requiring a redeploy.
 export const revalidate = 3600;
 
+const TITLE = "Small Business IT Support in Auckland";
+const DESCRIPTION =
+  "On-call IT support for Auckland small businesses: workstations, email, networks, backups and staff devices. Ad-hoc callouts or a monthly retainer, no lock-in.";
+
 export const metadata: Metadata = {
-  title: "Small Business IT Support in Auckland",
-  description:
-    "On-call IT support for Auckland small businesses: workstations, email, networks, backups and staff devices. Ad-hoc callouts or a monthly retainer, no lock-in.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/business" },
-  openGraph: {
-    title: "Business IT Support - To the Point Tech",
-    description:
-      "Your on-call IT person, without hiring one. Ad-hoc help and monthly retainers for Auckland small businesses.",
-    url: "/business",
-  },
+  openGraph: pageOpenGraph({ title: TITLE, description: DESCRIPTION, url: "/business" }),
 };
 
 interface BusinessService {

@@ -6,25 +6,25 @@
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
+import { pageOpenGraph } from "@/shared/lib/open-graph";
 import type { Metadata } from "next";
 import type React from "react";
 import { ManageLookupForm } from "./ManageLookupForm";
 
+const TITLE = "Manage your booking";
+const DESCRIPTION =
+  "Lost your confirmation email? Enter the address you booked with and we'll re-send the links to change or cancel your appointment.";
+
 export const metadata: Metadata = {
-  title: "Manage your booking",
-  description:
-    "Lost your confirmation email? Enter the address you booked with and we'll re-send the links to change or cancel your appointment.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/booking/manage" },
   // Matches its siblings (cancel / edit / success), which are all noindex: this
   // is a utility form reached from a confirmation email, not a landing page,
   // and it is deliberately absent from the sitemap. Indexable-but-unlisted was
   // the one incoherent combination.
   robots: { index: false, follow: false },
-  openGraph: {
-    title: "Manage your booking - To the Point Tech",
-    description: "Re-send the links to change or cancel your appointment.",
-    url: "/booking/manage",
-  },
+  openGraph: pageOpenGraph({ title: TITLE, description: DESCRIPTION, url: "/booking/manage" }),
 };
 
 /**

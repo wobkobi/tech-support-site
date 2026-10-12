@@ -679,15 +679,16 @@ export function applyPromoToHourlyRate(
  * Friendly end-date phrase: "this Saturday" within a week, "Sat 16 May" beyond.
  * @param endIso - Promo `endAt` ISO timestamp.
  * @param now - Reference time (injected for tests).
+ * @param fixedDate - Always give the date, never "this Saturday".
  * @returns Short date phrase.
  */
-export function formatPromoEnd(endIso: string, now: Date = new Date()): string {
+export function formatPromoEnd(endIso: string, now: Date = new Date(), fixedDate = false): string {
   const end = new Date(endIso);
   const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
   // Within a week: anchor on weekday ("I have until Friday"). Pin to NZ time so
   // a promo ending between NZ midnight and noon isn't labelled the prior day.
-  if (diffDays <= 7 && diffDays > 0) {
+  if (!fixedDate && diffDays <= 7 && diffDays > 0) {
     const weekday = new Intl.DateTimeFormat("en-NZ", {
       timeZone: NZ_TZ,
       weekday: "long",
@@ -945,10 +946,18 @@ export function describePromoOffer(promo: ActivePromo): string {
 /**
  * Customer-facing one-line summary for banner + pricing hero.
  * @param promo - Active promo.
+ * @param options - Formatting options.
+ * @param options.fixedDate - Name the end date ("Fri, 17 Oct") instead of "this
+ *   Friday". Use it for page metadata: Google can show a cached title for days, so a
+ *   relative day would point at the wrong week.
  * @returns Banner string.
  */
-export function summariseForBanner(promo: ActivePromo): string {
-  const base = `${describePromoOffer(promo)} until ${formatPromoEnd(promo.endAt)}`;
+export function summariseForBanner(
+  promo: ActivePromo,
+  { fixedDate = false }: { fixedDate?: boolean } = {},
+): string {
+  const end = formatPromoEnd(promo.endAt, new Date(), fixedDate);
+  const base = `${describePromoOffer(promo)} until ${end}`;
   const restriction = describeRecurringWindow(promo);
   return restriction ? `${base}, ${restriction} only` : base;
 }

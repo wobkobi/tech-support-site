@@ -7,6 +7,7 @@ import { PageShell } from "@/shared/components/PageLayout";
 import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
 import Image from "next/image";
@@ -18,15 +19,16 @@ const siteUrl = getSiteUrl();
 /** Portrait, relative to the public directory. */
 const PHOTO_SRC = "/source/harrison-2026.jpg";
 
+const TITLE = "Harrison Raynes - Auckland Tech Support";
+const DESCRIPTION =
+  "Computer science graduate based in Auckland. I help households and small businesses across Auckland with friendly, jargon-free tech support.";
+
 export const metadata: Metadata = {
-  title: "Harrison Raynes - Auckland Tech Support",
-  description:
-    "Computer science graduate based in Auckland. I help households and small businesses across Auckland with friendly, jargon-free tech support.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/about" },
   openGraph: {
-    title: "About - To the Point Tech",
-    description: "Local computer and IT support across Auckland.",
-    url: "/about",
+    ...pageOpenGraph({ title: TITLE, description: DESCRIPTION, url: "/about" }),
     type: "profile",
   },
 };
