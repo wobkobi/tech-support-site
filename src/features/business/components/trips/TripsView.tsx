@@ -34,6 +34,8 @@ import {
   sortTrips,
   type SuggestApiResponse,
   type TripApiResponse,
+  type TripContact,
+  type TripDistanceApiResponse,
   type TripListApiResponse,
   type TripRow,
   type TripSuggestion,
@@ -66,6 +68,8 @@ interface TripsViewProps {
   initialTrips: TripRow[];
   /** Jobs in the FY with no trip yet. */
   initialSuggestions: TripSuggestion[];
+  /** Saved contacts the trip form's "Who" box searches. */
+  contacts: TripContact[];
   /** The FY's IRD km rates for the configured fuel type. */
   rates: { tier1: number; tier2: number };
   /**
@@ -93,6 +97,7 @@ interface TripsViewProps {
  * @param props.endISO - FY end (exclusive ISO).
  * @param props.initialTrips - Trips logged in the FY.
  * @param props.initialSuggestions - Jobs with no trip yet.
+ * @param props.contacts - Saved contacts for the trip form.
  * @param props.rates - Tier 1 and tier 2 rates per km.
  * @param props.totalVehicleKm - The car's total km for the FY, or null when not entered.
  * @param props.kmPeriods - km-rate vehicle service periods; trips outside them earn nothing.
@@ -109,6 +114,7 @@ export function TripsView({
   endISO,
   initialTrips,
   initialSuggestions,
+  contacts,
   rates,
   totalVehicleKm,
   kmPeriods,
@@ -128,6 +134,7 @@ export function TripsView({
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [addingAll, setAddingAll] = useState(false);
+  const [lookingUpId, setLookingUpId] = useState<string | null>(null);
 
   // Same rule as computeTaxYear: only trips on a day a km-rate vehicle was in service count.
   const split = splitTripKm(trips, kmPeriods);
@@ -204,6 +211,33 @@ export function TripsView({
   }
 
   /**
+   * Fills one job's km from Google Maps: the round trip from the base address to the
+   * job's address (the booking's, else the contact's).
+   * @param s - The job.
+   */
+  async function handleLookUp(s: TripSuggestion): Promise<void> {
+    if (!s.address || lookingUpId) return;
+    setLookingUpId(s.bookingId);
+    try {
+      const res = await fetch("/api/business/trips/distance", {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ address: s.address }),
+      });
+      const d = (await res.json()) as TripDistanceApiResponse;
+      if (d.ok && d.km !== undefined) {
+        handleDraftChange(s.bookingId, String(d.km));
+      } else {
+        toast(d.error ?? `Couldn't get the km for ${s.name} from Google.`, { tone: "warning" });
+      }
+    } catch {
+      toast("Couldn't reach Google. Check your connection, or type the km.", { tone: "error" });
+    } finally {
+      setLookingUpId(null);
+    }
+  }
+
+  /**
    * Reloads the suggestions, keeping km already typed.
    * @returns True when the list was reloaded.
    */
@@ -270,7 +304,14 @@ export function TripsView({
       const res = await fetch("/api/business/trips", {
         method: "POST",
         headers: JSON_HEADERS,
-        body: JSON.stringify({ date: s.date, km, purpose: s.purpose, bookingId: s.bookingId }),
+        body: JSON.stringify({
+          date: s.date,
+          km,
+          purpose: s.purpose,
+          destination: s.address,
+          contactId: s.contactId,
+          bookingId: s.bookingId,
+        }),
       });
       if (res.status === 409) {
         setSuggestions((prev) => prev.filter((x) => x.bookingId !== s.bookingId));
@@ -474,7 +515,9 @@ export function TripsView({
         kmDrafts={kmDrafts}
         addingId={addingId}
         addingAll={addingAll}
+        lookingUpId={lookingUpId}
         onDraftChange={handleDraftChange}
+        onLookUp={(s) => void handleLookUp(s)}
         onAdd={(s) => void handleAdd(s)}
         onAddAll={() => void handleAddAll()}
         // The key, not the label: the first year's label carries "(partial)".
@@ -496,6 +539,7 @@ export function TripsView({
           key={editing?.id ?? "new"}
           trip={editing}
           defaultDate={defaultTripDate(startISO, endISO, todayISO())}
+          contacts={contacts}
           onSaved={handleSaved}
           onClose={closeForm}
           filedYears={filedYears}
@@ -508,9 +552,9 @@ export function TripsView({
         body={
           deleting ? (
             <>
-              {`${formatDateShort(deleting.date)}, ${formatKm(deleting.km)}: ${deleting.purpose}.${
-                deleting.bookingId ? " The job goes back on the jobs without a trip list." : ""
-              }`}
+              {`${formatDateShort(deleting.date)}, ${formatKm(deleting.km)}: ${deleting.purpose}${
+                deleting.destination ? ` at ${deleting.destination}` : ""
+              }.${deleting.bookingId ? " The job goes back on the jobs without a trip list." : ""}`}
               <FiledYearWarning
                 filedYears={filedYears}
                 spans={[{ from: deleting.date, to: deleting.date }]}

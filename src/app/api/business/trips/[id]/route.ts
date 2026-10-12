@@ -1,6 +1,6 @@
 // src/app/api/business/trips/[id]/route.ts
-// Admin single-trip endpoint. PUT replaces the trip's date, km, purpose and notes (the
-// job link is fixed when the trip is logged); DELETE removes it, which puts a linked
+// Admin single-trip endpoint. PUT replaces the trip's date, km, purpose, destination,
+// contact and notes (the job link is fixed when the trip is logged); DELETE removes it, which puts a linked
 // job back on the suggestions list.
 
 import { parseTripInput, toTripRow } from "@/features/business/lib/trips";
@@ -39,11 +39,11 @@ export async function PUT(
   const parsed = parseTripInput(body);
   if (!parsed.ok) return noStore(errorResponse(parsed.error, 400));
 
-  const { date, km, purpose, notes } = parsed.value;
+  const { date, km, purpose, destination, contactId, notes } = parsed.value;
   try {
     const trip = await prisma.trip.update({
       where: { id },
-      data: { date, km, purpose, notes },
+      data: { date, km, purpose, destination, contactId, notes },
       select: TRIP_SELECT,
     });
     return noStore(NextResponse.json({ ok: true, trip: toTripRow(trip) }));

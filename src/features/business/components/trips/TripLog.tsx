@@ -1,7 +1,8 @@
 "use client";
 // src/features/business/components/trips/TripLog.tsx
-// The FY's trip log: a table from md up with a km total, stacked cards on phones. Rows
-// logged from a job carry a "From a job" tag, and rows that earn no km claim carry a tag
+// The FY's trip log: a table from md up with a km total, stacked cards on phones. Each row
+// shows where the trip went when an address was saved, rows logged from a job carry a
+// "From a job" tag, and rows that earn no km claim carry a tag
 // saying why (before the km-rate car, or no km-rate vehicle that day); edit and delete
 // hand the row to TripsView.
 
@@ -21,7 +22,7 @@ import { formatKm, sumTripKm, type TripRow } from "@/features/business/lib/trips
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
-import { FaPlus } from "react-icons/fa6";
+import { FaLocationDot, FaPlus } from "react-icons/fa6";
 
 /**
  * Why a trip earns no km claim: dated before the first km-rate vehicle went into service
@@ -76,6 +77,25 @@ function TripTags({
         <StatusPill tone="warning">Not claimed: no km-rate vehicle</StatusPill>
       )}
     </span>
+  );
+}
+
+/**
+ * Where the trip went, under its purpose. Nothing for a trip with no address saved.
+ * @param props - Component props.
+ * @param props.trip - The trip.
+ * @returns The address line, or null.
+ */
+function Destination({ trip }: { trip: TripRow }): React.ReactElement | null {
+  if (!trip.destination) return null;
+  return (
+    <p className="mt-0.5 flex items-start gap-1.5 text-sm text-admin-text-secondary">
+      <FaLocationDot aria-hidden className="mt-1 shrink-0 text-admin-muted" />
+      <span>
+        <span className="sr-only">To </span>
+        {trip.destination}
+      </span>
+    </p>
   );
 }
 
@@ -182,6 +202,7 @@ export function TripLog({
                     <td className={cn(TD_CLS, "whitespace-nowrap")}>{formatDateShort(t.date)}</td>
                     <td className={TD_CLS}>
                       <p className="font-semibold text-admin-text">{t.purpose}</p>
+                      <Destination trip={t} />
                       <TripTags trip={t} unclaimed={unclaimed.get(t.id)} className="mt-1.5" />
                       {t.notes && <p className="mt-0.5 text-sm text-admin-muted">{t.notes}</p>}
                     </td>
@@ -214,6 +235,7 @@ export function TripLog({
                   <div className="min-w-0">
                     <p className="font-semibold text-admin-text">{t.purpose}</p>
                     <p className="text-sm text-admin-text-secondary">{formatDateShort(t.date)}</p>
+                    <Destination trip={t} />
                   </div>
                   <p className="shrink-0 font-bold text-admin-text tabular-nums">
                     {formatKm(t.km)}

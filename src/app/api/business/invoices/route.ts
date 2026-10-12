@@ -345,6 +345,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       address: tripRequest.address,
       date: tripRequest.date,
       clientName: invoice.clientName,
+      contactId: parseObjectId(contactId),
       invoiceNumber: invoice.number,
     });
   }

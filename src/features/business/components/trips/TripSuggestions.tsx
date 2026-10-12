@@ -1,8 +1,9 @@
 "use client";
 // src/features/business/components/trips/TripSuggestions.tsx
-// "Jobs without a trip": completed jobs in the FY with no trip logged. Each row takes the
-// round-trip km (prefilled from the last trip to the same address when there is one) and
-// adds a trip linked to the booking; "Add all" adds every row that has km filled in.
+// "Jobs without a trip": completed jobs in the FY with no trip logged. Each row shows
+// where the job was (the booking's address, else the contact's), takes the round-trip km
+// (prefilled from the last trip to the same address, or fetched from Google) and adds a
+// trip linked to the booking; "Add all" adds every row that has km filled in.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -24,8 +25,12 @@ interface TripSuggestionsProps {
   addingId: string | null;
   /** True while "Add all" runs. */
   addingAll: boolean;
+  /** Booking whose Google km lookup is in flight, or null. */
+  lookingUpId: string | null;
   /** Called as km is typed for a job. */
   onDraftChange: (bookingId: string, value: string) => void;
+  /** Fills one job's km from Google Maps. */
+  onLookUp: (suggestion: TripSuggestion) => void;
   /** Adds one job's trip. */
   onAdd: (suggestion: TripSuggestion) => void;
   /** Adds every job that has km filled in. */
@@ -46,6 +51,7 @@ function hintFor(s: TripSuggestion): string {
   if (s.travelMins !== null) {
     parts.push(`Booked drive about ${formatMins(s.travelMins)} there and back`);
   }
+  if (s.addressFromContact) parts.push("Address from their contact");
   if (s.suggestedKm !== null) parts.push("Km from your last trip to this address");
   if (s.noShow) parts.push("No-show, but you still drove there");
   return parts.join(". ");
@@ -58,7 +64,9 @@ function hintFor(s: TripSuggestion): string {
  * @param props.kmDrafts - Km typed per job.
  * @param props.addingId - Booking whose Add is in flight.
  * @param props.addingAll - Whether "Add all" is running.
+ * @param props.lookingUpId - Booking whose Google km lookup is in flight.
  * @param props.onDraftChange - Km input change handler.
+ * @param props.onLookUp - Fills one job's km from Google Maps.
  * @param props.onAdd - Adds one job's trip.
  * @param props.onAddAll - Adds every job with km filled in.
  * @param props.yearPhrase - Which year the jobs are from, worked into the copy.
@@ -70,7 +78,9 @@ export function TripSuggestions({
   kmDrafts,
   addingId,
   addingAll,
+  lookingUpId,
   onDraftChange,
+  onLookUp,
   onAdd,
   onAddAll,
   yearPhrase,
@@ -82,7 +92,7 @@ export function TripSuggestions({
       <div className="px-4 pt-4 sm:px-5 sm:pt-5">
         <CardHeader
           title="Jobs without a trip"
-          description={`Completed jobs ${yearPhrase} with no trip logged. Each job is one round trip: enter the km there and back, then add it.`}
+          description={`Completed jobs ${yearPhrase} with no trip logged. Each job is one round trip: get the km from Google or type it, then add it.`}
           actions={
             suggestions.length > 0 ? (
               <AdminButton
@@ -120,7 +130,18 @@ export function TripSuggestions({
                   </p>
                   {hint && <p className="mt-0.5 text-sm text-admin-muted">{hint}</p>}
                 </div>
-                <div className="flex items-end gap-2">
+                <div className="flex flex-wrap items-end gap-2">
+                  {s.address && (
+                    <AdminButton
+                      variant="outline"
+                      onClick={() => onLookUp(s)}
+                      busy={lookingUpId === s.bookingId}
+                      disabled={lookingUpId !== null && lookingUpId !== s.bookingId}
+                      aria-label={`Get km from Google for ${s.name}`}
+                    >
+                      Get km
+                    </AdminButton>
+                  )}
                   <AdminField label="Km (round trip)" htmlFor={inputId} className="w-36">
                     <AdminInput
                       id={inputId}

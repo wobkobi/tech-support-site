@@ -1,9 +1,10 @@
 // scripts/check-trips.ts
 // Fixtures for the trips log helpers in src/features/business/lib/trips.ts: request-body
-// parsing (km rounding and limits, real calendar dates, ObjectId guard), the half-open FY
+// parsing (km rounding and limits, real calendar dates, address cap, ObjectId guards), the half-open FY
 // window, km totals against the tier split, the add-form default date, and which bookings
 // become "jobs without a trip" (status, remote, already linked, NZ-day FY boundary, one
-// round trip per job, km reused from an earlier trip to the same address).
+// round trip per job, the contact's address when the booking has none, km reused from an
+// earlier trip to the same address).
 // Run with: npm run check:trips
 
 import { listFinancialYears } from "@/features/business/lib/financial-year";
@@ -34,6 +35,9 @@ const FY_END = "2027-04-01T00:00:00.000Z";
 
 /** A well-formed ObjectId for the booking link cases. */
 const BOOKING_ID = "0123456789abcdef01234567";
+
+/** A well-formed ObjectId for the contact link cases. */
+const CONTACT_ID = "89abcdef0123456789abcdef";
 
 /** "Now" for every eligibility case: 9 Oct 2026. */
 const NOW = new Date("2026-10-09T00:00:00.000Z");
@@ -74,6 +78,7 @@ function candidate(overrides: Partial<TripCandidate> & { id: string }): TripCand
     calendarEventMissingAt: null,
     travelMinsAtBooking: 25,
     travelMinsBackAtBooking: 28,
+    contact: null,
     ...overrides,
   };
 }
@@ -85,7 +90,16 @@ function candidate(overrides: Partial<TripCandidate> & { id: string }): TripCand
  * @returns The trip row.
  */
 function trip(id: string, date: string): TripRow {
-  return { id, date, km: 1, purpose: "x", bookingId: null, notes: null };
+  return {
+    id,
+    date,
+    km: 1,
+    purpose: "x",
+    destination: null,
+    contactId: null,
+    bookingId: null,
+    notes: null,
+  };
 }
 
 /** Runs every fixture group and exits non-zero on any failure. */
@@ -122,6 +136,8 @@ function main(): void {
       date: "2026-10-09",
       km: "24.5",
       purpose: "  Job: Jane Smith  ",
+      destination: " 1 Queen St Auckland ",
+      contactId: CONTACT_ID,
       notes: "   ",
       bookingId: BOOKING_ID,
     }),
@@ -131,6 +147,8 @@ function main(): void {
         date: "2026-10-09T00:00:00.000Z",
         km: 24.5,
         purpose: "Job: Jane Smith",
+        destination: "1 Queen St Auckland",
+        contactId: CONTACT_ID,
         notes: null,
         bookingId: BOOKING_ID,
       },
@@ -145,20 +163,31 @@ function main(): void {
         date: "2026-10-09T00:00:00.000Z",
         km: 12,
         purpose: "Parts run",
+        destination: null,
+        contactId: null,
         notes: "PB Tech",
         bookingId: null,
       },
     },
   );
   expectEqual(
-    "empty bookingId means none",
-    parseTripInput({ date: "2026-10-09", km: 12, purpose: "Parts run", bookingId: "" }),
+    "empty ids and a blank address mean none",
+    parseTripInput({
+      date: "2026-10-09",
+      km: 12,
+      purpose: "Parts run",
+      destination: "  ",
+      contactId: "",
+      bookingId: "",
+    }),
     {
       ok: true,
       value: {
         date: "2026-10-09T00:00:00.000Z",
         km: 12,
         purpose: "Parts run",
+        destination: null,
+        contactId: null,
         notes: null,
         bookingId: null,
       },
@@ -195,6 +224,16 @@ function main(): void {
     "filter object as booking id",
     parseTripInput({ date: "2026-10-09", km: 5, purpose: "x", bookingId: { not: "" } }),
     { ok: false, error: "Invalid booking id" },
+  );
+  expectEqual(
+    "long address",
+    parseTripInput({ date: "2026-10-09", km: 5, purpose: "x", destination: "a".repeat(251) }),
+    { ok: false, error: "The address can be up to 250 characters" },
+  );
+  expectEqual(
+    "filter object as contact id",
+    parseTripInput({ date: "2026-10-09", km: 5, purpose: "x", contactId: { not: "" } }),
+    { ok: false, error: "Invalid contact id" },
   );
 
   console.log("\nFY window and picking:");
@@ -263,25 +302,19 @@ function main(): void {
 
   console.log("\nKm from earlier trips to the same address:");
   expectEqual("address key", addressKey("  12/160 Kepa Road   Orakei "), "12/160 kepa road orakei");
-  const kmByAddress = kmByAddressFrom(
-    [
-      { bookingId: "b1", km: 18, date: "2026-05-01T00:00:00.000Z" },
-      { bookingId: "b2", km: 22, date: "2026-07-01T00:00:00.000Z" },
-      { bookingId: null, km: 99, date: "2026-08-01T00:00:00.000Z" },
-      { bookingId: "b3", km: 30, date: "2026-06-01T00:00:00.000Z" },
-    ],
-    new Map<string, string | null>([
-      ["b1", "1 Queen St Auckland"],
-      ["b2", " 1 queen st  Auckland"],
-      ["b3", null],
-    ]),
-  );
+  const kmByAddress = kmByAddressFrom([
+    { address: "1 Queen St Auckland", km: 18, date: "2026-05-01T00:00:00.000Z" },
+    { address: " 1 queen st  Auckland", km: 22, date: "2026-07-01T00:00:00.000Z" },
+    { address: null, km: 99, date: "2026-08-01T00:00:00.000Z" },
+    { address: "   ", km: 30, date: "2026-06-01T00:00:00.000Z" },
+  ]);
   expectEqual("latest trip per address wins", [...kmByAddress], [["1 queen st auckland", 22]]);
 
   console.log("\nJobs without a trip:");
   const suggestions = suggestTrips(
     [
-      candidate({ id: "b-done" }),
+      // The booking's own address wins over the contact's.
+      candidate({ id: "b-done", contact: { id: "c-jane", address: "99 Elsewhere Rd" } }),
       candidate({
         id: "b-past",
         name: "Past Confirmed",
@@ -331,6 +364,8 @@ function main(): void {
         id: "b-lastday",
         name: "Late Job",
         address: null,
+        // No booking address, so the contact's stands in (and finds the earlier km).
+        contact: { id: "c-late", address: "1 Queen St  Auckland" },
         startAt: new Date("2027-03-31T10:00:00.000Z"),
         endAt: new Date("2027-03-31T10:30:00.000Z"),
       }),
@@ -356,6 +391,8 @@ function main(): void {
       date: "2026-09-11",
       name: "Jane Smith",
       address: "1 Queen St Auckland",
+      addressFromContact: false,
+      contactId: "c-jane",
       travelMins: 53,
       suggestedKm: 22,
       purpose: "Job: Jane Smith",
@@ -370,6 +407,8 @@ function main(): void {
       date: "2026-10-02",
       name: "Past Confirmed",
       address: "5 Other Rd",
+      addressFromContact: false,
+      contactId: null,
       travelMins: 40,
       suggestedKm: null,
       purpose: "Job: Past Confirmed",
@@ -384,14 +423,32 @@ function main(): void {
       date: "2026-08-05",
       name: "No Show",
       address: null,
+      addressFromContact: false,
+      contactId: null,
       travelMins: null,
       suggestedKm: null,
       purpose: "Job: No Show (no-show)",
       noShow: true,
     },
   );
+  expectEqual(
+    "booking with no address uses the contact's",
+    suggestions.find((s) => s.bookingId === "b-lastday"),
+    {
+      bookingId: "b-lastday",
+      date: "2027-03-31",
+      name: "Late Job",
+      address: "1 Queen St  Auckland",
+      addressFromContact: true,
+      contactId: "c-late",
+      travelMins: 53,
+      suggestedKm: 22,
+      purpose: "Job: Late Job",
+      noShow: false,
+    },
+  );
   expectEqual("drafts prefill from suggestedKm", kmDraftsFor(suggestions, {}), {
-    "b-lastday": "",
+    "b-lastday": "22",
     "b-past": "",
     "b-done": "22",
     "b-noshow": "",
@@ -399,7 +456,7 @@ function main(): void {
   expectEqual(
     "drafts keep typed km and drop jobs that left the list",
     kmDraftsFor(suggestions, { "b-done": "30", gone: "9" }),
-    { "b-lastday": "", "b-past": "", "b-done": "30", "b-noshow": "" },
+    { "b-lastday": "22", "b-past": "", "b-done": "30", "b-noshow": "" },
   );
 
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
