@@ -66,11 +66,10 @@ const nextConfig: NextConfig = {
       // Next's client entry pulls the file in by a relative path
       // (client/app-globals.js: require("../build/polyfills/polyfill-module")), and
       // aliases match the request string, so the relative form needs its own key.
-      "next/dist/build/polyfills/polyfill-module": path.resolve(
-        __dirname,
-        "src/empty-polyfills.js",
-      ),
-      "../build/polyfills/polyfill-module": path.resolve(__dirname, "src/empty-polyfills.js"),
+      // Targets are project-relative: Turbopack rejects an absolute Windows path
+      // ("windows imports are not implemented yet").
+      "next/dist/build/polyfills/polyfill-module": "./src/empty-polyfills.js",
+      "../build/polyfills/polyfill-module": "./src/empty-polyfills.js",
     },
   },
 
