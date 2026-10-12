@@ -1,6 +1,7 @@
 // src/features/booking/lib/booking.ts
 // Booking system with duration selection (1hr quick jobs vs 2hr standard jobs).
 
+import type { DateSurcharge } from "@/features/business/lib/pricing-policy";
 import type { AvailabilitySettings, MorningGuard } from "@/shared/lib/settings/types";
 import {
   NZ_TZ,
@@ -347,6 +348,11 @@ export interface BookableDay {
   isWeekend: boolean;
   timeWindows: TimeWindow[];
   hasAnySlots: boolean; // True if any time slots are available
+  /**
+   * Labour surcharge for the day (public holiday or weekend), attached on the server
+   * from the live pricing settings; null or absent when none applies.
+   */
+  surcharge?: DateSurcharge | null;
 }
 
 export interface BuildAvailableDaysResult {

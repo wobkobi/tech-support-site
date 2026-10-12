@@ -156,6 +156,8 @@ export interface InlineQuote {
   minsLow: number;
   /** High end of the time band in minutes. */
   minsHigh: number;
+  /** Says the labour range includes a weekend or public-holiday surcharge; null when none. */
+  surchargeNote: string | null;
 }
 
 /** Saved new-booking draft, persisted to localStorage under {@link DRAFT_KEY}. */

@@ -15,6 +15,7 @@ import {
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
 import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
+import { withDateSurcharges } from "@/features/business/lib/pricing-policy.server";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
@@ -213,6 +214,8 @@ export default async function EditBookingPage({
       }),
     });
   }
+  // A reschedule onto a weekend or public holiday shows the same surcharge note as a new booking.
+  const pricedDays = await withDateSurcharges(availableDays);
 
   return (
     <PageShell>
@@ -280,7 +283,7 @@ export default async function EditBookingPage({
                 </p>
               )}
               <BookingForm
-                availableDays={availableDays}
+                availableDays={pricedDays}
                 durations={availabilityConfig.durations}
                 cancelToken={cancelToken}
                 initialValues={initialValues}

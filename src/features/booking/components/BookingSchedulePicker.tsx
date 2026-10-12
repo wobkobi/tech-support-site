@@ -14,6 +14,7 @@ import {
   durationText,
   subSlotLabel,
 } from "@/features/booking/lib/booking-form";
+import { dateSurchargeNote } from "@/features/business/lib/pricing-policy";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
@@ -194,6 +195,12 @@ export function BookingSchedulePicker({
           <legend className="mb-3 text-base font-semibold text-rich-black">
             Start time for {selectedDay.fullLabel}
           </legend>
+
+          {selectedDay.surcharge && (
+            <p className="rounded-lg border border-mustard-300/60 bg-mustard-50/40 p-3 text-base text-rich-black">
+              {dateSurchargeNote(selectedDay.surcharge)}
+            </p>
+          )}
 
           {dayHasNoRoom ? (
             <div className="rounded-lg border border-seasalt-200/80 bg-white/30 p-4">
