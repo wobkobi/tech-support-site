@@ -42,6 +42,8 @@ interface Props {
   gstRegistered?: boolean;
   /** Money handed over before the invoice went out; adds Already paid and Balance due when > 0. */
   alreadyPaid?: number;
+  /** An unsaved quote: QUOTE title, no due date, and the accept call-out in place of the bank one. */
+  isQuote?: boolean;
 }
 
 /**
@@ -61,6 +63,7 @@ interface Props {
  * @param props.unsuccessfulDiscount - Half-price labour discount; renders the line when > 0.
  * @param props.gstRegistered - Live GST-registration flag; controls the "Includes GST" line.
  * @param props.alreadyPaid - Amount already paid; renders Already paid and Balance due when > 0.
+ * @param props.isQuote - Render as an unsaved quote with no validity date, as the PDF draws one.
  * @returns Invoice preview element.
  */
 function InvoicePreviewPanelImpl({
@@ -77,6 +80,7 @@ function InvoicePreviewPanelImpl({
   unsuccessfulDiscount = 0,
   gstRegistered,
   alreadyPaid = 0,
+  isQuote = false,
 }: Props): React.ReactElement {
   const totals = calcInvoiceTotals(lineItems, promoDiscount + unsuccessfulDiscount, gstRegistered);
   const showPromoLine = promoDiscount > 0;
@@ -106,7 +110,7 @@ function InvoicePreviewPanelImpl({
           />
           <div className="text-right">
             <p className="text-xl leading-none font-extrabold text-russian-violet sm:text-2xl">
-              {identity.gstNumber ? "TAX INVOICE" : "INVOICE"}
+              {isQuote ? "QUOTE" : identity.gstNumber ? "TAX INVOICE" : "INVOICE"}
             </p>
             <p className="mt-2 font-mono text-sm text-slate-700">{number || "TTP-XXXX-0000"}</p>
             {number === "DRAFT" && (
@@ -134,12 +138,15 @@ function InvoicePreviewPanelImpl({
                 {issueDate ? formatDateShort(issueDate) : "-"}
               </span>
             </p>
-            <p className="flex justify-between gap-4">
-              <span className="text-slate-500">Due:</span>
-              <span className="font-bold text-slate-800">
-                {dueDate ? formatDateShort(dueDate) : "-"}
-              </span>
-            </p>
+            {/* A quote has no payment due date, and the calculator sets no validity date. */}
+            {!isQuote && (
+              <p className="flex justify-between gap-4">
+                <span className="text-slate-500">Due:</span>
+                <span className="font-bold text-slate-800">
+                  {dueDate ? formatDateShort(dueDate) : "-"}
+                </span>
+              </p>
+            )}
           </div>
         </div>
 
@@ -246,22 +253,34 @@ function InvoicePreviewPanelImpl({
           )}
         </div>
 
-        {/* Bank transfer call-out. */}
-        <div className="mb-4 space-y-1 rounded-lg border border-slate-200 px-3 py-3 text-[11px]">
-          <p className="text-xs font-bold text-russian-violet">Bank transfer</p>
-          <p className="text-slate-500">Payee: {identity.name}</p>
-          <p className="font-semibold text-slate-700">Account: {identity.bankAccount}</p>
-          <p className="font-semibold text-slate-700">
-            Particulars: {clientName ? bankParticulars(clientName) : "[surname]"}
-          </p>
-          <p className="font-semibold text-slate-700">
-            Code: {number ? bankCode(number) : "[invoice number]"}
-          </p>
-          <p className="text-slate-500">
-            Due within {identity.paymentTermsDays} days of issue
-            {dueDate ? ` (by ${formatDateShort(dueDate)}).` : "."}
-          </p>
-        </div>
+        {/* Quote: the accept call-out, worded as the PDF's quote box without a validity date. */}
+        {isQuote ? (
+          <div className="mb-4 space-y-1 rounded-lg border border-slate-200 px-3 py-3 text-[11px]">
+            <p className="text-xs font-bold text-russian-violet">Accepting this quote</p>
+            <p className="text-slate-700">
+              Reply to the email or ring {identity.phone} to go ahead.
+            </p>
+            <p className="text-slate-700">
+              Prices may change if the scope does - anything extra is agreed first.
+            </p>
+          </div>
+        ) : (
+          <div className="mb-4 space-y-1 rounded-lg border border-slate-200 px-3 py-3 text-[11px]">
+            <p className="text-xs font-bold text-russian-violet">Bank transfer</p>
+            <p className="text-slate-500">Payee: {identity.name}</p>
+            <p className="font-semibold text-slate-700">Account: {identity.bankAccount}</p>
+            <p className="font-semibold text-slate-700">
+              Particulars: {clientName ? bankParticulars(clientName) : "[surname]"}
+            </p>
+            <p className="font-semibold text-slate-700">
+              Code: {number ? bankCode(number) : "[invoice number]"}
+            </p>
+            <p className="text-slate-500">
+              Due within {identity.paymentTermsDays} days of issue
+              {dueDate ? ` (by ${formatDateShort(dueDate)}).` : "."}
+            </p>
+          </div>
+        )}
 
         {notes && <p className="mb-6 text-[11px] text-slate-500">{notes}</p>}
 

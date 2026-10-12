@@ -37,7 +37,11 @@ import {
 } from "@/features/business/lib/business";
 import { lookupAutoTravel } from "@/features/business/lib/calculator-helpers";
 import { buildIncomeDescription } from "@/features/business/lib/invoice-maths";
-import { clampBillableMins } from "@/features/business/lib/pricing-policy";
+import {
+  clampBillableMins,
+  unsuccessfulShareLabel,
+  type DateSurcharge,
+} from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
 import type {
   JobCalculation,
@@ -62,8 +66,8 @@ interface QuickPricing {
   travelRatePerHour: number;
   minBillableMins: number;
   billingIncrementMins: number;
-  /** Labour uplift fraction when today is a public holiday, else 0. */
-  holidayUplift: number;
+  /** Share of the labour still charged when the problem wasn't fixed (0.5 = half price). */
+  unsuccessfulFactor: number;
 }
 
 /** One of today's booking-calendar events, with NZ-local HH:MM bounds. */
@@ -113,8 +117,8 @@ interface Props {
   rates: RateConfig[];
   /** Automatic promo live right now, or null. */
   promo: ActivePromo | null;
-  /** Today's public holiday name, or null. */
-  holidayName: string | null;
+  /** Today's labour surcharge (public holiday or weekend), or null. */
+  surcharge: DateSurcharge | null;
   /** Account number shown under the total for a bank transfer. */
   bankAccount: string;
   /** NZ wall-clock HH:MM at page load; seeds the end time without a hydration mismatch. */
@@ -131,7 +135,7 @@ interface Props {
  * @param props - Component props.
  * @param props.rates - Rate rows; the default hourly row prices labour.
  * @param props.promo - Automatic promo to apply, or null.
- * @param props.holidayName - Today's public holiday name, or null.
+ * @param props.surcharge - Today's labour surcharge (public holiday or weekend), or null.
  * @param props.bankAccount - Account number for bank transfers.
  * @param props.initialEnd - End time to start with (now, at page load).
  * @param props.events - Today's events to match against.
@@ -142,7 +146,7 @@ interface Props {
 export function QuickPriceView({
   rates,
   promo,
-  holidayName,
+  surcharge,
   bankAccount,
   initialEnd,
   events,
@@ -153,6 +157,8 @@ export function QuickPriceView({
   const [start, setStart] = useState(prefill?.start ?? "");
   const [end, setEnd] = useState(prefill?.end ?? initialEnd);
   const [business, setBusiness] = useState(false);
+  // Couldn't fix the problem: the labour bills at the unsuccessful-visit share.
+  const [unfixed, setUnfixed] = useState(false);
   const [travel, setTravel] = useState<TravelEntry | null>(prefill?.travel ?? null);
   const [lookingUp, setLookingUp] = useState(false);
   const [travelNote, setTravelNote] = useState<string | null>(null);
@@ -200,6 +206,7 @@ export function QuickPriceView({
             unitPrice: hourlyRate,
             lineTotal: Math.round((billedMins / 60) * hourlyRate * 100) / 100,
             minutes: billedMins,
+            unsuccessful: unfixed,
           },
         ]
       : [];
@@ -216,7 +223,8 @@ export function QuickPriceView({
     gstRegistered: pricing.gstRegistered,
     minTravelCharge: pricing.minTravelCharge,
     minBillableMins: pricing.minBillableMins,
-    holidayUplift: pricing.holidayUplift,
+    surchargeUplift: surcharge?.uplift ?? 0,
+    unsuccessfulFactor: pricing.unsuccessfulFactor,
     businessModifierId: businessModifier?.id ?? null,
     standardRate: standard?.ratePerHour ?? null,
     rates,
@@ -287,7 +295,10 @@ export function QuickPriceView({
         ? ` (total ${formatNZD(totals.total)})`
         : "";
     const description =
-      buildIncomeDescription(job) + (noTravel ? " - no travel charged" : "") + totalNote;
+      buildIncomeDescription(job) +
+      (unfixed ? " - couldn't fix" : "") +
+      (noTravel ? " - no travel charged" : "") +
+      totalNote;
     let sheetWarning = false;
     for (const row of pendingRows) {
       try {
@@ -429,6 +440,11 @@ export function QuickPriceView({
               label={`Business rate (+${formatMoneyCompact(businessModifier.hourlyDelta ?? 0)}/hr)`}
             />
           )}
+          <AdminCheckbox
+            checked={unfixed}
+            onChange={setUnfixed}
+            label={`Couldn't fix it (${unsuccessfulShareLabel(pricing.unsuccessfulFactor)})`}
+          />
         </div>
       </Card>
 
@@ -441,7 +457,7 @@ export function QuickPriceView({
         onToggleNoTravel={() => setNoTravel((v) => !v)}
         driveMins={driveMins}
         lookingUp={lookingUp}
-        holidayName={holidayName}
+        surcharge={surcharge}
         promo={promo}
         bankAccount={bankAccount}
         clientName={prefill?.clientName ?? null}

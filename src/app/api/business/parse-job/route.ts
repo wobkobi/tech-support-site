@@ -10,6 +10,7 @@ import {
   isChannelModifier,
   restatesTaskLine,
 } from "@/features/business/lib/business";
+import { isBusinessModifier, withJobModifiers } from "@/features/business/lib/job-modifiers";
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import {
   buildParseJobContext,
@@ -78,6 +79,8 @@ function findTemplateByTags<T extends { device: string | null; action: string | 
  * POST /api/business/parse-job - Parses a plain-English job description using gpt-4.1.
  * Pre-computes session total from time ranges and attaches travel info from the AI-extracted
  * destination, falling back to the caller-supplied `fallbackDestination` when the text names none.
+ * A remote booking (`meetingType`) and a company bill-to (`billedToCompany`) add Remote and
+ * Business to the parsed tasks.
  * @param request - Incoming Next.js request with input string in body
  * @returns JSON with structured ParseJobResponse or a 422 error
  */
@@ -93,12 +96,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (body === null || typeof body !== "object") {
     return errorResponse("Invalid request body", 400);
   }
-  const { input, answers, jobDate, fallbackDestination } = body as {
+  const { input, answers, jobDate, fallbackDestination, meetingType, billedToCompany } = body as {
     input: unknown;
     answers?: Record<string, unknown>;
     jobDate?: unknown;
     fallbackDestination?: unknown;
+    meetingType?: unknown;
+    billedToCompany?: unknown;
   };
+  // Facts the calculator knows that the description may not say: how the booking was to
+  // be met, and whether the invoice is addressed to the contact's company.
+  const remoteBooked = meetingType === "remote";
+  const companyBill = billedToCompany === true;
   // Job date (NZ-local YYYY-MM-DD) anchors travel quotes to the job's weekday.
   const jobDateAnchor =
     typeof jobDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(jobDate) ? jobDate : undefined;
@@ -218,6 +227,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         .map(([k, v]) => `${k}=${v}`)
         .join(", ");
       userContent += `\n\n[User clarifications: ${clarifications}]`;
+    }
+    if (remoteBooked) {
+      userContent += `\n\n[Booking: this job was booked as a remote session]`;
+    }
+    if (companyBill) {
+      userContent += `\n\n[Invoice: billed to the client's company]`;
     }
 
     // Call the model and parse the response. gpt-4.1 (not -mini) is deliberate:
@@ -419,6 +434,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // can't pull every later parse off the "PC" the rest of the table uses.
       const knownDevices = canonicalTagMap(templates, "device");
       const knownActions = canonicalTagMap(templates, "action");
+      // Job-wide modifiers. Remote fills in on a remote booking unless the parse found a
+      // trip to the client. Business is all or nothing: a company bill-to, or the model
+      // putting it on any one task, bills every task at it.
+      const jobFacts = {
+        remoteBooking: remoteBooked && !parsed.destination,
+        business:
+          companyBill ||
+          parsed.tasks.some((task) =>
+            ((task as { modifierLabels?: string[] }).modifierLabels ?? []).some((label) =>
+              isBusinessModifier({ label }),
+            ),
+          ),
+      };
+      let remoteAdded = 0;
+      let businessAdded = 0;
       // Tags the model coined that aren't in the taxonomy. Surfaced as a
       // warning so a genuinely new tag is a visible operator decision and a
       // drifted synonym gets corrected before it splits the price history.
@@ -490,7 +520,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           (best, r) => (best === null || (r.hourlyDelta ?? 0) > (best.hourlyDelta ?? 0) ? r : best),
           null,
         );
-        const modifierIds = [
+        const channelIds = [
           ...new Set(
             modifierRates
               .filter((r) => !isChannelModifier(r) || r.id === keptChannel?.id)
@@ -505,6 +535,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               .join(" + ")}); kept ${keptChannel?.label}.`,
           ];
         }
+
+        const job = withJobModifiers(channelIds, ratesForLookup, jobFacts);
+        const modifierIds = job.ids;
+        if (job.addedRemote) remoteAdded++;
+        if (job.addedBusiness) businessAdded++;
 
         const computed = effectiveHourlyRate(ratesForLookup, baseRate?.id ?? null, modifierIds);
         const unitPrice = computed > 0 ? computed : (snap?.defaultPrice ?? task.unitPrice ?? 0);
@@ -546,6 +581,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           `Dropped wording that only repeated the line: ${[...strippedRestatements].join(
             ", ",
           )}. The device and action already say it.`,
+        ];
+      }
+      if (remoteAdded > 0) {
+        parsed.warnings = [
+          ...(parsed.warnings ?? []),
+          `Booked as a remote session: Remote added to ${remoteAdded} task(s) the description gave no other channel for.`,
+        ];
+      }
+      if (businessAdded > 0) {
+        parsed.warnings = [
+          ...(parsed.warnings ?? []),
+          companyBill
+            ? `Billed to a company: Business rate added to ${businessAdded} task(s).`
+            : `Business rate added to ${businessAdded} more task(s) so the whole job bills at it.`,
         ];
       }
       if (newTags.size > 0) {

@@ -107,6 +107,8 @@ interface CalculatorViewProps {
   eventPrefill: EventPrefill | null;
   /** What a voided invoice being re-issued carries over; null on a normal load. */
   reissue: ReissuePrefill | null;
+  /** Opened from "New quote": the save area leads with Save quote and drops the payment boxes. */
+  quoteMode: boolean;
 }
 
 // The prefill shapes live in the shared business types so the event picker
@@ -125,6 +127,7 @@ export type { EventPrefill, EventPrefillSlot } from "@/features/business/types/b
  * @param props.initialPromo - Server-resolved active promo, or null.
  * @param props.eventPrefill - Schedule-event job prefill, or null on a normal load.
  * @param props.reissue - Voided invoice being re-issued, or null on a normal load.
+ * @param props.quoteMode - Whether the calculator was opened to make a quote.
  * @returns The rendered calculator view element.
  */
 export function CalculatorView({
@@ -136,6 +139,7 @@ export function CalculatorView({
   initialPromo,
   eventPrefill,
   reissue,
+  quoteMode,
 }: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
 
@@ -236,9 +240,8 @@ export function CalculatorView({
   const [clientEmail, setClientEmail] = useState(() =>
     normaliseEmail(eventPrefill?.clientEmail ?? reissue?.clientEmail),
   );
-  // Address-to state mirrors the InvoiceBuilder's segmented control so the
-  // operator picks Name/Company/Custom once and the choice rides through to
-  // the invoice without re-picking.
+  // Address-to state: the operator picks Name/Company/Custom once and the
+  // choice rides through to the invoice without re-picking.
   const [pickedContactName, setPickedContactName] = useState<string | null>(null);
   const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(null);
   const [pickedContactGoogleId, setPickedContactGoogleId] = useState<string | null>(null);
@@ -316,7 +319,7 @@ export function CalculatorView({
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [promoCode, setPromoCode] = useState("");
 
-  // Job date drives the holiday + promo lookup so a past job is priced by what
+  // Job date drives the surcharge + promo lookup so a past job is priced by what
   // applied THEN, not today. Persisted in the draft; defaults to today (NZ).
   // A re-issue with no event falls back to the voided invoice's issue date, so the promo is
   // priced for when the job was billed.
@@ -333,8 +336,8 @@ export function CalculatorView({
       .sort()[0] ?? "";
   const prefillBookingId = eventPrefill?.bookingId ?? null;
 
-  // Holiday + date-resolved promo for the selected job date.
-  const { holiday, activePromo } = useJobContext({
+  // Date surcharge (public holiday or weekend) + date-resolved promo for the job date.
+  const { surcharge: dateSurcharge, activePromo } = useJobContext({
     jobDate,
     jobStartTime,
     promoCode,
@@ -365,6 +368,7 @@ export function CalculatorView({
     jobAddress,
     timeRanges,
     timesSet,
+    billedToCompany: addressMode === "company",
     setFollowUpMins,
     setTimeRanges,
     setTimesSet,
@@ -432,10 +436,10 @@ export function CalculatorView({
     setWalkedChoice(null);
   }
 
-  // A cancellation fee is a flat charge, not labour: no holiday uplift on it, and no
+  // A cancellation fee is a flat charge, not labour: no date surcharge on it, and no
   // promo, which would also spend a redemption on a job that never happened.
   const pricedPromo = cancelMode ? null : activePromo;
-  const holidayUplift = cancelMode ? 0 : holiday.uplift;
+  const surcharge = cancelMode ? null : dateSurcharge;
 
   /**
    * Applies a picked Places suggestion: keep the full formatted address and
@@ -600,11 +604,12 @@ export function CalculatorView({
   const aggregateEnd = sortedRanges[sortedRanges.length - 1]?.endTime ?? "";
   // Base hourly rates (e.g. Standard $65/hr) used as the per-task base rate.
   const baseRates = rates.filter((r) => r.ratePerHour !== null);
-  // Modifier rates: either signed $/hr deltas (At home -$10, Remote -$10)
-  // or percent uplifts (Public Holiday +25%). Toggled per task to shift the
-  // effective rate.
+  // Modifier rates: signed $/hr deltas (Business +$20, At home -$15, Remote -$10),
+  // toggled per task to shift the effective rate. The percent rows (Public Holiday)
+  // stay off the chips: the date surcharge already adds that uplift as its own line,
+  // so a chip on top would charge it twice.
   const modifierRates = rates
-    .filter((r) => r.hourlyDelta !== null || r.percentDelta !== null)
+    .filter((r) => r.hourlyDelta !== null)
     .sort((a, b) => a.label.localeCompare(b.label));
   const flatRates = rates.filter((r) => r.flatRate !== null);
 
@@ -620,7 +625,7 @@ export function CalculatorView({
     clientEmail,
   };
 
-  // Apply the date's public-holiday uplift to labour (0 when not a holiday),
+  // Apply the date surcharge to labour (public holiday or weekend, none otherwise),
   // and tell the totals which modifier marks business labour so a promo skips
   // it - promos are a home-rate offer.
   // Same predicate getPublicPricing uses to derive the business rate, so the
@@ -635,7 +640,7 @@ export function CalculatorView({
     null;
   const jobPricing = {
     ...pricing,
-    holidayUplift,
+    surchargeUplift: surcharge?.uplift ?? 0,
     businessModifierId,
     standardRate,
     rates,
@@ -646,14 +651,14 @@ export function CalculatorView({
   // skip re-render when unrelated parent state changes (e.g. typing in the
   // AI input box). Recomputes when any meaningful input shifts.
   const previewLineItems = useMemo(
-    () => jobToLineItems(job, holidayUplift, pricing.minTravelCharge, pricing.minBillableMins),
+    () => jobToLineItems(job, surcharge, pricing.minTravelCharge, pricing.minBillableMins),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       tasks,
       parts,
       timeRanges,
       durationMins,
-      holidayUplift,
+      surcharge,
       travelEntries,
       clientName,
       clientEmail,
@@ -684,7 +689,7 @@ export function CalculatorView({
     renameContactTo: renameContact ? contactRenameOffer : null,
     job,
     totals,
-    holidayUplift,
+    surcharge,
     pricing,
     activePromo: pricedPromo,
     skipPromo,
@@ -764,7 +769,11 @@ export function CalculatorView({
     // Billing a booked job: the prefill is a server prop keyed by eventId, so
     // state resets alone can't remove the banner - drop the query param and
     // let the remount start truly blank.
-    if (eventPrefill || reissue) router.replace("/admin/business/calculator");
+    if (eventPrefill || reissue) {
+      router.replace(
+        quoteMode ? "/admin/business/calculator?quote=1" : "/admin/business/calculator",
+      );
+    }
   }
 
   /**
@@ -848,7 +857,7 @@ export function CalculatorView({
         onApplyPromoCode={() => setPromoCode(promoCodeInput.trim())}
         onClearForm={() => setConfirmClearOpen(true)}
 
-        holiday={holiday}
+        surcharge={surcharge}
         activePromo={pricedPromo}
         skipPromo={skipPromo}
         onSkipPromoChange={setSkipPromo}
@@ -989,6 +998,7 @@ export function CalculatorView({
                 baseRates={baseRates}
                 modifierRates={modifierRates}
                 flatRates={flatRates}
+                unsuccessfulFactor={pricing.unsuccessfulFactor ?? 0.5}
               />
             </>
           )}
@@ -1085,6 +1095,7 @@ export function CalculatorView({
             savingInvoice={savingInvoice}
             saveSendMode={saveSendMode}
             saveQuoteMode={saveQuoteMode}
+            quoteMode={quoteMode}
             savingIncome={savingIncome}
             parsing={parsing}
             subtotal={totals.subtotal}
@@ -1102,6 +1113,7 @@ export function CalculatorView({
           <InvoicePreviewPanel
             identity={identity}
             number="DRAFT"
+            isQuote={quoteMode}
             clientName={clientName}
             clientEmail={clientEmail}
             issueDate={todayISO()}
@@ -1110,7 +1122,7 @@ export function CalculatorView({
             notes={notes}
             gstRegistered={pricing.gstRegistered}
             unsuccessfulDiscount={totals.unsuccessfulDiscount}
-            alreadyPaid={paidCash ? 0 : alreadyPaidAmount(alreadyPaid)}
+            alreadyPaid={paidCash || quoteMode ? 0 : alreadyPaidAmount(alreadyPaid)}
             promoTitle={
               pricedPromo && !skipPromo && totals.promoDiscount > 0 ? pricedPromo.title : null
             }

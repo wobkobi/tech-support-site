@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
  * email first, since the ask's stop link is signed per contact. Refuses with 409 when
  * the person has opted out of review asks or unsubscribed. Stamps reviewSentAt only
  * when the send succeeds; a booking with no email is rejected with 400.
- * Requires X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @param params - Route params.
  * @param params.params - Destructured route params containing booking id.

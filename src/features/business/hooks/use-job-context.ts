@@ -1,8 +1,10 @@
 "use client";
 // src/features/business/hooks/use-job-context.ts
 // Resolves the calculator's job date (plus start time, promo code and customer) to the
-// public-holiday uplift and the promo that applied then, via /api/business/job-context.
+// date surcharge (public holiday or weekend) and the promo that applied then, via
+// /api/business/job-context.
 
+import type { DateSurcharge } from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
 import { useEffect, useState } from "react";
 
@@ -22,16 +24,16 @@ interface UseJobContextArgs {
   initialPromo: ActivePromo | null;
 }
 
-/** Holiday + promo context for the selected job date. */
+/** Surcharge + promo context for the selected job date. */
 interface JobContext {
-  /** Holiday name (for the UI) + labour uplift fraction (0 when not a holiday). */
-  holiday: { name: string | null; uplift: number };
+  /** Labour surcharge for the date (public holiday or weekend), or null when neither applies. */
+  surcharge: DateSurcharge | null;
   /** Promo resolved for the job date, or null. */
   activePromo: ActivePromo | null;
 }
 
 /**
- * Resolves the job date > { holiday, promo } whenever the date changes, so a
+ * Resolves the job date > { surcharge, promo } whenever the date changes, so a
  * past job is priced by what applied THEN, not today. Best effort: failures
  * leave the prior context in place.
  * @param args - Lookup inputs.
@@ -41,7 +43,7 @@ interface JobContext {
  * @param args.clientEmail - Typed client email.
  * @param args.prefillBookingId - Booking the job was billed from, or null.
  * @param args.initialPromo - Server-resolved promo for the first render.
- * @returns The date's holiday context and active promo.
+ * @returns The date's surcharge and active promo.
  */
 export function useJobContext({
   jobDate,
@@ -54,14 +56,10 @@ export function useJobContext({
   // activePromo holds the promo for the selected job date (refined by the
   // lookup below).
   const [activePromo, setActivePromo] = useState<ActivePromo | null>(initialPromo);
-  // Holiday context for the selected date: name (for the UI) + the live labour
-  // uplift fraction (0 when the date isn't a public holiday).
-  const [holiday, setHoliday] = useState<{ name: string | null; uplift: number }>({
-    name: null,
-    uplift: 0,
-  });
+  // Labour surcharge for the selected date, with its reason for the UI.
+  const [surcharge, setSurcharge] = useState<DateSurcharge | null>(null);
 
-  // Resolve the job date > { holiday, promo } whenever the date changes. Best
+  // Resolve the job date > { surcharge, promo } whenever the date changes. Best
   // effort: failures leave the prior context in place. Overwrites activePromo
   // with the date-resolved promo so every downstream consumer is date-aware.
   useEffect(() => {
@@ -77,22 +75,14 @@ export function useJobContext({
     // A booked job keeps the promo it was booked with, and its own redemption
     // does not count against the customer's limits.
     if (prefillBookingId) query.set("bookingId", prefillBookingId);
-    /** Fetches the holiday + promo context for the current date, code and customer. */
+    /** Fetches the surcharge + promo context for the current date, code and customer. */
     const run = (): void => {
       fetch(`/api/business/job-context?${query.toString()}`)
         .then((r) => r.json())
         .then(
-          (d: {
-            ok?: boolean;
-            holidayName?: string | null;
-            holidayUplift?: number;
-            promo?: ActivePromo | null;
-          }) => {
+          (d: { ok?: boolean; surcharge?: DateSurcharge | null; promo?: ActivePromo | null }) => {
             if (cancelled || !d?.ok) return;
-            setHoliday({
-              name: d.holidayName ?? null,
-              uplift: typeof d.holidayUplift === "number" ? d.holidayUplift : 0,
-            });
+            setSurcharge(d.surcharge ?? null);
             setActivePromo(d.promo ?? null);
           },
         )
@@ -109,5 +99,5 @@ export function useJobContext({
     };
   }, [jobDate, jobStartTime, promoCode, clientEmail, prefillBookingId]);
 
-  return { holiday, activePromo };
+  return { surcharge, activePromo };
 }

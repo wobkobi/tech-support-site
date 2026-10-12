@@ -130,7 +130,7 @@ async function findScheduleConflict(
  * silent; anything else is a real reschedule (conflicts checked, travel
  * re-snapshotted, both parties emailed). Either way the Google event is patched
  * to match, so the row and the calendar never drift.
- * Requires X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @param params - Route params.
  * @param params.params - Destructured route params containing booking id.
@@ -512,7 +512,7 @@ export async function PATCH(
 /**
  * DELETE /api/admin/bookings/[id]
  * Permanently deletes a booking and its calendar event.
- * Requires X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @param params - Route params.
  * @param params.params - Destructured route params containing booking id.

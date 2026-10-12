@@ -1,6 +1,7 @@
 // src/app/sitemap.ts
 // Dynamic sitemap for search engines. Lists all crawlable public routes.
 
+import { SERVICE_PAGE_SLUGS } from "@/shared/lib/service-pages";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { MetadataRoute } from "next";
 
@@ -25,6 +26,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }> = [
     { path: "/", priority: 1.0, changeFrequency: "weekly", lastModified: now },
     { path: "/services", priority: 0.9, changeFrequency: "monthly", lastModified: monthStart },
+    ...SERVICE_PAGE_SLUGS.map((slug) => ({
+      path: `/services/${slug}`,
+      priority: 0.8,
+      changeFrequency: "monthly" as const,
+      lastModified: monthStart,
+    })),
     { path: "/business", priority: 0.9, changeFrequency: "monthly", lastModified: monthStart },
     { path: "/pricing", priority: 0.9, changeFrequency: "monthly", lastModified: now },
     { path: "/booking", priority: 0.9, changeFrequency: "weekly", lastModified: now },

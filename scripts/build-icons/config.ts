@@ -218,6 +218,17 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     quality: 90,
     useMarkLogo: true,
   },
+  // Apple Business place card logo: Apple rejects anything 1024px or smaller. Blur
+  // scales with the canvas so the backdrop reads the same as the 720px Google one.
+  {
+    name: "apple-business-2048",
+    width: 2048,
+    height: 2048,
+    blur: 60,
+    logoScale: 0.65,
+    quality: 90,
+    useMarkLogo: true,
+  },
 ];
 
 /* ---------- Additional Assets ---------- */

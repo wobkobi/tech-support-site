@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
  * - winner "site" - keeps the site value, marks resolved, pushes to Google.
  * - winner "google" - copies Google value to site contact, marks resolved.
  * - winner "custom" - writes `customValue` to site, marks resolved, pushes.
- * Requires X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @param ctx - Route ctx with the conflict id.
  * @param ctx.params - Resolved Next.js dynamic route params.

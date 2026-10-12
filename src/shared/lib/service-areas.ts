@@ -1,7 +1,8 @@
 // src/shared/lib/service-areas.ts
 // The service categories, shared by the services page (full cards) and the home
-// page's "What I can help with" tiles, which link to /services#<slug>. One list
-// keeps a tile's anchor from drifting off its card.
+// page's "What I can help with" tiles. serviceHref() in service-pages.ts sends a tile
+// to the category's own page when it has one, else to its /services#<slug> card, so
+// the card ids here must stay stable.
 
 import type { IconType } from "react-icons";
 import {

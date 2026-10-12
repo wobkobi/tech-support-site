@@ -413,8 +413,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           travelMinsAtBooking,
           travelMinsBackAtBooking,
           // Rate snapshot locks in the quoted price against later admin edits.
-          // complexRateAtBooking is no longer written (the Complex tier was
-          // removed); the column stays for historical bookings.
+          // complexRateAtBooking is not written (there is no Complex tier); the
+          // column stays for older bookings that carry it.
           baseRateAtBooking,
           travelRatePerHourAtBooking,
           // Promo snapshot denormalised - survives Promo deletion before service.

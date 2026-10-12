@@ -27,7 +27,7 @@ interface ResolveBody {
  * Applies the chosen value for each conflicting field to both the local Contact
  * and the originating source record. This keeps both sides in sync regardless of
  * which value was chosen.
- * Requires X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns JSON { ok: true } on success or an error response.
  */

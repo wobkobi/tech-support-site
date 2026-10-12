@@ -29,7 +29,7 @@ function csvCell(value: string | null | undefined): string {
  * GET /api/admin/contacts/export
  * Returns all contacts as a CSV file compatible with Google Contacts import.
  * Column layout mirrors the format Google Contacts produces when exporting.
- * Authenticated via X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns CSV file response.
  */

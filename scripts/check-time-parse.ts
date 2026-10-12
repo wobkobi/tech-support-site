@@ -82,7 +82,7 @@ function travelTotal(line: string, lineTotal: number): number | undefined {
     reply({ travelCosts: [{ label: "Parking", cost: 5 }] }),
     [booked],
     "18:00",
-    { minBillableMins: 60, travelRatePerHour: 60, minTravelCharge: 10, holidayUplift: 0 },
+    { minBillableMins: 60, travelRatePerHour: 60, minTravelCharge: 10, surcharge: null },
     {
       line: { description: line, qty: 1, unitPrice: lineTotal, lineTotal },
       destination: "1 Queen St",
@@ -124,7 +124,7 @@ function unsuccessfulCut(factor: number, promoDiscount: number): number {
       minBillableMins: 60,
       travelRatePerHour: 60,
       minTravelCharge: 10,
-      holidayUplift: 0,
+      surcharge: null,
       unsuccessfulFactor: factor,
     },
     { line: null, destination: null },

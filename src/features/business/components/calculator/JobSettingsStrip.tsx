@@ -1,13 +1,14 @@
 "use client";
 // src/features/business/components/calculator/JobSettingsStrip.tsx
 // Top strip of the calculator: job date, promo code entry, the form tools (clear, a link
-// to the rate editor in Settings), the holiday chip, and the resolved promo with its
+// to the rate editor in Settings), the date surcharge chip, and the resolved promo with its
 // per-job skip toggle.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
+import type { DateSurcharge } from "@/features/business/lib/pricing-policy";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -20,7 +21,7 @@ interface Props {
   promoCode: string;
   onApplyPromoCode: () => void;
   onClearForm: () => void;
-  holiday: { name: string | null; uplift: number };
+  surcharge: DateSurcharge | null;
   activePromo: ActivePromo | null;
   skipPromo: boolean;
   onSkipPromoChange: (skip: boolean) => void;
@@ -29,7 +30,7 @@ interface Props {
 /**
  * Job settings strip: the date, the promo code and the form tools share one
  * box, so the first screen reaches the event picker and the job description.
- * The date drives the public-holiday and promo lookup.
+ * The date drives the surcharge (public holiday or weekend) and promo lookup.
  * @param props - Component props.
  * @param props.jobDate - Selected job date (YYYY-MM-DD).
  * @param props.onJobDateChange - Called with the picked date, or "" when the input is cleared.
@@ -38,7 +39,7 @@ interface Props {
  * @param props.promoCode - The applied promo code, or "".
  * @param props.onApplyPromoCode - Applies the box text as the promo code.
  * @param props.onClearForm - Opens the clear-form confirm.
- * @param props.holiday - Holiday name + labour uplift for the job date.
+ * @param props.surcharge - Labour surcharge for the job date, or null when none applies.
  * @param props.activePromo - Promo resolved for the job date, or null.
  * @param props.skipPromo - Whether the promo is skipped for this job.
  * @param props.onSkipPromoChange - Toggles the per-job promo skip.
@@ -52,7 +53,7 @@ export function JobSettingsStrip({
   promoCode,
   onApplyPromoCode,
   onClearForm,
-  holiday,
+  surcharge,
   activePromo,
   skipPromo,
   onSkipPromoChange,
@@ -125,10 +126,10 @@ export function JobSettingsStrip({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm text-admin-muted">
-        <span>The job date sets which promo and public-holiday rate apply.</span>
-        {holiday.name && (
+        <span>The job date sets which promo and weekend or public-holiday rate apply.</span>
+        {surcharge && (
           <span className="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-800">
-            {holiday.name} - labour +{Math.round(holiday.uplift * 100)}%
+            {surcharge.reason} - labour +{Math.round(surcharge.uplift * 100)}%
           </span>
         )}
       </div>

@@ -11,6 +11,7 @@ import {
   TASK_TIMING_FALLBACK,
   taskLineTotals,
   timeDiffMins,
+  type LabourSurcharge,
   type TaskTimingConfig,
 } from "@/features/business/lib/business";
 import { storeRunEntry } from "@/features/business/lib/calculator-helpers";
@@ -392,8 +393,8 @@ export interface ParsedJobPricing {
   minBillableMins: number;
   travelRatePerHour: number;
   minTravelCharge: number;
-  /** Public-holiday labour uplift fraction for the job date (0 when none). */
-  holidayUplift: number;
+  /** Labour surcharge for the job date (public holiday or weekend), or null when none. */
+  surcharge: LabourSurcharge | null;
   /** Share of an unsuccessful line still charged (0.5 = half price). */
   unsuccessfulFactor?: number;
 }
@@ -506,7 +507,7 @@ export function parsedJobToLineItems(
       clientName: "",
       clientEmail: "",
     },
-    pricing.holidayUplift,
+    pricing.surcharge,
     pricing.minTravelCharge,
     pricing.minBillableMins,
   );

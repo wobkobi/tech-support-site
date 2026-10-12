@@ -504,6 +504,13 @@ export const PRICING_FIELD_META = {
     unit: "%",
     off: "Set 0 to charge normal rates on public holidays.",
   },
+  weekendUplift: {
+    title: "Weekend surcharge",
+    description:
+      "Extra added to labour on Saturdays and Sundays (10 = +10%). A public holiday on a weekend takes the public-holiday surcharge instead. Travel and parts are unchanged.",
+    unit: "%",
+    off: "Set 0 to charge normal rates at weekends.",
+  },
   minTravelCharge: {
     title: "Minimum travel charge",
     description:

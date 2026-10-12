@@ -1,9 +1,11 @@
 // src/app/api/business/job-context/route.ts
 // GET /api/business/job-context?date=YYYY-MM-DD[&time=HH:MM][&code=CODE][&email=][&bookingId=]
-// - admin-only. Given when a job was actually done, returns whether it was an NZ public
-// holiday (with the live labour uplift) and which promo applies, so the calculator prices
-// a past job by what applied then, not today. A booked job keeps the promo it locked in.
+// - admin-only. Given when a job was actually done, returns the date surcharge that applied
+// (an NZ public holiday or a weekend, with the live labour uplift) and which promo applies,
+// so the calculator prices a past job by what applied then, not today. A booked job keeps
+// the promo it locked in.
 
+import { dateSurcharge, type DateSurcharge } from "@/features/business/lib/pricing-policy";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import {
   lockedInPromo,
@@ -16,14 +18,14 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
-import { dateKeyParts, nzWallClockUtc, timeParts } from "@/shared/lib/timezone-utils";
+import { dateKeyParts, nzWallClockUtc, nzWeekday, timeParts } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
 interface JobContextResponse {
   /** Holiday name when the date is an NZ public holiday, else null. */
   holidayName: string | null;
-  /** Labour uplift fraction to apply (the live setting on a holiday, else 0). */
-  holidayUplift: number;
+  /** Labour surcharge for the date (holiday first, else weekend), or null when neither applies. */
+  surcharge: DateSurcharge | null;
   /**
    * Promo that applies to the job, or null. A code that resolves is returned
    * in place of the booking's locked-in or automatic promo; one that does not
@@ -40,7 +42,7 @@ interface JobContextResponse {
  * real start, an optional `code` for a job taken over the phone, an optional
  * `email` so per-customer limits bind an operator-priced job too, and an
  * optional `bookingId` when billing a booked job.
- * @returns JSON { holidayName, holidayUplift, promo }.
+ * @returns JSON { holidayName, surcharge, promo }.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
@@ -102,9 +104,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   ]);
   const codeTook = code !== null && resolved?.code === code;
 
+  const holidayName = holiday?.name ?? null;
   const body: JobContextResponse = {
-    holidayName: holiday?.name ?? null,
-    holidayUplift: holiday ? settings.pricing.publicHolidayUplift : 0,
+    holidayName,
+    surcharge: dateSurcharge(holidayName, nzWeekday(at), settings.pricing),
     promo: codeTook ? resolved : (locked ?? resolved),
   };
   return NextResponse.json({ ok: true, ...body });

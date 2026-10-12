@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * POST /api/admin/contacts/backfill
  * Merges phone-only duplicates then upserts a Contact per unique booking email.
- * Requires X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns JSON with the number of contacts created.
  */

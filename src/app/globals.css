@@ -127,11 +127,20 @@
   --color-foreground: #171717;
 }
 
-/* Base */
+/* Base. Body takes a minimum height, not a fixed one: the sticky site header can only
+   stick inside its parent, so a body exactly one screen tall let the header scroll away
+   after the first screen. */
 html,
 body {
-  height: 100%;
   overflow-x: clip;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
 }
 
 /* Force transparency to defeat dark-mode extensions painting body */

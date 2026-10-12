@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * POST /api/admin/reviews/match-contacts
  * Links reviews that have no contactId to their matching Contact.
- * Requires X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns JSON with { ok: true, matchedCount } on success, or error.
  */

@@ -169,7 +169,7 @@ export async function importGoogleContactByEmail(
  *
  * Matching happens in memory against normalised keys rather than in the query.
  * A Mongo equality filter only matches the stored string exactly, so a contact
- * saved as "Tina0261@outlook.com" or "0210311047" never matched Google's
+ * saved as "Pat.Lee@Example.com" or "0210000000" never matched Google's
  * lowercased email or E.164 phone and was re-created as a duplicate on every
  * single run.
  * @returns The number of contacts created or updated (skipped rows not counted).
@@ -340,7 +340,7 @@ export async function importFromGoogleContacts(): Promise<number> {
             // and its email-bearing Google twin can't drift into two rows.
             if (emailEntry && !existing.email && renameTrusted) updates.email = emailEntry;
             // Writing the E.164 form back also repairs a number stored in
-            // domestic form, which is what made the row unmatchable on import.
+            // domestic form, which the import cannot match.
             if (phone && phone !== existing.phone) updates.phone = phone;
             // Add, never replace: contact merges also write altEmails, and
             // setting the list here would discard what a merge folded in. An

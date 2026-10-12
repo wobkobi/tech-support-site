@@ -128,6 +128,12 @@ export interface PricingSettings {
   maxJobMins: number;
   /** Public-holiday labour surcharge, fraction (0.25 = +25%). 0 = no surcharge. */
   publicHolidayUplift: number;
+  /**
+   * Weekend labour surcharge, fraction (0.1 = +10%), for jobs on an NZ Saturday or Sunday.
+   * A public holiday on a weekend takes the holiday surcharge instead; the two never stack.
+   * 0 = no surcharge.
+   */
+  weekendUplift: number;
   /** Minimum travel charge floor (NZD). 0 = no floor. */
   minTravelCharge: number;
   /** Hourly rate for drive time (NZD/hr); prices every round trip. */

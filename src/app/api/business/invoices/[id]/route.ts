@@ -151,8 +151,8 @@ export async function PATCH(
   }
 
   // Full update: the body carries invoice fields, not just a status. Includes
-  // notes-only edits - clientEmail/issueDate/dueDate/notes previously fell
-  // through to the status branch and 400'd on the missing status.
+  // notes-only edits, so clientEmail/issueDate/dueDate/notes never fall through
+  // to the status branch, which 400s on a missing status.
   if (
     body.clientName !== undefined ||
     body.clientEmail !== undefined ||

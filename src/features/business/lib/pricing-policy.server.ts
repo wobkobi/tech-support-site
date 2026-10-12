@@ -83,6 +83,7 @@ export const getPolicy = cache(async (): Promise<Policy> => {
     MIN_TASK_MINS: pricing.minTaskMins,
     MAX_JOB_MINS: pricing.maxJobMins,
     PUBLIC_HOLIDAY_UPLIFT: pricing.publicHolidayUplift,
+    WEEKEND_UPLIFT: pricing.weekendUplift,
     UNSUCCESSFUL_WORK_FACTOR: pricing.unsuccessfulWorkFactor,
     NO_FIX_FREE_MINS: pricing.noFixFreeMins,
     WORKMANSHIP_WINDOW_DAYS: pricing.workmanshipWindowDays,
@@ -129,6 +130,7 @@ const MODIFIER_DESCRIPTIONS: Record<string, string> = {
   "At home": "Bench repair at my place - I take the device home to fix it instead of visiting.",
   Phone: "Help over the phone - quick calls are often free; longer fixes bill at this rate.",
   "Public Holiday": "Applied automatically on NZ public holidays.",
+  Weekend: "Applied automatically on Saturdays and Sundays (not on top of a public holiday).",
 };
 
 /**
@@ -192,6 +194,18 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
         description: MODIFIER_DESCRIPTIONS[row.label] ?? "",
       });
     }
+  }
+  // Weekend is a pricing setting with no rate row, so it's added after the rows and
+  // described the same way as the holiday uplift.
+  if (pricing.weekendUplift > 0) {
+    const upliftPerHour = Math.round(baseRate * pricing.weekendUplift * 100) / 100;
+    modifiers.push({
+      label: "Weekend",
+      kind: "uplift",
+      effectiveRate: Math.round((baseRate + upliftPerHour) * 100) / 100,
+      deltaDescription: `+${formatMoneyCompact(upliftPerHour)}`,
+      description: MODIFIER_DESCRIPTIONS.Weekend ?? "",
+    });
   }
 
   // Latest mtime across rows; powers the "Rates last updated on {date}" footer.

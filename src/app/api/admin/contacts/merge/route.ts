@@ -25,7 +25,7 @@ interface MergeBody {
 /**
  * POST /api/admin/contacts/merge
  * Merges the secondary contact into the primary and soft-deletes the secondary.
- * Requires X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request with primaryId and secondaryId.
  * @returns JSON { ok: true } on success, or an error response.
  */
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // the later ask is the one the send cooldown and the "already asked" picker
   // gate must see, so the newer timestamp wins and brings its own mode. Dropping
   // this loses the ask entirely, because the row holding it is soft-deleted
-  // below - which is what made an invoice-era reviewer resurface as "Legacy".
+  // below, and an invoice-era reviewer then resurfaces as "Legacy".
   if (
     secondary.reviewLinkSentAt &&
     (!primary.reviewLinkSentAt || secondary.reviewLinkSentAt > primary.reviewLinkSentAt)

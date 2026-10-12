@@ -168,9 +168,8 @@ export function ReviewLinkHistoryTable({
     if (!entry.id) return;
     setSaving(true);
     try {
-      // PATCH the Contact row - email/phone live there now that the standalone
-      // ReviewRequest model has been retired. Rows with no contact behind them
-      // are read-only, so `entry.id` is the gate above.
+      // PATCH the Contact row - email/phone live there. Rows with no contact
+      // behind them are read-only, so `entry.id` is the gate above.
       const res = await fetch(`/api/admin/contacts/${entry.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

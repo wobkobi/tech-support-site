@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * POST /api/admin/contacts/import
  * Imports all contacts from Google Contacts into the local database.
- * Requires X-Admin-Secret header.
+ * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns JSON with importedCount on success, or error on failure.
  */

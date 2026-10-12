@@ -97,8 +97,8 @@ export default async function AdminReviewsPage({
         },
       }),
       // Invoices whose email carried the review line. That send is stamped on the
-      // invoice and never on the contact, so a contact-only read cannot see it -
-      // which is what used to drop these reviewers into "Legacy".
+      // invoice and never on the contact, so a contact-only read cannot see it
+      // and these reviewers would drop into "Legacy".
       prisma.invoice.findMany({
         where: { reviewLinkSentAt: { not: null } },
         orderBy: { reviewLinkSentAt: "desc" },
