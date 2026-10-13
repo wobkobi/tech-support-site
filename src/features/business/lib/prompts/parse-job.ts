@@ -183,7 +183,10 @@ SESSION TIMES:
   - Vague amounts ("a bit", "a while", "and a bit", "or so", "a few minutes") are not durations. Is there also a stated range or an exact duration for that same work? YES > bill that and ignore the vague part. NO > take the stated figure and add nothing for the vague part ("an hour and a bit" = 60 min, "an hour or so" = 60 min), and add a warning naming the phrase.
 - durationMins: settled by BILLING rule 1 - the pre-computed annotation when present, plus any outside work with its own duration. Without the annotation, sum the worked segment durations, never the wall-clock span from first start to last end.
 - outOfSessionMins: of durationMins, the minutes of work the description NARRATES as happening outside the session ranges - a call or remote fix before or after the on-site times, with its own duration. These minutes are PART of durationMins (never subtracted from it); this field reports how many of them fell outside the window, which is what exempts them from the wall-clock ceiling below. 0 when every billed minute sits inside the stated times, 0 when no session window was stated, and 0 whenever the only thing pushing the total past the window is an instruction about the total rather than a description of work.
-- durationMins is never negative, and never zero while a session range is stated. A range with identical start and end ("9am-9am") states no duration - ignore that range rather than inventing a span for it.
+- durationMins is never negative, and never zero while a session range is stated.
+- ZERO-LENGTH RANGE: Does a stated range start and end at the same time ("9am-9am", "14:00-14:00")?
+  - YES: that range states NO duration. Drop it: it adds no minutes and sets neither startTime nor endTime. Is another range or a stated duration left? YES > bill from that alone. NO > durationMins null - never a placeholder such as 60 - and a warning quoting the range so the operator can correct the times.
+  - NO: read the range normally.
 - startTime / endTime: Single session → exact HH:MM 24-hour strings. Multi-session → first start and last end. Open-ended session (e.g. "8:10 -") → use current NZ time above as end. No times mentioned → both null.
 - MULTI-DAY JOBS: one description can cover several days, marked by a date line, a weekday line, a "Day 1" / "Day 2" line above that day's times, or a weekday named on the same line as its times ("printer set up Friday, 1:46 pm to 2:05 pm"). The same clock time on two different days is two separate blocks of work - never merge, dedupe, or treat the second as a repeat of the first. The pre-computed total already sums every day, so use it as given.
 - WALL-CLOCK CEILING: When both startTime and endTime are stated for a SINGLE day, settle outOfSessionMins BEFORE durationMins, in this order.
@@ -293,40 +296,51 @@ OTHER RULES:
 - notes: A single professional sentence suitable for the invoice footer. Use empty string if nothing meaningful to add.
 - confidence: "high" if all session times are clearly stated. "medium" if some times were estimated. "low" if mostly guessed.
 - warnings[]: Flag anything ambiguous, assumed, or conflicting in plain English.
-- storeRuns[]: a STORE RUN is a drive Harrison made DURING the visit, from the client's place to a store and back. Settle store runs FIRST, before the destination decision below. Work through these steps for each store, shop or supplier the description names.
-  STEP A - Was Harrison AT the client's place, then LEFT partway through the job to go to that store, then CAME BACK to carry on? "Had to run to PB Tech for a cable", "popped out to Noel Leeming and came back", "nipped to Bunnings mid-job", "left to grab a part, then finished the install".
-    - NO: the stop was on the way there or on the way home, or the description never says he went back ("grabbed a cable on the way", "stopped at PB Tech before heading over", "dropped by on the way home"). Not a store run - the destination decision below handles it. STOP for this store.
-    - YES: go to STEP B.
-  STEP B - Did he get to the client on foot or by bicycle?
-    - YES: not a store run - STEP 5 of the destination decision below settles that drive. STOP for this store.
-    - NO, or the description doesn't say: go to STEP C.
+- trips[]: write this list FIRST - storeRuns and the destination decision below both read from it. LIST every trip the description names, in the order it names them. Read to the final sentence before listing - a supply run is normally named after the visit it followed. One entry per trip:
+  - to: the place, kept WHOLE ("their place", "Papakura", "PB Tech St Lukes").
+  - mode: "foot", "bicycle", "vehicle" (car, van, drove) or "public transport"; "unstated" when the description names the place but not how he got there.
+  - client: true for the trip to the client's place, false for any other.
+  - midJob: true only when he was AT the client's place, LEFT partway through, went there and CAME BACK to carry on ("had to run to PB Tech for a cable", "popped out to Noel Leeming and came back", "left to grab a part, then finished the install"). A stop on the way there or home, or one the description never says he came back from, is false.
+  Remote work, a phone call and work at his own place are not trips. Empty array when the description names no trip.
+  Worked: "Walked to their place. Diagnosed Wi-Fi issues. Drove to Noel Leeming Westgate to pick up parts and bought a USB cable for $25" is TWO trips: {to "their place", mode "foot", client true, midJob false}, then {to "Noel Leeming Westgate", mode "vehicle", client false, midJob false}.
+- storeRuns[]: a STORE RUN is a drive Harrison made DURING the visit, from the client's place to a store and back. Settle store runs from trips[], before the destination decision below. Work through these steps for each non-client trip in trips[].
+  STEP A - Is the client trip in trips[] on foot or by bicycle?
+    - YES: storeRuns is EMPTY for this job. No store is a store run when the client was reached on foot or by bicycle; STEP 5 of the destination decision below settles every drive. STOP - skip the other steps for every store.
+    - NO, or the description doesn't say: go to STEP B.
+  STEP B - Is that trip's midJob true?
+    - NO: not a store run - the destination decision below handles it. STOP for this store.
+    - YES: go to STEP C.
   STEP C - Was the run for THIS client's job - buying, collecting or returning something for them?
     - YES: add the store to storeRuns, named WHOLE like a destination ("PB Tech St Lukes", never just "St Lukes").
     - NO, an errand of his own (lunch, fuel, his own stock): leave it out.
-  INVARIANT - a store run is EXTRA to the trip to the client and never stands in for it. Once a store is in storeRuns, leave that trip OUT of every step of the destination decision: it is not the destination, not a trip on the STEP 3a list, and not "travel mentioned" for STEP 1. storeRuns never holds the client's own address. Empty array when there is none.
+  Worked: the trips[] example above - the client trip is on foot, so STEP A is YES, storeRuns is [] and the destination decision's STEP 5 makes "Noel Leeming Westgate" the destination.
+  INVARIANT - storeRuns is [] whenever the client trip in trips[] is on foot or by bicycle.
+  INVARIANT - a store run is EXTRA to the trip to the client and never stands in for it. Once a store is in storeRuns, leave that trip OUT of every step of the destination decision: it is not the destination, not a trip on the STEP 3a list, and not "travel mentioned" for STEP 1. storeRuns never holds the client's own address, and never holds the store the destination decision names as the destination - one store is one or the other, never both. Empty array when there is none.
 - destination + noTravelCharge: ONE decision, worked through in this order. A job bills a single round trip to the client, never two; store runs settled above bill on top of it.
   STEP 1 - Is travel mentioned AT ALL, store runs aside? If the description says nothing about getting anywhere - no travel verb, no destination, no "remote", no "at home" - that is an OMISSION, not a statement that no trip happened. Descriptions routinely cover only the work. Set destination null and noTravelCharge FALSE, then STOP: the caller holds the address and the drive already measured for the booking, and decides from those.
   STEP 2 - Did Harrison reach the CLIENT at all, by any means? Work delivered entirely remotely, over the phone, or from his own place never reached them.
     - NO, no visit happened: the only thing that can still bill is a supply run that put a part on THIS invoice. If a vehicle trip collected something that appears in parts[], destination is that supply stop and noTravelCharge false; otherwise destination null and noTravelCharge TRUE. Either way STOP - a remote job's other errands are the operator's own, whatever they were for.
     - YES, he got to them (on foot, by bicycle, or by vehicle): go to STEP 3.
   STEP 3 - How was each trip made? Answer 3a before 3b - the list is what stops an early walk settling it.
-    3a. LIST every trip the description names, in the order it names them, each with its mode: on foot, bicycle, car/vehicle, or public transport. Read to the final sentence before listing - a supply run is normally named after the visit it followed.
-    3b. Is at least ONE trip on that list by car, vehicle or public transport?
+    3a. Take trips[], leaving out any trip whose store is in storeRuns.
+    3b. Is at least ONE trip left on that list by vehicle or public transport?
       - NO, every one was on foot or by bicycle: destination null, noTravelCharge TRUE, STOP.
       - YES: go to STEP 4.
-    Worked: "Walked to their place. Diagnosed Wi-Fi. Drove to the shop for parts and bought a drive" lists TWO trips - foot, then car - so 3b is YES and the on-foot branch is never reached. The walk does not make the drive free.
-  STEP 4 - Was the CLIENT's place reached by vehicle? Then destination is the client's suburb or address (e.g. "Papakura", "123 Smith St Manukau") and noTravelCharge is false. A supply stop on the way there or back is a detour: ignore it completely, no second destination and no warning. A store run already in storeRuns is separate and still bills.
+    Worked: the trips[] example above leaves TWO trips - foot, then vehicle - so 3b is YES and the on-foot branch is never reached. The walk does not make the drive free.
+  STEP 4 - Is the client trip in trips[] by vehicle or public transport (or unstated while another trip is by vehicle)?
+    - YES: destination is the client's suburb or address (e.g. "Papakura", "123 Smith St Manukau") and noTravelCharge is false. A supply stop on the way there or back is a detour: ignore it completely, no second destination and no warning. A store run already in storeRuns is separate and still bills. STOP.
+    - NO, the client trip was on foot or by bicycle: the vehicle trip 3b found is a supply run. Go to STEP 5 - never stop here with noTravelCharge true.
   STEP 5 - The client was reached on foot, so the only vehicle trip was a supply run. Did what it collected end up in parts[] on THIS invoice?
     - YES: destination is that supply stop and noTravelCharge false. The job caused that drive, so the job pays for it - the walk does not make it free.
     - NO: restocking, a warranty return, or an errand of the operator's own. destination null, noTravelCharge false - he still went to the client, so the drive already measured for the booking is what bills. Never bill a client for a drive that put nothing on their invoice.
-  Only two outcomes set noTravelCharge TRUE: no visit happened and nothing was bought, or every trip to the client was on foot or by bicycle.
+  Only two outcomes set noTravelCharge TRUE: no visit happened and nothing was bought, or EVERY trip in trips[] - the client trip and any supply run alike - was on foot or by bicycle. A walk to the client plus a driven supply run is neither: STEP 5 settles it.
   INVARIANT - never name a destination and then refuse to charge it: a non-null destination ALWAYS pairs with noTravelCharge false. noTravelCharge true means the operator STATED a trip that is not chargeable, and always pairs with a null destination - it never means "travel was not mentioned". Walking to the client while driving a billed supply run is a CHARGED trip to that supply run: not a free walk, and no on-foot warning.
   Keep a named place WHOLE - a business or store name and the branch qualifier that follows it are one destination ("PB Tech St Lukes", never just "St Lukes"; "Bunnings Mt Roskill", never just "Mt Roskill"). The value is geocoded exactly as written, and the bare qualifier is a different place - usually a suburb centre or a mall, giving a drive that was never made.
 - statedDistanceKm: If the user explicitly states a travel distance AND travelled by car/vehicle OR public transport, set this to the total round-trip km as a number (e.g. "travelled 10 km there and back" → 10, "drove 8 km each way" → 16). Set to null if no distance was stated, or if travel was by foot or bicycle.
-  - Walking or cycling: set statedDistanceKm to null. Whether anything is charged was already settled by the destination decision above - only add the warning "Travelled by [mode] - no travel charge applied (assumed local job). Verify if this should be charged." when that decision ended with noTravelCharge true because every trip to the client was on foot or by bicycle. If a supply run billed, the drive bills and this warning is wrong.
+  - Walking or cycling: set statedDistanceKm to null. Whether anything is charged was already settled by the destination decision above - only add the warning "Travelled by [mode] - no travel charge applied (assumed local job). Verify if this should be charged." when that decision ended with noTravelCharge true because every trip in trips[] was on foot or by bicycle. If a supply run billed, the drive bills and this warning is wrong.
   - Car/vehicle or public transport, with stated km: set statedDistanceKm to the round-trip total, noTravelCharge to false.
   - Car/vehicle or public transport, without stated km but with a destination: set statedDistanceKm to null, noTravelCharge to false (the route looks up the driving route via API and charges it - travel bills the same regardless of how the operator actually got there).
-- noTravelCharge: set by the destination decision above - true only in its two no-charge outcomes (no visit and nothing bought, or every trip on foot or by bicycle). Never decide it separately from destination, and never set it true just because travel went unmentioned.
+- noTravelCharge: set by the destination decision above - true only in its two no-charge outcomes (no visit and nothing bought, or every trip in trips[] on foot or by bicycle). Never decide it separately from destination, and never set it true just because travel went unmentioned.
 - travelCosts[]: out-of-pocket travel disbursements the operator states with a dollar amount - parking, road tolls, ferry fares ("Parking cost me $4" → { "label": "Parking", "cost": 4 }; "$2.30 toll each way" → { "label": "Tolls", "cost": 4.6 }). Pass the stated amount through at cost; these are NOT tasks, NOT parts, and never affect drive time. Empty array when none are stated.
 - paidCash: did the description say the client paid in CASH?
   - YES, it names cash as how they paid: "paid cash", "paid in cash", "cash job", "gave me cash", "paid $47 in cash", "$80 cash". Set true.
@@ -390,13 +404,16 @@ Return this exact JSON shape (when not asking for clarification):
   "notes": string,
   "confidence": "high" | "medium" | "low",
   "warnings": string[],
+  "trips": [
+    { "to": string, "mode": "foot" | "bicycle" | "vehicle" | "public transport" | "unstated", "client": boolean, "midJob": boolean }
+  ],
+  "storeRuns": string[],
   "destination": string | null,
   "statedDistanceKm": number | null,
   "noTravelCharge": boolean,
   "travelCosts": [
     { "label": string, "cost": number }
   ],
-  "storeRuns": string[],
   "paidCash": boolean,
   "cashPaid": number | null
 }`;

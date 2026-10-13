@@ -7,6 +7,7 @@
 //   npm run eval:ai                       # full run against http://localhost:3000
 //   npm run eval:ai -- --url=http://localhost:3001
 //   npm run eval:ai -- --runs=3           # repeat each case 3x for reproducibility
+//   npm run eval:ai -- --only=zero-length,walk-plus   # just the cases whose id contains one
 
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import { calcSessionMins } from "@/features/business/lib/time-parse";
@@ -48,6 +49,8 @@ interface RawRun {
     gotNoTravelCharge: boolean | null;
     wantDestination: string | null;
     wantNoTravelCharge: boolean;
+    gotStoreRuns: string[];
+    wantStoreRuns?: string[];
     why: string;
   };
   durations: number[];
@@ -121,6 +124,7 @@ function parseArgs(): {
   runs: number;
   probe: boolean;
   showContext: boolean;
+  only: string[];
 } {
   const args = process.argv.slice(2);
   let selfTest = false;
@@ -128,14 +132,16 @@ function parseArgs(): {
   let runs = 2;
   let probe = false;
   let showContext = false;
+  let only: string[] = [];
   for (const arg of args) {
     if (arg === "--self-test") selfTest = true;
     else if (arg.startsWith("--url=")) url = arg.slice(6);
     else if (arg.startsWith("--runs=")) runs = Math.max(1, parseInt(arg.slice(7), 10) || 1);
     else if (arg === "--probe") probe = true;
     else if (arg === "--show-context") showContext = true;
+    else if (arg.startsWith("--only=")) only = arg.slice(7).split(",").filter(Boolean);
   }
-  return { selfTest, url, runs, probe, showContext };
+  return { selfTest, url, runs, probe, showContext, only };
 }
 
 /**
@@ -167,12 +173,14 @@ async function runCase(
  * @param url - Server base URL.
  * @param adminSecret - Admin secret for both routes.
  * @param runs - Repeat count per case (reproducibility).
+ * @param only - Case-id filters from --only; empty runs every case.
  * @returns Raw runs plus the live context used to build expectations.
  */
 async function collectRaw(
   url: string,
   adminSecret: string,
   runs: number,
+  only: string[],
 ): Promise<{ ctx: LiveContext; raw: RawRun[]; aborted: boolean }> {
   const { loadLiveContext } = await import("./context");
   const { callEstimate, callParseJob } = await import("./client");
@@ -182,12 +190,25 @@ async function collectRaw(
   const ctx = await loadLiveContext();
   const raw: RawRun[] = [];
 
+  /**
+   * Whether --only keeps a case. Filters match by substring, so a single failing case
+   * can be re-run without paying for the other 80.
+   * @param id - Case id (benchmarks are `est-<label>`).
+   * @returns True when no filter is given or the id contains one of them.
+   */
+  const keep = (id: string): boolean => only.length === 0 || only.some((o) => id.includes(o));
+  const benchmarks = ctx.benchmarks.filter((b) => keep(`est-${b.label}`));
+  const estimateCases = ESTIMATE_CASES.filter((c) => keep(c.id));
+  const parseCases = PARSE_CASES.filter((c) => keep(c.id));
+  const travelCases = TRAVEL_CASES.filter((c) => keep(c.id));
+  const crossRouteCases = CROSS_ROUTE_CASES.filter((c) => keep(c.id));
+
   const total =
-    ctx.benchmarks.length +
-    ESTIMATE_CASES.length +
-    PARSE_CASES.length +
-    CROSS_ROUTE_CASES.length +
-    TRAVEL_CASES.length;
+    benchmarks.length +
+    estimateCases.length +
+    parseCases.length +
+    crossRouteCases.length +
+    travelCases.length;
   console.log(
     `Running ${total} cases x ${runs} run(s) = ${total * runs} paid calls. This takes a few minutes.\n`,
   );
@@ -230,7 +251,7 @@ async function collectRaw(
   };
 
   // Single-task estimate probes generated from live benchmarks.
-  for (const b of ctx.benchmarks) {
+  for (const b of benchmarks) {
     if (aborted) break;
     const id = `est-${b.label}`;
     tick(id);
@@ -248,7 +269,7 @@ async function collectRaw(
   }
 
   // Authored estimate cases (report-only drift + reproducibility).
-  for (const c of ESTIMATE_CASES) {
+  for (const c of estimateCases) {
     if (aborted) break;
     tick(c.id);
     await tryCase(c.id, "estimate-multi", async () => {
@@ -261,7 +282,7 @@ async function collectRaw(
   }
 
   // Parse cases (canonical stated-time assertion, or report-only for "info").
-  for (const c of PARSE_CASES) {
+  for (const c of parseCases) {
     if (aborted) break;
     tick(c.id);
     await tryCase(c.id, "parse", async () => {
@@ -282,7 +303,7 @@ async function collectRaw(
 
   // Travel decisions. Run once each: the answer is a branch, not a measured
   // number, so repeated runs would only re-walk the same branch.
-  for (const c of TRAVEL_CASES) {
+  for (const c of travelCases) {
     if (aborted) break;
     tick(c.id);
     await tryCase(c.id, "travel", async () => {
@@ -298,6 +319,8 @@ async function collectRaw(
           gotNoTravelCharge: r.noTravelCharge ?? null,
           wantDestination: c.destination,
           wantNoTravelCharge: c.noTravelCharge,
+          gotStoreRuns: r.storeRuns ?? [],
+          wantStoreRuns: c.storeRuns,
           why: c.why,
         },
       });
@@ -306,7 +329,7 @@ async function collectRaw(
 
   // Cross-route: same job to BOTH routes (once each) so the report can compare
   // the public benchmark estimate against the admin stated-time duration.
-  for (const c of CROSS_ROUTE_CASES) {
+  for (const c of crossRouteCases) {
     if (aborted) break;
     tick(c.id);
     await tryCase(c.id, "cross-route", async () => {
@@ -436,6 +459,16 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
           ? dest === null
           : typeof dest === "string" && dest.toLowerCase().includes(t.wantDestination);
       const chargeOk = t.gotNoTravelCharge === t.wantNoTravelCharge;
+      // Store runs, when pinned: the same count, each wanted store matched by substring.
+      const want = t.wantStoreRuns;
+      const got = t.gotStoreRuns ?? [];
+      const storesOk =
+        !want ||
+        (got.length === want.length &&
+          want.every((w) => got.some((g) => g.toLowerCase().includes(w))));
+      const storesDetail = want
+        ? `, storeRuns ${JSON.stringify(got)} (want ${want.length ? want.map((w) => `"${w}"`).join(", ") : "none"})`
+        : "";
       // The invariant is independent of what this case expected: naming a
       // destination and then refusing to charge it is always wrong.
       const contradiction = dest !== null && t.gotNoTravelCharge === true;
@@ -444,10 +477,10 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
         id: r.id,
         family: "travel",
         label: `travel ${r.id}`,
-        status: destOk && chargeOk && !contradiction ? "pass" : "fail",
+        status: destOk && chargeOk && storesOk && !contradiction ? "pass" : "fail",
         detail: contradiction
           ? `contradiction: named ${JSON.stringify(dest)} then set noTravelCharge true`
-          : `destination ${JSON.stringify(dest)} (want ${wantDest}), noTravelCharge ${t.gotNoTravelCharge} (want ${t.wantNoTravelCharge}) - ${t.why}`,
+          : `destination ${JSON.stringify(dest)} (want ${wantDest}), noTravelCharge ${t.gotNoTravelCharge} (want ${t.wantNoTravelCharge})${storesDetail} - ${t.why}`,
       });
     }
 
@@ -527,7 +560,7 @@ function printReport(checks: CheckResult[]): void {
 }
 
 (async () => {
-  const { selfTest, probe, url, showContext, runs } = parseArgs();
+  const { selfTest, probe, url, showContext, runs, only } = parseArgs();
   if (selfTest) {
     process.exit(runSelfTest());
   }
@@ -558,7 +591,7 @@ function printReport(checks: CheckResult[]): void {
       process.exit(0);
     }
     const started = new Date().toISOString();
-    const { ctx, raw, aborted } = await collectRaw(url, adminSecret, runs);
+    const { ctx, raw, aborted } = await collectRaw(url, adminSecret, runs, only);
     const checks = evaluate(ctx, raw);
     printReport(checks);
 
