@@ -6,7 +6,7 @@
 // line (no benefits list, no fake buttons; the feed chrome + Meta's own CTA button carry
 // name/URL/CTA). The frosted card mirrors the website's FrostedSection. The 9:16 keeps
 // its content in the vertical safe zone (Meta overlays UI top/bottom). Edit AD_COPY /
-// AD_SPECS / STYLES below and re-run. Output lands in ad-creatives/ (not served or
+// AD_SPECS / STYLES below and re-run. Output lands in marketing/ads/ (not served or
 // committed).
 // Run with: npm run build:ads
 
@@ -44,7 +44,7 @@ type LogoKind = "square" | "wordmark";
 
 /** One ad creative to render. */
 interface AdSpec {
-  /** Output filename (written into ad-creatives/). */
+  /** Output filename (written into marketing/ads/). */
   name: string;
   /** Canvas width in pixels (CSS layout size; output is SCALE x this). */
   width: number;
@@ -56,7 +56,7 @@ interface AdSpec {
   logo: LogoKind;
 }
 
-const OUTPUT_DIR = "ad-creatives";
+const OUTPUT_DIR = "marketing/ads";
 
 // Export at 2x the layout size for crisp text/logo on high-DPI phones. Meta
 // downsizes per placement; the blurred 3456x2304 backdrop upscales invisibly.

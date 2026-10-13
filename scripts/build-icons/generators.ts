@@ -158,14 +158,15 @@ export async function buildFaviconSvg(): Promise<void> {
  */
 export async function buildSocialImages(): Promise<void> {
   console.log("📱 Building social images...");
-  await ensureDir("public");
 
   // Read logos used by social specs
   const logoFullBuffer = await fs.readFile(LOGO_FULL);
   const logoProfileBuffer = await fs.readFile(LOGO_PROFILE);
 
   for (const spec of SOCIAL_SPECS) {
-    const { name, width, height, blur, logoScale, quality, useMarkLogo, copyTo } = spec;
+    const { name, width, height, blur, logoScale, quality, useMarkLogo, outDir, copyTo } = spec;
+    const outPath = `${outDir}/${name}.jpg`;
+    await ensureDir(outDir);
 
     // Create blurred background
     const bg = await sharp(BACKDROP)
@@ -196,14 +197,14 @@ export async function buildSocialImages(): Promise<void> {
     await sharp(bg)
       .composite([{ input: frostedCard }, { input: logo, gravity: "centre" }])
       .jpeg({ quality })
-      .toFile(`public/${name}.jpg`);
+      .toFile(outPath);
 
-    // Mirror to any extra destination (e.g. Next's file-based opengraph-image)
     if (copyTo) {
-      await fs.copyFile(`public/${name}.jpg`, copyTo);
-      console.log(`  ✓ ${name} (${width}x${height}) > ${copyTo}`);
+      await ensureDir(copyTo);
+      await fs.copyFile(outPath, `${copyTo}/${name}.jpg`);
+      console.log(`  ✓ ${name} (${width}x${height}) > ${outDir}/ + ${copyTo}/`);
     } else {
-      console.log(`  ✓ ${name} (${width}x${height})`);
+      console.log(`  ✓ ${name} (${width}x${height}) > ${outDir}/`);
     }
   }
 }

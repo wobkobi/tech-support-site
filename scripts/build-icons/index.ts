@@ -63,8 +63,10 @@ function printSummary(): void {
   console.log("  • favicon.svg (with prefers-color-scheme CSS)");
   console.log("  • favicon.ico (16 + 32 + 48 multi-res)\n");
 
-  console.log("Social Images (public/):");
-  SOCIAL_SPECS.forEach((s) => console.log(`  • ${s.name}.jpg (${s.width}x${s.height})`));
+  console.log("Social Images:");
+  SOCIAL_SPECS.forEach((s) =>
+    console.log(`  • ${s.outDir}/${s.name}.jpg (${s.width}x${s.height})`),
+  );
   console.log("");
 
   console.log("Backdrop Variants (public/source/):");

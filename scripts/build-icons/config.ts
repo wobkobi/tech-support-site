@@ -81,9 +81,17 @@ export interface SocialSpec {
   quality: number;
   /** Use square logo mark instead of full wordmark. */
   useMarkLogo?: boolean;
-  /** Extra destination to copy the finished image to (besides public/). */
+  /** Directory the image is written to. */
+  outDir: string;
+  /** Extra directory to copy the finished image to. */
   copyTo?: string;
 }
+
+// Upload-only images (banners and profile pictures pasted into each platform by hand)
+// go to the gitignored marketing/ folder next to the ad creatives, not public/, so the
+// site only serves what it actually links to.
+const MARKETING_BANNERS = "marketing/banners";
+const MARKETING_PROFILES = "marketing/profiles";
 
 export const SOCIAL_SPECS: SocialSpec[] = [
   // Open Graph (Facebook, LinkedIn, Discord, etc.). Every page's og:image and the
@@ -96,6 +104,7 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     blur: 25,
     logoScale: 0.85,
     quality: 90,
+    outDir: "public",
   },
   // Twitter/X Card
   {
@@ -105,6 +114,7 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     blur: 25,
     logoScale: 0.85,
     quality: 90,
+    outDir: MARKETING_BANNERS,
   },
   // General social banner (high-res)
   {
@@ -114,6 +124,7 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     blur: 32,
     logoScale: 0.8,
     quality: 90,
+    outDir: MARKETING_BANNERS,
   },
   // Facebook cover photo
   {
@@ -123,6 +134,7 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     blur: 30,
     logoScale: 0.75,
     quality: 90,
+    outDir: MARKETING_BANNERS,
   },
   // LinkedIn banner
   {
@@ -132,6 +144,7 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     blur: 28,
     logoScale: 0.6,
     quality: 90,
+    outDir: MARKETING_BANNERS,
   },
   // YouTube banner
   {
@@ -141,6 +154,7 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     blur: 35,
     logoScale: 0.5,
     quality: 85,
+    outDir: MARKETING_BANNERS,
   },
   // Profile pics (square) - use profile logo
   {
@@ -151,6 +165,7 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     logoScale: 0.85,
     quality: 90,
     useMarkLogo: true,
+    outDir: MARKETING_PROFILES,
   },
   {
     name: "profile-square-512",
@@ -160,6 +175,7 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     logoScale: 0.85,
     quality: 90,
     useMarkLogo: true,
+    outDir: MARKETING_PROFILES,
   },
   {
     name: "profile-square-200",
@@ -169,6 +185,7 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     logoScale: 0.85,
     quality: 90,
     useMarkLogo: true,
+    outDir: MARKETING_PROFILES,
   },
   // Circle-safe profile pics (scaled to fit within inscribed circle)
   {
@@ -179,6 +196,7 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     logoScale: 0.65,
     quality: 90,
     useMarkLogo: true,
+    outDir: MARKETING_PROFILES,
   },
   {
     name: "profile-circle-512",
@@ -188,6 +206,7 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     logoScale: 0.65,
     quality: 90,
     useMarkLogo: true,
+    outDir: MARKETING_PROFILES,
   },
   {
     name: "profile-circle-200",
@@ -197,8 +216,10 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     logoScale: 0.65,
     quality: 90,
     useMarkLogo: true,
+    outDir: MARKETING_PROFILES,
   },
-  // Platform-specific profile pics
+  // Platform-specific profile pics. The Instagram one is also the avatar in the admin's
+  // social post previews (PlatformPreview.tsx), so it stays served from public/.
   {
     name: "instagram-profile-320",
     width: 320,
@@ -207,6 +228,8 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     logoScale: 0.65,
     quality: 90,
     useMarkLogo: true,
+    outDir: "public",
+    copyTo: MARKETING_PROFILES,
   },
   {
     name: "google-business-720",
@@ -216,6 +239,7 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     logoScale: 0.65,
     quality: 90,
     useMarkLogo: true,
+    outDir: MARKETING_PROFILES,
   },
   // Apple Business place card logo: Apple rejects anything 1024px or smaller. Blur
   // scales with the canvas so the backdrop reads the same as the 720px Google one.
@@ -227,6 +251,7 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     logoScale: 0.65,
     quality: 90,
     useMarkLogo: true,
+    outDir: MARKETING_PROFILES,
   },
 ];
 
