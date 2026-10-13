@@ -1,7 +1,7 @@
 // scripts/check-job-modifiers.ts
 // Job-wide modifiers the parse adds from outside the description: Remote on a remote
 // booking's tasks that name no channel, and Business on every task of a business job.
-// Run with: npm run check:job-modifiers
+// Run with: npm test -- job-modifiers
 
 import { isBusinessModifier, withJobModifiers } from "@/features/business/lib/job-modifiers";
 

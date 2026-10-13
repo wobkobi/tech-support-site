@@ -2,7 +2,7 @@
 // Which promo wins when several windows overlap, and how a customer-entered
 // code is normalised before it is compared. Pure logic, no database: the window
 // filter itself is Prisma's job.
-// Run with: npm run check:promos
+// Run with: npm test -- promo-selection
 
 import {
   describeRecurringWindow,

@@ -4,7 +4,7 @@
 // settings > status mapping, the rate a new expense defaults to, the chart rows the
 // business page and the dashboard build, FY totals across a mid-year registration, and the
 // series labels.
-// Run with: npm run check:gst-basis
+// Run with: npm test -- gst-basis
 
 import { incomeExpenseSeries } from "@/features/admin/components/charts/series";
 import { listFinancialYears } from "@/features/business/lib/financial-year";

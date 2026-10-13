@@ -4,7 +4,7 @@
 // unsubscribe token signing, recipient selection, batch chunking, template switching, the
 // editor's Add menu and the quiet-hours window that holds list sends until morning. Pure
 // logic, no database and no network.
-// Run with: npm run check:mailing
+// Run with: npm test -- mailing
 
 import { emailInsertGroups } from "@/features/mailing/lib/insertables";
 import { selectRecipients, type PoolContact } from "@/features/mailing/lib/recipients";

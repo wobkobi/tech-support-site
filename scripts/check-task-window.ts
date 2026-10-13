@@ -2,7 +2,7 @@
 // How task durations are fitted to the job window. This decides what a real
 // invoice charges for labour, in both directions: an over-long parse is scaled
 // down, and a parse that falls short of the window is grown to meet it.
-// Run with: npm run check:task-window
+// Run with: npm test -- task-window
 
 import {
   collapseToWindow,

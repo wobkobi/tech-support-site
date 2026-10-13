@@ -3,7 +3,7 @@
 // the year record (blank rates filled from IRD for the year and fuel type), and
 // settings.tax > the rules the maths reads. load.ts is server-only, hence the
 // react-server condition; nothing here touches the database.
-// Run with: npm run check:tax-load
+// Run with: npm test -- tax-load
 
 import {
   taxRulesFrom,

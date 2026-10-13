@@ -374,7 +374,7 @@ export interface JobPricing {
 /**
  * Promo discount on a job's labour only (hourly task lines).
  *
- * Exported for check:promo-pricing - this decides real money on an invoice and
+ * Exported for scripts/check-promo-pricing.ts - this decides real money on an invoice and
  * the business exclusion below has no other coverage.
  * @param job - Job calculation.
  * @param resolvedPromo - Active promo or null, before spend narrows it.

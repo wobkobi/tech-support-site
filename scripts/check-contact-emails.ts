@@ -3,7 +3,7 @@
 // used to read only emailAddresses[0] and the push used to write a
 // single-element array, so every address after the first was dropped one way
 // and deleted the other. These cases pin both directions.
-// Run with: npm run check:emails-merge
+// Run with: npm test -- contact-emails
 
 import { mergeEmails } from "@/features/contacts/lib/merge-emails";
 

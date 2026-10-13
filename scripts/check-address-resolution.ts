@@ -1,7 +1,7 @@
 // scripts/check-address-resolution.ts
 // Feeds fixture Geocoding API responses through resolveAddress and asserts each of the
 // four statuses. fetch is stubbed per case, so this costs no network and no quota.
-// Run with: npm run check:addresses
+// Run with: npm test -- address-resolution
 
 import { resolveAddress, type AddressResolution } from "@/shared/lib/normalise-address";
 

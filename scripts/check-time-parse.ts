@@ -2,7 +2,7 @@
 // How the job calculator reads times. The description's ranges become the billed
 // session, and the parse reply's start/end/duration become the window the tasks are
 // fitted to, so a misread here changes what an invoice charges for labour.
-// Run with: npm run check:time-parse
+// Run with: npm test -- time-parse
 
 import { restatesTaskLine } from "@/features/business/lib/business-format";
 import {

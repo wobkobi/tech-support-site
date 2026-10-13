@@ -2,7 +2,7 @@
 // Tax and GST settings validation: the shipped defaults pass, and each new rule rejects a
 // shape the Tax page couldn't use (unordered bands, an open-ended middle band, an IETC
 // range out of order, a business-use share over 100%, a bad registration date).
-// Run with: npm run check:tax-settings
+// Run with: npm test -- tax-settings
 
 import type { VehicleFuel } from "@/features/business/lib/tax/types";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
