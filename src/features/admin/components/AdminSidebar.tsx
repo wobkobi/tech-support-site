@@ -69,8 +69,6 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   path: string;
-  /** Left out of the phone menu: a desk job, not done on a phone. The page still opens from a link. */
-  desktopOnly?: boolean;
 }
 
 // Ordered by how often each page is opened: the day's jobs first, then the
@@ -127,7 +125,6 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
   {
     page: "business",
     label: "Overview",
-    desktopOnly: true,
     icon: <FaBriefcase className="shrink-0" />,
     path: "/admin/business",
   },
@@ -172,14 +169,12 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
     label: "Tax",
     icon: <FaScaleBalanced className="shrink-0" />,
     path: "/admin/business/tax",
-    desktopOnly: true,
   },
   {
     page: "business-assets",
     label: "Assets",
     icon: <FaBoxesStacked className="shrink-0" />,
     path: "/admin/business/assets",
-    desktopOnly: true,
   },
   {
     page: "business-trips",
@@ -201,7 +196,6 @@ const MAILING_NAV_ITEM: NavItem = {
   label: "Mailing list",
   icon: <FaEnvelope className="shrink-0" />,
   path: "/admin/mailing",
-  desktopOnly: true,
 };
 
 const SOCIAL_NAV_ITEM: NavItem = {
@@ -209,7 +203,6 @@ const SOCIAL_NAV_ITEM: NavItem = {
   label: "Social posts",
   icon: <FaShareNodes className="shrink-0" />,
   path: "/admin/social",
-  desktopOnly: true,
 };
 
 const NOTIFICATIONS_NAV_ITEM: NavItem = {
@@ -357,10 +350,9 @@ export function AdminSidebar({
    * @param item.label - Visible label, also the collapsed tooltip.
    * @param item.icon - Leading icon.
    * @param item.path - Link target, compared against the active path.
-   * @param item.desktopOnly - Hide the link on phones.
    * @returns The link element.
    */
-  function navLink({ page, label, icon, path, desktopOnly }: NavItem): React.ReactElement {
+  function navLink({ page, label, icon, path }: NavItem): React.ReactElement {
     const isActive = active === path;
     return (
       <Link
@@ -369,7 +361,7 @@ export function AdminSidebar({
         onClick={() => onDrawerClose(false)}
         aria-current={isActive ? "page" : undefined}
         title={collapsed ? label : undefined}
-        className={cn(rowClasses(isActive, collapsed), desktopOnly && "max-md:hidden")}
+        className={rowClasses(isActive, collapsed)}
       >
         {icon}
         <RowLabel collapsed={collapsed}>{label}</RowLabel>
