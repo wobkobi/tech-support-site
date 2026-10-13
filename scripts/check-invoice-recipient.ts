@@ -1,7 +1,7 @@
 // scripts/check-invoice-recipient.ts
 // Whether an invoice went to a person or to their company, and who its emails greet.
 // An invoice addressed to "68 Ltd" on Michael Smith's contact must greet Michael, not "68".
-// Run with: npm run check:invoice-recipient
+// Run with: npm test -- invoice-recipient
 
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
 

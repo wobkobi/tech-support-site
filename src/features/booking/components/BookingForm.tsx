@@ -229,6 +229,7 @@ export default function BookingForm({
     unit,
     address,
     dateKey: selectedDay?.dateKey ?? null,
+    surcharge: selectedDay?.surcharge ?? null,
     selectedTime,
     selectedMinute,
     duration,

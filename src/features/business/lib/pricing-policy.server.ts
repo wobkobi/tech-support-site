@@ -5,16 +5,18 @@
 
 import { formatMoneyCompact } from "@/features/business/lib/business-format";
 import {
+  dateSurcharge,
   FALLBACK_BASE_RATE,
   FALLBACK_BUSINESS_DELTA,
   GST_RATE,
   HOME_REGION,
   NZ_REGION,
+  type DateSurcharge,
   type Policy,
 } from "@/features/business/lib/pricing-policy";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
-import { nzDateKey } from "@/shared/lib/timezone-utils";
+import { dateKeyParts, nzDateKey, weekdayOf } from "@/shared/lib/timezone-utils";
 import Holidays from "date-holidays";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
@@ -325,4 +327,31 @@ export async function lookupPublicHolidaysForKeys(
     if (fallback) result.set(key, fallback);
   }
   return result;
+}
+
+/**
+ * Attaches each booking day's labour surcharge (public holiday or weekend) from the
+ * live pricing settings, through the same {@link dateSurcharge} rule invoices bill
+ * with, so the booking form names it and its estimate prices it.
+ * @param days - Bookable days keyed by NZ-local date.
+ * @returns The same days, each with `surcharge` set (null when none applies).
+ */
+export async function withDateSurcharges<T extends { dateKey: string }>(
+  days: T[],
+): Promise<Array<T & { surcharge: DateSurcharge | null }>> {
+  const [policy, holidays] = await Promise.all([
+    getPolicy(),
+    lookupPublicHolidaysForKeys(days.map((d) => d.dateKey)),
+  ]);
+  const uplifts = {
+    publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
+    weekendUplift: policy.WEEKEND_UPLIFT,
+  };
+  return days.map((day) => {
+    const [y, m, d] = dateKeyParts(day.dateKey);
+    // Read at UTC noon so no time-zone offset can tip the date key into a neighbouring day.
+    const weekday = weekdayOf(new Date(Date.UTC(y, m - 1, d, 12)));
+    const holiday = holidays.get(day.dateKey)?.name ?? null;
+    return { ...day, surcharge: dateSurcharge(holiday, weekday, uplifts) };
+  });
 }

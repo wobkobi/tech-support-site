@@ -6,7 +6,7 @@
 // the income tax, the set-aside total is residual tax plus ACC), and the labels a filed
 // year shows once Settings have changed (rates from the saved amounts, band rows only while
 // the brackets still give the saved income tax).
-// Run with: npm run check:tax-page
+// Run with: npm test -- tax-page
 
 import {
   ASSET_CLASSES,

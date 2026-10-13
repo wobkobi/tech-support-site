@@ -32,6 +32,8 @@ export interface ParseJobResult {
   destination?: string | null;
   /** True only when the operator STATED a trip that is not chargeable. */
   noTravelCharge?: boolean;
+  /** Mid-job drives from the client to a store and back, billed on top of the trip. */
+  storeRuns?: string[];
   clarify?: unknown[];
 }
 

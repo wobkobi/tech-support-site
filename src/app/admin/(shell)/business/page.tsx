@@ -370,10 +370,7 @@ export default async function BusinessPage({
         ))}
       </div>
 
-      {/* Sheet import is a desk job: off on phones. */}
-      <div className="max-md:hidden">
-        <SheetImportButton />
-      </div>
+      <SheetImportButton />
     </>
   );
 }

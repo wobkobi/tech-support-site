@@ -11,6 +11,7 @@ import {
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
 import type { InlineQuote } from "@/features/booking/lib/booking-form";
+import { quoteSurchargeNote, type DateSurcharge } from "@/features/business/lib/pricing-policy";
 import { fetchQuickEstimate } from "@/features/business/lib/quick-estimate";
 import type { EstimatorRange } from "@/shared/lib/settings/types";
 import { useState } from "react";
@@ -39,6 +40,8 @@ export interface InlineEstimateInputs {
   address: string;
   /** Chosen day key, or null. */
   dateKey: string | null;
+  /** The chosen day's weekend or public-holiday surcharge, or null. */
+  surcharge: DateSurcharge | null;
   /** Chosen time window, or null. */
   selectedTime: TimeOfDay | null;
   /** Chosen minute past the hour. */
@@ -97,6 +100,7 @@ export function useInlineEstimate(inputs: InlineEstimateInputs): InlineEstimateS
     unit,
     address,
     dateKey,
+    surcharge,
     selectedTime,
     selectedMinute,
     duration,
@@ -172,6 +176,7 @@ export function useInlineEstimate(inputs: InlineEstimateInputs): InlineEstimateS
         lowEndFloorFactor,
         departureTimeIso: slotStart?.toISOString(),
         returnDepartureTimeIso: slotEnd?.toISOString(),
+        surchargeUplift: surcharge?.uplift ?? 0,
         promoCode,
         email,
       });
@@ -181,6 +186,7 @@ export function useInlineEstimate(inputs: InlineEstimateInputs): InlineEstimateS
         travelCharge: res.travelCharge,
         minsLow: res.minsLow,
         minsHigh: res.minsHigh,
+        surchargeNote: surcharge ? quoteSurchargeNote(surcharge) : null,
       });
       if (res.estimateId) onEstimateId(res.estimateId);
       setQuotedFor(estimateInputsKey);

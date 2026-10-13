@@ -531,7 +531,7 @@ async function firstEligible(
 /**
  * The two instants a promo resolution judges, with their defaults applied.
  *
- * Pure and exported for check:promos, since the defaulting is where the
+ * Pure and exported for scripts/check-promo-selection.ts, since the defaulting is where the
  * booking-date rule lives: dates fall back to the appointment only when no
  * booking time is given, and an explicit null appointment skips the weekday
  * restriction rather than judging it at now.

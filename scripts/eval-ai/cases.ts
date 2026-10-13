@@ -40,6 +40,11 @@ export interface TravelCase {
    * St. Luke's" the next), and both geocode to the same store.
    */
   destination: string | null;
+  /**
+   * Lowercase substrings, one per store run the job must return ([] = none). Omitted
+   * when the case doesn't pin store runs.
+   */
+  storeRuns?: string[];
   /** Why this case exists, printed beside the result. */
   why: string;
 }
@@ -370,6 +375,7 @@ export const TRAVEL_CASES: TravelCase[] = [
       "09:30-10:30\nWalked to their place. Diagnosed Wi-Fi issues.\nDrove to PB Tech St. Luke's to pick up parts and bought a WD Elements SE 1TB Portable External HDD for $185",
     noTravelCharge: false,
     destination: "pb tech",
+    storeRuns: [],
     why: "the walk must not hide the drive that collected a billed part",
   },
   {
@@ -378,7 +384,17 @@ export const TRAVEL_CASES: TravelCase[] = [
       "09:00-11:00\nDrove to their place in Papakura. Fixed the laptop wifi. Stopped at PB Tech St. Luke's on the way and bought a WD Elements SE 1TB HDD for $185",
     noTravelCharge: false,
     destination: "papakura",
+    storeRuns: [],
     why: "reached the client by vehicle, so the supply stop is a detour and ignored",
+  },
+  {
+    id: "travel-mid-job-store-run",
+    input:
+      "10:00-12:00\nDrove to their place in Grey Lynn. Set up the new TV. Had to run to PB Tech St Lukes for an HDMI cable ($30), then came back and finished the setup.",
+    noTravelCharge: false,
+    destination: "grey lynn",
+    storeRuns: ["pb tech"],
+    why: "left the client mid-job and came back, so the shop is a store run on top of the trip",
   },
   {
     id: "travel-supply-run-not-billed",

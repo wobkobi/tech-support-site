@@ -12,8 +12,7 @@
 // --conditions is required, not optional: email-booking.ts reaches pricing-policy.server.ts,
 // which imports `server-only` - a package that throws on the default condition and is
 // empty under `react-server`, the condition Next builds with.
-// Run with:
-//   npx dotenv -e .env.local -- tsx --conditions=react-server scripts/check-email-render.ts
+// Run with: npm test -- email-render
 
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
 import { sendOwnerBookingNotification } from "@/features/reviews/lib/email-booking";

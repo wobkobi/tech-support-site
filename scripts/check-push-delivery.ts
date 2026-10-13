@@ -2,7 +2,7 @@
 // Exercises the pure parts of the push helper: which push-service status codes
 // retire a device, and the payload the service worker receives. No network and
 // no database - the send path itself is covered by the manual checklist.
-// Run with: npm run check:push
+// Run with: npm test -- push-delivery
 
 import { buildPushPayload, isGoneStatus } from "@/features/notifications/lib/push";
 

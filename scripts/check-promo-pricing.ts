@@ -8,7 +8,7 @@
 // round differently. flat_hourly and percent therefore stay on the rate stage
 // and must leave the quote stage untouched; the equivalence cases below fail
 // if that ever stops being true.
-// Run with: npm run check:promo-pricing
+// Run with: npm test -- promo-pricing
 
 import {
   calcInvoiceTotals,

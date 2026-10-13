@@ -5,7 +5,7 @@
 // become "jobs without a trip" (status, remote, already linked, NZ-day FY boundary, one
 // round trip per job, the contact's address when the booking has none, km reused from an
 // earlier trip to the same address).
-// Run with: npm run check:trips
+// Run with: npm test -- trips
 
 import { listFinancialYears } from "@/features/business/lib/financial-year";
 import { kmClaim, splitTripKm } from "@/features/business/lib/tax/vehicle";

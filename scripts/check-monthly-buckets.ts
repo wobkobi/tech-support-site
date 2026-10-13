@@ -3,7 +3,7 @@
 // bucketing cases: a row must land in the same month the dashboard's and business page's
 // `>= nzMidnightUtc(y, m, 1)` filters put it in, either side of NZDT and NZST month ends,
 // for real instants and for ledger dates (stored as UTC midnight of the NZ day).
-// Run with: npm run check:monthly
+// Run with: npm test -- monthly-buckets
 
 import { formatAxisDollars, niceScale } from "@/features/admin/components/charts/chart-scale";
 import { listFinancialYears } from "@/features/business/lib/financial-year";

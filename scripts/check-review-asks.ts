@@ -3,7 +3,7 @@
 // waiting before skipping, the paid-without-emailing clock, due dates across the NZ
 // daylight-saving changes, the gap boundary, which address the ask goes to, and that a
 // "stop asking me" link and a mailing unsubscribe link can't stand in for each other.
-// Run with: npm run check:review-asks
+// Run with: npm test -- review-asks
 
 import {
   signReviewAskStopToken,

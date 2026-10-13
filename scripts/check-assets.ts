@@ -3,7 +3,7 @@
 // (low-value grouping across the whole register, filed closing values carried forward),
 // the expense prefill and link list, the view shape the Assets page hands the browser, the
 // asset form's round trip through parseAssetBody and its cost label's GST side.
-// Run with: npm run check:assets
+// Run with: npm test -- assets
 
 import {
   costFieldText,

@@ -4,7 +4,7 @@
 // JPEG size reader, how per-platform outcomes roll up into the post status, how a
 // take-down is recorded, and the composer's PATCH parsing. Pure logic, no database
 // and no network.
-// Run with: npm run check:social
+// Run with: npm test -- social
 
 import { postFromEmail } from "@/features/social/lib/from-email";
 import { insertableGroups } from "@/features/social/lib/insertables";

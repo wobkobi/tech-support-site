@@ -679,6 +679,32 @@ export function dateSurcharge(
 }
 
 /**
+ * Customer-facing note for a booking day that carries a date surcharge, shown when
+ * the day is picked so the higher labour rate is never a surprise on the invoice.
+ * @param surcharge - The day's surcharge from {@link dateSurcharge}.
+ * @returns One plain sentence naming the reason, the percent and what it leaves alone.
+ */
+export function dateSurchargeNote(surcharge: DateSurcharge): string {
+  const pct = Math.round(surcharge.uplift * 100);
+  const lead =
+    surcharge.reason === "Weekend"
+      ? `Weekend rates apply: labour costs ${pct}% more on Saturdays and Sundays.`
+      : `${surcharge.reason} is a public holiday, so labour costs ${pct}% more.`;
+  return `${lead} Travel and parts cost the same.`;
+}
+
+/**
+ * Line under a booking estimate whose labour range includes a date surcharge.
+ * @param surcharge - The picked day's surcharge from {@link dateSurcharge}.
+ * @returns One short sentence naming the surcharge and its percent.
+ */
+export function quoteSurchargeNote(surcharge: DateSurcharge): string {
+  const pct = Math.round(surcharge.uplift * 100);
+  const kind = surcharge.reason === "Weekend" ? "weekend" : "public holiday";
+  return `Includes the ${pct}% ${kind} surcharge on labour.`;
+}
+
+/**
  * GST disclosure text. Reads either the flag default or an explicit override.
  * @param registered - GST-registration state (defaults to the module constant).
  * @returns Copy describing the GST stance.

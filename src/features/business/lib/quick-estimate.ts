@@ -37,6 +37,11 @@ export interface QuickEstimateInput {
   /** End of the visit; the return leg is quoted from here. */
   returnDepartureTimeIso?: string;
   /**
+   * Labour uplift for the picked day (weekend or public holiday) as a fraction,
+   * e.g. 0.1. Omitted or 0 when none applies or no day is picked yet.
+   */
+  surchargeUplift?: number;
+  /**
    * A promo code the customer entered. A valid one beats the automatic promo;
    * an invalid one is ignored and the automatic promo still applies.
    */
@@ -66,7 +71,7 @@ export interface QuickEstimateResult {
 }
 
 /**
- * Runs the full public-estimate flow (rates + promo + AI duration + travel),
+ * Runs the full public-estimate flow (rates + promo + AI duration + travel + date surcharge),
  * computes the confidence-scaled range, logs it, and returns the range + log id.
  * @param input - Description, meeting mode, address, and live pricing settings.
  * @returns The price range, the logged estimate id, and the AI confidence/explanation.
@@ -209,7 +214,13 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     estimatorRange,
     lowEndFloorFactor,
   );
-  const promo = promoForSpend(dateGated, undiscounted.low + rawTravel);
+  // The date surcharge is a cut of full-rate labour that no promo discounts, and the
+  // spend threshold is judged with it included - the order calcJobTotal bills in.
+  // Whole dollars like the band: the low end rounds down, the high end up.
+  const uplift = Math.max(0, input.surchargeUplift ?? 0);
+  const surchargeLow = Math.floor(undiscounted.low * uplift);
+  const surchargeHigh = Math.ceil(undiscounted.high * uplift);
+  const promo = promoForSpend(dateGated, undiscounted.low + surchargeLow + rawTravel);
 
   const promoRate = applyPromoToHourlyRate(fullRate, promo, baseStandard);
   const band = priceRangeFor(
@@ -229,10 +240,10 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
   // The labour band is the range shown to the customer; travel is a mostly fixed add-on on
   // its own line rather than folded in. The logged price below stays the all-in total, so
   // the booking snapshot is unchanged.
-  const low = discounted.labourLow;
-  const high = discounted.labourHigh;
-  const totalLow = discounted.labourLow + travel;
-  const totalHigh = discounted.labourHigh + travel;
+  const low = discounted.labourLow + surchargeLow;
+  const high = discounted.labourHigh + surchargeHigh;
+  const totalLow = low + travel;
+  const totalHigh = high + travel;
 
   // Labour-time band from the same confidence factors that widen the price, rounded to
   // 5-min steps so the card's range ("15 - 30 min") lines up with the price range. Travel

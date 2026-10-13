@@ -12,6 +12,7 @@ import {
   type BookableDay,
   type ExistingBooking,
 } from "@/features/booking/lib/booking";
+import { withDateSurcharges } from "@/features/business/lib/pricing-policy.server";
 import { hasActivePromoCode } from "@/features/business/lib/promos";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
@@ -250,9 +251,10 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
   } = await getAvailableDays();
   // Pricing context for the inline "get a rough estimate" affordance.
   // A failed promo lookup shows the code box rather than hiding a code that works.
-  const [settings, showPromoCode] = await Promise.all([
+  const [settings, showPromoCode, pricedDays] = await Promise.all([
     getSettings(),
     hasActivePromoCode().catch(() => true),
+    withDateSurcharges(days),
   ]);
   // Explain the same-day closure from the live availability settings rather
   // than baked-in defaults, so editing either value updates the banner.
@@ -305,7 +307,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
         </div>
       )}
       <BookingForm
-        availableDays={days}
+        availableDays={pricedDays}
         durations={durations}
         estimatorRange={settings.estimator.range}
         lowEndFloorFactor={settings.estimator.lowEndFloorFactor}

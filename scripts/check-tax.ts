@@ -3,7 +3,7 @@
 // (part years, brought-in assets, low-value grouping, Investment Boost, disposals, filed
 // carry-forward), km tiers, home office, brackets, IETC, set-aside targets and one
 // end-to-end FY 2026-27 estimate. Every expected figure is worked by hand in a comment.
-// Run with: npm run check:tax
+// Run with: npm test -- tax
 
 import { getFinancialYear } from "@/features/business/lib/financial-year";
 import {

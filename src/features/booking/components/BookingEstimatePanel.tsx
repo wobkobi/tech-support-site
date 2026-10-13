@@ -123,6 +123,9 @@ export function BookingEstimatePanel({
               + {formatMoneyCompact(quote.travelCharge)} round-trip travel
             </p>
           )}
+          {quote.surchargeNote && (
+            <p className="mt-1 text-base font-medium text-rich-black/80">{quote.surchargeNote}</p>
+          )}
           <p className="mt-2 text-base text-rich-black/70">
             This is a guide only, based on what you&apos;ve written. The final cost is confirmed
             with you before any work starts.
