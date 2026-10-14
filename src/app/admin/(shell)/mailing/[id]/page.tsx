@@ -114,6 +114,7 @@ export default async function AdminMailingEditPage({
         templates={templates}
         promo={wording.promo}
         linkTargets={emailLinkTargets(getSiteUrl())}
+        canDraft={Boolean(process.env.OPENAI_API_KEY)}
         adminEmail={process.env.ADMIN_EMAIL?.trim() || null}
       />
     </>

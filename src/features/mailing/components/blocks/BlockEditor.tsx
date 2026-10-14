@@ -7,9 +7,12 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import type { InsertGroup } from "@/features/admin/components/ui/InsertMenu";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { AddBlockMenu } from "@/features/mailing/components/blocks/AddBlockMenu";
 import { BlockCard, type BlockCardShared } from "@/features/mailing/components/blocks/BlockCard";
+import { DraftDialog } from "@/features/mailing/components/blocks/DraftDialog";
 import { useBlockHistory } from "@/features/mailing/components/blocks/useBlockHistory";
+import { fillBlocks } from "@/features/mailing/lib/ai-draft";
 import {
   emptyBlock,
   newBlockId,
@@ -37,7 +40,7 @@ import {
 } from "@dnd-kit/sortable";
 import Link from "next/link";
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
-import { FaArrowRotateLeft, FaArrowRotateRight } from "react-icons/fa6";
+import { FaArrowRotateLeft, FaArrowRotateRight, FaWandMagicSparkles } from "react-icons/fa6";
 
 /** Where focus goes after a change: the card itself (a move) or its first field (an add). */
 interface FocusTarget {
@@ -57,6 +60,8 @@ interface FocusTarget {
  * @param props.insertGroups - The Add menu for Text blocks.
  * @param props.promo - Today's promo wording, for the promo card.
  * @param props.linkTargets - Pages buttons and pictures can link to.
+ * @param props.draft - Turns on "Draft with AI": the email's linked promo, and where the
+ *   drafted subject and preview text go. Null when OpenAI isn't set up.
  * @returns The editor.
  */
 export function BlockEditor({
@@ -67,6 +72,7 @@ export function BlockEditor({
   insertGroups,
   promo,
   linkTargets,
+  draft = null,
 }: {
   body: string;
   onChange: (body: string) => void;
@@ -75,7 +81,13 @@ export function BlockEditor({
   insertGroups: InsertGroup[];
   promo: PromoWording | null;
   linkTargets: LinkTarget[];
+  draft?: {
+    promoId: string | null;
+    onSubject: (subject: string, preheader: string) => void;
+  } | null;
 }): React.ReactElement {
+  const { toast } = useToast();
+  const [drafting, setDrafting] = useState(false);
   const { blocks, commit, undo, redo, reset, canUndo, canRedo } = useBlockHistory(() =>
     parseBlocks(body),
   );
@@ -272,10 +284,31 @@ export function BlockEditor({
           >
             <FaArrowRotateRight aria-hidden /> Redo
           </AdminButton>
+          {draft && (
+            <AdminButton size="xs" variant="secondary" onClick={() => setDrafting(true)}>
+              <FaWandMagicSparkles aria-hidden /> Draft with AI
+            </AdminButton>
+          )}
           <p className="ml-auto hidden text-sm text-admin-muted sm:block">
             Alt+Up or Alt+Down moves the block you&apos;re in.
           </p>
         </div>
+      )}
+
+      {draft && drafting && (
+        <DraftDialog
+          promoId={draft.promoId}
+          buttonUrl={blocks.find((b) => b.type === "button")?.url ?? ""}
+          onClose={() => setDrafting(false)}
+          onDraft={(result, withSubject) => {
+            setDrafting(false);
+            apply(fillBlocks(blocks, result));
+            if (withSubject) draft.onSubject(result.subject, result.preheader);
+            toast("Draft added. Read it through and make it yours; Undo takes it back.", {
+              tone: "success",
+            });
+          }}
+        />
       )}
 
       {blocks.length === 0 && (

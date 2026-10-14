@@ -89,6 +89,7 @@ const SNIPPETS: { label: string; title: string; before: string; after: string; l
  * @param props.templates - Templates for the dropdown; empty when the email isn't a draft.
  * @param props.promo - Wording of the email's promo (its linked one, or whichever is running), for the promo card block.
  * @param props.linkTargets - Pages the block editor's buttons and pictures can link to.
+ * @param props.canDraft - Whether "Draft with AI" is available (OpenAI is set up).
  * @returns Editor element.
  */
 export function CampaignEditor({
@@ -103,6 +104,7 @@ export function CampaignEditor({
   templates,
   promo,
   linkTargets,
+  canDraft,
 }: {
   initial: CampaignRow;
   sends: SendRow[];
@@ -115,6 +117,7 @@ export function CampaignEditor({
   templates: Template[];
   promo: PromoWording | null;
   linkTargets: LinkTarget[];
+  canDraft: boolean;
 }): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -270,6 +273,20 @@ export function CampaignEditor({
       el?.focus();
       el?.setSelectionRange(cursor, cursor);
     });
+  }
+
+  /**
+   * Takes an AI draft's subject and preview text, keeping the current one where the
+   * draft left it blank.
+   * @param subject - Drafted subject.
+   * @param preheader - Drafted preview text.
+   */
+  function applyDraftSubject(subject: string, preheader: string): void {
+    setContent((c) => ({
+      ...c,
+      subject: subject || c.subject,
+      preheader: preheader || c.preheader,
+    }));
   }
 
   /**
@@ -505,6 +522,7 @@ export function CampaignEditor({
                   insertGroups={insertGroups}
                   promo={promo}
                   linkTargets={linkTargets}
+                  draft={canDraft ? { promoId, onSubject: applyDraftSubject } : null}
                 />
               ) : (
                 <>

@@ -6,6 +6,7 @@
 // logic, no database and no network.
 // Run with: npm test -- mailing
 
+import { fillBlocks, readDraft, type AiDraft } from "@/features/mailing/lib/ai-draft";
 import {
   emptyBlock,
   isEmptyBlock,
@@ -694,6 +695,91 @@ function roundTrip(body: string): string | null {
   return same ? again : null;
 }
 
+/** The AI draft's reading and its fill into the blocks. */
+function checkAiDraft(): void {
+  console.log("AI draft");
+  expect(
+    "a reply with no heading or paragraphs is no draft",
+    readDraft({ subject: "Hi" }) === null,
+  );
+  expect("a reply that isn't an object is no draft", readDraft("text") === null);
+  const read = readDraft({
+    subject: "  Home visits out west  ",
+    paragraphs: ["One.", 7, "", "Two."],
+    bullets: "not a list",
+    buttonText: "Book a time",
+    extra: "ignored",
+  });
+  expect(
+    "a reply is trimmed, wrong shapes drop out and missing parts come back empty",
+    read?.subject === "Home visits out west" &&
+      read.paragraphs.join("|") === "One.|Two." &&
+      read.bullets.length === 0 &&
+      read.heading === "" &&
+      read.preheader === "",
+    JSON.stringify(read),
+  );
+
+  const draft: AiDraft = {
+    subject: "s",
+    preheader: "p",
+    heading: "New heading",
+    paragraphs: ["First para.", "Second para."],
+    bullets: ["One", "Two"],
+    buttonText: "Read more",
+  };
+  /**
+   * Fills a body's blocks with the test draft.
+   * @param body - Body text.
+   * @returns The filled body text.
+   */
+  const fillOf = (body: string): string => serializeBlocks(fillBlocks(parseBlocks(body), draft));
+  const tip = starterPresets("https://example.co.nz").find((p) => p.presetKey === "tip")!;
+  const filledTip = fillOf(tip.body);
+  expect(
+    "a template is filled by position: heading, first paragraph after the greeting, list, button words",
+    filledTip.startsWith(
+      [
+        "Hi {firstName},",
+        "# New heading",
+        "First para.",
+        "Second para.",
+        "## How to do it",
+        "- One\n- Two",
+      ].join("\n\n"),
+    ) && filledTip.endsWith("[Read more](https://example.co.nz/booking)"),
+    JSON.stringify(filledTip),
+  );
+  expect(
+    "an empty email gets a greeting, then every part in order, and a button still needing a link",
+    fillOf("") ===
+      [
+        "Hi {firstName},",
+        "# New heading",
+        "First para.",
+        "Second para.",
+        "- One\n- Two",
+        "[Read more]()",
+      ].join("\n\n"),
+    JSON.stringify(fillOf("")),
+  );
+  const announcement = starterPresets("https://example.co.nz").find(
+    (p) => p.presetKey === "announcement",
+  )!;
+  expect(
+    "a heading above the greeting is filled in place and the picture slot stays first",
+    fillOf(announcement.body).startsWith(
+      [
+        "![A picture that goes with your news]()",
+        "# New heading",
+        "Hi {firstName},",
+        "First para.",
+      ].join("\n\n"),
+    ),
+    JSON.stringify(fillOf(announcement.body)),
+  );
+}
+
 /** The block editor's parse and serialise. */
 function checkBlocks(): void {
   console.log("Blocks");
@@ -819,6 +905,7 @@ function main(): void {
   checkBlockRendering();
   checkBlockProblems();
   checkBlocks();
+  checkAiDraft();
   checkPlaceholders();
   checkTokens();
   checkRecipients();

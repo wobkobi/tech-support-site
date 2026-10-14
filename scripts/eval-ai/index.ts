@@ -1,6 +1,6 @@
 // scripts/eval-ai/index.ts
-// On-demand eval harness for the two AI routes: black-box tests estimate-duration and
-// parse-job against a running dev server (`npm run dev` in another terminal).
+// On-demand eval harness for the AI routes: black-box tests estimate-duration, parse-job
+// and the mailing ai-draft against a running dev server (`npm run dev` in another terminal).
 //
 // Usage:
 //   npm run eval:ai -- --self-test        # pure checks, no server, no API calls
@@ -13,6 +13,7 @@ import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import { calcSessionMins } from "@/features/business/lib/time-parse";
 import {
   type CheckResult,
+  draftProblems,
   estimateTolerance,
   expectedEstimateMins,
   spread,
@@ -35,7 +36,7 @@ interface SelfCase {
 /** Raw results for one case across N runs. */
 interface RawRun {
   id: string;
-  kind: "estimate-single" | "estimate-multi" | "parse" | "cross-route" | "travel";
+  kind: "estimate-single" | "estimate-multi" | "parse" | "cross-route" | "travel" | "draft";
   benchmarkLabel?: string;
   /** Raw input text (parse + cross-route) - the auditor re-derives the canonical duration from it. */
   input?: string;
@@ -53,11 +54,23 @@ interface RawRun {
     wantStoreRuns?: string[];
     why: string;
   };
+  /** Draft cases: what broke the shared rules (hard, soft) and the case's own forbid list. */
+  draftCheck?: { hard: string[]; soft: string[] };
   durations: number[];
   first: unknown;
   /** Set when the case could not complete; reported as a hard fail, no checks run. */
   error?: string;
 }
+
+/** A draft that breaks no rule, for the self-test to vary one field at a time. */
+const SAMPLE_DRAFT = {
+  subject: "Home visits out west",
+  preheader: "Tuesdays and Thursdays.",
+  heading: "Now visiting Titirangi",
+  paragraphs: ["I'm now coming out to Titirangi."],
+  bullets: [],
+  buttonText: "Book a time",
+};
 
 /**
  * Runs the network-free pure-logic checks and reports pass/fail.
@@ -97,6 +110,42 @@ function runSelfTest(): number {
     { name: "clamp caps at ceiling", got: clampBillableMins(500, 15, 5, 480), want: 480 },
     { name: "clamp floors zero to min", got: clampBillableMins(0, 15, 5), want: 15 },
     { name: "clamp survives zero increment", got: clampBillableMins(47, 15, 0), want: 45 },
+    // Draft rule truths.
+    {
+      name: "clean draft has no problems",
+      got: draftProblems(SAMPLE_DRAFT, "").hard.length,
+      want: 0,
+    },
+    {
+      name: "em dash is a hard problem",
+      got: draftProblems({ ...SAMPLE_DRAFT, heading: "Out west \u2014 now" }, "").hard.length,
+      want: 1,
+    },
+    {
+      name: "figure from the brief is fine",
+      got: draftProblems({ ...SAMPLE_DRAFT, paragraphs: ["It's $65."] }, "$65 an hour").hard.length,
+      want: 0,
+    },
+    {
+      name: "invented figure is a hard problem",
+      got: draftProblems({ ...SAMPLE_DRAFT, paragraphs: ["It's $65."] }, "").hard.length,
+      want: 1,
+    },
+    {
+      name: "placeholder digits don't count",
+      got: draftProblems({ ...SAMPLE_DRAFT, paragraphs: ["{promoOffer}"] }, "").hard.length,
+      want: 0,
+    },
+    {
+      name: "greeting in the first paragraph is a hard problem",
+      got: draftProblems({ ...SAMPLE_DRAFT, paragraphs: ["Hi there, news."] }, "").hard.length,
+      want: 1,
+    },
+    {
+      name: "curly quote is soft only",
+      got: draftProblems({ ...SAMPLE_DRAFT, paragraphs: ["It\u2019s here."] }, "").soft.length,
+      want: 1,
+    },
   ];
   let failed = 0;
   for (const c of cases) {
@@ -183,8 +232,9 @@ async function collectRaw(
   only: string[],
 ): Promise<{ ctx: LiveContext; raw: RawRun[]; aborted: boolean }> {
   const { loadLiveContext } = await import("./context");
-  const { callEstimate, callParseJob } = await import("./client");
-  const { PARSE_CASES, ESTIMATE_CASES, CROSS_ROUTE_CASES, TRAVEL_CASES } = await import("./cases");
+  const { callEstimate, callParseJob, callMailingDraft } = await import("./client");
+  const { PARSE_CASES, ESTIMATE_CASES, CROSS_ROUTE_CASES, TRAVEL_CASES, DRAFT_CASES } =
+    await import("./cases");
 
   process.stdout.write("Loading live context (settings, rates, templates)...\n");
   const ctx = await loadLiveContext();
@@ -202,13 +252,15 @@ async function collectRaw(
   const parseCases = PARSE_CASES.filter((c) => keep(c.id));
   const travelCases = TRAVEL_CASES.filter((c) => keep(c.id));
   const crossRouteCases = CROSS_ROUTE_CASES.filter((c) => keep(c.id));
+  const draftCases = DRAFT_CASES.filter((c) => keep(c.id));
 
   const total =
     benchmarks.length +
     estimateCases.length +
     parseCases.length +
     crossRouteCases.length +
-    travelCases.length;
+    travelCases.length +
+    draftCases.length;
   console.log(
     `Running ${total} cases x ${runs} run(s) = ${total * runs} paid calls. This takes a few minutes.\n`,
   );
@@ -323,6 +375,31 @@ async function collectRaw(
           wantStoreRuns: c.storeRuns,
           why: c.why,
         },
+      });
+    });
+  }
+
+  // Mailing drafts. Run once each: the checks are rules every draft must keep, so a
+  // repeat only spends another call on the same rules.
+  for (const c of draftCases) {
+    if (aborted) break;
+    tick(c.id);
+    await tryCase(c.id, "draft", async () => {
+      const draft = await callMailingDraft(url, adminSecret, {
+        brief: c.brief,
+        kind: c.kind,
+        buttonUrl: c.buttonUrl,
+      });
+      const { hard, soft } = draftProblems(draft, c.brief);
+      const text = JSON.stringify(draft);
+      for (const f of c.forbid ?? []) if (f.pattern.test(text)) hard.push(f.why);
+      raw.push({
+        id: c.id,
+        kind: "draft",
+        input: c.brief,
+        durations: [],
+        first: draft,
+        draftCheck: { hard, soft },
       });
     });
   }
@@ -503,10 +580,25 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
       });
     }
 
-    // Family 2: reproducibility across runs (skip cross-route, which runs once).
+    // Draft: the shared rules plus the case's forbid list are hard; style is info.
+    if (r.kind === "draft" && r.draftCheck) {
+      const { hard, soft } = r.draftCheck;
+      const draft = r.first as { subject?: string };
+      out.push({
+        id: r.id,
+        family: "draft",
+        label: `draft ${r.id}`,
+        status: hard.length === 0 ? "pass" : "fail",
+        detail:
+          (hard.length === 0 ? `"${draft.subject ?? ""}"` : hard.join("; ")) +
+          (soft.length > 0 ? ` (style: ${soft.join(", ")})` : ""),
+      });
+    }
+
+    // Family 2: reproducibility across runs (skip cross-route and draft, which run once).
     // Only deterministic exact-parse cases hold a zero-spread bar; model-estimated
     // cases get the lenient increment-based tolerance.
-    if (r.kind !== "cross-route") {
+    if (r.kind !== "cross-route" && r.kind !== "draft") {
       const sp = spread(r.durations);
       const tol = r.kind === "parse" && r.expectMode !== "info" ? 0 : 2 * inc;
       out.push({
@@ -529,6 +621,7 @@ function printReport(checks: CheckResult[]): void {
   const families: CheckResult["family"][] = [
     "context",
     "travel",
+    "draft",
     "reproducibility",
     "drift",
     "cross-route",
@@ -536,6 +629,7 @@ function printReport(checks: CheckResult[]): void {
   const titles: Record<CheckResult["family"], string> = {
     context: "1. Each model uses ALL context",
     travel: "2. Travel decisions (one round trip, or none)",
+    draft: "2b. Mailing drafts (no dashes, no made-up figures or claims, no greeting or sign-off)",
     reproducibility: "3. Reproducibility",
     drift: "4. Public estimate vs benchmarks (report-only)",
     "cross-route":
@@ -604,10 +698,13 @@ function printReport(checks: CheckResult[]): void {
 
     // The deterministic asserts gate the exit code: context (stated-time exactness,
     // min-billable floor, increment) and travel (which single trip the job bills) are
-    // branch decisions with one right answer, not model taste. Reproducibility is soft -
+    // branch decisions with one right answer, not model taste; draft rules are INVARIANTs
+    // in the prompt, so breaking one is a bug, not a style call. Reproducibility is soft -
     // a hosted LLM is never bit-for-bit reproducible, so a spread warns, never fails.
     const hardFailed = checks.filter(
-      (c) => c.status === "fail" && (c.family === "context" || c.family === "travel"),
+      (c) =>
+        c.status === "fail" &&
+        (c.family === "context" || c.family === "travel" || c.family === "draft"),
     );
     const reproFailed = checks.filter((c) => c.status === "fail" && c.family === "reproducibility");
     const completed = raw.filter((r) => !r.error);
@@ -649,8 +746,8 @@ function printReport(checks: CheckResult[]): void {
     }
     console.log(
       hardFailed.length === 0
-        ? `\n\x1b[32m✓ all hard (context + travel) assertions passed\x1b[0m\n`
-        : `\n\x1b[31m✗ ${hardFailed.length} hard (context + travel) assertion(s) failed\x1b[0m\n`,
+        ? `\n\x1b[32m✓ all hard (context, travel, draft) assertions passed\x1b[0m\n`
+        : `\n\x1b[31m✗ ${hardFailed.length} hard (context, travel, draft) assertion(s) failed\x1b[0m\n`,
     );
     process.exit(hardFailed.length === 0 ? 0 : 1);
   } catch (err) {
