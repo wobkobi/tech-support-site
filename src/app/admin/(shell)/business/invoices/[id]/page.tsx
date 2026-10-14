@@ -133,6 +133,9 @@ async function InvoiceRail({
           status={invoice.status}
           createdAt={invoice.createdAt}
           sentAt={invoice.sentAt}
+          resentAt={invoice.resentAt}
+          clientEmail={invoice.clientEmail}
+          resentFromEmail={invoice.resentFromEmail}
           reviewLinkSentAt={invoice.reviewLinkSentAt}
           reviewAskOutcome={invoice.reviewAskOutcome}
           reviewAskNote={invoice.reviewAskNote}

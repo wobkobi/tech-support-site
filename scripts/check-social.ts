@@ -1,12 +1,13 @@
 // scripts/check-social.ts
 // Social posting logic that has to be right before anything goes public: each
-// platform's validator, promo placeholder filling, turning an email into a post, the
+// platform's validator, the Google post body, promo placeholder filling, turning an email into a post, the
 // JPEG size reader, how per-platform outcomes roll up into the post status, how a
 // take-down is recorded, and the composer's PATCH parsing. Pure logic, no database
 // and no network.
 // Run with: npm test -- social
 
 import { postFromEmail } from "@/features/social/lib/from-email";
+import { googlePostBody } from "@/features/social/lib/google-post";
 import { insertableGroups } from "@/features/social/lib/insertables";
 import { jpegSize } from "@/features/social/lib/jpeg-size";
 import { mergeTargets, parsePostPatch } from "@/features/social/lib/parse";
@@ -23,7 +24,10 @@ import {
 } from "@/features/social/lib/targets";
 import {
   blockingIssues,
+  cropOf,
   fillPromo,
+  pictureFor,
+  shownRatio,
   textFor,
   validatePost,
   type PostDraft,
@@ -75,7 +79,11 @@ function draft(over: Partial<PostDraft> = {}): PostDraft {
  * @param hasPromo - Whether a promo is running.
  * @returns Its error messages.
  */
-function errorsFor(post: PostDraft, platform: "facebook" | "instagram", hasPromo = true): string[] {
+function errorsFor(
+  post: PostDraft,
+  platform: "facebook" | "instagram" | "google",
+  hasPromo = true,
+): string[] {
   return (validatePost(post, hasPromo)[platform] ?? [])
     .filter((i) => i.level === "error")
     .map((i) => i.message);
@@ -229,6 +237,300 @@ function checkValidators(): void {
   );
 }
 
+/**
+ * A post going to Google only, with any fields overridden.
+ * @param over - Fields to change.
+ * @returns The draft.
+ */
+function googleDraft(over: Partial<PostDraft> = {}): PostDraft {
+  return draft({
+    imageWidth: 1200,
+    imageHeight: 900,
+    targets: [{ platform: "google", enabled: true, textOverride: null }],
+    ...over,
+  });
+}
+
+/**
+ * A full Google offer, with any fields overridden.
+ * @param over - Fields to change.
+ * @returns The draft.
+ */
+function offerDraft(over: Partial<PostDraft> = {}): PostDraft {
+  return googleDraft({
+    googleType: "OFFER",
+    googleTitle: "Spring special",
+    offerStart: "2026-10-14",
+    offerEnd: new Date("2026-10-31T00:00:00.000Z"),
+    ...over,
+  });
+}
+
+/** Google rules and the localPosts body. */
+function checkGoogle(): void {
+  console.log("Google");
+  expect("google: a plain update passes", errorsFor(googleDraft(), "google").length === 0);
+  expect(
+    "google: empty text blocks",
+    errorsFor(googleDraft({ body: " " }), "google").includes("Google needs some text."),
+  );
+  expect(
+    "google: over 1,500 characters blocks",
+    errorsFor(googleDraft({ body: "a".repeat(1_501) }), "google").some((m) => m.includes("1,500")),
+  );
+  for (const phone of ["021 123 4567", "(09) 555-1234", "+64 21 123 4567", "0800 123 456"]) {
+    expect(
+      `google: phone "${phone}" blocks`,
+      errorsFor(googleDraft({ body: `Call ${phone} today` }), "google").some((m) =>
+        m.includes("phone numbers"),
+      ),
+    );
+  }
+  for (const fine of [
+    "Open 10.00-17.00",
+    "Book by 14/10/2026",
+    "Sessions from $120",
+    "Since 2019",
+  ]) {
+    expect(
+      `google: "${fine}" isn't a phone number`,
+      errorsFor(googleDraft({ body: fine }), "google").length === 0,
+    );
+  }
+  expect(
+    "google: an email address blocks",
+    errorsFor(googleDraft({ body: "Email help@example.co.nz" }), "google").some((m) =>
+      m.includes("email addresses"),
+    ),
+  );
+  expect(
+    "google: Book without a link blocks",
+    errorsFor(googleDraft({ googleCta: "BOOK" }), "google").some((m) => m.includes("needs a link")),
+  );
+  expect(
+    "google: Call needs no link",
+    errorsFor(googleDraft({ googleCta: "CALL" }), "google").length === 0,
+  );
+  const linkNoButton = validatePost(googleDraft({ linkUrl: "https://example.co.nz" }), true);
+  expect(
+    "google: a link without a button warns but doesn't block",
+    (linkNoButton.google ?? []).some((i) => i.level === "warning") &&
+      !(linkNoButton.google ?? []).some((i) => i.level === "error"),
+  );
+  expect("google: a full offer passes", errorsFor(offerDraft(), "google").length === 0);
+  expect(
+    "google: an offer without a title blocks",
+    errorsFor(offerDraft({ googleTitle: " " }), "google").includes("A Google offer needs a title."),
+  );
+  expect(
+    "google: an offer without an end date blocks",
+    errorsFor(offerDraft({ offerEnd: null }), "google").some((m) => m.includes("start and an end")),
+  );
+  expect(
+    "google: an offer ending before it starts blocks",
+    errorsFor(offerDraft({ offerStart: "2026-11-01" }), "google").some((m) =>
+      m.includes("ends before it starts"),
+    ),
+  );
+  expect(
+    "google: an offer's link is the redeem link, not a warning",
+    (validatePost(offerDraft({ linkUrl: "https://example.co.nz" }), true).google ?? []).length ===
+      0,
+  );
+
+  const base = {
+    text: "Hello",
+    imageUrl: BLOB,
+    imageAlt: null,
+    linkUrl: "https://example.co.nz/booking",
+  };
+  const noGoogle = { title: null, start: null, end: null, couponCode: null };
+  const update = googlePostBody({
+    ...base,
+    google: { type: "STANDARD", cta: "BOOK", ...noGoogle },
+  });
+  expect(
+    "body: update sends the picture and a Book button with the link",
+    update.topicType === "STANDARD" &&
+      update.media?.[0]?.sourceUrl === BLOB &&
+      update.callToAction?.actionType === "BOOK" &&
+      update.callToAction.url === base.linkUrl &&
+      update.event === undefined,
+  );
+  const call = googlePostBody({ ...base, google: { type: "STANDARD", cta: "CALL", ...noGoogle } });
+  expect(
+    "body: Call sends no URL",
+    call.callToAction?.actionType === "CALL" && call.callToAction.url === undefined,
+  );
+  const plain = googlePostBody({ ...base, google: { type: "STANDARD", cta: null, ...noGoogle } });
+  expect("body: no button sends no callToAction", plain.callToAction === undefined);
+  const offerBody = googlePostBody({
+    ...base,
+    google: {
+      type: "OFFER",
+      cta: "BOOK",
+      title: "Spring special",
+      start: "2026-10-14",
+      end: "2026-10-31",
+      couponCode: "SPRING",
+    },
+  });
+  expect(
+    "body: offer sends whole-day dates, coupon and redeem link, and no button",
+    offerBody.topicType === "OFFER" &&
+      offerBody.callToAction === undefined &&
+      offerBody.event?.title === "Spring special" &&
+      JSON.stringify(offerBody.event.schedule) ===
+        JSON.stringify({
+          startDate: { year: 2026, month: 10, day: 14 },
+          startTime: { hours: 0, minutes: 0 },
+          endDate: { year: 2026, month: 10, day: 31 },
+          endTime: { hours: 23, minutes: 59 },
+        }) &&
+      offerBody.offer?.couponCode === "SPRING" &&
+      offerBody.offer.redeemOnlineUrl === base.linkUrl,
+  );
+}
+
+/** Which edges each platform cuts, the OK, and per-platform pictures. */
+function checkPictures(): void {
+  console.log("Pictures");
+  const OWN = "https://abc.public.blob.vercel-storage.com/social/google-x1.jpg";
+  expect("crop: 4:3 fits Google", cropOf("google", 1200, 900) === null);
+  expect("crop: 1200 x 899 still fits Google", cropOf("google", 1200, 899) === null);
+  expect(
+    "crop: a square loses Google its top and bottom",
+    cropOf("google", 1080, 1080) === "top and bottom",
+  );
+  expect("crop: 16:9 loses Google its sides", cropOf("google", 1600, 900) === "sides");
+  expect("crop: a square fits Facebook", cropOf("facebook", 1080, 1080) === null);
+  expect(
+    "crop: 9:16 loses Facebook its top and bottom",
+    cropOf("facebook", 675, 1200) === "top and bottom",
+  );
+  expect("crop: 3:1 loses Facebook its sides", cropOf("facebook", 1500, 500) === "sides");
+  expect("shown: Facebook draws 9:16 at 4:5", shownRatio("facebook", 675, 1200) === 4 / 5);
+  expect("shown: Google draws an unknown size at 4:3", shownRatio("google", null, null) === 4 / 3);
+
+  /**
+   * A post with a square picture.
+   * @param targets - The post's targets.
+   * @returns The draft.
+   */
+  const square = (targets: PostDraft["targets"]): PostDraft => draft({ targets });
+  expect(
+    "google: a square picture blocks until OK'd",
+    errorsFor(square([{ platform: "google", enabled: true, textOverride: null }]), "google").some(
+      (m) => m.includes("cut off the picture's top and bottom"),
+    ),
+  );
+  const okd =
+    validatePost(
+      square([{ platform: "google", enabled: true, textOverride: null, cropApprovedFor: BLOB }]),
+      true,
+    ).google ?? [];
+  expect(
+    "google: OK'ing the cut turns it into a note",
+    !okd.some((i) => i.level === "error") && okd.some((i) => i.message.includes("You've OK'd")),
+  );
+  expect(
+    "google: an OK for a different picture doesn't count",
+    errorsFor(
+      square([{ platform: "google", enabled: true, textOverride: null, cropApprovedFor: OWN }]),
+      "google",
+    ).some((m) => m.includes("cut off")),
+  );
+  const ownPicture = square([
+    {
+      platform: "google",
+      enabled: true,
+      textOverride: null,
+      imageUrl: OWN,
+      imageWidth: 1200,
+      imageHeight: 900,
+    },
+  ]);
+  expect("google: its own 4:3 picture passes", errorsFor(ownPicture, "google").length === 0);
+  expect("pictureFor: own picture wins", pictureFor(ownPicture, "google")?.url === OWN);
+  expect("pictureFor: others get the post's", pictureFor(ownPicture, "facebook")?.url === BLOB);
+  expect(
+    "facebook: 9:16 blocks until OK'd",
+    errorsFor(draft({ imageWidth: 675, imageHeight: 1200 }), "facebook").some((m) =>
+      m.includes("cut off"),
+    ),
+  );
+  expect(
+    "facebook: unknown size blocks",
+    errorsFor(draft({ imageWidth: null }), "facebook").some((m) => m.includes("size is unknown")),
+  );
+  expect(
+    "instagram: an OK can't get a 9:16 picture through",
+    errorsFor(
+      draft({
+        imageWidth: 675,
+        imageHeight: 1200,
+        targets: [
+          { platform: "instagram", enabled: true, textOverride: null, cropApprovedFor: BLOB },
+        ],
+      }),
+      "instagram",
+    ).some((m) => m.includes("4:5")),
+  );
+  expect(
+    "instagram: its own picture gets a 9:16 post through",
+    errorsFor(
+      draft({
+        imageWidth: 675,
+        imageHeight: 1200,
+        targets: [
+          {
+            platform: "instagram",
+            enabled: true,
+            textOverride: null,
+            imageUrl: OWN,
+            imageWidth: 1080,
+            imageHeight: 1350,
+          },
+        ],
+      }),
+      "instagram",
+    ).length === 0,
+  );
+
+  const parsed = parsePostPatch({
+    targets: [
+      {
+        platform: "google",
+        imageUrl: OWN,
+        imageAlt: "Laptop on a desk",
+        imageWidth: 1200,
+        imageHeight: 900,
+        cropApprovedFor: BLOB,
+      },
+    ],
+  });
+  expect(
+    "parse: own picture and OK come through",
+    !("error" in parsed) &&
+      parsed.targets?.[0]?.imageUrl === OWN &&
+      parsed.targets[0].imageWidth === 1200 &&
+      parsed.targets[0].cropApprovedFor === BLOB,
+  );
+  expect(
+    "parse: own picture from another host is refused",
+    "error" in
+      parsePostPatch({ targets: [{ platform: "google", imageUrl: "https://evil.example/x.jpg" }] }),
+  );
+  const merged = mergeTargets(
+    [target("google", "pending")],
+    [{ platform: "google", imageUrl: OWN, cropApprovedFor: null }],
+  );
+  expect(
+    "merge: own picture lands, untouched fields stay",
+    merged[0]!.imageUrl === OWN && merged[0]!.enabled && merged[0]!.cropApprovedFor === null,
+  );
+}
+
 /** Override selection and promo filling. */
 function checkFilling(): void {
   console.log("Filling");
@@ -333,6 +635,11 @@ function target(
     platform,
     enabled,
     textOverride: null,
+    imageUrl: null,
+    imageAlt: null,
+    imageWidth: null,
+    imageHeight: null,
+    cropApprovedFor: null,
     status,
     externalId: status === "posted" ? "1" : null,
     permalink: null,
@@ -347,9 +654,9 @@ function checkTargets(): void {
   console.log("Targets");
   const defaults = defaultTargets();
   expect(
-    "defaults: Facebook and Instagram on, Google off",
+    "defaults: every platform on",
     defaults.map((t) => `${t.platform}:${t.enabled}`).join(",") ===
-      "facebook:true,instagram:true,google:false",
+      "facebook:true,instagram:true,google:true",
   );
   const g = target("google", "pending", false);
   expect(
@@ -498,9 +805,28 @@ function checkParse(): void {
   );
   expect("fractional width is refused", "error" in parsePostPatch({ imageWidth: 10.5 }));
   expect(
-    "Google can't be switched on yet",
-    "error" in parsePostPatch({ targets: [{ platform: "google", enabled: true }] }),
+    "Google can be switched on",
+    !("error" in parsePostPatch({ targets: [{ platform: "google", enabled: true }] })),
   );
+  const offer = parsePostPatch({
+    googleType: "OFFER",
+    googleCta: null,
+    googleTitle: "  Spring special  ",
+    offerStart: "2026-10-14",
+    offerEnd: "",
+  });
+  expect(
+    "Google offer fields parse, a blank date clears",
+    !("error" in offer) &&
+      offer.patch.googleType === "OFFER" &&
+      offer.patch.googleCta === null &&
+      offer.patch.googleTitle === "Spring special" &&
+      offer.patch.offerStart?.toISOString() === "2026-10-14T00:00:00.000Z" &&
+      offer.patch.offerEnd === null,
+  );
+  expect("unknown Google type is refused", "error" in parsePostPatch({ googleType: "ALERT" }));
+  expect("unknown Google button is refused", "error" in parsePostPatch({ googleCta: "SHOP" }));
+  expect("31 February is refused", "error" in parsePostPatch({ offerEnd: "2026-02-31" }));
   expect("bad promoId is refused", "error" in parsePostPatch({ promoId: "nope" }));
 
   const merged = mergeTargets(
@@ -559,6 +885,8 @@ function checkInsertables(): void {
 /** Runs every group and exits non-zero on any failure. */
 function main(): void {
   checkValidators();
+  checkGoogle();
+  checkPictures();
   checkFilling();
   checkFromEmail();
   checkJpegSize();

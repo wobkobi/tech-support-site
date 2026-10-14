@@ -32,6 +32,9 @@ export interface InvoiceSendFlow {
   sentLocal: boolean;
   greetingName: string;
   setGreetingName: (value: string) => void;
+  /** Recipient for this send; starts as the invoice's clientEmail. A change is saved on send. */
+  toEmail: string;
+  setToEmail: (value: string) => void;
   customBody: string;
   setCustomBody: (value: string) => void;
   reviewAsk: boolean;
@@ -94,6 +97,9 @@ export function useInvoiceSend({
   const [sentLocal, setSentLocal] = useState<boolean>(sentAt != null);
   // Operator-typed greeting override. Empty = the preview's defaultGreeting.
   const [greetingName, setGreetingName] = useState("");
+  // Recipient override (the stored address bounced). The send route saves a changed
+  // address to the invoice and the contact.
+  const [toEmail, setToEmail] = useState(clientEmail);
   // Editable email body, pre-populated with the default copy (quote wording
   // when the row is a quote).
   const [customBody, setCustomBody] = useState(
@@ -159,6 +165,7 @@ export function useInvoiceSend({
         body: JSON.stringify({
           greetingName,
           customBody,
+          toEmail,
           ...(reviewAskInfo ? { reviewAsk } : {}),
         }),
       });
@@ -167,7 +174,9 @@ export function useInvoiceSend({
       setSentLocal(true);
       setPreviewOpen(false);
       setPreview(null);
-      toast(`Invoice ${invoiceNumber} sent to ${clientName || "client"}.`, { tone: "success" });
+      toast(`Invoice ${invoiceNumber} sent to ${clientName || "client"} (${toEmail.trim()}).`, {
+        tone: "success",
+      });
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send email");
@@ -203,6 +212,8 @@ export function useInvoiceSend({
     sentLocal,
     greetingName,
     setGreetingName,
+    toEmail,
+    setToEmail,
     customBody,
     setCustomBody,
     reviewAsk,
@@ -244,6 +255,8 @@ export function SendInvoiceModal({
     error,
     greetingName,
     setGreetingName,
+    toEmail,
+    setToEmail,
     customBody,
     setCustomBody,
     reviewAsk,
@@ -264,7 +277,7 @@ export function SendInvoiceModal({
         title="Send invoice"
         description={
           <>
-            To: <span className="font-medium">{preview?.to ?? clientEmail}</span>
+            To: <span className="font-medium">{toEmail.trim() || preview?.to || clientEmail}</span>
           </>
         }
         size="lg"
@@ -276,7 +289,7 @@ export function SendInvoiceModal({
             <AdminButton
               onClick={() => void confirmSend()}
               busy={sending}
-              disabled={loading || !!error || !preview}
+              disabled={loading || !!error || !preview || !toEmail.trim()}
             >
               Send email
             </AdminButton>
@@ -291,6 +304,23 @@ export function SendInvoiceModal({
         )}
         {preview && !loading && (
           <div>
+            <AdminField label="Send to" htmlFor="send-to-email" className="mb-4">
+              <AdminInput
+                id="send-to-email"
+                type="email"
+                value={toEmail}
+                onChange={(e) => setToEmail(e.target.value)}
+                placeholder={clientEmail || "name@example.com"}
+                disabled={sending}
+              />
+              {toEmail.trim().toLowerCase() !== clientEmail.trim().toLowerCase() && (
+                <p className="mt-1 text-sm text-admin-muted">
+                  Replaces {clientEmail || "no email"} on this invoice and their contact (the old
+                  address stays on the contact as a spare). A review ask that already went out is
+                  sent again to the new address.
+                </p>
+              )}
+            </AdminField>
             <AdminField
               label="Greeting (the person you're emailing)"
               htmlFor="greeting-name"

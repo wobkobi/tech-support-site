@@ -75,10 +75,14 @@ next-env.d.ts
 !/docs/DEPLOY.md
 google-tokens.txt
 
-# Generated marketing creatives, uploaded by hand rather than served by the site
-# (regenerate with `npm run build:ads` and `npm run build:social`). Contrast
-# public/downloads, which is versioned because the site links to it.
-/ad-creatives/
+# Generated marketing images, uploaded by hand rather than served by the site:
+# ads/ (`npm run build:ads`), posts/ (`npm run build:social`), banners/ and
+# profiles/ (`npm run build:icons`). Contrast public/downloads, which is versioned
+# because the site links to it.
+/marketing/
+
+# Superseded drafts kept for reference (old poster PDFs, first-round embroidery).
+/brand/archive/
 
 # local reference material
 To the Point - Template.xlsx

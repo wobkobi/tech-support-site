@@ -8,7 +8,7 @@ import { mergeTargets, parsePostPatch } from "@/features/social/lib/parse";
 import { toPostRow } from "@/features/social/lib/post-row";
 import { takeDownPost } from "@/features/social/lib/publish";
 import { takeDownDue } from "@/features/social/lib/targets";
-import { PLATFORM_LABEL, type SocialPlatformKey } from "@/features/social/lib/validate";
+import { PLATFORM_LABEL } from "@/features/social/lib/validate";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -104,10 +104,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
         const left = takeDownDue(result.targets);
         if (left.length > 0) {
           const reasons = left
-            .map(
-              (t) =>
-                `${PLATFORM_LABEL[t.platform as SocialPlatformKey] ?? t.platform}: ${t.error ?? "failed"}`,
-            )
+            .map((t) => `${PLATFORM_LABEL[t.platform] ?? t.platform}: ${t.error ?? "failed"}`)
             .join(" ");
           return errorResponse(
             `Couldn't take it down everywhere, so the post was kept. ${reasons}`,

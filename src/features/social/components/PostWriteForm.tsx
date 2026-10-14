@@ -1,12 +1,14 @@
 "use client";
 // src/features/social/components/PostWriteForm.tsx
 // The composer's form card: name, linked promo, which apps it posts to, the post text with
-// its Add menu and counter, the picture, the link and per-app text. The composer owns
+// its Add menu and counter, the picture, the link, Google's post type and button or offer
+// details, and per-app text. The composer owns
 // every value and handler; this file only lays them out.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
@@ -15,6 +17,8 @@ import type { PostContent } from "@/features/social/components/PostComposer";
 import {
   PLATFORM_LABEL,
   SOCIAL_PLATFORMS,
+  cropOf,
+  pictureFor,
   type SocialPlatformKey,
 } from "@/features/social/lib/validate";
 import { cn } from "@/shared/lib/cn";
@@ -40,8 +44,9 @@ import { FaChevronDown } from "react-icons/fa6";
  * @param props.overrideRefs - Each app's own-text textarea.
  * @param props.strictest - Lowest character limit among apps that post the main text.
  * @param props.canUpload - Whether image uploads are configured.
- * @param props.imageBusy - Whether a picture is uploading.
+ * @param props.pictureBusy - Which picture is uploading: "main", a platform, or null.
  * @param props.fileRef - Hidden file input behind the picture buttons.
+ * @param props.onPickPicture - Opens the file picker for the post's picture or one app's own.
  * @param props.onFile - Uploads a picked picture.
  * @param props.enabled - Apps the post goes to.
  * @param props.overridesOpen - Whether "Different text for one app" starts open.
@@ -63,8 +68,9 @@ export function PostWriteForm({
   overrideRefs,
   strictest,
   canUpload,
-  imageBusy,
+  pictureBusy,
   fileRef,
+  onPickPicture,
   onFile,
   enabled,
   overridesOpen,
@@ -84,8 +90,9 @@ export function PostWriteForm({
   overrideRefs: React.RefObject<Partial<Record<SocialPlatformKey, HTMLTextAreaElement | null>>>;
   strictest: number | null;
   canUpload: boolean;
-  imageBusy: boolean;
+  pictureBusy: string | null;
   fileRef: React.RefObject<HTMLInputElement | null>;
+  onPickPicture: (forWhat: "main" | SocialPlatformKey) => void;
   onFile: (file: File) => void;
   enabled: SocialPlatformKey[];
   overridesOpen: boolean;
@@ -222,9 +229,9 @@ export function PostWriteForm({
                     <AdminButton
                       size="xs"
                       variant="secondary"
-                      busy={imageBusy}
+                      busy={pictureBusy === "main"}
                       disabled={!canUpload}
-                      onClick={() => fileRef.current?.click()}
+                      onClick={() => onPickPicture("main")}
                     >
                       Replace
                     </AdminButton>
@@ -249,11 +256,11 @@ export function PostWriteForm({
           ) : editable ? (
             <button
               type="button"
-              disabled={!canUpload || imageBusy}
-              onClick={() => fileRef.current?.click()}
+              disabled={!canUpload || pictureBusy !== null}
+              onClick={() => onPickPicture("main")}
               className="flex h-20 items-center justify-center rounded-lg border border-dashed border-admin-border-strong text-sm font-semibold text-admin-muted transition-colors hover:border-russian-violet hover:text-russian-violet disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {imageBusy ? "Adding the picture..." : "+ Add a picture"}
+              {pictureBusy === "main" ? "Adding the picture..." : "+ Add a picture"}
             </button>
           ) : (
             <p className="text-sm text-admin-muted">No picture</p>
@@ -263,6 +270,18 @@ export function PostWriteForm({
               Picture uploads are off until BLOB_READ_WRITE_TOKEN is set.
             </p>
           )}
+          {enabled.map((p) => (
+            <AppPicture
+              key={p}
+              platform={p}
+              content={content}
+              setTarget={setTarget}
+              editable={editable}
+              canUpload={canUpload}
+              busy={pictureBusy === p}
+              onPick={() => onPickPicture(p)}
+            />
+          ))}
           <input
             ref={fileRef}
             type="file"
@@ -285,6 +304,112 @@ export function PostWriteForm({
             inputMode="url"
           />
         </AdminField>
+
+        {enabled.includes("google") && (
+          <fieldset className="flex flex-col gap-4 rounded-lg border border-admin-border px-3 py-3">
+            <legend className="px-1 text-sm font-bold text-admin-text">Google options</legend>
+            <div role="radiogroup" aria-label="Google post type" className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["STANDARD", "Update"],
+                  ["OFFER", "Offer"],
+                ] as const
+              ).map(([type, label]) => {
+                const checked =
+                  type === "STANDARD"
+                    ? content.googleType === "STANDARD"
+                    : content.googleType !== "STANDARD";
+                return (
+                  <label
+                    key={type}
+                    className={cn(
+                      "inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-colors",
+                      editable && "cursor-pointer",
+                      checked
+                        ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
+                        : "border-admin-border-strong text-admin-muted hover:border-russian-violet/50",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name={`${fieldId}-google-type`}
+                      checked={checked}
+                      disabled={!editable}
+                      onChange={() => setContent((c) => ({ ...c, googleType: type }))}
+                      className="size-4 accent-russian-violet"
+                    />
+                    {label}
+                  </label>
+                );
+              })}
+            </div>
+
+            {content.googleType === "STANDARD" ? (
+              <AdminField label="Button" htmlFor={`${fieldId}-google-cta`}>
+                <AdminSelect
+                  id={`${fieldId}-google-cta`}
+                  value={content.googleCta}
+                  onChange={(e) =>
+                    setContent((c) => ({
+                      ...c,
+                      googleCta: e.target.value as PostContent["googleCta"],
+                    }))
+                  }
+                  disabled={!editable}
+                >
+                  <option value="">No button</option>
+                  <option value="BOOK">Book (goes to the Link)</option>
+                  <option value="CALL">Call now (rings your profile&apos;s number)</option>
+                  <option value="LEARN_MORE">Learn more (goes to the Link)</option>
+                </AdminSelect>
+              </AdminField>
+            ) : (
+              <>
+                <AdminField label="Offer title" htmlFor={`${fieldId}-google-title`}>
+                  <AdminInput
+                    id={`${fieldId}-google-title`}
+                    value={content.googleTitle}
+                    onChange={(e) => setContent((c) => ({ ...c, googleTitle: e.target.value }))}
+                    disabled={!editable}
+                    maxLength={100}
+                  />
+                </AdminField>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <AdminField label="Starts" htmlFor={`${fieldId}-offer-start`}>
+                    <AdminInput
+                      id={`${fieldId}-offer-start`}
+                      type="date"
+                      value={content.offerStart}
+                      onChange={(e) => setContent((c) => ({ ...c, offerStart: e.target.value }))}
+                      disabled={!editable}
+                    />
+                  </AdminField>
+                  <AdminField label="Last day" htmlFor={`${fieldId}-offer-end`}>
+                    <AdminInput
+                      id={`${fieldId}-offer-end`}
+                      type="date"
+                      value={content.offerEnd}
+                      onChange={(e) => setContent((c) => ({ ...c, offerEnd: e.target.value }))}
+                      disabled={!editable}
+                    />
+                  </AdminField>
+                </div>
+                <AdminField label="Coupon code (optional)" htmlFor={`${fieldId}-coupon`}>
+                  <AdminInput
+                    id={`${fieldId}-coupon`}
+                    value={content.couponCode}
+                    onChange={(e) => setContent((c) => ({ ...c, couponCode: e.target.value }))}
+                    disabled={!editable}
+                    maxLength={50}
+                  />
+                </AdminField>
+                <p className="text-sm text-admin-muted">
+                  The Link above becomes the offer&apos;s &quot;Redeem online&quot; link.
+                </p>
+              </>
+            )}
+          </fieldset>
+        )}
 
         {enabled.length > 0 && (
           <details className="group rounded-lg border border-admin-border" open={overridesOpen}>
@@ -333,5 +458,165 @@ export function PostWriteForm({
         )}
       </div>
     </Card>
+  );
+}
+
+// The shape each app shows whole, for the cut-off notes.
+const FIT_WORDS: Record<SocialPlatformKey, string> = {
+  facebook: "between 4:5 portrait and 1.91:1 landscape",
+  instagram: "between 4:5 portrait and 1.91:1 landscape",
+  google: "at 4:3 landscape, like 1200 x 900",
+};
+
+/**
+ * One app's picture row under Picture. Shows the app's own picture when it has one,
+ * and, when the picture it would get doesn't fit its shape, why and what to do: add a
+ * picture for that app, or OK the cut (Facebook and Google only; Instagram refuses the
+ * shape outright). Renders nothing while the post's picture fits the app.
+ * @param props - Component props.
+ * @param props.platform - The app.
+ * @param props.content - Current field values.
+ * @param props.setTarget - Updates the app's picture or crop OK.
+ * @param props.editable - Whether the post can still be changed.
+ * @param props.canUpload - Whether image uploads are configured.
+ * @param props.busy - Whether this app's picture is uploading.
+ * @param props.onPick - Opens the file picker for this app's picture.
+ * @returns Row element, or null.
+ */
+function AppPicture({
+  platform,
+  content,
+  setTarget,
+  editable,
+  canUpload,
+  busy,
+  onPick,
+}: {
+  platform: SocialPlatformKey;
+  content: PostContent;
+  setTarget: (platform: string, patch: Partial<PostContent["targets"][number]>) => void;
+  editable: boolean;
+  canUpload: boolean;
+  busy: boolean;
+  onPick: () => void;
+}): React.ReactElement | null {
+  const fieldId = useId();
+  const target = content.targets.find((t) => t.platform === platform);
+  const picture = pictureFor(content, platform);
+  if (!target || !picture) return null;
+  const label = PLATFORM_LABEL[platform];
+  const cut =
+    picture.width && picture.height ? cropOf(platform, picture.width, picture.height) : null;
+  const approved = cut !== null && target.cropApprovedFor === picture.url;
+  if (!target.imageUrl && !cut) return null;
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-2 rounded-lg border p-3",
+        cut && !approved ? "border-amber-300 bg-amber-50" : "border-admin-border",
+      )}
+    >
+      {target.imageUrl && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={target.imageUrl}
+            alt={target.imageAlt}
+            className="h-20 w-auto self-start rounded-md border border-admin-border"
+          />
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <AdminField label={`${label}'s own picture: description`} htmlFor={`${fieldId}-alt`}>
+              <AdminInput
+                id={`${fieldId}-alt`}
+                value={target.imageAlt}
+                onChange={(e) => setTarget(platform, { imageAlt: e.target.value })}
+                disabled={!editable}
+                maxLength={300}
+              />
+            </AdminField>
+            {editable && (
+              <div className="flex flex-wrap gap-2">
+                <AdminButton
+                  size="xs"
+                  variant="secondary"
+                  busy={busy}
+                  disabled={!canUpload}
+                  onClick={onPick}
+                >
+                  Replace
+                </AdminButton>
+                <AdminButton
+                  size="xs"
+                  variant="ghost"
+                  onClick={() =>
+                    setTarget(platform, {
+                      imageUrl: null,
+                      imageAlt: "",
+                      imageWidth: null,
+                      imageHeight: null,
+                    })
+                  }
+                >
+                  Use the main picture
+                </AdminButton>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {cut && (
+        <>
+          <p className="text-sm text-admin-text">
+            {platform === "instagram" ? (
+              <>
+                Instagram only takes pictures {FIT_WORDS.instagram}, so it won&apos;t take this one.
+              </>
+            ) : approved ? (
+              <>
+                You&apos;ve OK&apos;d {label} cutting off the {cut} of this picture.
+              </>
+            ) : (
+              <>
+                {label} shows pictures {FIT_WORDS[platform]}, so it would cut off the {cut} of this
+                one. Check its preview, then add a picture for {label} or OK the cut.
+              </>
+            )}
+          </p>
+          {editable && (
+            <div className="flex flex-wrap gap-2">
+              <AdminButton
+                size="xs"
+                variant="secondary"
+                busy={busy}
+                disabled={!canUpload}
+                onClick={onPick}
+              >
+                {target.imageUrl ? `Replace ${label}'s picture` : `Add a picture for ${label}`}
+              </AdminButton>
+              {platform !== "instagram" &&
+                (approved ? (
+                  <AdminButton
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => setTarget(platform, { cropApprovedFor: null })}
+                  >
+                    Undo the OK
+                  </AdminButton>
+                ) : (
+                  <AdminButton
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => setTarget(platform, { cropApprovedFor: picture.url })}
+                  >
+                    OK, cut it off
+                  </AdminButton>
+                ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }

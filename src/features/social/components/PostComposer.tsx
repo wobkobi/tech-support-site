@@ -24,13 +24,17 @@ import { liveOn, type Connection } from "@/features/social/lib/post-display";
 import type { SocialPostRow, SocialTargetRow } from "@/features/social/lib/post-row";
 import {
   FACEBOOK_MAX_CHARS,
+  GOOGLE_MAX_CHARS,
   INSTAGRAM_MAX_CHARS,
   PLATFORM_LABEL,
   SOCIAL_PLATFORMS,
   blockingIssues,
   fillPromo,
+  pictureFor,
   textFor,
   validatePost,
+  type GooglePostCta,
+  type GooglePostType,
   type SocialPlatformKey,
 } from "@/features/social/lib/validate";
 import { cn } from "@/shared/lib/cn";
@@ -45,6 +49,7 @@ const AUTOSAVE_MS = 1200;
 const MAX_CHARS: Record<SocialPlatformKey, number> = {
   facebook: FACEBOOK_MAX_CHARS,
   instagram: INSTAGRAM_MAX_CHARS,
+  google: GOOGLE_MAX_CHARS,
 };
 
 /** Editable fields, as last saved. */
@@ -56,7 +61,26 @@ interface Content {
   imageWidth: number | null;
   imageHeight: number | null;
   linkUrl: string;
-  targets: { platform: string; enabled: boolean; textOverride: string }[];
+  targets: {
+    platform: string;
+    enabled: boolean;
+    textOverride: string;
+    /** The platform's own picture, replacing the post's there; null to use the post's. */
+    imageUrl: string | null;
+    imageAlt: string;
+    imageWidth: number | null;
+    imageHeight: number | null;
+    /** The picture URL the operator OK'd this platform cutting off. */
+    cropApprovedFor: string | null;
+  }[];
+  googleType: GooglePostType;
+  /** Empty for no button. */
+  googleCta: GooglePostCta | "";
+  googleTitle: string;
+  /** YYYY-MM-DD, empty when unset. */
+  offerStart: string;
+  offerEnd: string;
+  couponCode: string;
 }
 
 /** The editable fields, for the form card in PostWriteForm. */
@@ -82,7 +106,18 @@ function contentOf(p: SocialPostRow): Content {
       platform: t.platform,
       enabled: t.enabled,
       textOverride: t.textOverride ?? "",
+      imageUrl: t.imageUrl,
+      imageAlt: t.imageAlt ?? "",
+      imageWidth: t.imageWidth,
+      imageHeight: t.imageHeight,
+      cropApprovedFor: t.cropApprovedFor,
     })),
+    googleType: p.googleType,
+    googleCta: p.googleCta ?? "",
+    googleTitle: p.googleTitle ?? "",
+    offerStart: p.offerStart ?? "",
+    offerEnd: p.offerEnd ?? "",
+    couponCode: p.couponCode ?? "",
   };
 }
 
@@ -103,10 +138,16 @@ function diff(now: Content, saved: Content): Record<string, unknown> {
   }
   if (now.imageAlt !== saved.imageAlt) out.imageAlt = now.imageAlt || null;
   if (now.linkUrl !== saved.linkUrl) out.linkUrl = now.linkUrl.trim() || null;
+  if (now.googleType !== saved.googleType) out.googleType = now.googleType;
+  if (now.googleCta !== saved.googleCta) out.googleCta = now.googleCta || null;
+  if (now.googleTitle !== saved.googleTitle) out.googleTitle = now.googleTitle || null;
+  if (now.offerStart !== saved.offerStart) out.offerStart = now.offerStart || null;
+  if (now.offerEnd !== saved.offerEnd) out.offerEnd = now.offerEnd || null;
+  if (now.couponCode !== saved.couponCode) out.couponCode = now.couponCode || null;
   if (JSON.stringify(now.targets) !== JSON.stringify(saved.targets)) {
     out.targets = now.targets
       .filter((t) => (SOCIAL_PLATFORMS as readonly string[]).includes(t.platform))
-      .map((t) => ({ ...t, textOverride: t.textOverride || null }));
+      .map((t) => ({ ...t, textOverride: t.textOverride || null, imageAlt: t.imageAlt || null }));
   }
   return out;
 }
@@ -167,6 +208,8 @@ export function PostComposer({
   const rootRef = useRef<HTMLDivElement>(null);
   const [scheduling, setScheduling] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Which picture the file picker is choosing: the post's, or one platform's own.
+  const uploadFor = useRef<"main" | SocialPlatformKey>("main");
   const [accounts, setAccounts] = useState<Partial<Record<SocialPlatformKey, string>>>({});
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const overrideRefs = useRef<Partial<Record<SocialPlatformKey, HTMLTextAreaElement | null>>>({});
@@ -307,11 +350,22 @@ export function PostComposer({
   }
 
   /**
-   * Shrinks and uploads a picture, replacing any current one.
+   * Opens the file picker for the post's picture or one platform's own.
+   * @param forWhat - "main" or the platform the picture is for.
+   */
+  function pickPicture(forWhat: "main" | SocialPlatformKey): void {
+    uploadFor.current = forWhat;
+    fileRef.current?.click();
+  }
+
+  /**
+   * Shrinks and uploads a picture, replacing the current one it's for: the post's, or
+   * the platform's own picked through {@link pickPicture}.
    * @param file - Picked image.
    */
   async function addImage(file: File): Promise<void> {
-    setBusy("image");
+    const forWhat = uploadFor.current;
+    setBusy(`image:${forWhat}`);
     try {
       const small = await shrinkImage(file);
       const form = new FormData();
@@ -321,12 +375,20 @@ export function PostComposer({
         toast(res.error, { tone: "error" });
         return;
       }
-      setContent((c) => ({
-        ...c,
-        imageUrl: res.url,
-        imageWidth: small.width,
-        imageHeight: small.height,
-      }));
+      if (forWhat === "main") {
+        setContent((c) => ({
+          ...c,
+          imageUrl: res.url,
+          imageWidth: small.width,
+          imageHeight: small.height,
+        }));
+      } else {
+        setTarget(forWhat, {
+          imageUrl: res.url,
+          imageWidth: small.width,
+          imageHeight: small.height,
+        });
+      }
     } catch (error) {
       toast(error instanceof Error ? error.message : "Couldn't add the picture.", {
         tone: "error",
@@ -376,8 +438,7 @@ export function PostComposer({
      * @param t - Target.
      * @returns Display name.
      */
-    const label = (t: SocialTargetRow): string =>
-      PLATFORM_LABEL[t.platform as SocialPlatformKey] ?? t.platform;
+    const label = (t: SocialTargetRow): string => PLATFORM_LABEL[t.platform] ?? t.platform;
     const posted = live.filter((t) => t.status === "posted").map(label);
     const failed = live.filter((t) => t.status === "failed").map(label);
     const waiting = live.filter((t) => t.status === "pending").map(label);
@@ -417,8 +478,7 @@ export function PostComposer({
      * @param t - Target.
      * @returns Display name.
      */
-    const label = (t: SocialTargetRow): string =>
-      PLATFORM_LABEL[t.platform as SocialPlatformKey] ?? t.platform;
+    const label = (t: SocialTargetRow): string => PLATFORM_LABEL[t.platform] ?? t.platform;
     const attempted = res.targets.filter((t) => before.has(t.platform));
     const down = attempted.filter((t) => t.status === "removed").map(label);
     const stuck = attempted.filter((t) => t.status === "posted").map(label);
@@ -475,6 +535,11 @@ export function PostComposer({
     imageHeight: content.imageHeight,
     linkUrl: content.linkUrl.trim() || null,
     targets: content.targets,
+    googleType: content.googleType,
+    googleCta: content.googleCta || null,
+    googleTitle: content.googleTitle,
+    offerStart: content.offerStart,
+    offerEnd: content.offerEnd,
   };
   const issues = validatePost(draft, promo !== null);
   const blocked = blockingIssues(issues);
@@ -501,13 +566,23 @@ export function PostComposer({
    * @returns Preview content.
    */
   function previewOf(p: SocialPlatformKey): PreviewPost {
+    const picture = pictureFor(draft, p);
+    const own = content.targets.find((t) => t.platform === p);
     return {
       text: fillPromo(textFor(draft, p), promo).trim(),
-      imageUrl: content.imageUrl,
-      imageAlt: content.imageAlt,
-      imageWidth: content.imageWidth,
-      imageHeight: content.imageHeight,
+      imageUrl: picture?.url ?? null,
+      imageAlt: own?.imageUrl ? own.imageAlt : content.imageAlt,
+      imageWidth: picture?.width ?? null,
+      imageHeight: picture?.height ?? null,
       linkUrl: draft.linkUrl,
+      google: {
+        type: content.googleType,
+        cta: content.googleCta || null,
+        title: content.googleTitle.trim(),
+        start: content.offerStart || null,
+        end: content.offerEnd || null,
+        couponCode: content.couponCode.trim() || null,
+      },
     };
   }
 
@@ -597,8 +672,9 @@ export function PostComposer({
             overrideRefs={overrideRefs}
             strictest={strictest}
             canUpload={canUpload}
-            imageBusy={busy === "image"}
+            pictureBusy={busy?.startsWith("image:") ? busy.slice(6) : null}
             fileRef={fileRef}
+            onPickPicture={pickPicture}
             onFile={(file) => void addImage(file)}
             enabled={enabled}
             overridesOpen={overridesOpen}

@@ -8,7 +8,7 @@ import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { POST_STATUS_PILL } from "@/features/social/lib/post-display";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
-import { PLATFORM_LABEL, type SocialPlatformKey } from "@/features/social/lib/validate";
+import { PLATFORM_LABEL } from "@/features/social/lib/validate";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import type React from "react";
@@ -132,7 +132,7 @@ export function PostStatusBanner({
       </div>
       <ul className="flex flex-col gap-1">
         {live.map((t) => {
-          const label = PLATFORM_LABEL[t.platform as SocialPlatformKey] ?? t.platform;
+          const label = PLATFORM_LABEL[t.platform] ?? t.platform;
           return (
             <li key={t.platform}>
               <strong>{label}:</strong>{" "}

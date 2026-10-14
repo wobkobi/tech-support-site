@@ -1,9 +1,12 @@
 "use client";
 // src/features/social/components/PlatformPreview.tsx
-// Look-alike Facebook and Instagram feed posts for the composer. They copy each app's
-// light-mode layout, type sizes and colours, and its "See more" / "more" cut-off,
-// so the operator sees roughly where a long post folds before it goes out.
+// Look-alike Facebook and Instagram feed posts and Google Business Profile updates for
+// the composer. They copy each app's light-mode layout, type sizes and colours, and the
+// feeds' "See more" / "more" cut-off, so the operator sees roughly where a long post
+// folds before it goes out.
 
+import type { GoogleFields } from "@/features/social/lib/adapter";
+import { GOOGLE_CTA_LABEL, shownRatio } from "@/features/social/lib/validate";
 import { cn } from "@/shared/lib/cn";
 import React, { useState } from "react";
 import {
@@ -32,15 +35,11 @@ const INSTAGRAM_FOLD = { chars: 125, lines: 2 };
 // Facebook shows a short text-only post in large type.
 const FACEBOOK_BIG_TEXT_MAX = 85;
 
-// Instagram's accepted aspect range, width / height; it crops anything outside it.
-const INSTAGRAM_MIN_RATIO = 4 / 5;
-const INSTAGRAM_MAX_RATIO = 1.91;
-
 // Hashtags and @mentions start a word, so an email address's "@" doesn't match.
 const TAG_RE = /(?<=^|\s)(?:#[\p{L}\p{N}_]+|@[\w.]+)/u;
 const URL_RE = /https?:\/\/\S+/u;
 
-/** The parts of a post both previews need. */
+/** The parts of a post the previews need. */
 export interface PreviewPost {
   text: string;
   imageUrl: string | null;
@@ -48,6 +47,7 @@ export interface PreviewPost {
   imageWidth: number | null;
   imageHeight: number | null;
   linkUrl: string | null;
+  google: GoogleFields;
 }
 
 /**
@@ -180,7 +180,12 @@ export function FacebookPreview({
 
       {post.imageUrl && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={post.imageUrl} alt={post.imageAlt} className="max-h-150 w-full object-cover" />
+        <img
+          src={post.imageUrl}
+          alt={post.imageAlt}
+          style={{ aspectRatio: shownRatio("facebook", post.imageWidth, post.imageHeight) }}
+          className="w-full bg-[#f0f2f5] object-cover"
+        />
       )}
       {!post.imageUrl && post.linkUrl && (
         <div className="border-y border-[#ced0d4] bg-[#f0f2f5] px-4 py-2.5">
@@ -225,13 +230,7 @@ export function InstagramPreview({
 }): React.ReactElement {
   const [open, setOpen] = useState(false);
   const { head, cut } = foldText(post.text, INSTAGRAM_FOLD);
-  const ratio =
-    post.imageWidth && post.imageHeight
-      ? Math.min(
-          INSTAGRAM_MAX_RATIO,
-          Math.max(INSTAGRAM_MIN_RATIO, post.imageWidth / post.imageHeight),
-        )
-      : 1;
+  const ratio = shownRatio("instagram", post.imageWidth, post.imageHeight);
 
   return (
     <article
@@ -278,6 +277,102 @@ export function InstagramPreview({
         )}
       </p>
       <p className="px-3 pt-1.5 pb-3 text-[12px] text-[#737373]">Just now</p>
+    </article>
+  );
+}
+
+/**
+ * A YYYY-MM-DD day as Google prints it on an offer, like "14 Oct".
+ * @param key - Date key.
+ * @returns Short date, or the raw text if it doesn't parse.
+ */
+function offerDay(key: string): string {
+  const day = new Date(`${key}T00:00:00.000Z`);
+  if (Number.isNaN(day.getTime())) return key;
+  return new Intl.DateTimeFormat("en-NZ", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  }).format(day);
+}
+
+/**
+ * A Business Profile post as it shows under Updates on Google Search and Maps. An
+ * offer shows its title, dates, coupon code and "Redeem online" link the way
+ * publishing sends them; an update shows its button only when it will be sent (Book
+ * and Learn more need the link).
+ * @param props - Component props.
+ * @param props.post - Filled post content.
+ * @param props.businessName - The profile's business name.
+ * @returns Google post element.
+ */
+export function GooglePreview({
+  post,
+  businessName,
+}: {
+  post: PreviewPost;
+  businessName: string;
+}): React.ReactElement {
+  const { google } = post;
+  const offer = google.type === "OFFER" || google.type === "EVENT";
+  const button =
+    !offer && google.cta && (google.cta === "CALL" || post.linkUrl)
+      ? GOOGLE_CTA_LABEL[google.cta]
+      : null;
+
+  return (
+    <article
+      style={SYSTEM_FONT}
+      className="mx-auto w-full max-w-110 overflow-hidden rounded-lg border border-[#dadce0] bg-white font-normal text-[#202124]"
+    >
+      <header className="flex items-center gap-3 px-4 pt-3 pb-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={AVATAR_SRC} alt="" className="size-9 shrink-0 rounded-full" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14px] leading-5 font-medium">{businessName}</p>
+          <p className="text-[12px] leading-4 text-[#70757a]">Just now</p>
+        </div>
+      </header>
+
+      {post.imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={post.imageUrl}
+          alt={post.imageAlt}
+          style={{ aspectRatio: shownRatio("google", post.imageWidth, post.imageHeight) }}
+          className="w-full bg-[#f1f3f4] object-cover"
+        />
+      )}
+
+      <div className="flex flex-col gap-2 px-4 pt-3 pb-4">
+        {offer && (
+          <div>
+            <p className="text-[18px] leading-6 font-medium">{google.title || "Offer title"}</p>
+            <p className="text-[13px] leading-5 text-[#70757a]">
+              {google.start && google.end
+                ? `${offerDay(google.start)} - ${offerDay(google.end)}`
+                : "Pick the offer dates"}
+            </p>
+          </div>
+        )}
+        {post.text && (
+          <p className="text-[14px] leading-5 wrap-break-word whitespace-pre-wrap">{post.text}</p>
+        )}
+        {offer && google.couponCode && (
+          <div className="rounded-md border border-dashed border-[#dadce0] px-3 py-2 text-center">
+            <p className="text-[12px] text-[#70757a]">Show this code at the store</p>
+            <p className="text-[16px] font-medium tracking-wide">{google.couponCode}</p>
+          </div>
+        )}
+        {offer && post.linkUrl && (
+          <p className="text-[14px] font-medium text-[#1a73e8]">Redeem online</p>
+        )}
+        {button && (
+          <span className="mt-1 inline-flex self-start rounded-full border border-[#dadce0] px-4 py-1.5 text-[14px] font-medium text-[#1a73e8]">
+            {button}
+          </span>
+        )}
+      </div>
     </article>
   );
 }
