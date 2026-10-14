@@ -392,9 +392,10 @@ export function InvoiceActions({
               aria-label={!clientEmail ? "Add a client email to enable sending" : undefined}
               className={cn(showPhoneBar && "max-lg:flex-1")}
             >
-              {/* Short labels on phones, where two of these share the bar. */}
+              {/* Short labels on phones, where two of these share the bar. The button's
+                  flex gap supplies the word space. */}
               {alreadySent ? "Re-send" : "Send"}
-              <span className="max-sm:hidden">&nbsp;to client</span>
+              <span className="max-sm:hidden">to client</span>
             </AdminButton>
           )}
         </div>

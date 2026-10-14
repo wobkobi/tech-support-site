@@ -4,6 +4,7 @@
 // payload projection.
 
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import type { Invoice } from "@prisma/client";
 import type { NextRequest } from "next/server";
@@ -19,6 +20,11 @@ export interface InvoiceEmailOverrides {
    * unticked it). Undefined or true leaves the ask to go out on schedule.
    */
   reviewAsk?: boolean;
+  /**
+   * Send route only: a recipient that replaces Invoice.clientEmail (e.g. the stored
+   * address bounced). Normalised; blank becomes undefined.
+   */
+  toEmail?: string;
   /** Void route only: whether to email the customer about the void. */
   sendNotification: boolean;
 }
@@ -56,12 +62,15 @@ export async function parseInvoiceEmailOverrides(
     greetingName?: unknown;
     customBody?: unknown;
     reviewAsk?: unknown;
+    toEmail?: unknown;
     sendNotification?: unknown;
   };
   return {
     greetingName: typeof body.greetingName === "string" ? body.greetingName : undefined,
     customBody: typeof body.customBody === "string" ? body.customBody : undefined,
     reviewAsk: typeof body.reviewAsk === "boolean" ? body.reviewAsk : undefined,
+    toEmail:
+      typeof body.toEmail === "string" ? normaliseEmail(body.toEmail) || undefined : undefined,
     sendNotification: body.sendNotification === true,
   };
 }

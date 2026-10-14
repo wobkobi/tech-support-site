@@ -1,5 +1,6 @@
 // src/features/business/components/invoice/InvoiceTimeline.tsx
-// Vertical lifecycle timeline for an invoice: Created > Sent > Review link sent (or the
+// Vertical lifecycle timeline for an invoice: Created > Sent > Re-sent to a new address >
+// Review link sent (or the
 // review ask's due date or why it didn't go) > Reminder sent > Paid > Apology sent >
 // Voided. Steps render only once reached; a reached step with a null timestamp (legacy
 // rows) degrades to a muted "date not recorded" rather than vanishing. Server component.
@@ -19,6 +20,12 @@ interface InvoiceTimelineProps {
   createdAt: Date | string;
   /** First SENT stamp; null on legacy sent rows. */
   sentAt?: Date | string | null;
+  /** Latest send to a changed address; null when the address never changed. */
+  resentAt?: Date | string | null;
+  /** The address the invoice now goes to. */
+  clientEmail?: string | null;
+  /** The address that send replaced. */
+  resentFromEmail?: string | null;
   /** When the review-request link was emailed; null when never sent. */
   reviewLinkSentAt?: Date | string | null;
   /** The automatic review ask's stamped outcome; null while undecided. */
@@ -59,6 +66,9 @@ interface Step {
  * @param props.status - Stored invoice status.
  * @param props.createdAt - Record creation timestamp.
  * @param props.sentAt - First-sent timestamp (nullable).
+ * @param props.resentAt - Re-send to a changed address timestamp (nullable).
+ * @param props.clientEmail - Current client email, shown on the re-send step.
+ * @param props.resentFromEmail - Address the re-send replaced (nullable).
  * @param props.reviewLinkSentAt - Review-link send timestamp (nullable).
  * @param props.reviewAskOutcome - Automatic review ask outcome (nullable).
  * @param props.reviewAskNote - Reason or failure note for that outcome (nullable).
@@ -77,6 +87,9 @@ export function InvoiceTimeline({
   status,
   createdAt,
   sentAt,
+  resentAt,
+  clientEmail,
+  resentFromEmail,
   reviewLinkSentAt,
   reviewAskOutcome,
   reviewAskNote,
@@ -96,6 +109,12 @@ export function InvoiceTimeline({
   // on its own, so it only shows this step when an actual sentAt exists.
   const wasSent = sentAt != null || status === "SENT" || status === "PAID";
   if (wasSent) steps.push({ label: "Sent to client", date: sentAt ?? null, tone: "info" });
+  if (resentAt) {
+    const detail = [clientEmail, resentFromEmail && `was ${resentFromEmail}`]
+      .filter(Boolean)
+      .join(" · ");
+    steps.push({ label: "Re-sent to new email", date: resentAt, detail, tone: "info" });
+  }
 
   if (reviewLinkSentAt) {
     steps.push({ label: "Review link sent", date: reviewLinkSentAt, tone: "violet" });
