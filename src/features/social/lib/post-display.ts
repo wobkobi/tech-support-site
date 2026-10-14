@@ -32,5 +32,5 @@ export interface Connection {
 export function liveOn(p: Pick<SocialPostRow, "targets">): string[] {
   return p.targets
     .filter((t) => t.status === "posted")
-    .map((t) => PLATFORM_LABEL[t.platform as SocialPlatformKey] ?? t.platform);
+    .map((t) => PLATFORM_LABEL[t.platform] ?? t.platform);
 }

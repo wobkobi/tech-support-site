@@ -2,12 +2,25 @@
 // The shape every platform adapter shares, so the publisher and the connections
 // check loop over platforms instead of branching on their names.
 
+import type { GooglePostCta, GooglePostType } from "@/features/social/lib/validate";
+
+/** Google-only post settings; the other adapters ignore them. Dates are YYYY-MM-DD. */
+export interface GoogleFields {
+  type: GooglePostType;
+  cta: GooglePostCta | null;
+  title: string | null;
+  start: string | null;
+  end: string | null;
+  couponCode: string | null;
+}
+
 /** What an adapter needs to publish: final text, already filled in. */
 export interface PublishInput {
   text: string;
   imageUrl: string | null;
   imageAlt: string | null;
   linkUrl: string | null;
+  google: GoogleFields;
 }
 
 /** Where the published post lives. */

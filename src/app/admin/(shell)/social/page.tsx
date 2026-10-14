@@ -47,7 +47,7 @@ export default async function AdminSocialPage({
     <>
       <PageHeader
         title="Social posts"
-        description="Write a post once and send it to Facebook and Instagram, now or at a set time."
+        description="Write a post once and send it to Facebook, Instagram and Google, now or at a set time."
       />
       <SocialView
         initial={posts.map(toPostRow)}

@@ -544,6 +544,11 @@ model Invoice {
   // Stamped when send-email promotes DRAFT>SENT - a real send time, not
   // updatedAt standing in for one. Null on legacy SENT rows.
   sentAt               DateTime?
+  // Latest send to a changed address from the send modal (the stored one bounced).
+  // clientEmail already holds the new address; resentFromEmail is the one it replaced.
+  // The timeline shows these as their own step.
+  resentAt             DateTime?
+  resentFromEmail      String?
   // Payment record, stamped by POST /pay when the invoice becomes PAID.
   // paymentMethod is an INCOME_METHODS value; paymentReference is an optional
   // operator note. Null on legacy PAID rows (the timeline degrades gracefully;
@@ -1116,16 +1121,24 @@ enum GooglePostCta {
 
 // One platform's copy of a social post and how publishing it went.
 type SocialTarget {
-  platform     SocialPlatform
-  enabled      Boolean            @default(true)
+  platform        SocialPlatform
+  enabled         Boolean            @default(true)
   // Replaces the shared body on this platform only.
-  textOverride String?
-  status       SocialTargetStatus @default(pending)
-  externalId   String?
-  permalink    String?
-  error        String?
-  postedAt     DateTime?
-  removedAt    DateTime?
+  textOverride    String?
+  // Replaces the shared picture on this platform only, for one that fits its shape.
+  imageUrl        String?
+  imageAlt        String?
+  imageWidth      Int?
+  imageHeight     Int?
+  // The picture URL the operator agreed this platform may cut off. Tied to the URL so
+  // a new picture needs a new OK.
+  cropApprovedFor String?
+  status          SocialTargetStatus @default(pending)
+  externalId      String?
+  permalink       String?
+  error           String?
+  postedAt        DateTime?
+  removedAt       DateTime?
 }
 
 // A post the operator writes once in /admin/social and publishes to Facebook,

@@ -14,6 +14,7 @@ import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSiteUrl } from "@/shared/lib/site-url";
+import { nzDateKey } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -64,10 +65,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (!source) return errorResponse("That post no longer exists.", 404);
       // Starting a draft from a preset keeps its name; any other copy says it's one.
       const name = source.isPreset && !asPreset ? source.name : `${source.name} (copy)`;
-      // Toggles and per-platform text carry over; past outcomes don't.
+      // Toggles, per-platform text and pictures, and crop OKs carry over; past
+      // outcomes don't.
       const targets = defaultTargets().map((t) => {
         const from = source.targets.find((s) => s.platform === t.platform);
-        return from ? { ...t, enabled: from.enabled, textOverride: from.textOverride } : t;
+        return from
+          ? {
+              ...t,
+              enabled: from.enabled,
+              textOverride: from.textOverride,
+              imageUrl: from.imageUrl,
+              imageAlt: from.imageAlt,
+              imageWidth: from.imageWidth,
+              imageHeight: from.imageHeight,
+              cropApprovedFor: from.cropApprovedFor,
+            }
+          : t;
       });
       const created = await prisma.socialPost.create({
         data: {
@@ -81,6 +94,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           promoId: source.promoId,
           isPreset: asPreset,
           targets,
+          googleType: source.googleType,
+          googleCta: source.googleCta,
+          googleTitle: source.googleTitle,
+          offerStart: source.offerStart,
+          offerEnd: source.offerEnd,
+          couponCode: source.couponCode,
         },
       });
       return okResponse({ post: toPostRow(created) }, 201);
@@ -102,6 +121,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         (await prisma.socialPost.findFirst({
           where: { isPreset: true, presetKey: PROMO_POST_PRESET_KEY },
         })) ?? starterPostPresets(getSiteUrl()).find((p) => p.presetKey === PROMO_POST_PRESET_KEY)!;
+      // Google shows it as an offer card over the promo's own NZ calendar days. endAt
+      // is midnight starting the day after the last day (exclusive), so the last day
+      // is read 1ms before it.
+      const lastDay = new Date(Date.parse(promo.endAt) - 1);
       const created = await prisma.socialPost.create({
         data: {
           name: `Promo: ${promo.title}`,
@@ -109,6 +132,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           linkUrl: preset.linkUrl,
           promoId,
           targets: defaultTargets(),
+          googleType: "OFFER",
+          googleTitle: promo.title.slice(0, 100),
+          offerStart: new Date(`${nzDateKey(new Date(promo.startAt))}T00:00:00.000Z`),
+          offerEnd: new Date(`${nzDateKey(lastDay)}T00:00:00.000Z`),
         },
       });
       return okResponse({ post: toPostRow(created) }, 201);

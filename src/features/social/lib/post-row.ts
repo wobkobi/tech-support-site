@@ -1,6 +1,7 @@
 // src/features/social/lib/post-row.ts
 // Plain-data social post shape for the server > client boundary and the social API.
 
+import { dateKey, type GooglePostCta, type GooglePostType } from "@/features/social/lib/validate";
 import type { SocialPost } from "@prisma/client";
 
 /** Post lifecycle, mirroring the SocialPostStatus enum. */
@@ -12,6 +13,11 @@ export interface SocialTargetRow {
   platform: "facebook" | "instagram" | "google";
   enabled: boolean;
   textOverride: string | null;
+  imageUrl: string | null;
+  imageAlt: string | null;
+  imageWidth: number | null;
+  imageHeight: number | null;
+  cropApprovedFor: string | null;
   status: "pending" | "posted" | "failed" | "skipped" | "removed";
   permalink: string | null;
   error: string | null;
@@ -36,6 +42,13 @@ export interface SocialPostRow {
   promoId: string | null;
   campaignId: string | null;
   targets: SocialTargetRow[];
+  googleType: GooglePostType;
+  googleCta: GooglePostCta | null;
+  googleTitle: string | null;
+  /** Offer dates as YYYY-MM-DD. */
+  offerStart: string | null;
+  offerEnd: string | null;
+  couponCode: string | null;
   updatedAt: string;
 }
 
@@ -64,12 +77,23 @@ export function toPostRow(p: SocialPost): SocialPostRow {
       platform: t.platform,
       enabled: t.enabled,
       textOverride: t.textOverride,
+      imageUrl: t.imageUrl,
+      imageAlt: t.imageAlt,
+      imageWidth: t.imageWidth,
+      imageHeight: t.imageHeight,
+      cropApprovedFor: t.cropApprovedFor,
       status: t.status,
       permalink: t.permalink,
       error: t.error,
       postedAt: t.postedAt?.toISOString() ?? null,
       removedAt: t.removedAt?.toISOString() ?? null,
     })),
+    googleType: p.googleType,
+    googleCta: p.googleCta,
+    googleTitle: p.googleTitle,
+    offerStart: dateKey(p.offerStart),
+    offerEnd: dateKey(p.offerEnd),
+    couponCode: p.couponCode,
     updatedAt: p.updatedAt.toISOString(),
   };
 }

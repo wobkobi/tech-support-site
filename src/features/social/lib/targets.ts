@@ -8,6 +8,11 @@ export interface TargetState {
   platform: "facebook" | "instagram" | "google";
   enabled: boolean;
   textOverride: string | null;
+  imageUrl: string | null;
+  imageAlt: string | null;
+  imageWidth: number | null;
+  imageHeight: number | null;
+  cropApprovedFor: string | null;
   status: "pending" | "posted" | "failed" | "skipped" | "removed";
   externalId: string | null;
   permalink: string | null;
@@ -20,14 +25,19 @@ export interface TargetState {
 export type TakeDownOutcome = { ok: true } | { ok: false; error: string };
 
 /**
- * One target per platform. Google stays off until its API access is approved.
+ * One target per platform, all switched on.
  * @returns Fresh pending targets.
  */
 export function defaultTargets(): TargetState[] {
   return (["facebook", "instagram", "google"] as const).map((platform) => ({
     platform,
-    enabled: platform !== "google",
+    enabled: true,
     textOverride: null,
+    imageUrl: null,
+    imageAlt: null,
+    imageWidth: null,
+    imageHeight: null,
+    cropApprovedFor: null,
     status: "pending",
     externalId: null,
     permalink: null,

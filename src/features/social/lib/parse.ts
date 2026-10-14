@@ -5,7 +5,11 @@
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import type { TargetState } from "@/features/social/lib/targets";
-import { SOCIAL_PLATFORMS } from "@/features/social/lib/validate";
+import {
+  SOCIAL_PLATFORMS,
+  type GooglePostCta,
+  type GooglePostType,
+} from "@/features/social/lib/validate";
 
 const MAX_NAME = 120;
 const MAX_BODY = 10_000;
@@ -25,13 +29,49 @@ export interface PostPatch {
   imageHeight?: number | null;
   linkUrl?: string | null;
   promoId?: string | null;
+  googleType?: GooglePostType;
+  googleCta?: GooglePostCta | null;
+  googleTitle?: string | null;
+  offerStart?: Date | null;
+  offerEnd?: Date | null;
+  couponCode?: string | null;
 }
 
-/** A target edit from the composer: the toggle and override only. */
+const GOOGLE_TYPES: readonly string[] = ["STANDARD", "OFFER", "EVENT"];
+const GOOGLE_CTAS: readonly string[] = ["BOOK", "CALL", "LEARN_MORE"];
+const MAX_GOOGLE_TITLE = 100;
+const MAX_COUPON = 50;
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Checks an optional YYYY-MM-DD date, stored at UTC midnight of that calendar day so
+ * the day reads back the same in any timezone.
+ * @param value - Raw value.
+ * @param label - Field name for the error.
+ * @returns The Date or null, or an error message.
+ */
+function optionalDay(value: unknown, label: string): Date | null | { error: string } {
+  if (value === null || value === "") return null;
+  if (typeof value !== "string" || !DATE_KEY_RE.test(value)) {
+    return { error: `${label} must be a date.` };
+  }
+  const day = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== value) {
+    return { error: `${label} isn't a real date.` };
+  }
+  return day;
+}
+
+/** A target edit from the composer: the toggle, own text, own picture and crop OK. */
 export interface TargetEdit {
   platform: string;
   enabled?: boolean;
   textOverride?: string | null;
+  imageUrl?: string | null;
+  imageAlt?: string | null;
+  imageWidth?: number | null;
+  imageHeight?: number | null;
+  cropApprovedFor?: string | null;
 }
 
 /**
@@ -132,9 +172,36 @@ export function parsePostPatch(
     checks.push(["imageHeight", optionalPixels(body.imageHeight, "Picture height")]);
   }
   if (body.linkUrl !== undefined) checks.push(["linkUrl", optionalUrl(body.linkUrl, "Link")]);
+  if (body.googleTitle !== undefined) {
+    checks.push(["googleTitle", optionalText(body.googleTitle, "Offer title", MAX_GOOGLE_TITLE)]);
+  }
+  if (body.couponCode !== undefined) {
+    checks.push(["couponCode", optionalText(body.couponCode, "Coupon code", MAX_COUPON)]);
+  }
   for (const [key, v] of checks) {
     if (v !== null && typeof v === "object") return v;
     (patch as Record<string, unknown>)[key] = v;
+  }
+  for (const [key, label] of [
+    ["offerStart", "Offer start"],
+    ["offerEnd", "Offer end"],
+  ] as const) {
+    if (body[key] === undefined) continue;
+    const v = optionalDay(body[key], label);
+    if (v !== null && !(v instanceof Date)) return v;
+    patch[key] = v;
+  }
+  if (body.googleType !== undefined) {
+    if (typeof body.googleType !== "string" || !GOOGLE_TYPES.includes(body.googleType)) {
+      return { error: "Unknown Google post type." };
+    }
+    patch.googleType = body.googleType as GooglePostType;
+  }
+  if (body.googleCta !== undefined) {
+    if (body.googleCta === null) patch.googleCta = null;
+    else if (typeof body.googleCta !== "string" || !GOOGLE_CTAS.includes(body.googleCta)) {
+      return { error: "Unknown Google button." };
+    } else patch.googleCta = body.googleCta as GooglePostCta;
   }
   if (body.promoId !== undefined) {
     if (body.promoId === null) patch.promoId = null;
@@ -165,11 +232,42 @@ export function parsePostPatch(
         if (v !== null && typeof v !== "string") return v;
         edit.textOverride = v;
       }
+      const pictureChecks: [keyof TargetEdit, string | null | number | { error: string }][] = [];
+      if (t.imageUrl !== undefined) {
+        pictureChecks.push(["imageUrl", optionalUrl(t.imageUrl, "Picture", IMAGE_HOST_SUFFIX)]);
+      }
+      if (t.imageAlt !== undefined) {
+        pictureChecks.push(["imageAlt", optionalText(t.imageAlt, "Picture description", MAX_ALT)]);
+      }
+      if (t.imageWidth !== undefined) {
+        pictureChecks.push(["imageWidth", optionalPixels(t.imageWidth, "Picture width")]);
+      }
+      if (t.imageHeight !== undefined) {
+        pictureChecks.push(["imageHeight", optionalPixels(t.imageHeight, "Picture height")]);
+      }
+      // Only ever compared with a picture URL, so it needs no host check of its own.
+      if (t.cropApprovedFor !== undefined) {
+        pictureChecks.push(["cropApprovedFor", optionalText(t.cropApprovedFor, "OK", MAX_URL)]);
+      }
+      for (const [key, v] of pictureChecks) {
+        if (v !== null && typeof v === "object") return v;
+        (edit as unknown as Record<string, unknown>)[key] = v;
+      }
       targets.push(edit);
     }
   }
   return { patch, targets };
 }
+
+const TARGET_EDIT_FIELDS = [
+  "enabled",
+  "textOverride",
+  "imageUrl",
+  "imageAlt",
+  "imageWidth",
+  "imageHeight",
+  "cropApprovedFor",
+] as const;
 
 /**
  * Applies target edits to the stored targets. Only platforms with an adapter can be
@@ -182,10 +280,10 @@ export function mergeTargets(stored: TargetState[], edits: TargetEdit[]): Target
   return stored.map((t) => {
     const edit = edits.find((e) => e.platform === t.platform);
     if (!edit) return t;
-    return {
-      ...t,
-      ...(edit.enabled !== undefined ? { enabled: edit.enabled } : {}),
-      ...(edit.textOverride !== undefined ? { textOverride: edit.textOverride } : {}),
-    };
+    const next = { ...t };
+    for (const key of TARGET_EDIT_FIELDS) {
+      if (edit[key] !== undefined) (next as Record<string, unknown>)[key] = edit[key];
+    }
+    return next;
   });
 }

@@ -10,7 +10,7 @@ import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { dateLabel, firstLine } from "@/features/social/components/social-list-helpers";
 import { POST_STATUS_PILL } from "@/features/social/lib/post-display";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
-import { PLATFORM_LABEL, type SocialPlatformKey } from "@/features/social/lib/validate";
+import { PLATFORM_LABEL } from "@/features/social/lib/validate";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { FaChevronDown } from "react-icons/fa6";
@@ -120,7 +120,7 @@ function PostedRow({
         {outcomes.length > 0 && (
           <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {outcomes.map((t) => {
-              const label = PLATFORM_LABEL[t.platform as SocialPlatformKey] ?? t.platform;
+              const label = PLATFORM_LABEL[t.platform] ?? t.platform;
               return (
                 <li key={t.platform}>
                   {t.status === "posted" && t.permalink ? (

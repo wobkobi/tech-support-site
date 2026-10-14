@@ -23,7 +23,9 @@ import {
   PLATFORM_LABEL,
   SOCIAL_PLATFORMS,
   blockingIssues,
+  dateKey,
   fillPromo,
+  pictureFor,
   textFor,
   validatePost,
   type SocialPlatformKey,
@@ -58,11 +60,9 @@ function missingSetup(post: Pick<SocialPost, "targets">): string[] {
   return post.targets
     .filter((t) => t.enabled && isLive(t.platform))
     .flatMap((t) => {
-      const missing = PLATFORMS[t.platform as SocialPlatformKey].missingEnv();
+      const missing = PLATFORMS[t.platform].missingEnv();
       return missing.length > 0
-        ? [
-            `${PLATFORM_LABEL[t.platform as SocialPlatformKey]} is off until ${missing.join(", ")} is set.`,
-          ]
+        ? [`${PLATFORM_LABEL[t.platform]} is off until ${missing.join(", ")} is set.`]
         : [];
     });
 }
@@ -134,11 +134,20 @@ async function runPending(
   const due = targets.filter((t) => t.enabled && t.status === "pending" && isLive(t.platform));
   const settled = await Promise.allSettled(
     due.map((t) =>
-      PLATFORMS[t.platform as SocialPlatformKey].publish({
+      PLATFORMS[t.platform].publish({
         text: fillPromo(textFor(post, t.platform), promo).trim(),
-        imageUrl: post.imageUrl,
-        imageAlt: post.imageAlt,
+        // The platform's own picture when it has one, with its own description.
+        imageUrl: pictureFor(post, t.platform)?.url ?? null,
+        imageAlt: t.imageUrl ? t.imageAlt : post.imageAlt,
         linkUrl: post.linkUrl,
+        google: {
+          type: post.googleType,
+          cta: post.googleCta,
+          title: post.googleTitle,
+          start: dateKey(post.offerStart),
+          end: dateKey(post.offerEnd),
+          couponCode: post.couponCode,
+        },
       }),
     ),
   );

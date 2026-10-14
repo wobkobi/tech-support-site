@@ -1,11 +1,12 @@
 "use client";
 // src/features/social/components/PostPreviewPanel.tsx
-// The composer's preview column: a look-alike Facebook or Instagram card for each enabled
-// platform, its fix-first and note lines, and a switch between platforms. From xl it
-// pins beside the form, clearing the admin top bar and, on drafts, the pinned action bar.
+// The composer's preview column: a look-alike Facebook, Instagram or Google card for each
+// enabled platform, its fix-first and note lines, and a switch between platforms. From xl
+// it pins beside the form, clearing the admin top bar and, on drafts, the pinned action bar.
 
 import {
   FacebookPreview,
+  GooglePreview,
   InstagramPreview,
   type PreviewPost,
 } from "@/features/social/components/PlatformPreview";
@@ -106,10 +107,15 @@ export function PostPreviewPanel({
                 post={previewOf("facebook")}
                 pageName={accounts.facebook ?? "Your Page"}
               />
-            ) : (
+            ) : shownPreview === "instagram" ? (
               <InstagramPreview
                 post={previewOf("instagram")}
                 username={(accounts.instagram ?? "your.account").replace(/^@/, "")}
+              />
+            ) : (
+              <GooglePreview
+                post={previewOf("google")}
+                businessName={accounts.google ?? "Your business"}
               />
             )}
           </div>
