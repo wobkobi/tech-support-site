@@ -6,6 +6,12 @@
 // logic, no database and no network.
 // Run with: npm test -- mailing
 
+import {
+  emptyBlock,
+  isEmptyBlock,
+  parseBlocks,
+  serializeBlocks,
+} from "@/features/mailing/lib/blocks";
 import { emailInsertGroups } from "@/features/mailing/lib/insertables";
 import { selectRecipients, type PoolContact } from "@/features/mailing/lib/recipients";
 import {
@@ -15,6 +21,7 @@ import {
   type RenderContext,
 } from "@/features/mailing/lib/render";
 import { chunk } from "@/features/mailing/lib/send";
+import { starterPresets } from "@/features/mailing/lib/starter-presets";
 import {
   BLANK_TEMPLATE,
   matchTemplate,
@@ -503,11 +510,270 @@ function checkInsertables(): void {
   expect("phone comes from the details", byLabel.get("Phone number")?.text === "021 000 0000");
 }
 
+/** The block lines: promo card, quote, divider, spacer, social row, picture options. */
+function checkBlockRendering(): void {
+  console.log("Block rendering");
+  const promo = renderBody("::promo", VALUES, CTX.promo);
+  expect(
+    "the promo card shows the offer and end date",
+    promo.includes(">$10 off</p>") && promo.includes("Ends Friday 3 October</p>"),
+    promo,
+  );
+  const limited = renderBody("::promo", VALUES, { ...CTX.promo!, restriction: "weekdays" });
+  expect(
+    "the promo card names a weekday limit",
+    limited.includes("Ends Friday 3 October, weekdays only"),
+    limited,
+  );
+  expect("no promo leaves the card out", renderBody("::promo", VALUES, null) === "");
+
+  const quote = renderBody("> ★★★★\n> Fixed it **fast**.\n> - Pat, Avondale", VALUES);
+  expect(
+    "a quote shows its stars, text and name",
+    quote.includes('aria-label="4 out of 5 stars">★★★★</p>') &&
+      quote.includes("Fixed it <strong>fast</strong>.") &&
+      quote.includes(">- Pat, Avondale</p>"),
+    quote,
+  );
+  const ownReview = renderBody("> {reviewText}", { ...VALUES, reviewText: "<b>Great</b>" });
+  expect(
+    "a {reviewText} quote fills in escaped",
+    ownReview.includes("&lt;b&gt;Great&lt;/b&gt;"),
+    ownReview,
+  );
+  expect(
+    "a quote that comes out blank is left out",
+    renderBody("> ★★★★★\n> {reviewText}", VALUES) === "",
+  );
+  const nameOnly = renderBody("> - Pat", VALUES);
+  expect(
+    "a lone dash line in a quote is its text, not a name",
+    nameOnly.includes('font-style:italic">- Pat</p>'),
+    nameOnly,
+  );
+
+  expect("--- is a divider", renderBody("---", VALUES).startsWith("<hr"));
+  expect("::space is a gap", renderBody("::space", VALUES).includes("&nbsp;"));
+  const social = renderBody("::social", VALUES);
+  expect(
+    "::social links Google, Facebook and Instagram",
+    (social.match(/<a href="https:\/\//g) ?? []).length === 3,
+    social,
+  );
+  expect("an unknown ::word renders nothing", renderBody("::mystery", VALUES) === "");
+
+  const small = renderBody(`![Shop](${BLOB_IMAGE} "small")`, VALUES);
+  expect(
+    'a "small" picture is half width and centred',
+    small.includes("max-width:248px") && small.includes("text-align:center"),
+    small,
+  );
+  const linked = renderBody(`[![Shop](${BLOB_IMAGE})](https://example.test/x)`, VALUES);
+  expect(
+    "a linked picture is wrapped in its link",
+    linked.includes(
+      `<a href="https://example.test/x" style="display:block"><img src="${BLOB_IMAGE}"`,
+    ),
+    linked,
+  );
+  const linkedOutside = renderBody(
+    "[![x](https://elsewhere.test/a.jpg)](https://example.test)",
+    VALUES,
+  );
+  expect("a linked picture from another host is dropped", !linkedOutside.includes("<img"));
+
+  const button = renderBody("[Book](https://example.test/booking)", VALUES);
+  expect(
+    "a button sits in a coloured table cell for Outlook",
+    button.startsWith('<table role="presentation"') && button.includes("background:#206f79"),
+    button,
+  );
+
+  const text = renderCampaign(
+    {
+      subject: "Hi",
+      preheader: null,
+      body: "::promo\n\n> ★★★★★\n> Great job.\n> - Pat\n\n::social",
+    },
+    { name: "Sam" },
+    CTX,
+  ).text;
+  expect(
+    "the text part reads the promo, quote and social links",
+    text.includes("$10 off\n\nEnds Friday 3 October") &&
+      text.includes("★★★★★\n\nGreat job.\n\n- Pat") &&
+      text.includes("Find us on Google (https://"),
+    text,
+  );
+}
+
+/**
+ * Problems for a body, with a promo running or not.
+ * @param body - Body text.
+ * @param hasPromo - Whether a promo is running.
+ * @returns The problems.
+ */
+function problemsOf(body: string, hasPromo = true): string[] {
+  return listProblems({ subject: "s", preheader: null, body }, hasPromo);
+}
+
+/** The new problems: promo card, unknown blocks, broken and http links. */
+function checkBlockProblems(): void {
+  console.log("Block problems");
+  expect("a promo card with no promo is a problem", problemsOf("::promo", false).length === 1);
+  expect("a promo card with a promo is fine", problemsOf("::promo").length === 0);
+  expect(
+    "an unknown ::word is a problem",
+    problemsOf("::mystery").some((p) => p.includes("::mystery")),
+  );
+  expect(
+    "a button with no link is a problem",
+    problemsOf("[Book a time]()").some((p) => p.includes("link is missing")),
+  );
+  expect(
+    "an http button is a problem",
+    problemsOf("[Book](http://example.test)").some((p) => p.includes("https://")),
+  );
+  expect(
+    "an http picture link is a problem",
+    problemsOf(`[![x](${BLOB_IMAGE})](http://example.test)`).some((p) => p.includes("https://")),
+  );
+  expect(
+    "the same problem on two lines is listed once",
+    problemsOf("[Book](http://example.test)\n\n[Book](http://example.test)").length === 1,
+  );
+  const allGood = problemsOf(
+    [
+      "::promo",
+      "::space",
+      "::social",
+      "---",
+      "> ★★★★★\n> Great\n> - Pat",
+      `![x](${BLOB_IMAGE} "small")`,
+      `[![x](${BLOB_IMAGE})](https://example.test)`,
+      "[Book](https://example.test)",
+    ].join("\n\n"),
+  );
+  expect("every block line done right has no problems", allGood.length === 0, allGood.join(" | "));
+}
+
+/** Bodies that must survive a parse and re-serialise without the email changing. */
+const ROUND_TRIP_FIXTURES = [
+  "Hi {firstName},\n\nline one\nline two\n- touching list\n* star item\nafter list",
+  "Hi there,\r\n\r\n# Big\r\n## Small\r\nText right under\r\n",
+  "> ★★★★★\n> Great\n> - Pat\n\n> just text\n>\n> - name only",
+  "> - lone name line\n\n>\n\n> ★★",
+  "::promo\n::space\n::social\n::mystery\n---\nafter divider",
+  `![a](${BLOB_IMAGE})\n![b](${BLOB_IMAGE} "small")\n[![c](${BLOB_IMAGE})](https://example.test)\n[Book](https://example.test)`,
+  "[Book a time]()\n[not a button](see below)\n### three hashes\n#nospace",
+  "**{firstName}**, see [the site](https://example.test) - {promo}\n- {promoOffer} item\n> {reviewText}",
+  "\n\n\nlots\n\n\n\nof gaps\n\n\n",
+];
+
+/**
+ * Re-serialises a body through the blocks.
+ * @param body - Body text.
+ * @returns The re-serialised body, or null when the rendered email changed.
+ */
+function roundTrip(body: string): string | null {
+  const values = { ...VALUES, reviewText: "Good stuff" };
+  const again = serializeBlocks(parseBlocks(body));
+  const same = renderBody(again, values, CTX.promo) === renderBody(body, values, CTX.promo);
+  return same ? again : null;
+}
+
+/** The block editor's parse and serialise. */
+function checkBlocks(): void {
+  console.log("Blocks");
+  for (const preset of starterPresets("https://example.co.nz")) {
+    const again = roundTrip(preset.body);
+    expect(`preset "${preset.name}" renders the same after a round trip`, again !== null);
+    expect(
+      `preset "${preset.name}" body is unchanged by a round trip`,
+      again === preset.body,
+      JSON.stringify(again),
+    );
+  }
+  ROUND_TRIP_FIXTURES.forEach((body, i) => {
+    const again = roundTrip(body);
+    expect(
+      `fixture ${i + 1} renders the same after a round trip`,
+      again !== null,
+      JSON.stringify(body),
+    );
+    expect(
+      `fixture ${i + 1} settles after one round trip`,
+      again !== null && serializeBlocks(parseBlocks(again)) === again,
+      JSON.stringify(again),
+    );
+  });
+
+  const types = parseBlocks(
+    `# H\n\nPara\n- a\n- b\n\n[Go](https://example.test)\n![p](${BLOB_IMAGE})\n> q\n\n::promo\n---\n::space\n::social\n::mystery`,
+  ).map((b) => b.type);
+  expect(
+    "each line becomes its block type",
+    types.join(" ") === "heading text list button picture quote promo divider spacer social text",
+    types.join(" "),
+  );
+  const quote = parseBlocks("> ★★★\n> one\n> two\n> - Pat")[0];
+  expect(
+    "a quote reads its stars, text and name",
+    quote?.type === "quote" &&
+      quote.stars === 3 &&
+      quote.text === "one\ntwo" &&
+      quote.name === "Pat",
+    JSON.stringify(quote),
+  );
+  const picture = parseBlocks(`[![p](${BLOB_IMAGE} "small")](https://example.test)`)[0];
+  expect(
+    "a picture reads its size and link",
+    picture?.type === "picture" && picture.small && picture.link === "https://example.test",
+    JSON.stringify(picture),
+  );
+
+  const empties = (["heading", "text", "list", "button", "picture", "quote"] as const).map((type) =>
+    emptyBlock(type),
+  );
+  expect(
+    "empty blocks are left out of the body",
+    serializeBlocks([...empties, { id: "x", type: "text", text: "Hi" }]) === "Hi" &&
+      empties.every(isEmptyBlock),
+  );
+  expect(
+    "a button with a label but no link is kept, so the problem shows",
+    serializeBlocks([{ id: "x", type: "button", label: "Book", url: "" }]) === "[Book]()",
+  );
+  const unsafe = serializeBlocks([
+    { id: "x", type: "button", label: "Book ] now\nplease", url: "https://example.test" },
+  ]);
+  expect(
+    "brackets and line breaks can't break a button line",
+    parseBlocks(unsafe)[0]?.type === "button",
+    unsafe,
+  );
+  const built = serializeBlocks([
+    { id: "1", type: "heading", text: "Spring", size: "small" },
+    { id: "2", type: "list", items: ["one", " ", "two"] },
+    { id: "3", type: "quote", stars: 5, text: "Great\n\njob", name: "Pat" },
+    { id: "4", type: "picture", alt: "p", url: BLOB_IMAGE, small: true, link: "" },
+  ]);
+  expect(
+    "blocks write the expected lines",
+    built ===
+      `## Spring\n\n- one\n- two\n\n> ★★★★★\n> Great\n> job\n> - Pat\n\n![p](${BLOB_IMAGE} "small")`,
+    JSON.stringify(built),
+  );
+}
+
 /** Runs every group and exits non-zero on any failure. */
 function main(): void {
   checkEscaping();
   checkFormatting();
   checkImages();
+  checkBlockRendering();
+  checkBlockProblems();
+  checkBlocks();
   checkPlaceholders();
   checkTokens();
   checkRecipients();

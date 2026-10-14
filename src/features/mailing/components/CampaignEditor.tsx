@@ -541,6 +541,26 @@ export function CampaignEditor({
                     Words in curly brackets, like <code>{"{firstName}"}</code>, fill in for each
                     person. Add lists them all, with links, buttons and contact details.
                   </p>
+                  <p className="mt-2">Each of these goes on a line of its own:</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-5">
+                    <li>
+                      <code>::promo</code> - a box with the current promo and when it ends
+                    </li>
+                    <li>
+                      <code>{"> "}</code> lines - a review quote. Start with a line of stars like{" "}
+                      <code>{"> ★★★★★"}</code> and end with <code>{"> - Name, Suburb"}</code>
+                    </li>
+                    <li>
+                      <code>---</code> - a dividing line; <code>::space</code> - an empty gap
+                    </li>
+                    <li>
+                      <code>::social</code> - links to Google, Facebook and Instagram
+                    </li>
+                    <li>
+                      <code>{'![alt](url "small")'}</code> - a half-width picture; wrap a picture in{" "}
+                      <code>{"[...](https://...)"}</code> to make it a link
+                    </li>
+                  </ul>
                 </details>
               )}
               {editable && (

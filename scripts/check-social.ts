@@ -593,6 +593,43 @@ function checkFromEmail(): void {
     reviewer.body === "Thanks again.\nSee you soon.",
     JSON.stringify(reviewer.body),
   );
+
+  const blocks = postFromEmail(
+    [
+      "Hi {firstName},",
+      "",
+      "::promo",
+      "",
+      "---",
+      "",
+      "> ★★★★★",
+      "> Sorted my printer in no time.",
+      "> - Pat, Avondale",
+      "",
+      "::space",
+      "::social",
+      "::mystery",
+      "",
+      '[![Shop front](https://abc.public.blob.vercel-storage.com/mailing/c.jpg "small")](https://tothepoint.co.nz)',
+    ].join("\n"),
+  );
+  expect(
+    "promo card becomes {promo}; divider, spacer, social and unknown blocks drop; quote loses its markers",
+    blocks.body === "{promo}\n\n★★★★★\nSorted my printer in no time.\n- Pat, Avondale",
+    JSON.stringify(blocks.body),
+  );
+  expect(
+    "a linked, small picture still becomes the image",
+    blocks.imageUrl === "https://abc.public.blob.vercel-storage.com/mailing/c.jpg" &&
+      blocks.imageAlt === "Shop front",
+    JSON.stringify(blocks),
+  );
+  const ownReview = postFromEmail("> ★★★★★\n> {reviewText}\n\nThanks!");
+  expect(
+    "a quote of the recipient's own review is dropped whole",
+    ownReview.body === "Thanks!",
+    JSON.stringify(ownReview.body),
+  );
 }
 
 /** JPEG header size reader. */
