@@ -9,7 +9,7 @@ import { parseObjectId } from "@/features/business/lib/validation";
 import { CampaignEditor, type SendRow } from "@/features/mailing/components/CampaignEditor";
 import { toCampaignRow } from "@/features/mailing/lib/campaign-row";
 import { missingSendEnv, promoWording } from "@/features/mailing/lib/context";
-import { emailInsertGroups } from "@/features/mailing/lib/insertables";
+import { emailInsertGroups, emailLinkTargets } from "@/features/mailing/lib/insertables";
 import { BLANK_TEMPLATE, type Template } from "@/features/mailing/lib/templates";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { canUploadImages } from "@/shared/lib/image-upload";
@@ -112,6 +112,8 @@ export default async function AdminMailingEditPage({
         quiet={quietHoursOf(comms)}
         promoTitle={promo?.title ?? null}
         templates={templates}
+        promo={wording.promo}
+        linkTargets={emailLinkTargets(getSiteUrl())}
         adminEmail={process.env.ADMIN_EMAIL?.trim() || null}
       />
     </>

@@ -11,6 +11,7 @@ import {
   type InsertDetails,
 } from "@/features/admin/lib/insertables";
 import { PLACEHOLDERS, type PromoWording } from "@/features/mailing/lib/render";
+import { GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
 
 // Pages the menu links to: [menu label, link text, path]. The link text is lower case
 // because it sits inside a sentence ("Have a look at our prices page").
@@ -29,6 +30,26 @@ const BUTTONS: [string, string][] = [
   ["Read our reviews", "/reviews"],
   ["Get in touch", "/contact"],
 ];
+
+/** A place the block editor's buttons and pictures can link to. */
+export interface LinkTarget {
+  label: string;
+  url: string;
+}
+
+/**
+ * The block editor's link choices: the site's main pages plus the Google profile,
+ * where the reviews are.
+ * @param siteUrl - Site origin.
+ * @returns Choices in menu order.
+ */
+export function emailLinkTargets(siteUrl: string): LinkTarget[] {
+  return [
+    { label: "Home page", url: siteUrl },
+    ...PAGES.map(([label, , path]) => ({ label, url: `${siteUrl}${path}` })),
+    { label: "Google profile and reviews", url: GOOGLE_BUSINESS_PROFILE_URL },
+  ];
+}
 
 /**
  * The menu's sections. Links and buttons use the `[text](url)` form the renderer

@@ -32,6 +32,9 @@ export type Block =
 /** Every block type. */
 export type BlockType = Block["type"];
 
+/** Omit that keeps a union a union, so each block type keeps its own fields. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
 /** Names the editor shows for each block type, in Add-menu order. */
 export const BLOCK_LABELS: Record<BlockType, string> = {
   heading: "Heading",
@@ -88,11 +91,21 @@ export function emptyBlock(type: BlockType): Block {
  * a blank line ends a paragraph, list or quote, and every other block stands
  * alone on its line. Text that isn't any block, including an unknown `::word`,
  * becomes a Text block, so nothing the operator typed is lost.
+ *
+ * Ids are the prefix plus the position, so the server render and hydration give the
+ * same ids for the same body. Pass a fresh prefix when re-parsing on the client, so
+ * new blocks never reuse an old block's id (and with it React's state for that card).
  * @param body - Body text.
+ * @param idPrefix - Start of every id.
  * @returns The blocks, top to bottom.
  */
-export function parseBlocks(body: string): Block[] {
+export function parseBlocks(body: string, idPrefix = "p"): Block[] {
   const blocks: Block[] = [];
+  /**
+   * The next block's id.
+   * @returns The id.
+   */
+  const nextId = (): string => `${idPrefix}${blocks.length}`;
   let paragraph: string[] = [];
   let list: string[] = [];
   let quote: string[] = [];
@@ -100,13 +113,13 @@ export function parseBlocks(body: string): Block[] {
   /** Closes the paragraph being collected. */
   function flushParagraph(): void {
     if (paragraph.length === 0) return;
-    blocks.push({ id: newBlockId(), type: "text", text: paragraph.join("\n") });
+    blocks.push({ id: nextId(), type: "text", text: paragraph.join("\n") });
     paragraph = [];
   }
   /** Closes the bullet list being collected. */
   function flushList(): void {
     if (list.length === 0) return;
-    blocks.push({ id: newBlockId(), type: "list", items: list });
+    blocks.push({ id: nextId(), type: "list", items: list });
     list = [];
   }
   /** Closes the quote being collected, reading stars and name as renderBody does. */
@@ -119,7 +132,7 @@ export function parseBlocks(body: string): Block[] {
     const name = lines.length > 1 ? (lines.at(-1)?.match(QUOTE_NAME_RE)?.[1] ?? "") : "";
     if (name) lines.pop();
     blocks.push({
-      id: newBlockId(),
+      id: nextId(),
       type: "quote",
       stars: stars.length,
       text: lines.join("\n"),
@@ -127,12 +140,13 @@ export function parseBlocks(body: string): Block[] {
     });
   }
   /**
-   * Adds a block that stands alone on its line, closing any open paragraph.
-   * @param block - The block.
+   * Adds a block that stands alone on its line, closing any open paragraph first so
+   * the ids stay in order.
+   * @param block - The block, minus its id.
    */
-  function push(block: Block): void {
+  function push(block: DistributiveOmit<Block, "id">): void {
     flushParagraph();
-    blocks.push(block);
+    blocks.push({ ...block, id: nextId() });
   }
 
   for (const rawLine of body.replace(/\r\n?/g, "\n").split("\n")) {
@@ -158,25 +172,23 @@ export function parseBlocks(body: string): Block[] {
     }
     flushList();
 
-    const id = newBlockId();
     if (DIVIDER_RE.test(line)) {
-      push({ id, type: "divider" });
+      push({ type: "divider" });
       continue;
     }
     const directive = line.match(DIRECTIVE_RE);
     if (directive) {
       const word = directive[1]!;
-      if (!isDirective(word)) push({ id, type: "text", text: line });
-      else if (word === "promo") push({ id, type: "promo" });
-      else if (word === "space") push({ id, type: "spacer" });
-      else push({ id, type: "social" });
+      if (!isDirective(word)) push({ type: "text", text: line });
+      else if (word === "promo") push({ type: "promo" });
+      else if (word === "space") push({ type: "spacer" });
+      else push({ type: "social" });
       continue;
     }
     const linked = line.match(LINKED_IMAGE_LINE_RE);
     const image = linked ?? line.match(IMAGE_LINE_RE);
     if (image) {
       push({
-        id,
         type: "picture",
         alt: image[1]!,
         url: image[2]!,
@@ -187,15 +199,15 @@ export function parseBlocks(body: string): Block[] {
     }
     const button = line.match(BUTTON_LINE_RE);
     if (button) {
-      push({ id, type: "button", label: button[1]!, url: button[2]! });
+      push({ type: "button", label: button[1]!, url: button[2]! });
       continue;
     }
     if (line.startsWith("## ")) {
-      push({ id, type: "heading", text: line.slice(3).trim(), size: "small" });
+      push({ type: "heading", text: line.slice(3).trim(), size: "small" });
       continue;
     }
     if (line.startsWith("# ")) {
-      push({ id, type: "heading", text: line.slice(2).trim(), size: "big" });
+      push({ type: "heading", text: line.slice(2).trim(), size: "big" });
       continue;
     }
     paragraph.push(line);

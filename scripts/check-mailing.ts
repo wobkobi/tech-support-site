@@ -708,6 +708,23 @@ function checkBlocks(): void {
     );
   });
 
+  // A paragraph right above a standalone line is closed by it, so this checks the
+  // paragraph and the line don't end up sharing an id.
+  const idBody = "Para\n# H\nMore\n[Go](https://example.test)\n> q\n\n- a";
+  const ids = parseBlocks(idBody).map((b) => b.id);
+  expect("parsed block ids are unique", new Set(ids).size === ids.length, ids.join(","));
+  expect(
+    "parsing the same body twice gives the same ids (server and browser agree)",
+    ids.join(",") ===
+      parseBlocks(idBody)
+        .map((b) => b.id)
+        .join(","),
+  );
+  expect(
+    "an id prefix keeps a re-parse's ids apart from the first",
+    parseBlocks(idBody, "r1-").every((b) => !ids.includes(b.id)),
+  );
+
   const types = parseBlocks(
     `# H\n\nPara\n- a\n- b\n\n[Go](https://example.test)\n![p](${BLOB_IMAGE})\n> q\n\n::promo\n---\n::space\n::social\n::mystery`,
   ).map((b) => b.type);
