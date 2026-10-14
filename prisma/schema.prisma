@@ -1230,6 +1230,19 @@ model SocialDesign {
   @@index([isTemplate, updatedAt])
 }
 
+// A saved copy of a post maker design, for its History menu. Written by the save route
+// at most once every 5 minutes (holding the design as it was before that editing
+// session), kept to the last 20 per design, deleted with the design.
+model SocialDesignVersion {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  designId  String   @db.ObjectId
+  name      String
+  doc       Json
+  createdAt DateTime @default(now())
+
+  @@index([designId, createdAt])
+}
+
 // One entry in the depreciable asset register (/admin/business/assets). Site-only, like
 // Subscription: nothing here syncs to the Google Sheets workbook. Money is NZD on the GST
 // basis at entry; rates are fractions.

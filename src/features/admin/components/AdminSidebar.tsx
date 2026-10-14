@@ -31,6 +31,7 @@ import {
   FaGear,
   FaHandHoldingDollar,
   FaMagnifyingGlassDollar,
+  FaPalette,
   FaReceipt,
   FaRoute,
   FaScaleBalanced,
@@ -61,6 +62,7 @@ type AdminPage =
   | "promos"
   | "mailing"
   | "social"
+  | "post-maker"
   | "notifications"
   | "settings";
 
@@ -205,6 +207,13 @@ const SOCIAL_NAV_ITEM: NavItem = {
   path: "/admin/social",
 };
 
+const POST_MAKER_NAV_ITEM: NavItem = {
+  page: "post-maker",
+  label: "Post maker",
+  icon: <FaPalette className="shrink-0" />,
+  path: "/admin/social/design",
+};
+
 const NOTIFICATIONS_NAV_ITEM: NavItem = {
   page: "notifications",
   label: "Notifications",
@@ -224,6 +233,7 @@ const TOOL_NAV_ITEMS: NavItem[] = [
   PROMOS_NAV_ITEM,
   MAILING_NAV_ITEM,
   SOCIAL_NAV_ITEM,
+  POST_MAKER_NAV_ITEM,
   NOTIFICATIONS_NAV_ITEM,
   SETTINGS_NAV_ITEM,
 ];

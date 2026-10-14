@@ -1,10 +1,12 @@
 // scripts/check-social-design.ts
 // Post maker logic the editor and exports rely on: the size registry, the design
 // document parser, placing layers on another size (every size pair), carrying linked
-// edits across sizes, the align and distribute moves, and the out-of-date hash.
+// edits across sizes, the align and distribute moves, the out-of-date hash, and the
+// editor's edits (add, move, restack, group, paste, restyle) plus every new-layer kind.
 // Pure logic, no database and no browser.
 // Run with: npm test -- social-design
 
+import { boundText } from "@/features/social-design/lib/bound";
 import { blankDoc } from "@/features/social-design/lib/design-row";
 import {
   docHash,
@@ -14,6 +16,23 @@ import {
   type Geometry,
   type TextLayer,
 } from "@/features/social-design/lib/doc";
+import {
+  addLayer,
+  alignLayers,
+  applyTextPreset,
+  duplicateLayers,
+  expandGroups,
+  groupLayers,
+  moveLayerTo,
+  pasteStyle,
+  presetFontSize,
+  removeLayers,
+  restack,
+  setGeometry,
+  setTextHeights,
+  startGeometry,
+  styleOf,
+} from "@/features/social-design/lib/editor-ops";
 import {
   FORMAT_KEYS,
   FORMATS,
@@ -30,6 +49,7 @@ import {
   propagate,
   relinkSource,
 } from "@/features/social-design/lib/layout";
+import { makeLayer, type AddKind } from "@/features/social-design/lib/new-layer";
 
 let failures = 0;
 
@@ -562,6 +582,198 @@ function checkHash(): void {
   expect("the paid-ad switch changes the hash", docHash({ ...doc, paidAd: true }, NO_BOUND) !== h);
 }
 
+/**
+ * Ids of a document's layers, bottom first, joined for easy comparison.
+ * @param doc - Design.
+ * @returns Joined layer ids.
+ */
+function order(doc: DesignDoc): string {
+  return doc.layers.map((l) => l.id).join("");
+}
+
+/** The editor's edits and every kind of new layer. */
+function checkEditorOps(): void {
+  console.log("\nEditor edits");
+  const base = docWithText((f) => ({
+    x: 90,
+    y: 200,
+    w: FORMATS[f].width - 180,
+    h: 300,
+    rotation: 0,
+    fontSize: 96,
+    linked: true,
+  }));
+
+  // Every Add menu kind makes a layer the parser accepts once placed.
+  const kinds: AddKind[] = [
+    { kind: "text", preset: "headline" },
+    { kind: "text", preset: "small" },
+    {
+      kind: "image",
+      src: "https://abc.public.blob.vercel-storage.com/social-design/a.jpg",
+      naturalWidth: 1600,
+      naturalHeight: 1200,
+    },
+    { kind: "logo", variant: "full" },
+    { kind: "backdrop", source: "gradient" },
+    {
+      kind: "backdrop",
+      source: "photo",
+      src: "https://abc.public.blob.vercel-storage.com/social-design/b.jpg",
+    },
+    { kind: "frosted" },
+    { kind: "shape", shape: "rect" },
+    { kind: "shape", shape: "arrow" },
+    { kind: "bullets" },
+    { kind: "stars" },
+    { kind: "quote-mark" },
+    { kind: "contact", fields: ["phone", "email"] },
+    { kind: "promo", field: "offer" },
+  ];
+  let all = base;
+  for (const add of kinds) {
+    const { layer, share, ratio } = makeLayer(add);
+    all = addLayer(all, layer, "feed-4x5", startGeometry(layer, "feed-4x5", share, ratio));
+  }
+  const parsed = parseDesignDoc(all);
+  expect(
+    "every Add menu kind places a layer the parser accepts",
+    "doc" in parsed,
+    "error" in parsed ? parsed.error : "",
+  );
+  const added = all.layers.at(-1)?.id ?? "";
+  expect(
+    "a new layer gets a place on every size",
+    all.formats.every((f) => !!all.layouts[f]?.[added]),
+  );
+
+  // Linked edits reach linked sizes only; "this size" edits unlink.
+  const before = base.layouts["feed-4x5"]!.head1!;
+  const shifted = { head1: { ...before, x: before.x + 100 } };
+  const unlinked = structuredClone(base);
+  unlinked.layouts.square!.head1!.linked = false;
+  const moved = setGeometry(unlinked, "feed-4x5", shifted, "all");
+  expect(
+    "a move in all sizes reaches a linked size",
+    moved.layouts.story!.head1!.x !== base.layouts.story!.head1!.x,
+  );
+  expect(
+    "a move in all sizes leaves an unlinked size alone",
+    sortedJson(moved.layouts.square!.head1) === sortedJson(unlinked.layouts.square!.head1),
+  );
+  const only = setGeometry(base, "feed-4x5", shifted, "this");
+  expect(
+    "a move on this size only changes nothing else and unlinks it here",
+    only.layouts["feed-4x5"]!.head1!.linked === false &&
+      sortedJson(only.layouts.story) === sortedJson(base.layouts.story),
+  );
+
+  // Removing and duplicating.
+  const removed = removeLayers(base, ["head1"]);
+  expect(
+    "removing a layer clears its place on every size",
+    !removed.layers.some((l) => l.id === "head1") &&
+      Object.values(removed.layouts).every((l) => !l?.head1),
+  );
+  const dup = duplicateLayers(base, ["head1"], "feed-4x5");
+  const copyId = dup.ids[0] ?? "";
+  expect(
+    "a duplicate gets a new id, sits on top and is shifted",
+    copyId !== "head1" &&
+      dup.doc.layers.at(-1)?.id === copyId &&
+      dup.doc.layouts["feed-4x5"]![copyId]!.x === before.x + 24,
+  );
+  expect("a duplicate parses", "doc" in parseDesignDoc(dup.doc));
+
+  // Stack order, bottom first.
+  const text = base.layers[1]!;
+  const stack: DesignDoc = {
+    ...base,
+    layers: ["a", "b", "c", "d"].map((id) => ({ ...text, id })),
+  };
+  expect("forward steps up one", order(restack(stack, ["b"], "forward")) === "acbd");
+  expect("backward steps down one", order(restack(stack, ["c"], "backward")) === "acbd");
+  expect("front goes to the top", order(restack(stack, ["a", "c"], "front")) === "bdac");
+  expect("back goes to the bottom", order(restack(stack, ["d"], "back")) === "dabc");
+  expect("forward at the top stays", order(restack(stack, ["d"], "forward")) === "abcd");
+  expect("drag to a place moves one layer", order(moveLayerTo(stack, "d", 1)) === "adbc");
+
+  // Groups.
+  const grouped = groupLayers(stack, ["a", "c"]);
+  /**
+   * A layer's group in the grouped stack.
+   * @param id - Layer id.
+   * @returns Group id, or null.
+   */
+  const groupOf = (id: string): string | null =>
+    grouped.layers.find((l) => l.id === id)?.groupId ?? null;
+  expect(
+    "grouping pulls members together under the top member",
+    order(grouped) === "bacd" && !!groupOf("a") && groupOf("a") === groupOf("c"),
+    order(grouped),
+  );
+  expect(
+    "picking one group member picks the group",
+    expandGroups(grouped, ["a"]).sort().join("") === "ac",
+  );
+
+  // Align leaves locked layers alone.
+  const locked = structuredClone(base);
+  locked.layers[1]!.locked = true;
+  const aligned = alignLayers(locked, "feed-4x5", ["head1"], "left", "all");
+  expect("align skips a locked layer", aligned.layouts["feed-4x5"]!.head1!.x === before.x);
+
+  // Copy and paste style.
+  const other: TextLayer = {
+    ...(text as TextLayer),
+    id: "t2",
+    text: "Other",
+    colour: "coquelicot",
+  };
+  const styled = pasteStyle(
+    { ...base, layers: [...base.layers, other] },
+    ["head1"],
+    styleOf(other),
+  );
+  const head = styled.layers[1] as TextLayer;
+  expect(
+    "paste style copies the look but not the words",
+    head.colour === "coquelicot" && head.text === "Friendly local IT support",
+  );
+
+  // Presets scale their font by each size's shorter side.
+  const small = applyTextPreset(base, "head1", "support");
+  expect(
+    "a preset sets the font on every size, scaled",
+    small.layouts["feed-4x5"]!.head1!.fontSize === presetFontSize("support", "feed-4x5") &&
+      small.layouts.landscape!.head1!.fontSize === presetFontSize("support", "landscape") &&
+      presetFontSize("support", "landscape") < presetFontSize("support", "feed-4x5"),
+  );
+
+  // Text heights.
+  expect(
+    "unchanged text heights return the same design",
+    setTextHeights(base, { "feed-4x5": { head1: 300.2 } }) === base,
+  );
+  expect(
+    "a new text height is written",
+    setTextHeights(base, { "feed-4x5": { head1: 180 } }).layouts["feed-4x5"]!.head1!.h === 180,
+  );
+
+  // Bound words.
+  const contact = makeLayer({ kind: "contact", fields: ["phone", "email"] }).layer;
+  const promo = makeLayer({ kind: "promo", field: "ends" }).layer;
+  expect(
+    "contact details draw one per line",
+    contact.type === "contact" && boundText(contact, NO_BOUND) === "021 000 0000\nhi@example.nz",
+  );
+  expect(
+    "a missing promo draws a reminder",
+    promo.type === "promo" &&
+      boundText(promo, { ...NO_BOUND, promoEnds: null }) === "[No promo running]",
+  );
+}
+
 /** Runs every group and exits non-zero on any failure. */
 function main(): void {
   checkFormats();
@@ -570,6 +782,7 @@ function main(): void {
   checkPropagate();
   checkAlign();
   checkHash();
+  checkEditorOps();
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);
 }

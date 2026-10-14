@@ -5,6 +5,7 @@
 import { parseObjectId } from "@/features/business/lib/validation";
 import { DESIGN_KINDS, toDesignRow, toKind } from "@/features/social-design/lib/design-row";
 import { MAX_DOC_BYTES, parseDesignDoc } from "@/features/social-design/lib/doc";
+import { snapshotBeforeSave } from "@/features/social-design/lib/versions";
 import { errorResponse, isRecordNotFound, noStore, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -84,6 +85,14 @@ export async function PATCH(request: NextRequest, { params }: Ctx): Promise<Next
     data.doc = parsed.doc as unknown as Prisma.InputJsonValue;
   }
 
+  // Copy the design as it stands before this save, for the History menu. A failure
+  // here never blocks the save itself.
+  if (data.doc !== undefined) {
+    await snapshotBeforeSave(id).catch((error: unknown) =>
+      console.error(`[social-design] ${id} version copy failed:`, error),
+    );
+  }
+
   // One conditional write: matching on updatedAt makes check-and-save atomic, so two
   // tabs saving at once can't both win. updatedAt is set explicitly so the value
   // returned is exactly the one stored.
@@ -113,6 +122,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
   if (!id) return errorResponse("Design not found.", 404);
   try {
     await prisma.socialDesign.delete({ where: { id } });
+    await prisma.socialDesignVersion.deleteMany({ where: { designId: id } });
   } catch (error) {
     if (isRecordNotFound(error)) return errorResponse("Design not found.", 404);
     throw error;
