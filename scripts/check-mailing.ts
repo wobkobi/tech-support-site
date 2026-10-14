@@ -11,6 +11,7 @@ import {
   isEmptyBlock,
   parseBlocks,
   serializeBlocks,
+  type Block,
 } from "@/features/mailing/lib/blocks";
 import { emailInsertGroups } from "@/features/mailing/lib/insertables";
 import { selectRecipients, type PoolContact } from "@/features/mailing/lib/recipients";
@@ -21,7 +22,7 @@ import {
   type RenderContext,
 } from "@/features/mailing/lib/render";
 import { chunk } from "@/features/mailing/lib/send";
-import { starterPresets } from "@/features/mailing/lib/starter-presets";
+import { starterPresets, V2_PRESET_KEYS } from "@/features/mailing/lib/starter-presets";
 import {
   BLANK_TEMPLATE,
   matchTemplate,
@@ -526,6 +527,11 @@ function checkBlockRendering(): void {
     limited,
   );
   expect("no promo leaves the card out", renderBody("::promo", VALUES, null) === "");
+  expect(
+    "a picture still to choose is left out",
+    renderBody("![A picture of the van]()\n\nAfter", VALUES).startsWith("<p") &&
+      !renderBody("![A picture of the van]()", VALUES).includes("van"),
+  );
 
   const quote = renderBody("> ★★★★\n> Fixed it **fast**.\n> - Pat, Avondale", VALUES);
   expect(
@@ -622,6 +628,12 @@ function checkBlockProblems(): void {
   console.log("Block problems");
   expect("a promo card with no promo is a problem", problemsOf("::promo", false).length === 1);
   expect("a promo card with a promo is fine", problemsOf("::promo").length === 0);
+  const placeholder = problemsOf("![A picture of the van]()");
+  expect(
+    "a picture still to choose is one plain problem",
+    placeholder.length === 1 && placeholder[0]!.includes("hasn't been chosen"),
+    placeholder.join(" | "),
+  );
   expect(
     "an unknown ::word is a problem",
     problemsOf("::mystery").some((p) => p.includes("::mystery")),
@@ -723,6 +735,22 @@ function checkBlocks(): void {
   expect(
     "an id prefix keeps a re-parse's ids apart from the first",
     parseBlocks(idBody, "r1-").every((b) => !ids.includes(b.id)),
+  );
+
+  const [wanted] = parseBlocks("![A picture of the van]()");
+  expect(
+    "a picture still to choose parses as an empty Picture block that keeps its words",
+    wanted?.type === "picture" && wanted.url === "" && wanted.alt === "A picture of the van",
+  );
+  expect(
+    "a blank new Picture block is left out, a described one stays as a placeholder",
+    serializeBlocks([emptyBlock("picture")]) === "" &&
+      serializeBlocks([{ ...emptyBlock("picture"), alt: "Van" } as Block]) === "![Van]()",
+  );
+  const keys = starterPresets("https://example.co.nz").map((p) => p.presetKey);
+  expect(
+    "every later preset key is a starter, and keys are unique",
+    V2_PRESET_KEYS.every((k) => keys.includes(k)) && new Set(keys).size === keys.length,
   );
 
   const types = parseBlocks(

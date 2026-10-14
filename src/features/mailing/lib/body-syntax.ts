@@ -14,6 +14,13 @@ export const BUTTON_LINE_RE = /^\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)$/i;
 export const IMAGE_LINE_RE = /^!\[([^\]\n]*)\]\((https:\/\/[^)\s]+)(?:\s+"(small)")?\)$/i;
 
 /**
+ * A picture still to be chosen, `![alt]()`: a template's header picture before
+ * one is uploaded. Left out of the email (and listed as a problem) until it has one.
+ * Group 1 is the alt text.
+ */
+export const PICTURE_PLACEHOLDER_RE = /^!\[([^\]\n]*)\]\(\)$/;
+
+/**
  * A picture wrapped in a link, `[![alt](img)](https://link)`: a clickable picture.
  * Groups: 1 alt, 2 image URL, 3 `small` when present, 4 link URL.
  */

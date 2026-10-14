@@ -13,6 +13,7 @@ import {
   isDirective,
   isListLine,
   LINKED_IMAGE_LINE_RE,
+  PICTURE_PLACEHOLDER_RE,
   QUOTE_LINE_RE,
   QUOTE_NAME_RE,
   QUOTE_STARS_RE,
@@ -372,6 +373,10 @@ export function renderBody(
       if (html) blocks.push(html);
       continue;
     }
+    if (PICTURE_PLACEHOLDER_RE.test(line)) {
+      flushParagraph();
+      continue;
+    }
     const linked = line.match(LINKED_IMAGE_LINE_RE);
     const image = linked ?? line.match(IMAGE_LINE_RE);
     if (image) {
@@ -502,6 +507,12 @@ export function listProblems(
           "The email has a promo card but there's no promo running, so the card would be left out.",
         );
       }
+      continue;
+    }
+    if (PICTURE_PLACEHOLDER_RE.test(line)) {
+      lineProblems.add(
+        "A picture hasn't been chosen yet, so it's left out. Choose one, or delete that block.",
+      );
       continue;
     }
     const linked = line.match(LINKED_IMAGE_LINE_RE);

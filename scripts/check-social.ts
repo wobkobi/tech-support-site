@@ -609,6 +609,7 @@ function checkFromEmail(): void {
       "::space",
       "::social",
       "::mystery",
+      "![A picture still to choose]()",
       "",
       '[![Shop front](https://abc.public.blob.vercel-storage.com/mailing/c.jpg "small")](https://tothepoint.co.nz)',
     ].join("\n"),

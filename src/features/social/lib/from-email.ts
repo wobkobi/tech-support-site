@@ -10,6 +10,7 @@ import {
   IMAGE_LINE_RE,
   INLINE_LINK_RE,
   LINKED_IMAGE_LINE_RE,
+  PICTURE_PLACEHOLDER_RE,
   QUOTE_LINE_RE,
 } from "@/features/mailing/lib/body-syntax";
 
@@ -56,6 +57,7 @@ export function postFromEmail(emailBody: string): PostFromEmail {
       continue;
     }
     flushQuote();
+    if (PICTURE_PLACEHOLDER_RE.test(line)) continue;
     const image = line.match(LINKED_IMAGE_LINE_RE) ?? line.match(IMAGE_LINE_RE);
     if (image) {
       if (!imageUrl) {

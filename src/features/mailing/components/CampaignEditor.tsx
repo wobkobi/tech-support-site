@@ -591,6 +591,10 @@ export function CampaignEditor({
                           <code>{'![alt](url "small")'}</code> - a half-width picture; wrap a
                           picture in <code>{"[...](https://...)"}</code> to make it a link
                         </li>
+                        <li>
+                          <code>{"![What goes here]()"}</code> - a picture still to choose;
+                          it&apos;s left out until you add one
+                        </li>
                       </ul>
                     </details>
                   )}

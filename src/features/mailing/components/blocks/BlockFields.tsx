@@ -512,7 +512,9 @@ export function PictureFields({
   async function pick(file: File): Promise<void> {
     const url = await upload(file);
     if (fileRef.current) fileRef.current.value = "";
-    if (url) onChange({ url });
+    // A template's placeholder words describe the picture wanted, not the one uploaded,
+    // so a first upload clears them and the hint asks for a real description.
+    if (url) onChange(block.url ? { url } : { url, alt: "" });
   }
 
   const chooser = editable && (
@@ -544,6 +546,11 @@ export function PictureFields({
     return (
       <div className="flex flex-col items-start gap-2 rounded-lg border-2 border-dashed border-admin-border p-4">
         {chooser}
+        {block.alt.trim() && (
+          <p className="text-sm text-admin-text-secondary">
+            Wanted here: {block.alt}. It&apos;s left out of the email until you choose one.
+          </p>
+        )}
         {!canUpload && (
           <p className="text-sm text-admin-muted">
             Picture uploads aren&apos;t set up yet (BLOB_READ_WRITE_TOKEN).

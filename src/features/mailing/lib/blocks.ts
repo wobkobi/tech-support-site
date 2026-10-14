@@ -11,6 +11,7 @@ import {
   isDirective,
   isListLine,
   LINKED_IMAGE_LINE_RE,
+  PICTURE_PLACEHOLDER_RE,
   QUOTE_LINE_RE,
   QUOTE_NAME_RE,
   QUOTE_STARS_RE,
@@ -185,6 +186,11 @@ export function parseBlocks(body: string, idPrefix = "p"): Block[] {
       else push({ type: "social" });
       continue;
     }
+    const placeholder = line.match(PICTURE_PLACEHOLDER_RE);
+    if (placeholder) {
+      push({ type: "picture", alt: placeholder[1]!, url: "", small: false, link: "" });
+      continue;
+    }
     const linked = line.match(LINKED_IMAGE_LINE_RE);
     const image = linked ?? line.match(IMAGE_LINE_RE);
     if (image) {
@@ -275,7 +281,9 @@ export function serializeBlock(block: Block): string {
     }
     case "picture": {
       const url = block.url.trim();
-      if (!url) return "";
+      // No picture yet: a described one stays as a placeholder for later (a template's
+      // header picture); a blank new block is simply empty.
+      if (!url) return block.alt.trim() ? `![${bracketSafe(block.alt)}]()` : "";
       const img = `![${bracketSafe(block.alt)}](${url}${block.small ? ' "small"' : ""})`;
       const link = block.link.trim();
       return link ? `[${img}](${link})` : img;

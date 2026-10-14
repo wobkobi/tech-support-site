@@ -2,8 +2,16 @@
 // The starter mailing presets' wording. Kept apart from the seeding in presets.ts so the
 // checks can read it without loading the database client.
 
+import { GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
+
 /** presetKey of the preset "Email this promo" starts from. */
 export const PROMO_PRESET_KEY = "promo";
+
+/**
+ * Presets added after the first seeding. Installs seeded before them get just these on
+ * the next Mailing page load, so a starter the operator deleted stays deleted.
+ */
+export const V2_PRESET_KEYS: readonly string[] = ["announcement", "review-showcase", "tip"];
 
 /** A starter preset's content. */
 export interface StarterPreset {
@@ -31,7 +39,9 @@ export function starterPresets(siteUrl: string): StarterPreset[] {
       body: [
         "Hi {firstName},",
         "",
-        "Just a quick heads-up that I'm running a deal at the moment: **{promo}**.",
+        "Just a quick heads-up that I'm running a deal at the moment.",
+        "",
+        "::promo",
         "",
         "If something's been bugging you, like a slow computer, a phone that won't do what you want, or email that's stopped working, now's a good time to get it sorted.",
         "",
@@ -48,7 +58,9 @@ export function starterPresets(siteUrl: string): StarterPreset[] {
       body: [
         "Hi {firstName},",
         "",
-        "Just a reminder that my current deal, **{promo}**, is nearly over.",
+        "Just a reminder that my current deal is nearly over.",
+        "",
+        "::promo",
         "",
         "If you've been meaning to get something looked at, now's the time to book.",
         "",
@@ -142,6 +154,65 @@ export function starterPresets(siteUrl: string): StarterPreset[] {
         book,
         "",
         "Or just reply to this email and tell me what's going on.",
+      ].join("\n"),
+    },
+    {
+      presetKey: "announcement",
+      name: "Announcement",
+      subject: "Some news from me",
+      preheader: "Something new I wanted you to hear about first.",
+      body: [
+        "![A picture that goes with your news]()",
+        "",
+        "# Your news in a few words",
+        "",
+        "Hi {firstName},",
+        "",
+        "Say what's new and what it means for them. Keep it to two or three short sentences.",
+        "",
+        book,
+      ].join("\n"),
+    },
+    {
+      presetKey: "review-showcase",
+      name: "What people are saying",
+      subject: "What people have been saying",
+      preheader: "A few kind words from people I've helped.",
+      body: [
+        "Hi {firstName},",
+        "",
+        "I like to share a kind word now and then. Here's what someone said after I helped them recently:",
+        "",
+        "> ★★★★★",
+        "> Paste a real review here, word for word.",
+        "> - Their first name, suburb",
+        "",
+        "If I've helped you too, a review on Google means a lot. It's how most people find me.",
+        "",
+        `[Read more reviews on Google](${GOOGLE_BUSINESS_PROFILE_URL})`,
+      ].join("\n"),
+    },
+    {
+      presetKey: "tip",
+      name: "Tech tip",
+      subject: "A quick tech tip",
+      preheader: "Something small that saves a headache later.",
+      body: [
+        "Hi {firstName},",
+        "",
+        "# Your tip in a few words",
+        "",
+        "Say in a sentence or two why it matters.",
+        "",
+        "## How to do it",
+        "",
+        "- First step",
+        "- Second step",
+        "- Third step",
+        "",
+        "If you'd like a hand with it, I'm happy to come and help.",
+        "",
+        book,
       ].join("\n"),
     },
   ];
