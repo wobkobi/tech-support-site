@@ -75,3 +75,56 @@ export const QUOTE_NAME_RE = /^-\s+(.+)$/;
 export function isListLine(line: string): boolean {
   return line.startsWith("- ") || line.startsWith("* ");
 }
+
+/**
+ * A `>> ` line: part of a big box, a coloured panel with a large headline. Checked
+ * before {@link QUOTE_LINE_RE}, which would otherwise read it as a quote line starting
+ * with `>`. Group 1 is the text after the marker.
+ */
+export const BOX_LINE_RE = /^>>[ \t]?(.*)$/;
+
+/** A big box's parts, read from its `>> ` lines. */
+export interface BoxParts {
+  /** Background photo URL, or "" for the plain brand colour. */
+  photo: string;
+  /** The large line; a box without one is left out. */
+  headline: string;
+  /** Smaller lines under the headline. */
+  lines: string[];
+  /** Button words, or "" for no button. */
+  label: string;
+  /** Button link, or "" while it waits for one. */
+  url: string;
+}
+
+/**
+ * Reads a big box from the text of its `>> ` lines (markers already stripped):
+ * - the first picture line is the background photo,
+ * - the first button line (or `[Text]()` waiting for a link) is the button,
+ * - the first other line is the headline and the rest are the smaller lines.
+ * @param lines - Trimmed line texts, blank ones already dropped.
+ * @returns The box's parts.
+ */
+export function readBox(lines: readonly string[]): BoxParts {
+  const box: BoxParts = { photo: "", headline: "", lines: [], label: "", url: "" };
+  let hasPhoto = false;
+  let hasButton = false;
+  for (const line of lines) {
+    const photo = line.match(IMAGE_LINE_RE) ?? line.match(PICTURE_PLACEHOLDER_RE);
+    if (photo && !hasPhoto) {
+      hasPhoto = true;
+      box.photo = photo[2] ?? "";
+      continue;
+    }
+    const button = line.match(BUTTON_LINE_RE) ?? line.match(BUTTON_PLACEHOLDER_RE);
+    if (button && !hasButton) {
+      hasButton = true;
+      box.label = button[1]!;
+      box.url = button[2] ?? "";
+      continue;
+    }
+    if (!box.headline) box.headline = line;
+    else box.lines.push(line);
+  }
+  return box;
+}

@@ -14,12 +14,15 @@ import {
   serializeBlocks,
   type Block,
 } from "@/features/mailing/lib/blocks";
+import { optOutActionFor } from "@/features/mailing/lib/delivery-events";
 import { emailInsertGroups, emailLinkTargets } from "@/features/mailing/lib/insertables";
 import { selectRecipients, type PoolContact } from "@/features/mailing/lib/recipients";
 import {
+  campaignTag,
   listProblems,
   renderBody,
   renderCampaign,
+  tagLinks,
   type RenderContext,
 } from "@/features/mailing/lib/render";
 import { chunk } from "@/features/mailing/lib/send";
@@ -305,6 +308,22 @@ function checkRecipients(): void {
   expect(
     "an opt-out follows the contact after an email change",
     ids(result.optedOut).includes("e"),
+  );
+  const reasons = selectRecipients(
+    pool,
+    [
+      { email: "cat@example.com", contactId: null, source: "bounce" },
+      { email: "dan@example.com", contactId: "d", source: "complaint" },
+      { email: "new-eve@example.com", contactId: "e", source: "link" },
+    ],
+    new Set(),
+  ).optedOut;
+  expect(
+    "a bounce or spam report shows its reason; a reader's own unsubscribe has none",
+    reasons.find((r) => r.contactId === "c")?.optOutReason === "bounce" &&
+      reasons.find((r) => r.contactId === "d")?.optOutReason === "complaint" &&
+      reasons.find((r) => r.contactId === "e")?.optOutReason === undefined,
+    JSON.stringify(reasons),
   );
   expect("an unticked contact is excluded", ids(result.excluded) === "d", ids(result.excluded));
   const all = [...result.recipients, ...result.excluded, ...result.optedOut];
@@ -708,6 +727,8 @@ const ROUND_TRIP_FIXTURES = [
   "[Book a time]()\n[not a button](see below)\n### three hashes\n#nospace",
   "**{firstName}**, see [the site](https://example.test) - {promo}\n- {promoOffer} item\n> {reviewText}",
   "\n\n\nlots\n\n\n\nof gaps\n\n\n",
+  `>> ![](${BLOB_IMAGE})\n>> Lock in **today's** rate, {firstName}\n>> Before it ends\n>> and soon\n>> [Book](https://example.test)\n> ★★★★★\n> after the box`,
+  ">> Just a headline\n>>\n>> [Waiting]()\n\n>> ![]()\n>> no photo yet\n\n>> [Only a button](https://example.test)",
 ];
 
 /**
@@ -745,6 +766,17 @@ function checkAiDraft(): void {
       read.heading === "" &&
       read.preheader === "",
     JSON.stringify(read),
+  );
+  const curly = readDraft({
+    heading: "We’re open “late”",
+    paragraphs: ["One more thing – I’d love a review—thanks.", "Open 9–5 weekdays."],
+  });
+  expect(
+    "curly quotes come back straight and dashes as plain hyphens",
+    curly?.heading === `We're open "late"` &&
+      curly.paragraphs[0] === "One more thing - I'd love a review - thanks." &&
+      curly.paragraphs[1] === "Open 9-5 weekdays.",
+    JSON.stringify(curly),
   );
 
   const draft: AiDraft = {
@@ -970,6 +1002,195 @@ function checkBlocks(): void {
   );
 }
 
+/** Link tracking: only the site's own links get tagged, and only on a real send. */
+function checkTracking(): void {
+  console.log("Link tracking");
+  expect(
+    "the tag is the subject as a slug, with placeholders dropped",
+    campaignTag("{firstName}, a quick update & 20% off!") === "a-quick-update-20-off" &&
+      campaignTag("{firstName}") === "email",
+  );
+  const tracking = { siteUrl: "https://tothepoint.co.nz", campaign: "spring" };
+  const tagged = tagLinks(
+    [
+      `<a href="https://tothepoint.co.nz/booking">`,
+      `<a href="https://www.tothepoint.co.nz/pricing?x=1&amp;y=2">`,
+      `<a href="https://g.page/r/abc/review">`,
+      `<a href="https://tothepoint.co.nz/unsubscribe/tok">`,
+      `<a href="https://tothepoint.co.nz/faq?utm_source=flyer">`,
+    ].join("\n"),
+    tracking,
+  ).split("\n");
+  const tags = "utm_source=newsletter&amp;utm_medium=email&amp;utm_campaign=spring";
+  expect(
+    "the site's own links get the tags, keeping any query they had",
+    tagged[0] === `<a href="https://tothepoint.co.nz/booking?${tags}">` &&
+      tagged[1] === `<a href="https://www.tothepoint.co.nz/pricing?x=1&amp;y=2&amp;${tags}">`,
+    tagged.slice(0, 2).join(" | "),
+  );
+  expect(
+    "other sites, unsubscribe links and links with their own tags are left alone",
+    tagged[2] === `<a href="https://g.page/r/abc/review">` &&
+      tagged[3] === `<a href="https://tothepoint.co.nz/unsubscribe/tok">` &&
+      tagged[4] === `<a href="https://tothepoint.co.nz/faq?utm_source=flyer">`,
+    tagged.slice(2).join(" | "),
+  );
+  const content = {
+    subject: "Spring",
+    preheader: "",
+    body: "[Book](https://tothepoint.co.nz/booking)",
+  };
+  const unsub = { ...CTX, unsubscribeUrl: "https://tothepoint.co.nz/unsubscribe/abc" };
+  const live = renderCampaign(content, { name: "Sam" }, { ...unsub, tracking }).html;
+  const test = renderCampaign(content, { name: "Sam" }, unsub).html;
+  expect(
+    "a real send tags the button but never the unsubscribe link; a test send tags nothing",
+    live.includes("booking?utm_source=newsletter") &&
+      live.includes(`href="https://tothepoint.co.nz/unsubscribe/abc"`) &&
+      !test.includes("utm_"),
+  );
+}
+
+/** Resend webhooks: which events take an address off the list, and why. */
+function checkDeliveryEvents(): void {
+  console.log("Delivery events");
+  /**
+   * A webhook event of a type, to one address, with extra data.
+   * @param type - Event type.
+   * @param extra - Extra `data` fields.
+   * @returns The event.
+   */
+  const event = (type: string, extra: Record<string, unknown> = {}): unknown => ({
+    type,
+    data: { email_id: "x", to: ["Sam Taylor <Sam@Example.com>"], ...extra },
+  });
+  const hard = optOutActionFor(event("email.bounced", { bounce: { type: "Permanent" } }));
+  expect(
+    "a hard bounce drops the bare, lowercased address",
+    hard?.source === "bounce" && hard.emails.join() === "sam@example.com",
+    JSON.stringify(hard),
+  );
+  expect(
+    "a soft bounce leaves the list alone",
+    optOutActionFor(event("email.bounced", { bounce: { type: "Transient" } })) === null,
+  );
+  expect(
+    "a spam report is a complaint",
+    optOutActionFor(event("email.complained"))?.source === "complaint",
+  );
+  expect(
+    "a suppressed send follows Resend's reason",
+    optOutActionFor(event("email.suppressed", { suppressed: { type: "Complaint" } }))?.source ===
+      "complaint" &&
+      optOutActionFor(event("email.suppressed", { suppressed: { type: "Bounce" } }))?.source ===
+        "bounce",
+  );
+  expect(
+    "sent, delivered and opened events, and junk, change nothing",
+    optOutActionFor(event("email.delivered")) === null &&
+      optOutActionFor(event("email.opened")) === null &&
+      optOutActionFor({ type: "email.complained", data: { to: ["not an address"] } }) === null &&
+      optOutActionFor(null) === null,
+  );
+}
+
+/** The big box: a coloured panel with a large headline, smaller lines, a button and a photo. */
+function checkBox(): void {
+  console.log("Big box");
+  const full = [
+    `>> ![](${BLOB_IMAGE})`,
+    ">> Lock in today's rate, {firstName}",
+    ">> Book before Friday",
+    ">> [Book a time](https://example.test/booking)",
+  ].join("\n");
+  const html = renderBody(full, VALUES);
+  expect(
+    "the photo sits behind the box, with the brand colour for apps that drop it",
+    html.includes(`background="${BLOB_IMAGE}"`) &&
+      html.includes(`background-image:url('${BLOB_IMAGE}')`) &&
+      html.includes('bgcolor="#206f79"'),
+    html,
+  );
+  expect(
+    "the headline is large and filled in, the smaller line follows and the button is white",
+    html.includes("today&#39;s rate, Sam</h2>") &&
+      html.includes(">Book before Friday</p>") &&
+      html.includes('href="https://example.test/booking"') &&
+      html.includes("color:#0c0a3e"),
+    html,
+  );
+  const plain = renderBody(">> Headline only", VALUES);
+  expect(
+    "a box with no photo is the plain colour, with no photo attribute",
+    plain.includes('bgcolor="#206f79"') && !plain.includes("background="),
+    plain,
+  );
+  const offHost = renderBody(">> ![](https://example.test/x.jpg)\n>> Headline", VALUES);
+  expect(
+    "a photo from another site is dropped for the plain colour",
+    !offHost.includes("example.test/x.jpg") && offHost.includes("Headline</h2>"),
+    offHost,
+  );
+  expect(
+    "a box with no headline, or a button waiting for its link, is left out",
+    renderBody(`>> ![](${BLOB_IMAGE})`, VALUES) === "" &&
+      !renderBody(">> Headline\n>> [Book]()", VALUES).includes("Book"),
+  );
+  const mixed = renderBody(">> Headline\n> A quote line", VALUES);
+  expect(
+    "a quote line straight after a box is its own quote, not part of the box",
+    mixed.includes("Headline</h2>") && mixed.includes("A quote line") && !mixed.includes("&gt;"),
+    mixed,
+  );
+
+  /**
+   * Problems for a body, with a promo running.
+   * @param body - Body text.
+   * @returns The problems listed.
+   */
+  const problems = (body: string): string[] =>
+    listProblems({ subject: "s", preheader: "", body }, true);
+  expect(
+    "a box with no headline is listed as a problem",
+    problems(`>> ![](${BLOB_IMAGE})`).some((p) => p.includes("no headline")),
+  );
+  expect(
+    "a box button waiting for its link is listed, and so is a photo from another site",
+    problems(">> Headline\n>> [Book]()").some((p) => p.includes('"Book" button')) &&
+      problems(">> ![](https://example.test/x.jpg)\n>> Headline").some((p) =>
+        p.includes("big box's photo"),
+      ),
+  );
+  expect("a complete box has no problems", problems(full).length === 0, problems(full).join());
+
+  const [box] = parseBlocks(full);
+  expect(
+    "a box parses into its photo, headline, smaller lines and button",
+    box?.type === "box" &&
+      box.photo === BLOB_IMAGE &&
+      box.headline === "Lock in today's rate, {firstName}" &&
+      box.line === "Book before Friday" &&
+      box.label === "Book a time" &&
+      box.url === "https://example.test/booking",
+    JSON.stringify(box),
+  );
+  expect(
+    "a box with no headline yet is empty and left out of the body",
+    serializeBlocks([
+      {
+        id: "x",
+        type: "box",
+        photo: BLOB_IMAGE,
+        headline: " ",
+        line: "words",
+        label: "Go",
+        url: "",
+      },
+    ]) === "",
+  );
+  expect("a box written back is unchanged", serializeBlocks(parseBlocks(full)) === full);
+}
+
 /** Runs every group and exits non-zero on any failure. */
 function main(): void {
   checkEscaping();
@@ -978,7 +1199,10 @@ function main(): void {
   checkBlockRendering();
   checkBlockProblems();
   checkBlocks();
+  checkBox();
   checkAiDraft();
+  checkTracking();
+  checkDeliveryEvents();
   checkPlaceholders();
   checkTokens();
   checkRecipients();

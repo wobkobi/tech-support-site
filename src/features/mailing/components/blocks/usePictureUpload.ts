@@ -14,7 +14,7 @@ import { useState } from "react";
  *   (after a toast saying why), and `busy` while one is in flight.
  */
 export function usePictureUpload(): {
-  upload: (file: File) => Promise<string | null>;
+  upload: (file: File, shade?: number) => Promise<string | null>;
   busy: boolean;
 } {
   const { toast } = useToast();
@@ -23,12 +23,13 @@ export function usePictureUpload(): {
   /**
    * Shrinks and uploads a picked file.
    * @param file - The picked image.
+   * @param shade - Darkening for a photo that sits behind words, as for shrinkImage.
    * @returns The picture's URL, or null when it failed.
    */
-  async function upload(file: File): Promise<string | null> {
+  async function upload(file: File, shade = 0): Promise<string | null> {
     setBusy(true);
     try {
-      const { file: small } = await shrinkImage(file);
+      const { file: small } = await shrinkImage(file, undefined, shade);
       const form = new FormData();
       form.append("file", small);
       const res = await callApi<{ url: string }>("/api/admin/mailing/upload", "POST", form);

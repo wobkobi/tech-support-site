@@ -4,6 +4,7 @@
 // so a parse and re-serialise always renders the same email. Pure and client-safe.
 
 import {
+  BOX_LINE_RE,
   BUTTON_LINE_RE,
   BUTTON_PLACEHOLDER_RE,
   DIRECTIVE_RE,
@@ -16,6 +17,7 @@ import {
   QUOTE_LINE_RE,
   QUOTE_NAME_RE,
   QUOTE_STARS_RE,
+  readBox,
 } from "@/features/mailing/lib/body-syntax";
 
 /** One block. `id` only keys the editor's list; it is never saved. */
@@ -26,6 +28,16 @@ export type Block =
   | { id: string; type: "button"; label: string; url: string }
   | { id: string; type: "picture"; alt: string; url: string; small: boolean; link: string }
   | { id: string; type: "quote"; stars: number; text: string; name: string }
+  | {
+      id: string;
+      type: "box";
+      photo: string;
+      headline: string;
+      /** Smaller lines under the headline, one per line. */
+      line: string;
+      label: string;
+      url: string;
+    }
   | { id: string; type: "promo" }
   | { id: string; type: "divider" }
   | { id: string; type: "spacer" }
@@ -44,6 +56,7 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
   list: "Bullet list",
   button: "Button",
   picture: "Picture",
+  box: "Big box",
   promo: "Promo card",
   quote: "Review quote",
   divider: "Divider",
@@ -83,6 +96,8 @@ export function emptyBlock(type: BlockType): Block {
       return { id, type, alt: "", url: "", small: false, link: "" };
     case "quote":
       return { id, type, stars: 5, text: "", name: "" };
+    case "box":
+      return { id, type, photo: "", headline: "", line: "", label: "", url: "" };
     default:
       return { id, type };
   }
@@ -111,12 +126,28 @@ export function parseBlocks(body: string, idPrefix = "p"): Block[] {
   let paragraph: string[] = [];
   let list: string[] = [];
   let quote: string[] = [];
+  let box: string[] = [];
 
   /** Closes the paragraph being collected. */
   function flushParagraph(): void {
     if (paragraph.length === 0) return;
     blocks.push({ id: nextId(), type: "text", text: paragraph.join("\n") });
     paragraph = [];
+  }
+  /** Closes the big box being collected, reading its parts as renderBody does. */
+  function flushBox(): void {
+    if (box.length === 0) return;
+    const parts = readBox(box.filter(Boolean));
+    box = [];
+    blocks.push({
+      id: nextId(),
+      type: "box",
+      photo: parts.photo,
+      headline: parts.headline,
+      line: parts.lines.join("\n"),
+      label: parts.label,
+      url: parts.url,
+    });
   }
   /** Closes the bullet list being collected. */
   function flushList(): void {
@@ -157,8 +188,18 @@ export function parseBlocks(body: string, idPrefix = "p"): Block[] {
       flushParagraph();
       flushList();
       flushQuote();
+      flushBox();
       continue;
     }
+    const boxed = line.match(BOX_LINE_RE);
+    if (boxed) {
+      flushParagraph();
+      flushList();
+      flushQuote();
+      box.push(boxed[1]!.trim());
+      continue;
+    }
+    flushBox();
     const quoted = line.match(QUOTE_LINE_RE);
     if (quoted) {
       flushParagraph();
@@ -222,6 +263,7 @@ export function parseBlocks(body: string, idPrefix = "p"): Block[] {
   flushParagraph();
   flushList();
   flushQuote();
+  flushBox();
   return blocks;
 }
 
@@ -299,6 +341,22 @@ export function serializeBlock(block: Block): string {
         ...text.map((l) => `> ${l}`),
         ...(name ? [`> - ${name}`] : []),
       ].join("\n");
+    }
+    case "box": {
+      // The headline is what makes it a box: without one the block stays empty, and
+      // the photo or button picked so far waits in the editor until it has one.
+      const headline = block.headline.replace(/\s+/g, " ").trim();
+      if (!headline) return "";
+      const photo = block.photo.trim();
+      const label = bracketSafe(block.label);
+      return [
+        ...(photo ? [`![](${photo})`] : []),
+        headline,
+        ...linesOf(block.line),
+        ...(label ? [`[${label}](${block.url.trim()})`] : []),
+      ]
+        .map((l) => `>> ${l}`)
+        .join("\n");
     }
     case "promo":
       return "::promo";

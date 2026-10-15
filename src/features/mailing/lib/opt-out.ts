@@ -2,6 +2,7 @@
 // Records and reverses mailing-list unsubscribes. Every address a contact uses is
 // opted out together, so a merged contact's second address can't keep getting emails.
 
+import type { OptOutAction } from "@/features/mailing/lib/delivery-events";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import type { EmailOptOutSource } from "@prisma/client";
@@ -34,6 +35,32 @@ export async function optOutContact(
     });
   }
   return true;
+}
+
+/**
+ * Takes addresses off the list after Resend reports a problem with them.
+ * - A bounce drops only the dead address, with no contact id, so a contact whose other
+ *   address works stays on the list through that one.
+ * - A spam report drops the reader entirely: every address of the matching contact,
+ *   the same as an unsubscribe, or just the address when no contact uses it.
+ * An existing opt-out keeps its original source.
+ * @param action - What the webhook asked for.
+ */
+export async function optOutForDelivery(action: OptOutAction): Promise<void> {
+  for (const email of action.emails) {
+    if (action.source === "complaint") {
+      const contact = await prisma.contact.findFirst({
+        where: { deletedAt: null, OR: [{ email }, { altEmails: { has: email } }] },
+        select: { id: true },
+      });
+      if (contact && (await optOutContact(contact.id, "complaint"))) continue;
+    }
+    await prisma.emailOptOut.upsert({
+      where: { email },
+      create: { email, source: action.source },
+      update: {},
+    });
+  }
 }
 
 /**

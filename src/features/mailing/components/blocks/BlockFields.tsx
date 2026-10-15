@@ -14,11 +14,13 @@ import {
 import { ADMIN_CHECKBOX_CLS } from "@/features/admin/components/ui/field-classes";
 import { InsertMenu, type InsertGroup } from "@/features/admin/components/ui/InsertMenu";
 import { Modal } from "@/features/admin/components/ui/Modal";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { LinkPicker } from "@/features/mailing/components/blocks/LinkPicker";
 import { usePictureUpload } from "@/features/mailing/components/blocks/usePictureUpload";
 import type { Block } from "@/features/mailing/lib/blocks";
 import type { LinkTarget } from "@/features/mailing/lib/insertables";
 import type { PromoWording } from "@/features/mailing/lib/render";
+import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useId, useRef, useState } from "react";
 import { FaArrowDown, FaArrowUp, FaPlus, FaXmark } from "react-icons/fa6";
@@ -694,6 +696,177 @@ export function QuoteFields({
           </AdminField>
         </>
       )}
+    </div>
+  );
+}
+
+/** Opacity of the navy wash on a big box photo: dark enough for white words on any photo. */
+const BOX_PHOTO_SHADE = 0.55;
+
+/** The operator's own photo, the one on the About page, for "Use my photo". */
+const OWN_PHOTO_PATH = "/source/harrison-2026.jpg";
+
+/** A big box headline past this length wraps onto three lines on a phone. */
+const LONG_BOX_HEADLINE = 40;
+
+/** Shadow under the box's white words, matching the email's. */
+const BOX_SHADOW_CLS = "[text-shadow:0_1px_3px_rgba(0,0,0,.45)]";
+
+/**
+ * Big box controls: a small copy of the box, the photo behind it (uploaded, the
+ * operator's own, or none for the plain colour), the headline, smaller lines and an
+ * optional button. Photos are darkened as they upload, so white words read on them.
+ * @param props - Component props.
+ * @param props.block - The box.
+ * @param props.onChange - Reports a change.
+ * @param props.editable - Whether it can be changed.
+ * @param props.canUpload - Whether picture uploads are set up.
+ * @param props.linkTargets - Pages the button can go to.
+ * @returns The controls.
+ */
+export function BoxFields({
+  block,
+  onChange,
+  editable,
+  canUpload,
+  linkTargets,
+}: FieldsProps<BlockOf<"box">> & {
+  canUpload: boolean;
+  linkTargets: LinkTarget[];
+}): React.ReactElement {
+  const id = useId();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const { upload, busy } = usePictureUpload();
+  const { toast } = useToast();
+
+  /**
+   * Darkens and uploads a photo, then puts it behind the box.
+   * @param file - The photo.
+   */
+  async function setPhoto(file: File): Promise<void> {
+    const url = await upload(file, BOX_PHOTO_SHADE);
+    if (fileRef.current) fileRef.current.value = "";
+    if (url) onChange({ photo: url });
+  }
+
+  /** Fetches the operator's own photo from the site and uses it. */
+  async function setOwnPhoto(): Promise<void> {
+    const res = await fetch(OWN_PHOTO_PATH).catch(() => null);
+    if (!res?.ok) {
+      toast("Couldn't load your photo.", { tone: "error" });
+      return;
+    }
+    const blob = await res.blob();
+    await setPhoto(new File([blob], "harrison.jpg", { type: blob.type || "image/jpeg" }));
+  }
+
+  const uploadTitle = canUpload ? undefined : "Picture uploads need BLOB_READ_WRITE_TOKEN set";
+  return (
+    <div className="flex flex-col gap-3">
+      <div
+        className="rounded-xl bg-moonstone-700 bg-cover bg-center px-4 py-6 text-center text-white"
+        style={block.photo ? { backgroundImage: `url("${block.photo}")` } : undefined}
+      >
+        <p className={cn("text-2xl leading-tight font-extrabold", BOX_SHADOW_CLS)}>
+          {block.headline.trim() || "Your headline"}
+        </p>
+        {block.line.trim() && (
+          <p className={cn("mt-2 text-base whitespace-pre-line", BOX_SHADOW_CLS)}>
+            {block.line.trim()}
+          </p>
+        )}
+        {block.label.trim() && (
+          <span className="mt-4 inline-block rounded-lg bg-white px-5 py-2 font-bold text-russian-violet">
+            {block.label.trim()}
+          </span>
+        )}
+      </div>
+      {editable && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-bold text-admin-text">Behind it</span>
+          <AdminButton
+            size="sm"
+            variant="secondary"
+            busy={busy}
+            disabled={!canUpload}
+            title={uploadTitle}
+            onClick={() => fileRef.current?.click()}
+          >
+            Upload a photo
+          </AdminButton>
+          <AdminButton
+            size="sm"
+            variant="secondary"
+            disabled={!canUpload || busy}
+            title={uploadTitle}
+            onClick={() => void setOwnPhoto()}
+          >
+            Use my photo
+          </AdminButton>
+          {block.photo && (
+            <AdminButton size="sm" variant="secondary" onClick={() => onChange({ photo: "" })}>
+              No photo
+            </AdminButton>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void setPhoto(file);
+            }}
+          />
+        </div>
+      )}
+      <AdminField label="Headline" htmlFor={`${id}-headline`}>
+        <AdminInput
+          id={`${id}-headline`}
+          placeholder="Lock in today's rate"
+          value={block.headline}
+          disabled={!editable}
+          maxLength={100}
+          onChange={(e) => onChange({ headline: e.target.value }, `${block.id}:headline`)}
+        />
+        {editable && block.headline.trim().length > LONG_BOX_HEADLINE && (
+          <p className="mt-1 text-sm text-amber-700">
+            Short is better: big words wrap onto several lines on a phone.
+          </p>
+        )}
+      </AdminField>
+      <AdminField label="Smaller words under it (optional)" htmlFor={`${id}-line`}>
+        <AdminTextarea
+          id={`${id}-line`}
+          rows={2}
+          placeholder="Book before the end of the month"
+          value={block.line}
+          disabled={!editable}
+          maxLength={300}
+          onChange={(e) => onChange({ line: e.target.value }, `${block.id}:line`)}
+        />
+      </AdminField>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <AdminField label="Button words (optional)" htmlFor={`${id}-label`}>
+          <AdminInput
+            id={`${id}-label`}
+            placeholder="Book a time"
+            value={block.label}
+            disabled={!editable}
+            maxLength={60}
+            onChange={(e) => onChange({ label: e.target.value }, `${block.id}:label`)}
+          />
+        </AdminField>
+        <AdminField label="Where the button goes" htmlFor={`${id}-url`}>
+          <LinkPicker
+            id={`${id}-url`}
+            value={block.url}
+            onChange={(url) => onChange({ url })}
+            targets={linkTargets}
+            disabled={!editable}
+          />
+        </AdminField>
+      </div>
     </div>
   );
 }

@@ -600,6 +600,13 @@ export function CampaignEditor({
                           <code>{"> - Name, Suburb"}</code>
                         </li>
                         <li>
+                          <code>{">> "}</code> lines - a big box: the first line is the large
+                          headline, then smaller lines, an optional{" "}
+                          <code>{">> [Text](https://...)"}</code> button and an optional{" "}
+                          <code>{">> ![](photo)"}</code> behind it (add the photo from the Blocks
+                          tab so it&apos;s darkened)
+                        </li>
+                        <li>
                           <code>---</code> - a dividing line; <code>::space</code> - an empty gap
                         </li>
                         <li>

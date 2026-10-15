@@ -4,6 +4,7 @@
 // the first button becomes the post's link, and the first picture becomes its image.
 
 import {
+  BOX_LINE_RE,
   BUTTON_LINE_RE,
   BUTTON_PLACEHOLDER_RE,
   DIRECTIVE_RE,
@@ -33,7 +34,9 @@ export interface PostFromEmail {
  * becomes a `{promo}` line, which the post fills with the live promo when it
  * publishes; spacers, dividers and the social links row are dropped, and a
  * review quote loses its `> ` markers (or goes entirely when it quotes the
- * recipient's own review).
+ * recipient's own review). A big box loses its `>> ` markers too: its words are
+ * post text and its button can be the link, but its photo is skipped, since it was
+ * darkened to sit behind the box's words.
  * @param emailBody - The email's body text.
  * @returns Plain-text body, the first button's URL and the first picture.
  */
@@ -52,7 +55,12 @@ export function postFromEmail(emailBody: string): PostFromEmail {
 
   for (const raw of emailBody.replace(/\r\n/g, "\n").split("\n")) {
     let line = raw.trim();
-    const quoted = line.match(QUOTE_LINE_RE);
+    const boxed = line.match(BOX_LINE_RE);
+    if (boxed) {
+      line = boxed[1]!.trim();
+      if (IMAGE_LINE_RE.test(line) || PICTURE_PLACEHOLDER_RE.test(line)) continue;
+    }
+    const quoted = boxed ? null : line.match(QUOTE_LINE_RE);
     if (quoted) {
       quote.push(quoted[1]!.trim());
       continue;

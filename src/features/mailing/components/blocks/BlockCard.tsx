@@ -5,6 +5,7 @@
 
 import type { InsertGroup } from "@/features/admin/components/ui/InsertMenu";
 import {
+  BoxFields,
   ButtonFields,
   HeadingFields,
   IconButton,
@@ -41,6 +42,7 @@ const EMPTY_HINTS: Partial<Record<Block["type"], string>> = {
   button: "Needs words, so it's left out of the email.",
   picture: "No picture yet, so it's left out of the email.",
   quote: "No words yet, so it's left out of the email.",
+  box: "Needs a headline, so it's left out of the email.",
 };
 
 /**
@@ -97,6 +99,16 @@ function BlockBody({
       );
     case "quote":
       return <QuoteFields block={block} onChange={onChange} editable={editable} />;
+    case "box":
+      return (
+        <BoxFields
+          block={block}
+          onChange={onChange}
+          editable={editable}
+          canUpload={shared.canUpload}
+          linkTargets={shared.linkTargets}
+        />
+      );
     case "promo":
       return <PromoFields promo={shared.promo} />;
     case "divider":

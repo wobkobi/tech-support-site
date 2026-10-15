@@ -68,13 +68,30 @@ export interface AiDraft {
 }
 
 /**
- * A trimmed string field, or "" when missing or not a string, cut to a length.
+ * Straightens the typography the prompt bans but the model still slips in now and
+ * then: curly quotes become straight ones, and an en or em dash becomes a spaced
+ * hyphen (an unspaced one between digits, so a range reads "9-5"). Only punctuation
+ * changes; the words stay as written.
+ * @param value - Model text.
+ * @returns The text with plain punctuation.
+ */
+export function plainPunctuation(value: string): string {
+  return value
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/(\d)\s*[–—]\s*(\d)/g, "$1-$2")
+    .replace(/\s*[–—]\s*/g, " - ");
+}
+
+/**
+ * A trimmed string field with plain punctuation, or "" when missing or not a string,
+ * cut to a length.
  * @param value - Raw value.
  * @param max - Longest allowed.
  * @returns The string.
  */
 function text(value: unknown, max: number): string {
-  return typeof value === "string" ? value.trim().slice(0, max) : "";
+  return typeof value === "string" ? plainPunctuation(value.trim()).trim().slice(0, max) : "";
 }
 
 /**
@@ -94,8 +111,9 @@ function list(value: unknown, count: number, max: number): string[] {
 
 /**
  * Reads the model's JSON into a draft, dropping anything the wrong shape and capping
- * lengths so a runaway reply can't flood the editor. The wording itself is left as
- * written: the operator reads every draft before it goes anywhere.
+ * lengths so a runaway reply can't flood the editor. Beyond straightening quotes and
+ * dashes the wording is left as written: the operator reads every draft before it
+ * goes anywhere.
  * @param raw - Parsed JSON from the model.
  * @returns The draft, or null when it has nothing to fill in.
  */

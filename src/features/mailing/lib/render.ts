@@ -4,7 +4,9 @@
 // always match. Pure: everything it needs from the database arrives in the context.
 
 import type { CampaignAudience } from "@/features/mailing/lib/audience";
+import { parseBlocks } from "@/features/mailing/lib/blocks";
 import {
+  BOX_LINE_RE,
   BUTTON_LINE_RE,
   BUTTON_PLACEHOLDER_RE,
   DIRECTIVE_RE,
@@ -18,6 +20,7 @@ import {
   QUOTE_LINE_RE,
   QUOTE_NAME_RE,
   QUOTE_STARS_RE,
+  readBox,
 } from "@/features/mailing/lib/body-syntax";
 import {
   escapeHtml,
@@ -72,6 +75,19 @@ export interface RenderContext {
   promo: PromoWording | null;
   /** This recipient's unsubscribe page. */
   unsubscribeUrl: string;
+  /**
+   * Tracking tags for the site's own links. Only a real send passes it, so the preview
+   * and test sends never count as visits from the email.
+   */
+  tracking?: LinkTracking;
+}
+
+/** Which site gets tagged links, and the email's name in the tags. */
+export interface LinkTracking {
+  /** Absolute site URL; links to its host get tagged. */
+  siteUrl: string;
+  /** `utm_campaign` value, from {@link campaignTag}. */
+  campaign: string;
 }
 
 /** Placeholders the operator can type, with the help text the editor shows. */
@@ -141,6 +157,19 @@ const STARS_STYLE = "margin:0 0 6px;color:#cb9801;font-size:20px;letter-spacing:
 const QUOTE_TEXT_STYLE =
   "margin:0 0 8px;color:#333;font-size:17px;line-height:1.6;font-style:italic";
 const QUOTE_NAME_STYLE = "margin:0;color:#555;font-size:15px;line-height:1.5";
+// Big box: a brand-colour panel, or a photo darkened at upload, under large white
+// text. The colour sits on the cell (bgcolor plus background-color) so an app that
+// drops the photo, like Outlook on Windows, still shows white on moonstone-700 at
+// 5.8:1. The `background` attribute is the photo for apps that skip the CSS one.
+const BOX_CELL_STYLE = `background-color:${BUTTON_BG};background-size:cover;background-position:center;border-radius:12px;padding:40px 24px;text-align:center`;
+const BOX_TEXT_SHADOW = "text-shadow:0 1px 3px rgba(0,0,0,.45)";
+const BOX_HEADLINE_STYLE = `margin:0;color:#ffffff;font-size:30px;font-weight:800;line-height:1.2;${BOX_TEXT_SHADOW}`;
+const BOX_LINE_STYLE = `margin:10px 0 0;color:#ffffff;font-size:18px;line-height:1.5;${BOX_TEXT_SHADOW}`;
+// A white button with navy words: it stands out on the dark panel at 15:1.
+const BOX_BUTTON_TABLE =
+  '<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="margin:22px auto 0"><tr><td style="background:#ffffff;border-radius:8px">';
+const BOX_BUTTON_STYLE =
+  "display:inline-block;background:#ffffff;color:#0c0a3e;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:16px";
 const DIVIDER_HTML = '<hr style="border:0;border-top:1px solid #dde3e8;margin:22px 0" />';
 const SPACER_HTML = '<div style="height:20px;line-height:20px;font-size:1px">&nbsp;</div>';
 // Text links, not icons: many email apps block images by default, and words
@@ -243,6 +272,33 @@ function pictureHtml(alt: string, url: string, small: boolean, link: string | nu
 }
 
 /**
+ * HTML for a big box from its `>> ` lines (escaped, placeholders still tokens), or
+ * an empty string when it has no headline. A photo off the site's Blob store is
+ * dropped for the plain colour, and a button still waiting for its link is left out;
+ * {@link listProblems} names both.
+ * @param lines - The box's line texts.
+ * @returns The box's HTML.
+ */
+function boxHtml(lines: string[]): string {
+  const box = readBox(lines);
+  if (!box.headline) return "";
+  // Lines arrive escaped, so the photo URL is undone before the host check.
+  const photo = box.photo.replace(/&amp;/g, "&");
+  const background = photo && isAllowedImageUrl(photo) ? box.photo : "";
+  const cellAttrs = background
+    ? `background="${background}" bgcolor="${BUTTON_BG}" style="${BOX_CELL_STYLE};background-image:url('${background}')"`
+    : `bgcolor="${BUTTON_BG}" style="${BOX_CELL_STYLE}"`;
+  const smaller = box.lines
+    .map((l) => `<p style="${BOX_LINE_STYLE}">${renderInline(l)}</p>`)
+    .join("");
+  const button =
+    box.label && /^https?:\/\//i.test(box.url)
+      ? `${BOX_BUTTON_TABLE}<a href="${box.url}" style="${BOX_BUTTON_STYLE}">${box.label}</a></td></tr></table>`
+      : "";
+  return `${BOX_TABLE}<tr><td ${cellAttrs}><h2 style="${BOX_HEADLINE_STYLE}">${renderInline(box.headline)}</h2>${smaller}${button}</td></tr></table>`;
+}
+
+/**
  * HTML for a `::word` line: the promo card, a spacer or the social links row.
  * The promo card is empty when no promo applies; {@link listProblems} warns
  * about that before sending. An unknown word renders nothing.
@@ -297,12 +353,20 @@ export function renderBody(
   let paragraph: string[] = [];
   let list: string[] = [];
   let quote: string[] = [];
+  let box: string[] = [];
 
   /** Closes the paragraph being collected. */
   function flushParagraph(): void {
     if (paragraph.length === 0) return;
     blocks.push(`<p style="${P_STYLE}">${paragraph.map(renderInline).join("<br>")}</p>`);
     paragraph = [];
+  }
+  /** Closes the big box being collected. */
+  function flushBox(): void {
+    if (box.length === 0) return;
+    const html = boxHtml(box.filter(Boolean));
+    box = [];
+    if (html) blocks.push(html);
   }
   /** Closes the bullet list being collected. */
   function flushList(): void {
@@ -345,8 +409,18 @@ export function renderBody(
       flushParagraph();
       flushList();
       flushQuote();
+      flushBox();
       continue;
     }
+    const boxed = line.match(BOX_LINE_RE);
+    if (boxed) {
+      flushParagraph();
+      flushList();
+      flushQuote();
+      box.push(escapeHtml(boxed[1]!.trim()));
+      continue;
+    }
+    flushBox();
     const quoted = line.match(QUOTE_LINE_RE);
     if (quoted) {
       flushParagraph();
@@ -414,6 +488,7 @@ export function renderBody(
   flushParagraph();
   flushList();
   flushQuote();
+  flushBox();
 
   return fill(blocks.join("\n"));
 }
@@ -440,9 +515,11 @@ export function renderCampaign(
     : "";
   const footer = `<p style="margin:24px 0 0;font-size:13px;color:#888;line-height:1.5">You're getting this because you've had help from ${escapeHtml(ctx.brand)}. If you'd rather not get emails like this, you can <a href="${escapeHtml(ctx.unsubscribeUrl)}" style="color:#888">unsubscribe</a>.</p>`;
 
+  // Tagging runs before the footer goes on, so the unsubscribe link is never touched.
+  const bodyHtml = `${renderBody(content.body, values, ctx.promo)}
+${ctx.signatureHtml}`;
   const html = renderNotificationEmail(`${preheaderHtml}
-${renderBody(content.body, values, ctx.promo)}
-${ctx.signatureHtml}
+${ctx.tracking ? tagLinks(bodyHtml, ctx.tracking) : bodyHtml}
 ${footer}
 `);
   // The hidden preheader would otherwise lead the text part.
@@ -496,8 +573,23 @@ export function listProblems(
 
   // A Set, so ten broken buttons read as one note.
   const lineProblems = new Set<string>();
+  if (parseBlocks(content.body).some((b) => b.type === "box" && !b.headline.trim())) {
+    lineProblems.add("A big box has no headline, so it's left out. Give it one, or delete it.");
+  }
   for (const raw of content.body.split(/\r?\n/)) {
-    const line = raw.trim();
+    // A big box's photo and button lines are checked like any other.
+    const boxed = raw.trim().match(BOX_LINE_RE);
+    const line = boxed ? boxed[1]!.trim() : raw.trim();
+    if (boxed && PICTURE_PLACEHOLDER_RE.test(line)) continue;
+    const boxPhoto = boxed ? line.match(IMAGE_LINE_RE) : null;
+    if (boxPhoto) {
+      if (!isAllowedImageUrl(boxPhoto[2]!)) {
+        lineProblems.add(
+          "The big box's photo wasn't added with its photo buttons, so the box shows plain colour. Pick the photo again.",
+        );
+      }
+      continue;
+    }
     const directive = line.match(DIRECTIVE_RE);
     if (directive) {
       const word = directive[1]!;
@@ -545,4 +637,51 @@ export function listProblems(
   }
   problems.push(...lineProblems);
   return problems;
+}
+
+/**
+ * The email's name in Google Analytics (`utm_campaign`): its subject as a slug, with
+ * placeholders dropped so every recipient's copy shares one name. The subject is
+ * what readers see anyway, unlike the admin-only campaign name.
+ * @param subject - The subject as typed, before placeholders are filled.
+ * @returns A lowercase slug of up to 60 characters, or "email" when nothing is left.
+ */
+export function campaignTag(subject: string): string {
+  const slug = subject
+    .replace(PLACEHOLDER_RE, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .slice(0, 60)
+    .replace(/^-+|-+$/g, "");
+  return slug || "email";
+}
+
+/**
+ * Adds `utm_source=newsletter`, `utm_medium=email` and `utm_campaign` to every link
+ * that points at the site, so Google Analytics shows the visits and bookings each email
+ * brought in. Other sites' links (Google reviews, Facebook) are left alone, as are
+ * unsubscribe and API links and any link that already carries its own `utm_source`.
+ * hrefs arrive HTML-escaped, so `&amp;` is undone before parsing and the result is
+ * escaped again.
+ * @param html - Rendered HTML.
+ * @param tracking - The site and the email's tag.
+ * @returns The HTML with the site's links tagged.
+ */
+export function tagLinks(html: string, tracking: LinkTracking): string {
+  const host = new URL(tracking.siteUrl).hostname.replace(/^www\./, "");
+  return html.replace(/href="(https?:\/\/[^"]+)"/g, (whole, href: string) => {
+    let url: URL;
+    try {
+      url = new URL(href.replace(/&amp;/g, "&"));
+    } catch {
+      return whole;
+    }
+    if (url.hostname.replace(/^www\./, "") !== host) return whole;
+    if (/^\/(unsubscribe|api)(\/|$)/.test(url.pathname)) return whole;
+    if (url.searchParams.has("utm_source")) return whole;
+    url.searchParams.set("utm_source", "newsletter");
+    url.searchParams.set("utm_medium", "email");
+    url.searchParams.set("utm_campaign", tracking.campaign);
+    return `href="${escapeHtml(url.toString())}"`;
+  });
 }

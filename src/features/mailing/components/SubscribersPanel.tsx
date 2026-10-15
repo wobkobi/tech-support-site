@@ -150,6 +150,13 @@ function SubscriberList({
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-admin-text">{r.name}</p>
                 <p className="truncate text-sm text-admin-muted">{r.email}</p>
+                {r.optOutReason && (
+                  <p className="text-sm text-admin-muted">
+                    {r.optOutReason === "bounce"
+                      ? "Email bounced: this address doesn't exist"
+                      : "Marked an email as spam"}
+                  </p>
+                )}
               </div>
               <AdminButton
                 size="xs"

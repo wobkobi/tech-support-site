@@ -585,6 +585,21 @@ function checkFromEmail(): void {
     out.imageUrl === "https://abc.public.blob.vercel-storage.com/mailing/a.jpg" &&
       out.imageAlt === "A laptop on a desk",
   );
+  const boxed = postFromEmail(
+    [
+      ">> ![](https://abc.public.blob.vercel-storage.com/mailing/dark.jpg)",
+      ">> Lock in today's rate",
+      ">> Before Friday",
+      ">> [Book a time](https://tothepoint.co.nz/booking)",
+    ].join("\n"),
+  );
+  expect(
+    "a big box gives its words and button, but not its darkened photo",
+    boxed.body === "Lock in today's rate\nBefore Friday" &&
+      boxed.linkUrl === "https://tothepoint.co.nz/booking" &&
+      boxed.imageUrl === null,
+    JSON.stringify(boxed),
+  );
   const bare = postFromEmail("Just text");
   expect("no button or picture leaves them null", bare.linkUrl === null && bare.imageUrl === null);
   const reviewer = postFromEmail("Thanks again.\nYou wrote: {reviewText}\nSee you soon.");
