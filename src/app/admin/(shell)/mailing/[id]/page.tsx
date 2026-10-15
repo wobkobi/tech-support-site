@@ -9,7 +9,7 @@ import { parseObjectId } from "@/features/business/lib/validation";
 import { CampaignEditor, type SendRow } from "@/features/mailing/components/CampaignEditor";
 import { toCampaignRow } from "@/features/mailing/lib/campaign-row";
 import { missingSendEnv, promoWording } from "@/features/mailing/lib/context";
-import { emailInsertGroups } from "@/features/mailing/lib/insertables";
+import { emailInsertGroups, emailLinkTargets } from "@/features/mailing/lib/insertables";
 import { BLANK_TEMPLATE, type Template } from "@/features/mailing/lib/templates";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { canUploadImages } from "@/shared/lib/image-upload";
@@ -83,7 +83,7 @@ export default async function AdminMailingEditPage({
   if (!campaign) notFound();
 
   const isDraft = !campaign.isPreset && campaign.status === "draft";
-  const [sends, { comms, identity }, promo, templates, wording] = await Promise.all([
+  const [sends, { comms, identity, reviews }, promo, templates, wording] = await Promise.all([
     campaign.status === "draft" ? Promise.resolve([]) : loadSends(campaign.id),
     getSettings(),
     campaign.promoId
@@ -106,12 +106,19 @@ export default async function AdminMailingEditPage({
         key={`${row.status}-${row.updatedAt}`}
         initial={row}
         sends={sends}
-        insertGroups={emailInsertGroups(insertDetailsOf(identity, getSiteUrl()), wording.promo)}
+        insertGroups={emailInsertGroups(
+          insertDetailsOf(identity, getSiteUrl()),
+          wording.promo,
+          reviews.googleReviewUrl,
+        )}
         missingEnv={missingSendEnv()}
         canUpload={canUploadImages()}
         quiet={quietHoursOf(comms)}
         promoTitle={promo?.title ?? null}
         templates={templates}
+        promo={wording.promo}
+        linkTargets={emailLinkTargets(getSiteUrl(), reviews.googleReviewUrl)}
+        canDraft={Boolean(process.env.OPENAI_API_KEY)}
         adminEmail={process.env.ADMIN_EMAIL?.trim() || null}
       />
     </>

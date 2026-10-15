@@ -2,11 +2,20 @@
 // Turns a mailing-list email body (the editor's markdown-lite) into a starting point for
 // a social post. Facebook and Instagram show markdown as typed, so formatting is stripped,
 // the first button becomes the post's link, and the first picture becomes its image.
-// The line patterns match src/features/mailing/lib/render.ts.
 
-const BUTTON_LINE_RE = /^\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)$/i;
-const IMAGE_LINE_RE = /^!\[([^\]\n]*)\]\((https:\/\/[^)\s]+)\)$/i;
-const INLINE_LINK_RE = /\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/gi;
+import {
+  BOX_LINE_RE,
+  BUTTON_LINE_RE,
+  BUTTON_PLACEHOLDER_RE,
+  DIRECTIVE_RE,
+  DIVIDER_RE,
+  IMAGE_LINE_RE,
+  INLINE_LINK_RE,
+  LINKED_IMAGE_LINE_RE,
+  PICTURE_PLACEHOLDER_RE,
+  QUOTE_LINE_RE,
+} from "@/features/mailing/lib/body-syntax";
+
 // "Hi {firstName}," and friends: an email greeting reads oddly at the top of a post.
 const GREETING_RE = /^(hi|hello|hey|kia ora|dear)\s+\{(firstName|name)\},?$/i;
 // One person's own review: meaningless, and private, in a public post.
@@ -21,7 +30,13 @@ export interface PostFromEmail {
 }
 
 /**
- * Converts an email body to post text plus a link and picture.
+ * Converts an email body to post text plus a link and picture. The promo card
+ * becomes a `{promo}` line, which the post fills with the live promo when it
+ * publishes; spacers, dividers and the social links row are dropped, and a
+ * review quote loses its `> ` markers (or goes entirely when it quotes the
+ * recipient's own review). A big box loses its `>> ` markers too: its words are
+ * post text and its button can be the link, but its photo is skipped, since it was
+ * darkened to sit behind the box's words.
  * @param emailBody - The email's body text.
  * @returns Plain-text body, the first button's URL and the first picture.
  */
@@ -30,10 +45,29 @@ export function postFromEmail(emailBody: string): PostFromEmail {
   let imageUrl: string | null = null;
   let imageAlt: string | null = null;
   const lines: string[] = [];
+  let quote: string[] = [];
+
+  /** Adds the quote being collected, unless it quotes the recipient's own review. */
+  function flushQuote(): void {
+    if (!quote.some((l) => REVIEW_TEXT_RE.test(l))) lines.push(...quote.filter(Boolean));
+    quote = [];
+  }
 
   for (const raw of emailBody.replace(/\r\n/g, "\n").split("\n")) {
-    const line = raw.trim();
-    const image = line.match(IMAGE_LINE_RE);
+    let line = raw.trim();
+    const boxed = line.match(BOX_LINE_RE);
+    if (boxed) {
+      line = boxed[1]!.trim();
+      if (IMAGE_LINE_RE.test(line) || PICTURE_PLACEHOLDER_RE.test(line)) continue;
+    }
+    const quoted = boxed ? null : line.match(QUOTE_LINE_RE);
+    if (quoted) {
+      quote.push(quoted[1]!.trim());
+      continue;
+    }
+    flushQuote();
+    if (PICTURE_PLACEHOLDER_RE.test(line) || BUTTON_PLACEHOLDER_RE.test(line)) continue;
+    const image = line.match(LINKED_IMAGE_LINE_RE) ?? line.match(IMAGE_LINE_RE);
     if (image) {
       if (!imageUrl) {
         imageUrl = image[2]!;
@@ -46,6 +80,12 @@ export function postFromEmail(emailBody: string): PostFromEmail {
       linkUrl ??= button[2]!;
       continue;
     }
+    const directive = line.match(DIRECTIVE_RE);
+    if (directive) {
+      if (directive[1] === "promo") lines.push("{promo}");
+      continue;
+    }
+    if (DIVIDER_RE.test(line)) line = "";
     if (lines.length === 0 && (line === "" || GREETING_RE.test(line))) continue;
     if (REVIEW_TEXT_RE.test(line)) continue;
     lines.push(
@@ -55,6 +95,7 @@ export function postFromEmail(emailBody: string): PostFromEmail {
         .replace(INLINE_LINK_RE, "$1 ($2)"),
     );
   }
+  flushQuote();
 
   const body = lines
     .join("\n")

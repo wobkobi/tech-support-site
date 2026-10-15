@@ -11,6 +11,7 @@ import {
   type InsertDetails,
 } from "@/features/admin/lib/insertables";
 import { PLACEHOLDERS, type PromoWording } from "@/features/mailing/lib/render";
+import { GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
 
 // Pages the menu links to: [menu label, link text, path]. The link text is lower case
 // because it sits inside a sentence ("Have a look at our prices page").
@@ -30,16 +31,42 @@ const BUTTONS: [string, string][] = [
   ["Get in touch", "/contact"],
 ];
 
+/** A place the block editor's buttons and pictures can link to. */
+export interface LinkTarget {
+  label: string;
+  url: string;
+}
+
+/**
+ * The block editor's link choices: the site's main pages, the Google "write a review"
+ * link (opens the review box straight away) and the Google profile, where people read
+ * the reviews.
+ * @param siteUrl - Site origin.
+ * @param googleReviewUrl - The review-box link from Settings > Reviews; left out when blank.
+ * @returns Choices in menu order.
+ */
+export function emailLinkTargets(siteUrl: string, googleReviewUrl: string): LinkTarget[] {
+  const review = googleReviewUrl.trim();
+  return [
+    { label: "Home page", url: siteUrl },
+    ...PAGES.map(([label, , path]) => ({ label, url: `${siteUrl}${path}` })),
+    ...(review ? [{ label: "Leave a Google review", url: review }] : []),
+    { label: "Google profile (read reviews)", url: GOOGLE_BUSINESS_PROFILE_URL },
+  ];
+}
+
 /**
  * The menu's sections. Links and buttons use the `[text](url)` form the renderer
  * understands, so they show as words in the email rather than a bare address.
  * @param details - Site address and contact details.
  * @param promo - Wording of the email's promo (its linked one, or whichever is running), or null.
+ * @param googleReviewUrl - The review-box link from Settings > Reviews; no button when blank.
  * @returns Groups in menu order.
  */
 export function emailInsertGroups(
   details: InsertDetails,
   promo: PromoWording | null,
+  googleReviewUrl: string,
 ): InsertGroup[] {
   /**
    * A full link to one of the site's pages.
@@ -48,6 +75,7 @@ export function emailInsertGroups(
    */
   const page = (path: string): string => `${details.siteUrl}${path}`;
   const help = new Map<string, string>(PLACEHOLDERS.map((p) => [p.key, p.help]));
+  const review = googleReviewUrl.trim();
   return [
     {
       label: "About them",
@@ -60,12 +88,24 @@ export function emailInsertGroups(
     promoGroup(promo),
     {
       label: "Buttons",
-      items: BUTTONS.map(([text, path]) => ({
-        label: text,
-        hint: `Big button to ${page(path)}`,
-        text: `[${text}](${page(path)})`,
-        line: true,
-      })),
+      items: [
+        ...BUTTONS.map(([text, path]) => ({
+          label: text,
+          hint: `Big button to ${page(path)}`,
+          text: `[${text}](${page(path)})`,
+          line: true,
+        })),
+        ...(review
+          ? [
+              {
+                label: "Leave a Google review",
+                hint: "Big button that opens the Google review box",
+                text: `[Leave a Google review](${review})`,
+                line: true,
+              },
+            ]
+          : []),
+      ],
     },
     {
       label: "Links",

@@ -16,6 +16,7 @@ import {
 } from "@/features/mailing/lib/context";
 import { loadRecipients, loadReviewTexts } from "@/features/mailing/lib/recipients";
 import {
+  campaignTag,
   listProblems,
   renderCampaign,
   SAMPLE_REVIEW_TEXT,
@@ -28,6 +29,7 @@ import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
 import { nextSendTime, quietHoursOf } from "@/shared/lib/quiet-hours";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Campaign } from "@prisma/client";
 
 /** Resend's batch limit. */
@@ -118,6 +120,7 @@ async function deliverPending(campaign: Campaign, parts: SharedRenderParts): Pro
   const from = process.env.EMAIL_FROM!;
   const replyTo = process.env.ADMIN_EMAIL?.trim() || undefined;
   const content = contentOf(campaign);
+  const tracking = { siteUrl: getSiteUrl(), campaign: campaignTag(campaign.subject) };
 
   for (let round = 0; round < MAX_CHUNKS; round++) {
     const rows = await prisma.campaignSend.findMany({
@@ -147,7 +150,7 @@ async function deliverPending(campaign: Campaign, parts: SharedRenderParts): Pro
           name: names.get(row.contactId) ?? null,
           reviewText: reviewTexts?.get(row.contactId) ?? null,
         },
-        { ...parts, unsubscribeUrl: unsubscribePageUrl(token) },
+        { ...parts, unsubscribeUrl: unsubscribePageUrl(token), tracking },
       );
       return {
         from,

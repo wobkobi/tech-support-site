@@ -4,6 +4,7 @@
 
 import {
   describePromoOffer,
+  describeRecurringWindow,
   findAdvertisablePromo,
   formatPromoEnd,
   getActivePromo,
@@ -40,6 +41,7 @@ export async function promoWording(
       summary: summariseForBanner(promo),
       offer: describePromoOffer(promo),
       ends: formatPromoEnd(promo.endAt),
+      restriction: describeRecurringWindow(promo),
     },
     linkedPromoLive: true,
   };

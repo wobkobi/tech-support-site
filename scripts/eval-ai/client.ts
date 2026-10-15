@@ -1,7 +1,9 @@
 // scripts/eval-ai/client.ts
-// Thin HTTP client for the two AI routes. Sends the admin secret on both:
-// parse-job requires it for auth, and estimate-duration uses it to trigger the
-// dev-only rate-limit bypass so the harness can batch calls.
+// Thin HTTP client for the AI routes. Sends the admin secret on all of them:
+// parse-job and the mailing draft require it for auth, and estimate-duration uses it
+// to trigger the dev-only rate-limit bypass so the harness can batch calls.
+
+import type { AiDraft } from "@/features/mailing/lib/ai-draft";
 
 /** estimate-duration success payload (the `result` field). */
 export interface EstimateResult {
@@ -164,4 +166,27 @@ export async function callParseJob(
     adminSecret,
   );
   return json.result ?? { clarify: json.clarify };
+}
+
+/**
+ * Calls the admin mailing ai-draft route.
+ * @param baseUrl - Server base URL (no trailing slash).
+ * @param adminSecret - Admin secret for auth.
+ * @param body - The brief, the kind of email and where its button goes.
+ * @param body.brief - What the email is about.
+ * @param body.kind - A draft kind key.
+ * @param body.buttonUrl - The email's button link, or "" for none.
+ * @returns The draft.
+ */
+export async function callMailingDraft(
+  baseUrl: string,
+  adminSecret: string,
+  body: { brief: string; kind: string; buttonUrl: string },
+): Promise<AiDraft> {
+  const json = await postJson<{ ok: true; draft: AiDraft }>(
+    `${baseUrl}/api/admin/mailing/ai-draft`,
+    { ...body, promoId: null },
+    adminSecret,
+  );
+  return json.draft;
 }

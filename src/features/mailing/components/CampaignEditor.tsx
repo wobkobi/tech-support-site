@@ -11,11 +11,15 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { AdminTabs } from "@/features/admin/components/ui/AdminTabs";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { InsertMenu, type InsertGroup } from "@/features/admin/components/ui/InsertMenu";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { BlockEditor } from "@/features/mailing/components/blocks/BlockEditor";
+import { useBodyMode } from "@/features/mailing/components/blocks/useBodyMode";
+import { usePictureUpload } from "@/features/mailing/components/blocks/usePictureUpload";
 import {
   CampaignPreviewCard,
   type CampaignPreview,
@@ -26,9 +30,10 @@ import { SendDialog, type SendMode } from "@/features/mailing/components/SendDia
 import { callApi } from "@/features/mailing/lib/api-client";
 import { AUDIENCE_OPTIONS, type CampaignAudience } from "@/features/mailing/lib/audience";
 import type { CampaignRow } from "@/features/mailing/lib/campaign-row";
+import type { LinkTarget } from "@/features/mailing/lib/insertables";
+import type { PromoWording } from "@/features/mailing/lib/render";
 import { matchTemplate, switchTemplate, type Template } from "@/features/mailing/lib/templates";
 import type { QuietHours } from "@/shared/lib/quiet-hours";
-import { shrinkImage } from "@/shared/lib/resize-image";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 
@@ -82,6 +87,9 @@ const SNIPPETS: { label: string; title: string; before: string; after: string; l
  * @param props.promoTitle - Title of the linked promo, if any.
  * @param props.adminEmail - Inbox test sends go to.
  * @param props.templates - Templates for the dropdown; empty when the email isn't a draft.
+ * @param props.promo - Wording of the email's promo (its linked one, or whichever is running), for the promo card block.
+ * @param props.linkTargets - Pages the block editor's buttons and pictures can link to.
+ * @param props.canDraft - Whether "Draft with AI" is available (OpenAI is set up).
  * @returns Editor element.
  */
 export function CampaignEditor({
@@ -94,6 +102,9 @@ export function CampaignEditor({
   promoTitle,
   adminEmail,
   templates,
+  promo,
+  linkTargets,
+  canDraft,
 }: {
   initial: CampaignRow;
   sends: SendRow[];
@@ -104,6 +115,9 @@ export function CampaignEditor({
   promoTitle: string | null;
   adminEmail: string | null;
   templates: Template[];
+  promo: PromoWording | null;
+  linkTargets: LinkTarget[];
+  canDraft: boolean;
 }): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -129,6 +143,8 @@ export function CampaignEditor({
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const fieldId = useId();
+  const [bodyMode, setBodyMode] = useBodyMode();
+  const picture = usePictureUpload();
 
   /**
    * Writes whatever changed since the last save.
@@ -260,30 +276,35 @@ export function CampaignEditor({
   }
 
   /**
-   * Shrinks, uploads and inserts a picture on its own line.
+   * Takes an AI draft's subject and preview text, keeping the current one where the
+   * draft left it blank.
+   * @param subject - Drafted subject.
+   * @param preheader - Drafted preview text.
+   */
+  function applyDraftSubject(subject: string, preheader: string): void {
+    setContent((c) => ({
+      ...c,
+      subject: subject || c.subject,
+      preheader: preheader || c.preheader,
+    }));
+  }
+
+  /**
+   * Uploads a picture and inserts it on its own line.
    * @param file - Picked image.
    */
   async function addImage(file: File): Promise<void> {
-    setBusy("image");
-    try {
-      const { file: small } = await shrinkImage(file);
-      const form = new FormData();
-      form.append("file", small);
-      const res = await callApi<{ url: string }>("/api/admin/mailing/upload", "POST", form);
-      if (!res.ok) {
-        toast(res.error, { tone: "error" });
-        return;
-      }
-      insert(`\n![Picture](${res.url})\n`, "", true);
-      toast('Picture added. Change "Picture" to a few words describing it.', { tone: "success" });
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "Couldn't add the picture.", {
-        tone: "error",
-      });
-    } finally {
-      setBusy(null);
-      if (fileRef.current) fileRef.current.value = "";
-    }
+    const url = await picture.upload(file);
+    if (fileRef.current) fileRef.current.value = "";
+    if (!url) return;
+    insert(
+      `
+![Picture](${url})
+`,
+      "",
+      true,
+    );
+    toast('Picture added. Change "Picture" to a few words describing it.', { tone: "success" });
   }
 
   /** Saves, then sends the saved version to the operator. */
@@ -474,74 +495,135 @@ export function CampaignEditor({
             )}
 
             <div className="flex flex-col gap-1">
-              <label htmlFor={`${fieldId}-body`} className={ADMIN_LABEL_CLS}>
-                Email
-              </label>
-              {editable && (
-                <div className="flex flex-wrap gap-1.5">
-                  {SNIPPETS.map((s) => (
-                    <AdminButton
-                      key={s.label}
-                      size="xs"
-                      variant="secondary"
-                      onClick={() => insert(s.before, s.after, s.line)}
-                    >
-                      <span title={s.title}>{s.label}</span>
-                    </AdminButton>
-                  ))}
-                  <AdminButton
-                    size="xs"
-                    variant="secondary"
-                    busy={busy === "image"}
-                    disabled={!canUpload}
-                    onClick={() => fileRef.current?.click()}
-                  >
-                    <span title={canUpload ? "Add a picture" : "Set BLOB_READ_WRITE_TOKEN first"}>
-                      Picture
-                    </span>
-                  </AdminButton>
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) void addImage(file);
-                    }}
+              <div className="flex flex-wrap items-end justify-between gap-x-4">
+                {bodyMode === "text" ? (
+                  <label htmlFor={`${fieldId}-body`} className={ADMIN_LABEL_CLS}>
+                    Email
+                  </label>
+                ) : (
+                  <span className={ADMIN_LABEL_CLS}>Email</span>
+                )}
+                <AdminTabs
+                  aria-label="How to edit the email"
+                  tabs={[
+                    { key: "blocks", label: "Blocks" },
+                    { key: "text", label: "Plain text" },
+                  ]}
+                  active={bodyMode}
+                  onSelect={setBodyMode}
+                />
+              </div>
+              {bodyMode === "blocks" ? (
+                <BlockEditor
+                  body={content.body}
+                  onChange={(body) => setField("body", body)}
+                  editable={editable}
+                  canUpload={canUpload}
+                  insertGroups={insertGroups}
+                  promo={promo}
+                  linkTargets={linkTargets}
+                  draft={canDraft ? { promoId, onSubject: applyDraftSubject } : null}
+                />
+              ) : (
+                <>
+                  {editable && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {SNIPPETS.map((s) => (
+                        <AdminButton
+                          key={s.label}
+                          size="xs"
+                          variant="secondary"
+                          onClick={() => insert(s.before, s.after, s.line)}
+                        >
+                          <span title={s.title}>{s.label}</span>
+                        </AdminButton>
+                      ))}
+                      <AdminButton
+                        size="xs"
+                        variant="secondary"
+                        busy={picture.busy}
+                        disabled={!canUpload}
+                        title={canUpload ? "Add a picture" : "Set BLOB_READ_WRITE_TOKEN first"}
+                        onClick={() => fileRef.current?.click()}
+                      >
+                        Picture
+                      </AdminButton>
+                      <input
+                        ref={fileRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) void addImage(file);
+                        }}
+                      />
+                      <div className="ml-auto">
+                        <InsertMenu
+                          groups={insertGroups}
+                          onInsert={(text, line) => insert(text, "", line)}
+                          align="right"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <AdminTextarea
+                    ref={bodyRef}
+                    id={`${fieldId}-body`}
+                    value={content.body}
+                    onChange={(e) => setField("body", e.target.value)}
+                    disabled={!editable}
+                    rows={18}
+                    className="font-mono text-sm leading-relaxed"
                   />
-                  <div className="ml-auto">
-                    <InsertMenu
-                      groups={insertGroups}
-                      onInsert={(text, line) => insert(text, "", line)}
-                      align="right"
-                    />
-                  </div>
-                </div>
-              )}
-              <AdminTextarea
-                ref={bodyRef}
-                id={`${fieldId}-body`}
-                value={content.body}
-                onChange={(e) => setField("body", e.target.value)}
-                disabled={!editable}
-                rows={18}
-                className="font-mono text-sm leading-relaxed"
-              />
-              {editable && (
-                <details className="text-sm text-admin-text-secondary">
-                  <summary className="cursor-pointer font-semibold text-russian-violet">
-                    Formatting help
-                  </summary>
-                  <p className="mt-2">
-                    A blank line starts a new paragraph. A line that is only{" "}
-                    <code>[Text](https://...)</code> becomes a big button.
-                  </p>
-                  <p className="mt-2">
-                    Words in curly brackets, like <code>{"{firstName}"}</code>, fill in for each
-                    person. Add lists them all, with links, buttons and contact details.
-                  </p>
-                </details>
+                  {editable && (
+                    <details className="text-sm text-admin-text-secondary">
+                      <summary className="cursor-pointer font-semibold text-russian-violet">
+                        Formatting help
+                      </summary>
+                      <p className="mt-2">
+                        A blank line starts a new paragraph. A line that is only{" "}
+                        <code>[Text](https://...)</code> becomes a big button.
+                      </p>
+                      <p className="mt-2">
+                        Words in curly brackets, like <code>{"{firstName}"}</code>, fill in for each
+                        person. Add lists them all, with links, buttons and contact details.
+                      </p>
+                      <p className="mt-2">Each of these goes on a line of its own:</p>
+                      <ul className="mt-1 list-disc space-y-1 pl-5">
+                        <li>
+                          <code>::promo</code> - a box with the current promo and when it ends
+                        </li>
+                        <li>
+                          <code>{"> "}</code> lines - a review quote. Start with a line of stars
+                          like <code>{"> ★★★★★"}</code> and end with{" "}
+                          <code>{"> - Name, Suburb"}</code>
+                        </li>
+                        <li>
+                          <code>{">> "}</code> lines - a big box: the first line is the large
+                          headline, then smaller lines, an optional{" "}
+                          <code>{">> [Text](https://...)"}</code> button and an optional{" "}
+                          <code>{">> ![](photo)"}</code> behind it (add the photo from the Blocks
+                          tab so it&apos;s darkened)
+                        </li>
+                        <li>
+                          <code>---</code> - a dividing line; <code>::space</code> - an empty gap
+                        </li>
+                        <li>
+                          <code>::social</code> - links to Google, Facebook and Instagram
+                        </li>
+                        <li>
+                          <code>{'![alt](url "small")'}</code> - a half-width picture; wrap a
+                          picture in <code>{"[...](https://...)"}</code> to make it a link
+                        </li>
+                        <li>
+                          <code>{"![What goes here]()"}</code> - a picture still to choose;
+                          it&apos;s left out until you add one
+                        </li>
+                      </ul>
+                    </details>
+                  )}
+                </>
               )}
               {editable && (
                 <p className="text-sm text-admin-muted" aria-live="polite">

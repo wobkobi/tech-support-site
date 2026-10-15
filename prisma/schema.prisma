@@ -1041,10 +1041,14 @@ model CampaignSend {
   @@index([campaignId, status])
 }
 
+// bounce and complaint come from Resend's webhook: an address that hard-bounced, or a
+// reader who marked an email as spam.
 enum EmailOptOutSource {
   link
   one_click
   manual
+  bounce
+  complaint
 }
 
 // Addresses that asked not to get mailing-list emails. Kept off Contact: a

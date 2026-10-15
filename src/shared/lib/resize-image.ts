@@ -15,15 +15,18 @@ export interface ShrunkImage {
 }
 
 /**
- * Scales an image so its longest edge is at most 1200px and re-encodes it as JPEG.
+ * Scales an image so its longest edge is at most `maxEdge` and re-encodes it as JPEG.
  * Smaller images are re-encoded without scaling, which also strips camera metadata
  * like GPS location.
  * @param file - Image the operator picked.
+ * @param maxEdge - Longest edge in pixels; 1200 unless a caller needs more.
+ * @param shade - Opacity (0 to 1) of a brand navy wash laid over the picture, so white
+ *   words on top stay readable; 0 leaves it as it is.
  * @returns A JPEG file ready to upload, with its width and height in pixels.
  */
-export async function shrinkImage(file: File): Promise<ShrunkImage> {
+export async function shrinkImage(file: File, maxEdge = MAX_EDGE, shade = 0): Promise<ShrunkImage> {
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
   const width = Math.round(bitmap.width * scale);
   const height = Math.round(bitmap.height * scale);
 
@@ -37,6 +40,10 @@ export async function shrinkImage(file: File): Promise<ShrunkImage> {
   ctx.fillRect(0, 0, width, height);
   ctx.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
+  if (shade > 0) {
+    ctx.fillStyle = `rgba(12, 10, 62, ${Math.min(shade, 1)})`;
+    ctx.fillRect(0, 0, width, height);
+  }
 
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY),

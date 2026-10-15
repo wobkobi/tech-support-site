@@ -1,177 +1,68 @@
 // src/features/mailing/lib/presets.ts
-// Starter presets for the mailing list. They are seeded into the database once, the first
-// time the Mailing page opens, and from then on they're ordinary records the operator
-// edits or deletes; nothing here is read again after seeding.
+// Starter presets for the mailing list. They are seeded into the database the first time
+// the Mailing page opens, and from then on they're ordinary records the operator edits or
+// deletes. Presets added later (V2_PRESET_KEYS) are seeded once more on their own,
+// so an install that already had the first set gets the new ones without its deleted or
+// edited presets coming back.
 
+import {
+  starterPresets,
+  V2_PRESET_KEYS,
+  type StarterPreset,
+} from "@/features/mailing/lib/starter-presets";
 import { prisma } from "@/shared/lib/prisma";
 import { getSiteUrl } from "@/shared/lib/site-url";
+import type { Prisma } from "@prisma/client";
 
-/** Setting key marking the starter presets as seeded, so deleted ones stay deleted. */
+/** Setting key marking the first starter set as seeded, so deleted ones stay deleted. */
 const SEEDED_KEY = "mailing:presetsSeeded";
-
-/** presetKey of the preset "Email this promo" starts from. */
-export const PROMO_PRESET_KEY = "promo";
-
-/** A starter preset's content. */
-export interface StarterPreset {
-  presetKey: string;
-  name: string;
-  subject: string;
-  preheader: string;
-  body: string;
-}
+/** Setting key marking the later presets as seeded. */
+const SEEDED_V2_KEY = "mailing:presetsSeeded:v2";
 
 /**
- * The starter set. Dates and prices inside them are examples for the operator
- * to overwrite.
- * @param siteUrl - Site origin for the booking buttons.
- * @returns The presets in display order.
+ * Claims a seeding step. Creating the marker row doubles as a lock: its unique key
+ * makes a second concurrent page load fail the create and skip the step.
+ * @param key - The step's marker key.
+ * @returns True when this call should do the seeding.
  */
-export function starterPresets(siteUrl: string): StarterPreset[] {
-  const book = `[Book a time](${siteUrl}/booking)`;
-  return [
-    {
-      presetKey: PROMO_PRESET_KEY,
-      name: "New promo",
-      subject: "{promoOffer} on tech help until {promoEnds}",
-      preheader: "A quick heads-up about a deal I'm running.",
-      body: [
-        "Hi {firstName},",
-        "",
-        "Just a quick heads-up that I'm running a deal at the moment: **{promo}**.",
-        "",
-        "If something's been bugging you, like a slow computer, a phone that won't do what you want, or email that's stopped working, now's a good time to get it sorted.",
-        "",
-        book,
-        "",
-        "Or just reply to this email and I'll get back to you.",
-      ].join("\n"),
-    },
-    {
-      presetKey: "promo-ending",
-      name: "Promo ending soon",
-      subject: "Last chance: {promoOffer} ends {promoEnds}",
-      preheader: "My current deal is nearly over.",
-      body: [
-        "Hi {firstName},",
-        "",
-        "Just a reminder that my current deal, **{promo}**, is nearly over.",
-        "",
-        "If you've been meaning to get something looked at, now's the time to book.",
-        "",
-        book,
-      ].join("\n"),
-    },
-    {
-      presetKey: "away",
-      name: "Away / holiday hours",
-      subject: "I'm taking a break over the holidays",
-      preheader: "When I'm away and when I'm back.",
-      body: [
-        "Hi {firstName},",
-        "",
-        "Just letting you know I'm taking a break from **Saturday 20 December** and I'll be back on **Monday 5 January**.",
-        "",
-        "You can still book online while I'm away and I'll confirm it when I'm back. If something's urgent, send me an email and I'll reply as soon as I can.",
-        "",
-        "Have a great break!",
-      ].join("\n"),
-    },
-    {
-      presetKey: "scam-warning",
-      name: "Scam warning",
-      subject: "Watch out for this scam going around",
-      preheader: "What it looks like and what to do if you get one.",
-      body: [
-        "Hi {firstName},",
-        "",
-        "A few people have been in touch about a scam doing the rounds, so I wanted to give you a heads-up.",
-        "",
-        "## What it looks like",
-        "",
-        "Describe the message or call here, for example a text saying a parcel couldn't be delivered, with a link to pay a small fee.",
-        "",
-        "## How to spot it",
-        "",
-        "- It wants you to click a link or pay money in a hurry",
-        "- The sender's address or number doesn't match the real company",
-        "- It asks for a password, your bank details or a code sent to your phone",
-        "",
-        "## What to do",
-        "",
-        "Don't click the link or reply, just delete it. If you've already clicked or typed in your details, call your bank straight away, then get in touch and I'll help you check your devices.",
-        "",
-        "If you're ever not sure about a message, forward it to me and I'll tell you if it's genuine.",
-      ].join("\n"),
-    },
-    {
-      presetKey: "price-change",
-      name: "Price change notice",
-      subject: "A change to my prices",
-      preheader: "What's changing and when.",
-      body: [
-        "Hi {firstName},",
-        "",
-        "I wanted to let you know before it happens: from **1 April** my hourly rate is going from **$X** to **$Y**.",
-        "",
-        "Anything booked before then stays at the current rate.",
-        "",
-        "Thanks for sticking with me. If you've got any questions, just reply to this email.",
-      ].join("\n"),
-    },
-    {
-      presetKey: "general",
-      name: "General update",
-      subject: "A quick update",
-      preheader: "",
-      body: [
-        "Hi {firstName},",
-        "",
-        "# Your heading here",
-        "",
-        "Write your update here.",
-        "",
-        `[Find out more](${siteUrl})`,
-      ].join("\n"),
-    },
-    {
-      presetKey: "checking-in",
-      name: "Checking in",
-      subject: "Anything giving you trouble lately?",
-      preheader: "It's been a while, so I thought I'd check in.",
-      body: [
-        "Hi {firstName},",
-        "",
-        "It's been a while, so I thought I'd check in. Is anything with your computer, phone or internet giving you grief at the moment?",
-        "",
-        "It might be something small, like a printer that won't connect, or photos you'd like backed up before something goes wrong. Either way, I'm happy to come and take a look.",
-        "",
-        book,
-        "",
-        "Or just reply to this email and tell me what's going on.",
-      ].join("\n"),
-    },
-  ];
+async function claim(key: string): Promise<boolean> {
+  const seeded = await prisma.setting.findUnique({ where: { key } });
+  if (seeded) return false;
+  try {
+    await prisma.setting.create({ data: { key, value: new Date().toISOString() } });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Seeds the starter presets the first time it runs, and never again. Creating
- * the marker row first doubles as a lock: its unique key makes a second
- * concurrent page load fail the create and skip the seeding.
+ * Campaign rows for starter presets.
+ * @param presets - The presets to create.
+ * @returns Rows for createMany.
+ */
+function presetRows(presets: StarterPreset[]): Prisma.CampaignCreateManyInput[] {
+  return presets.map((p) => ({ ...p, preheader: p.preheader || null, isPreset: true }));
+}
+
+/**
+ * Seeds the starter presets that haven't been seeded yet, each set exactly once. A fresh
+ * install gets everything in the first step and marks the later step done too.
  */
 export async function ensureStarterPresets(): Promise<void> {
-  const seeded = await prisma.setting.findUnique({ where: { key: SEEDED_KEY } });
-  if (seeded) return;
-  try {
-    await prisma.setting.create({ data: { key: SEEDED_KEY, value: new Date().toISOString() } });
-  } catch {
+  const all = starterPresets(getSiteUrl());
+  if (await claim(SEEDED_KEY)) {
+    await claim(SEEDED_V2_KEY);
+    await prisma.campaign.createMany({ data: presetRows(all) });
     return;
   }
-  await prisma.campaign.createMany({
-    data: starterPresets(getSiteUrl()).map((p) => ({
-      ...p,
-      preheader: p.preheader || null,
-      isPreset: true,
-    })),
+  if (!(await claim(SEEDED_V2_KEY))) return;
+  // Skip any key already present, in case one was made by hand before this step ran.
+  const existing = await prisma.campaign.findMany({
+    where: { isPreset: true, presetKey: { in: [...V2_PRESET_KEYS] } },
+    select: { presetKey: true },
   });
+  const have = new Set(existing.map((c) => c.presetKey));
+  const missing = all.filter((p) => V2_PRESET_KEYS.includes(p.presetKey) && !have.has(p.presetKey));
+  if (missing.length > 0) await prisma.campaign.createMany({ data: presetRows(missing) });
 }

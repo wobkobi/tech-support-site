@@ -22,12 +22,27 @@ export interface Recipient {
   contactId: string;
   name: string;
   email: string;
+  /** Set on an opted-out contact when Resend took them off: a bounce or a spam report. */
+  optOutReason?: DeliveryOptOut;
 }
+
+/** Opt-out sources that came from Resend rather than the reader. */
+export type DeliveryOptOut = "bounce" | "complaint";
 
 /** An opt-out row as the selection reads it. */
 export interface OptOutEntry {
   email: string;
   contactId: string | null;
+  source?: string;
+}
+
+/**
+ * The opt-out source when it came from Resend.
+ * @param source - The row's source.
+ * @returns The delivery reason, or undefined for the reader's own unsubscribe.
+ */
+function deliveryReason(source: string | undefined): DeliveryOptOut | undefined {
+  return source === "bounce" || source === "complaint" ? source : undefined;
 }
 
 /** Result of {@link selectRecipients}. */
@@ -61,6 +76,14 @@ export function selectRecipients(
 ): RecipientSelection {
   const optedOutEmails = new Set(optOuts.map((o) => normaliseEmail(o.email)));
   const optedOutIds = new Set(optOuts.flatMap((o) => (o.contactId ? [o.contactId] : [])));
+  // Why Resend took an address or contact off, for the Subscribers list.
+  const reasons = new Map<string, DeliveryOptOut>();
+  for (const o of optOuts) {
+    const reason = deliveryReason(o.source);
+    if (!reason) continue;
+    reasons.set(normaliseEmail(o.email), reason);
+    if (o.contactId) reasons.set(o.contactId, reason);
+  }
   const seen = new Set<string>();
   const result: RecipientSelection = { recipients: [], excluded: [], optedOut: [] };
 
@@ -70,8 +93,10 @@ export function selectRecipients(
     if (!email || seen.has(email)) continue;
     seen.add(email);
     const entry: Recipient = { contactId: contact.id, name: contact.name, email };
-    if (optedOutEmails.has(email) || optedOutIds.has(contact.id)) result.optedOut.push(entry);
-    else if (excludedIds.has(contact.id)) result.excluded.push(entry);
+    if (optedOutEmails.has(email) || optedOutIds.has(contact.id)) {
+      const optOutReason = reasons.get(email) ?? reasons.get(contact.id);
+      result.optedOut.push(optOutReason ? { ...entry, optOutReason } : entry);
+    } else if (excludedIds.has(contact.id)) result.excluded.push(entry);
     else result.recipients.push(entry);
   }
   return result;
@@ -134,7 +159,7 @@ export async function loadRecipients(
       select: { id: true, name: true, email: true, altEmails: true },
       orderBy: { createdAt: "asc" },
     }),
-    prisma.emailOptOut.findMany({ select: { email: true, contactId: true } }),
+    prisma.emailOptOut.findMany({ select: { email: true, contactId: true, source: true } }),
     reviewers ? prisma.reviewAskOptOut.findMany({ select: { email: true, contactId: true } }) : [],
     reviewers ? loadReviewTexts() : null,
   ]);
