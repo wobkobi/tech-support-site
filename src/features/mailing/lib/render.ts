@@ -6,6 +6,7 @@
 import type { CampaignAudience } from "@/features/mailing/lib/audience";
 import {
   BUTTON_LINE_RE,
+  BUTTON_PLACEHOLDER_RE,
   DIRECTIVE_RE,
   DIVIDER_RE,
   IMAGE_LINE_RE,
@@ -373,7 +374,7 @@ export function renderBody(
       if (html) blocks.push(html);
       continue;
     }
-    if (PICTURE_PLACEHOLDER_RE.test(line)) {
+    if (PICTURE_PLACEHOLDER_RE.test(line) || BUTTON_PLACEHOLDER_RE.test(line)) {
       flushParagraph();
       continue;
     }
@@ -512,6 +513,13 @@ export function listProblems(
     if (PICTURE_PLACEHOLDER_RE.test(line)) {
       lineProblems.add(
         "A picture hasn't been chosen yet, so it's left out. Choose one, or delete that block.",
+      );
+      continue;
+    }
+    const waiting = line.match(BUTTON_PLACEHOLDER_RE);
+    if (waiting) {
+      lineProblems.add(
+        `The "${waiting[1]}" button has no link yet, so it's left out. Pick where it goes, or delete that block.`,
       );
       continue;
     }

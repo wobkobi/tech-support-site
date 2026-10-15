@@ -14,6 +14,13 @@ export const BUTTON_LINE_RE = /^\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)$/i;
 export const IMAGE_LINE_RE = /^!\[([^\]\n]*)\]\((https:\/\/[^)\s]+)(?:\s+"(small)")?\)$/i;
 
 /**
+ * A button still waiting for its link, `[Text]()`: a new Button block, or one a draft
+ * added. Left out of the email (and listed as a problem) until it has one.
+ * Group 1 is the button text.
+ */
+export const BUTTON_PLACEHOLDER_RE = /^\[([^\]\n]+)\]\(\)$/;
+
+/**
  * A picture still to be chosen, `![alt]()`: a template's header picture before
  * one is uploaded. Left out of the email (and listed as a problem) until it has one.
  * Group 1 is the alt text.

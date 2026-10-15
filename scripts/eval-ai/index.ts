@@ -70,6 +70,7 @@ const SAMPLE_DRAFT = {
   paragraphs: ["I'm now coming out to Titirangi."],
   bullets: [],
   buttonText: "Book a time",
+  buttonUrl: "",
 };
 
 /**

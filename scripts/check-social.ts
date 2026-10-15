@@ -610,12 +610,13 @@ function checkFromEmail(): void {
       "::social",
       "::mystery",
       "![A picture still to choose]()",
+      "[A button still to link]()",
       "",
       '[![Shop front](https://abc.public.blob.vercel-storage.com/mailing/c.jpg "small")](https://tothepoint.co.nz)',
     ].join("\n"),
   );
   expect(
-    "promo card becomes {promo}; divider, spacer, social and unknown blocks drop; quote loses its markers",
+    "promo card becomes {promo}; divider, spacer, social, unknown blocks and unlinked buttons drop; quote loses its markers",
     blocks.body === "{promo}\n\n★★★★★\nSorted my printer in no time.\n- Pat, Avondale",
     JSON.stringify(blocks.body),
   );

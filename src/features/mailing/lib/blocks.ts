@@ -5,6 +5,7 @@
 
 import {
   BUTTON_LINE_RE,
+  BUTTON_PLACEHOLDER_RE,
   DIRECTIVE_RE,
   DIVIDER_RE,
   IMAGE_LINE_RE,
@@ -203,9 +204,9 @@ export function parseBlocks(body: string, idPrefix = "p"): Block[] {
       });
       continue;
     }
-    const button = line.match(BUTTON_LINE_RE);
+    const button = line.match(BUTTON_LINE_RE) ?? line.match(BUTTON_PLACEHOLDER_RE);
     if (button) {
-      push({ type: "button", label: button[1]!, url: button[2]! });
+      push({ type: "button", label: button[1]!, url: button[2] ?? "" });
       continue;
     }
     if (line.startsWith("## ")) {

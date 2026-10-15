@@ -14,7 +14,7 @@ import {
   serializeBlocks,
   type Block,
 } from "@/features/mailing/lib/blocks";
-import { emailInsertGroups } from "@/features/mailing/lib/insertables";
+import { emailInsertGroups, emailLinkTargets } from "@/features/mailing/lib/insertables";
 import { selectRecipients, type PoolContact } from "@/features/mailing/lib/recipients";
 import {
   listProblems,
@@ -463,9 +463,25 @@ function checkInsertables(): void {
     phone: "021 000 0000",
     email: "me@example.co.nz",
   };
-  const items = emailInsertGroups(details, CTX.promo).flatMap((g) => g.items);
+  const reviewUrl = "https://g.page/r/example/review";
+  const items = emailInsertGroups(details, CTX.promo, reviewUrl).flatMap((g) => g.items);
   const byLabel = new Map(items.map((i) => [i.label, i]));
   expect("labels are unique (they key the menu buttons)", byLabel.size === items.length);
+  expect(
+    "the review button opens the Google review box from settings, and goes when that's blank",
+    byLabel.get("Leave a Google review")?.text === `[Leave a Google review](${reviewUrl})` &&
+      !emailInsertGroups(details, CTX.promo, " ")
+        .flatMap((g) => g.items)
+        .some((i) => i.label === "Leave a Google review"),
+  );
+  const targets = emailLinkTargets(details.siteUrl, reviewUrl);
+  expect(
+    "the link picker offers the review box before the profile, and drops it when blank",
+    targets.findIndex((t) => t.url === reviewUrl) >= 0 &&
+      targets.findIndex((t) => t.url === reviewUrl) <
+        targets.findIndex((t) => t.label.startsWith("Google profile")) &&
+      !emailLinkTargets(details.siteUrl, "").some((t) => t.label === "Leave a Google review"),
+  );
 
   const placeholders = items.filter((i) => i.text.startsWith("{"));
   expect(
@@ -639,9 +655,20 @@ function checkBlockProblems(): void {
     "an unknown ::word is a problem",
     problemsOf("::mystery").some((p) => p.includes("::mystery")),
   );
+  const waiting = problemsOf("[Book a time]()");
   expect(
-    "a button with no link is a problem",
-    problemsOf("[Book a time]()").some((p) => p.includes("link is missing")),
+    "a button with no link yet is one plain problem, and it's left out of the email",
+    waiting.length === 1 &&
+      waiting[0]!.includes('"Book a time" button has no link yet') &&
+      !renderBody("Hi\n\n[Book a time]()", VALUES, null).includes("Book a time"),
+    waiting.join(" | "),
+  );
+  const waitingBlocks = parseBlocks("[Book a time]()");
+  expect(
+    "a button with no link yet reads back as a button, not text",
+    waitingBlocks.length === 1 &&
+      waitingBlocks[0]!.type === "button" &&
+      serializeBlocks(waitingBlocks) === "[Book a time]()",
   );
   expect(
     "an http button is a problem",
@@ -727,6 +754,7 @@ function checkAiDraft(): void {
     paragraphs: ["First para.", "Second para."],
     bullets: ["One", "Two"],
     buttonText: "Read more",
+    buttonUrl: "",
   };
   /**
    * Fills a body's blocks with the test draft.
@@ -777,6 +805,51 @@ function checkAiDraft(): void {
       ].join("\n\n"),
     ),
     JSON.stringify(fillOf(announcement.body)),
+  );
+
+  const twice = serializeBlocks(
+    fillBlocks(parseBlocks(fillOf("")), { ...draft, paragraphs: ["New one.", "New two."] }),
+  );
+  expect(
+    "drafting again swaps the paragraphs and the button instead of adding more",
+    twice ===
+      [
+        "Hi {firstName},",
+        "# New heading",
+        "New one.",
+        "New two.",
+        "- One\n- Two",
+        "[Read more]()",
+      ].join("\n\n"),
+    JSON.stringify(twice),
+  );
+  const written = fillOf("Hi {firstName},\n\nMy own words.\n\nMore of mine.\n\n---\n\nKept below.");
+  expect(
+    "words already after the greeting are replaced up to the next other block, and the rest stays",
+    written.includes("First para.\n\nSecond para.") &&
+      !written.includes("My own words") &&
+      !written.includes("More of mine") &&
+      written.includes("---\n\nKept below."),
+    JSON.stringify(written),
+  );
+  const linked = { ...draft, buttonUrl: "https://example.co.nz/reviews" };
+  expect(
+    "a new button takes the draft's link",
+    serializeBlocks(fillBlocks(parseBlocks(""), linked)).endsWith(
+      "[Read more](https://example.co.nz/reviews)",
+    ),
+  );
+  expect(
+    "a button waiting for its link takes the draft's link",
+    serializeBlocks(fillBlocks(parseBlocks("Hi {firstName},\n\n[Old words]()"), linked)).endsWith(
+      "[Read more](https://example.co.nz/reviews)",
+    ),
+  );
+  expect(
+    "a button that has a link keeps it",
+    serializeBlocks(
+      fillBlocks(parseBlocks("Hi {firstName},\n\n[Old](https://example.co.nz/booking)"), linked),
+    ).endsWith("[Read more](https://example.co.nz/booking)"),
   );
 }
 

@@ -60,6 +60,11 @@ export interface AiDraft {
   paragraphs: string[];
   bullets: string[];
   buttonText: string;
+  /**
+   * Where a button with no link yet should go: one of the editor's link choices, or ""
+   * to leave the link for the operator. Ignored when the button already has a link.
+   */
+  buttonUrl: string;
 }
 
 /**
@@ -104,6 +109,7 @@ export function readDraft(raw: unknown): AiDraft | null {
     paragraphs: list(r.paragraphs, 5, 800),
     bullets: list(r.bullets, 8, 200),
     buttonText: text(r.buttonText, 40),
+    buttonUrl: text(r.buttonUrl, 300),
   };
   return draft.paragraphs.length > 0 || draft.heading ? draft : null;
 }
@@ -123,12 +129,14 @@ function isGreeting(block: Block): boolean {
 /**
  * Fills a block list from a draft, by position, so a template's layout keeps its shape:
  * - the heading goes in the first Heading block,
- * - the first paragraph replaces the first Text block after the greeting, and any
- *   further paragraphs go in as new Text blocks under it,
+ * - the paragraphs replace the run of Text blocks that starts at the first one after the
+ *   greeting (all of them up to the next other block), so drafting into an email that
+ *   already has words, or drafting twice, swaps them rather than piling up,
  * - the bullets replace the first Bullet list's points,
- * - the button words replace the first Button's words, keeping its link.
+ * - the button words replace the first Button's words, keeping its link; a button with
+ *   no link yet takes the draft's link.
  * A part with no block to go in is added: a heading under the greeting, the paragraphs
- * under that, a list under the paragraphs and a button (with no link yet) at the end.
+ * under that, a list under the paragraphs and a button at the end.
  * A missing greeting is added at the top. Pictures, quotes, the promo card and every
  * other block stay as they were.
  * @param blocks - The current blocks.
@@ -155,25 +163,24 @@ export function fillBlocks(blocks: readonly Block[], draft: AiDraft): Block[] {
     }
   }
 
-  // Paragraphs: the first Text after the greeting, then new ones under it. With none to
-  // replace, they start under the heading (or the greeting).
+  // Paragraphs: swap out the run of Text blocks from the first one after the greeting.
+  // With none to replace, they start under the heading (or the greeting).
   let lastParagraph = Math.max(greeting, heading);
   if (draft.paragraphs.length > 0) {
     const first = out.findIndex((b, i) => i > greeting && b.type === "text");
-    const [lead, ...rest] = draft.paragraphs;
-    let at: number;
+    let start = lastParagraph + 1;
+    let runLength = 0;
     if (first >= 0) {
-      out[first] = { ...out[first], text: lead } as Block;
-      at = first;
-    } else {
-      at = lastParagraph + 1;
-      out.splice(at, 0, { ...emptyBlock("text"), text: lead } as Block);
+      start = first;
+      while (out[start + runLength]?.type === "text") runLength += 1;
     }
-    for (const paragraph of rest) {
-      at += 1;
-      out.splice(at, 0, { ...emptyBlock("text"), text: paragraph } as Block);
-    }
-    lastParagraph = at;
+    const paragraphs = draft.paragraphs.map(
+      (paragraph) => ({ ...emptyBlock("text"), text: paragraph }) as Block,
+    );
+    // Keep the first replaced block's id so focus and the card's place in the list hold.
+    if (runLength > 0) paragraphs[0] = { ...out[start], text: draft.paragraphs[0] } as Block;
+    out.splice(start, runLength, ...paragraphs);
+    lastParagraph = start + paragraphs.length - 1;
   }
 
   if (draft.bullets.length > 0) {
@@ -184,8 +191,16 @@ export function fillBlocks(blocks: readonly Block[], draft: AiDraft): Block[] {
 
   if (draft.buttonText) {
     const buttonAt = out.findIndex((b) => b.type === "button");
-    if (buttonAt >= 0) out[buttonAt] = { ...out[buttonAt], label: draft.buttonText } as Block;
-    else out.push({ ...emptyBlock("button"), label: draft.buttonText } as Block);
+    const existing = buttonAt >= 0 ? out[buttonAt] : null;
+    if (existing?.type === "button") {
+      out[buttonAt] = {
+        ...existing,
+        label: draft.buttonText,
+        url: existing.url || draft.buttonUrl,
+      };
+    } else {
+      out.push({ ...emptyBlock("button"), label: draft.buttonText, url: draft.buttonUrl } as Block);
+    }
   }
 
   return out;

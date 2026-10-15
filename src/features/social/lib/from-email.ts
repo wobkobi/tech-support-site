@@ -5,6 +5,7 @@
 
 import {
   BUTTON_LINE_RE,
+  BUTTON_PLACEHOLDER_RE,
   DIRECTIVE_RE,
   DIVIDER_RE,
   IMAGE_LINE_RE,
@@ -57,7 +58,7 @@ export function postFromEmail(emailBody: string): PostFromEmail {
       continue;
     }
     flushQuote();
-    if (PICTURE_PLACEHOLDER_RE.test(line)) continue;
+    if (PICTURE_PLACEHOLDER_RE.test(line) || BUTTON_PLACEHOLDER_RE.test(line)) continue;
     const image = line.match(LINKED_IMAGE_LINE_RE) ?? line.match(IMAGE_LINE_RE);
     if (image) {
       if (!imageUrl) {
