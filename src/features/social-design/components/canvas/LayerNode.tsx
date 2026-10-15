@@ -273,6 +273,40 @@ function Logo({ src, w, h, shadow }: DrawProps & { src: string }): React.ReactEl
 }
 
 /**
+ * Placement of a layer's Group: centred on its box and offset by half its size, so
+ * turns and flips happen about the middle.
+ * @param layer - The layer.
+ * @param g - Its geometry on the size drawn.
+ * @returns Konva Group attributes.
+ */
+export function layerTransform(
+  layer: Layer,
+  g: Geometry,
+): {
+  x: number;
+  y: number;
+  offsetX: number;
+  offsetY: number;
+  rotation: number;
+  scaleX: number;
+  scaleY: number;
+  opacity: number;
+  visible: boolean;
+} {
+  return {
+    x: g.x + g.w / 2,
+    y: g.y + g.h / 2,
+    offsetX: g.w / 2,
+    offsetY: g.h / 2,
+    rotation: g.rotation,
+    scaleX: layer.flipX ? -1 : 1,
+    scaleY: layer.flipY ? -1 : 1,
+    opacity: layer.opacity,
+    visible: !g.hidden,
+  };
+}
+
+/**
  * The visual part of one layer, in its box's own space.
  * @param props - Component props.
  * @param props.layer - Layer to draw.

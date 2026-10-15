@@ -2,17 +2,16 @@
 // src/features/social-design/components/LayersPanel.tsx
 // The post maker's layer list, top layer first as it stacks on the picture: drag to
 // reorder, click to select (Shift adds), double-click to rename, and hide or lock each
-// layer. Hiding applies to the size on screen and carries to linked sizes like any
-// other edit.
+// layer. Hiding applies to the size on screen only. With more than one size, a chain
+// shows whether the layer still follows the other sizes here; a broken chain re-links.
 
 import { IconButton } from "@/features/social-design/components/editor-fields";
 import type { DesignDoc, Layer, LayerType } from "@/features/social-design/lib/doc";
 import {
-  layerById,
   moveLayerTo,
-  setGeometry,
+  relinkLayers,
+  setHidden,
   updateLayers,
-  type EditScope,
 } from "@/features/social-design/lib/editor-ops";
 import type { FormatKey } from "@/features/social-design/lib/formats";
 import { cn } from "@/shared/lib/cn";
@@ -44,6 +43,8 @@ import {
   FaGripVertical,
   FaIcons,
   FaImage,
+  FaLink,
+  FaLinkSlash,
   FaListCheck,
   FaLock,
   FaLockOpen,
@@ -78,7 +79,6 @@ const TYPE_ICON: Record<LayerType, IconType> = {
  * @param props.doc - Design.
  * @param props.format - Size on screen.
  * @param props.selected - Selected layer ids.
- * @param props.scope - Which sizes a hide reaches.
  * @param props.apply - Runs an edit as an undo step.
  * @param props.onSelect - Picks layers; `additive` toggles them into the selection.
  * @returns Panel element.
@@ -87,14 +87,12 @@ export function LayersPanel({
   doc,
   format,
   selected,
-  scope,
   apply,
   onSelect,
 }: {
   doc: DesignDoc;
   format: FormatKey;
   selected: string[];
-  scope: EditScope;
   apply: (edit: (doc: DesignDoc) => DesignDoc, tag?: string) => void;
   onSelect: (ids: string[], additive: boolean) => void;
 }): React.ReactElement {
@@ -105,6 +103,7 @@ export function LayersPanel({
   );
   // Top of the stack first, as the layers sit on the picture.
   const shown = [...doc.layers].reverse();
+  const manySizes = doc.formats.length > 1;
 
   /**
    * Drops a dragged row at its new place.
@@ -138,6 +137,7 @@ export function LayersPanel({
                   key={layer.id}
                   layer={layer}
                   hidden={!!doc.layouts[format]?.[layer.id]?.hidden}
+                  linked={manySizes ? (doc.layouts[format]?.[layer.id]?.linked ?? true) : null}
                   selected={selected.includes(layer.id)}
                   onSelect={(additive) => onSelect([layer.id], additive)}
                   onRename={(name) => apply((d) => updateLayers(d, [layer.id], () => ({ name })))}
@@ -145,15 +145,11 @@ export function LayersPanel({
                     apply((d) => updateLayers(d, [layer.id], (l) => ({ locked: !l.locked })))
                   }
                   onToggleHidden={() =>
-                    apply((d) => {
-                      const g = d.layouts[format]?.[layer.id];
-                      if (!g || !layerById(d, layer.id)) return d;
-                      const next = { ...g };
-                      if (g.hidden) delete next.hidden;
-                      else next.hidden = true;
-                      return setGeometry(d, format, { [layer.id]: next }, scope);
-                    })
+                    apply((d) =>
+                      setHidden(d, format, [layer.id], !d.layouts[format]?.[layer.id]?.hidden),
+                    )
                   }
+                  onRelink={() => apply((d) => relinkLayers(d, format, [layer.id]))}
                 />
               ))}
             </ul>
@@ -169,29 +165,35 @@ export function LayersPanel({
  * @param props - Component props.
  * @param props.layer - The layer.
  * @param props.hidden - Whether it is hidden on the size on screen.
+ * @param props.linked - Whether it follows the other sizes here, or null with one size.
  * @param props.selected - Whether it is selected.
  * @param props.onSelect - Selects it; `additive` toggles it into the selection.
  * @param props.onRename - Renames it.
  * @param props.onToggleLock - Locks or unlocks it.
- * @param props.onToggleHidden - Hides or shows it.
+ * @param props.onToggleHidden - Hides or shows it on this size.
+ * @param props.onRelink - Puts it back in step with the other sizes.
  * @returns Row element.
  */
 function LayerRow({
   layer,
   hidden,
+  linked,
   selected,
   onSelect,
   onRename,
   onToggleLock,
   onToggleHidden,
+  onRelink,
 }: {
   layer: Layer;
   hidden: boolean;
+  linked: boolean | null;
   selected: boolean;
   onSelect: (additive: boolean) => void;
   onRename: (name: string) => void;
   onToggleLock: () => void;
   onToggleHidden: () => void;
+  onRelink: () => void;
 }): React.ReactElement {
   const {
     attributes,
@@ -265,8 +267,25 @@ function LayerRow({
           )}
         </button>
       )}
+      {linked === true && (
+        <span
+          title="Follows the other sizes"
+          className="flex size-7 shrink-0 items-center justify-center text-admin-muted"
+        >
+          <FaLink aria-hidden className="size-3" />
+          <span className="sr-only">Follows the other sizes</span>
+        </span>
+      )}
+      {linked === false && (
+        <IconButton
+          label={`${layer.name} is set by hand on this size. Re-link to follow the other sizes`}
+          onClick={onRelink}
+        >
+          <FaLinkSlash aria-hidden className="size-3.5 text-coquelicot-700" />
+        </IconButton>
+      )}
       <IconButton
-        label={hidden ? `Show ${layer.name}` : `Hide ${layer.name}`}
+        label={hidden ? `Show ${layer.name} on this size` : `Hide ${layer.name} on this size`}
         onClick={onToggleHidden}
       >
         {hidden ? (

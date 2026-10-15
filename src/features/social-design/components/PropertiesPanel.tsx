@@ -4,6 +4,7 @@
 // flip, group), exact position and size, the layer's look, and the controls for its
 // type. Shows design-wide help when nothing is selected.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import {
   Check,
@@ -35,6 +36,7 @@ import {
   applyTextPreset,
   distributeLayers,
   layerById,
+  relinkLayers,
   restack,
   setGeometry,
   updateLayers,
@@ -51,6 +53,7 @@ import {
   FaArrowDown,
   FaArrowUp,
   FaCopy,
+  FaLink,
   FaLock,
   FaLockOpen,
   FaObjectGroup,
@@ -213,6 +216,9 @@ export function PropertiesPanel({
   };
 
   const grouped = layers.some((l) => l.groupId);
+  const unlinked = layers
+    .filter((l) => doc.layouts[format]?.[l.id]?.linked === false)
+    .map((l) => l.id);
   const allLocked = layers.every((l) => l.locked);
 
   return (
@@ -318,6 +324,33 @@ export function PropertiesPanel({
           )}
         </div>
       </Section>
+
+      {doc.formats.length > 1 && (
+        <Section title="Other sizes">
+          {unlinked.length === 0 ? (
+            <p className="text-sm text-admin-text-secondary">
+              {layers.length === 1 ? "Follows" : "These follow"} the other sizes: moving or resizing{" "}
+              {layers.length === 1 ? "it" : "them"} here does the same there, unless you pick This
+              size only.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-admin-text-secondary">
+                {unlinked.length === layers.length
+                  ? "Set by hand on this size, so changes here stay here."
+                  : `${unlinked.length} of these are set by hand on this size.`}
+              </p>
+              <AdminButton
+                size="xs"
+                variant="outline"
+                onClick={() => apply((d) => relinkLayers(d, format, unlinked))}
+              >
+                <FaLink aria-hidden className="size-3" /> Re-link to the other sizes
+              </AdminButton>
+            </>
+          )}
+        </Section>
+      )}
 
       {layer && g && (
         <Section title={`Position on ${FORMATS[format].label}`}>

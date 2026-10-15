@@ -1,9 +1,10 @@
 "use client";
 // src/features/social-design/components/DesignEditor.tsx
-// The post maker editor: toolbar, layers panel, canvas and properties panel around one
-// design. Holds the design with undo and redo, the selection, the size on screen and
-// the view settings, autosaves, and turns keyboard shortcuts and panel actions into
-// edits from editor-ops. Loaded only in the browser (Konva has no server build).
+// The post maker editor: toolbar, size tabs, layers panel, canvas (or every size side
+// by side) and properties panel around one design. Holds the design with undo and
+// redo, the selection, the size on screen, whether moves reach every size, and the
+// view settings, autosaves, and turns keyboard shortcuts and panel actions into edits
+// from editor-ops. Loaded only in the browser (Konva has no server build).
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
@@ -21,17 +22,21 @@ import {
   PropertiesPanel,
   type PanelActions,
 } from "@/features/social-design/components/PropertiesPanel";
+import { SizeTabs } from "@/features/social-design/components/SizeTabs";
 import { TipStrip } from "@/features/social-design/components/TipStrip";
 import {
   useDesignAutosave,
   type SaveState,
 } from "@/features/social-design/components/use-design-autosave";
 import { useDocHistory } from "@/features/social-design/components/use-doc-history";
+import { appCrops } from "@/features/social-design/lib/app-crops";
 import type { DesignRow } from "@/features/social-design/lib/design-row";
 import type { BoundValues, DesignDoc, Geometry } from "@/features/social-design/lib/doc";
 import {
+  addFormat,
   addLayer,
   copyLayers,
+  copyLayout,
   duplicateLayers,
   expandGroups,
   groupLayers,
@@ -39,6 +44,7 @@ import {
   nudgeLayers,
   pasteLayers,
   pasteStyle,
+  removeFormat,
   removeLayers,
   restack,
   setGeometry,
@@ -56,11 +62,12 @@ import { makeLayer, type AddKind } from "@/features/social-design/lib/new-layer"
 import { cn } from "@/shared/lib/cn";
 import { shrinkImage } from "@/shared/lib/resize-image";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   FaArrowRotateLeft,
   FaArrowRotateRight,
   FaBorderAll,
+  FaCropSimple,
   FaLink,
   FaMagnifyingGlassMinus,
   FaMagnifyingGlassPlus,
@@ -74,6 +81,23 @@ const PHOTO_EDGE = 2400;
 
 /** What the file picker is choosing a photo for. */
 type PhotoTarget = { mode: "image" } | { mode: "backdrop" } | { mode: "replace"; id: string };
+
+const SCOPES: { value: EditScope; label: string; title: string }[] = [
+  {
+    value: "all",
+    label: "Every size",
+    title: "Moving or resizing a layer does the same on every size it follows",
+  },
+  {
+    value: "this",
+    label: "This size only",
+    title:
+      "Moving or resizing a layer changes this size only, and it stops following the others here",
+  },
+];
+
+/** The all-sizes cells always fit their box, so they report nothing back. */
+function ignoreZoom(): void {}
 
 const SAVE_LABEL: Record<SaveState, string> = {
   saved: "All changes saved",
@@ -120,7 +144,12 @@ export function DesignEditor({
   const { doc, apply, current } = history;
   const [name, setName] = useState(initial.name);
   const [selectedRaw, setSelected] = useState<string[]>([]);
-  const [format, setFormat] = useState<FormatKey>(initial.doc.formats[0] ?? "feed-4x5");
+  const [formatRaw, setFormat] = useState<FormatKey>(initial.doc.formats[0] ?? "feed-4x5");
+  // An undo can take away the size on screen; fall back to the first one left.
+  const format = doc.formats.includes(formatRaw) ? formatRaw : (doc.formats[0] ?? formatRaw);
+  const [allSizes, setAllSizes] = useState(false);
+  const [scope, setScope] = useState<EditScope>("all");
+  const [showCrops, setShowCrops] = useState(false);
   const [zoom, setZoom] = useState<Zoom>("fit");
   const [shownZoom, setShownZoom] = useState(0.3);
   const [lockRatio, setLockRatio] = useState(false);
@@ -132,9 +161,8 @@ export function DesignEditor({
   const clip = useRef<Clip | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const photoFor = useRef<PhotoTarget>({ mode: "image" });
-  // Every geometry edit reaches the linked sizes; the "This size only" switch lands
-  // with the multi-size tools.
-  const scope: EditScope = "all";
+  // The tab thumbnails redraw a beat behind edits, so dragging and typing stay smooth.
+  const tabDoc = useDeferredValue(doc);
 
   // Drop ids of layers that no longer exist (deleted, or undone away).
   const selected = useMemo(
@@ -376,6 +404,35 @@ export function DesignEditor({
     [apply, format, scope],
   );
 
+  /**
+   * Shows one size on its own, zoomed to fit.
+   * @param f - Size to show.
+   */
+  function openSize(f: FormatKey): void {
+    setFormat(f);
+    setAllSizes(false);
+    setZoom("fit");
+  }
+
+  /**
+   * Adds a size and shows it.
+   * @param f - Size to add.
+   */
+  function addSize(f: FormatKey): void {
+    apply((d) => addFormat(d, f));
+    openSize(f);
+    toast(`${FORMATS[f].label} added, laid out from the closest shape.`);
+  }
+
+  /**
+   * Removes a size; undo brings it back with its layout.
+   * @param f - Size to remove.
+   */
+  function removeSize(f: FormatKey): void {
+    apply((d) => removeFormat(d, f));
+    toast(`${FORMATS[f].label} removed. Undo brings it back.`);
+  }
+
   const onText = useCallback(
     (id: string, text: string) =>
       apply((d) =>
@@ -509,61 +566,112 @@ export function DesignEditor({
 
       {/* 15rem covers the admin top bar, page header and toolbar, so at Fit the whole
           picture shows without scrolling once the tips are dismissed. */}
-      <div className="grid min-h-0 gap-3 lg:h-[calc(100dvh-15rem)] lg:min-h-136 lg:grid-cols-[15rem_minmax(0,1fr)_18rem]">
+      <div className="grid min-h-0 grid-cols-1 gap-3 lg:h-[calc(100dvh-15rem)] lg:min-h-136 lg:grid-cols-[15rem_minmax(0,1fr)_18rem]">
         <aside className="order-2 max-h-80 overflow-y-auto rounded-lg border border-admin-border bg-admin-surface lg:order-0 lg:max-h-none">
           <LayersPanel
             doc={doc}
             format={format}
             selected={selected}
-            scope={scope}
             apply={apply}
             onSelect={select}
           />
         </aside>
 
         <div className="order-1 flex min-h-0 flex-col gap-2 lg:order-0">
+          <SizeTabs
+            doc={tabDoc}
+            format={format}
+            allSizes={allSizes}
+            bound={bound}
+            family={family}
+            onPick={openSize}
+            onAllSizes={() => setAllSizes(true)}
+            onAdd={addSize}
+            onRemove={removeSize}
+          />
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-sm text-admin-text-secondary">
-              Size
+            {doc.formats.length > 1 && (
+              <div
+                role="group"
+                aria-label="Which sizes moves and resizes reach"
+                className="flex items-center gap-2 text-sm text-admin-text-secondary"
+              >
+                Moves reach
+                <div className="flex overflow-hidden rounded-md border border-admin-border-strong">
+                  {SCOPES.map((s) => (
+                    <button
+                      key={s.value}
+                      type="button"
+                      title={s.title}
+                      aria-pressed={scope === s.value}
+                      onClick={() => setScope(s.value)}
+                      className={cn(
+                        "h-8 px-2.5 text-sm transition-colors not-first:border-l not-first:border-admin-border",
+                        scope === s.value
+                          ? "bg-russian-violet text-seasalt"
+                          : "bg-admin-surface text-admin-text hover:bg-admin-bg",
+                      )}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!allSizes && doc.formats.length > 1 && (
               <select
-                value={format}
+                aria-label="Copy the layout of another size onto this one"
+                value=""
                 onChange={(e) => {
-                  setFormat(e.target.value as FormatKey);
-                  setZoom("fit");
+                  const from = e.target.value as FormatKey;
+                  if (!from) return;
+                  apply((d) => copyLayout(d, from, format));
+                  toast(
+                    `${FORMATS[format].label} now follows the ${FORMATS[from].label} layout. Undo takes it back.`,
+                  );
                 }}
                 className={cn(ADMIN_INPUT_CLS, "h-8 w-auto py-0")}
               >
-                {doc.formats.map((f) => (
-                  <option key={f} value={f}>
-                    {FORMATS[f].label} ({FORMATS[f].width} × {FORMATS[f].height})
-                  </option>
-                ))}
+                <option value="">Copy layout from...</option>
+                {doc.formats
+                  .filter((f) => f !== format)
+                  .map((f) => (
+                    <option key={f} value={f}>
+                      {FORMATS[f].label}
+                    </option>
+                  ))}
               </select>
-            </label>
+            )}
             <div className="ml-auto flex items-center gap-1">
-              <IconButton label="Zoom out" onClick={() => stepZoom(1 / 1.25)}>
-                <FaMagnifyingGlassMinus aria-hidden className="size-3.5" />
-              </IconButton>
-              <select
-                aria-label="Zoom"
-                value={zoom === "fit" ? "fit" : String(zoom)}
-                onChange={(e) => setZoom(e.target.value === "fit" ? "fit" : Number(e.target.value))}
-                className={cn(ADMIN_INPUT_CLS, "h-8 w-auto py-0")}
-              >
-                <option value="fit">Fit ({Math.round(shownZoom * 100)}%)</option>
-                {[0.25, 0.5, 1, 2].map((z) => (
-                  <option key={z} value={String(z)}>
-                    {z * 100}%
-                  </option>
-                ))}
-                {zoom !== "fit" && ![0.25, 0.5, 1, 2].includes(zoom) && (
-                  <option value={String(zoom)}>{Math.round(zoom * 100)}%</option>
-                )}
-              </select>
-              <IconButton label="Zoom in" onClick={() => stepZoom(1.25)}>
-                <FaMagnifyingGlassPlus aria-hidden className="size-3.5" />
-              </IconButton>
-              <span className="mx-1 h-6 w-px bg-admin-border" aria-hidden />
+              {!allSizes && (
+                <>
+                  <IconButton label="Zoom out" onClick={() => stepZoom(1 / 1.25)}>
+                    <FaMagnifyingGlassMinus aria-hidden className="size-3.5" />
+                  </IconButton>
+                  <select
+                    aria-label="Zoom"
+                    value={zoom === "fit" ? "fit" : String(zoom)}
+                    onChange={(e) =>
+                      setZoom(e.target.value === "fit" ? "fit" : Number(e.target.value))
+                    }
+                    className={cn(ADMIN_INPUT_CLS, "h-8 w-auto py-0")}
+                  >
+                    <option value="fit">Fit ({Math.round(shownZoom * 100)}%)</option>
+                    {[0.25, 0.5, 1, 2].map((z) => (
+                      <option key={z} value={String(z)}>
+                        {z * 100}%
+                      </option>
+                    ))}
+                    {zoom !== "fit" && ![0.25, 0.5, 1, 2].includes(zoom) && (
+                      <option value={String(zoom)}>{Math.round(zoom * 100)}%</option>
+                    )}
+                  </select>
+                  <IconButton label="Zoom in" onClick={() => stepZoom(1.25)}>
+                    <FaMagnifyingGlassPlus aria-hidden className="size-3.5" />
+                  </IconButton>
+                  <span className="mx-1 h-6 w-px bg-admin-border" aria-hidden />
+                </>
+              )}
               <IconButton label="Grid" active={showGrid} onClick={() => setShowGrid((v) => !v)}>
                 <FaBorderAll aria-hidden className="size-3.5" />
               </IconButton>
@@ -575,12 +683,21 @@ export function DesignEditor({
                 <FaVectorSquare aria-hidden className="size-3.5" />
               </IconButton>
               <IconButton
-                label="Rulers"
-                active={showRulers}
-                onClick={() => setShowRulers((v) => !v)}
+                label="What each app shows when this goes up as a post"
+                active={showCrops}
+                onClick={() => setShowCrops((v) => !v)}
               >
-                <FaRulerCombined aria-hidden className="size-3.5" />
+                <FaCropSimple aria-hidden className="size-3.5" />
               </IconButton>
+              {!allSizes && (
+                <IconButton
+                  label="Rulers"
+                  active={showRulers}
+                  onClick={() => setShowRulers((v) => !v)}
+                >
+                  <FaRulerCombined aria-hidden className="size-3.5" />
+                </IconButton>
+              )}
               <IconButton
                 label="Keep shape when resizing from a corner"
                 active={lockRatio}
@@ -590,8 +707,60 @@ export function DesignEditor({
               </IconButton>
             </div>
           </div>
+          {showCrops && !allSizes && <CropNote format={format} />}
           <div className="h-[60vh] min-h-80 overflow-hidden rounded-lg border border-admin-border bg-seasalt-200/60 lg:h-auto lg:flex-1">
-            {family ? (
+            {family && allSizes ? (
+              <div className="grid size-full auto-rows-[minmax(16rem,1fr)] grid-cols-1 gap-2 overflow-y-auto p-2 sm:grid-cols-2 xl:grid-cols-3">
+                {doc.formats.map((f) => (
+                  <section
+                    key={f}
+                    aria-label={FORMATS[f].label}
+                    className={cn(
+                      "flex min-h-0 flex-col overflow-hidden rounded-md border bg-admin-surface",
+                      f === format ? "border-moonstone-600" : "border-admin-border",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openSize(f)}
+                      title="Open this size on its own"
+                      className="flex items-baseline gap-2 border-b border-admin-border px-2 py-1 text-left text-sm hover:bg-admin-bg"
+                    >
+                      <span className="font-semibold text-admin-text">{FORMATS[f].label}</span>
+                      <span className="text-admin-muted">
+                        {FORMATS[f].width} × {FORMATS[f].height}
+                      </span>
+                    </button>
+                    <div className="min-h-0 flex-1">
+                      <DesignCanvas
+                        compact
+                        doc={doc}
+                        format={f}
+                        selected={selected}
+                        bound={bound}
+                        family={family}
+                        zoom="fit"
+                        lockRatio={lockRatio}
+                        showGrid={showGrid}
+                        showGuides={showGuides}
+                        showRulers={false}
+                        crops={showCrops ? appCrops(f).crops : []}
+                        onSelect={(ids, additive) => {
+                          setFormat(f);
+                          select(ids, additive);
+                        }}
+                        onGeometry={(changes) => {
+                          setFormat(f);
+                          apply((d) => setGeometry(d, f, changes, scope));
+                        }}
+                        onText={onText}
+                        onZoom={ignoreZoom}
+                      />
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : family ? (
               <DesignCanvas
                 doc={doc}
                 format={format}
@@ -603,6 +772,7 @@ export function DesignEditor({
                 showGrid={showGrid}
                 showGuides={showGuides}
                 showRulers={showRulers}
+                crops={showCrops ? appCrops(format).crops : []}
                 onSelect={select}
                 onGeometry={onGeometry}
                 onText={onText}
@@ -641,4 +811,28 @@ export function DesignEditor({
       />
     </div>
   );
+}
+
+/**
+ * One line under the toolbar saying how the apps treat this size as a post picture,
+ * shown with the app-crop boxes.
+ * @param props - Component props.
+ * @param props.format - Size on screen.
+ * @returns Note element.
+ */
+function CropNote({ format }: { format: FormatKey }): React.ReactElement {
+  const { crops, refusedBy } = appCrops(format);
+  const parts: string[] = [];
+  if (crops.length === 0 && refusedBy.length === 0) {
+    parts.push("Facebook, Instagram and Google all show this size whole.");
+  }
+  if (crops.length > 0) {
+    parts.push(
+      `${crops.map((c) => c.label).join(" and ")} cut this size; the boxes show what stays.`,
+    );
+  }
+  if (refusedBy.length > 0) {
+    parts.push(`${refusedBy.join(" and ")} won't take this shape as a post picture.`);
+  }
+  return <p className="text-sm text-admin-text-secondary">{parts.join(" ")}</p>;
 }

@@ -35,9 +35,10 @@ export function TipStrip({ className }: { className?: string }): React.ReactElem
     >
       <FaLightbulb aria-hidden className="mt-0.5 size-4 shrink-0 text-moonstone-700" />
       <p className="flex-1">
-        Every change you make here shows on all the sizes at once: switch sizes from the size menu
-        to check each one. Double-click words to type on the picture, drag across the picture to
-        pick several things, and use Ctrl+Z to undo.
+        Every change you make here shows on all the sizes at once: click a size above the picture,
+        or Side by side, to check each one. To move something on one size only, pick This size only.
+        Double-click words to type on the picture, drag across the picture to pick several things,
+        and use Ctrl+Z to undo.
       </p>
       <button
         type="button"

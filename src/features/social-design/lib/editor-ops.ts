@@ -1,8 +1,9 @@
 // src/features/social-design/lib/editor-ops.ts
 // Every change the post maker editor makes to a design, as pure functions from one
 // document to the next: adding, moving, restyling, reordering, grouping and pasting
-// layers. Geometry edits on one size carry across to the sizes where the layer is
-// still linked. Pure and client-safe; check-social-design covers them.
+// layers, plus adding, removing and re-laying-out whole sizes. Geometry edits on one
+// size carry across to the sizes where the layer is still linked. Pure and
+// client-safe; check-social-design covers them.
 
 import { TEXT_PRESETS, type TextPreset } from "@/features/social-design/lib/brand";
 import {
@@ -13,13 +14,14 @@ import {
   type Geometry,
   type Layer,
 } from "@/features/social-design/lib/doc";
-import { FORMATS, type FormatKey } from "@/features/social-design/lib/formats";
+import { FORMAT_KEYS, FORMATS, type FormatKey } from "@/features/social-design/lib/formats";
 import {
   align,
   autoPlace,
   canvasBox,
   distribute,
   propagate,
+  relinkSource,
   type AlignTo,
 } from "@/features/social-design/lib/layout";
 
@@ -130,7 +132,8 @@ export function updateLayers(
  * Writes new geometry for some layers on the size being edited. With "all", each
  * change carries to every other listed size where that layer is linked, as the same
  * move, resize and turn rather than a copy; with "this", only the edited size changes
- * and the layer becomes unlinked there.
+ * and the layer becomes unlinked there. A layer already unlinked on the edited size
+ * was set by hand for that size, so its edits stay there too.
  * @param doc - Design.
  * @param format - Size the edit was made on.
  * @param changes - New geometry per layer id on that size.
@@ -149,7 +152,7 @@ export function setGeometry(
     const before = here[id];
     if (!before) continue;
     here[id] = scope === "this" ? { ...after, linked: false } : { ...after, linked: before.linked };
-    if (scope !== "all") continue;
+    if (scope !== "all" || !before.linked) continue;
     for (const other of doc.formats) {
       if (other === format) continue;
       const target = layouts[other]?.[id];
@@ -621,4 +624,155 @@ export function startGeometry(
       layer.type === "text" ? presetFontSize(layer.preset, format) : Math.round((40 * unit) / 1080);
   }
   return g;
+}
+
+/**
+ * Hides or shows layers on one size only. Hiding is about what each size shows, so it
+ * never carries across and never unlinks the layer's place.
+ * @param doc - Design.
+ * @param format - Size on screen.
+ * @param ids - Layers to hide or show.
+ * @param hidden - Whether to hide them.
+ * @returns New design.
+ */
+export function setHidden(
+  doc: DesignDoc,
+  format: FormatKey,
+  ids: string[],
+  hidden: boolean,
+): DesignDoc {
+  const here = { ...(doc.layouts[format] ?? {}) };
+  for (const id of ids) {
+    const g = here[id];
+    if (!g) continue;
+    const next = { ...g };
+    if (hidden) next.hidden = true;
+    else delete next.hidden;
+    here[id] = next;
+  }
+  return { ...doc, layouts: { ...doc.layouts, [format]: here } };
+}
+
+/**
+ * Width over height of a size.
+ * @param key - Size.
+ * @returns Aspect ratio.
+ */
+function ratioOf(key: FormatKey): number {
+  return FORMATS[key].width / FORMATS[key].height;
+}
+
+/**
+ * The listed size nearest in shape to another, to lay a new size out from: the
+ * smallest gap in aspect ratio, measured as a factor so 2:1 and 1:2 are equally far
+ * from square.
+ * @param doc - Design.
+ * @param key - Size being added or laid out.
+ * @returns The nearest other listed size, or null when there is none.
+ */
+export function nearestFormat(doc: DesignDoc, key: FormatKey): FormatKey | null {
+  const r = ratioOf(key);
+  /**
+   * Shape difference from the new size, on a log scale so 2:1 and 1:2 are equally far.
+   * @param f - Size to compare.
+   * @returns Distance between the two ratios.
+   */
+  const gap = (f: FormatKey): number => Math.abs(Math.log(ratioOf(f) / r));
+  return doc.formats.filter((f) => f !== key).sort((a, b) => gap(a) - gap(b))[0] ?? null;
+}
+
+/**
+ * Lays every layer out on one size from its place on another, all linked. A layer the
+ * source size has no place for keeps the place it has, or is placed from the first
+ * size that has one.
+ * @param doc - Design.
+ * @param from - Size to copy from.
+ * @param to - Size to lay out.
+ * @returns The new layout for `to`.
+ */
+function layoutFrom(doc: DesignDoc, from: FormatKey | null, to: FormatKey): FormatLayout {
+  const out: FormatLayout = {};
+  for (const l of doc.layers) {
+    const src = from ? doc.layouts[from]?.[l.id] : undefined;
+    if (src && from) {
+      out[l.id] = autoPlace(src, from, to);
+      continue;
+    }
+    const own = doc.layouts[to]?.[l.id];
+    if (own) {
+      out[l.id] = own;
+      continue;
+    }
+    const other = doc.formats.find((f) => f !== to && doc.layouts[f]?.[l.id]);
+    const g = other ? doc.layouts[other]?.[l.id] : undefined;
+    if (other && g) out[l.id] = autoPlace(g, other, to);
+  }
+  return out;
+}
+
+/**
+ * Adds a size to a design, laying every layer out from the listed size nearest in
+ * shape. Sizes stay in tab order.
+ * @param doc - Design.
+ * @param key - Size to add.
+ * @returns New design, or the same one when the size is already listed.
+ */
+export function addFormat(doc: DesignDoc, key: FormatKey): DesignDoc {
+  if (doc.formats.includes(key)) return doc;
+  const layout = layoutFrom(doc, nearestFormat(doc, key), key);
+  return {
+    ...doc,
+    formats: FORMAT_KEYS.filter((f) => f === key || doc.formats.includes(f)),
+    layouts: { ...doc.layouts, [key]: layout },
+  };
+}
+
+/**
+ * Removes a size and its layout. The last size can't be removed.
+ * @param doc - Design.
+ * @param key - Size to remove.
+ * @returns New design, or the same one when it is the only size or isn't listed.
+ */
+export function removeFormat(doc: DesignDoc, key: FormatKey): DesignDoc {
+  if (!doc.formats.includes(key) || doc.formats.length <= 1) return doc;
+  const layouts = { ...doc.layouts };
+  delete layouts[key];
+  return { ...doc, formats: doc.formats.filter((f) => f !== key), layouts };
+}
+
+/**
+ * Replaces one size's layout with another size's, re-placed to fit, every layer
+ * linked again. Undo is the way back.
+ * @param doc - Design.
+ * @param from - Size to copy from.
+ * @param to - Size to lay out.
+ * @returns New design.
+ */
+export function copyLayout(doc: DesignDoc, from: FormatKey, to: FormatKey): DesignDoc {
+  if (from === to || !doc.formats.includes(from) || !doc.formats.includes(to)) return doc;
+  return { ...doc, layouts: { ...doc.layouts, [to]: layoutFrom(doc, from, to) } };
+}
+
+/**
+ * Re-links layers on one size: each goes back to where it would be placed from a size
+ * it is still linked on, and follows edits again. Whether it is hidden on this size
+ * stays as it was.
+ * @param doc - Design.
+ * @param format - Size to re-link on.
+ * @param ids - Layers to re-link.
+ * @returns New design.
+ */
+export function relinkLayers(doc: DesignDoc, format: FormatKey, ids: string[]): DesignDoc {
+  const here = { ...(doc.layouts[format] ?? {}) };
+  for (const id of ids) {
+    const own = here[id];
+    const from = relinkSource(doc, id, format);
+    const src = from ? doc.layouts[from]?.[id] : undefined;
+    if (!own || !from || !src) continue;
+    const next = autoPlace(src, from, format);
+    if (own.hidden) next.hidden = true;
+    else delete next.hidden;
+    here[id] = next;
+  }
+  return { ...doc, layouts: { ...doc.layouts, [format]: here } };
 }

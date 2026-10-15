@@ -6,6 +6,7 @@
 // Pure logic, no database and no browser.
 // Run with: npm test -- social-design
 
+import { appCrops } from "@/features/social-design/lib/app-crops";
 import { boundText } from "@/features/social-design/lib/bound";
 import { blankDoc } from "@/features/social-design/lib/design-row";
 import {
@@ -17,18 +18,24 @@ import {
   type TextLayer,
 } from "@/features/social-design/lib/doc";
 import {
+  addFormat,
   addLayer,
   alignLayers,
   applyTextPreset,
+  copyLayout,
   duplicateLayers,
   expandGroups,
   groupLayers,
   moveLayerTo,
+  nearestFormat,
   pasteStyle,
   presetFontSize,
+  relinkLayers,
+  removeFormat,
   removeLayers,
   restack,
   setGeometry,
+  setHidden,
   setTextHeights,
   startGeometry,
   styleOf,
@@ -774,6 +781,129 @@ function checkEditorOps(): void {
   );
 }
 
+/** Adding, removing and re-laying-out sizes, re-linking, hiding, and app crops. */
+function checkSizes(): void {
+  console.log("\nSizes in a design");
+  const base = docWithText((f) => ({
+    x: 90,
+    y: 200,
+    w: FORMATS[f].width - 180,
+    h: 300,
+    rotation: 0,
+    fontSize: 96,
+    linked: true,
+  }));
+  /**
+   * Headline geometry on one size.
+   * @param d - Design.
+   * @param f - Size.
+   * @returns The headline's geometry there, if laid out.
+   */
+  const head = (d: DesignDoc, f: FormatKey): Geometry | undefined => d.layouts[f]?.head1;
+
+  expect("the closest shape to an X post is landscape", nearestFormat(base, "x") === "landscape");
+  expect(
+    "the closest shape to a profile picture is square",
+    nearestFormat(base, "profile") === "square",
+  );
+
+  const withX = addFormat(base, "x");
+  expect(
+    "an added size is listed in tab order with every layer placed",
+    withX.formats.at(-1) === "x" &&
+      withX.layers.every((l) => !!withX.layouts.x?.[l.id]) &&
+      head(withX, "x")?.linked === true,
+  );
+  expect("adding a size twice changes nothing", addFormat(withX, "x") === withX);
+  expect("a design with an extra size parses", "doc" in parseDesignDoc(withX));
+
+  const lessSquare = removeFormat(base, "square");
+  expect(
+    "removing a size drops it and its layout",
+    !lessSquare.formats.includes("square") && !lessSquare.layouts.square,
+  );
+  const one: DesignDoc = { ...base, formats: ["square"], layouts: { square: base.layouts.square } };
+  expect("the last size can't be removed", removeFormat(one, "square") === one);
+
+  // A hand-set layer stops pushing its edits to the other sizes.
+  const handSet = setGeometry(
+    base,
+    "square",
+    { head1: { ...head(base, "square")!, x: 10 } },
+    "this",
+  );
+  const fromHandSet = setGeometry(
+    handSet,
+    "square",
+    { head1: { ...head(handSet, "square")!, x: 300 } },
+    "all",
+  );
+  expect(
+    "a move on a size set by hand stays there",
+    sortedJson(fromHandSet.layouts.story) === sortedJson(base.layouts.story) &&
+      head(fromHandSet, "square")?.x === 300,
+  );
+
+  // Re-linking puts it back where the other sizes place it, keeping hidden as it was.
+  const hidden = setHidden(handSet, "square", ["head1"], true);
+  const relinked = relinkLayers(hidden, "square", ["head1"]);
+  const expected = autoPlace(head(base, "feed-4x5")!, "feed-4x5", "square");
+  expect(
+    "re-linking places the layer from a linked size",
+    head(relinked, "square")?.linked === true && near(head(relinked, "square")!.x, expected.x),
+    JSON.stringify(head(relinked, "square")),
+  );
+  expect("re-linking keeps it hidden on that size", head(relinked, "square")?.hidden === true);
+
+  // Hiding is one size only and doesn't unlink.
+  expect(
+    "hiding touches one size and keeps the link",
+    head(hidden, "square")?.hidden === true &&
+      head(hidden, "story")?.hidden === undefined &&
+      head(setHidden(base, "story", ["head1"], true), "story")?.linked === true,
+  );
+  expect(
+    "showing again clears the flag",
+    head(setHidden(hidden, "square", ["head1"], false), "square")?.hidden === undefined,
+  );
+
+  // Copy layout re-places every layer from the source, linked.
+  const copied = copyLayout(handSet, "feed-4x5", "square");
+  expect(
+    "copy layout replaces a hand-set place and links it",
+    head(copied, "square")?.linked === true && near(head(copied, "square")!.x, expected.x),
+  );
+  expect("copy layout onto itself changes nothing", copyLayout(base, "square", "square") === base);
+
+  // App crops agree with the composer's picture rules.
+  const feed = appCrops("feed-4x5");
+  expect(
+    "a 4:5 picture is cut by Google only",
+    feed.crops.length === 1 && feed.crops[0]?.label === "Google" && feed.refusedBy.length === 0,
+  );
+  const land = appCrops("landscape");
+  const google = land.crops.find((c) => c.label === "Google");
+  expect(
+    "Google cuts a landscape picture to a centred 4:3",
+    !!google && near(google.w / google.h, 4 / 3, 0.01) && near(google.x * 2 + google.w, 1200),
+    JSON.stringify(google),
+  );
+  expect(
+    "Facebook shows a landscape picture whole",
+    !land.crops.some((c) => c.label.includes("Facebook")),
+  );
+  const story = appCrops("story");
+  expect(
+    "a story is cut by Facebook and refused by Instagram as a post",
+    story.crops.some((c) => c.label.includes("Facebook")) && story.refusedBy.includes("Instagram"),
+    JSON.stringify(story),
+  );
+  expect(
+    "Google 4:3 shows whole on Google",
+    !appCrops("google-4x3").crops.some((c) => c.label.includes("Google")),
+  );
+}
+
 /** Runs every group and exits non-zero on any failure. */
 function main(): void {
   checkFormats();
@@ -783,6 +913,7 @@ function main(): void {
   checkAlign();
   checkHash();
   checkEditorOps();
+  checkSizes();
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);
 }

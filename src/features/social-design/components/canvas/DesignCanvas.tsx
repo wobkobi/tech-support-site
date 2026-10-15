@@ -2,10 +2,12 @@
 // src/features/social-design/components/canvas/DesignCanvas.tsx
 // The post maker's artboard: one size of the design drawn with Konva, with selection,
 // drag, resize and rotate handles, snapping guides, a marquee, zoom and pan, rulers,
-// grid and guides, and in-place text editing. The design itself lives in the editor;
-// this reports finished moves back as new geometry.
+// grid and guides, app-crop boxes, and in-place text editing. The design itself lives
+// in the editor; this reports finished moves back as new geometry. Several can show at
+// once (the all-sizes view), each drawing one size of the same design.
 
-import { LayerVisual } from "@/features/social-design/components/canvas/LayerNode";
+import { LayerVisual, layerTransform } from "@/features/social-design/components/canvas/LayerNode";
+import type { AppCrop } from "@/features/social-design/lib/app-crops";
 import { hexOf } from "@/features/social-design/lib/brand";
 import {
   TEXT_LIKE,
@@ -19,7 +21,17 @@ import { FORMATS, safeRect, type FormatKey } from "@/features/social-design/lib/
 import type Konva from "konva";
 import type React from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Group, Layer as KLayer, Line, Rect, Stage, Text, Transformer } from "react-konva";
+import {
+  Group,
+  Layer as KLayer,
+  Label,
+  Line,
+  Rect,
+  Stage,
+  Tag,
+  Text,
+  Transformer,
+} from "react-konva";
 
 /** How far the editor is zoomed: fit to the space, or a fixed scale (1 = 100%). */
 export type Zoom = "fit" | number;
@@ -33,8 +45,11 @@ interface Guide {
 // Snap distance and ruler size in screen pixels.
 const SNAP_PX = 6;
 const RULER = 20;
-// Space kept around the picture when zoomed to fit.
+// Space kept around the picture when zoomed to fit; less in the all-sizes grid.
 const FIT_PAD = 48;
+const COMPACT_PAD = 12;
+// Margin guides sit this share of the shorter side in from each edge.
+const MARGIN_SHARE = 0.06;
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 4;
 const SIDE_ANCHORS = new Set(["middle-left", "middle-right"]);
@@ -87,6 +102,9 @@ function rulerStep(scale: number): number {
  * @param props.showGrid - Whether to draw the grid.
  * @param props.showGuides - Whether to draw margins and the safe area.
  * @param props.showRulers - Whether to draw rulers.
+ * @param props.crops - App-crop boxes to outline, or none.
+ * @param props.compact - A small cell in the all-sizes grid: less padding, and the
+ *   mouse wheel scrolls the page instead of the canvas.
  * @param props.onSelect - Picks layers; `additive` toggles them into the selection.
  * @param props.onGeometry - A move, resize or rotate finished.
  * @param props.onText - In-place text editing finished with new words.
@@ -104,6 +122,8 @@ export function DesignCanvas({
   showGrid,
   showGuides,
   showRulers,
+  crops = [],
+  compact = false,
   onSelect,
   onGeometry,
   onText,
@@ -119,6 +139,8 @@ export function DesignCanvas({
   showGrid: boolean;
   showGuides: boolean;
   showRulers: boolean;
+  crops?: AppCrop[];
+  compact?: boolean;
   onSelect: (ids: string[], additive: boolean) => void;
   onGeometry: (changes: Record<string, Geometry>) => void;
   onText: (id: string, text: string) => void;
@@ -161,9 +183,9 @@ export function DesignCanvas({
 
   const fitScale = useMemo(() => {
     if (size.w === 0 || size.h === 0) return 0.3;
-    const pad = FIT_PAD + (showRulers ? RULER : 0);
+    const pad = (compact ? COMPACT_PAD : FIT_PAD) + (showRulers ? RULER : 0);
     return Math.max(MIN_ZOOM, Math.min((size.w - pad * 2) / W, (size.h - pad * 2) / H));
-  }, [size, W, H, showRulers]);
+  }, [size, W, H, showRulers, compact]);
   const scale = zoom === "fit" ? fitScale : zoom;
 
   // Centre the picture whenever the zoom is set from the toolbar, the size changes or
@@ -340,6 +362,7 @@ export function DesignCanvas({
    * @param e - Konva wheel event.
    */
   function onWheel(e: Konva.KonvaEventObject<WheelEvent>): void {
+    if (compact) return;
     e.evt.preventDefault();
     const stage = e.target.getStage();
     const p = stage?.getPointerPosition();
@@ -359,9 +382,9 @@ export function DesignCanvas({
   }
 
   /**
-   * Snaps a dragged layer to the picture's edges and centre lines and to other layers'
-   * edges and centres, whichever is nearest within a few screen pixels, and records the
-   * lines it snapped to for drawing.
+   * Snaps a dragged layer to the picture's edges and centre lines, the margin guides,
+   * the safe area's edges, and other layers' edges and centres, whichever is nearest
+   * within a few screen pixels, and records the lines it snapped to for drawing.
    * @param e - Konva drag event.
    */
   function onDragMove(e: Konva.KonvaEventObject<DragEvent>): void {
@@ -372,8 +395,10 @@ export function DesignCanvas({
     if (!g) return;
     const x = node.x() - g.w / 2;
     const y = node.y() - g.h / 2;
-    const xs = [0, W / 2, W];
-    const ys = [0, H / 2, H];
+    const m = Math.round(Math.min(W, H) * MARGIN_SHARE);
+    const s = safeRect(format);
+    const xs = [0, W / 2, W, m, W - m, s.x1, s.x2];
+    const ys = [0, H / 2, H, m, H - m, s.y1, s.y2];
     for (const l of doc.layers) {
       const o = layout[l.id];
       if (l.id === id || !o || o.hidden || l.type === "backdrop") continue;
@@ -533,7 +558,7 @@ export function DesignCanvas({
   const safe = safeRect(format);
   const step = rulerStep(scale);
   const gridStep = Math.round(Math.min(W, H) / 12);
-  const margin = Math.round(Math.min(W, H) * 0.06);
+  const margin = Math.round(Math.min(W, H) * MARGIN_SHARE);
 
   return (
     <div
@@ -577,15 +602,7 @@ export function DesignCanvas({
                         if (n) nodes.current.set(layer.id, n);
                         else nodes.current.delete(layer.id);
                       }}
-                      x={g.x + g.w / 2}
-                      y={g.y + g.h / 2}
-                      offsetX={g.w / 2}
-                      offsetY={g.h / 2}
-                      rotation={g.rotation}
-                      scaleX={layer.flipX ? -1 : 1}
-                      scaleY={layer.flipY ? -1 : 1}
-                      opacity={layer.opacity}
-                      visible={!g.hidden}
+                      {...layerTransform(layer, g)}
                       draggable={!layer.locked && !spaceDown && editing !== layer.id}
                       onDragMove={onDragMove}
                       onDragEnd={onDragEnd}
@@ -685,6 +702,29 @@ export function DesignCanvas({
                   )}
                 </>
               )}
+              {crops.map((c) => (
+                <Group key={c.label}>
+                  <Rect
+                    x={c.x}
+                    y={c.y}
+                    width={c.w}
+                    height={c.h}
+                    stroke={hexOf("russian-violet")}
+                    strokeWidth={2 / scale}
+                    dash={[4 / scale, 4 / scale]}
+                  />
+                  <Label x={c.x + 6 / scale} y={c.y + 6 / scale}>
+                    <Tag fill={hexOf("russian-violet")} cornerRadius={3 / scale} />
+                    <Text
+                      text={`${c.label} shows this`}
+                      fontSize={12 / scale}
+                      fontStyle="bold"
+                      padding={4 / scale}
+                      fill="#ffffff"
+                    />
+                  </Label>
+                </Group>
+              ))}
               {guides.map((gd, i) =>
                 gd.axis === "x" ? (
                   <Line
