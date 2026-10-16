@@ -6,6 +6,7 @@ import {
   buildAppointmentDescription,
   combineUnitAndAddress,
   parseHourLabel,
+  PHONE_INVALID_MESSAGE,
   splitUnitFromAddress,
   validateBookingPayloadFields,
   validateBookingRequest,
@@ -35,6 +36,7 @@ import {
 import { errorResponse } from "@/shared/lib/api-response";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
+import { checkEmailDomain } from "@/shared/lib/email-domain.server";
 import { normaliseAddress } from "@/shared/lib/normalise-address";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { normaliseName } from "@/shared/lib/normalise-name";
@@ -116,10 +118,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Normalise + validate phone up front so a malformed number (letters,
     // wrong length) is rejected before any of the calendar / DB work runs.
-    const phoneValidation = validatePhone(phone ?? "");
+    const phoneValidation = validatePhone(phone ?? "", { nzOnly: true });
     if (phoneValidation.result === "invalid") {
       return NextResponse.json(
-        { ok: false, error: "Please enter a valid phone number, or leave it blank." },
+        { ok: false, error: `${PHONE_INVALID_MESSAGE} Or leave it blank.` },
         { status: 400 },
       );
     }
@@ -152,6 +154,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
     if (!payloadCheck.valid) {
       return errorResponse(payloadCheck.error, 400);
+    }
+    // The format check passes a made-up domain like "bgp.bgp"; DNS shows it can't
+    // take mail. An unanswered lookup lets the booking through.
+    if ((await checkEmailDomain(email)) === "no-mail") {
+      return errorResponse(
+        "That email address can't receive email. Please check it for typos.",
+        400,
+      );
     }
 
     // normaliseAddress only formats an UNAMBIGUOUS match (null on 0 or >1 candidates), so

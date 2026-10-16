@@ -2,7 +2,8 @@
 // src/shared/components/PhoneInput.tsx
 // Shared NZ phone input. On blur, formats the value with formatNZPhone and runs
 // validatePhone so every form on the site behaves identically. Per-form wording can be
-// customised via errorMessages.
+// customised via errorMessages. Public forms pass nzOnly, which refuses numbers from
+// other countries.
 
 import { cn } from "@/shared/lib/cn";
 import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
@@ -38,6 +39,8 @@ interface PhoneInputProps {
   onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
   /** ARIA describedby id forwarded to the input when an error is shown. */
   errorId?: string;
+  /** Public forms: refuse numbers from countries other than NZ. */
+  nzOnly?: boolean;
 }
 
 const DEFAULT_INVALID = "Enter a valid phone number.";
@@ -65,6 +68,7 @@ const DEFAULT_INPUT_CLASSES = cn(
  * @param props.disabled - HTML disabled attribute.
  * @param props.onBlur - Called after the internal blur handler runs.
  * @param props.errorId - Override for the aria-describedby id when an error is shown.
+ * @param props.nzOnly - Reject numbers from countries other than NZ.
  * @returns Phone input element.
  */
 export function PhoneInput({
@@ -83,6 +87,7 @@ export function PhoneInput({
   disabled,
   onBlur,
   errorId,
+  nzOnly,
 }: PhoneInputProps): React.ReactElement {
   const [internalError, setInternalError] = useState<string | null>(null);
   const activeError = error !== undefined ? error : internalError;
@@ -99,7 +104,7 @@ export function PhoneInput({
       const formatted = formatNZPhone(raw);
       if (formatted !== raw) onChange(formatted);
     }
-    const check = validatePhone(raw);
+    const check = validatePhone(raw, { nzOnly });
     if (check.result === "invalid") {
       setInternalError(errorMessages?.invalid ?? DEFAULT_INVALID);
     } else {

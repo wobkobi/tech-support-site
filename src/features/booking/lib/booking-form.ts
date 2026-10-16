@@ -4,6 +4,9 @@
 
 import {
   BOOKING_FIELD_LIMITS,
+  checkDescription,
+  DESCRIPTION_NO_WORDS_MESSAGE,
+  PHONE_INVALID_MESSAGE,
   validateEmail,
   type BookableDay,
   type JobDuration,
@@ -300,24 +303,27 @@ export function validateBookingFields(values: BookingFieldValues): Record<string
   if (validateEmail(email) !== "ok") {
     fe.email = "Please enter a valid email address.";
   }
-  const phoneCheck = validatePhone(phone).result;
+  const phoneCheck = validatePhone(phone, { nzOnly: true }).result;
   if (meetingType === "in-person") {
     if (!phone.trim()) {
       fe.phone = "Please enter a phone number so I can contact you about arrival.";
     } else if (phoneCheck === "invalid") {
-      fe.phone = "Please enter a valid phone number.";
+      fe.phone = PHONE_INVALID_MESSAGE;
     }
   } else if (phoneCheck === "invalid") {
-    fe.phone = "Please enter a valid phone number, or leave it blank.";
+    fe.phone = `${PHONE_INVALID_MESSAGE} Or leave it blank.`;
   }
   if (!meetingType) fe.meetingType = "Please select in-person or remote.";
   if (meetingType === "in-person" && !address.trim()) {
     fe.address = "Please enter your address for in-person appointments.";
   }
-  if (!notes.trim()) {
+  const description = checkDescription(notes);
+  if (description === "empty") {
     fe.notes = "Please describe what you need help with.";
-  } else if (notes.trim().length < BOOKING_FIELD_LIMITS.notesMin) {
+  } else if (description === "too-short") {
     fe.notes = `Please describe the issue in at least ${BOOKING_FIELD_LIMITS.notesMin} characters so I have enough context.`;
+  } else if (description === "no-words") {
+    fe.notes = DESCRIPTION_NO_WORDS_MESSAGE;
   }
   return fe;
 }

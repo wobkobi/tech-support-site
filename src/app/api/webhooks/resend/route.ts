@@ -1,9 +1,11 @@
 // src/app/api/webhooks/resend/route.ts
 // Resend's delivery webhook. A hard bounce or a spam report takes the address off the
 // mailing list, so the list stops writing to dead addresses and people who don't want it,
-// both of which count against the sender's reputation. Every call is checked against
-// the webhook's signing secret before anything is read from it.
+// both of which count against the sender's reputation. A hard bounce on a recent
+// booking's address also pushes the operator, since that booking is likely fake.
+// Every call is checked against the webhook's signing secret before anything is read.
 
+import { flagBouncedBookings } from "@/features/booking/lib/bounced-booking.server";
 import { optOutActionFor } from "@/features/mailing/lib/delivery-events";
 import { optOutForDelivery } from "@/features/mailing/lib/opt-out";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
@@ -46,6 +48,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!action) return okResponse();
   try {
     await optOutForDelivery(action);
+    // A booking confirmation that bounces points at a fake booking. Swallows its own
+    // errors so a push failure can't make Resend retry the opt-out above.
+    if (action.source === "bounce") await flagBouncedBookings(action.emails);
     return okResponse();
   } catch (error) {
     // A 500 makes Resend retry the event later.

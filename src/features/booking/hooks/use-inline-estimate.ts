@@ -5,6 +5,7 @@
 
 import {
   BOOKING_FIELD_LIMITS,
+  checkDescription,
   combineUnitAndAddress,
   type JobDuration,
   type StartMinute,
@@ -203,11 +204,14 @@ export function useInlineEstimate(inputs: InlineEstimateInputs): InlineEstimateS
     setQuoteError(null);
   }
 
-  const descriptionReady = notes.trim().length >= BOOKING_FIELD_LIMITS.notesMin;
+  const description = checkDescription(notes);
+  const descriptionReady = description === "ok";
   const quoteStale = quote !== null && quotedFor !== currentEstimateKey();
   // Why the estimate button is greyed out, or what it will leave out.
   const estimateHelp = !descriptionReady
-    ? `Describe the problem above first (at least ${BOOKING_FIELD_LIMITS.notesMin} characters).`
+    ? description === "no-words"
+      ? "Describe the problem above in a few words first."
+      : `Describe the problem above first (at least ${BOOKING_FIELD_LIMITS.notesMin} characters).`
     : meetingType === "in-person" && !address.trim()
       ? "Add your address above if you'd like travel included."
       : null;
