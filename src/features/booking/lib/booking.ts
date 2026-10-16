@@ -2,6 +2,7 @@
 // Booking system with duration selection (1hr quick jobs vs 2hr standard jobs).
 
 import type { DateSurcharge } from "@/features/business/lib/pricing-policy";
+import { isPlausibleName } from "@/shared/lib/normalise-name";
 import type { AvailabilitySettings, MorningGuard } from "@/shared/lib/settings/types";
 import {
   NZ_TZ,
@@ -859,6 +860,42 @@ export function validateEmail(raw: string): EmailValidationResult {
 }
 
 /**
+ * Discriminator returned by {@link checkDescription}. "no-words" is filler that
+ * meets the length rule without describing anything.
+ */
+export type DescriptionCheckResult = "empty" | "too-short" | "no-words" | "ok";
+
+/** Fewest letters (any script) a description needs; "PC slow" has 6. */
+const DESCRIPTION_MIN_LETTERS = 4;
+
+/**
+ * Whether a "what do you need help with" box describes a problem. Beyond the
+ * length rule it needs a few letters, so digits and symbols alone fail, and it
+ * must not be one short chunk typed over and over: with spaces removed,
+ * `^(.{1,4})\1+$` matches "123123123123", "asdasdasd" and "aaaaaaaaaa", none of
+ * which a real description ever is.
+ * @param raw - Raw description text.
+ * @returns The check result.
+ */
+export function checkDescription(raw: string): DescriptionCheckResult {
+  const trimmed = raw.trim();
+  if (!trimmed) return "empty";
+  if (trimmed.length < BOOKING_FIELD_LIMITS.notesMin) return "too-short";
+  const letters = trimmed.match(/\p{L}/gu)?.length ?? 0;
+  if (letters < DESCRIPTION_MIN_LETTERS) return "no-words";
+  if (/^(.{1,4})\1+$/u.test(trimmed.toLowerCase().replace(/\s+/g, ""))) return "no-words";
+  return "ok";
+}
+
+/** Booking wording for a phone number the shared phone validator rejects. */
+export const PHONE_INVALID_MESSAGE =
+  "Please enter an NZ phone number starting with 0, like 021 123 4567.";
+
+/** Shown when {@link checkDescription} returns "no-words". */
+export const DESCRIPTION_NO_WORDS_MESSAGE =
+  'Please describe the problem in a few words, like "printer won\'t connect to the wifi".';
+
+/**
  * Validates the user-supplied fields on a booking POST/edit payload. Returns
  * the same `{ valid, error }` shape as {@link validateBookingRequest} so call sites
  * can treat both checks uniformly.
@@ -877,6 +914,9 @@ export function validateBookingPayloadFields(
   if (payload.name && payload.name.length > BOOKING_FIELD_LIMITS.name) {
     return { valid: false, error: "Name is too long." };
   }
+  if (!isPlausibleName(payload.name)) {
+    return { valid: false, error: "Please enter your full name." };
+  }
   if (opts.requireEmail || payload.email?.trim()) {
     const emailResult = validateEmail(payload.email ?? "");
     if (opts.requireEmail && emailResult === "empty") {
@@ -889,14 +929,18 @@ export function validateBookingPayloadFields(
       return { valid: false, error: "Email is too long." };
     }
   }
-  if (!payload.notes?.trim()) {
+  const description = checkDescription(payload.notes ?? "");
+  if (description === "empty") {
     return { valid: false, error: "Please describe what you need help with." };
   }
-  if (payload.notes && payload.notes.trim().length < BOOKING_FIELD_LIMITS.notesMin) {
+  if (description === "too-short") {
     return {
       valid: false,
       error: `Please describe the issue in at least ${BOOKING_FIELD_LIMITS.notesMin} characters.`,
     };
+  }
+  if (description === "no-words") {
+    return { valid: false, error: DESCRIPTION_NO_WORDS_MESSAGE };
   }
   if (payload.notes && payload.notes.length > BOOKING_FIELD_LIMITS.notes) {
     return { valid: false, error: "Description is too long." };

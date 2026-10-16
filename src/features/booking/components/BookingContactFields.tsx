@@ -3,7 +3,7 @@
 // "Your details" inputs for the booking form: name, email (with the typo
 // prompt), phone and meeting type.
 
-import { BOOKING_FIELD_LIMITS } from "@/features/booking/lib/booking";
+import { BOOKING_FIELD_LIMITS, PHONE_INVALID_MESSAGE } from "@/features/booking/lib/booking";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
@@ -237,7 +237,8 @@ export function BookingPhoneField({
         error={error}
         errorId="booking-phone-error"
         maxLength={BOOKING_FIELD_LIMITS.phone}
-        errorMessages={{ invalid: "Please enter a valid phone number." }}
+        errorMessages={{ invalid: PHONE_INVALID_MESSAGE }}
+        nzOnly
         className={cn(
           "w-full rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
           "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",

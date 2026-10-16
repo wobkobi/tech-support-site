@@ -10,6 +10,7 @@ import {
   type BusinessEnquiryData,
 } from "@/features/reviews/lib/email-enquiry";
 import { errorResponse } from "@/shared/lib/api-response";
+import { checkEmailDomain } from "@/shared/lib/email-domain.server";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
@@ -87,12 +88,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (validateEmail(email) !== "ok") {
       return errorResponse("Please enter a valid email address.", 400);
     }
+    if ((await checkEmailDomain(email)) === "no-mail") {
+      return errorResponse(
+        "That email address can't receive email. Please check it for typos.",
+        400,
+      );
+    }
     if (!needs) return errorResponse("Please tell me what you need help with.", 400);
     if (needs.length > MAX_NEEDS) {
       return errorResponse("That message is a bit long - please trim it down.", 400);
     }
 
-    const phoneValidation = validatePhone(body.phone ?? "");
+    const phoneValidation = validatePhone(body.phone ?? "", { nzOnly: true });
     if (phoneValidation.result === "invalid") {
       return errorResponse("Please enter a valid phone number, or leave it blank.", 400);
     }

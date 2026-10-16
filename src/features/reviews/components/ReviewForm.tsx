@@ -147,7 +147,7 @@ export default function ReviewFormProtected({
   const remaining = textMax - textCount;
   const isAnonymous = nameDisplay === "anonymous";
 
-  const phoneInvalid = validatePhone(phoneInput).result === "invalid";
+  const phoneInvalid = validatePhone(phoneInput, { nzOnly: true }).result === "invalid";
 
   const NAME_OPTIONS: { value: NameDisplay; label: string }[] = [
     { value: "name", label: "Name" },
@@ -512,6 +512,7 @@ export default function ReviewFormProtected({
               }}
               disabled={loading}
               errorMessages={{ invalid: "Doesn't look right - check the number." }}
+              nzOnly
               className={cn(FIELD_CLASSES, "w-full rounded-md border px-3 py-2 text-base")}
             />
           </div>

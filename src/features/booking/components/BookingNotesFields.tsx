@@ -2,7 +2,11 @@
 // src/features/booking/components/BookingNotesFields.tsx
 // Issue description and visit access-notes textareas for the booking form.
 
-import { BOOKING_FIELD_LIMITS } from "@/features/booking/lib/booking";
+import {
+  BOOKING_FIELD_LIMITS,
+  checkDescription,
+  DESCRIPTION_NO_WORDS_MESSAGE,
+} from "@/features/booking/lib/booking";
 import { NOTES_WARN_GAP } from "@/features/booking/lib/booking-form";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -66,11 +70,13 @@ export function BookingNotesField({
         onChange={(e) => onChange(e.target.value)}
         onBlur={() => {
           // Nudge before submit if there's some text but not enough context.
-          const trimmed = notes.trim();
-          if (trimmed && trimmed.length < BOOKING_FIELD_LIMITS.notesMin) {
+          const description = checkDescription(notes);
+          if (description === "too-short") {
             onError(
               `Please describe the issue in at least ${BOOKING_FIELD_LIMITS.notesMin} characters so I have enough context.`,
             );
+          } else if (description === "no-words") {
+            onError(DESCRIPTION_NO_WORDS_MESSAGE);
           }
         }}
         onPaste={(e) => {

@@ -231,6 +231,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
             value={phone}
             onChange={setPhone}
             errorMessages={{ invalid: "Please enter a valid phone number." }}
+            nzOnly
             className={FIELD_INPUT}
           />
         </div>

@@ -114,7 +114,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // the booking, calendar event and contact all carry the same verified one. Falls back
     // to the typed value when Google has no single confident match.
     const cleanName = normaliseName(name) || name.trim();
-    const phoneValidation = validatePhone(phone ?? "");
+    const phoneValidation = validatePhone(phone ?? "", { nzOnly: true });
     if (phoneValidation.result === "invalid") {
       return NextResponse.json(
         { ok: false, error: "Please enter a valid phone number, or leave it blank." },
