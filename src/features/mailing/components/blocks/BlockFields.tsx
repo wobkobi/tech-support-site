@@ -15,6 +15,7 @@ import { ADMIN_CHECKBOX_CLS } from "@/features/admin/components/ui/field-classes
 import { InsertMenu, type InsertGroup } from "@/features/admin/components/ui/InsertMenu";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { DesignPicker, type PickedDesign } from "@/features/mailing/components/blocks/DesignPicker";
 import { LinkPicker } from "@/features/mailing/components/blocks/LinkPicker";
 import { usePictureUpload } from "@/features/mailing/components/blocks/usePictureUpload";
 import type { Block } from "@/features/mailing/lib/blocks";
@@ -484,7 +485,8 @@ export function ButtonFields({
 }
 
 /**
- * Picture controls: upload or replace, describe it, pick its size and an optional link.
+ * Picture controls: upload or replace, or use a Post maker design's picture; describe it,
+ * pick its size and an optional link.
  * @param props - Component props.
  * @param props.block - The picture.
  * @param props.onChange - Reports a change.
@@ -506,6 +508,17 @@ export function PictureFields({
   const id = useId();
   const fileRef = useRef<HTMLInputElement>(null);
   const { upload, busy } = usePictureUpload();
+  const [designsOpen, setDesignsOpen] = useState(false);
+
+  /**
+   * Points the block at a design's picture. The design's own description replaces the
+   * old one, since it describes this picture; without one, the same rule as an upload.
+   * @param picked - The size picked.
+   */
+  function pickDesign(picked: PickedDesign): void {
+    setDesignsOpen(false);
+    onChange({ url: picked.url, alt: picked.alt || (block.url ? block.alt : "") });
+  }
 
   /**
    * Uploads a picked file and points the block at it.
@@ -531,6 +544,10 @@ export function PictureFields({
       >
         {block.url ? "Replace picture" : "Choose a picture"}
       </AdminButton>
+      <AdminButton size="sm" variant="outline" onClick={() => setDesignsOpen(true)}>
+        Use a design
+      </AdminButton>
+      <DesignPicker open={designsOpen} onPick={pickDesign} onClose={() => setDesignsOpen(false)} />
       <input
         ref={fileRef}
         type="file"
@@ -547,7 +564,7 @@ export function PictureFields({
   if (!block.url) {
     return (
       <div className="flex flex-col items-start gap-2 rounded-lg border-2 border-dashed border-admin-border p-4">
-        {chooser}
+        <div className="flex flex-wrap gap-2">{chooser}</div>
         {block.alt.trim() && (
           <p className="text-sm text-admin-text-secondary">
             Wanted here: {block.alt}. It&apos;s left out of the email until you choose one.
@@ -555,7 +572,8 @@ export function PictureFields({
         )}
         {!canUpload && (
           <p className="text-sm text-admin-muted">
-            Picture uploads aren&apos;t set up yet (BLOB_READ_WRITE_TOKEN).
+            Picture uploads aren&apos;t set up yet (BLOB_READ_WRITE_TOKEN). A design&apos;s picture
+            still works.
           </p>
         )}
       </div>
@@ -573,7 +591,7 @@ export function PictureFields({
           alt={block.alt}
           className="max-h-36 w-auto max-w-full rounded-md border border-admin-border sm:max-w-48"
         />
-        {chooser}
+        <div className="flex flex-wrap gap-2">{chooser}</div>
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <AdminField label="Describe the picture" htmlFor={`${id}-alt`}>

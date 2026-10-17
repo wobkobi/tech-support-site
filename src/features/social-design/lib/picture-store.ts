@@ -35,8 +35,10 @@ export async function writeKeepingUpdatedAt(
 /**
  * Deletes exported pictures from Blob once nothing points at them. A picture a post or
  * one of its apps uses stays up, since a published post keeps its picture forever, and so
- * does one any design still lists. Uploaded photos are never touched. Failures are
- * logged, never thrown: a leftover file costs nothing but storage.
+ * does one any design still lists or any email or email preset has in its words (the mail
+ * Picture block's "Use a design"; a sent email keeps its picture forever too). Uploaded
+ * photos are never touched. Failures are logged, never thrown: a leftover file costs
+ * nothing but storage.
  * @param urls - Addresses that may have fallen out of use.
  */
 export async function deleteUnusedPictures(urls: (string | null | undefined)[]): Promise<void> {
@@ -45,13 +47,14 @@ export async function deleteUnusedPictures(urls: (string | null | undefined)[]):
   );
   for (const url of candidates) {
     try {
-      const [posts, designs] = await Promise.all([
+      const [posts, designs, emails] = await Promise.all([
         prisma.socialPost.count({
           where: { OR: [{ imageUrl: url }, { targets: { some: { imageUrl: url } } }] },
         }),
         prisma.socialDesign.count({ where: { renders: { some: { url } } } }),
+        prisma.campaign.count({ where: { body: { contains: url } } }),
       ]);
-      if (posts === 0 && designs === 0) await del(url);
+      if (posts === 0 && designs === 0 && emails === 0) await del(url);
     } catch (error) {
       console.error(`[social-design] couldn't clean up ${url}:`, error);
     }
