@@ -47,8 +47,9 @@ export const metadata: Metadata = {
 };
 
 // ISR with tag-based purge: rate and settings edits bust their cache tags,
-// which invalidates this page immediately - no per-request render needed.
-export const revalidate = 300;
+// which invalidates this page immediately - no per-request render needed. The daily
+// timer is only a fallback.
+export const revalidate = 86400;
 
 interface FaqItem {
   question: string;

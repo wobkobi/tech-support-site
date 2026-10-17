@@ -28,8 +28,9 @@ import { notFound } from "next/navigation";
 import type React from "react";
 
 // ISR like /services, so rate edits reach the page without a redeploy. Review
-// moderation purges it sooner through revalidateReviewPaths().
-export const revalidate = 3600;
+// moderation purges it sooner through revalidateReviewPaths(). The daily timer is
+// only a fallback.
+export const revalidate = 86400;
 // Only the generated slugs exist; anything else 404s instead of rendering on demand.
 export const dynamicParams = false;
 

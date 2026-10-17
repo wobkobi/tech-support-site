@@ -50,9 +50,10 @@ import Link from "next/link";
 import type React from "react";
 
 // ISR with tag-based purge: admin rate / promo edits bust the rate-config /
-// active-promo tags, which invalidates this page immediately; the 5-minute
-// window only limits how long a purely time-expired promo can linger.
-export const revalidate = 300;
+// active-promo tags, which invalidates this page immediately, and the publish cron
+// busts active-promo within ~5 minutes of a promo starting or ending. The daily
+// timer is only a fallback.
+export const revalidate = 86400;
 
 /**
  * Builds page metadata; reflects the active promo and live base/complex rates.

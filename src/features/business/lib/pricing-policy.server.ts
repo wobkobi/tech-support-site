@@ -44,7 +44,8 @@ export interface CachedRateRow {
 /**
  * Cached RateConfig rows for the public pages and the public rates API.
  * Tagged with {@link RATE_CONFIG_TAG}; the admin rate routes bust the tag on
- * every write, so the 5-minute revalidate only matters as a safety net.
+ * every write. No time-based revalidate: the root layout reads the rates, and an
+ * unstable_cache timer becomes every public page's ISR interval.
  * @returns Rate rows ordered by label, Dates flattened to ISO strings.
  */
 export const getRateRows = unstable_cache(
@@ -62,7 +63,7 @@ export const getRateRows = unstable_cache(
     }));
   },
   ["rate-config"],
-  { tags: [RATE_CONFIG_TAG], revalidate: 300 },
+  { tags: [RATE_CONFIG_TAG], revalidate: false },
 );
 
 /**

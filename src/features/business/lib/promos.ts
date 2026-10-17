@@ -1,12 +1,13 @@
 // src/features/business/lib/promos.ts
-// Active-promo lookup + helpers. Cached 60s; admin writes revalidate.
+// Active-promo lookup + helpers. Cached until the tag is busted: admin writes bust it,
+// and the publish cron busts it when a promo starts or ends (refreshPromoCacheAtBoundary).
 
 import { promoForSpend, type PromoTierValues } from "@/features/business/lib/promo-tiers";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import { NZ_TZ, nzMinuteOfDay, nzWeekday } from "@/shared/lib/timezone-utils";
-import type { Promo } from "@prisma/client";
-import { unstable_cache } from "next/cache";
+import type { Prisma, Promo } from "@prisma/client";
+import { revalidateTag, unstable_cache } from "next/cache";
 
 /** Cache tag invalidated by the promo CRUD routes. */
 export const ACTIVE_PROMO_TAG = "active-promo";
@@ -172,30 +173,38 @@ function toActivePromo(row: Promo): ActivePromo {
 }
 
 /**
+ * Promos of one kind that are switched on and inside their start and end dates.
+ * @param kind - Promo kind to match.
+ * @param now - The instant to test against.
+ * @returns Prisma where clause.
+ */
+function inWindowWhere(kind: "automatic" | "code", now: Date): Prisma.PromoWhereInput {
+  return { isActive: true, kind, startAt: { lte: now }, endAt: { gt: now } };
+}
+
+/**
  * Returns the currently-active automatic promo or null. Highest priority wins
  * on overlap, then newest.
  *
  * Automatic only, and deliberately so: every caller is a display surface, and
  * a code promo advertised on the banner or the pricing page would be offered to
  * people who never entered the code. Widening this filter re-opens that.
+ *
+ * No time-based revalidate: the root layout reads this for the banner, and an
+ * unstable_cache timer becomes every public page's ISR interval. A promo
+ * starting or ending is picked up by {@link refreshPromoCacheAtBoundary}.
  * @returns Active automatic promo or null.
  */
 export const getActivePromo = unstable_cache(
   async (): Promise<ActivePromo | null> => {
-    const now = new Date();
     const row = await prisma.promo.findFirst({
-      where: {
-        isActive: true,
-        kind: "automatic",
-        startAt: { lte: now },
-        endAt: { gt: now },
-      },
+      where: inWindowWhere("automatic", new Date()),
       orderBy: PROMO_ORDER,
     });
     return row ? toActivePromo(row) : null;
   },
   ["active-promo"],
-  { tags: [ACTIVE_PROMO_TAG], revalidate: 60 },
+  { tags: [ACTIVE_PROMO_TAG], revalidate: false },
 );
 
 /**
@@ -207,9 +216,8 @@ export const getActivePromo = unstable_cache(
  * @returns The promo, or null when it is missing, a code promo, off or outside its window.
  */
 export async function findAdvertisablePromo(id: string): Promise<ActivePromo | null> {
-  const now = new Date();
   const row = await prisma.promo.findFirst({
-    where: { id, isActive: true, kind: "automatic", startAt: { lte: now }, endAt: { gt: now } },
+    where: { id, ...inWindowWhere("automatic", new Date()) },
   });
   return row ? toActivePromo(row) : null;
 }
@@ -222,15 +230,40 @@ export async function findAdvertisablePromo(id: string): Promise<ActivePromo | n
  */
 export const hasActivePromoCode = unstable_cache(
   async (): Promise<boolean> => {
-    const now = new Date();
-    const count = await prisma.promo.count({
-      where: { isActive: true, kind: "code", startAt: { lte: now }, endAt: { gt: now } },
-    });
+    const count = await prisma.promo.count({ where: inWindowWhere("code", new Date()) });
     return count > 0;
   },
   ["has-active-promo-code"],
-  { tags: [ACTIVE_PROMO_TAG], revalidate: 60 },
+  { tags: [ACTIVE_PROMO_TAG], revalidate: false },
 );
+
+/**
+ * Busts {@link ACTIVE_PROMO_TAG} when a promo has started or ended since the cached
+ * answers were taken, by comparing {@link getActivePromo} and
+ * {@link hasActivePromoCode} against the same queries run live. Called by the
+ * 5-minute publish cron, so the banner and pricing page move on within ~5 minutes of
+ * a boundary while costing no ISR writes when nothing changed. Admin edits bust the
+ * tag themselves, so only a pure time boundary reaches this.
+ * @returns True when the cache was out of date and the tag was busted.
+ */
+export async function refreshPromoCacheAtBoundary(): Promise<boolean> {
+  const now = new Date();
+  const [cachedPromo, cachedHasCode, livePromo, liveCodeCount] = await Promise.all([
+    getActivePromo(),
+    hasActivePromoCode(),
+    prisma.promo.findFirst({
+      where: inWindowWhere("automatic", now),
+      orderBy: PROMO_ORDER,
+      select: { id: true },
+    }),
+    prisma.promo.count({ where: inWindowWhere("code", now) }),
+  ]);
+  const unchanged =
+    (cachedPromo?.id ?? null) === (livePromo?.id ?? null) && cachedHasCode === liveCodeCount > 0;
+  if (unchanged) return false;
+  revalidateTag(ACTIVE_PROMO_TAG, {});
+  return true;
+}
 
 /** The recurring restriction a promo can carry inside its outer window. */
 export interface RecurringWindow {
