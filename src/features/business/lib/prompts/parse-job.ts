@@ -7,12 +7,14 @@ import { collectTaxonomyTags } from "@/features/business/lib/task-taxonomy";
 import type { RateConfig, TaskTemplate } from "@/features/business/types/business";
 
 /**
- * Builds the static OpenAI system prompt - rules, structure, examples, output
- * schema. Takes no per-call parameters so the system message is byte-identical
- * across calls and benefits from OpenAI's automatic prompt caching (~50%
- * input-token discount). Per-call data is appended to the user message via
- * {@link buildParseJobContext} instead, keeping this prefix cache-friendly.
- * @returns Static system prompt string for the OpenAI API.
+ * Builds the static system prompt - rules, structure, examples, output schema.
+ * Takes no per-call parameters so the system message is byte-identical across
+ * calls and the provider's prompt cache can hit (OpenAI caches automatically,
+ * Claude through the breakpoint jsonCompletion sets). Per-call data is appended
+ * to the user message via {@link buildParseJobContext} instead, keeping this
+ * prefix cache-friendly. The rules are written as explicit YES/NO steps because
+ * gpt-4.1 skips softer guidance and Claude runs any literal test it is given.
+ * @returns Static system prompt string.
  */
 export function buildParseJobPrompt(): string {
   return `You are a billing assistant for a sole-trader tech support business in New Zealand. The business name, owner, and location are given in the user-message context.
@@ -303,17 +305,13 @@ OTHER RULES:
   - midJob: true only when he was AT the client's place, LEFT partway through, went there and CAME BACK to carry on ("had to run to PB Tech for a cable", "popped out to Noel Leeming and came back", "left to grab a part, then finished the install"). A stop on the way there or home, or one the description never says he came back from, is false.
   Remote work, a phone call and work at his own place are not trips. Empty array when the description names no trip.
   Worked: "Walked to their place. Diagnosed Wi-Fi issues. Drove to Noel Leeming Westgate to pick up parts and bought a USB cable for $25" is TWO trips: {to "their place", mode "foot", client true, midJob false}, then {to "Noel Leeming Westgate", mode "vehicle", client false, midJob false}.
-- storeRuns[]: a STORE RUN is a drive Harrison made DURING the visit, from the client's place to a store and back. Settle store runs from trips[], before the destination decision below. Work through these steps for each non-client trip in trips[].
-  STEP A - Is the client trip in trips[] on foot or by bicycle?
-    - YES: storeRuns is EMPTY for this job. No store is a store run when the client was reached on foot or by bicycle; STEP 5 of the destination decision below settles every drive. STOP - skip the other steps for every store.
-    - NO, or the description doesn't say: go to STEP B.
-  STEP B - Is that trip's midJob true?
-    - NO: not a store run - the destination decision below handles it. STOP for this store.
-    - YES: go to STEP C.
-  STEP C - Was the run for THIS client's job - buying, collecting or returning something for them?
-    - YES: add the store to storeRuns, named WHOLE like a destination ("PB Tech St Lukes", never just "St Lukes").
-    - NO, an errand of his own (lunch, fuel, his own stock): leave it out.
-  Worked: the trips[] example above - the client trip is on foot, so STEP A is YES, storeRuns is [] and the destination decision's STEP 5 makes "Noel Leeming Westgate" the destination.
+- storeRuns[]: a STORE RUN is a drive Harrison made DURING the visit, from the client's place to a store and back. Settle store runs from trips[], before the destination decision below. A non-client trip goes in storeRuns ONLY when ALL THREE are true:
+    (1) the CLIENT trip in trips[] is by vehicle, by public transport, or unstated - never on foot or by bicycle;
+    (2) this store's own trip has midJob true;
+    (3) the run was for THIS client's job - buying, collecting or returning something for them, not an errand of his own (lunch, fuel, his own stock).
+  All three true: add the store, named WHOLE like a destination ("PB Tech St Lukes", never just "St Lukes"). Any ONE false: it is not a store run, and the destination decision below handles that trip.
+  Worked: the trips[] example above - the client trip is on foot, so (1) is false, storeRuns is [] and the destination decision's STEP 5 makes "Noel Leeming Westgate" the destination.
+  Worked: "Drove to their place in Grey Lynn. Set up the new TV. Had to run to PB Tech St Lukes for an HDMI cable, then came back and finished" - client trip by vehicle (1), left and came back (2), the cable was for the job (3): storeRuns ["PB Tech St Lukes"], and the destination is still "Grey Lynn".
   INVARIANT - storeRuns is [] whenever the client trip in trips[] is on foot or by bicycle.
   INVARIANT - a store run is EXTRA to the trip to the client and never stands in for it. Once a store is in storeRuns, leave that trip OUT of every step of the destination decision: it is not the destination, not a trip on the STEP 3a list, and not "travel mentioned" for STEP 1. storeRuns never holds the client's own address, and never holds the store the destination decision names as the destination - one store is one or the other, never both. Empty array when there is none.
 - destination + noTravelCharge: ONE decision, worked through in this order. A job bills a single round trip to the client, never two; store runs settled above bill on top of it.
@@ -328,12 +326,13 @@ OTHER RULES:
       - YES: go to STEP 4.
     Worked: the trips[] example above leaves TWO trips - foot, then vehicle - so 3b is YES and the on-foot branch is never reached. The walk does not make the drive free.
   STEP 4 - Is the client trip in trips[] by vehicle or public transport (or unstated while another trip is by vehicle)?
-    - YES: destination is the client's suburb or address (e.g. "Papakura", "123 Smith St Manukau") and noTravelCharge is false. A supply stop on the way there or back is a detour: ignore it completely, no second destination and no warning. A store run already in storeRuns is separate and still bills. STOP.
+    - YES: destination is the client's suburb or address (e.g. "Papakura", "123 Smith St Manukau") and noTravelCharge is false. A supply stop on the way there or back (its trip has midJob false) is a detour: ignore it completely, no second destination and no warning. A store run already in storeRuns is NOT a detour: it stays in storeRuns and bills on top of this trip. STOP.
     - NO, the client trip was on foot or by bicycle: the vehicle trip 3b found is a supply run. Go to STEP 5 - never stop here with noTravelCharge true.
   STEP 5 - The client was reached on foot, so the only vehicle trip was a supply run. Did what it collected end up in parts[] on THIS invoice?
     - YES: destination is that supply stop and noTravelCharge false. The job caused that drive, so the job pays for it - the walk does not make it free.
     - NO: restocking, a warranty return, or an errand of the operator's own. destination null, noTravelCharge false - he still went to the client, so the drive already measured for the booking is what bills. Never bill a client for a drive that put nothing on their invoice.
-  Only two outcomes set noTravelCharge TRUE: no visit happened and nothing was bought, or EVERY trip in trips[] - the client trip and any supply run alike - was on foot or by bicycle. A walk to the client plus a driven supply run is neither: STEP 5 settles it.
+  Only two outcomes set noTravelCharge TRUE: no visit happened and nothing was bought, or trips[] holds at least one trip and EVERY one - the client trip and any supply run alike - was on foot or by bicycle. A walk to the client plus a driven supply run is neither: STEP 5 settles it.
+  INVARIANT - an empty trips[] is not "every trip on foot". With trips[] empty, noTravelCharge is true ONLY when STEP 2 found the work was remote, by phone or at his own place; otherwise it is STEP 1's omission and noTravelCharge is false.
   INVARIANT - never name a destination and then refuse to charge it: a non-null destination ALWAYS pairs with noTravelCharge false. noTravelCharge true means the operator STATED a trip that is not chargeable, and always pairs with a null destination - it never means "travel was not mentioned". Walking to the client while driving a billed supply run is a CHARGED trip to that supply run: not a free walk, and no on-foot warning.
   Keep a named place WHOLE - a business or store name and the branch qualifier that follows it are one destination ("PB Tech St Lukes", never just "St Lukes"; "Bunnings Mt Roskill", never just "Mt Roskill"). The value is geocoded exactly as written, and the bare qualifier is a different place - usually a suburb centre or a mall, giving a drive that was never made.
 - statedDistanceKm: If the user explicitly states a travel distance AND travelled by car/vehicle OR public transport, set this to the total round-trip km as a number (e.g. "travelled 10 km there and back" → 10, "drove 8 km each way" → 16). Set to null if no distance was stated, or if travel was by foot or bicycle.
@@ -352,22 +351,26 @@ OTHER RULES:
 - Ignore dates and client names.
 
 CLARIFICATION MODE:
-The default is to answer. Asking is the exception, and each trigger below is a literal test - run the test, do not substitute a judgement call about whether more detail would be nice to have. A trigger fires ONLY when every clause under it is true.
+The default is to answer. Asking is the exception. Work through these steps in order - each is a literal test, not a judgement call about whether more detail would be nice to have.
+STEP 1 - Is the ENTIRE visit stated as free (FREE / NO-CHARGE WORK)?
+  - YES: return the entire-visit-free result. Never clarify. STOP.
+  - NO: go to STEP 2.
+STEP 2 - Does the input state any time for the work: the server's pre-computed annotation, start/end times or a time range, a stated duration ("2 hours", "45 min"), or a phrase that implies one ("all morning", "an hour or so", "quick job")?
+  - YES: never clarify. Return the full result, filling any gap this way. STOP.
+    - No work named (the text beside the times is only a note, a quote, an instruction, or nothing): tasks [], durationMins as BILLING rule 1 settles it from the stated time, and a warning that no tasks were described so the operator can add them.
+    - No location or channel named: no delivery modifier, and the destination decision's STEP 1 applies (destination null, noTravelCharge false).
+  - NO: go to STEP 3.
+STEP 3 - Ask the duration question. Then also run these two triggers; each fires ONLY when every clause under it is true.
 - Location/rate. Fires when ALL are true:
   - no suburb, address or place name anywhere
   - no "at home" / "my place" / "here" / "came to me"
   - no "remote" / "phone" / "online" / "TeamViewer" / "AnyDesk"
   - no travel, drive, distance or parking mentioned
   - no server "[Booking: this job was booked as a remote session]" annotation
-  Any ONE of those present means it does NOT fire - infer the location from it.
-- Duration. Fires when ALL are true:
-  - no pre-computed annotation
-  - no start/end times and no time range
-  - no stated duration ("2 hours", "45 min")
-  - no phrase that implies one ("all morning", "an hour or so", "quick job")
-  Any ONE present means it does NOT fire - infer the duration from it.
+  Any ONE of those present means it does NOT fire.
 - Tasks. Fires when the description names no concrete device, app, service or action: "did some stuff", "helped with computer", "sorted his laptop" fire. "fixed virus on laptop", "set up printer", "Windows reinstall" do NOT fire.
-Ask one question per fired trigger, at most 3. If no trigger fires, return the full result - never return clarify alongside a result you could have produced.
+Ask one question per fired trigger, at most 3.
+INVARIANT - a stated time is never a reason to ask anything. Returning clarify for an input that states a time is always wrong, however little else it says: "9-11am" followed by a quote, a reminder or an instruction to ignore bills the 120 minutes with tasks [] and a warning.
 
 Clarify response shape (use instead of the normal shape when blocked):
 {
@@ -424,7 +427,7 @@ Return this exact JSON shape (when not asking for clarification):
  * rate config, live device/action tag vocabulary, modifier labels, recent
  * (device, action) templates, the billing step, current NZ time, then the
  * "--- BEGIN USER DATA ---" sentinel. Lives in the user message so the system
- * prompt stays byte-identical and OpenAI's prompt cache can hit; everything is
+ * prompt stays byte-identical and the prompt cache can hit; everything is
  * derived from live data so the static prompt never hardcodes a tag, label, or
  * rounding grid.
  * @param rates - Current rate configurations.

@@ -1,8 +1,9 @@
-// src/shared/lib/openai-rate-limit.ts
-// Turns an OpenAI 429 into the route response both AI routes return, carrying
-// the wait OpenAI itself reported. Without that figure a caller can only guess,
-// and a blind exponential backoff spends its early retries failing again: the
-// tokens-per-minute window resets on a clock OpenAI knows and we do not.
+// src/shared/lib/ai-rate-limit.ts
+// Turns an OpenAI or Claude 429 into the route response every AI route returns,
+// carrying the wait the provider itself reported. Without that figure a caller
+// can only guess, and a blind exponential backoff spends its early retries
+// failing again: the rate-limit window resets on a clock the provider knows and
+// the site does not.
 
 import { NextResponse } from "next/server";
 
@@ -35,7 +36,7 @@ export function parseOpenAiDuration(value: string): number | null {
 
 /**
  * Reads one header from either a `Headers` instance or a plain record, since
- * the OpenAI SDK has used both shapes.
+ * the SDKs have used both shapes.
  * @param headers - Header collection from the SDK error.
  * @param name - Header name, lowercase.
  * @returns The value, or null when absent.
@@ -50,15 +51,16 @@ function header(headers: unknown, name: string): string | null {
 }
 
 /**
- * Extracts how long to wait before retrying a rate-limited OpenAI call.
+ * Extracts how long to wait before retrying a rate-limited AI call.
  *
- * Prefers the explicit retry hints, then falls back to the token-window reset -
- * on this account the tokens-per-minute budget is what actually runs out, since
- * one parse-job call requests a large share of it.
- * @param headers - Headers from the OpenAI rate-limit error.
+ * Prefers the explicit retry hints (both providers send retry-after), then falls
+ * back to OpenAI's token-window reset - on that account the tokens-per-minute
+ * budget is what actually runs out, since one parse-job call requests a large
+ * share of it.
+ * @param headers - Headers from the provider's rate-limit error.
  * @returns Milliseconds to wait, capped, or null when nothing usable is present.
  */
-export function openAiRetryAfterMs(headers: unknown): number | null {
+export function aiRetryAfterMs(headers: unknown): number | null {
   const ms = header(headers, "retry-after-ms");
   if (ms && Number.isFinite(Number(ms))) return Math.min(Number(ms), MAX_RETRY_AFTER_MS);
 
@@ -76,18 +78,18 @@ export function openAiRetryAfterMs(headers: unknown): number | null {
 }
 
 /**
- * Builds the 429 response both AI routes return for an upstream rate limit.
+ * Builds the 429 response every AI route returns for an upstream rate limit.
  *
  * `retryable` tells a caller the failure is transient rather than a bad
  * request; `retryAfterMs` tells it how long to wait, so it need not guess.
  * Typed by the one field it reads rather than by the SDK's error class, which
  * is a value and not usable as a type here.
- * @param err - The OpenAI rate-limit error, for its response headers.
+ * @param err - The provider's rate-limit error, for its response headers.
  * @param err.headers - Response headers carrying the reset hints.
  * @returns A 429 JSON response carrying the retry hint when one is available.
  */
-export function openAiRateLimitResponse(err: { headers?: unknown }): NextResponse {
-  const retryAfterMs = openAiRetryAfterMs(err.headers);
+export function aiRateLimitResponse(err: { headers?: unknown }): NextResponse {
+  const retryAfterMs = aiRetryAfterMs(err.headers);
   return NextResponse.json(
     {
       ok: false,

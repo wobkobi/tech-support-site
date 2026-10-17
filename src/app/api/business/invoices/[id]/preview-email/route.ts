@@ -1,18 +1,18 @@
 // src/app/api/business/invoices/[id]/preview-email/route.ts
 // Admin endpoint that renders the invoice email for review without sending it. POST
 // builds the subject + HTML body, applying optional operator overrides (greetingName,
-// customBody), and reports what the automatic review ask will do for the modal's checkbox.
+// customBody), and reports what the automatic review ask will do (including when the
+// gap or an opt-out will skip it) for the modal's checkbox.
 
-import { invoiceHasContact } from "@/features/business/lib/contact-review-token";
 import {
   parseInvoiceEmailOverrides,
   toInvoiceEmailPayload,
 } from "@/features/business/lib/invoice-email-request";
 import { buildInvoiceEmail } from "@/features/reviews/lib/email-invoice";
-import { reviewAskDueAt, type InvoiceReviewAskInfo } from "@/features/reviews/lib/review-ask-rules";
+import { forecastInvoiceReviewAsk } from "@/features/reviews/lib/review-ask-queue.server";
+import type { InvoiceReviewAskInfo } from "@/features/reviews/lib/review-ask-rules";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { formatDateShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NextRequest, NextResponse } from "next/server";
@@ -56,16 +56,11 @@ export async function POST(
   const { reviews } = await getSettings();
   let reviewAsk: InvoiceReviewAskInfo | null = null;
   if (!invoice.isQuote && !invoice.reviewAskOutcome && reviews.reviewAskEnabled) {
-    // Sending stamps sentAt when it's empty, so an unsent invoice's clock starts now.
-    const start = invoice.sentAt ?? new Date();
-    reviewAsk = {
-      delayDays: reviews.reviewAskDelayDays,
-      dueLabel: formatDateShort(reviewAskDueAt(start, reviews.reviewAskDelayDays)),
-      hasContact: await invoiceHasContact({
-        contactId: invoice.contactId,
-        clientEmail: invoice.clientEmail,
-      }),
-    };
+    reviewAsk = await forecastInvoiceReviewAsk(
+      invoice,
+      { delayDays: reviews.reviewAskDelayDays, gapDays: reviews.reviewAskGapDays },
+      new Date(),
+    );
   }
 
   return NextResponse.json({

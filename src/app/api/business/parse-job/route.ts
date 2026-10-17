@@ -24,14 +24,14 @@ import type {
   ParseJobResponse,
   RateConfig,
 } from "@/features/business/types/business";
+import { aiRateLimitResponse } from "@/shared/lib/ai-rate-limit";
+import { isAiRateLimitError, jsonCompletion } from "@/shared/lib/ai/json-completion";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { openAiRateLimitResponse } from "@/shared/lib/openai-rate-limit";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NZ_TZ, nextNzWallClockOnWeekday, timeParts } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
 
 /** Clarifying-question ids the calculator's form can answer (the prompt's clarify block). */
 const CLARIFY_IDS = new Set(["location", "duration", "tasks"]);
@@ -146,16 +146,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  // The SDK defaults (10-minute timeout, 2 retries with retry-after sleeps) can
-  // outlive the 60s function ceiling, and swallow a 429 that the catch below
-  // hands back as retryable. One attempt, well inside the budget, leaves room
-  // for the travel lookups that follow.
-  const client = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    timeout: 25_000,
-    maxRetries: 0,
-  });
-
   try {
     // Load rates, templates and settings
     const [rates, templates, settings] = await Promise.all([
@@ -237,31 +227,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Call the model and parse the response. gpt-4.1 (not -mini) is deliberate:
     // the 2026-07-24 eval showed mini obeying an injected negative-duration
-    // correction (parse-injection-negative) that 4.1 correctly ignores.
-    const completion = await client.chat.completions.create({
-      model: "gpt-4.1",
-      max_tokens: 1000,
+    // correction (parse-injection-negative) that 4.1 correctly ignores. The SDK
+    // defaults (10-minute timeout, 2 retries with retry-after sleeps) can outlive
+    // the 60s function ceiling and swallow a 429 the catch below hands back as
+    // retryable, so one attempt, leaving room for the travel lookups that follow.
+    const { text, model, usage } = await jsonCompletion({
+      feature: "parse-job",
+      openAiModel: "gpt-4.1",
+      system: [systemPrompt],
+      user: userContent,
+      maxTokens: 1000,
       temperature: 0,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
+      timeoutMs: 25_000,
+      maxRetries: 0,
     });
 
     // Prompt-cache visibility. The system prompt is ~13.9k static tokens sent on
-    // every call, so whether it is served from cache is the difference between
-    // roughly $3 and $1.40 a hundred calls. cached_tokens is the only ground
-    // truth for that - it does NOT reduce tokens-per-minute usage, which is
-    // billed on the full prompt either way.
-    const usage = completion.usage;
+    // every call, so whether it is served from cache decides most of the cost.
+    // The cached count is the only ground truth for that.
     console.log(
-      `[parse-job] prompt ${usage?.prompt_tokens ?? "?"} tokens, ${
-        usage?.prompt_tokens_details?.cached_tokens ?? 0
-      } cached, completion ${usage?.completion_tokens ?? "?"}`,
+      `[parse-job] ${model} prompt ${usage.input} tokens, ${usage.cached} cached, completion ${usage.output}`,
     );
 
-    const text = completion.choices[0]?.message?.content ?? "";
     const parsed = JSON.parse(text) as ParseJobResponse & { clarify?: ParseJobQuestion[] };
 
     if (!parsed || typeof parsed !== "object") throw new Error("Invalid response shape");
@@ -878,10 +865,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, result: parsed });
   } catch (err) {
     console.error("[parse-job] failed:", err);
-    // Upstream OpenAI 429s are transient: mark them retryable so callers can
+    // Upstream 429s are transient: mark them retryable so callers can
     // back off and retry instead of reading a rate limit as a parse failure.
-    if (err instanceof OpenAI.RateLimitError) {
-      return openAiRateLimitResponse(err);
+    if (isAiRateLimitError(err)) {
+      return aiRateLimitResponse(err);
     }
     return errorResponse("Could not parse job description", 422);
   }
