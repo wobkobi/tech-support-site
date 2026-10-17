@@ -16,7 +16,10 @@ import {
   DEFAULT_INVOICE_EMAIL_BODY,
   DEFAULT_QUOTE_EMAIL_BODY,
 } from "@/features/business/lib/invoice-email-defaults";
-import type { InvoiceReviewAskInfo } from "@/features/reviews/lib/review-ask-rules";
+import {
+  reviewAskNoteLabel,
+  type InvoiceReviewAskInfo,
+} from "@/features/reviews/lib/review-ask-rules";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -50,6 +53,24 @@ export interface InvoiceSendFlow {
 
 /** Static JSON request headers - module-scoped so it's a stable useCallback dep. */
 const headers = { "Content-Type": "application/json" };
+
+/**
+ * Why no review ask will go out for this invoice, in place of the checkbox. A missing
+ * contact isn't covered: the checkbox stays, with an "add to contacts" prompt, since
+ * adding them before the due date still gets them asked.
+ * @param info - Review ask forecast from the preview route.
+ * @returns The note, or null when the checkbox shows.
+ */
+function reviewAskSkipText(info: InvoiceReviewAskInfo): string | null {
+  if (!info.skip || info.skip === "no_contact") return null;
+  if (info.skip === "asked_recently" && info.blockingAsk) {
+    const gap = `you ask each person at most once every ${info.gapDays} days`;
+    return info.blockingAsk.queued
+      ? `No review ask with this invoice. Their review ask from another invoice goes out on ${info.blockingAsk.label}, and ${gap}.`
+      : `No review ask with this invoice. You asked them for a review on ${info.blockingAsk.label}, and ${gap}.`;
+  }
+  return `No review ask with this invoice - ${reviewAskNoteLabel(info.skip)}.`;
+}
 
 /**
  * Owns the send preview's state and the preview/send requests, and opens the
@@ -268,6 +289,7 @@ export function SendInvoiceModal({
     confirmSend,
     closePreview,
   } = flow;
+  const reviewAskSkipNote = reviewAskInfo ? reviewAskSkipText(reviewAskInfo) : null;
 
   return (
     <>
@@ -350,7 +372,10 @@ export function SendInvoiceModal({
                 disabled={sending}
               />
             </AdminField>
-            {reviewAskInfo && (
+            {reviewAskSkipNote && (
+              <p className="mb-4 text-sm text-admin-muted">{reviewAskSkipNote}</p>
+            )}
+            {reviewAskInfo && !reviewAskSkipNote && (
               <div className="mb-4">
                 <label className="flex items-start gap-2 text-sm text-admin-text">
                   <input
@@ -368,7 +393,7 @@ export function SendInvoiceModal({
                     </span>
                   </span>
                 </label>
-                {reviewAsk && !reviewAskInfo.hasContact && (
+                {reviewAsk && reviewAskInfo.skip === "no_contact" && (
                   <p className="mt-1 ml-6 text-sm text-admin-muted italic">
                     Not in your contacts yet -{" "}
                     <button

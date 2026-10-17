@@ -3,20 +3,28 @@
 // and last-ask state the rules need, and runs decideReviewAsk on each. Read-only on
 // purpose: the admin reviews page calls this on every render, and minting a review token
 // writes the Contact, which re-pushes it to Google on the next sync. The job mints the
-// token only after it has claimed an invoice.
+// token only after it has claimed an invoice. Also forecasts one invoice's ask for the
+// send modal, with the same rules.
 
+import { findInvoiceContact } from "@/features/business/lib/contact-review-token";
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
+import { contactReviewAskState } from "@/features/reviews/lib/review-ask-opt-out";
 import {
   contactAddresses,
   decideReviewAsk,
   pickReviewAskAddress,
   reviewAskClockStart,
+  reviewAskDueAt,
+  type InvoiceReviewAskInfo,
   type ReviewAskDecision,
   type ReviewAskTiming,
 } from "@/features/reviews/lib/review-ask-rules";
+import { formatDateShort } from "@/shared/lib/date-format";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import type { ReviewAskOutcome } from "@prisma/client";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** A failed ask is retried by the next run until it has been attempted this many times. */
 export const REVIEW_ASK_MAX_ATTEMPTS = 2;
@@ -274,6 +282,111 @@ export async function loadReviewAskCandidates(
     });
   }
   return candidates;
+}
+
+/**
+ * What an invoice's automatic review ask will do if the invoice is sent now, for the send
+ * modal. Judges the same rules the job does at the due date, and also counts asks still
+ * queued on the person's other invoices: of several invoices sent close together, only
+ * the first ask goes out and the gap skips the rest.
+ * @param invoice - The invoice being sent.
+ * @param invoice.id - Invoice id, left out of the queued asks.
+ * @param invoice.contactId - Optional Contact id.
+ * @param invoice.clientEmail - Invoice's client email.
+ * @param invoice.sentAt - Set when the invoice went out before (a re-send).
+ * @param timing - Delay and gap from settings.
+ * @param now - Current instant.
+ * @returns Modal info: due date, and the skip that will apply with the ask behind it.
+ */
+export async function forecastInvoiceReviewAsk(
+  invoice: { id: string; contactId: string | null; clientEmail: string; sentAt: Date | null },
+  timing: ReviewAskTiming,
+  now: Date,
+): Promise<InvoiceReviewAskInfo> {
+  // Sending stamps sentAt when it's empty, so an unsent invoice's clock starts now.
+  const dueAt = reviewAskDueAt(invoice.sentAt ?? now, timing.delayDays);
+  const info: InvoiceReviewAskInfo = {
+    delayDays: timing.delayDays,
+    dueLabel: formatDateShort(dueAt),
+    gapDays: timing.gapDays,
+    skip: null,
+    blockingAsk: null,
+  };
+
+  const contact = await findInvoiceContact(invoice);
+  if (!contact) return { ...info, skip: "no_contact" };
+
+  const addresses = contactAddresses(contact);
+  const [state, queuedInvoices] = await Promise.all([
+    contactReviewAskState(contact.id),
+    prisma.invoice.findMany({
+      where: {
+        id: { not: invoice.id },
+        status: { in: ["SENT", "PAID"] },
+        AND: [
+          NOT_A_QUOTE_FILTER,
+          { OR: [{ contactId: contact.id }, ...insensitiveAny("clientEmail", addresses)] },
+          {
+            OR: [
+              { reviewAskOutcome: null },
+              { reviewAskOutcome: { isSet: false } },
+              { reviewAskOutcome: "sending" },
+            ],
+          },
+        ],
+      },
+      select: { status: true, sentAt: true, paidAt: true },
+    }),
+  ]);
+
+  // Play the queued asks forward in due order: each one that clears the gap goes out
+  // and becomes the latest ask. An overdue one goes out on the next run, so it counts
+  // from now.
+  let lastAsk = state.lastAskedAt;
+  let lastAskQueued = false;
+  if (timing.gapDays > 0) {
+    const queuedDues = queuedInvoices
+      .map((q) => reviewAskClockStart(q))
+      .filter((d): d is Date => !!d)
+      .map((start) => reviewAskDueAt(start, timing.delayDays))
+      .sort((a, b) => a.getTime() - b.getTime());
+    for (const due of queuedDues) {
+      if (due > dueAt) break;
+      const at = due < now ? now : due;
+      if (!lastAsk || at.getTime() - lastAsk.getTime() >= timing.gapDays * DAY_MS) {
+        lastAsk = at;
+        lastAskQueued = true;
+      }
+    }
+  }
+
+  const decision = decideReviewAsk(
+    {
+      status: "SENT",
+      clockStart: invoice.sentAt ?? now,
+      hasContact: true,
+      address: pickReviewAskAddress(invoice.clientEmail, contact),
+      reviewOptOut: state.blockedBy === "review_opt_out",
+      mailingOptOut: state.blockedBy === "mailing_opt_out",
+      lastAskedAt: lastAsk,
+    },
+    timing,
+    now,
+  );
+  const skip =
+    decision.action === "skip"
+      ? decision.reason
+      : decision.action === "wait"
+        ? decision.forecast
+        : null;
+  return {
+    ...info,
+    skip,
+    blockingAsk:
+      skip === "asked_recently" && lastAsk
+        ? { label: formatDateShort(lastAsk), queued: lastAskQueued }
+        : null,
+  };
 }
 
 /** A decided review ask, for the admin "last 14 days" panel. */

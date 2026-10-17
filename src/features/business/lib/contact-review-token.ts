@@ -1,6 +1,6 @@
 // src/features/business/lib/contact-review-token.ts
 // The per-contact review token behind a review ask's site-form link, and the read-only
-// "is this invoice's customer in Contacts?" check the send modal shows.
+// "which contact is this invoice's customer?" lookup the send modal's forecast reads.
 
 import { prisma } from "@/shared/lib/prisma";
 import { randomUUID } from "crypto";
@@ -36,20 +36,20 @@ export async function ensureContactReviewToken(contactId: string): Promise<strin
 }
 
 /**
- * Whether a live contact matches an invoice, by its contactId or its client email. The
+ * The live contact an invoice belongs to, by its contactId or its client email. The
  * same match the review-ask job uses; without one the ask is skipped. Read-only.
  * @param args - Lookup inputs.
  * @param args.contactId - Optional Contact id from the invoice.
  * @param args.clientEmail - Invoice's clientEmail (case-insensitive match).
- * @returns True when a contact matches.
+ * @returns The contact's id and addresses, or null when none matches.
  */
-export async function invoiceHasContact({
+export async function findInvoiceContact({
   contactId,
   clientEmail,
 }: {
   contactId: string | null | undefined;
   clientEmail: string | null | undefined;
-}): Promise<boolean> {
+}): Promise<{ id: string; email: string | null; altEmails: string[] } | null> {
   const email = clientEmail?.trim().toLowerCase();
   const or = [
     ...(contactId ? [{ id: contactId }] : []),
@@ -57,10 +57,9 @@ export async function invoiceHasContact({
       ? [{ email: { equals: email, mode: "insensitive" as const } }, { altEmails: { has: email } }]
       : []),
   ];
-  if (or.length === 0) return false;
-  const match = await prisma.contact.findFirst({
+  if (or.length === 0) return null;
+  return prisma.contact.findFirst({
     where: { deletedAt: null, OR: or },
-    select: { id: true },
+    select: { id: true, email: true, altEmails: true },
   });
-  return match !== null;
 }

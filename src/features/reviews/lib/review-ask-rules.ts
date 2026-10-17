@@ -61,8 +61,15 @@ export interface InvoiceReviewAskInfo {
   delayDays: number;
   /** The date it's due if the invoice is sent now, e.g. "8 Oct 2026". */
   dueLabel: string;
-  /** False when no contact matches - the ask would be skipped. */
-  hasContact: boolean;
+  /** Settings reviews.reviewAskGapDays, for the "at most once every" wording. */
+  gapDays: number;
+  /** The skip that will apply on the due date if nothing changes, or null when it sends. */
+  skip: ReviewAskSkipReason | null;
+  /**
+   * `asked_recently` only: the ask that blocks this one. `queued` when it hasn't gone out
+   * yet - another invoice's ask that is due first.
+   */
+  blockingAsk: { label: string; queued: boolean } | null;
 }
 
 /** The invoice fields the clock reads. */
