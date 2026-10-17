@@ -14,6 +14,7 @@ import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { InsertMenu, type InsertGroup } from "@/features/admin/components/ui/InsertMenu";
 import type { PostContent } from "@/features/social/components/PostComposer";
+import type { PostDesign } from "@/features/social/lib/open-post";
 import {
   PLATFORM_LABEL,
   SOCIAL_PLATFORMS,
@@ -24,7 +25,7 @@ import {
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useId } from "react";
-import { FaChevronDown } from "react-icons/fa6";
+import { FaChevronDown, FaPalette } from "react-icons/fa6";
 
 /**
  * Form card for one post.
@@ -50,6 +51,8 @@ import { FaChevronDown } from "react-icons/fa6";
  * @param props.onFile - Uploads a picked picture.
  * @param props.enabled - Apps the post goes to.
  * @param props.overridesOpen - Whether "Different text for one app" starts open.
+ * @param props.design - Post maker design the picture came from, or null.
+ * @param props.onDesign - Saves and opens the post maker for this post.
  * @returns Form card element.
  */
 export function PostWriteForm({
@@ -74,6 +77,8 @@ export function PostWriteForm({
   onFile,
   enabled,
   overridesOpen,
+  design,
+  onDesign,
 }: {
   content: PostContent;
   setContent: React.Dispatch<React.SetStateAction<PostContent>>;
@@ -96,6 +101,8 @@ export function PostWriteForm({
   onFile: (file: File) => void;
   enabled: SocialPlatformKey[];
   overridesOpen: boolean;
+  design: PostDesign | null;
+  onDesign: () => void;
 }): React.ReactElement {
   const fieldId = useId();
   return (
@@ -201,7 +208,31 @@ export function PostWriteForm({
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className={cn(ADMIN_LABEL_CLS, "mb-0")}>Picture</span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className={cn(ADMIN_LABEL_CLS, "mb-0")}>Picture</span>
+            {editable && !isPreset && (
+              <AdminButton
+                size="xs"
+                variant="outline"
+                onClick={onDesign}
+                title="Make the picture in the post maker: every app gets its own size, so nothing is cut off"
+              >
+                <FaPalette aria-hidden className="size-3" />
+                {design ? "Edit design" : "Design a picture"}
+              </AdminButton>
+            )}
+          </div>
+          {editable && design?.stale && (
+            <div
+              role="status"
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-mustard-400 bg-mustard-50 px-3 py-2 text-sm text-admin-text"
+            >
+              Pictures are out of date: this post doesn&apos;t show the design as it is now.
+              <AdminButton size="xs" variant="outline" onClick={onDesign}>
+                Update pictures
+              </AdminButton>
+            </div>
+          )}
           {content.imageUrl ? (
             <div className="flex flex-col gap-3 rounded-lg border border-admin-border p-3 sm:flex-row sm:items-start">
               {/* Blob-hosted and already shrunk, so next/image would add nothing. */}

@@ -4,6 +4,7 @@
 // DELETE can take the post down from its platforms first.
 
 import { parseObjectId } from "@/features/business/lib/validation";
+import { deleteUnusedPictures } from "@/features/social-design/lib/picture-store";
 import { mergeTargets, parsePostPatch } from "@/features/social/lib/parse";
 import { toPostRow } from "@/features/social/lib/post-row";
 import { takeDownPost } from "@/features/social/lib/publish";
@@ -118,6 +119,12 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
     }
   }
 
+  const pictures = keepOnline
+    ? null
+    : await prisma.socialPost.findUnique({
+        where: { id },
+        select: { imageUrl: true, targets: { select: { imageUrl: true } } },
+      });
   // The status guard is in the delete itself: a post that went out between the
   // take-down check and here is still up, so it stays.
   const deleted = await prisma.socialPost.deleteMany({
@@ -130,6 +137,10 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
       "This post is going out, being taken down or has just gone up, so it wasn't deleted. Reload the page and try again.",
       409,
     );
+  }
+  // Post maker pictures only this post used go too. Kept when the post stays online.
+  if (pictures) {
+    await deleteUnusedPictures([pictures.imageUrl, ...pictures.targets.map((t) => t.imageUrl)]);
   }
   return okResponse();
 }

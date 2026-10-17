@@ -29,7 +29,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 /**
  * POST /api/admin/social/designs - creates a design.
- * Body: `{ source: "blank" | "copy", sourceId?, kind?, asTemplate? }`.
+ * Body: `{ source: "blank" | "copy", sourceId?, kind?, asTemplate?, postId? }`. postId
+ * links the new design to the post it was started from in the composer.
  * @param request - Incoming request.
  * @returns JSON `{ design }` (summary), 201.
  */
@@ -40,8 +41,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     sourceId?: unknown;
     kind?: unknown;
     asTemplate?: unknown;
+    postId?: unknown;
   } | null;
   const asTemplate = body?.asTemplate === true;
+  let postId: string | null = null;
+  if (body?.postId !== undefined && !asTemplate) {
+    postId = parseObjectId(body.postId);
+    const post = postId
+      ? await prisma.socialPost.findUnique({ where: { id: postId }, select: { id: true } })
+      : null;
+    if (!post) return errorResponse("That post no longer exists.", 404);
+  }
 
   if (body?.source === "blank") {
     const kind: DesignKind =
@@ -53,6 +63,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         name: asTemplate ? "New template" : "New design",
         kind,
         isTemplate: asTemplate,
+        postId,
         doc: blankDoc() as unknown as Prisma.InputJsonValue,
       },
     });
@@ -73,6 +84,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         name,
         kind: source.kind,
         isTemplate: asTemplate,
+        postId,
         doc: source.doc as Prisma.InputJsonValue,
       },
     });

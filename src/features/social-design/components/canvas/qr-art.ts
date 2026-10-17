@@ -11,6 +11,9 @@ import { useEffect, useState } from "react";
 const QR_PX = 1024;
 
 const cache = new Map<string, Promise<string>>();
+// Finished draws, so a canvas mounted after the draw (an export) has the code on its
+// first render instead of a placeholder.
+const drawnUrls = new Map<string, string>();
 
 /**
  * Draws a QR code and returns a blob URL for it.
@@ -40,7 +43,9 @@ export function qrImageUrl(url: string, hex: string): Promise<string> {
     });
     const data = await qr.getRawData("png");
     if (!(data instanceof Blob)) throw new Error("Couldn't draw the QR code.");
-    return URL.createObjectURL(data);
+    const src = URL.createObjectURL(data);
+    drawnUrls.set(key, src);
+    return src;
   })();
   // A failed draw is dropped so a later render can try again.
   made.catch(() => cache.delete(key));
@@ -57,7 +62,9 @@ export function qrImageUrl(url: string, hex: string): Promise<string> {
 export function useQrImageUrl(url: string, hex: string): string | null {
   const [drawn, setDrawn] = useState<{ key: string; src: string } | null>(null);
   const key = `${url}|${hex}`;
+  const ready = drawnUrls.get(key) ?? null;
   useEffect(() => {
+    if (drawnUrls.has(`${url}|${hex}`)) return;
     let live = true;
     qrImageUrl(url, hex).then(
       (src) => {
@@ -71,5 +78,5 @@ export function useQrImageUrl(url: string, hex: string): string | null {
       live = false;
     };
   }, [url, hex]);
-  return drawn?.key === key ? drawn.src : null;
+  return ready ?? (drawn?.key === key ? drawn.src : null);
 }

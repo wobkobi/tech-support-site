@@ -602,7 +602,7 @@ export function DesignCanvas({
                         if (n) nodes.current.set(layer.id, n);
                         else nodes.current.delete(layer.id);
                       }}
-                      {...layerTransform(layer, g)}
+                      {...layerTransform(layer, g, doc.paidAd)}
                       draggable={!layer.locked && !spaceDown && editing !== layer.id}
                       onDragMove={onDragMove}
                       onDragEnd={onDragEnd}

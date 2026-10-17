@@ -20,6 +20,7 @@ import type {
   Layer,
   QrLayer,
 } from "@/features/social-design/lib/doc";
+import { leftOffPaidAd } from "@/features/social-design/lib/pictures";
 import Konva from "konva";
 import type React from "react";
 import { useEffect, useRef } from "react";
@@ -374,11 +375,13 @@ function Logo({ src, w, h, shadow }: DrawProps & { src: string }): React.ReactEl
  * turns and flips happen about the middle.
  * @param layer - The layer.
  * @param g - Its geometry on the size drawn.
+ * @param paidAd - The design's paid-ad switch, which leaves contact details off.
  * @returns Konva Group attributes.
  */
 export function layerTransform(
   layer: Layer,
   g: Geometry,
+  paidAd: boolean,
 ): {
   x: number;
   y: number;
@@ -399,7 +402,7 @@ export function layerTransform(
     scaleX: layer.flipX ? -1 : 1,
     scaleY: layer.flipY ? -1 : 1,
     opacity: layer.opacity,
-    visible: !g.hidden,
+    visible: !g.hidden && !leftOffPaidAd(layer, paidAd),
   };
 }
 

@@ -60,6 +60,14 @@ import {
   relinkSource,
 } from "@/features/social-design/lib/layout";
 import { makeLayer, type AddKind } from "@/features/social-design/lib/new-layer";
+import {
+  autoAltText,
+  isRenderUrl,
+  jpegSize,
+  leftOffPaidAd,
+  pictureFileName,
+  pictureState,
+} from "@/features/social-design/lib/pictures";
 import { starterTemplates } from "@/features/social-design/templates/starters";
 
 let failures = 0;
@@ -1034,6 +1042,119 @@ function checkTemplates(): void {
   expect("an unknown icon draws nothing", iconDataUri("FaNotAnIcon", "#000000") === null);
 }
 
+/**
+ * The smallest JPEG header the size reader needs: start of image, a JFIF block, then a
+ * baseline frame header.
+ * @param width - Width in the frame header.
+ * @param height - Height in the frame header.
+ * @param frame - Start-of-frame marker byte.
+ * @returns Bytes.
+ */
+function jpegHeader(width: number, height: number, frame = 0xc0): Uint8Array {
+  const jfif = [0xff, 0xe0, 0x00, 0x10, ...Array.from({ length: 14 }, () => 0)];
+  const sof = [0xff, frame, 0x00, 0x11, 0x08, height >> 8, height & 255, width >> 8, width & 255];
+  return new Uint8Array([0xff, 0xd8, ...jfif, ...sof, ...Array.from({ length: 9 }, () => 0)]);
+}
+
+/** Stored pictures: out-of-date state, paid ads, descriptions, file names, JPEG sizes. */
+function checkPictures(): void {
+  console.log("\nPictures");
+  const [promo] = starterTemplates({ bookingUrl: "https://example.co.nz/booking" }).filter(
+    (t) => t.kind === "promo",
+  );
+  const doc = promo.doc;
+  const hash = docHash(doc, NO_BOUND);
+  const none = pictureState(doc, NO_BOUND, []);
+  expect(
+    "no pictures: none, every size outdated",
+    none.status === "none" && none.outdated.length === doc.formats.length,
+  );
+  const all = doc.formats.map((format) => ({ format, docHash: hash }));
+  expect("every size current", pictureState(doc, NO_BOUND, all).status === "current");
+  const oneOld = all.map((r) => (r.format === "story" ? { ...r, docHash: "0" } : r));
+  const stale = pictureState(doc, NO_BOUND, oneOld);
+  expect(
+    "one old size: stale, only that size",
+    stale.status === "stale" && sortedJson(stale.outdated) === sortedJson(["story"]),
+  );
+  const missing = pictureState(
+    doc,
+    NO_BOUND,
+    all.filter((r) => r.format !== "square"),
+  );
+  expect("a missing size is outdated", sortedJson(missing.outdated) === sortedJson(["square"]));
+  const newPhone = pictureState(doc, { ...NO_BOUND, phone: "09 000 0000" }, all);
+  expect("a new phone number outdates a design showing it", newPhone.status === "stale");
+  const paid = pictureState({ ...doc, paidAd: true }, NO_BOUND, all);
+  expect("switching to a paid ad outdates the pictures", paid.status === "stale");
+  const words = pictureState(
+    { ...doc, caption: "New words", altText: "New description" },
+    NO_BOUND,
+    all,
+  );
+  expect("post words and description don't outdate the pictures", words.status === "current");
+
+  const contact = doc.layers.find((l) => l.type === "contact");
+  const headline = doc.layers.find((l) => l.role === "headline");
+  expect("paid ads leave contact details off", !!contact && leftOffPaidAd(contact, true));
+  expect("ordinary posts keep contact details", !!contact && !leftOffPaidAd(contact, false));
+  expect("paid ads keep the headline", !!headline && !leftOffPaidAd(headline, true));
+
+  expect(
+    "promo description is its headline as a sentence",
+    autoAltText(doc) === "Get your tech sorted.",
+    autoAltText(doc),
+  );
+  const announcement = starterTemplates({ bookingUrl: "" }).find((t) => t.kind === "announcement");
+  expect(
+    "headline and short line join as sentences",
+    autoAltText(announcement!.doc) === "Big news to share. Say what's new in a line or two here.",
+    autoAltText(announcement!.doc),
+  );
+  expect("no words, no description", autoAltText(blankDoc()) === "");
+
+  expect(
+    "file name: slug, size label and pixels",
+    pictureFileName("Spring promo!", "feed-4x5", 1, "jpg") ===
+      "spring-promo-post-4-5-1080x1350.jpg",
+    pictureFileName("Spring promo!", "feed-4x5", 1, "jpg"),
+  );
+  expect(
+    "file name: macrons come off, 2x doubles the pixels",
+    pictureFileName("Māngere tips", "story", 2, "png") === "mangere-tips-story-2160x3840.png",
+    pictureFileName("Māngere tips", "story", 2, "png"),
+  );
+  expect(
+    "file name: an empty name still names the file",
+    pictureFileName("  ", "square", 1, "jpg").startsWith("design-"),
+  );
+
+  expect(
+    "JPEG size: baseline",
+    sortedJson(jpegSize(jpegHeader(1080, 1350))) === sortedJson({ width: 1080, height: 1350 }),
+  );
+  expect(
+    "JPEG size: progressive",
+    sortedJson(jpegSize(jpegHeader(1200, 900, 0xc2))) === sortedJson({ width: 1200, height: 900 }),
+  );
+  expect(
+    "JPEG size: a PNG isn't read",
+    jpegSize(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0, 0, 0, 0])) === null,
+  );
+  expect(
+    "JPEG size: a cut-off file is null",
+    jpegSize(jpegHeader(1080, 1350).slice(0, 12)) === null,
+  );
+
+  const blob = "https://abc.public.blob.vercel-storage.com";
+  expect("an export is a render", isRenderUrl(`${blob}/social-design/render-story-AbC123.jpg`));
+  expect("an uploaded photo isn't", !isRenderUrl(`${blob}/social-design/image-AbC123.jpg`));
+  expect(
+    "a render name further down the path isn't",
+    !isRenderUrl(`${blob}/x/social-design/render-a.jpg`),
+  );
+}
+
 /** Runs every group and exits non-zero on any failure. */
 function main(): void {
   checkFormats();
@@ -1045,6 +1166,7 @@ function main(): void {
   checkEditorOps();
   checkSizes();
   checkTemplates();
+  checkPictures();
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);
 }

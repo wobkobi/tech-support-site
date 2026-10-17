@@ -20,6 +20,7 @@ import { PostPreviewPanel } from "@/features/social/components/PostPreviewPanel"
 import { PostStatusBanner } from "@/features/social/components/PostStatusBanner";
 import { PostWriteForm } from "@/features/social/components/PostWriteForm";
 import { insertableGroups } from "@/features/social/lib/insertables";
+import type { PostDesign } from "@/features/social/lib/open-post";
 import { liveOn, type Connection } from "@/features/social/lib/post-display";
 import type { SocialPostRow, SocialTargetRow } from "@/features/social/lib/post-row";
 import {
@@ -161,6 +162,7 @@ function diff(now: Content, saved: Content): Record<string, unknown> {
  * @param props.canUpload - Whether image uploads are configured.
  * @param props.missingEnv - Per platform, env vars it still needs.
  * @param props.details - Site address and contact details for the Add menu.
+ * @param props.design - Post maker design the picture came from, or null.
  * @param props.onSaved - Called with the name and text after each successful save.
  * @param props.saveRef - Filled with a function that saves any pending edit, so the page
  *   can save before it opens another post in this composer's place.
@@ -173,6 +175,7 @@ export function PostComposer({
   canUpload,
   missingEnv,
   details,
+  design,
   onSaved,
   saveRef,
 }: {
@@ -182,6 +185,7 @@ export function PostComposer({
   canUpload: boolean;
   missingEnv: Record<SocialPlatformKey, string[]>;
   details: InsertDetails;
+  design: PostDesign | null;
   onSaved?: (saved: { name: string; body: string }) => void;
   saveRef?: React.RefObject<(() => Promise<boolean>) | null>;
 }): React.ReactElement {
@@ -263,6 +267,16 @@ export function PostComposer({
     if (ok) setSaveState((s) => (s === "saving" ? "saved" : s));
     return ok;
   }, [content, editable, initial.id, onSaved, toast]);
+
+  /**
+   * Saves, then opens the post maker: the linked design, or a new one for this post.
+   */
+  async function openDesign(): Promise<void> {
+    if (!(await save())) return;
+    router.push(
+      design ? `/admin/social/design/${design.id}` : `/admin/social/design?post=${initial.id}`,
+    );
+  }
 
   useEffect(() => {
     if (!saveRef) return;
@@ -678,6 +692,8 @@ export function PostComposer({
             onFile={(file) => void addImage(file)}
             enabled={enabled}
             overridesOpen={overridesOpen}
+            design={design}
+            onDesign={() => void openDesign()}
           />
         </div>
 

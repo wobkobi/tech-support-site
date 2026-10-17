@@ -336,6 +336,7 @@ export function SocialView({
             canUpload={open.canUpload}
             missingEnv={open.missingEnv}
             details={open.details}
+            design={open.design}
             onSaved={onSaved}
             saveRef={saveOpen}
           />

@@ -22,9 +22,16 @@ import { FaCopy, FaPlus, FaTrash } from "react-icons/fa6";
  * Design list.
  * @param props - Component props.
  * @param props.initial - Every design and template, last edited first.
+ * @param props.forPost - Post a new design is for, when started from the composer.
  * @returns List element.
  */
-export function DesignList({ initial }: { initial: DesignSummary[] }): React.ReactElement {
+export function DesignList({
+  initial,
+  forPost,
+}: {
+  initial: DesignSummary[];
+  forPost: { id: string; name: string } | null;
+}): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
   const [rows, setRows] = useState(initial);
@@ -41,7 +48,10 @@ export function DesignList({ initial }: { initial: DesignSummary[] }): React.Rea
    */
   async function create(body: Record<string, unknown>, key: string): Promise<void> {
     setBusy(key);
-    const res = await callApi<{ design: DesignSummary }>("/api/admin/social/designs", "POST", body);
+    const res = await callApi<{ design: DesignSummary }>("/api/admin/social/designs", "POST", {
+      ...body,
+      ...(forPost ? { postId: forPost.id } : {}),
+    });
     if (!res.ok) {
       setBusy(null);
       toast(res.error, { tone: "error" });
@@ -88,11 +98,12 @@ export function DesignList({ initial }: { initial: DesignSummary[] }): React.Rea
       <section aria-labelledby="design-start">
         <Card className="flex flex-col gap-3">
           <h2 id="design-start" className="text-lg font-semibold text-admin-text">
-            Start a design
+            {forPost ? `Start a design for "${forPost.name}"` : "Start a design"}
           </h2>
           <p className="-mt-2 text-sm text-admin-text-secondary">
             Start blank, or from a template already in your style. Every design makes all the sizes
             at once.
+            {forPost && " When it's ready, Pictures > Use in post puts it on that post."}
           </p>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             <StartCard

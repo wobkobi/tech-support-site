@@ -19,6 +19,7 @@ import { IconButton } from "@/features/social-design/components/editor-fields";
 import { HistoryMenu } from "@/features/social-design/components/HistoryMenu";
 import { LayersPanel } from "@/features/social-design/components/LayersPanel";
 import { PhotoPicker, type RecentPhoto } from "@/features/social-design/components/PhotoPicker";
+import { PicturesPanel } from "@/features/social-design/components/PicturesPanel";
 import {
   PropertiesPanel,
   type PanelActions,
@@ -30,6 +31,7 @@ import {
   type SaveState,
 } from "@/features/social-design/components/use-design-autosave";
 import { useDocHistory } from "@/features/social-design/components/use-doc-history";
+import { usePictures } from "@/features/social-design/components/use-pictures";
 import { appCrops } from "@/features/social-design/lib/app-crops";
 import type { DesignRow, DesignSummary } from "@/features/social-design/lib/design-row";
 import type { BoundValues, DesignDoc, Geometry } from "@/features/social-design/lib/doc";
@@ -71,9 +73,11 @@ import {
   FaBookmark,
   FaBorderAll,
   FaCropSimple,
+  FaImages,
   FaLink,
   FaMagnifyingGlassMinus,
   FaMagnifyingGlassPlus,
+  FaRotate,
   FaRulerCombined,
   FaVectorSquare,
 } from "react-icons/fa6";
@@ -173,6 +177,8 @@ export function DesignEditor({
   const [uploading, setUploading] = useState(false);
   const [picker, setPicker] = useState<PhotoTarget | null>(null);
   const [copying, setCopying] = useState(false);
+  const [picturesOpen, setPicturesOpen] = useState(false);
+  const [using, setUsing] = useState(false);
   const clip = useRef<Clip | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const photoFor = useRef<PhotoTarget>({ mode: "image" });
@@ -205,6 +211,15 @@ export function DesignEditor({
   const onSaveError = useCallback((message: string) => toast(message, { tone: "error" }), [toast]);
   const fields = useMemo(() => ({ name, kind: initial.kind, doc }), [name, initial.kind, doc]);
   const save = useDesignAutosave(initial.id, initial.updatedAt, fields, onSaveError);
+  const pictures = usePictures({
+    designId: initial.id,
+    doc: tabDoc,
+    current,
+    bound,
+    family,
+    initialRenders: initial.renders,
+    saveNow: save.saveNow,
+  });
 
   /**
    * Changes the selection. Picking one member of a group picks the whole group;
@@ -337,6 +352,31 @@ export function DesignEditor({
     }
     if (initial.isTemplate) router.push(`/admin/social/design/${res.design.id}`);
     else toast("Saved as a template. It's under Start a design on the Post maker page.");
+  }
+
+  /**
+   * Stores any out-of-date pictures, hands them to the linked post (or a new draft) and
+   * opens it in the composer.
+   */
+  async function putInPost(): Promise<void> {
+    setUsing(true);
+    try {
+      if (!(await pictures.update())) {
+        toast("Not every picture was stored, so the post wasn't changed.", { tone: "error" });
+        return;
+      }
+      const res = await callApi<{ postId: string; created: boolean }>(
+        `/api/admin/social/designs/${initial.id}/use`,
+        "POST",
+      );
+      if (!res.ok) {
+        toast(res.error, { tone: "error" });
+        return;
+      }
+      router.push(`/admin/social?post=${res.postId}`);
+    } finally {
+      setUsing(false);
+    }
   }
 
   /**
@@ -646,8 +686,37 @@ export function DesignEditor({
             <FaBookmark aria-hidden className="size-3" />
             {initial.isTemplate ? "New design from this" : "Save as template"}
           </AdminButton>
+          <AdminButton onClick={() => setPicturesOpen(true)}>
+            <FaImages aria-hidden className="size-3.5" /> Pictures
+          </AdminButton>
         </div>
       </div>
+
+      {pictures.state.status === "stale" && !initial.isTemplate && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-3 rounded-lg border border-mustard-400 bg-mustard-50 px-3 py-2 text-sm text-admin-text"
+        >
+          {pictures.progress
+            ? `Drawing ${FORMATS[pictures.progress.format].label} (${pictures.progress.step} of ${pictures.progress.total})...`
+            : "Pictures are out of date."}
+          {canUpload && (
+            <AdminButton
+              size="xs"
+              variant="outline"
+              busy={pictures.progress !== null}
+              onClick={() =>
+                void pictures.update().then((ok) => {
+                  if (ok) toast("Pictures updated.");
+                  else setPicturesOpen(true);
+                })
+              }
+            >
+              <FaRotate aria-hidden className="size-3" /> Update pictures
+            </AdminButton>
+          )}
+        </div>
+      )}
 
       {save.state === "conflict" && (
         <div
@@ -896,6 +965,20 @@ export function DesignEditor({
         </aside>
       </div>
 
+      <PicturesPanel
+        open={picturesOpen}
+        onClose={() => setPicturesOpen(false)}
+        doc={doc}
+        current={current}
+        name={name}
+        pictures={pictures}
+        canUpload={canUpload}
+        isTemplate={initial.isTemplate}
+        using={using}
+        onUse={() => void putInPost()}
+        onDoc={(change, tag) => apply((d) => ({ ...d, ...change }), tag)}
+      />
+      {pictures.stage}
       <PhotoPicker
         open={picker !== null}
         title={picker ? PICKER_TITLE[picker.mode] : ""}

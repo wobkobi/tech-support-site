@@ -5,6 +5,7 @@
 import { parseObjectId } from "@/features/business/lib/validation";
 import { DESIGN_KINDS, toDesignRow, toKind } from "@/features/social-design/lib/design-row";
 import { MAX_DOC_BYTES, parseDesignDoc } from "@/features/social-design/lib/doc";
+import { deleteUnusedPictures } from "@/features/social-design/lib/picture-store";
 import { snapshotBeforeSave } from "@/features/social-design/lib/versions";
 import { errorResponse, isRecordNotFound, noStore, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -110,7 +111,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx): Promise<Next
 }
 
 /**
- * DELETE /api/admin/social/designs/[id]
+ * DELETE /api/admin/social/designs/[id] - also deletes its exported pictures, except
+ * any a post uses.
  * @param request - Incoming request.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the design id.
@@ -120,12 +122,14 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
   const id = parseObjectId((await params).id);
   if (!id) return errorResponse("Design not found.", 404);
+  let renders: { url: string }[];
   try {
-    await prisma.socialDesign.delete({ where: { id } });
+    ({ renders } = await prisma.socialDesign.delete({ where: { id } }));
     await prisma.socialDesignVersion.deleteMany({ where: { designId: id } });
   } catch (error) {
     if (isRecordNotFound(error)) return errorResponse("Design not found.", 404);
     throw error;
   }
+  await deleteUnusedPictures(renders.map((r) => r.url));
   return okResponse();
 }

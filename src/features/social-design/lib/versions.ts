@@ -16,13 +16,17 @@ export const MAX_VERSIONS = 20;
  * saved in the last 5 minutes. Runs before the save, so the copy holds the design as it
  * stood at the start of an editing session rather than after its first change.
  * @param designId - Design id.
+ * @param always - Skip the 5-minute gap, for "Use in post": the copy then holds exactly
+ *   the design a post's pictures came from.
  */
-export async function snapshotBeforeSave(designId: string): Promise<void> {
-  const latest = await prisma.socialDesignVersion.findFirst({
-    where: { designId },
-    orderBy: { createdAt: "desc" },
-    select: { createdAt: true },
-  });
+export async function snapshotBeforeSave(designId: string, always = false): Promise<void> {
+  const latest = always
+    ? null
+    : await prisma.socialDesignVersion.findFirst({
+        where: { designId },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      });
   if (latest && Date.now() - latest.createdAt.getTime() < VERSION_GAP_MS) return;
   const current = await prisma.socialDesign.findUnique({
     where: { id: designId },
