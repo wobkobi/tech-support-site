@@ -1,7 +1,8 @@
 // src/features/mailing/lib/blocks.ts
 // The block editor's view of an email body. The body text stays the saved format: this
-// reads it into blocks and writes blocks back, walking lines exactly as renderBody does,
-// so a parse and re-serialise always renders the same email. Pure and client-safe.
+// reads it into blocks and writes blocks back. renderBody renders from these same
+// blocks, so the editor and the sent email always agree on the block structure, and a
+// parse and re-serialise always renders the same email. Pure and client-safe.
 
 import {
   BOX_LINE_RE,
@@ -104,10 +105,11 @@ export function emptyBlock(type: BlockType): Block {
 }
 
 /**
- * Parses a body into blocks. Lines are grouped the way renderBody groups them:
- * a blank line ends a paragraph, list or quote, and every other block stands
- * alone on its line. Text that isn't any block, including an unknown `::word`,
- * becomes a Text block, so nothing the operator typed is lost.
+ * Parses a body into blocks; renderBody renders the email from this too. A blank
+ * line ends a paragraph, list or quote, and every other block stands alone on its
+ * line. Text that isn't any block, including an unknown `::word`, becomes a Text
+ * block, so nothing the operator typed is lost (the email renders an unknown
+ * `::word` as nothing).
  *
  * Ids are the prefix plus the position, so the server render and hydration give the
  * same ids for the same body. Pass a fresh prefix when re-parsing on the client, so
@@ -134,7 +136,7 @@ export function parseBlocks(body: string, idPrefix = "p"): Block[] {
     blocks.push({ id: nextId(), type: "text", text: paragraph.join("\n") });
     paragraph = [];
   }
-  /** Closes the big box being collected, reading its parts as renderBody does. */
+  /** Closes the big box being collected, reading its photo, headline, lines and button. */
   function flushBox(): void {
     if (box.length === 0) return;
     const parts = readBox(box.filter(Boolean));
@@ -155,7 +157,10 @@ export function parseBlocks(body: string, idPrefix = "p"): Block[] {
     blocks.push({ id: nextId(), type: "list", items: list });
     list = [];
   }
-  /** Closes the quote being collected, reading stars and name as renderBody does. */
+  /**
+   * Closes the quote being collected. A first line of only stars is the rating and a
+   * last `- Name` line is who said it.
+   */
   function flushQuote(): void {
     if (quote.length === 0) return;
     const lines = quote.filter(Boolean);
