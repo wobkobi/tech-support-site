@@ -57,6 +57,7 @@ export default async function AdminDesignEditorPage({
         bound={bound}
         canUpload={canUploadImages()}
         bookingUrl={`${getSiteUrl()}/booking`}
+        canDraft={Boolean(process.env.OPENAI_API_KEY)}
       />
     </>
   );

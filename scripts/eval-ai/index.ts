@@ -1,6 +1,7 @@
 // scripts/eval-ai/index.ts
 // On-demand eval harness for the AI routes: black-box tests estimate-duration, parse-job
-// and the mailing ai-draft against a running dev server (`npm run dev` in another terminal).
+// and the mailing and post maker ai-drafts against a running dev server (`npm run dev` in
+// another terminal).
 //
 // Usage:
 //   npm run eval:ai -- --self-test        # pure checks, no server, no API calls
@@ -16,6 +17,7 @@ import {
   draftProblems,
   estimateTolerance,
   expectedEstimateMins,
+  postDraftProblems,
   spread,
   withinTolerance,
 } from "./assert";
@@ -72,6 +74,17 @@ const SAMPLE_DRAFT = {
   buttonText: "Book a time",
   buttonUrl: "",
 };
+
+/** A post maker draft that breaks no rule, and the room it was written for. */
+const SAMPLE_POST = {
+  headline: "Home visits in Titirangi",
+  support: "Tuesdays and Thursdays, at your place.",
+  bullets: [],
+  quote: "",
+  name: "",
+  caption: "I'm now coming out to Titirangi.",
+};
+const SAMPLE_ROOM = { headline: true, support: true, bullets: 0, quote: false, name: false };
 
 /**
  * Runs the network-free pure-logic checks and reports pass/fail.
@@ -145,6 +158,41 @@ function runSelfTest(): number {
     {
       name: "curly quote is soft only",
       got: draftProblems({ ...SAMPLE_DRAFT, paragraphs: ["It\u2019s here."] }, "").soft.length,
+      want: 1,
+    },
+    {
+      name: "clean post draft has no problems",
+      got: postDraftProblems(SAMPLE_POST, "", SAMPLE_ROOM, false).hard.length,
+      want: 0,
+    },
+    {
+      name: "a phone number on the picture is a hard problem",
+      got: postDraftProblems(
+        { ...SAMPLE_POST, support: "Call 021 123 4567" },
+        "021 123 4567",
+        SAMPLE_ROOM,
+        false,
+      ).hard.length,
+      want: 1,
+    },
+    {
+      name: "a booking address in a paid ad's words is a hard problem",
+      got: postDraftProblems(
+        { ...SAMPLE_POST, caption: "Book at https://example.co.nz/booking" },
+        "",
+        SAMPLE_ROOM,
+        true,
+      ).hard.length,
+      want: 1,
+    },
+    {
+      name: "a quote not in the brief is a hard problem",
+      got: postDraftProblems(
+        { ...SAMPLE_POST, quote: "Best in Auckland" },
+        "Fixed my printer",
+        SAMPLE_ROOM,
+        false,
+      ).hard.length,
       want: 1,
     },
   ];
@@ -233,9 +281,15 @@ async function collectRaw(
   only: string[],
 ): Promise<{ ctx: LiveContext; raw: RawRun[]; aborted: boolean }> {
   const { loadLiveContext } = await import("./context");
-  const { callEstimate, callParseJob, callMailingDraft } = await import("./client");
-  const { PARSE_CASES, ESTIMATE_CASES, CROSS_ROUTE_CASES, TRAVEL_CASES, DRAFT_CASES } =
-    await import("./cases");
+  const { callEstimate, callParseJob, callMailingDraft, callPostDraft } = await import("./client");
+  const {
+    PARSE_CASES,
+    ESTIMATE_CASES,
+    CROSS_ROUTE_CASES,
+    TRAVEL_CASES,
+    DRAFT_CASES,
+    POST_DRAFT_CASES,
+  } = await import("./cases");
 
   process.stdout.write("Loading live context (settings, rates, templates)...\n");
   const ctx = await loadLiveContext();
@@ -254,6 +308,7 @@ async function collectRaw(
   const travelCases = TRAVEL_CASES.filter((c) => keep(c.id));
   const crossRouteCases = CROSS_ROUTE_CASES.filter((c) => keep(c.id));
   const draftCases = DRAFT_CASES.filter((c) => keep(c.id));
+  const postDraftCases = POST_DRAFT_CASES.filter((c) => keep(c.id));
 
   const total =
     benchmarks.length +
@@ -261,7 +316,8 @@ async function collectRaw(
     parseCases.length +
     crossRouteCases.length +
     travelCases.length +
-    draftCases.length;
+    draftCases.length +
+    postDraftCases.length;
   console.log(
     `Running ${total} cases x ${runs} run(s) = ${total * runs} paid calls. This takes a few minutes.\n`,
   );
@@ -392,6 +448,51 @@ async function collectRaw(
         buttonUrl: c.buttonUrl,
       });
       const { hard, soft } = draftProblems(draft, c.brief);
+      const text = JSON.stringify(draft);
+      for (const f of c.forbid ?? []) if (f.pattern.test(text)) hard.push(f.why);
+      raw.push({
+        id: c.id,
+        kind: "draft",
+        input: c.brief,
+        durations: [],
+        first: draft,
+        draftCheck: { hard, soft },
+      });
+    });
+  }
+
+  // Post maker drafts, once each like the mailing ones. The review cases also check the
+  // quote both ways: cut from real review words, and left empty when there are none.
+  for (const c of postDraftCases) {
+    if (aborted) break;
+    tick(c.id);
+    await tryCase(c.id, "draft", async () => {
+      const draft = await callPostDraft(url, adminSecret, {
+        brief: c.brief,
+        kind: c.kind,
+        room: c.room,
+        paidAd: c.paidAd,
+      });
+      if (!draft) {
+        raw.push({
+          id: c.id,
+          kind: "draft",
+          input: c.brief,
+          durations: [],
+          first: { headline: "(refused)" },
+          draftCheck: {
+            hard: c.refused ? [] : ["refused a brief it should have written"],
+            soft: [],
+          },
+        });
+        return;
+      }
+      const { hard, soft } = postDraftProblems(draft, c.brief, c.room, c.paidAd);
+      if (c.refused) hard.push("wrote a review post with no review words in the brief");
+      if (c.quote === "filled" && !draft.quote) hard.push("no quote from real review words");
+      if (c.quote === "empty" && (draft.quote || draft.name)) {
+        hard.push("wrote a quote or name with no review words in the brief");
+      }
       const text = JSON.stringify(draft);
       for (const f of c.forbid ?? []) if (f.pattern.test(text)) hard.push(f.why);
       raw.push({
@@ -584,15 +685,16 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
     // Draft: the shared rules plus the case's forbid list are hard; style is info.
     if (r.kind === "draft" && r.draftCheck) {
       const { hard, soft } = r.draftCheck;
-      const draft = r.first as { subject?: string };
+      const draft = r.first as { subject?: string; headline?: string; quote?: string };
       out.push({
         id: r.id,
         family: "draft",
         label: `draft ${r.id}`,
         status: hard.length === 0 ? "pass" : "fail",
         detail:
-          (hard.length === 0 ? `"${draft.subject ?? ""}"` : hard.join("; ")) +
-          (soft.length > 0 ? ` (style: ${soft.join(", ")})` : ""),
+          (hard.length === 0
+            ? `"${draft.subject ?? (draft.headline || draft.quote) ?? ""}"`
+            : hard.join("; ")) + (soft.length > 0 ? ` (style: ${soft.join(", ")})` : ""),
       });
     }
 
@@ -630,7 +732,8 @@ function printReport(checks: CheckResult[]): void {
   const titles: Record<CheckResult["family"], string> = {
     context: "1. Each model uses ALL context",
     travel: "2. Travel decisions (one round trip, or none)",
-    draft: "2b. Mailing drafts (no dashes, no made-up figures or claims, no greeting or sign-off)",
+    draft:
+      "2b. Mailing and post maker drafts (no dashes, no made-up figures, claims or reviews, no greeting or sign-off)",
     reproducibility: "3. Reproducibility",
     drift: "4. Public estimate vs benchmarks (report-only)",
     "cross-route":

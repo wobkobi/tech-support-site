@@ -2,11 +2,23 @@
 // Post maker logic the editor and exports rely on: the size registry, the design
 // document parser, placing layers on another size (every size pair), carrying linked
 // edits across sizes, the align and distribute moves, the out-of-date hash, and the
-// editor's edits (add, move, restack, group, paste, restyle) plus every new-layer kind.
+// editor's edits (add, move, restack, group, paste, restyle) plus every new-layer kind,
+// the starter templates, the stored pictures and the AI draft (room, reply, review guard
+// and fill).
 // Pure logic, no database and no browser.
 // Run with: npm test -- social-design
 
 import { ICON_ART, iconDataUri } from "@/features/social-design/components/canvas/icon-art";
+import {
+  draftKindFor,
+  draftRoom,
+  fillDraft,
+  fromBrief,
+  POST_DRAFT_KINDS,
+  readDesignDraft,
+  readRoom,
+  type DesignDraft,
+} from "@/features/social-design/lib/ai-draft";
 import { appCrops } from "@/features/social-design/lib/app-crops";
 import { boundText } from "@/features/social-design/lib/bound";
 import { blankDoc } from "@/features/social-design/lib/design-row";
@@ -16,6 +28,7 @@ import {
   type BoundValues,
   type DesignDoc,
   type Geometry,
+  type Layer,
   type TextLayer,
 } from "@/features/social-design/lib/doc";
 import {
@@ -27,6 +40,7 @@ import {
   duplicateLayers,
   expandGroups,
   groupLayers,
+  makeRoom,
   moveLayerTo,
   nearestFormat,
   pasteStyle,
@@ -1155,6 +1169,196 @@ function checkPictures(): void {
   );
 }
 
+/** The AI draft: room per template, reading the reply, the review guard and the fill. */
+function checkAiDraft(): void {
+  console.log("\nAI draft");
+  const starters = starterTemplates({ bookingUrl: "https://example.co.nz/booking" });
+  /**
+   * A starter template's design.
+   * @param kind - Template kind.
+   * @returns Its design.
+   */
+  const byKind = (kind: string): DesignDoc => starters.find((t) => t.kind === kind)!.doc;
+  const [announcement, review, tip] = [byKind("announcement"), byKind("review"), byKind("tip")];
+
+  const roomA = draftRoom(announcement);
+  expect(
+    "announcement has a headline and a short line, nothing else",
+    roomA.headline && roomA.support && roomA.bullets === 0 && !roomA.quote && !roomA.name,
+    JSON.stringify(roomA),
+  );
+  const roomR = draftRoom(review);
+  expect(
+    "review has a quote and a name, no headline",
+    roomR.quote && roomR.name && !roomR.headline && roomR.bullets === 0,
+    JSON.stringify(roomR),
+  );
+  const roomT = draftRoom(tip);
+  expect("tip has a headline and 3 ticked points", roomT.headline && roomT.bullets === 3);
+  const roomB = draftRoom(blankDoc());
+  expect(
+    "a blank design gets a headline and a short line",
+    roomB.headline && roomB.support && roomB.bullets === 0 && !roomB.quote,
+  );
+  expect(
+    "every design kind starts on a draft kind",
+    (["announcement", "review", "tip", "promo", "blank"] as const).every((k) =>
+      POST_DRAFT_KINDS.some((d) => d.key === draftKindFor(k)),
+    ),
+  );
+
+  expect("a room reads back", sortedJson(readRoom(roomT)) === sortedJson(roomT));
+  expect("a room with 9 points is refused", readRoom({ ...roomT, bullets: 9 }) === null);
+  expect("a room missing a flag is refused", readRoom({ bullets: 0, headline: true }) === null);
+
+  const brief = '"Sorted my printer and my email in no time, very patient." Margaret, Titirangi';
+  expect("a cut quote is from the brief", fromBrief("Sorted my printer in no time", brief));
+  expect(
+    "a quote with new words isn't",
+    !fromBrief("The best tech in Auckland, highly recommend", brief),
+  );
+  expect("a name from the brief is", fromBrief("Margaret, Titirangi", brief));
+  expect("a made-up name isn't", !fromBrief("John, Henderson", brief));
+
+  const reply = {
+    headline: "Printer “sorted” — fast",
+    support: "x",
+    bullets: ["a", "b", "c", "d", "e"],
+    quote: "Sorted my printer in no time",
+    name: "Margaret, Titirangi",
+    caption: "Thanks Margaret.",
+  };
+  const forReview = readDesignDraft(reply, roomR, brief);
+  expect(
+    "words with no room are dropped",
+    forReview !== null &&
+      forReview.headline === "" &&
+      forReview.support === "" &&
+      forReview.bullets.length === 0 &&
+      forReview.quote === "Sorted my printer in no time",
+  );
+  const invented = readDesignDraft({ ...reply, quote: "Best tech in Auckland!" }, roomR, brief);
+  expect("an invented quote is dropped", invented?.quote === "");
+  const forTip = readDesignDraft(reply, roomT, brief);
+  expect(
+    "curly quotes and long dashes straightened",
+    forTip?.headline === 'Printer "sorted" - fast',
+    forTip?.headline,
+  );
+  expect("ticked points capped at 4", forTip?.bullets.length === 4);
+  expect(
+    "an empty reply is nothing to fill",
+    readDesignDraft({ headline: "", caption: " " }, roomA, "") === null,
+  );
+  expect("a non-object reply is nothing", readDesignDraft("text", roomA, "") === null);
+
+  const draft: DesignDraft = {
+    headline: "Home visits in Titirangi",
+    support: "Tuesdays and Thursdays, at your place.",
+    bullets: ["One", "Two", "Three"],
+    quote: "",
+    name: "",
+    caption: "I'm now coming to Titirangi.",
+  };
+  /**
+   * Words of the first text layer with a role.
+   * @param doc - Design.
+   * @param role - Role.
+   * @returns The words, or undefined with no such layer.
+   */
+  const textOf = (doc: DesignDoc, role: string): string | undefined => {
+    const l = doc.layers.find((x) => x.type === "text" && x.role === role);
+    return l?.type === "text" ? l.text : undefined;
+  };
+  const filledA = fillDraft(announcement, draft);
+  expect(
+    "announcement: headline, short line and post words filled",
+    textOf(filledA.doc, "headline") === draft.headline &&
+      textOf(filledA.doc, "support") === draft.support &&
+      filledA.doc.caption === draft.caption &&
+      filledA.missing.length === 0,
+  );
+  expect(
+    "the fill leaves every layout alone",
+    JSON.stringify(filledA.doc.layouts) === JSON.stringify(announcement.layouts),
+  );
+  const filledT = fillDraft(tip, draft);
+  const list = filledT.doc.layers.find((l) => l.type === "bullets");
+  expect(
+    "tip: the ticked points are replaced",
+    list?.type === "bullets" && sortedJson(list.items) === sortedJson(draft.bullets),
+  );
+  const filledR = fillDraft(review, { ...draft, headline: "", support: "" });
+  expect(
+    "review with no review words keeps its placeholder quote",
+    textOf(filledR.doc, "quote") === textOf(review, "quote") && filledR.missing.length === 0,
+  );
+  const filledB = fillDraft(blankDoc(), draft);
+  expect(
+    "blank: the headline and short line are listed for adding",
+    sortedJson(filledB.missing) === sortedJson(["headline", "support"]) &&
+      filledB.doc.layers.length === blankDoc().layers.length,
+  );
+  const keepCaption = fillDraft({ ...announcement, caption: "Mine" }, { ...draft, caption: "" });
+  expect("an empty caption keeps the one there", keepCaption.doc.caption === "Mine");
+
+  // Making room: a quote 60px taller on 4:5 moves what's around it and grows its card.
+  /**
+   * The id of a design's first layer that matches.
+   * @param doc - Design.
+   * @param test - Match.
+   * @returns The layer id.
+   */
+  const idOf = (doc: DesignDoc, test: (l: Layer) => boolean): string => doc.layers.find(test)!.id;
+  const quoteId = idOf(review, (l) => l.role === "quote");
+  const nameId = idOf(review, (l) => l.role === "name");
+  const markId = idOf(review, (l) => l.type === "quote-mark");
+  const cardId = idOf(review, (l) => l.type === "frosted");
+  const backId = idOf(review, (l) => l.type === "backdrop");
+  const was = review.layouts["feed-4x5"]!;
+  const taller = setTextHeights(review, { "feed-4x5": { [quoteId]: was[quoteId]!.h + 60 } });
+  const roomy = makeRoom(review, taller);
+  const now = roomy.layouts["feed-4x5"]!;
+  expect(
+    "room: the name under the quote moves down by half",
+    now[nameId]!.y === was[nameId]!.y + 30,
+  );
+  expect("room: the quote mark above moves up by half", now[markId]!.y === was[markId]!.y - 30);
+  expect(
+    "room: the card grows by the change and stays centred",
+    now[cardId]!.h === was[cardId]!.h + 60 &&
+      now[cardId]!.y + now[cardId]!.h / 2 === was[cardId]!.y + was[cardId]!.h / 2,
+  );
+  expect("room: the backdrop stays put", sortedJson(now[backId]) === sortedJson(was[backId]));
+  expect(
+    "room: the name no longer runs into the quote",
+    now[nameId]!.y >= now[quoteId]!.y + now[quoteId]!.h,
+  );
+  expect(
+    "room: other sizes are left alone",
+    sortedJson(roomy.layouts.story) === sortedJson(review.layouts.story),
+  );
+  expect("room: nothing changed gives the same design", makeRoom(review, review) === review);
+  const shorter = setTextHeights(review, { "feed-4x5": { [quoteId]: was[quoteId]!.h - 40 } });
+  expect(
+    "room: a shorter quote pulls the name up and shrinks the card",
+    makeRoom(review, shorter).layouts["feed-4x5"]![nameId]!.y === was[nameId]!.y - 20 &&
+      makeRoom(review, shorter).layouts["feed-4x5"]![cardId]!.h === was[cardId]!.h - 40,
+  );
+  // On a wide size the photo sits beside the words, so a longer headline leaves it be.
+  const headId = idOf(announcement, (l) => l.role === "headline");
+  const photoId = idOf(announcement, (l) => l.role === "photo");
+  const wide = announcement.layouts.landscape!;
+  const wideAfter = makeRoom(
+    announcement,
+    setTextHeights(announcement, { landscape: { [headId]: wide[headId]!.h + 50 } }),
+  ).layouts.landscape!;
+  expect(
+    "room: a photo beside the words doesn't move",
+    sortedJson(wideAfter[photoId]) === sortedJson(wide[photoId]),
+  );
+}
+
 /** Runs every group and exits non-zero on any failure. */
 function main(): void {
   checkFormats();
@@ -1167,6 +1371,7 @@ function main(): void {
   checkSizes();
   checkTemplates();
   checkPictures();
+  checkAiDraft();
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);
 }

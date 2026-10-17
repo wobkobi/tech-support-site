@@ -20,6 +20,7 @@ import {
   autoPlace,
   canvasBox,
   distribute,
+  isFullBleed,
   propagate,
   relinkSource,
   type AlignTo,
@@ -197,6 +198,97 @@ export function setTextHeights(
     }
   }
   return changed ? { ...doc, layouts } : doc;
+}
+
+/** Slack in pixels when testing whether one box sits inside or below another. */
+const ROOM_SLACK = 2;
+
+/**
+ * Whether box `a` lies within box `b`, give or take {@link ROOM_SLACK}.
+ * @param a - Inner box.
+ * @param b - Outer box.
+ * @returns True when inside.
+ */
+function within(a: Box, b: Box): boolean {
+  return (
+    a.x >= b.x - ROOM_SLACK &&
+    a.y >= b.y - ROOM_SLACK &&
+    a.x + a.w <= b.x + b.w + ROOM_SLACK &&
+    a.y + a.h <= b.y + b.h + ROOM_SLACK
+  );
+}
+
+/**
+ * Makes room for words that changed length, on every size: when a text or bullet
+ * layer's height changes between `before` and `after` (both measured), the layers
+ * under it in the same column move by the difference, so new words never run into
+ * the stars or name below them. When the layer sits on a card (the smallest frosted
+ * card or rectangle holding it), the card grows by the same amount and the column
+ * moves up by half of it, so a card centred on the picture stays centred. Layers
+ * beside the column (a photo next to the words on a wide size) stay where they are.
+ * Full-bleed layers never move. Places are worked out from `before`, so several
+ * changes in one column add up.
+ * @param before - Design before the change, measured.
+ * @param after - Design after the change, measured.
+ * @returns `after` with the room made, or `after` itself when no height changed.
+ */
+export function makeRoom(before: DesignDoc, after: DesignDoc): DesignDoc {
+  let changed = false;
+  const layouts = { ...after.layouts };
+  for (const format of after.formats) {
+    const was = before.layouts[format];
+    const now = after.layouts[format];
+    if (!was || !now) continue;
+    const dy: Record<string, number> = {};
+    const dh: Record<string, number> = {};
+    const free = after.layers.filter((l) => {
+      const g = was[l.id];
+      return g && now[l.id] && !g.hidden && l.type !== "backdrop" && !isFullBleed(g, format);
+    });
+    for (const grown of free) {
+      if (grown.type !== "text" && grown.type !== "bullets") continue;
+      const box = was[grown.id]!;
+      const d = now[grown.id]!.h - box.h;
+      if (Math.abs(d) < 0.5) continue;
+      const card = free
+        .filter(
+          (l) =>
+            l.id !== grown.id &&
+            (l.type === "frosted" || (l.type === "shape" && l.shape === "rect")) &&
+            within(box, was[l.id]!),
+        )
+        .sort((a, b) => was[a.id]!.w * was[a.id]!.h - was[b.id]!.w * was[b.id]!.h)[0];
+      const cardBox = card ? was[card.id]! : null;
+      const shift = cardBox ? -d / 2 : 0;
+      for (const l of free) {
+        if (l.id === card?.id) continue;
+        const g = was[l.id]!;
+        if (cardBox && !within(g, cardBox)) continue;
+        const column = g.x < box.x + box.w && box.x < g.x + g.w;
+        if (!column) continue;
+        const below = l.id !== grown.id && g.y >= box.y + box.h - ROOM_SLACK;
+        dy[l.id] = (dy[l.id] ?? 0) + shift + (below ? d : 0);
+      }
+      if (card) {
+        dy[card.id] = (dy[card.id] ?? 0) + shift;
+        dh[card.id] = (dh[card.id] ?? 0) + d;
+      }
+    }
+    const ids = new Set([...Object.keys(dy), ...Object.keys(dh)]);
+    if (ids.size === 0) continue;
+    const next: FormatLayout = { ...now };
+    for (const id of ids) {
+      const g = now[id]!;
+      next[id] = {
+        ...g,
+        y: Math.round((g.y + (dy[id] ?? 0)) * 10) / 10,
+        h: Math.max(1, Math.round((g.h + (dh[id] ?? 0)) * 10) / 10),
+      };
+    }
+    layouts[format] = next;
+    changed = true;
+  }
+  return changed ? { ...after, layouts } : after;
 }
 
 /**

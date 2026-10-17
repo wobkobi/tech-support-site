@@ -15,6 +15,7 @@ import { DesignCanvas, type Zoom } from "@/features/social-design/components/can
 import { exoFamily, loadExo } from "@/features/social-design/components/canvas/fonts";
 import { reflowText } from "@/features/social-design/components/canvas/text-layout";
 import { loadImage } from "@/features/social-design/components/canvas/use-image";
+import { DraftDialog } from "@/features/social-design/components/DraftDialog";
 import { IconButton } from "@/features/social-design/components/editor-fields";
 import { HistoryMenu } from "@/features/social-design/components/HistoryMenu";
 import { LayersPanel } from "@/features/social-design/components/LayersPanel";
@@ -32,9 +33,15 @@ import {
 } from "@/features/social-design/components/use-design-autosave";
 import { useDocHistory } from "@/features/social-design/components/use-doc-history";
 import { usePictures } from "@/features/social-design/components/use-pictures";
+import {
+  draftKindFor,
+  draftRoom,
+  fillDraft,
+  type DesignDraft,
+} from "@/features/social-design/lib/ai-draft";
 import { appCrops } from "@/features/social-design/lib/app-crops";
 import type { DesignRow, DesignSummary } from "@/features/social-design/lib/design-row";
-import type { BoundValues, DesignDoc, Geometry } from "@/features/social-design/lib/doc";
+import type { BoundValues, DesignDoc, Geometry, Layer } from "@/features/social-design/lib/doc";
 import {
   addFormat,
   addLayer,
@@ -44,6 +51,7 @@ import {
   expandGroups,
   groupLayers,
   layerById,
+  makeRoom,
   nudgeLayers,
   pasteLayers,
   pasteStyle,
@@ -80,6 +88,7 @@ import {
   FaRotate,
   FaRulerCombined,
   FaVectorSquare,
+  FaWandMagicSparkles,
 } from "react-icons/fa6";
 
 // Photos for designs keep more pixels than the composer's 1200px: a full-bleed photo
@@ -137,6 +146,7 @@ function isTyping(e: KeyboardEvent): boolean {
  * @param props.bound - Live values for contact and promo layers.
  * @param props.canUpload - Whether photo uploads are set up.
  * @param props.bookingUrl - Booking page address, where a new QR code points.
+ * @param props.canDraft - Whether "Draft with AI" is available (OpenAI is set up).
  * @returns Editor element.
  */
 export function DesignEditor({
@@ -144,11 +154,13 @@ export function DesignEditor({
   bound,
   canUpload,
   bookingUrl,
+  canDraft,
 }: {
   initial: DesignRow;
   bound: BoundValues;
   canUpload: boolean;
   bookingUrl: string;
+  canDraft: boolean;
 }): React.ReactElement {
   const { toast } = useToast();
   const router = useRouter();
@@ -179,6 +191,7 @@ export function DesignEditor({
   const [copying, setCopying] = useState(false);
   const [picturesOpen, setPicturesOpen] = useState(false);
   const [using, setUsing] = useState(false);
+  const [draftOpen, setDraftOpen] = useState(false);
   const clip = useRef<Clip | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const photoFor = useRef<PhotoTarget>({ mode: "image" });
@@ -377,6 +390,45 @@ export function DesignEditor({
     } finally {
       setUsing(false);
     }
+  }
+
+  /**
+   * Fills an AI draft into the design as one undo step. Words that come out longer or
+   * shorter than what they replace move the layers under them and resize their card
+   * on every size ({@link makeRoom}). A design with no word layers gets a headline and
+   * a short line, stacked about the middle of the size on screen; the text re-measure
+   * that runs on every edit then sets their real heights.
+   * @param draft - The draft.
+   */
+  function fillAiDraft(draft: DesignDraft): void {
+    setDraftOpen(false);
+    const f = FORMATS[format];
+    apply((d) => {
+      const filled = fillDraft(d, draft);
+      // History holds measured designs, so `d` is the before; measure the new words and
+      // move what's under them, so a longer quote doesn't run into the stars.
+      const measured = family ? makeRoom(d, reflowText(filled.doc, bound, family)) : filled.doc;
+      const added = filled.missing.map((role) => {
+        const { layer, share, ratio } = makeLayer({ kind: "text", preset: role });
+        const words = role === "headline" ? draft.headline : draft.support;
+        const withWords: Layer = layer.type === "text" ? { ...layer, text: words } : layer;
+        return { layer: withWords, g: startGeometry(layer, format, share, ratio) };
+      });
+      const gap = Math.round(Math.min(f.width, f.height) * 0.03);
+      const total = added.reduce((sum, a) => sum + a.g.h, 0) + gap * (added.length - 1);
+      let y = Math.round((f.height - total) / 2);
+      let next = measured;
+      for (const a of added) {
+        next = addLayer(next, a.layer, format, { ...a.g, y });
+        y += a.g.h + gap;
+      }
+      return next;
+    });
+    toast(
+      draftRoom(doc).quote && !draft.quote
+        ? "Draft filled in. The review quote stays as it was: paste the review words into the brief to fill it."
+        : "Draft filled in. Undo takes it back.",
+    );
   }
 
   /**
@@ -686,6 +738,15 @@ export function DesignEditor({
             <FaBookmark aria-hidden className="size-3" />
             {initial.isTemplate ? "New design from this" : "Save as template"}
           </AdminButton>
+          {canDraft && (
+            <AdminButton
+              variant="outline"
+              onClick={() => setDraftOpen(true)}
+              title="Write the headline, short line, ticked points and post words from a sentence"
+            >
+              <FaWandMagicSparkles aria-hidden className="size-3" /> Draft with AI
+            </AdminButton>
+          )}
           <AdminButton onClick={() => setPicturesOpen(true)}>
             <FaImages aria-hidden className="size-3.5" /> Pictures
           </AdminButton>
@@ -979,6 +1040,15 @@ export function DesignEditor({
         onDoc={(change, tag) => apply((d) => ({ ...d, ...change }), tag)}
       />
       {pictures.stage}
+      {draftOpen && (
+        <DraftDialog
+          startKind={draftKindFor(initial.kind)}
+          room={draftRoom(doc)}
+          paidAd={doc.paidAd}
+          onClose={() => setDraftOpen(false)}
+          onDraft={fillAiDraft}
+        />
+      )}
       <PhotoPicker
         open={picker !== null}
         title={picker ? PICKER_TITLE[picker.mode] : ""}
