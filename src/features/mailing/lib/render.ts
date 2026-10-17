@@ -22,6 +22,7 @@ import {
   linkifyEscaped,
   renderNotificationEmail,
 } from "@/features/reviews/lib/email-core";
+import { isBlobImageUrl } from "@/shared/lib/blob-image";
 import {
   FACEBOOK_PAGE_URL,
   GOOGLE_BUSINESS_PROFILE_URL,
@@ -109,13 +110,6 @@ const PLACEHOLDER_RE = /\{(\w+)\}/g;
  */
 const LINK_SHAPED_LINE_RE = /^\[?!?\[[^\]\n]*\]\([^)\n]*\)(?:\]\([^)\n]*\))?$/;
 
-/**
- * Hosts an image may come from. Only the site's own Blob store: an image the
- * operator hotlinks from elsewhere can vanish or change after the email is
- * sent, and a third-party host sees every open.
- */
-const IMAGE_HOST_SUFFIX = ".public.blob.vercel-storage.com";
-
 // Inline styles: email clients ignore stylesheets. 16px body text because most
 // recipients are older and read on a phone.
 const P_STYLE = "margin:0 0 14px;color:#333;font-size:16px;line-height:1.6";
@@ -169,20 +163,6 @@ const SPACER_HTML = '<div style="height:20px;line-height:20px;font-size:1px">&nb
 // Text links, not icons: many email apps block images by default, and words
 // read better for older recipients than small logos.
 const SOCIAL_HTML = `<p style="${P_STYLE};text-align:center">Find us on <a href="${GOOGLE_BUSINESS_PROFILE_URL}" style="${LINK_STYLE}">Google</a> · <a href="${FACEBOOK_PAGE_URL}" style="${LINK_STYLE}">Facebook</a> · <a href="${INSTAGRAM_URL}" style="${LINK_STYLE}">Instagram</a></p>`;
-
-/**
- * Whether an image URL points at the site's own Blob store.
- * @param url - Image URL from an `![alt](url)` line.
- * @returns True when the host is allowed.
- */
-export function isAllowedImageUrl(url: string): boolean {
-  try {
-    const { protocol, hostname } = new URL(url);
-    return protocol === "https:" && hostname.endsWith(IMAGE_HOST_SUFFIX);
-  } catch {
-    return false;
-  }
-}
 
 /**
  * First word of a stored name, or null when there is none.
@@ -257,7 +237,7 @@ function renderInline(escaped: string): string {
  * @returns The picture's HTML, or null.
  */
 function pictureHtml(alt: string, url: string, small: boolean, link: string | null): string | null {
-  if (!isAllowedImageUrl(url)) return null;
+  if (!isBlobImageUrl(url)) return null;
   const img = small
     ? `<img src="${escapeHtml(url)}" alt="${alt}" width="248" style="${SMALL_IMAGE_STYLE}" />`
     : `<img src="${escapeHtml(url)}" alt="${alt}" width="496" style="${IMAGE_STYLE}" />`;
@@ -274,7 +254,7 @@ function pictureHtml(alt: string, url: string, small: boolean, link: string | nu
  */
 function boxHtml(box: Extract<Block, { type: "box" }>): string {
   if (!box.headline) return "";
-  const background = box.photo && isAllowedImageUrl(box.photo) ? escapeHtml(box.photo) : "";
+  const background = box.photo && isBlobImageUrl(box.photo) ? escapeHtml(box.photo) : "";
   const cellAttrs = background
     ? `background="${background}" bgcolor="${BUTTON_BG}" style="${BOX_CELL_STYLE};background-image:url('${background}')"`
     : `bgcolor="${BUTTON_BG}" style="${BOX_CELL_STYLE}"`;
@@ -506,7 +486,7 @@ export function listProblems(
     if (boxed && PICTURE_PLACEHOLDER_RE.test(line)) continue;
     const boxPhoto = boxed ? line.match(IMAGE_LINE_RE) : null;
     if (boxPhoto) {
-      if (!isAllowedImageUrl(boxPhoto[2]!)) {
+      if (!isBlobImageUrl(boxPhoto[2]!)) {
         lineProblems.add(
           "The big box's photo wasn't added with its photo buttons, so the box shows plain colour. Pick the photo again.",
         );
@@ -541,7 +521,7 @@ export function listProblems(
     const linked = line.match(LINKED_IMAGE_LINE_RE);
     const image = linked ?? line.match(IMAGE_LINE_RE);
     const button = image ? null : line.match(BUTTON_LINE_RE);
-    if (image && !isAllowedImageUrl(image[2]!)) {
+    if (image && !isBlobImageUrl(image[2]!)) {
       lineProblems.add(
         "An image wasn't added with the Picture button, so it's left out. Add it with the Picture button instead.",
       );
