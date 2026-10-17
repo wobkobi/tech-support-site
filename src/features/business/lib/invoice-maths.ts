@@ -6,6 +6,7 @@ import { minsToHoursLabel } from "@/features/business/lib/business-format";
 import { GST_RATE, GST_REGISTERED } from "@/features/business/lib/pricing-policy";
 import type { JobCalculation, LineItem } from "@/features/business/types/business";
 import { formatDateSlash } from "@/shared/lib/date-format";
+import { roundCents } from "@/shared/lib/money";
 
 /**
  * Extracts GST from a GST-inclusive amount.
@@ -14,7 +15,7 @@ import { formatDateSlash } from "@/shared/lib/date-format";
  * @returns GST component, rounded to 2 decimal places
  */
 export function calcGstFromInclusive(amountIncl: number, gstRate: number): number {
-  return Math.round(((amountIncl * gstRate) / (1 + gstRate)) * 100) / 100;
+  return roundCents((amountIncl * gstRate) / (1 + gstRate));
 }
 
 /** The fields {@link splitLineTotals} prices a line from. */
@@ -107,7 +108,7 @@ export function splitGstInclusive(
   gstRate: number,
 ): { gstAmount: number; amountExcl: number } {
   const gstAmount = calcGstFromInclusive(amountIncl, gstRate);
-  return { gstAmount, amountExcl: Math.round((amountIncl - gstAmount) * 100) / 100 };
+  return { gstAmount, amountExcl: roundCents(amountIncl - gstAmount) };
 }
 
 /**
@@ -129,9 +130,8 @@ export function calcInvoiceTotals(
 ): { subtotal: number; gstAmount: number; total: number } {
   // Sum the same per-line cents jobToLineItems stores and the PDF prints, so the Total
   // column always adds up to the Subtotal under it.
-  const subtotal =
-    Math.round(splitLineTotals(lineItems).reduce((sum, line) => sum + line, 0) * 100) / 100;
-  const taxableAmount = Math.max(0, Math.round((subtotal - promoDiscount) * 100) / 100);
+  const subtotal = roundCents(splitLineTotals(lineItems).reduce((sum, line) => sum + line, 0));
+  const taxableAmount = Math.max(0, roundCents(subtotal - promoDiscount));
   const gstAmount = gstRegistered ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {
     subtotal,
@@ -151,7 +151,7 @@ export function calcInvoiceTotals(
  */
 export function balanceDue(invoice: { total: number; alreadyPaid?: number | null }): number {
   const paid = invoice.alreadyPaid ?? 0;
-  return Math.max(0, Math.round((invoice.total - paid) * 100) / 100);
+  return Math.max(0, roundCents(invoice.total - paid));
 }
 
 /**

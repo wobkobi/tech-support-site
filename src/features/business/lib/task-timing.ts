@@ -4,6 +4,7 @@
 
 import { MIN_BILLABLE_MINS } from "@/features/business/lib/pricing-policy";
 import type { TaskLine } from "@/features/business/types/business";
+import { roundCents } from "@/shared/lib/money";
 
 /**
  * Total minutes contributed by hourly tasks. Flat-rate tasks (Travel, etc.)
@@ -360,7 +361,7 @@ function withMinutes(task: TaskLine, mins: number): TaskLine {
     ...task,
     minutes,
     qty,
-    lineTotal: Math.round(qty * task.unitPrice * 100) / 100,
+    lineTotal: roundCents(qty * task.unitPrice),
   };
 }
 

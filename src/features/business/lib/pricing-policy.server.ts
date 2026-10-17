@@ -14,6 +14,7 @@ import {
   type DateSurcharge,
   type Policy,
 } from "@/features/business/lib/pricing-policy";
+import { roundCents } from "@/shared/lib/money";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { dateKeyParts, nzDateKey, weekdayOf } from "@/shared/lib/timezone-utils";
@@ -163,7 +164,7 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
   const businessDelta =
     rows.find((r) => r.label === "Business" && r.unit === "modifier")?.hourlyDelta ??
     FALLBACK_BUSINESS_DELTA;
-  const businessRate = Math.round((baseRate + businessDelta) * 100) / 100;
+  const businessRate = roundCents(baseRate + businessDelta);
 
   // Public Holiday uses percentDelta; the rest use hourlyDelta.
   const modifiers: PublicModifier[] = [];
@@ -176,7 +177,7 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
       modifiers.push({
         label: row.label,
         kind: "delta",
-        effectiveRate: Math.round((baseRate + row.hourlyDelta) * 100) / 100,
+        effectiveRate: roundCents(baseRate + row.hourlyDelta),
         deltaDescription: row.hourlyDelta > 0 ? `+$${row.hourlyDelta}` : `-$${-row.hourlyDelta}`,
         description: MODIFIER_DESCRIPTIONS[row.label] ?? "",
       });
@@ -188,11 +189,11 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
       // billed rate is the discounted headline + this amount, so "+$25 = $90"
       // adds up next to a $65 headline where "+25%" would read as 25% of $65.
       const uplift = pricing.publicHolidayUplift;
-      const upliftPerHour = Math.round(baseRate * uplift * 100) / 100;
+      const upliftPerHour = roundCents(baseRate * uplift);
       modifiers.push({
         label: row.label,
         kind: "uplift",
-        effectiveRate: Math.round((baseRate + upliftPerHour) * 100) / 100,
+        effectiveRate: roundCents(baseRate + upliftPerHour),
         deltaDescription: `+${formatMoneyCompact(upliftPerHour)}`,
         description: MODIFIER_DESCRIPTIONS[row.label] ?? "",
       });
@@ -201,11 +202,11 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
   // Weekend is a pricing setting with no rate row, so it's added after the rows and
   // described the same way as the holiday uplift.
   if (pricing.weekendUplift > 0) {
-    const upliftPerHour = Math.round(baseRate * pricing.weekendUplift * 100) / 100;
+    const upliftPerHour = roundCents(baseRate * pricing.weekendUplift);
     modifiers.push({
       label: "Weekend",
       kind: "uplift",
-      effectiveRate: Math.round((baseRate + upliftPerHour) * 100) / 100,
+      effectiveRate: roundCents(baseRate + upliftPerHour),
       deltaDescription: `+${formatMoneyCompact(upliftPerHour)}`,
       description: MODIFIER_DESCRIPTIONS.Weekend ?? "",
     });

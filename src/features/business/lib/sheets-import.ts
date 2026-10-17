@@ -16,6 +16,7 @@ import {
 } from "@/features/business/lib/sheets-sync";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { parseSheetDate } from "@/shared/lib/date-format";
+import { roundCents } from "@/shared/lib/money";
 import { prisma } from "@/shared/lib/prisma";
 import { acquireRunLock, releaseRunLock } from "@/shared/lib/run-lock";
 import type { ExpenseEntry, IncomeEntry } from "@prisma/client";
@@ -433,7 +434,7 @@ async function importFromSheet(
     // Derived columns I/J are never trusted from the sheet; recompute the GST
     // split from the inclusive amount and the sheet's rate.
     const gstAmount = calcGstFromInclusive(amountIncl, gstRate);
-    const amountExcl = Math.round((amountIncl - gstAmount) * 100) / 100;
+    const amountExcl = roundCents(amountIncl - gstAmount);
     const data: ExpenseRowData = {
       date,
       supplier,

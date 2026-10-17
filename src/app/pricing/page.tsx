@@ -43,6 +43,7 @@ import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section"
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { renderEmphasised } from "@/shared/components/renderEmphasised";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { roundCents } from "@/shared/lib/money";
 import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
@@ -121,8 +122,8 @@ export default async function PricingPage(): Promise<React.ReactElement> {
   // down by the standard rates.
   const displayRate = promoDisplayRate(baseRate, pricedPromo);
   const travelFactor = promoTravelFactor(pricedPromo);
-  const displayTravelRate = Math.round(pricing.travelRatePerHour * travelFactor * 100) / 100;
-  const displayMinTravel = Math.round(policy.MIN_TRAVEL_CHARGE * travelFactor * 100) / 100;
+  const displayTravelRate = roundCents(pricing.travelRatePerHour * travelFactor);
+  const displayMinTravel = roundCents(policy.MIN_TRAVEL_CHARGE * travelFactor);
   const rateDiscounted = displayRate !== baseRate;
   const travelDiscounted = travelFactor < 1;
   const { identity } = settings;

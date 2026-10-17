@@ -34,6 +34,7 @@ import type {
   TaskLine,
   TravelEntry,
 } from "@/features/business/types/business";
+import { roundCents } from "@/shared/lib/money";
 import { timeParts } from "@/shared/lib/timezone-utils";
 
 export {
@@ -123,7 +124,7 @@ export function timeDiffMins(start: string, end: string): number {
  * @returns Total travel charge in NZD, rounded to 2dp.
  */
 export function travelEntriesTotal(entries: TravelEntry[]): number {
-  return Math.round(entries.reduce((s, e) => s + (e.cost || 0), 0) * 100) / 100;
+  return roundCents(entries.reduce((s, e) => s + (e.cost || 0), 0));
 }
 
 /** A job's travel split the way the invoice bills it. */
@@ -152,7 +153,7 @@ export function splitTravel(entries: TravelEntry[], minTravelCharge: number): Tr
   const hasAutoEntry = trip.some((e) => e.isAuto && e.cost > 0);
   const tripTotal =
     hasAutoEntry && rawTrip > 0 && rawTrip < minTravelCharge ? minTravelCharge : rawTrip;
-  const total = Math.round((tripTotal + travelEntriesTotal(storeRuns)) * 100) / 100;
+  const total = roundCents(tripTotal + travelEntriesTotal(storeRuns));
   return { tripTotal, storeRuns, total };
 }
 
@@ -199,7 +200,7 @@ export function effectiveHourlyRate(
   const mods = ids.map((id) => rates.find((r) => r.id === id)).filter((m): m is RateConfig => !!m);
   const sumDelta = mods.reduce((s, m) => s + (m.hourlyDelta ?? 0), 0);
   const percentFactor = mods.reduce((f, m) => f * (1 + (m.percentDelta ?? 0)), 1);
-  return Math.round((base.ratePerHour + sumDelta) * percentFactor * 100) / 100;
+  return roundCents((base.ratePerHour + sumDelta) * percentFactor);
 }
 
 /**
@@ -260,7 +261,7 @@ export function jobToLineItems(
   }
 
   if (surcharge && surcharge.uplift > 0 && labourTotal > 0) {
-    const amount = Math.round(labourTotal * surcharge.uplift * 100) / 100;
+    const amount = roundCents(labourTotal * surcharge.uplift);
     if (amount > 0) {
       items.push({
         description: `${surcharge.label} (+${Math.round(surcharge.uplift * 100)}%)`,
@@ -453,7 +454,7 @@ function jobPromoBreakdown(
     // offer, and the alternative silently under-bills a business customer.
     if (job.tasks.some(isBusinessTask)) return none;
     const charged = Math.min(1, Math.max(0, promo.travelPercent));
-    return { ...none, total: Math.round(travelTotal * (1 - charged) * 100) / 100 };
+    return { ...none, total: roundCents(travelTotal * (1 - charged)) };
   }
 
   /**
@@ -505,12 +506,12 @@ function jobPromoBreakdown(
         live > 0 ? Math.min(cut, Math.max(0, t.unitPrice - Math.max(0, live - cut))) : cut;
       return Math.min(line, t.qty * hourCut);
     });
-    return { total: Math.round(byTask.reduce((s, d) => s + d, 0) * 100) / 100, byTask };
+    return { total: roundCents(byTask.reduce((s, d) => s + d, 0)), byTask };
   }
   if (promo.percentDiscount !== null) {
     const pct = Math.max(0, Math.min(1, promo.percentDiscount));
     return {
-      total: Math.round(labourSubtotal * pct * 100) / 100,
+      total: roundCents(labourSubtotal * pct),
       byTask: shares((_, line) => line * pct),
     };
   }
@@ -520,7 +521,7 @@ function jobPromoBreakdown(
     // labour is capped instead of eating into it.
     const amount = Math.min(Math.max(0, promo.fixedAmount), labourSubtotal);
     return {
-      total: Math.round(amount * 100) / 100,
+      total: roundCents(amount),
       byTask: shares((_, line) => (amount * line) / labourSubtotal),
     };
   }
@@ -584,9 +585,8 @@ export function calcJobTotal(
     (s, t, i) => (isHourlyTask(t) ? s + lineTotals[i]! : s),
     0,
   );
-  const surchargeTotal =
-    surchargeUplift > 0 ? Math.round(hourlyTasksTotal * surchargeUplift * 100) / 100 : 0;
-  const subtotal = Math.round((tasksTotal + partsTotal + travelTotal + surchargeTotal) * 100) / 100;
+  const surchargeTotal = surchargeUplift > 0 ? roundCents(hourlyTasksTotal * surchargeUplift) : 0;
+  const subtotal = roundCents(tasksTotal + partsTotal + travelTotal + surchargeTotal);
   const { total: promoDiscount, byTask: promoByTask } = jobPromoBreakdown(
     job,
     promo,
@@ -614,17 +614,11 @@ export function calcJobTotal(
         : s,
     0,
   );
-  const unsuccessfulDiscount = Math.max(
-    0,
-    Math.round(unsuccessfulBase * unsuccessfulCut * 100) / 100,
-  );
+  const unsuccessfulDiscount = Math.max(0, roundCents(unsuccessfulBase * unsuccessfulCut));
   // GST applies to the discounted amount, per IRD price-reduction treatment. Clamped at 0
   // like calcInvoiceTotals, so stacked promo + unsuccessful discounts can't drive the
   // total negative and disagree with the persisted invoice.
-  const taxableAmount = Math.max(
-    0,
-    Math.round((subtotal - promoDiscount - unsuccessfulDiscount) * 100) / 100,
-  );
+  const taxableAmount = Math.max(0, roundCents(subtotal - promoDiscount - unsuccessfulDiscount));
   const gstAmount = pricing.gstRegistered ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {
     tasksTotal,

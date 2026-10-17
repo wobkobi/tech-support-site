@@ -15,6 +15,7 @@ import {
 } from "@/features/business/lib/already-paid-input";
 import { formatNZD } from "@/features/business/lib/business-format";
 import { cn } from "@/shared/lib/cn";
+import { roundCents } from "@/shared/lib/money";
 import type React from "react";
 import { useId } from "react";
 
@@ -67,8 +68,8 @@ export function AlreadyPaidField({
 }: Props): React.ReactElement {
   const id = useId();
   const amount = alreadyPaidAmount(value);
-  const balance = Math.max(0, Math.round((total - amount) * 100) / 100);
-  const over = Math.round((amount - total) * 100) / 100;
+  const balance = Math.max(0, roundCents(total - amount));
+  const over = roundCents(amount - total);
 
   return (
     <div className="space-y-1.5">

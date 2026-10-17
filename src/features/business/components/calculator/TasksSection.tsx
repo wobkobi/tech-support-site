@@ -20,6 +20,7 @@ import { unsuccessfulShareLabel } from "@/features/business/lib/pricing-policy";
 import { collectTaxonomyTags } from "@/features/business/lib/task-taxonomy";
 import type { RateConfig, TaskLine, TaskTemplate } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
+import { roundCents } from "@/shared/lib/money";
 import type React from "react";
 
 interface Props {
@@ -179,8 +180,7 @@ export function TasksSection({
                         // template price goes stale whenever the rates change.
                         if (tmpl && !updated.baseRateId) {
                           updated.unitPrice = tmpl.defaultPrice;
-                          updated.lineTotal =
-                            Math.round(updated.qty * tmpl.defaultPrice * 100) / 100;
+                          updated.lineTotal = roundCents(updated.qty * tmpl.defaultPrice);
                         }
                         arr[idx] = updated;
                         return arr;
@@ -214,8 +214,7 @@ export function TasksSection({
                             : null;
                         if (tmpl && !updated.baseRateId) {
                           updated.unitPrice = tmpl.defaultPrice;
-                          updated.lineTotal =
-                            Math.round(updated.qty * tmpl.defaultPrice * 100) / 100;
+                          updated.lineTotal = roundCents(updated.qty * tmpl.defaultPrice);
                         }
                         arr[idx] = updated;
                         return arr;

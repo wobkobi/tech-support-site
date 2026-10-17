@@ -3,6 +3,7 @@
 // the amount as typed, and whether it came in as Cash or Bank. Client-safe (no Prisma).
 
 import type { INCOME_METHODS } from "@/features/business/lib/constants";
+import { roundCents } from "@/shared/lib/money";
 
 /** The ways money can come in on the day; Mixed is left to the full Payment dialog. */
 export const ALREADY_PAID_METHODS = [
@@ -29,7 +30,7 @@ export const EMPTY_ALREADY_PAID: AlreadyPaidState = { amount: "", method: "Cash"
  */
 export function alreadyPaidAmount(state: AlreadyPaidState): number {
   const n = Number(state.amount.replace(/[$,\s]/g, ""));
-  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+  return Number.isFinite(n) && n > 0 ? roundCents(n) : 0;
 }
 
 /**

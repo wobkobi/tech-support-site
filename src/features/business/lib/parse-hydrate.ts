@@ -30,6 +30,7 @@ import type {
   TaskLine,
   TravelEntry,
 } from "@/features/business/types/business";
+import { roundCents } from "@/shared/lib/money";
 import { timeParts } from "@/shared/lib/timezone-utils";
 
 /**
@@ -257,7 +258,7 @@ export function hydrateParsedTasks(result: ParseJobResponse): TaskLine[] {
       qty,
       ...(minutes != null && { minutes }),
       unitPrice: t.unitPrice,
-      lineTotal: Math.round(qty * t.unitPrice * 100) / 100,
+      lineTotal: roundCents(qty * t.unitPrice),
       device,
       action,
       details,
@@ -359,7 +360,7 @@ export function parsedAutoTravel(
 export function parsedCostEntries(result: ParseJobResponse): TravelEntry[] {
   return (result.travelCosts ?? []).map((c) => ({
     label: c.label,
-    cost: Math.round(c.cost * 100) / 100,
+    cost: roundCents(c.cost),
     isParsedCost: true,
   }));
 }
@@ -525,6 +526,6 @@ export function parsedJobToLineItems(
   const promoShare =
     labour > 0 ? (Math.min(Math.max(0, promoDiscount), labour) * failed) / labour : 0;
   const cut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
-  const unsuccessfulDiscount = Math.max(0, Math.round((failed - promoShare) * cut * 100) / 100);
+  const unsuccessfulDiscount = Math.max(0, roundCents((failed - promoShare) * cut));
   return { lineItems, fit, windowMins, unsuccessfulDiscount };
 }

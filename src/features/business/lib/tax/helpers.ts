@@ -4,14 +4,8 @@
 import type { TaxFy } from "@/features/business/lib/tax/types";
 import { nzDayStartUtc } from "@/shared/lib/timezone-utils";
 
-/**
- * Rounds a dollar figure to cents.
- * @param n - Amount in dollars.
- * @returns The amount rounded to the nearest cent.
- */
-export function roundCents(n: number): number {
-  return Math.round(n * 100) / 100;
-}
+// Re-exported so the tax modules keep one import line for their small helpers.
+export { roundCents } from "@/shared/lib/money";
 
 /**
  * Rounds a distance to 0.1 km so summed float trips don't leave 0.30000000004 tails.

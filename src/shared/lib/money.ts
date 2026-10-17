@@ -1,6 +1,16 @@
-// src/shared/lib/parse-money.ts
-// Shared helpers for turning loosely-formatted money text (e.g. a price copied off a shop
-// page) into a plain number for numeric inputs.
+// src/shared/lib/money.ts
+// Shared money helpers: rounding a dollar figure to cents, and turning loosely-formatted
+// money text (e.g. a price copied off a shop page) into a plain number for numeric inputs.
+
+/**
+ * Rounds a dollar figure to cents, keeping summed and multiplied amounts out of
+ * float drift (0.1 + 0.2 > 0.3, not 0.30000000000000004).
+ * @param n - Amount in dollars.
+ * @returns The amount rounded to the nearest cent.
+ */
+export function roundCents(n: number): number {
+  return Math.round(n * 100) / 100;
+}
 
 /**
  * Strip currency symbols, thousands separators, and surrounding whitespace from

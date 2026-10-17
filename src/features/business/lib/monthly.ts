@@ -3,6 +3,7 @@
 // date, read through nzDateParts, which agrees with the `>= nzMidnightUtc(y, m, 1)` month
 // filters the dashboard and business pages already use, for real instants and ledger dates.
 
+import { roundCents } from "@/shared/lib/money";
 import { nzDateParts } from "@/shared/lib/timezone-utils";
 
 /** One NZ calendar month. */
@@ -103,7 +104,7 @@ export function bucketByNzMonth<T>(
     const i = slot.get(monthOf(row[fields.date] as Date | string).key);
     if (i !== undefined) totals[i] = (totals[i] ?? 0) + (row[fields.amount] as number);
   }
-  return totals.map((t) => Math.round(t * 100) / 100);
+  return totals.map((t) => roundCents(t));
 }
 
 /**

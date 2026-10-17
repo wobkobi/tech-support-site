@@ -29,6 +29,7 @@ import type {
   TaskLine,
   TaskTemplate,
 } from "@/features/business/types/business";
+import { roundCents } from "@/shared/lib/money";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
@@ -528,7 +529,7 @@ export function useCalculatorSave({
     const rows: { key: string; method: string; amount: number }[] = split
       ? [
           { key: "part", method: alreadyPaid.method, amount: prepaid },
-          { key: "rest", method: bank, amount: Math.round((totals.total - prepaid) * 100) / 100 },
+          { key: "rest", method: bank, amount: roundCents(totals.total - prepaid) },
         ]
       : [
           {

@@ -3,6 +3,7 @@
 // and the publish cron busts it when a promo starts or ends (refreshPromoCacheAtBoundary).
 
 import { promoForSpend, type PromoTierValues } from "@/features/business/lib/promo-tiers";
+import { roundCents } from "@/shared/lib/money";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import { NZ_TZ, nzMinuteOfDay, nzWeekday } from "@/shared/lib/timezone-utils";
@@ -89,15 +90,6 @@ export interface QuoteParts {
 }
 
 /**
- * Rounds a dollar figure to cents, keeping the arithmetic out of float drift.
- * @param value - Raw dollar amount.
- * @returns The amount rounded to two decimal places.
- */
-function toCents(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
-/**
  * Applies the promo types that act on the whole quote, after the labour band
  * and travel have been priced.
  *
@@ -114,7 +106,7 @@ export function applyPromoToQuote(parts: QuoteParts, promo: ActivePromo | null):
 
   if (promo.discountType === "free_travel" && promo.travelPercent !== null) {
     const factor = Math.min(1, Math.max(0, promo.travelPercent));
-    return { ...parts, travel: toCents(parts.travel * factor) };
+    return { ...parts, travel: roundCents(parts.travel * factor) };
   }
 
   if (promo.discountType === "fixed_amount" && promo.fixedAmount !== null) {
@@ -125,8 +117,8 @@ export function applyPromoToQuote(parts: QuoteParts, promo: ActivePromo | null):
     const off = Math.max(0, promo.fixedAmount);
     return {
       ...parts,
-      labourLow: toCents(Math.max(0, parts.labourLow - off)),
-      labourHigh: toCents(Math.max(0, parts.labourHigh - off)),
+      labourLow: roundCents(Math.max(0, parts.labourLow - off)),
+      labourHigh: roundCents(Math.max(0, parts.labourHigh - off)),
     };
   }
 
@@ -699,11 +691,11 @@ export function applyPromoToHourlyRate(
     // Never raise the price - a promo above the base rate is a misconfig, so
     // the cut floors at zero, and so does the discounted rate.
     const cut = Math.max(0, baseRate - promo.flatHourlyRate);
-    return Math.round(Math.max(0, rate - cut) * 100) / 100;
+    return roundCents(Math.max(0, rate - cut));
   }
   if (promo.percentDiscount !== null) {
     const factor = Math.max(0, 1 - promo.percentDiscount);
-    return Math.round(rate * factor * 100) / 100;
+    return roundCents(rate * factor);
   }
   return rate;
 }
@@ -797,7 +789,7 @@ export function promoModifierRate(
   }
   if (kind === "delta") return promoDisplayRate(modifierRate, promo);
   const discountPerHour = baseRate - promoDisplayRate(baseRate, promo);
-  return Math.round((modifierRate - discountPerHour) * 100) / 100;
+  return roundCents(modifierRate - discountPerHour);
 }
 
 /** A crossed-out "before" figure and the one a promo leaves in its place. */
@@ -825,7 +817,7 @@ export function promoRateBeforeAfter(
 ): PromoBeforeAfter | null {
   if (promo.discountType === "free_travel") return null;
   if (promo.discountType === "fixed_amount" && promo.fixedAmount !== null) {
-    const after = Math.max(0, Math.round((baseRate - promo.fixedAmount) * 100) / 100);
+    const after = Math.max(0, roundCents(baseRate - promo.fixedAmount));
     return after < baseRate ? { before: baseRate, after } : null;
   }
   const after = applyPromoToHourlyRate(baseRate, promo);
@@ -846,7 +838,7 @@ export function promoTravelBeforeAfter(
 ): PromoBeforeAfter | null {
   if (promo.discountType !== "free_travel" || promo.travelPercent === null) return null;
   const factor = Math.min(1, Math.max(0, promo.travelPercent));
-  const after = Math.round(minTravelCharge * factor * 100) / 100;
+  const after = roundCents(minTravelCharge * factor);
   return after < minTravelCharge ? { before: minTravelCharge, after } : null;
 }
 

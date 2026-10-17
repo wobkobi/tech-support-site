@@ -6,6 +6,7 @@
 import { effectiveHourlyRate, isChannelModifier, todayISO } from "@/features/business/lib/business";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
 import type { RateConfig, TaskLine, TravelEntry } from "@/features/business/types/business";
+import { roundCents } from "@/shared/lib/money";
 import { addDaysToDateKey, nextNzWallClockOnWeekday, timeParts } from "@/shared/lib/timezone-utils";
 
 /**
@@ -115,11 +116,11 @@ export function updateTaskField(
     if (rate) {
       item.description = rate.label;
       item.unitPrice = rate.flatRate ?? rate.ratePerHour ?? 0;
-      item.lineTotal = Math.round(item.qty * item.unitPrice * 100) / 100;
+      item.lineTotal = roundCents(item.qty * item.unitPrice);
     }
   }
   if (field === "qty" || field === "unitPrice") {
-    item.lineTotal = Math.round(Number(item.qty) * Number(item.unitPrice) * 100) / 100;
+    item.lineTotal = roundCents(Number(item.qty) * Number(item.unitPrice));
   }
   t[idx] = item;
   return t;
@@ -161,7 +162,7 @@ export function toggleTaskModifierLine(
     ...target,
     modifierIds: next,
     unitPrice: newPrice,
-    lineTotal: Math.round(target.qty * newPrice * 100) / 100,
+    lineTotal: roundCents(target.qty * newPrice),
   };
   return arr;
 }
@@ -188,7 +189,7 @@ export function setTaskBaseLine(
     ...target,
     baseRateId: baseId,
     unitPrice: newPrice,
-    lineTotal: Math.round(target.qty * newPrice * 100) / 100,
+    lineTotal: roundCents(target.qty * newPrice),
   };
   return arr;
 }
@@ -206,7 +207,7 @@ export function repriceHourlyTasks(tasks: TaskLine[], rates: RateConfig[]): Task
   return tasks.map((t) => {
     const live = effectiveHourlyRate(rates, t.baseRateId, t.modifierIds);
     if (live <= 0 || live === t.unitPrice) return t;
-    return { ...t, unitPrice: live, lineTotal: Math.round(t.qty * live * 100) / 100 };
+    return { ...t, unitPrice: live, lineTotal: roundCents(t.qty * live) };
   });
 }
 

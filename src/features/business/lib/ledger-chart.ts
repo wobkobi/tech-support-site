@@ -22,6 +22,7 @@ import {
 } from "@/features/business/lib/monthly";
 import { expenseTaxBasis, incomeTaxBasis } from "@/features/business/lib/tax/gst-basis";
 import type { GstStatus } from "@/features/business/lib/tax/types";
+import { roundCents } from "@/shared/lib/money";
 
 /** Income and expense rows; dates as Date (from Prisma) or ISO strings (page payloads). */
 export interface LedgerRows {
@@ -200,7 +201,7 @@ export function fyTotalGroups(
       key,
       shortLabel: key,
       label: fy.label + (fy.current ? TO_DATE : ""),
-      values: [Math.round(income * 100) / 100, Math.round(expenses * 100) / 100],
+      values: [roundCents(income), roundCents(expenses)],
     };
   });
 }

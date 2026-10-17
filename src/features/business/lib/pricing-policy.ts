@@ -15,6 +15,7 @@ import {
   formatMoneyCompact,
 } from "@/features/business/lib/business";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { roundCents } from "@/shared/lib/money";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 
 /** GST is back-calculated from the inclusive total via calcGstFromInclusive when enabled. */
@@ -297,7 +298,7 @@ export function breakdownTravelCharge(
   if (thereMins + backMins <= 0 || travelRatePerHour <= 0) {
     return { rawCost: 0, roundedCost: 0, finalCost: 0, minimumApplied: false };
   }
-  const rawCost = Math.round(((thereMins + backMins) / 60) * travelRatePerHour * 100) / 100;
+  const rawCost = roundCents(((thereMins + backMins) / 60) * travelRatePerHour);
   const roundedCost = Math.round(rawCost / 5) * 5;
   const finalCost = Math.max(minTravelCharge, roundedCost);
   return {

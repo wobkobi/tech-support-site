@@ -22,7 +22,7 @@ import { formatNZD, travelEntriesTotal } from "@/features/business/lib/business"
 import { lookupStoreRunEntry } from "@/features/business/lib/calculator-helpers";
 import { breakdownTravelCharge } from "@/features/business/lib/pricing-policy";
 import type { TravelEntry } from "@/features/business/types/business";
-import { parseMoney } from "@/shared/lib/parse-money";
+import { parseMoney, roundCents } from "@/shared/lib/money";
 import type React from "react";
 import { useState } from "react";
 
@@ -311,14 +311,14 @@ export function TravelSection({
                         if (value === null) return;
                         e.preventDefault();
                         patchEntry(index, {
-                          cost: Math.round(value * 100) / 100,
+                          cost: roundCents(value),
                           isAuto: false,
                           isParsedCost: false,
                         });
                       }}
                       onChange={(e) =>
                         patchEntry(index, {
-                          cost: Math.round((parseFloat(e.target.value) || 0) * 100) / 100,
+                          cost: roundCents(parseFloat(e.target.value) || 0),
                           isAuto: false,
                           isParsedCost: false,
                         })
