@@ -397,31 +397,29 @@ function DesignGrid({
                 {KIND_LABEL[r.kind]} · {r.formatCount} sizes · {formatDateShort(r.updatedAt)}
               </p>
             </div>
+            {/* Each button names its design in screen-reader text, not aria-label: React writes
+                text content escaped, and an attribute built from a typed name trips CodeQL. */}
             <div className={cn("flex shrink-0 gap-1", editing?.id === r.id && "hidden")}>
               <AdminButton
                 variant="ghost"
-                aria-label={`Rename ${r.name}`}
                 title="Rename"
                 onClick={() => setEditing({ id: r.id, name: r.name })}
               >
                 <FaPen aria-hidden className="size-3.5" />
+                <span className="sr-only">Rename {r.name}</span>
               </AdminButton>
               <AdminButton
                 variant="ghost"
-                aria-label={`Duplicate ${r.name}`}
                 title="Duplicate"
                 busy={busy === `dup-${r.id}`}
                 onClick={() => onDuplicate(r)}
               >
                 <FaCopy aria-hidden className="size-3.5" />
+                <span className="sr-only">Duplicate {r.name}</span>
               </AdminButton>
-              <AdminButton
-                variant="ghost"
-                aria-label={`Delete ${r.name}`}
-                title="Delete"
-                onClick={() => onDelete(r)}
-              >
+              <AdminButton variant="ghost" title="Delete" onClick={() => onDelete(r)}>
                 <FaTrash aria-hidden className="size-3.5" />
+                <span className="sr-only">Delete {r.name}</span>
               </AdminButton>
             </div>
           </div>
