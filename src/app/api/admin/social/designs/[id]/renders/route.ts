@@ -10,10 +10,11 @@ import {
   deleteUnusedPictures,
   writeKeepingUpdatedAt,
 } from "@/features/social-design/lib/picture-store";
-import { jpegSize, RENDER_PREFIX } from "@/features/social-design/lib/pictures";
+import { RENDER_PREFIX } from "@/features/social-design/lib/pictures";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { canUploadImages } from "@/shared/lib/image-upload";
+import { jpegSize } from "@/shared/lib/jpeg-size";
 import { prisma } from "@/shared/lib/prisma";
 import type { DesignRender } from "@prisma/client";
 import { put } from "@vercel/blob";

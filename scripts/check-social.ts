@@ -9,7 +9,6 @@
 import { postFromEmail } from "@/features/social/lib/from-email";
 import { googlePostBody } from "@/features/social/lib/google-post";
 import { insertableGroups } from "@/features/social/lib/insertables";
-import { jpegSize } from "@/features/social/lib/jpeg-size";
 import { mergeTargets, parsePostPatch } from "@/features/social/lib/parse";
 import {
   applyTakeDown,
@@ -32,6 +31,7 @@ import {
   validatePost,
   type PostDraft,
 } from "@/features/social/lib/validate";
+import { jpegSize } from "@/shared/lib/jpeg-size";
 
 let failures = 0;
 

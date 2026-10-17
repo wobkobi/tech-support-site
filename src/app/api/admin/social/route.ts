@@ -6,12 +6,12 @@
 import { findAdvertisablePromo } from "@/features/business/lib/promos";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { postFromEmail } from "@/features/social/lib/from-email";
-import { fetchJpegSize } from "@/features/social/lib/jpeg-size";
 import { toPostRow } from "@/features/social/lib/post-row";
 import { PROMO_POST_PRESET_KEY, starterPostPresets } from "@/features/social/lib/presets";
 import { defaultTargets } from "@/features/social/lib/targets";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { fetchJpegSize } from "@/shared/lib/jpeg-size";
 import { prisma } from "@/shared/lib/prisma";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import { nzDateKey } from "@/shared/lib/timezone-utils";

@@ -77,7 +77,6 @@ import { makeLayer, type AddKind } from "@/features/social-design/lib/new-layer"
 import {
   autoAltText,
   isRenderUrl,
-  jpegSize,
   leftOffPaidAd,
   pictureFileName,
   pictureState,
@@ -93,6 +92,7 @@ import {
   type Pixels,
 } from "@/features/social-design/lib/style-checks";
 import { starterTemplates } from "@/features/social-design/templates/starters";
+import { jpegSize } from "@/shared/lib/jpeg-size";
 
 let failures = 0;
 
