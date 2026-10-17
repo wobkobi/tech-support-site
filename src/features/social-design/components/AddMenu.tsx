@@ -1,7 +1,8 @@
 "use client";
 // src/features/social-design/components/AddMenu.tsx
 // The post maker's "Add" dropdown: every element the canvas can hold, grouped. Photos
-// open the file picker; everything else goes straight onto the picture, centred.
+// open the photo picker (recent photos or an upload); everything else goes straight
+// onto the picture, centred.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import {
@@ -26,11 +27,12 @@ interface Item {
 
 /**
  * The menu's groups.
- * @param canUpload - Whether photo uploads are set up.
+ * @param photosBusy - Whether a photo is uploading, so photo items wait.
+ * @param bookingUrl - Booking page address, where a new QR code points.
  * @returns Groups in menu order.
  */
-function groups(canUpload: boolean): { label: string; items: Item[] }[] {
-  const noUpload = canUpload ? undefined : "Photo uploads are off until Blob storage is set up";
+function groups(photosBusy: boolean, bookingUrl: string): { label: string; items: Item[] }[] {
+  const wait = photosBusy ? "Waiting for the last photo to upload" : undefined;
   return [
     {
       label: "Words",
@@ -44,10 +46,11 @@ function groups(canUpload: boolean): { label: string; items: Item[] }[] {
       items: [
         {
           label: "Photo...",
-          hint: noUpload,
+          hint: wait ?? "A recent photo or a new upload",
           add: { kind: "pick-photo", for: "image" },
-          disabled: !canUpload,
+          disabled: photosBusy,
         },
+        { label: "Empty photo frame", hint: "Pick the photo later", add: { kind: "photo-frame" } },
         ...(Object.keys(LOGOS) as LogoVariant[]).map((variant) => ({
           label: `Logo: ${LOGOS[variant].label.toLowerCase()}`,
           add: { kind: "logo", variant } as const,
@@ -70,6 +73,16 @@ function groups(canUpload: boolean): { label: string; items: Item[] }[] {
         { label: "Bullet list", hint: "Points with tick badges", add: { kind: "bullets" } },
         { label: "Stars", hint: "For reviews", add: { kind: "stars" } },
         { label: "Quote mark", add: { kind: "quote-mark" } },
+        {
+          label: "QR code",
+          hint: "Opens the booking page",
+          add: { kind: "qr", url: bookingUrl },
+        },
+        {
+          label: "Icon",
+          hint: "Pick which in the side panel",
+          add: { kind: "icon", icon: "FaLaptop" },
+        },
       ],
     },
     {
@@ -110,9 +123,9 @@ function groups(canUpload: boolean): { label: string; items: Item[] }[] {
         },
         {
           label: "Photo backdrop...",
-          hint: noUpload,
+          hint: wait,
           add: { kind: "pick-photo", for: "backdrop" },
-          disabled: !canUpload,
+          disabled: photosBusy,
         },
       ],
     },
@@ -122,17 +135,20 @@ function groups(canUpload: boolean): { label: string; items: Item[] }[] {
 /**
  * Add dropdown.
  * @param props - Component props.
- * @param props.canUpload - Whether photo uploads are set up.
+ * @param props.photosBusy - Whether a photo is uploading, so photo items wait.
+ * @param props.bookingUrl - Booking page address, where a new QR code points.
  * @param props.onAdd - Adds an element.
- * @param props.onPickPhoto - Opens the file picker for a photo layer or photo backdrop.
+ * @param props.onPickPhoto - Opens the photo picker for a photo layer or photo backdrop.
  * @returns Menu element.
  */
 export function AddMenu({
-  canUpload,
+  photosBusy,
+  bookingUrl,
   onAdd,
   onPickPhoto,
 }: {
-  canUpload: boolean;
+  photosBusy: boolean;
+  bookingUrl: string;
   onAdd: (add: AddKind) => void;
   onPickPhoto: (target: "image" | "backdrop") => void;
 }): React.ReactElement {
@@ -172,7 +188,7 @@ export function AddMenu({
       </AdminButton>
       {open && (
         <div className="absolute top-full left-0 z-30 mt-1 grid max-h-[70vh] w-[min(36rem,calc(100vw-2rem))] gap-3 overflow-y-auto rounded-lg border border-admin-border bg-admin-surface p-3 shadow-lg sm:grid-cols-2">
-          {groups(canUpload).map((group) => (
+          {groups(photosBusy, bookingUrl).map((group) => (
             <div key={group.label} className="flex flex-col gap-1">
               <p className="text-sm font-semibold text-admin-text-secondary">{group.label}</p>
               {group.items.map((item) => (

@@ -9,6 +9,7 @@ import { loadBoundValues } from "@/features/social-design/lib/load-bound";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { canUploadImages } from "@/shared/lib/image-upload";
 import { prisma } from "@/shared/lib/prisma";
+import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type React from "react";
@@ -51,7 +52,12 @@ export default async function AdminDesignEditorPage({
           { label: row.name },
         ]}
       />
-      <DesignEditorLoader initial={row} bound={bound} canUpload={canUploadImages()} />
+      <DesignEditorLoader
+        initial={row}
+        bound={bound}
+        canUpload={canUploadImages()}
+        bookingUrl={`${getSiteUrl()}/booking`}
+      />
     </>
   );
 }

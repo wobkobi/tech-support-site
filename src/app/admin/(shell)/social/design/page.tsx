@@ -4,6 +4,7 @@
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { DesignList } from "@/features/social-design/components/DesignList";
 import { toDesignSummary } from "@/features/social-design/lib/design-row";
+import { ensureStarterTemplates } from "@/features/social-design/templates/seed";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
@@ -22,6 +23,7 @@ export const metadata: Metadata = {
  */
 export default async function AdminPostMakerPage(): Promise<React.ReactElement> {
   await requireAdminAuth();
+  await ensureStarterTemplates();
   const designs = await prisma.socialDesign.findMany({ orderBy: { updatedAt: "desc" } });
 
   return (

@@ -26,12 +26,14 @@ const DesignEditor = dynamic(
  * @param props.initial - Design as loaded.
  * @param props.bound - Live values for contact and promo layers.
  * @param props.canUpload - Whether photo uploads are set up.
+ * @param props.bookingUrl - Booking page address, where a new QR code points.
  * @returns Editor element.
  */
 export function DesignEditorLoader(props: {
   initial: DesignRow;
   bound: BoundValues;
   canUpload: boolean;
+  bookingUrl: string;
 }): React.ReactElement {
   return <DesignEditor {...props} />;
 }

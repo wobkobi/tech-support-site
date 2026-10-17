@@ -64,8 +64,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!sourceId) return errorResponse("sourceId isn't a valid id.", 400);
     const source = await prisma.socialDesign.findUnique({ where: { id: sourceId } });
     if (!source) return errorResponse("That design no longer exists.", 404);
-    // Starting a design from a template keeps its name; any other copy says it's one.
-    const name = source.isTemplate && !asTemplate ? source.name : `${source.name} (copy)`;
+    // Crossing between design and template (starting from a template, or saving a design
+    // as one) keeps the name; a copy alongside the original says it's one.
+    const name = source.isTemplate === asTemplate ? `${source.name} (copy)` : source.name;
     // Exports aren't copied: they belong to the source, and its clean-up may delete them.
     const created = await prisma.socialDesign.create({
       data: {

@@ -6,6 +6,7 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { ICON_ART } from "@/features/social-design/components/canvas/icon-art";
 import {
   Check,
   IconButton,
@@ -30,6 +31,7 @@ import {
   type Geometry,
   type Layer,
   type PromoField,
+  type QrLayer,
 } from "@/features/social-design/lib/doc";
 import {
   alignLayers,
@@ -44,9 +46,11 @@ import {
   type StackMove,
 } from "@/features/social-design/lib/editor-ops";
 import { FORMATS, type FormatKey } from "@/features/social-design/lib/formats";
+import { ICON_CHOICES } from "@/features/social-design/lib/icons";
 import type { AlignTo } from "@/features/social-design/lib/layout";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
+import { useState } from "react";
 import {
   FaAnglesDown,
   FaAnglesUp,
@@ -84,9 +88,10 @@ export interface PanelActions {
   copyStyle: () => void;
   pasteStyle: () => void;
   canPasteStyle: boolean;
-  /** Opens the file picker to replace a photo layer's or photo backdrop's picture. */
+  /** Opens the photo picker to fill or replace a photo layer's or photo backdrop's picture. */
   replacePhoto: (id: string) => void;
-  canUpload: boolean;
+  /** Addresses a QR code can point at in one click. */
+  qrLinks: { label: string; url: string }[];
 }
 
 const ALIGNS: { how: AlignTo; label: string; icon: React.ReactNode }[] = [
@@ -602,14 +607,17 @@ function TypeFields({
     case "image":
       return (
         <Section title="Photo">
-          <button
-            type="button"
-            disabled={!actions.canUpload}
-            onClick={() => actions.replacePhoto(layer.id)}
-            className="h-8 rounded-md border border-admin-border bg-admin-surface px-2 text-sm hover:bg-admin-bg disabled:opacity-40"
-          >
-            Replace photo
-          </button>
+          {layer.src ? (
+            <button
+              type="button"
+              onClick={() => actions.replacePhoto(layer.id)}
+              className="h-8 rounded-md border border-admin-border bg-admin-surface px-2 text-sm hover:bg-admin-bg"
+            >
+              Replace photo
+            </button>
+          ) : (
+            <AdminButton onClick={() => actions.replacePhoto(layer.id)}>Choose a photo</AdminButton>
+          )}
           <Segmented
             label="Fill the frame"
             value={layer.fit}
@@ -871,9 +879,124 @@ function TypeFields({
         </Section>
       );
     case "qr":
+      return <QrFields key={layer.id} layer={layer} patch={patch} links={actions.qrLinks} />;
     case "icon":
-      return null;
+      return (
+        <Section title="Icon">
+          <div role="group" aria-label="Which icon" className="grid grid-cols-6 gap-1">
+            {ICON_CHOICES.map((c) => {
+              const Art = ICON_ART[c.name];
+              const on = layer.icon === c.name;
+              return (
+                <button
+                  key={c.name}
+                  type="button"
+                  title={c.label}
+                  aria-label={c.label}
+                  aria-pressed={on}
+                  onClick={() => patch({ icon: c.name, name: `Icon (${c.label.toLowerCase()})` })}
+                  className={cn(
+                    "flex aspect-square items-center justify-center rounded-md border",
+                    on
+                      ? "border-moonstone-600 bg-moonstone-100 text-russian-violet"
+                      : "border-admin-border text-admin-text-secondary hover:bg-admin-bg",
+                  )}
+                >
+                  {Art && <Art aria-hidden className="size-4" />}
+                </button>
+              );
+            })}
+          </div>
+          <SwatchPicker
+            label="Colour"
+            value={layer.colour}
+            onChange={(c) => c && patch({ colour: c })}
+          />
+        </Section>
+      );
   }
+}
+
+/**
+ * QR code controls: where it points (one-click links or any web address) and colour.
+ * The address field holds a draft and only saves a valid address.
+ * @param props - Component props.
+ * @param props.layer - QR layer.
+ * @param props.patch - Patches the layer.
+ * @param props.links - One-click addresses.
+ * @returns Section element.
+ */
+function QrFields({
+  layer,
+  patch,
+  links,
+}: {
+  layer: QrLayer;
+  patch: (fields: Partial<Layer>, tag?: string) => void;
+  links: { label: string; url: string }[];
+}): React.ReactElement {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft ?? layer.url;
+  const valid = /^https?:\/\/\S+$/.test(shown.trim());
+
+  /** Saves the typed address when it's a web address, else puts the saved one back. */
+  function commit(): void {
+    if (draft !== null && valid) patch({ url: draft.trim() });
+    setDraft(null);
+  }
+
+  return (
+    <Section title="QR code">
+      <div className="flex flex-wrap gap-1">
+        {links.map((link) => (
+          <button
+            key={link.label}
+            type="button"
+            aria-pressed={layer.url === link.url}
+            onClick={() => {
+              setDraft(null);
+              patch({ url: link.url });
+            }}
+            className={cn(
+              "h-8 rounded-md border px-2 text-sm",
+              layer.url === link.url
+                ? "border-moonstone-600 bg-moonstone-100 text-admin-text"
+                : "border-admin-border bg-admin-surface hover:bg-admin-bg",
+            )}
+          >
+            {link.label}
+          </button>
+        ))}
+      </div>
+      <label className="flex flex-col gap-0.5 text-sm text-admin-text-secondary">
+        Opens
+        <input
+          type="url"
+          value={shown}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+          }}
+          aria-invalid={!valid}
+          className={cn(ADMIN_INPUT_CLS, "py-1")}
+        />
+      </label>
+      {!valid && (
+        <p className="text-sm text-coquelicot-700">
+          Needs a full web address starting with https://
+        </p>
+      )}
+      <p className="text-sm text-admin-text-secondary">
+        Scan it with your phone before posting to check it opens the right page.
+      </p>
+      <SwatchPicker
+        label="Colour"
+        value={layer.colour}
+        onChange={(c) => c && patch({ colour: c })}
+      />
+    </Section>
+  );
 }
 
 /**
@@ -930,9 +1053,8 @@ function BackdropFields({
         <>
           <button
             type="button"
-            disabled={!actions.canUpload}
             onClick={() => actions.replacePhoto(layer.id)}
-            className="h-8 rounded-md border border-admin-border bg-admin-surface px-2 text-sm hover:bg-admin-bg disabled:opacity-40"
+            className="h-8 rounded-md border border-admin-border bg-admin-surface px-2 text-sm hover:bg-admin-bg"
           >
             Replace photo
           </button>

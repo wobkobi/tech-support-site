@@ -13,6 +13,7 @@ import {
   type TextPreset,
 } from "@/features/social-design/lib/brand";
 import { FORMATS, isFormatKey, type FormatKey } from "@/features/social-design/lib/formats";
+import { isIconName } from "@/features/social-design/lib/icons";
 
 export const DOC_VERSION = 1;
 
@@ -96,6 +97,7 @@ export interface TextLayer extends LayerBase {
 
 export interface ImageLayer extends LayerBase {
   type: "image";
+  /** Empty for a frame waiting for its photo, as templates start. */
   src: string;
   naturalWidth: number;
   naturalHeight: number;
@@ -421,7 +423,7 @@ function parseLayer(raw: unknown, path: string): Layer {
       return {
         ...base,
         type: "image",
-        src: blobUrl(r.src, p("src")),
+        src: r.src === "" ? "" : blobUrl(r.src, p("src")),
         naturalWidth: num(r.naturalWidth, p("naturalWidth"), 1, 20_000),
         naturalHeight: num(r.naturalHeight, p("naturalHeight"), 1, 20_000),
         fit: oneOf(r.fit, p("fit"), ["cover", "contain"] as const),
@@ -493,7 +495,7 @@ function parseLayer(raw: unknown, path: string): Layer {
     }
     case "icon": {
       const icon = str(r.icon, p("icon"), 60);
-      if (!/^[A-Z][A-Za-z0-9]+$/.test(icon)) throw new DocError(`${p("icon")} isn't an icon name.`);
+      if (!isIconName(icon)) throw new DocError(`${p("icon")} isn't one of the icons on offer.`);
       return { ...base, type: "icon", icon, colour: colour(r.colour, p("colour")) };
     }
     case "contact": {

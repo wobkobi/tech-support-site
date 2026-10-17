@@ -6,6 +6,8 @@
 // "hit-box" rect fills the box so thin shapes and gaps between words still pick up
 // clicks, and the Transformer sizes its frame from it.
 
+import { iconDataUri } from "@/features/social-design/components/canvas/icon-art";
+import { useQrImageUrl } from "@/features/social-design/components/canvas/qr-art";
 import { bulletsLayout, textSpec } from "@/features/social-design/components/canvas/text-layout";
 import { useImage } from "@/features/social-design/components/canvas/use-image";
 import { BACKDROP_BLURRED_SRC, FROSTED, hexOf, LOGOS } from "@/features/social-design/lib/brand";
@@ -13,8 +15,10 @@ import type {
   BackdropLayer,
   BoundValues,
   Geometry,
+  IconLayer,
   ImageLayer,
   Layer,
+  QrLayer,
 } from "@/features/social-design/lib/doc";
 import Konva from "konva";
 import type React from "react";
@@ -143,16 +147,68 @@ function FilteredImage({
 }
 
 /**
- * A photo layer: cropped into its frame, with rounded corners or a circle mask.
+ * A photo frame with no photo yet, as templates start: a pale panel with a camera and
+ * "Add a photo", clipped to the frame's shape.
+ * @param props - Component props.
+ * @param props.w - Box width.
+ * @param props.h - Box height.
+ * @param props.family - Font-family list.
+ * @returns Placeholder nodes.
+ */
+function EmptyPhoto({
+  w,
+  h,
+  family,
+}: Omit<DrawProps, "shadow"> & { family: string }): React.ReactElement {
+  const side = Math.min(w, h);
+  const camera = useImage(iconDataUri("FaCamera", hexOf("moonstone-600")));
+  const iconSize = side * 0.22;
+  const fontSize = Math.max(12, side * 0.075);
+  return (
+    <>
+      <Rect width={w} height={h} fill={hexOf("moonstone-100")} />
+      {camera && (
+        <KImage
+          image={camera}
+          x={(w - iconSize) / 2}
+          y={h / 2 - iconSize * 0.85}
+          width={iconSize}
+          height={iconSize}
+        />
+      )}
+      <Text
+        text="Add a photo"
+        width={w}
+        y={h / 2 + iconSize * 0.3}
+        align="center"
+        fontSize={fontSize}
+        fontStyle="700"
+        fontFamily={family}
+        fill={hexOf("moonstone-600")}
+      />
+    </>
+  );
+}
+
+/**
+ * A photo layer: cropped into its frame, with rounded corners or a circle mask. A
+ * frame with no photo yet draws the "Add a photo" placeholder.
  * @param props - Component props.
  * @param props.layer - Image layer.
  * @param props.w - Box width.
  * @param props.h - Box height.
  * @param props.shadow - Shadow attributes.
+ * @param props.family - Font-family list.
  * @returns Photo group.
  */
-function Photo({ layer, w, h, shadow }: DrawProps & { layer: ImageLayer }): React.ReactElement {
-  const img = useImage(layer.src);
+function Photo({
+  layer,
+  w,
+  h,
+  shadow,
+  family,
+}: DrawProps & { layer: ImageLayer; family: string }): React.ReactElement {
+  const img = useImage(layer.src || null);
   const radius = Math.min(layer.radius, w / 2, h / 2);
   /**
    * Draws the frame's outline for clipping.
@@ -190,7 +246,9 @@ function Photo({ layer, w, h, shadow }: DrawProps & { layer: ImageLayer }): Reac
           <Rect width={w} height={h} cornerRadius={radius} fill="#ffffff" {...shadow} />
         ))}
       <Group clipFunc={clip}>
-        {img && place ? (
+        {!layer.src ? (
+          <EmptyPhoto w={w} h={h} family={family} />
+        ) : img && place ? (
           <FilteredImage
             image={img}
             filters={filters}
@@ -256,6 +314,45 @@ function Backdrop({
       {layer.wash > 0 && <Rect width={w} height={h} fill={hexOf("seasalt")} opacity={layer.wash} />}
     </>
   );
+}
+
+/**
+ * A QR code layer, square in the middle of its box.
+ * @param props - Component props.
+ * @param props.layer - QR layer.
+ * @param props.w - Box width.
+ * @param props.h - Box height.
+ * @param props.shadow - Shadow attributes.
+ * @returns QR image, or a placeholder square while it draws.
+ */
+function QrCode({ layer, w, h, shadow }: DrawProps & { layer: QrLayer }): React.ReactElement {
+  const img = useImage(useQrImageUrl(layer.url, hexOf(layer.colour)));
+  const side = Math.min(w, h);
+  const at = { x: (w - side) / 2, y: (h - side) / 2, width: side, height: side };
+  return img ? (
+    <KImage image={img} {...at} {...shadow} />
+  ) : (
+    <Rect {...at} fill="#ffffff" cornerRadius={side * 0.04} {...shadow} />
+  );
+}
+
+/**
+ * An icon layer, from the post maker's icon set.
+ * @param props - Component props.
+ * @param props.layer - Icon layer.
+ * @param props.w - Box width.
+ * @param props.h - Box height.
+ * @param props.shadow - Shadow attributes.
+ * @returns Icon image, or nothing while it loads.
+ */
+function IconArt({
+  layer,
+  w,
+  h,
+  shadow,
+}: DrawProps & { layer: IconLayer }): React.ReactElement | null {
+  const img = useImage(iconDataUri(layer.icon, hexOf(layer.colour)));
+  return img ? <KImage image={img} width={w} height={h} {...shadow} /> : null;
 }
 
 /**
@@ -399,7 +496,7 @@ export function LayerVisual({
       );
     }
     case "image":
-      return <Photo layer={layer} w={w} h={h} shadow={shadow} />;
+      return <Photo layer={layer} w={w} h={h} shadow={shadow} family={family} />;
     case "logo":
       return <Logo src={LOGOS[layer.variant].src} w={w} h={h} shadow={shadow} />;
     case "backdrop":
@@ -496,16 +593,8 @@ export function LayerVisual({
         />
       );
     case "qr":
+      return <QrCode layer={layer} w={w} h={h} shadow={shadow} />;
     case "icon":
-      // Drawn properly once the brand elements land; until then a marked placeholder.
-      return (
-        <Rect
-          width={w}
-          height={h}
-          stroke={hexOf("seasalt-600")}
-          strokeWidth={2 * unit}
-          dash={[8 * unit, 6 * unit]}
-        />
-      );
+      return <IconArt layer={layer} w={w} h={h} shadow={shadow} />;
   }
 }

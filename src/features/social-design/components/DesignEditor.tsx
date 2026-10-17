@@ -18,6 +18,7 @@ import { loadImage } from "@/features/social-design/components/canvas/use-image"
 import { IconButton } from "@/features/social-design/components/editor-fields";
 import { HistoryMenu } from "@/features/social-design/components/HistoryMenu";
 import { LayersPanel } from "@/features/social-design/components/LayersPanel";
+import { PhotoPicker, type RecentPhoto } from "@/features/social-design/components/PhotoPicker";
 import {
   PropertiesPanel,
   type PanelActions,
@@ -30,7 +31,7 @@ import {
 } from "@/features/social-design/components/use-design-autosave";
 import { useDocHistory } from "@/features/social-design/components/use-doc-history";
 import { appCrops } from "@/features/social-design/lib/app-crops";
-import type { DesignRow } from "@/features/social-design/lib/design-row";
+import type { DesignRow, DesignSummary } from "@/features/social-design/lib/design-row";
 import type { BoundValues, DesignDoc, Geometry } from "@/features/social-design/lib/doc";
 import {
   addFormat,
@@ -61,11 +62,13 @@ import { fullBleed } from "@/features/social-design/lib/layout";
 import { makeLayer, type AddKind } from "@/features/social-design/lib/new-layer";
 import { cn } from "@/shared/lib/cn";
 import { shrinkImage } from "@/shared/lib/resize-image";
+import { useRouter } from "next/navigation";
 import type React from "react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   FaArrowRotateLeft,
   FaArrowRotateRight,
+  FaBookmark,
   FaBorderAll,
   FaCropSimple,
   FaLink,
@@ -79,8 +82,14 @@ import {
 // on a 1080x1920 story needs them.
 const PHOTO_EDGE = 2400;
 
-/** What the file picker is choosing a photo for. */
+/** What the photo picker is choosing a photo for. */
 type PhotoTarget = { mode: "image" } | { mode: "backdrop" } | { mode: "replace"; id: string };
+
+const PICKER_TITLE: Record<PhotoTarget["mode"], string> = {
+  image: "Add a photo",
+  backdrop: "Photo backdrop",
+  replace: "Choose the photo",
+};
 
 const SCOPES: { value: EditScope; label: string; title: string }[] = [
   {
@@ -123,18 +132,22 @@ function isTyping(e: KeyboardEvent): boolean {
  * @param props.initial - Design as loaded.
  * @param props.bound - Live values for contact and promo layers.
  * @param props.canUpload - Whether photo uploads are set up.
+ * @param props.bookingUrl - Booking page address, where a new QR code points.
  * @returns Editor element.
  */
 export function DesignEditor({
   initial,
   bound,
   canUpload,
+  bookingUrl,
 }: {
   initial: DesignRow;
   bound: BoundValues;
   canUpload: boolean;
+  bookingUrl: string;
 }): React.ReactElement {
   const { toast } = useToast();
+  const router = useRouter();
   const [family, setFamily] = useState<string | null>(null);
   const normalise = useCallback(
     (d: DesignDoc) => (family ? reflowText(d, bound, family) : d),
@@ -158,6 +171,8 @@ export function DesignEditor({
   const [showRulers, setShowRulers] = useState(true);
   const [styleClip, setStyleClip] = useState<LayerStyle | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [picker, setPicker] = useState<PhotoTarget | null>(null);
+  const [copying, setCopying] = useState(false);
   const clip = useRef<Clip | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const photoFor = useRef<PhotoTarget>({ mode: "image" });
@@ -234,17 +249,98 @@ export function DesignEditor({
   );
 
   /**
-   * Opens the file picker for a photo.
+   * Opens the photo picker.
    * @param target - What the photo is for.
    */
   function pickPhoto(target: PhotoTarget): void {
-    photoFor.current = target;
+    setPicker(target);
+  }
+
+  /** Swaps the photo picker for the file picker, for a new upload. */
+  function uploadPhoto(): void {
+    if (picker) photoFor.current = picker;
+    setPicker(null);
     fileRef.current?.click();
   }
 
   /**
-   * Shrinks, uploads and places a picked photo: as a new photo layer, a new photo
-   * backdrop, or in place of an existing layer's photo.
+   * Places a photo: as a new photo layer, a new photo backdrop, or in place of an
+   * existing layer's photo (filling an empty frame keeps the frame).
+   * @param target - What the photo is for.
+   * @param url - Photo address.
+   * @param size - The photo's pixel size.
+   * @param size.naturalWidth - Width.
+   * @param size.naturalHeight - Height.
+   */
+  function placePhoto(
+    target: PhotoTarget,
+    url: string,
+    size: { naturalWidth: number; naturalHeight: number },
+  ): void {
+    if (target.mode === "image") {
+      addElement({ kind: "image", src: url, ...size });
+    } else if (target.mode === "backdrop") {
+      addElement({ kind: "backdrop", source: "photo", src: url });
+    } else {
+      apply((d) =>
+        updateLayers(d, [target.id], (l) =>
+          l.type === "image"
+            ? { src: url, ...size, focusX: 0.5, focusY: 0.5, zoom: 1 }
+            : l.type === "backdrop"
+              ? { source: "photo", src: url, blur: l.blur || 24 }
+              : {},
+        ),
+      );
+    }
+  }
+
+  /**
+   * Uses a photo already in a design, loading it first when its size wasn't recorded.
+   * @param photo - Picked photo.
+   */
+  async function reusePhoto(photo: RecentPhoto): Promise<void> {
+    const target = picker;
+    setPicker(null);
+    if (!target) return;
+    try {
+      const img = await loadImage(photo.url);
+      placePhoto(target, photo.url, {
+        naturalWidth: photo.width ?? img.naturalWidth,
+        naturalHeight: photo.height ?? img.naturalHeight,
+      });
+    } catch {
+      toast("That photo couldn't be loaded.", { tone: "error" });
+    }
+  }
+
+  /**
+   * Copies this design into a new template, or starts a new design from this template.
+   * Waiting changes are saved first so the copy has them.
+   */
+  async function copyAs(): Promise<void> {
+    setCopying(true);
+    const saved = await save.saveNow();
+    if (!saved) {
+      setCopying(false);
+      toast("Couldn't save the latest changes, so nothing was copied.", { tone: "error" });
+      return;
+    }
+    const res = await callApi<{ design: DesignSummary }>("/api/admin/social/designs", "POST", {
+      source: "copy",
+      sourceId: initial.id,
+      asTemplate: !initial.isTemplate,
+    });
+    setCopying(false);
+    if (!res.ok) {
+      toast(res.error, { tone: "error" });
+      return;
+    }
+    if (initial.isTemplate) router.push(`/admin/social/design/${res.design.id}`);
+    else toast("Saved as a template. It's under Start a design on the Post maker page.");
+  }
+
+  /**
+   * Shrinks, uploads and places a picked file.
    * @param file - Picked file.
    */
   async function onPhoto(file: File): Promise<void> {
@@ -261,22 +357,7 @@ export function DesignEditor({
       }
       // Warm the image cache so the canvas draws it straight away.
       await loadImage(res.url).catch(() => undefined);
-      const size = { naturalWidth: small.width, naturalHeight: small.height };
-      if (target.mode === "image") {
-        addElement({ kind: "image", src: res.url, ...size });
-      } else if (target.mode === "backdrop") {
-        addElement({ kind: "backdrop", source: "photo", src: res.url });
-      } else {
-        apply((d) =>
-          updateLayers(d, [target.id], (l) =>
-            l.type === "image"
-              ? { src: res.url, ...size, focusX: 0.5, focusY: 0.5, zoom: 1 }
-              : l.type === "backdrop"
-                ? { source: "photo", src: res.url, blur: l.blur || 24 }
-                : {},
-          ),
-        );
-      }
+      placePhoto(target, res.url, { naturalWidth: small.width, naturalHeight: small.height });
     } catch (error) {
       toast(error instanceof Error ? error.message : "Couldn't add the photo.", { tone: "error" });
     } finally {
@@ -489,7 +570,10 @@ export function DesignEditor({
     replacePhoto: (id) => {
       pickPhoto({ mode: "replace", id });
     },
-    canUpload,
+    qrLinks: [
+      { label: "Booking page", url: bookingUrl },
+      { label: "Home page", url: new URL(bookingUrl).origin },
+    ],
   };
 
   /**
@@ -543,11 +627,25 @@ export function DesignEditor({
             </IconButton>
           </div>
           <AddMenu
-            canUpload={canUpload && !uploading}
+            photosBusy={uploading}
+            bookingUrl={bookingUrl}
             onAdd={addElement}
             onPickPhoto={(t) => pickPhoto({ mode: t })}
           />
           <HistoryMenu designId={initial.id} onRestore={restoreVersion} />
+          <AdminButton
+            variant="outline"
+            busy={copying}
+            onClick={() => void copyAs()}
+            title={
+              initial.isTemplate
+                ? "Start a new design from this template"
+                : "Keep a copy of this design as a starting point for new ones"
+            }
+          >
+            <FaBookmark aria-hidden className="size-3" />
+            {initial.isTemplate ? "New design from this" : "Save as template"}
+          </AdminButton>
         </div>
       </div>
 
@@ -798,6 +896,14 @@ export function DesignEditor({
         </aside>
       </div>
 
+      <PhotoPicker
+        open={picker !== null}
+        title={picker ? PICKER_TITLE[picker.mode] : ""}
+        canUpload={canUpload}
+        onUpload={uploadPhoto}
+        onPick={(p) => void reusePhoto(p)}
+        onClose={() => setPicker(null)}
+      />
       <input
         ref={fileRef}
         type="file"

@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.107.0",
+  "version": "4.108.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -72,6 +72,7 @@
     "next": "^16.4.0",
     "openai": "^7.32.0",
     "pdf-lib": "^1.17.1",
+    "qr-code-styling": "^1.9.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-icons": "^5.7.0",
@@ -108,7 +109,6 @@
     "prettier-plugin-tailwindcss": "^0.8.1",
     "prisma": "6.19.3",
     "puppeteer": "^25.13.0",
-    "qr-code-styling": "^1.9.2",
     "server-only": "^0.0.1",
     "sharp": "^0.35.5",
     "simple-git-hooks": "^2.14.0",

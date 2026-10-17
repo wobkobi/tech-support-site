@@ -17,6 +17,7 @@ import {
   type PromoField,
   type ShapeLayer,
 } from "@/features/social-design/lib/doc";
+import { ICON_CHOICES } from "@/features/social-design/lib/icons";
 
 /** A new layer and how it starts out on the picture. */
 export interface NewLayer {
@@ -31,6 +32,7 @@ export interface NewLayer {
 export type AddKind =
   | { kind: "text"; preset: TextPreset }
   | { kind: "image"; src: string; naturalWidth: number; naturalHeight: number }
+  | { kind: "photo-frame" }
   | { kind: "logo"; variant: LogoVariant }
   | { kind: "backdrop"; source: BackdropLayer["source"]; src?: string }
   | { kind: "frosted" }
@@ -38,6 +40,8 @@ export type AddKind =
   | { kind: "bullets" }
   | { kind: "stars" }
   | { kind: "quote-mark" }
+  | { kind: "qr"; url: string }
+  | { kind: "icon"; icon: string }
   | { kind: "contact"; fields: ContactField[] }
   | { kind: "promo"; field: PromoField };
 
@@ -128,6 +132,31 @@ export function makeLayer(add: AddKind): NewLayer {
         share: 0.6,
         ratio: add.naturalWidth / add.naturalHeight,
       };
+    case "photo-frame":
+      return {
+        layer: {
+          ...BASE,
+          id,
+          name: "Photo frame",
+          type: "image",
+          src: "",
+          // Shape of the frame until a photo arrives and brings its own.
+          naturalWidth: 1200,
+          naturalHeight: 1200,
+          fit: "cover",
+          focusX: 0.5,
+          focusY: 0.5,
+          zoom: 1,
+          radius: 24,
+          mask: "none",
+          brightness: 0,
+          contrast: 0,
+          greyscale: false,
+          role: "photo",
+        },
+        share: 0.5,
+        ratio: 1,
+      };
     case "logo":
       return {
         layer: {
@@ -209,6 +238,25 @@ export function makeLayer(add: AddKind): NewLayer {
         layer: { ...BASE, id, name: "Quote mark", type: "quote-mark", colour: "moonstone" },
         share: 0.14,
         ratio: 1.2,
+      };
+    case "qr":
+      return {
+        layer: { ...BASE, id, name: "QR code", type: "qr", url: add.url, colour: "russian-violet" },
+        share: 0.3,
+        ratio: 1,
+      };
+    case "icon":
+      return {
+        layer: {
+          ...BASE,
+          id,
+          name: `Icon (${ICON_CHOICES.find((c) => c.name === add.icon)?.label.toLowerCase() ?? "icon"})`,
+          type: "icon",
+          icon: add.icon,
+          colour: "moonstone-600",
+        },
+        share: 0.16,
+        ratio: 1,
       };
     case "contact":
       return {

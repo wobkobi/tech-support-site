@@ -6,6 +6,7 @@
 // Pure logic, no database and no browser.
 // Run with: npm test -- social-design
 
+import { ICON_ART, iconDataUri } from "@/features/social-design/components/canvas/icon-art";
 import { appCrops } from "@/features/social-design/lib/app-crops";
 import { boundText } from "@/features/social-design/lib/bound";
 import { blankDoc } from "@/features/social-design/lib/design-row";
@@ -41,11 +42,13 @@ import {
   styleOf,
 } from "@/features/social-design/lib/editor-ops";
 import {
+  CORE_FORMATS,
   FORMAT_KEYS,
   FORMATS,
   safeRect,
   type FormatKey,
 } from "@/features/social-design/lib/formats";
+import { ICON_CHOICES } from "@/features/social-design/lib/icons";
 import {
   align,
   autoPlace,
@@ -57,6 +60,7 @@ import {
   relinkSource,
 } from "@/features/social-design/lib/layout";
 import { makeLayer, type AddKind } from "@/features/social-design/lib/new-layer";
+import { starterTemplates } from "@/features/social-design/templates/starters";
 
 let failures = 0;
 
@@ -904,6 +908,132 @@ function checkSizes(): void {
   );
 }
 
+/**
+ * Whether two boxes overlap by more than a pixel.
+ * @param a - First box.
+ * @param b - Second box.
+ * @returns True when they overlap.
+ */
+function overlaps(a: Geometry, b: Geometry): boolean {
+  return a.x + 1 < b.x + b.w && b.x + 1 < a.x + a.w && a.y + 1 < b.y + b.h && b.y + 1 < a.y + a.h;
+}
+
+/** Starter templates, icons and empty photo frames. */
+function checkTemplates(): void {
+  console.log("\nStarter templates");
+  const bookingUrl = "https://example.co.nz/booking";
+  const templates = starterTemplates({ bookingUrl });
+  const keys = templates.map((t) => t.templateKey);
+  expect("template keys are unique", new Set(keys).size === keys.length, keys.join(", "));
+  expect(
+    "template keys carry a version",
+    keys.every((k) => /^[a-z]+@\d+$/.test(k)),
+    keys.join(", "),
+  );
+  expect(
+    "there's one template per kind",
+    sortedJson(templates.map((t) => t.kind).sort()) ===
+      sortedJson(["announcement", "promo", "review", "tip"]),
+  );
+
+  for (const t of templates) {
+    const parsed = parseDesignDoc(JSON.parse(JSON.stringify(t.doc)));
+    expect(
+      `${t.name}: parses back to the same document`,
+      "doc" in parsed && sortedJson(parsed.doc) === sortedJson(t.doc),
+      "error" in parsed ? parsed.error : "",
+    );
+    expect(
+      `${t.name}: has every core size`,
+      sortedJson([...t.doc.formats].sort()) === sortedJson([...CORE_FORMATS].sort()),
+      t.doc.formats.join(", "),
+    );
+    const [backdrop, card] = t.doc.layers;
+    expect(
+      `${t.name}: starts with a brand backdrop and a frosted card`,
+      backdrop.type === "backdrop" && backdrop.source === "brand" && card.type === "frosted",
+    );
+    for (const f of CORE_FORMATS) {
+      const layout = t.doc.layouts[f] ?? {};
+      const missing = t.doc.layers.filter((l) => !layout[l.id]).map((l) => l.name);
+      expect(`${t.name} on ${f}: every layer is laid out`, missing.length === 0, missing.join());
+      const content = t.doc.layers.slice(2).filter((l) => layout[l.id]);
+      const cardG = layout[card.id];
+      const outside = content.filter((l) => {
+        const g = layout[l.id];
+        return (
+          g.x < cardG.x - 1 ||
+          g.y < cardG.y - 1 ||
+          g.x + g.w > cardG.x + cardG.w + 1 ||
+          g.y + g.h > cardG.y + cardG.h + 1
+        );
+      });
+      expect(
+        `${t.name} on ${f}: the card holds all its content`,
+        outside.length === 0,
+        outside.map((l) => l.name).join(),
+      );
+      const s = safeRect(f);
+      expect(
+        `${t.name} on ${f}: the card sits inside the canvas and the safe area`,
+        inside(cardG, f) &&
+          cardG.x >= s.x1 - 1 &&
+          cardG.y >= s.y1 - 1 &&
+          cardG.x + cardG.w <= s.x2 + 1 &&
+          cardG.y + cardG.h <= s.y2 + 1,
+        JSON.stringify(cardG),
+      );
+      const clashes: string[] = [];
+      for (let i = 0; i < content.length; i++) {
+        for (let j = i + 1; j < content.length; j++) {
+          if (overlaps(layout[content[i].id], layout[content[j].id]))
+            clashes.push(`${content[i].name}/${content[j].name}`);
+        }
+      }
+      expect(`${t.name} on ${f}: nothing overlaps`, clashes.length === 0, clashes.join(", "));
+      const tiny = content.filter((l) => {
+        const size = layout[l.id].fontSize;
+        return size !== undefined && size < 18;
+      });
+      expect(
+        `${t.name} on ${f}: no text under 18px`,
+        tiny.length === 0,
+        tiny.map((l) => l.name).join(),
+      );
+    }
+  }
+
+  const promo = templates.find((t) => t.kind === "promo");
+  const qr = promo?.doc.layers.find((l) => l.type === "qr");
+  expect("the promo QR code opens the booking page", qr?.type === "qr" && qr.url === bookingUrl);
+  const announcement = templates.find((t) => t.kind === "announcement");
+  expect(
+    "the announcement starts with an empty photo frame",
+    announcement?.doc.layers.some((l) => l.type === "image" && l.src === "") === true,
+  );
+
+  const tip = templates.find((t) => t.kind === "tip");
+  const badIcon = JSON.parse(JSON.stringify(tip?.doc)) as RawDoc & {
+    layers: Record<string, unknown>[];
+  };
+  for (const l of badIcon.layers) if (l.type === "icon") l.icon = "FaNotAnIcon";
+  const rejected = parseDesignDoc(badIcon);
+  expect(
+    "an icon not on offer is refused",
+    "error" in rejected && rejected.error.includes("isn't one of the icons on offer"),
+    "error" in rejected ? rejected.error : "parsed",
+  );
+
+  const offered = ICON_CHOICES.map((c) => c.name).sort();
+  expect(
+    "every icon on offer has artwork and nothing else does",
+    sortedJson(offered) === sortedJson(Object.keys(ICON_ART).sort()),
+  );
+  const undrawn = offered.filter((n) => !iconDataUri(n, "#2b93a1")?.includes("2b93a1"));
+  expect("every icon draws in the chosen colour", undrawn.length === 0, undrawn.join());
+  expect("an unknown icon draws nothing", iconDataUri("FaNotAnIcon", "#000000") === null);
+}
+
 /** Runs every group and exits non-zero on any failure. */
 function main(): void {
   checkFormats();
@@ -914,6 +1044,7 @@ function main(): void {
   checkHash();
   checkEditorOps();
   checkSizes();
+  checkTemplates();
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);
 }
