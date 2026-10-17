@@ -1,9 +1,10 @@
 // scripts/eval-ai/client.ts
 // Thin HTTP client for the AI routes. Sends the admin secret on all of them:
-// parse-job and the mailing draft require it for auth, and estimate-duration uses it
+// parse-job and both drafts (mailing and post maker) require it for auth, and estimate-duration uses it
 // to trigger the dev-only rate-limit bypass so the harness can batch calls.
 
 import type { AiDraft } from "@/features/mailing/lib/ai-draft";
+import type { DesignDraft, DraftRoom } from "@/features/social-design/lib/ai-draft";
 
 /** estimate-duration success payload (the `result` field). */
 export interface EstimateResult {
@@ -189,4 +190,33 @@ export async function callMailingDraft(
     adminSecret,
   );
   return json.draft;
+}
+
+/**
+ * Calls the admin post maker ai-draft route.
+ * @param baseUrl - Server base URL (no trailing slash).
+ * @param adminSecret - Admin secret for auth.
+ * @param body - The brief, the kind of post, the design's room and its paid-ad switch.
+ * @param body.brief - What the post is about.
+ * @param body.kind - A post draft kind key.
+ * @param body.room - What the design has room for.
+ * @param body.paidAd - Whether the design is a paid ad.
+ * @returns The draft, or null when the route refused the brief (a 422).
+ */
+export async function callPostDraft(
+  baseUrl: string,
+  adminSecret: string,
+  body: { brief: string; kind: string; room: DraftRoom; paidAd: boolean },
+): Promise<DesignDraft | null> {
+  try {
+    const json = await postJson<{ ok: true; draft: DesignDraft }>(
+      `${baseUrl}/api/admin/social/designs/ai-draft`,
+      body,
+      adminSecret,
+    );
+    return json.draft;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("returned HTTP 422")) return null;
+    throw error;
+  }
 }

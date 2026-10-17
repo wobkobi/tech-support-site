@@ -1197,6 +1197,52 @@ model SocialPost {
   @@index([status, scheduledAt])
 }
 
+// One exported size of a post maker design. docHash is the design's fingerprint when it
+// was exported; a different hash now means the picture is out of date.
+type DesignRender {
+  format     String
+  url        String
+  width      Int
+  height     Int
+  docHash    String
+  renderedAt DateTime
+}
+
+// A picture designed in /admin/social/design: one set of layers laid out on every size
+// it exports. The document's shape and checks live in
+// src/features/social-design/lib/doc.ts.
+model SocialDesign {
+  id          String         @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  // announcement | review | tip | promo | blank
+  kind        String         @default("blank")
+  // Templates are starting points; opening one makes a copy.
+  isTemplate  Boolean        @default(false)
+  // Stable handle for a starter template the code seeds.
+  templateKey String?
+  doc         Json
+  renders     DesignRender[]
+  // Social post the pictures were handed to.
+  postId      String?        @db.ObjectId
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([isTemplate, updatedAt])
+}
+
+// A saved copy of a post maker design, for its History menu. Written by the save route
+// at most once every 5 minutes (holding the design as it was before that editing
+// session), kept to the last 20 per design, deleted with the design.
+model SocialDesignVersion {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  designId  String   @db.ObjectId
+  name      String
+  doc       Json
+  createdAt DateTime @default(now())
+
+  @@index([designId, createdAt])
+}
+
 // One entry in the depreciable asset register (/admin/business/assets). Site-only, like
 // Subscription: nothing here syncs to the Google Sheets workbook. Money is NZD on the GST
 // basis at entry; rates are fractions.

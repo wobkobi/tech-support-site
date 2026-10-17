@@ -6,6 +6,12 @@
 
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import type { AiDraft } from "@/features/mailing/lib/ai-draft";
+import {
+  fromBrief,
+  HEADLINE_TARGET,
+  type DesignDraft,
+  type DraftRoom,
+} from "@/features/social-design/lib/ai-draft";
 
 /** Grouping for a reported check. */
 type CheckFamily = "context" | "reproducibility" | "drift" | "cross-route" | "travel" | "draft";
@@ -110,5 +116,55 @@ export function draftProblems(draft: AiDraft, brief: string): { hard: string[]; 
   if (words > 4) soft.push(`button is ${words} words`);
   if (/[\u2018\u2019\u201c\u201d]/.test(all)) soft.push("curly quotes");
   if (draft.subject.length > 60) soft.push(`subject is ${draft.subject.length} characters`);
+  return { hard, soft };
+}
+
+/** A phone number, email address or web address, which a picture never carries. */
+const CONTACT_RE = /\b0\d[\d ]{6,}\d\b|@|\bwww\.|https?:\/\/|\.co\.nz\b/i;
+
+/**
+ * What a post maker draft got wrong. Hard problems break a rule the prompt states as an
+ * INVARIANT (dashes, picture figures not in the brief, contact details on the picture or
+ * in a paid ad, a quote or name not taken from the brief, words for a slot the design
+ * doesn't have, button-like words); soft ones are style (a headline over the target
+ * length, curly quotes, hashtags).
+ * @param draft - The draft the route returned.
+ * @param brief - The brief it was written from.
+ * @param room - What the design had room for.
+ * @param paidAd - Whether the design was a paid ad.
+ * @returns The hard and soft problems, empty when it's clean.
+ */
+export function postDraftProblems(
+  draft: DesignDraft,
+  brief: string,
+  room: DraftRoom,
+  paidAd: boolean,
+): { hard: string[]; soft: string[] } {
+  const hard: string[] = [];
+  const soft: string[] = [];
+  const picture = [draft.headline, draft.support, ...draft.bullets].join("\n");
+  const all = [picture, draft.quote, draft.name, draft.caption].join("\n");
+
+  if (/[\u2013\u2014]/.test(all)) hard.push("has an em or en dash");
+  const figures = picture.match(/\d+/g) ?? [];
+  const invented = [...new Set(figures)].filter((n) => !brief.includes(n));
+  if (invented.length > 0) hard.push(`picture figures not in the brief: ${invented.join(", ")}`);
+  if (CONTACT_RE.test(picture)) hard.push("contact details on the picture");
+  if (paidAd && CONTACT_RE.test(draft.caption)) hard.push("contact details in a paid ad's words");
+  if (/\b(tap|click) (here|to|below)\b|\blearn more\b|\blink in bio\b/i.test(picture)) {
+    hard.push("button-like words on the picture");
+  }
+  if (!fromBrief(draft.quote, brief)) hard.push("quote has words that aren't in the brief");
+  if (!fromBrief(draft.name, brief)) hard.push("name isn't in the brief");
+  if (room.headline && !draft.headline) hard.push("no headline");
+  if (room.bullets > 0 && draft.bullets.length !== room.bullets) {
+    hard.push(`${draft.bullets.length} ticked points, wanted ${room.bullets}`);
+  }
+  if (!draft.caption) hard.push("no post words");
+
+  const length = draft.headline.replace(/\n/g, " ").length;
+  if (length > HEADLINE_TARGET) soft.push(`headline is ${length} characters`);
+  if (/[\u2018\u2019\u201c\u201d]/.test(all)) soft.push("curly quotes");
+  if (/#\w/.test(draft.caption)) soft.push("hashtags");
   return { hard, soft };
 }

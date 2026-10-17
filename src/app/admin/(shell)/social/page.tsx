@@ -3,6 +3,7 @@
 // history, all on one page. `?post=<id>` picks which post is open in the composer.
 // Seeds the starter presets on the first visit.
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { SocialView } from "@/features/social/components/SocialView";
@@ -13,6 +14,7 @@ import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
 import type React from "react";
+import { FaPalette } from "react-icons/fa6";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +50,11 @@ export default async function AdminSocialPage({
       <PageHeader
         title="Social posts"
         description="Write a post once and send it to Facebook, Instagram and Google, now or at a set time."
+        actions={
+          <AdminButton href="/admin/social/design" variant="outline">
+            <FaPalette aria-hidden className="size-3.5" /> Post maker
+          </AdminButton>
+        }
       />
       <SocialView
         initial={posts.map(toPostRow)}

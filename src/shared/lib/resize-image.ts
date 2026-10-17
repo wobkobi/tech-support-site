@@ -2,7 +2,8 @@
 // Browser-side image shrink before upload, shared by the mailing and social editors.
 // Phone photos are 3-8 MB; an email shows them at 560px wide at most and Instagram
 // takes 320-1440px, so 1200px (crisp on high-DPI screens) as JPEG brings them to a few
-// hundred KB, keeping the upload under the function body limit.
+// hundred KB, keeping the upload under the function body limit. Post maker photos pass
+// a bigger edge: a full-bleed photo on a 1080x1920 story needs more than 1200px.
 
 const MAX_EDGE = 1200;
 const JPEG_QUALITY = 0.85;
