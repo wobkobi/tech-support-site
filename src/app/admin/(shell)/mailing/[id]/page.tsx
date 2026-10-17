@@ -11,6 +11,7 @@ import { toCampaignRow } from "@/features/mailing/lib/campaign-row";
 import { missingSendEnv, promoWording } from "@/features/mailing/lib/context";
 import { emailInsertGroups, emailLinkTargets } from "@/features/mailing/lib/insertables";
 import { BLANK_TEMPLATE, type Template } from "@/features/mailing/lib/templates";
+import { aiConfigured } from "@/shared/lib/ai/json-completion";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { canUploadImages } from "@/shared/lib/image-upload";
 import { prisma } from "@/shared/lib/prisma";
@@ -118,7 +119,7 @@ export default async function AdminMailingEditPage({
         templates={templates}
         promo={wording.promo}
         linkTargets={emailLinkTargets(getSiteUrl(), reviews.googleReviewUrl)}
-        canDraft={Boolean(process.env.OPENAI_API_KEY)}
+        canDraft={aiConfigured()}
         adminEmail={process.env.ADMIN_EMAIL?.trim() || null}
       />
     </>

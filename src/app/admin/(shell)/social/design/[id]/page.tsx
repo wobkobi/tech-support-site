@@ -6,6 +6,7 @@ import { parseObjectId } from "@/features/business/lib/validation";
 import { DesignEditorLoader } from "@/features/social-design/components/DesignEditorLoader";
 import { toDesignRow } from "@/features/social-design/lib/design-row";
 import { loadBoundValues } from "@/features/social-design/lib/load-bound";
+import { aiConfigured } from "@/shared/lib/ai/json-completion";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { canUploadImages } from "@/shared/lib/image-upload";
 import { prisma } from "@/shared/lib/prisma";
@@ -57,7 +58,7 @@ export default async function AdminDesignEditorPage({
         bound={bound}
         canUpload={canUploadImages()}
         bookingUrl={`${getSiteUrl()}/booking`}
-        canDraft={Boolean(process.env.OPENAI_API_KEY)}
+        canDraft={aiConfigured()}
       />
     </>
   );

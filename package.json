@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.112.2",
+  "version": "4.113.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -54,6 +54,7 @@
     "deepmerge-ts": "^8.0.2"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
