@@ -8,26 +8,7 @@
 import { checkDescription, validateBookingPayloadFields } from "@/features/booking/lib/booking";
 import { checkEmailDomain, type EmailDomainResolver } from "@/shared/lib/email-domain.server";
 import { validatePhone } from "@/shared/lib/normalise-phone";
-
-let failures = 0;
-
-/**
- * Compares a value against its expectation, recording rather than throwing so
- * every fixture runs even after one fails.
- * @param label - Human-readable case name.
- * @param actual - What the call produced.
- * @param expected - What it should have produced.
- */
-function expectEqual(label: string, actual: unknown, expected: unknown): void {
-  const a = JSON.stringify(actual);
-  const e = JSON.stringify(expected);
-  if (a === e) {
-    console.log(`  PASS  ${label} > ${a}`);
-  } else {
-    console.error(`  FAIL  ${label} > expected ${e}, got ${a}`);
-    failures++;
-  }
-}
+import { expectEqual, finish } from "./lib/harness.js";
 
 /**
  * A DNS error carrying a Node-style code.
@@ -185,8 +166,4 @@ for (const [email, expected] of [
   expectEqual(email, await checkEmailDomain(email, resolver), expected);
 }
 
-if (failures > 0) {
-  console.error(`\n${failures} failure(s)`);
-  process.exit(1);
-}
-console.log("\nAll booking-spam checks passed");
+finish();

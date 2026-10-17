@@ -93,23 +93,7 @@ import {
 } from "@/features/social-design/lib/style-checks";
 import { starterTemplates } from "@/features/social-design/templates/starters";
 import { jpegSize } from "@/shared/lib/jpeg-size";
-
-let failures = 0;
-
-/**
- * Records one assertion, so every case runs even after one fails.
- * @param label - Human-readable case name.
- * @param ok - Whether the case passed.
- * @param detail - Extra output shown on failure.
- */
-function expect(label: string, ok: boolean, detail = ""): void {
-  if (ok) {
-    console.log(`  PASS  ${label}`);
-  } else {
-    console.error(`  FAIL  ${label}${detail ? `\n        ${detail}` : ""}`);
-    failures++;
-  }
-}
+import { expect, finish } from "./lib/harness.js";
 
 /**
  * Whether two numbers are within a pixel of each other (geometry rounds to 0.1px).
@@ -1584,8 +1568,7 @@ function main(): void {
   checkPictures();
   checkAiDraft();
   checkStyle();
-  console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
-  process.exit(failures === 0 ? 0 : 1);
+  finish();
 }
 
 main();

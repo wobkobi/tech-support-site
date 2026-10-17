@@ -8,26 +8,7 @@ import type { VehicleFuel } from "@/features/business/lib/tax/types";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 import type { PricingSettings, TaxSettings } from "@/shared/lib/settings/types";
 import { validateGroup } from "@/shared/lib/settings/validate";
-
-let failures = 0;
-
-/**
- * Compares a value against its expectation, recording rather than throwing so
- * every fixture runs even after one fails.
- * @param label - Human-readable case name.
- * @param actual - What the call produced.
- * @param expected - What it should have produced.
- */
-function expectEqual(label: string, actual: unknown, expected: unknown): void {
-  const a = JSON.stringify(actual);
-  const e = JSON.stringify(expected);
-  if (a === e) {
-    console.log(`  PASS  ${label} > ${a}`);
-  } else {
-    console.error(`  FAIL  ${label} > expected ${e}, got ${a}`);
-    failures++;
-  }
-}
+import { expectEqual, finish } from "./lib/harness.js";
 
 /**
  * Field paths the tax validator rejects for the defaults with a patch applied.
@@ -188,8 +169,7 @@ function main(): void {
     "gstRegisteredFrom",
   ]);
 
-  console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
-  process.exit(failures === 0 ? 0 : 1);
+  finish();
 }
 
 main();

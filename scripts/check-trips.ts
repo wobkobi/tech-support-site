@@ -26,8 +26,7 @@ import {
   type TripRow,
 } from "@/features/business/lib/trips";
 import { parseDateKey } from "@/shared/lib/date-format";
-
-let failures = 0;
+import { expectEqual, finish } from "./lib/harness.js";
 
 /** FY 2026-27 on the ledger scale. */
 const FY_START = "2026-04-01T00:00:00.000Z";
@@ -41,24 +40,6 @@ const CONTACT_ID = "89abcdef0123456789abcdef";
 
 /** "Now" for every eligibility case: 9 Oct 2026. */
 const NOW = new Date("2026-10-09T00:00:00.000Z");
-
-/**
- * Compares a value against its expectation, recording rather than throwing so
- * every fixture runs even after one fails.
- * @param label - Human-readable case name.
- * @param actual - What the call produced.
- * @param expected - What it should have produced.
- */
-function expectEqual(label: string, actual: unknown, expected: unknown): void {
-  const a = JSON.stringify(actual);
-  const e = JSON.stringify(expected);
-  if (a === e) {
-    console.log(`  PASS  ${label} > ${a}`);
-  } else {
-    console.error(`  FAIL  ${label} > expected ${e}, got ${a}`);
-    failures++;
-  }
-}
 
 /**
  * A completed in-person booking on 11 Sep 2026 (NZ), overridden per case.
@@ -459,8 +440,7 @@ function main(): void {
     { "b-lastday": "22", "b-past": "", "b-done": "30", "b-noshow": "" },
   );
 
-  console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
-  process.exit(failures === 0 ? 0 : 1);
+  finish();
 }
 
 main();

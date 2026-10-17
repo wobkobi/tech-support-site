@@ -3,7 +3,8 @@
 // four statuses. fetch is stubbed per case, so this costs no network and no quota.
 // Run with: npm test -- address-resolution
 
-import { resolveAddress, type AddressResolution } from "@/shared/lib/normalise-address";
+import { resolveAddress } from "@/shared/lib/normalise-address";
+import { expectEqual, finish } from "./lib/harness.js";
 
 // normalise-address reads the key inside the request function, not at module
 // load, so setting it here still takes effect despite import hoisting.
@@ -58,28 +59,6 @@ function stubFetchThrows(): void {
   }) as unknown as typeof fetch;
 }
 
-let failures = 0;
-
-/**
- * Compares a resolution against the expected status, recording rather than
- * throwing so every fixture runs even after one fails.
- * @param label - Human-readable case name.
- * @param actual - Resolution returned by resolveAddress.
- * @param expected - Status the case should produce.
- */
-function expectStatus(
-  label: string,
-  actual: AddressResolution,
-  expected: AddressResolution["status"],
-): void {
-  if (actual.status === expected) {
-    console.log(`  PASS  ${label} > ${actual.status}`);
-  } else {
-    console.error(`  FAIL  ${label} > expected ${expected}, got ${actual.status}`);
-    failures++;
-  }
-}
-
 /**
  * Runs every fixture case and exits non-zero if any failed.
  * @returns Promise that resolves once all cases have run.
@@ -91,7 +70,11 @@ async function main(): Promise<void> {
     status: "OK",
     results: [preciseNZ("4 Name Street, Onehunga, Auckland 1061, New Zealand")],
   });
-  expectStatus("single precise NZ match", await resolveAddress("4 name street"), "resolved");
+  expectEqual(
+    "single precise NZ match",
+    (await resolveAddress("4 name street")).status,
+    "resolved",
+  );
 
   stubFetch({
     status: "OK",
@@ -100,10 +83,14 @@ async function main(): Promise<void> {
       preciseNZ("4 Name Street, Glenfield, Auckland 0629, New Zealand"),
     ],
   });
-  expectStatus("two precise NZ matches", await resolveAddress("4 name street"), "ambiguous");
+  expectEqual(
+    "two precise NZ matches",
+    (await resolveAddress("4 name street")).status,
+    "ambiguous",
+  );
 
   stubFetch({ status: "ZERO_RESULTS", results: [] });
-  expectStatus("no matches at all", await resolveAddress("not a real place"), "unresolved");
+  expectEqual("no matches at all", (await resolveAddress("not a real place")).status, "unresolved");
 
   // Google matched something, but only at locality precision - storing it would
   // replace a street address with a suburb.
@@ -118,7 +105,11 @@ async function main(): Promise<void> {
       },
     ],
   });
-  expectStatus("matched but nothing precise", await resolveAddress("onehunga"), "unresolved");
+  expectEqual(
+    "matched but nothing precise",
+    (await resolveAddress("onehunga")).status,
+    "unresolved",
+  );
 
   // A precise match that resolved outside NZ must not count - "27 maryland
   // street" resolving to Houston is the case the country guard exists for.
@@ -133,27 +124,26 @@ async function main(): Promise<void> {
       },
     ],
   });
-  expectStatus(
+  expectEqual(
     "precise match outside NZ",
-    await resolveAddress("27 maryland street"),
+    (await resolveAddress("27 maryland street")).status,
     "unresolved",
   );
 
   // The outage cases. An API failure must never look like "no such address",
   // or one bad sync pass would flag every contact in the database for review.
   stubFetch({ status: "OVER_QUERY_LIMIT", results: [] });
-  expectStatus("API over quota", await resolveAddress("4 name street"), "skipped");
+  expectEqual("API over quota", (await resolveAddress("4 name street")).status, "skipped");
 
   stubFetch({}, { ok: false, status: 500 });
-  expectStatus("HTTP 500", await resolveAddress("4 name street"), "skipped");
+  expectEqual("HTTP 500", (await resolveAddress("4 name street")).status, "skipped");
 
   stubFetchThrows();
-  expectStatus("network failure", await resolveAddress("4 name street"), "skipped");
+  expectEqual("network failure", (await resolveAddress("4 name street")).status, "skipped");
 
-  expectStatus("blank input", await resolveAddress("   "), "skipped");
+  expectEqual("blank input", (await resolveAddress("   ")).status, "skipped");
 
-  console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
-  process.exit(failures === 0 ? 0 : 1);
+  finish();
 }
 
 void main();

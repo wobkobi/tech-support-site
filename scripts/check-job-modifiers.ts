@@ -4,26 +4,7 @@
 // Run with: npm test -- job-modifiers
 
 import { isBusinessModifier, withJobModifiers } from "@/features/business/lib/job-modifiers";
-
-let failures = 0;
-
-/**
- * Compares a value against its expectation, recording rather than throwing so
- * every fixture runs even after one fails.
- * @param label - Human-readable case name.
- * @param actual - What the call produced.
- * @param expected - What it should have produced.
- */
-function expectEqual(label: string, actual: unknown, expected: unknown): void {
-  const a = JSON.stringify(actual);
-  const e = JSON.stringify(expected);
-  if (a === e) {
-    console.log(`  PASS  ${label} > ${a}`);
-  } else {
-    console.error(`  FAIL  ${label} > expected ${e}, got ${a}`);
-    failures++;
-  }
-}
+import { expectEqual, finish } from "./lib/harness.js";
 
 // The live modifier rows, as of 2026-10-12.
 const RATES = [
@@ -130,8 +111,7 @@ function main(): void {
   expectEqual("case and spaces", isBusinessModifier({ label: " business " }), true);
   expectEqual("other label", isBusinessModifier({ label: "After hours / weekend" }), false);
 
-  console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
-  process.exit(failures === 0 ? 0 : 1);
+  finish();
 }
 
 main();

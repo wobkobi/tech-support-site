@@ -14,24 +14,7 @@ import {
   type PromoCandidate,
   type RecurringWindow,
 } from "@/features/business/lib/promos";
-
-let failures = 0;
-
-/**
- * Compares the winning promo id against its expectation, recording rather than
- * throwing so every fixture runs even after one fails.
- * @param label - Human-readable case name.
- * @param actual - Winning promo id, or null.
- * @param expected - Id the case should produce.
- */
-function expectWinner(label: string, actual: string | null, expected: string | null): void {
-  if (actual === expected) {
-    console.log(`  PASS  ${label} > ${actual ?? "null"}`);
-  } else {
-    console.error(`  FAIL  ${label} > expected ${expected ?? "null"}, got ${actual ?? "null"}`);
-    failures++;
-  }
-}
+import { expectEqual, finish } from "./lib/harness.js";
 
 /**
  * Builds a candidate row.
@@ -42,21 +25,6 @@ function expectWinner(label: string, actual: string | null, expected: string | n
  */
 function promo(id: string, priority: number, createdAt: string): PromoCandidate {
   return { id, priority, createdAt: new Date(createdAt) };
-}
-
-/**
- * Compares a boolean against its expectation.
- * @param label - Human-readable case name.
- * @param actual - What the function returned.
- * @param expected - What it should have returned.
- */
-function expectBool(label: string, actual: boolean, expected: boolean): void {
-  if (actual === expected) {
-    console.log(`  PASS  ${label} > ${actual}`);
-  } else {
-    console.error(`  FAIL  ${label} > expected ${expected}, got ${actual}`);
-    failures++;
-  }
 }
 
 /**
@@ -87,16 +55,16 @@ function iso(d: Date | null): string | null {
 function main(): void {
   console.log("promo selection fixtures\n");
 
-  expectWinner("no candidates", pickWinningPromo([])?.id ?? null, null);
+  expectEqual("no candidates", pickWinningPromo([])?.id ?? null, null);
 
-  expectWinner(
+  expectEqual(
     "single candidate wins",
     pickWinningPromo([promo("a", 0, "2026-01-01")])?.id ?? null,
     "a",
   );
 
   // The whole point of the priority column.
-  expectWinner(
+  expectEqual(
     "higher priority beats newer",
     pickWinningPromo([
       promo("old-important", 10, "2026-01-01"),
@@ -106,14 +74,14 @@ function main(): void {
   );
 
   // Existing promos all sit at 0, so the old behaviour must survive untouched.
-  expectWinner(
+  expectEqual(
     "equal priority falls back to newest",
     pickWinningPromo([promo("older", 0, "2026-01-01"), promo("newer", 0, "2026-06-01")])?.id ??
       null,
     "newer",
   );
 
-  expectWinner(
+  expectEqual(
     "negative priority loses to default",
     pickWinningPromo([promo("suppressed", -5, "2026-06-01"), promo("normal", 0, "2026-01-01")])
       ?.id ?? null,
@@ -121,7 +89,7 @@ function main(): void {
   );
 
   // Order in must not matter.
-  expectWinner(
+  expectEqual(
     "input order is irrelevant",
     pickWinningPromo([
       promo("new-ordinary", 0, "2026-06-01"),
@@ -135,15 +103,15 @@ function main(): void {
   // Stored codes are uppercase, so comparing anything else silently fails to
   // match and the customer is told a real code is invalid.
 
-  expectWinner("trims and uppercases", normalisePromoCode("  spring25 "), "SPRING25");
-  expectWinner("blank becomes null", normalisePromoCode("   "), null);
-  expectWinner("undefined becomes null", normalisePromoCode(undefined), null);
-  expectWinner("null stays null", normalisePromoCode(null), null);
-  expectWinner("already uppercase is unchanged", normalisePromoCode("SPRING25"), "SPRING25");
+  expectEqual("trims and uppercases", normalisePromoCode("  spring25 "), "SPRING25");
+  expectEqual("blank becomes null", normalisePromoCode("   "), null);
+  expectEqual("undefined becomes null", normalisePromoCode(undefined), null);
+  expectEqual("null stays null", normalisePromoCode(null), null);
+  expectEqual("already uppercase is unchanged", normalisePromoCode("SPRING25"), "SPRING25");
   // Public routes hand over whatever JSON arrived. A throw here took the
   // automatic promo down with the code in booking/request.
-  expectWinner("a number is not a code", normalisePromoCode(25), null);
-  expectWinner("an object is not a code", normalisePromoCode({ $ne: "" }), null);
+  expectEqual("a number is not a code", normalisePromoCode(25), null);
+  expectEqual("an object is not a code", normalisePromoCode({ $ne: "" }), null);
 
   // ---- Booking date vs appointment ----
   //
@@ -155,32 +123,32 @@ function main(): void {
   const SLOT = new Date("2026-09-29T21:00:00Z");
   const BOOKED = new Date("2026-09-10T02:00:00Z");
 
-  expectWinner(
+  expectEqual(
     "a booking judges dates at booking time",
     iso(resolutionInstants({ at: SLOT, bookedAt: BOOKED }, NOW).datesAt),
     iso(BOOKED),
   );
-  expectWinner(
+  expectEqual(
     "and its weekday restriction at the slot",
     iso(resolutionInstants({ at: SLOT, bookedAt: BOOKED }, NOW).windowAt),
     iso(SLOT),
   );
-  expectWinner(
+  expectEqual(
     "a walk-up job with no booking time judges dates at the job",
     iso(resolutionInstants({ at: SLOT }, NOW).datesAt),
     iso(SLOT),
   );
-  expectWinner(
+  expectEqual(
     "no slot chosen yet skips the weekday restriction",
     iso(resolutionInstants({ at: null, bookedAt: NOW }, NOW).windowAt),
     null,
   );
-  expectWinner(
+  expectEqual(
     "but still judges dates at booking time",
     iso(resolutionInstants({ at: null, bookedAt: NOW }, NOW).datesAt),
     iso(NOW),
   );
-  expectWinner(
+  expectEqual(
     "nothing given judges both at now",
     iso(resolutionInstants({}, NOW).windowAt),
     iso(NOW),
@@ -196,30 +164,30 @@ function main(): void {
   const TUESDAY = [2];
 
   // Tuesday 00:30 NZ. Still Monday in UTC in both offsets.
-  expectBool(
+  expectEqual(
     "NZDT: just after NZ midnight is already Tuesday",
     matchesRecurringWindow(window(TUESDAY), new Date("2026-03-30T11:30:00Z")),
     true,
   );
-  expectBool(
+  expectEqual(
     "NZST: same NZ wall clock, different offset, same answer",
     matchesRecurringWindow(window(TUESDAY), new Date("2026-06-01T12:30:00Z")),
     true,
   );
 
   // Monday 23:59 NZ - one minute earlier, and it must not qualify.
-  expectBool(
+  expectEqual(
     "NZDT: the minute before is still Monday",
     matchesRecurringWindow(window(TUESDAY), new Date("2026-03-30T10:59:00Z")),
     false,
   );
-  expectBool(
+  expectEqual(
     "NZST: the minute before is still Monday",
     matchesRecurringWindow(window(TUESDAY), new Date("2026-06-01T11:59:00Z")),
     false,
   );
 
-  expectBool(
+  expectEqual(
     "no weekday restriction admits every day",
     matchesRecurringWindow(window([]), new Date("2026-06-03T21:00:00Z")),
     true,
@@ -228,22 +196,22 @@ function main(): void {
   // Time of day: 09:00-17:00 NZ.
   const OFFICE = window([], 9 * 60, 17 * 60);
 
-  expectBool(
+  expectEqual(
     "NZST: 09:00 NZ is inside an office-hours window",
     matchesRecurringWindow(OFFICE, new Date("2026-06-01T21:00:00Z")),
     true,
   );
-  expectBool(
+  expectEqual(
     "NZDT: 09:00 NZ is inside it too, at the other offset",
     matchesRecurringWindow(OFFICE, new Date("2026-03-30T20:00:00Z")),
     true,
   );
-  expectBool(
+  expectEqual(
     "NZST: 08:59 NZ is outside it",
     matchesRecurringWindow(OFFICE, new Date("2026-06-01T20:59:00Z")),
     false,
   );
-  expectBool(
+  expectEqual(
     "the closing minute is included",
     matchesRecurringWindow(OFFICE, new Date("2026-06-02T05:00:00Z")),
     true,
@@ -253,17 +221,17 @@ function main(): void {
   // would admit nothing, which looks like a broken promo rather than a
   // misconfigured one.
   const OVERNIGHT = window([], 20 * 60, 2 * 60);
-  expectBool(
+  expectEqual(
     "an overnight range admits the late evening",
     matchesRecurringWindow(OVERNIGHT, new Date("2026-06-01T09:00:00Z")),
     true,
   );
-  expectBool(
+  expectEqual(
     "and the small hours",
     matchesRecurringWindow(OVERNIGHT, new Date("2026-06-01T13:00:00Z")),
     true,
   );
-  expectBool(
+  expectEqual(
     "but not the afternoon between them",
     matchesRecurringWindow(OVERNIGHT, new Date("2026-06-01T03:00:00Z")),
     false,
@@ -271,16 +239,16 @@ function main(): void {
 
   // Half a range is not a range: treating one end as open would silently widen
   // a restriction the operator thought they had set.
-  expectBool(
+  expectEqual(
     "a start with no end is not a restriction",
     matchesRecurringWindow(window([], 9 * 60, null), new Date("2026-06-01T20:00:00Z")),
     true,
   );
 
-  expectBool("no restriction at all", hasRecurringWindow(window([])), false);
-  expectBool("a weekday list is a restriction", hasRecurringWindow(window(TUESDAY)), true);
-  expectBool("a complete time range is one", hasRecurringWindow(OFFICE), true);
-  expectBool("half a time range is not", hasRecurringWindow(window([], 9 * 60, null)), false);
+  expectEqual("no restriction at all", hasRecurringWindow(window([])), false);
+  expectEqual("a weekday list is a restriction", hasRecurringWindow(window(TUESDAY)), true);
+  expectEqual("a complete time range is one", hasRecurringWindow(OFFICE), true);
+  expectEqual("half a time range is not", hasRecurringWindow(window([], 9 * 60, null)), false);
 
   // ---- Naming the restriction ----
   //
@@ -289,44 +257,43 @@ function main(): void {
   // now. Hiding it until the day itself would keep it from exactly the person
   // deciding whether to book one.
 
-  expectWinner("no restriction has nothing to say", describeRecurringWindow(window([])), null);
-  expectWinner("one day", describeRecurringWindow(window(TUESDAY)), "Tuesdays");
-  expectWinner("two days", describeRecurringWindow(window([2, 4])), "Tuesdays and Thursdays");
-  expectWinner(
+  expectEqual("no restriction has nothing to say", describeRecurringWindow(window([])), null);
+  expectEqual("one day", describeRecurringWindow(window(TUESDAY)), "Tuesdays");
+  expectEqual("two days", describeRecurringWindow(window([2, 4])), "Tuesdays and Thursdays");
+  expectEqual(
     "three read as a list",
     describeRecurringWindow(window([1, 2, 3])),
     "Mondays, Tuesdays and Wednesdays",
   );
-  expectWinner(
+  expectEqual(
     "the full working week has its own word",
     describeRecurringWindow(window([1, 2, 3, 4, 5])),
     "weekdays",
   );
-  expectWinner("and so does the weekend", describeRecurringWindow(window([0, 6])), "weekends");
-  expectWinner(
+  expectEqual("and so does the weekend", describeRecurringWindow(window([0, 6])), "weekends");
+  expectEqual(
     "out-of-order days still read in order",
     describeRecurringWindow(window([4, 2])),
     "Tuesdays and Thursdays",
   );
-  expectWinner("a time range alone", describeRecurringWindow(OFFICE), "9am to 5pm");
-  expectWinner(
+  expectEqual("a time range alone", describeRecurringWindow(OFFICE), "9am to 5pm");
+  expectEqual(
     "days and a time range together",
     describeRecurringWindow(window(TUESDAY, 9 * 60, 17 * 60)),
     "Tuesdays 9am to 5pm",
   );
-  expectWinner(
+  expectEqual(
     "a half hour keeps its minutes",
     describeRecurringWindow(window([], 9 * 60 + 30, 12 * 60)),
     "9:30am to 12pm",
   );
-  expectWinner(
+  expectEqual(
     "half a range says nothing, matching how it is enforced",
     describeRecurringWindow(window([], 9 * 60, null)),
     null,
   );
 
-  console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
-  process.exit(failures === 0 ? 0 : 1);
+  finish();
 }
 
 main();

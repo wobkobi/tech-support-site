@@ -20,28 +20,9 @@ import {
   type AskPersonInput,
   type ReviewAskInput,
 } from "@/features/reviews/lib/review-ask-rules";
+import { expectEqual, finish } from "./lib/harness.js";
 
 process.env.UNSUBSCRIBE_SECRET = "check-review-asks-fixture-secret";
-
-let failures = 0;
-
-/**
- * Compares a value against its expectation, recording rather than throwing so
- * every fixture runs even after one fails.
- * @param label - Human-readable case name.
- * @param actual - What the call produced.
- * @param expected - What it should have produced.
- */
-function expectEqual(label: string, actual: unknown, expected: unknown): void {
-  const a = JSON.stringify(actual);
-  const e = JSON.stringify(expected);
-  if (a === e) {
-    console.log(`  PASS  ${label} > ${a}`);
-  } else {
-    console.error(`  FAIL  ${label} > expected ${e}, got ${a}`);
-    failures++;
-  }
-}
 
 const DAY = 24 * 60 * 60 * 1000;
 const TIMING = { delayDays: 2, gapDays: 30 };
@@ -322,11 +303,7 @@ function main(): void {
   expectEqual("unsubscribe token is not a stop", verifyReviewAskStopToken(unsubToken), null);
   expectEqual("tampered stop token", verifyReviewAskStopToken(`${stopToken}x`), null);
 
-  if (failures > 0) {
-    console.error(`\n${failures} check(s) failed.`);
-    process.exit(1);
-  }
-  console.log("\nAll review-ask checks passed.");
+  finish();
 }
 
 main();

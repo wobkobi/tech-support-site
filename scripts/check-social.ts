@@ -32,23 +32,7 @@ import {
   type PostDraft,
 } from "@/features/social/lib/validate";
 import { jpegSize } from "@/shared/lib/jpeg-size";
-
-let failures = 0;
-
-/**
- * Records one assertion, so every case runs even after one fails.
- * @param label - Human-readable case name.
- * @param ok - Whether the case passed.
- * @param detail - Extra output shown on failure.
- */
-function expect(label: string, ok: boolean, detail = ""): void {
-  if (ok) {
-    console.log(`  PASS  ${label}`);
-  } else {
-    console.error(`  FAIL  ${label}${detail ? `\n        ${detail}` : ""}`);
-    failures++;
-  }
-}
+import { expect, finish } from "./lib/harness.js";
 
 const BLOB = "https://abc.public.blob.vercel-storage.com/social/image-x1.jpg";
 
@@ -948,8 +932,7 @@ function main(): void {
   checkTakeDown();
   checkParse();
   checkInsertables();
-  console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
-  process.exit(failures === 0 ? 0 : 1);
+  finish();
 }
 
 main();
