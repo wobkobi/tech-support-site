@@ -60,11 +60,12 @@ function nonNeg(n: unknown): n is number {
 export const MAX_TAX_BANDS = 10;
 
 /**
- * True for a plain `{}` object (not null, not an array).
+ * True for a plain `{}` object (not null, not an array). Also tells get-settings.ts's
+ * deep merge which branches it can merge into.
  * @param v - Candidate value.
  * @returns Whether `v` is a plain object.
  */
-function isPlainObject(v: unknown): boolean {
+export function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
