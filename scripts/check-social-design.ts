@@ -82,6 +82,16 @@ import {
   pictureFileName,
   pictureState,
 } from "@/features/social-design/lib/pictures";
+import {
+  contrastIssues,
+  contrastRatio,
+  luminance,
+  mergeContrast,
+  styleChecks,
+  withoutWords,
+  wordLayersOn,
+  type Pixels,
+} from "@/features/social-design/lib/style-checks";
 import { starterTemplates } from "@/features/social-design/templates/starters";
 
 let failures = 0;
@@ -1359,6 +1369,207 @@ function checkAiDraft(): void {
   );
 }
 
+/** Style checks: small text, too much text, covered words, buttons, emoji and contrast. */
+function checkStyle(): void {
+  console.log("\nStyle checks");
+  for (const t of starterTemplates({ bookingUrl: "https://example.co.nz/booking" })) {
+    const issues = styleChecks(t.doc, NO_BOUND);
+    expect(
+      `${t.name} passes its own style checks`,
+      issues.length === 0,
+      issues.map((i) => i.message).join(" | "),
+    );
+  }
+
+  /**
+   * A design with one headline at the same place on every size.
+   * @param words - The headline's words.
+   * @param fontSize - Its font size on every size.
+   * @param at - Geometry changes.
+   * @returns The design.
+   */
+  const withWords = (words: string, fontSize = 96, at: Partial<Geometry> = {}): DesignDoc => {
+    const doc = docWithText(() => ({
+      x: 100,
+      y: 500,
+      w: 800,
+      h: 200,
+      rotation: 0,
+      linked: true,
+      fontSize,
+      ...at,
+    }));
+    doc.layers = doc.layers.map((l) => (l.type === "text" ? { ...l, text: words } : l));
+    return doc;
+  };
+  /**
+   * Kinds of issue a design has.
+   * @param doc - Design.
+   * @returns Kinds, sorted and joined.
+   */
+  const kinds = (doc: DesignDoc): string =>
+    styleChecks(doc, NO_BOUND)
+      .map((i) => i.kind)
+      .sort()
+      .join(",");
+
+  expect("a clean headline has no issues", kinds(withWords("Friendly local IT support")) === "");
+  const small = styleChecks(withWords("Name, Suburb", 26), NO_BOUND);
+  expect(
+    "26px is small on every size, one issue listing them all",
+    small.length === 1 && small[0]!.kind === "small-text" && small[0]!.formats.length === 5,
+    small.map((i) => i.message).join(" | "),
+  );
+  const at30 = styleChecks(withWords("Name, Suburb", 30), NO_BOUND);
+  expect(
+    "30px reads on 1080 wide but not on 1200 wide",
+    at30.length === 1 &&
+      sortedJson(at30[0]!.formats) === sortedJson(["google-4x3", "landscape"]) &&
+      at30[0]!.message.includes("at least 32"),
+    at30.map((i) => i.message).join(" | "),
+  );
+  const top = styleChecks(withWords("Big news", 96, { y: 40 }), NO_BOUND);
+  expect(
+    "words in a story's top band may be covered, on the story only",
+    top.some((i) => i.kind === "covered" && sortedJson(i.formats) === sortedJson(["story"])),
+  );
+  const profile = withWords("Big news", 96, { x: 0, y: 0, w: 300, h: 120 });
+  profile.formats = ["profile"];
+  profile.layouts = { profile: profile.layouts["feed-4x5"] };
+  expect("words in a profile picture's corner are cut by the circle", kinds(profile) === "covered");
+  expect("tap words read like a button", kinds(withWords("Tap here to book")) === "button");
+  expect("learn more reads like a button", kinds(withWords("Learn more")) === "button");
+  expect("book now on its own is fine", kinds(withWords("Book now")) === "");
+  const onBox = withWords("Book now", 96, { x: 300, y: 600, w: 480, h: 110 });
+  const box: Layer = { ...makeLayer({ kind: "shape", shape: "rect" }).layer, id: "btn" };
+  onBox.layers.splice(1, 0, box);
+  for (const f of onBox.formats) {
+    onBox.layouts[f] = {
+      ...onBox.layouts[f],
+      btn: { x: 280, y: 580, w: 520, h: 150, rotation: 0, linked: true },
+    };
+  }
+  expect("short words on a small box read like a button", kinds(onBox) === "button");
+  expect("an emoji is noted", kinds(withWords("Sorted \u{1F44D}")) === "emoji");
+
+  /**
+   * Adds a word layer at a free spot on every size.
+   * @param doc - Design.
+   * @param layer - Layer to add.
+   * @param y - Top edge.
+   * @returns The design.
+   */
+  const plus = (doc: DesignDoc, layer: Layer, y: number): DesignDoc => {
+    const layouts = { ...doc.layouts };
+    for (const f of doc.formats) {
+      layouts[f] = {
+        ...layouts[f],
+        [layer.id]: { x: 100, y, w: 800, h: 60, rotation: 0, linked: true, fontSize: 40 },
+      };
+    }
+    return { ...doc, layers: [...doc.layers, layer], layouts };
+  };
+  /**
+   * A support text layer.
+   * @param id - Layer id.
+   * @param words - Its words.
+   * @returns The layer.
+   */
+  const textLayer = (id: string, words: string): Layer =>
+    ({ ...makeLayer({ kind: "text", preset: "support" }).layer, id, text: words }) as Layer;
+  const busy = plus(
+    plus(withWords("One"), textLayer("t2", "Two"), 750),
+    textLayer("t3", "Three"),
+    850,
+  );
+  expect("three pieces of text are fine", kinds(busy) === "");
+  const contact: Layer = { ...makeLayer({ kind: "contact", fields: ["phone"] }).layer, id: "c1" };
+  const withContact = plus(busy, contact, 950);
+  expect("contact details don't count towards the limit", kinds(withContact) === "");
+  const many = styleChecks(plus(busy, textLayer("t4", "Four"), 1000), NO_BOUND).filter(
+    (i) => i.kind === "many-words",
+  );
+  expect(
+    "a fourth piece of text is too many",
+    many.length === 1 && many[0]!.layerId === null && many[0]!.message.startsWith("4 pieces"),
+  );
+  expect(
+    "a paid ad's contact layer draws no words",
+    wordLayersOn({ ...withContact, paidAd: true }, "feed-4x5", NO_BOUND).every(
+      (w) => w.layer.type !== "contact",
+    ),
+  );
+  expect(
+    "the backdrop drawing has no word layers",
+    withoutWords(withContact).layers.every(
+      (l) => !["text", "bullets", "contact", "promo"].includes(l.type),
+    ),
+  );
+
+  // Contrast, from made-up pixels at quarter scale.
+  expect(
+    "white on black is 21",
+    near(contrastRatio(luminance(255, 255, 255), luminance(0, 0, 0)), 21, 0.01),
+  );
+  /**
+   * A flat picture, optionally with a band of another colour from one row down.
+   * @param rgb - Main colour.
+   * @param band - Colour of the band, or null.
+   * @param from - First row of the band.
+   * @returns Pixels at 270 x 338 (a quarter of a 4:5 post).
+   */
+  const flat = (rgb: number[], band: number[] | null = null, from = 0): Pixels => {
+    const width = 270;
+    const height = 338;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const c = band && y >= from ? band : rgb;
+        data.set([c[0]!, c[1]!, c[2]!, 255], (y * width + x) * 4);
+      }
+    }
+    return { width, height, data };
+  };
+  const violet = withWords("Friendly local IT support");
+  const white = [255, 255, 255];
+  const night = [20, 18, 40];
+  expect(
+    "violet on white reads",
+    contrastIssues(violet, "feed-4x5", flat(white), 0.25, NO_BOUND).length === 0,
+  );
+  expect(
+    "violet on near-black doesn't",
+    contrastIssues(violet, "feed-4x5", flat(night), 0.25, NO_BOUND).length === 1,
+  );
+  // The headline box covers rows 125-175 at quarter scale; the dark band takes its lower 30%.
+  expect(
+    "a dark patch behind part of the words counts",
+    contrastIssues(violet, "feed-4x5", flat(white, night, 160), 0.25, NO_BOUND).length === 1,
+  );
+  const banded: DesignDoc = {
+    ...violet,
+    layers: violet.layers.map((l) =>
+      l.type === "text" ? { ...l, colour: "white", highlight: "russian-violet" } : l,
+    ),
+  };
+  expect(
+    "words on a highlight band are measured against the band",
+    contrastIssues(banded, "feed-4x5", flat(white), 0.25, NO_BOUND).length === 0,
+  );
+  const merged = mergeContrast(
+    violet,
+    [
+      { kind: "contrast", layerId: "head1", formats: ["story"], message: "" },
+      { kind: "contrast", layerId: "head1", formats: ["feed-4x5"], message: "" },
+    ],
+    NO_BOUND,
+  );
+  expect(
+    "contrast issues merge per layer in tab order",
+    merged.length === 1 && sortedJson(merged[0]!.formats) === sortedJson(["feed-4x5", "story"]),
+  );
+}
+
 /** Runs every group and exits non-zero on any failure. */
 function main(): void {
   checkFormats();
@@ -1372,6 +1583,7 @@ function main(): void {
   checkTemplates();
   checkPictures();
   checkAiDraft();
+  checkStyle();
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);
 }

@@ -1,22 +1,30 @@
 "use client";
 // src/features/social-design/components/DesignList.tsx
 // The post maker's home: start a design (blank or from a template), and the designs
-// and templates made so far, each with open, duplicate and delete.
+// and templates made so far, each with open, rename, duplicate and delete. Your
+// designs filter by kind once there's more than one kind to pick from.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
+import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { callApi } from "@/features/mailing/lib/api-client";
-import { KIND_LABEL, type DesignSummary } from "@/features/social-design/lib/design-row";
+import {
+  DESIGN_KINDS,
+  KIND_LABEL,
+  type DesignKind,
+  type DesignSummary,
+} from "@/features/social-design/lib/design-row";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
-import { FaCopy, FaPlus, FaTrash } from "react-icons/fa6";
+import { FaCopy, FaPen, FaPlus, FaTrash } from "react-icons/fa6";
 
 /**
  * Design list.
@@ -37,9 +45,14 @@ export function DesignList({
   const [rows, setRows] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<DesignSummary | null>(null);
+  const [kind, setKind] = useState<DesignKind | null>(null);
 
   const templates = rows.filter((r) => r.isTemplate);
   const designs = rows.filter((r) => !r.isTemplate);
+  const kinds = DESIGN_KINDS.filter((k) => designs.some((r) => r.kind === k));
+  // A filter left on a kind with no designs any more (the last one deleted) shows all.
+  const shownKind = kind && kinds.includes(kind) ? kind : null;
+  const shown = shownKind ? designs.filter((r) => r.kind === shownKind) : designs;
 
   /**
    * Creates a design and opens it in the editor.
@@ -77,6 +90,32 @@ export function DesignList({
       return;
     }
     setRows((prev) => [res.design, ...prev]);
+  }
+
+  /**
+   * Renames a design.
+   * @param row - Design to rename.
+   * @param name - New name.
+   * @returns Whether it saved.
+   */
+  async function rename(row: DesignSummary, name: string): Promise<boolean> {
+    setBusy(`ren-${row.id}`);
+    const res = await callApi<{ updatedAt: string }>(
+      `/api/admin/social/designs/${row.id}`,
+      "PATCH",
+      { expectedUpdatedAt: row.updatedAt, name },
+    );
+    setBusy(null);
+    if (!res.ok) {
+      toast(res.error, { tone: "error" });
+      return false;
+    }
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === row.id ? { ...r, name: name.trim(), updatedAt: res.updatedAt } : r,
+      ),
+    );
+    return true;
   }
 
   /** Deletes the design waiting in the confirm dialog. */
@@ -131,6 +170,33 @@ export function DesignList({
           <h2 id="design-mine" className="text-lg font-semibold text-admin-text">
             Your designs
           </h2>
+          {kinds.length > 1 && (
+            <div
+              role="group"
+              aria-label="Show designs of one kind"
+              className="flex flex-wrap gap-2"
+            >
+              <button
+                type="button"
+                aria-pressed={shownKind === null}
+                onClick={() => setKind(null)}
+                className={adminChipClass(shownKind === null)}
+              >
+                All
+              </button>
+              {kinds.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={shownKind === k}
+                  onClick={() => setKind(k)}
+                  className={adminChipClass(shownKind === k)}
+                >
+                  {KIND_LABEL[k]}
+                </button>
+              ))}
+            </div>
+          )}
           {designs.length === 0 ? (
             <EmptyState
               title="No designs yet"
@@ -138,8 +204,9 @@ export function DesignList({
             />
           ) : (
             <DesignGrid
-              rows={designs}
+              rows={shown}
               busy={busy}
+              onRename={rename}
               onDuplicate={(r) => void duplicate(r)}
               onDelete={setDeleting}
             />
@@ -159,6 +226,7 @@ export function DesignList({
             <DesignGrid
               rows={templates}
               busy={busy}
+              onRename={rename}
               onDuplicate={(r) => void duplicate(r)}
               onDelete={setDeleting}
             />
@@ -233,6 +301,7 @@ function StartCard({
  * @param props - Component props.
  * @param props.rows - Designs to show.
  * @param props.busy - Busy marker of the action in flight.
+ * @param props.onRename - Saves a new name; resolves to whether it saved.
  * @param props.onDuplicate - Copies a design.
  * @param props.onDelete - Asks to delete a design.
  * @returns Grid element.
@@ -240,14 +309,31 @@ function StartCard({
 function DesignGrid({
   rows,
   busy,
+  onRename,
   onDuplicate,
   onDelete,
 }: {
   rows: DesignSummary[];
   busy: string | null;
+  onRename: (row: DesignSummary, name: string) => Promise<boolean>;
   onDuplicate: (row: DesignSummary) => void;
   onDelete: (row: DesignSummary) => void;
 }): React.ReactElement {
+  const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
+
+  /**
+   * Saves the name being typed; an empty or unchanged name just closes the box.
+   * @param row - Design being renamed.
+   */
+  async function finishRename(row: DesignSummary): Promise<void> {
+    const name = editing?.name.trim() ?? "";
+    if (!name || name === row.name) {
+      setEditing(null);
+      return;
+    }
+    if (await onRename(row, name)) setEditing(null);
+  }
+
   return (
     <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {rows.map((r) => (
@@ -272,18 +358,54 @@ function DesignGrid({
             )}
           </Link>
           <div className="flex items-start justify-between gap-2 p-3">
-            <div className="min-w-0">
-              <Link
-                href={`/admin/social/design/${r.id}`}
-                className="block truncate font-semibold text-admin-text hover:underline"
-              >
-                {r.name}
-              </Link>
+            <div className="min-w-0 flex-1">
+              {editing?.id === r.id ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void finishRename(r);
+                  }}
+                  className="flex gap-1"
+                >
+                  <label className="sr-only" htmlFor={`rename-${r.id}`}>
+                    Name
+                  </label>
+                  <input
+                    id={`rename-${r.id}`}
+                    autoFocus
+                    value={editing.name}
+                    maxLength={120}
+                    onChange={(e) => setEditing({ id: r.id, name: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setEditing(null);
+                    }}
+                    className={cn(ADMIN_INPUT_CLS, "h-9 min-w-0 flex-1 py-1")}
+                  />
+                  <AdminButton type="submit" size="sm" busy={busy === `ren-${r.id}`}>
+                    Save
+                  </AdminButton>
+                </form>
+              ) : (
+                <Link
+                  href={`/admin/social/design/${r.id}`}
+                  className="block truncate font-semibold text-admin-text hover:underline"
+                >
+                  {r.name}
+                </Link>
+              )}
               <p className="text-sm text-admin-text-secondary">
                 {KIND_LABEL[r.kind]} · {r.formatCount} sizes · {formatDateShort(r.updatedAt)}
               </p>
             </div>
-            <div className="flex shrink-0 gap-1">
+            <div className={cn("flex shrink-0 gap-1", editing?.id === r.id && "hidden")}>
+              <AdminButton
+                variant="ghost"
+                aria-label={`Rename ${r.name}`}
+                title="Rename"
+                onClick={() => setEditing({ id: r.id, name: r.name })}
+              >
+                <FaPen aria-hidden className="size-3.5" />
+              </AdminButton>
               <AdminButton
                 variant="ghost"
                 aria-label={`Duplicate ${r.name}`}

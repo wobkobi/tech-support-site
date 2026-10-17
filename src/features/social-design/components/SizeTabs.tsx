@@ -24,7 +24,7 @@ const THUMB_H = 56;
  * @param props.bound - Live values for contact and promo layers.
  * @param props.family - Exo's font-family list, or null while fonts load.
  * @param props.onPick - Shows one size.
- * @param props.onAllSizes - Shows every size side by side.
+ * @param props.onAllSizes - Shows every size side by side; leave it out for no Side by side tab.
  * @param props.onAdd - Adds a size to the design.
  * @param props.onRemove - Removes a size from the design.
  * @returns Tab row.
@@ -46,7 +46,7 @@ export function SizeTabs({
   bound: BoundValues;
   family: string | null;
   onPick: (format: FormatKey) => void;
-  onAllSizes: () => void;
+  onAllSizes?: () => void;
   onAdd: (format: FormatKey) => void;
   onRemove: (format: FormatKey) => void;
 }): React.ReactElement {
@@ -99,7 +99,7 @@ export function SizeTabs({
             </button>
           );
         })}
-        {doc.formats.length > 1 && (
+        {onAllSizes && doc.formats.length > 1 && (
           <button
             type="button"
             role="tab"

@@ -7,6 +7,7 @@
 import type { FormatLayout, Geometry } from "@/features/social-design/lib/doc";
 import { FORMATS, safeRect, type FormatKey } from "@/features/social-design/lib/formats";
 import { fullBleed } from "@/features/social-design/lib/layout";
+import { MIN_TEXT_PX } from "@/features/social-design/lib/style-checks";
 
 /** One layer's box in a stack. */
 export interface Box {
@@ -34,6 +35,8 @@ export interface Frame {
   wide: boolean;
   /** Card padding. */
   pad: number;
+  /** Smallest font that still reads in a phone feed at this size's width. */
+  minFont: number;
   /** Room inside the card for its content. */
   inner: { w: number; h: number };
 }
@@ -74,6 +77,7 @@ export function frameFor(key: FormatKey): Frame {
     k,
     wide: FORMATS[key].width / FORMATS[key].height > 1.25,
     pad,
+    minFont: Math.ceil((MIN_TEXT_PX * FORMATS[key].width) / 1080),
     inner: { w: a.x2 - a.x1 - pad * 2, h: a.y2 - a.y1 - pad * 2 },
   };
 }

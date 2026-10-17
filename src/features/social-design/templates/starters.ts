@@ -74,14 +74,25 @@ function text(
 }
 
 /**
- * Font size of a preset on a frame.
+ * A font size scaled to a frame, never under the size that reads in a phone feed, so a
+ * template passes its own style checks on every size.
+ * @param size - Size on a 1080px-wide portrait post.
+ * @param frame - Size's frame.
+ * @returns Font size in pixels.
+ */
+function px(size: number, frame: Frame): number {
+  return Math.max(size * frame.k, frame.minFont);
+}
+
+/**
+ * Font size of a preset on a frame (see {@link px}).
  * @param preset - Style preset.
  * @param frame - Size's frame.
  * @param factor - Extra scale for this template.
  * @returns Font size in pixels.
  */
 function fs(preset: TextPreset, frame: Frame, factor = 1): number {
-  return TEXT_PRESETS[preset].fontSize * frame.k * factor;
+  return px(TEXT_PRESETS[preset].fontSize * factor, frame);
 }
 
 /**
@@ -133,6 +144,10 @@ function base(): [Layer, Layer] {
 }
 
 const WORDMARK = LOGOS.wordmark.ratio;
+// Accent words sit on the light frosted card, where moonstone-600 and coquelicot fall
+// under the style checks' 3:1 contrast; one shade darker reads and keeps the colour.
+const ACCENT_ON_CARD = { colour: "moonstone-700" } as const;
+const PRICE_ON_CARD = "coquelicot-600";
 
 /**
  * Announcement: a photo, a headline, a line or two and the wordmark. Wide sizes put the
@@ -176,7 +191,7 @@ function announcement(): StarterTemplate {
     const photoH = Math.min(w * 0.5625, h - logoB.h - head.h - sup.h - gap * 3);
     return col(gap, logoB, { id: photo.id, w, h: photoH }, head, sup);
   });
-  return { templateKey: "announcement@1", name: "Announcement", kind: "announcement", doc };
+  return { templateKey: "announcement@2", name: "Announcement", kind: "announcement", doc };
 }
 
 /**
@@ -208,7 +223,7 @@ function review(): StarterTemplate {
       logoBox(logo.id, 90 * f.k, LOGOS.mark.ratio),
     );
   });
-  return { templateKey: "review@1", name: "Review", kind: "review", doc };
+  return { templateKey: "review@2", name: "Review", kind: "review", doc };
 }
 
 /**
@@ -219,7 +234,7 @@ function review(): StarterTemplate {
 function tip(): StarterTemplate {
   const under = base();
   const icon = layer({ kind: "icon", icon: "FaLightbulb" });
-  const accent = text("accent", "TECH TIP", "Tip label", null);
+  const accent = text("accent", "TECH TIP", "Tip label", null, ACCENT_ON_CARD);
   const headline = text("headline", "Speed up a\nslow laptop", "Headline", "headline");
   const bullets = {
     ...layer({ kind: "bullets" }),
@@ -258,55 +273,54 @@ function tip(): StarterTemplate {
       logoB,
     );
   });
-  return { templateKey: "tip@1", name: "Tech tip", kind: "tip", doc };
+  return { templateKey: "tip@2", name: "Tech tip", kind: "tip", doc };
 }
 
 /**
- * Promo: the running promo's offer and end date (read live), a headline, a QR code to
- * the booking page with a "Scan to book" line, and contact details.
+ * Promo: the running promo's offer and end date as one line (read live), a headline, a
+ * QR code to the booking page with a "Scan to book" line, and contact details. Three
+ * pieces of text plus the contact small print, as the style checks ask.
  * @param ctx - Live addresses.
  * @returns Template.
  */
 function promo(ctx: StarterContext): StarterTemplate {
   const under = base();
   const logo = layer({ kind: "logo", variant: "wordmark" });
-  const offer = { ...layer({ kind: "promo", field: "offer" }), weight: 800 } as Layer;
+  // The summary says the offer and when it ends ("... until this Friday") in one line.
+  const offer = {
+    ...layer({ kind: "promo", field: "summary" }),
+    weight: 800,
+    colour: PRICE_ON_CARD,
+  } as Layer;
   const headline = text("headline", "Get your tech\nsorted", "Headline", "headline");
-  const endsLabel = text("small", "Offer ends", "Ends label", null);
-  const ends = { ...layer({ kind: "promo", field: "ends" }), colour: "russian-violet" } as Layer;
   const qr = layer({ kind: "qr", url: ctx.bookingUrl });
-  const scan = text("accent", "Scan to book", "Scan line", null);
+  const scan = text("accent", "Scan to book", "Scan line", null, ACCENT_ON_CARD);
   const contact = layer({ kind: "contact", fields: ["phone", "website"] });
 
-  const doc = assemble(under, [logo, offer, headline, endsLabel, ends, qr, scan, contact], (f) => {
+  const doc = assemble(under, [logo, offer, headline, qr, scan, contact], (f) => {
     const { w } = f.inner;
     const gap = 32 * f.k;
     const textW = f.wide ? Math.round(w * 0.58) : w;
     const words = col(
       gap,
       logoBox(logo.id, 300 * f.k, WORDMARK),
-      // The offer's length depends on the promo; two lines is the usual.
-      textBox(offer.id, 2, 72 * f.k, 1.2, textW),
+      // The summary's length depends on the promo; two lines is the usual.
+      textBox(offer.id, 2, px(60, f), 1.2, textW),
       textBox(headline.id, 2, fs("headline", f, 0.84), 1.05, textW),
-      col(
-        6 * f.k,
-        textBox(endsLabel.id, 1, fs("small", f), 1.35, textW),
-        textBox(ends.id, 1, 40 * f.k, 1.2, textW),
-      ),
     );
     const qrSide = (f.wide ? 240 : 200) * f.k;
     const sideW = f.wide ? w - textW - 48 * f.k : Math.min(w - qrSide - gap, 460 * f.k);
     const booking = col(
       14 * f.k,
       textBox(scan.id, 1, fs("accent", f), 1.2, sideW),
-      textBox(contact.id, 2, 32 * f.k, 1.4, sideW),
+      textBox(contact.id, 2, px(32, f), 1.4, sideW),
     );
     if (f.wide) {
       return row(48 * f.k, words, col(gap, { id: qr.id, w: qrSide, h: qrSide }, booking));
     }
     return col(gap, words, row(gap, { id: qr.id, w: qrSide, h: qrSide }, booking));
   });
-  return { templateKey: "promo@1", name: "Promo", kind: "promo", doc };
+  return { templateKey: "promo@2", name: "Promo", kind: "promo", doc };
 }
 
 /**

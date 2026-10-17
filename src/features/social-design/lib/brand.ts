@@ -19,8 +19,10 @@ export const SWATCHES: Swatch[] = [
   { key: "russian-violet-700", label: "Russian violet 700", hex: "#191584" },
   { key: "moonstone", label: "Moonstone", hex: "#43bccd" },
   { key: "moonstone-600", label: "Moonstone 600", hex: "#2b93a1" },
+  { key: "moonstone-700", label: "Moonstone 700", hex: "#206f79" },
   { key: "moonstone-100", label: "Moonstone 100", hex: "#d7f1f4" },
   { key: "coquelicot", label: "Coquelicot", hex: "#f34213" },
+  { key: "coquelicot-600", label: "Coquelicot 600", hex: "#c2320a" },
   { key: "mustard", label: "Mustard", hex: "#fed766" },
   { key: "rich-black", label: "Rich black", hex: "#001514" },
 ];

@@ -25,14 +25,18 @@ import {
   PropertiesPanel,
   type PanelActions,
 } from "@/features/social-design/components/PropertiesPanel";
+import { SimpleEditor } from "@/features/social-design/components/SimpleEditor";
 import { SizeTabs } from "@/features/social-design/components/SizeTabs";
+import { StyleChecksMenu } from "@/features/social-design/components/StyleChecksMenu";
 import { TipStrip } from "@/features/social-design/components/TipStrip";
 import {
   useDesignAutosave,
   type SaveState,
 } from "@/features/social-design/components/use-design-autosave";
 import { useDocHistory } from "@/features/social-design/components/use-doc-history";
+import { useNarrowScreen } from "@/features/social-design/components/use-narrow-screen";
 import { usePictures } from "@/features/social-design/components/use-pictures";
+import { useStyleChecks } from "@/features/social-design/components/use-style-checks";
 import {
   draftKindFor,
   draftRoom,
@@ -130,6 +134,30 @@ const SAVE_LABEL: Record<SaveState, string> = {
 };
 
 /**
+ * Edit that sets a text layer's words, or a ticked list's points from one line each
+ * (blank lines left out, at most 8).
+ * @param id - Layer.
+ * @param text - What was typed.
+ * @returns The edit.
+ */
+function wordsEdit(id: string, text: string): (d: DesignDoc) => DesignDoc {
+  return (d) =>
+    updateLayers(d, [id], (l) =>
+      l.type === "text"
+        ? { text }
+        : l.type === "bullets"
+          ? {
+              items: text
+                .split("\n")
+                .map((s) => s.trim())
+                .filter(Boolean)
+                .slice(0, 8),
+            }
+          : {},
+    );
+}
+
+/**
  * Whether a key press came from a field the operator is typing in.
  * @param e - Keyboard event.
  * @returns True inside inputs, text areas, selects and editable text.
@@ -192,6 +220,10 @@ export function DesignEditor({
   const [picturesOpen, setPicturesOpen] = useState(false);
   const [using, setUsing] = useState(false);
   const [draftOpen, setDraftOpen] = useState(false);
+  // Phones get the simple editor unless the operator asks for the full one.
+  const narrow = useNarrowScreen();
+  const [fullOnPhone, setFullOnPhone] = useState(false);
+  const simple = narrow && !fullOnPhone;
   const clip = useRef<Clip | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const photoFor = useRef<PhotoTarget>({ mode: "image" });
@@ -233,6 +265,7 @@ export function DesignEditor({
     initialRenders: initial.renders,
     saveNow: save.saveNow,
   });
+  const checks = useStyleChecks(tabDoc, bound, family);
 
   /**
    * Changes the selection. Picking one member of a group picks the whole group;
@@ -606,23 +639,10 @@ export function DesignEditor({
     toast(`${FORMATS[f].label} removed. Undo brings it back.`);
   }
 
-  const onText = useCallback(
-    (id: string, text: string) =>
-      apply((d) =>
-        updateLayers(d, [id], (l) =>
-          l.type === "text"
-            ? { text }
-            : l.type === "bullets"
-              ? {
-                  items: text
-                    .split("\n")
-                    .map((s) => s.trim())
-                    .filter(Boolean)
-                    .slice(0, 8),
-                }
-              : {},
-        ),
-      ),
+  const onText = useCallback((id: string, text: string) => apply(wordsEdit(id, text)), [apply]);
+  // The phone editor's boxes send every keystroke; a run of typing is one undo step.
+  const onWords = useCallback(
+    (id: string, text: string) => apply(wordsEdit(id, text), `words-${id}`),
     [apply],
   );
 
@@ -718,13 +738,28 @@ export function DesignEditor({
               <FaArrowRotateRight aria-hidden className="size-3.5" />
             </IconButton>
           </div>
-          <AddMenu
-            photosBusy={uploading}
-            bookingUrl={bookingUrl}
-            onAdd={addElement}
-            onPickPhoto={(t) => pickPhoto({ mode: t })}
-          />
+          {!simple && (
+            <AddMenu
+              photosBusy={uploading}
+              bookingUrl={bookingUrl}
+              onAdd={addElement}
+              onPickPhoto={(t) => pickPhoto({ mode: t })}
+            />
+          )}
+          {narrow && fullOnPhone && (
+            <AdminButton variant="outline" onClick={() => setFullOnPhone(false)}>
+              Simple view
+            </AdminButton>
+          )}
           <HistoryMenu designId={initial.id} onRestore={restoreVersion} />
+          <StyleChecksMenu
+            issues={checks.issues}
+            checkingContrast={checks.checkingContrast}
+            onShow={(f, id) => {
+              openSize(f);
+              if (id && !simple) select([id], false);
+            }}
+          />
           <AdminButton
             variant="outline"
             busy={copying}
@@ -790,241 +825,259 @@ export function DesignEditor({
           </AdminButton>
         </div>
       )}
-      <TipStrip />
+      {simple ? (
+        <SimpleEditor
+          doc={doc}
+          tabDoc={tabDoc}
+          format={format}
+          bound={bound}
+          family={family}
+          onPick={openSize}
+          onAddSize={addSize}
+          onRemoveSize={removeSize}
+          onWords={onWords}
+          onPhoto={(id) => pickPhoto({ mode: "replace", id })}
+          onFullEditor={() => setFullOnPhone(true)}
+        />
+      ) : (
+        <>
+          <TipStrip />
 
-      {/* 15rem covers the admin top bar, page header and toolbar, so at Fit the whole
+          {/* 15rem covers the admin top bar, page header and toolbar, so at Fit the whole
           picture shows without scrolling once the tips are dismissed. */}
-      <div className="grid min-h-0 grid-cols-1 gap-3 lg:h-[calc(100dvh-15rem)] lg:min-h-136 lg:grid-cols-[15rem_minmax(0,1fr)_18rem]">
-        <aside className="order-2 max-h-80 overflow-y-auto rounded-lg border border-admin-border bg-admin-surface lg:order-0 lg:max-h-none">
-          <LayersPanel
-            doc={doc}
-            format={format}
-            selected={selected}
-            apply={apply}
-            onSelect={select}
-          />
-        </aside>
-
-        <div className="order-1 flex min-h-0 flex-col gap-2 lg:order-0">
-          <SizeTabs
-            doc={tabDoc}
-            format={format}
-            allSizes={allSizes}
-            bound={bound}
-            family={family}
-            onPick={openSize}
-            onAllSizes={() => setAllSizes(true)}
-            onAdd={addSize}
-            onRemove={removeSize}
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            {doc.formats.length > 1 && (
-              <div
-                role="group"
-                aria-label="Which sizes moves and resizes reach"
-                className="flex items-center gap-2 text-sm text-admin-text-secondary"
-              >
-                Moves reach
-                <div className="flex overflow-hidden rounded-md border border-admin-border-strong">
-                  {SCOPES.map((s) => (
-                    <button
-                      key={s.value}
-                      type="button"
-                      title={s.title}
-                      aria-pressed={scope === s.value}
-                      onClick={() => setScope(s.value)}
-                      className={cn(
-                        "h-8 px-2.5 text-sm transition-colors not-first:border-l not-first:border-admin-border",
-                        scope === s.value
-                          ? "bg-russian-violet text-seasalt"
-                          : "bg-admin-surface text-admin-text hover:bg-admin-bg",
-                      )}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {!allSizes && doc.formats.length > 1 && (
-              <select
-                aria-label="Copy the layout of another size onto this one"
-                value=""
-                onChange={(e) => {
-                  const from = e.target.value as FormatKey;
-                  if (!from) return;
-                  apply((d) => copyLayout(d, from, format));
-                  toast(
-                    `${FORMATS[format].label} now follows the ${FORMATS[from].label} layout. Undo takes it back.`,
-                  );
-                }}
-                className={cn(ADMIN_INPUT_CLS, "h-8 w-auto py-0")}
-              >
-                <option value="">Copy layout from...</option>
-                {doc.formats
-                  .filter((f) => f !== format)
-                  .map((f) => (
-                    <option key={f} value={f}>
-                      {FORMATS[f].label}
-                    </option>
-                  ))}
-              </select>
-            )}
-            <div className="ml-auto flex items-center gap-1">
-              {!allSizes && (
-                <>
-                  <IconButton label="Zoom out" onClick={() => stepZoom(1 / 1.25)}>
-                    <FaMagnifyingGlassMinus aria-hidden className="size-3.5" />
-                  </IconButton>
-                  <select
-                    aria-label="Zoom"
-                    value={zoom === "fit" ? "fit" : String(zoom)}
-                    onChange={(e) =>
-                      setZoom(e.target.value === "fit" ? "fit" : Number(e.target.value))
-                    }
-                    className={cn(ADMIN_INPUT_CLS, "h-8 w-auto py-0")}
-                  >
-                    <option value="fit">Fit ({Math.round(shownZoom * 100)}%)</option>
-                    {[0.25, 0.5, 1, 2].map((z) => (
-                      <option key={z} value={String(z)}>
-                        {z * 100}%
-                      </option>
-                    ))}
-                    {zoom !== "fit" && ![0.25, 0.5, 1, 2].includes(zoom) && (
-                      <option value={String(zoom)}>{Math.round(zoom * 100)}%</option>
-                    )}
-                  </select>
-                  <IconButton label="Zoom in" onClick={() => stepZoom(1.25)}>
-                    <FaMagnifyingGlassPlus aria-hidden className="size-3.5" />
-                  </IconButton>
-                  <span className="mx-1 h-6 w-px bg-admin-border" aria-hidden />
-                </>
-              )}
-              <IconButton label="Grid" active={showGrid} onClick={() => setShowGrid((v) => !v)}>
-                <FaBorderAll aria-hidden className="size-3.5" />
-              </IconButton>
-              <IconButton
-                label="Margins and safe area"
-                active={showGuides}
-                onClick={() => setShowGuides((v) => !v)}
-              >
-                <FaVectorSquare aria-hidden className="size-3.5" />
-              </IconButton>
-              <IconButton
-                label="What each app shows when this goes up as a post"
-                active={showCrops}
-                onClick={() => setShowCrops((v) => !v)}
-              >
-                <FaCropSimple aria-hidden className="size-3.5" />
-              </IconButton>
-              {!allSizes && (
-                <IconButton
-                  label="Rulers"
-                  active={showRulers}
-                  onClick={() => setShowRulers((v) => !v)}
-                >
-                  <FaRulerCombined aria-hidden className="size-3.5" />
-                </IconButton>
-              )}
-              <IconButton
-                label="Keep shape when resizing from a corner"
-                active={lockRatio}
-                onClick={() => setLockRatio((v) => !v)}
-              >
-                <FaLink aria-hidden className="size-3.5" />
-              </IconButton>
-            </div>
-          </div>
-          {showCrops && !allSizes && <CropNote format={format} />}
-          <div className="h-[60vh] min-h-80 overflow-hidden rounded-lg border border-admin-border bg-seasalt-200/60 lg:h-auto lg:flex-1">
-            {family && allSizes ? (
-              <div className="grid size-full auto-rows-[minmax(16rem,1fr)] grid-cols-1 gap-2 overflow-y-auto p-2 sm:grid-cols-2 xl:grid-cols-3">
-                {doc.formats.map((f) => (
-                  <section
-                    key={f}
-                    aria-label={FORMATS[f].label}
-                    className={cn(
-                      "flex min-h-0 flex-col overflow-hidden rounded-md border bg-admin-surface",
-                      f === format ? "border-moonstone-600" : "border-admin-border",
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => openSize(f)}
-                      title="Open this size on its own"
-                      className="flex items-baseline gap-2 border-b border-admin-border px-2 py-1 text-left text-sm hover:bg-admin-bg"
-                    >
-                      <span className="font-semibold text-admin-text">{FORMATS[f].label}</span>
-                      <span className="text-admin-muted">
-                        {FORMATS[f].width} × {FORMATS[f].height}
-                      </span>
-                    </button>
-                    <div className="min-h-0 flex-1">
-                      <DesignCanvas
-                        compact
-                        doc={doc}
-                        format={f}
-                        selected={selected}
-                        bound={bound}
-                        family={family}
-                        zoom="fit"
-                        lockRatio={lockRatio}
-                        showGrid={showGrid}
-                        showGuides={showGuides}
-                        showRulers={false}
-                        crops={showCrops ? appCrops(f).crops : []}
-                        onSelect={(ids, additive) => {
-                          setFormat(f);
-                          select(ids, additive);
-                        }}
-                        onGeometry={(changes) => {
-                          setFormat(f);
-                          apply((d) => setGeometry(d, f, changes, scope));
-                        }}
-                        onText={onText}
-                        onZoom={ignoreZoom}
-                      />
-                    </div>
-                  </section>
-                ))}
-              </div>
-            ) : family ? (
-              <DesignCanvas
+          <div className="grid min-h-0 grid-cols-1 gap-3 lg:h-[calc(100dvh-15rem)] lg:min-h-136 lg:grid-cols-[15rem_minmax(0,1fr)_18rem]">
+            <aside className="order-2 max-h-80 overflow-y-auto rounded-lg border border-admin-border bg-admin-surface lg:order-0 lg:max-h-none">
+              <LayersPanel
                 doc={doc}
                 format={format}
                 selected={selected}
+                apply={apply}
+                onSelect={select}
+              />
+            </aside>
+
+            <div className="order-1 flex min-h-0 flex-col gap-2 lg:order-0">
+              <SizeTabs
+                doc={tabDoc}
+                format={format}
+                allSizes={allSizes}
                 bound={bound}
                 family={family}
-                zoom={zoom}
-                lockRatio={lockRatio}
-                showGrid={showGrid}
-                showGuides={showGuides}
-                showRulers={showRulers}
-                crops={showCrops ? appCrops(format).crops : []}
-                onSelect={select}
-                onGeometry={onGeometry}
-                onText={onText}
-                onZoom={onZoom}
+                onPick={openSize}
+                onAllSizes={() => setAllSizes(true)}
+                onAdd={addSize}
+                onRemove={removeSize}
               />
-            ) : (
-              <p className="flex size-full items-center justify-center text-sm text-admin-muted">
-                Loading fonts...
-              </p>
-            )}
-          </div>
-        </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {doc.formats.length > 1 && (
+                  <div
+                    role="group"
+                    aria-label="Which sizes moves and resizes reach"
+                    className="flex items-center gap-2 text-sm text-admin-text-secondary"
+                  >
+                    Moves reach
+                    <div className="flex overflow-hidden rounded-md border border-admin-border-strong">
+                      {SCOPES.map((s) => (
+                        <button
+                          key={s.value}
+                          type="button"
+                          title={s.title}
+                          aria-pressed={scope === s.value}
+                          onClick={() => setScope(s.value)}
+                          className={cn(
+                            "h-8 px-2.5 text-sm transition-colors not-first:border-l not-first:border-admin-border",
+                            scope === s.value
+                              ? "bg-russian-violet text-seasalt"
+                              : "bg-admin-surface text-admin-text hover:bg-admin-bg",
+                          )}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {!allSizes && doc.formats.length > 1 && (
+                  <select
+                    aria-label="Copy the layout of another size onto this one"
+                    value=""
+                    onChange={(e) => {
+                      const from = e.target.value as FormatKey;
+                      if (!from) return;
+                      apply((d) => copyLayout(d, from, format));
+                      toast(
+                        `${FORMATS[format].label} now follows the ${FORMATS[from].label} layout. Undo takes it back.`,
+                      );
+                    }}
+                    className={cn(ADMIN_INPUT_CLS, "h-8 w-auto py-0")}
+                  >
+                    <option value="">Copy layout from...</option>
+                    {doc.formats
+                      .filter((f) => f !== format)
+                      .map((f) => (
+                        <option key={f} value={f}>
+                          {FORMATS[f].label}
+                        </option>
+                      ))}
+                  </select>
+                )}
+                <div className="ml-auto flex items-center gap-1">
+                  {!allSizes && (
+                    <>
+                      <IconButton label="Zoom out" onClick={() => stepZoom(1 / 1.25)}>
+                        <FaMagnifyingGlassMinus aria-hidden className="size-3.5" />
+                      </IconButton>
+                      <select
+                        aria-label="Zoom"
+                        value={zoom === "fit" ? "fit" : String(zoom)}
+                        onChange={(e) =>
+                          setZoom(e.target.value === "fit" ? "fit" : Number(e.target.value))
+                        }
+                        className={cn(ADMIN_INPUT_CLS, "h-8 w-auto py-0")}
+                      >
+                        <option value="fit">Fit ({Math.round(shownZoom * 100)}%)</option>
+                        {[0.25, 0.5, 1, 2].map((z) => (
+                          <option key={z} value={String(z)}>
+                            {z * 100}%
+                          </option>
+                        ))}
+                        {zoom !== "fit" && ![0.25, 0.5, 1, 2].includes(zoom) && (
+                          <option value={String(zoom)}>{Math.round(zoom * 100)}%</option>
+                        )}
+                      </select>
+                      <IconButton label="Zoom in" onClick={() => stepZoom(1.25)}>
+                        <FaMagnifyingGlassPlus aria-hidden className="size-3.5" />
+                      </IconButton>
+                      <span className="mx-1 h-6 w-px bg-admin-border" aria-hidden />
+                    </>
+                  )}
+                  <IconButton label="Grid" active={showGrid} onClick={() => setShowGrid((v) => !v)}>
+                    <FaBorderAll aria-hidden className="size-3.5" />
+                  </IconButton>
+                  <IconButton
+                    label="Margins and safe area"
+                    active={showGuides}
+                    onClick={() => setShowGuides((v) => !v)}
+                  >
+                    <FaVectorSquare aria-hidden className="size-3.5" />
+                  </IconButton>
+                  <IconButton
+                    label="What each app shows when this goes up as a post"
+                    active={showCrops}
+                    onClick={() => setShowCrops((v) => !v)}
+                  >
+                    <FaCropSimple aria-hidden className="size-3.5" />
+                  </IconButton>
+                  {!allSizes && (
+                    <IconButton
+                      label="Rulers"
+                      active={showRulers}
+                      onClick={() => setShowRulers((v) => !v)}
+                    >
+                      <FaRulerCombined aria-hidden className="size-3.5" />
+                    </IconButton>
+                  )}
+                  <IconButton
+                    label="Keep shape when resizing from a corner"
+                    active={lockRatio}
+                    onClick={() => setLockRatio((v) => !v)}
+                  >
+                    <FaLink aria-hidden className="size-3.5" />
+                  </IconButton>
+                </div>
+              </div>
+              {showCrops && !allSizes && <CropNote format={format} />}
+              <div className="h-[60vh] min-h-80 overflow-hidden rounded-lg border border-admin-border bg-seasalt-200/60 lg:h-auto lg:flex-1">
+                {family && allSizes ? (
+                  <div className="grid size-full auto-rows-[minmax(16rem,1fr)] grid-cols-1 gap-2 overflow-y-auto p-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {doc.formats.map((f) => (
+                      <section
+                        key={f}
+                        aria-label={FORMATS[f].label}
+                        className={cn(
+                          "flex min-h-0 flex-col overflow-hidden rounded-md border bg-admin-surface",
+                          f === format ? "border-moonstone-600" : "border-admin-border",
+                        )}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => openSize(f)}
+                          title="Open this size on its own"
+                          className="flex items-baseline gap-2 border-b border-admin-border px-2 py-1 text-left text-sm hover:bg-admin-bg"
+                        >
+                          <span className="font-semibold text-admin-text">{FORMATS[f].label}</span>
+                          <span className="text-admin-muted">
+                            {FORMATS[f].width} × {FORMATS[f].height}
+                          </span>
+                        </button>
+                        <div className="min-h-0 flex-1">
+                          <DesignCanvas
+                            compact
+                            doc={doc}
+                            format={f}
+                            selected={selected}
+                            bound={bound}
+                            family={family}
+                            zoom="fit"
+                            lockRatio={lockRatio}
+                            showGrid={showGrid}
+                            showGuides={showGuides}
+                            showRulers={false}
+                            crops={showCrops ? appCrops(f).crops : []}
+                            onSelect={(ids, additive) => {
+                              setFormat(f);
+                              select(ids, additive);
+                            }}
+                            onGeometry={(changes) => {
+                              setFormat(f);
+                              apply((d) => setGeometry(d, f, changes, scope));
+                            }}
+                            onText={onText}
+                            onZoom={ignoreZoom}
+                          />
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                ) : family ? (
+                  <DesignCanvas
+                    doc={doc}
+                    format={format}
+                    selected={selected}
+                    bound={bound}
+                    family={family}
+                    zoom={zoom}
+                    lockRatio={lockRatio}
+                    showGrid={showGrid}
+                    showGuides={showGuides}
+                    showRulers={showRulers}
+                    crops={showCrops ? appCrops(format).crops : []}
+                    onSelect={select}
+                    onGeometry={onGeometry}
+                    onText={onText}
+                    onZoom={onZoom}
+                  />
+                ) : (
+                  <p className="flex size-full items-center justify-center text-sm text-admin-muted">
+                    Loading fonts...
+                  </p>
+                )}
+              </div>
+            </div>
 
-        <aside className="order-3 overflow-y-auto rounded-lg border border-admin-border bg-admin-surface lg:order-0">
-          <PropertiesPanel
-            doc={doc}
-            format={format}
-            selected={selected}
-            scope={scope}
-            apply={apply}
-            actions={actions}
-          />
-        </aside>
-      </div>
+            <aside className="order-3 overflow-y-auto rounded-lg border border-admin-border bg-admin-surface lg:order-0">
+              <PropertiesPanel
+                doc={doc}
+                format={format}
+                selected={selected}
+                scope={scope}
+                apply={apply}
+                actions={actions}
+              />
+            </aside>
+          </div>
+        </>
+      )}
 
       <PicturesPanel
         open={picturesOpen}
@@ -1040,6 +1093,7 @@ export function DesignEditor({
         onDoc={(change, tag) => apply((d) => ({ ...d, ...change }), tag)}
       />
       {pictures.stage}
+      {checks.stage}
       {draftOpen && (
         <DraftDialog
           startKind={draftKindFor(initial.kind)}
