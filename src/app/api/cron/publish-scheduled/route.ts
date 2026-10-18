@@ -8,7 +8,7 @@
 // The atomic claims in both libraries make overlapping runs harmless: a post or campaign
 // only ever goes out from one run.
 
-import { refreshPromoCacheAtBoundary } from "@/features/business/lib/promos";
+import { refreshPromoCacheAtBoundary } from "@/features/business/lib/promos.server";
 import { runScheduledSends } from "@/features/mailing/lib/send";
 import { runScheduledSocialPosts } from "@/features/social/lib/publish";
 import { errorResponse } from "@/shared/lib/api-response";
