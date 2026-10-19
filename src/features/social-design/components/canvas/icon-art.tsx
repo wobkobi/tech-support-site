@@ -1,8 +1,7 @@
 "use client";
 // src/features/social-design/components/canvas/icon-art.tsx
-// Icon layers' artwork. react-icons are React SVG components, so each one renders to
-// SVG markup once per icon and colour and draws on the canvas as a data-URI image.
-// Data URIs are same-origin, so the canvas stays exportable.
+// Icon layers' artwork: each react-icon renders once per icon and colour to an SVG data URI,
+// which is same-origin so the canvas stays exportable.
 
 import type { ComponentType } from "react";
 import { createElement } from "react";
@@ -94,8 +93,7 @@ export const ICON_ART: Record<string, ComponentType<IconBaseProps>> = {
 const cache = new Map<string, string>();
 
 /**
- * An icon as an SVG data URI in one colour. Drawn 512 square: wide icons sit centred
- * inside it, so every icon fills its box the same way.
+ * An icon as a one-colour SVG data URI, drawn 512 square with wide icons centred.
  * @param name - Icon component name.
  * @param hex - Colour.
  * @returns Data URI, or null for an unknown icon.

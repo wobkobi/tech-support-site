@@ -1,16 +1,12 @@
 // src/features/booking/lib/existing-bookings.server.ts
-// Loads the bookings that can block a slot, in the shape the slot engine expects. The
-// public booking flow, the edit flow and the edit page all need the same query, and a
-// select that drifts here would silently let a double-booking through.
+// Loads the bookings that can block a slot; one shared query so no flow lets a
+// double-booking through.
 
 import type { ExistingBooking } from "@/features/booking/lib/booking";
 import { prisma } from "@/shared/lib/prisma";
 
 /**
- * Loads held and confirmed bookings that have not finished yet.
- *
- * Only these can conflict: cancelled and completed bookings free their slot,
- * and anything already ended cannot overlap a future one.
+ * Loads held and confirmed bookings that have not finished yet - the only ones that can conflict.
  * @param now - Cutoff instant; bookings ending before it are ignored.
  * @param options - Optional refinements.
  * @param options.excludeId - Booking to leave out, so a reschedule can reuse its own slot.
@@ -26,8 +22,7 @@ export async function loadBlockingBookings(
       status: { in: ["held", "confirmed"] },
       endAt: { gte: now },
     },
-    // Selects exactly the ExistingBooking fields, so the result needs no
-    // re-projection at the call sites.
+    // Exactly the ExistingBooking fields.
     select: { id: true, startAt: true, endAt: true, bufferBeforeMin: true, bufferAfterMin: true },
   });
 }

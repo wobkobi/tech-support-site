@@ -1,7 +1,6 @@
 // src/app/api/business/trips/route.ts
-// Admin trip-log collection endpoint (site-only, no Sheets sync). GET lists trips newest
-// first, scoped to one FY with ?fy=2026-27 or all trips without it; POST validates and
-// logs a trip, refusing a second trip for the same booking (one round trip per job).
+// Admin trip-log collection endpoint (site-only, no Sheets sync). GET lists trips,
+// optionally for one FY; POST logs one, at most one per booking.
 
 import { loadAllFys } from "@/features/business/lib/tax/load";
 import { parseTripInput, pickFy, toTripRow } from "@/features/business/lib/trips";

@@ -1,7 +1,6 @@
 // src/features/admin/components/charts/series.ts
-// Series colours for the admin charts. Each pair is checked with the dataviz palette
-// validator against the white admin surface (lightness band, chroma floor, colour-blind
-// separation, 3:1 contrast); re-run it before swapping a colour.
+// Series colours for the admin charts, checked with the dataviz palette validator on white;
+// re-run it before swapping a colour.
 
 /** One plotted series: its name and the fill class for its bars and legend key. */
 export interface ChartSeries {
@@ -12,11 +11,8 @@ export interface ChartSeries {
 }
 
 /**
- * Income vs expenses, with both labels on the GST basis: "(excl. GST)" only while
- * registered, when income counts without the GST owed to IRD and expenses without the GST
- * claimed back. Teal rich-black-700 (#009991) and violet russian-violet-400 (#5450e2):
- * worst colour-blind separation ΔE 20.7 (deutan), both above 3:1 on white. Moonstone was
- * rejected: its 600 step sits under the chroma floor and reads as grey.
+ * Income vs expenses, labelled "(excl. GST)" while registered. Teal #009991 and violet
+ * #5450e2 separate by ΔE 20.7 (deutan); moonstone reads as grey under the chroma floor.
  * @param gstRegistered - Whether the business is GST registered.
  * @returns The two series, income first.
  */

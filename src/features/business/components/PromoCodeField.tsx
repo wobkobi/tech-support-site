@@ -1,8 +1,6 @@
 "use client";
 // src/features/business/components/PromoCodeField.tsx
-// Promo code entry, shared by the pricing wizard, the booking form and the calculator.
-// One control rather than three, because the surfaces have to agree on what "applied"
-// means and on the wording of a rejection.
+// Promo code entry shared by every surface, so they agree on "applied" and rejection wording.
 
 import { FIELD_INPUT, FIELD_LABEL } from "@/features/booking/lib/form-styles";
 import type { ActivePromo } from "@/features/business/lib/promos";
@@ -26,38 +24,23 @@ interface PromoCodeFieldProps {
   value: string;
   /** Called on every keystroke with the uppercased code. */
   onChange: (code: string) => void;
-  /**
-   * Called with the promo an accepted code unlocked, or null when the code was
-   * cleared or rejected. The parent reprices from this.
-   */
+  /** Called with the promo an accepted code unlocked, or null when cleared or rejected. */
   onApplied: (promo: ActivePromo | null) => void;
   /** Field label. Defaults to the customer-facing wording. */
   label?: string;
-  /**
-   * Check a code that arrived already filled in (from the pricing wizard's
-   * link) without making the customer press Apply a second time.
-   */
+  /** Check a prefilled code on mount without a second Apply. */
   applyOnMount?: boolean;
-  /**
-   * The chosen appointment start, when there is one, so a code restricted to
-   * certain days or hours is judged against it as the booking will judge it.
-   */
+  /** The chosen appointment start, for day- or hour-restricted codes. */
   startAt?: Date | null;
-  /**
-   * The email being booked with, when entered, so a new-customers-only or
-   * once-per-customer code is judged against this customer.
-   */
+  /** The booking email, for new-customer or once-per-customer codes. */
   email?: string | null;
   /** Extra classes for the wrapper. */
   className?: string;
 }
 
 /**
- * Lets someone enter a promo code and see straight away whether it is accepted.
- *
- * Checked on an explicit Apply rather than on blur: the endpoint is public and
- * rate limited, and a blur handler fires every time the field is tabbed
- * through, which would spend the customer's allowance on nothing.
+ * Lets someone enter a promo code and see whether it is accepted. Checked on Apply, not
+ * blur, so tabbing through doesn't spend the rate limit.
  * @param props - Component props.
  * @param props.value - The code as typed.
  * @param props.onChange - Called on every keystroke with the uppercased code.
@@ -80,8 +63,7 @@ export function PromoCodeField({
   className,
 }: PromoCodeFieldProps): React.ReactElement {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
-  // Unique per instance: the booking form and the wizard can both be mounted
-  // during a session, and a duplicated id breaks the label association.
+  // Unique per instance, as several can be mounted at once.
   const fieldId = useId();
   const statusId = `${fieldId}-status`;
 
@@ -104,9 +86,7 @@ export function PromoCodeField({
           email: email?.trim() || null,
         }),
       });
-      // A 429 lands here too: the body is not the success shape, so it reads as
-      // a failure to check rather than as a rejected code. Saying "not valid"
-      // for a code that was never checked is the worse of the two errors.
+      // A 429 lands here too, reading as a failed check rather than a rejected code.
       const data = (await res.json()) as {
         ok?: boolean;
         valid?: boolean;
@@ -131,8 +111,7 @@ export function PromoCodeField({
     }
   }
 
-  // Ref rather than state: apply() is redefined every render, so depending on
-  // it would re-run this on every keystroke.
+  // Ref, since apply() is redefined every render.
   const applied = useRef(false);
   useEffect(() => {
     if (!applyOnMount || applied.current || !value.trim()) return;
@@ -143,8 +122,7 @@ export function PromoCodeField({
   }, [applyOnMount]);
 
   /**
-   * Records a keystroke, uppercasing so what is shown is what gets stored, and
-   * drops any previous verdict since it no longer describes what is in the box.
+   * Records a keystroke (uppercased) and drops the previous verdict.
    * @param next - The raw input value.
    */
   function handleChange(next: string): void {
@@ -177,8 +155,7 @@ export function PromoCodeField({
           }}
           autoComplete="off"
           autoCapitalize="characters"
-          // Enter applies the code (above), so the phone keyboard's action key
-          // should say so rather than offering to submit the whole form.
+          // Enter applies the code, so label the phone keyboard's action key to match.
           enterKeyHint="done"
           spellCheck={false}
           maxLength={32}

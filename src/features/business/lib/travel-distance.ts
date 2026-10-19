@@ -1,13 +1,6 @@
 // src/features/business/lib/travel-distance.ts
-// Round-trip driving distance + duration lookup against the Google Distance Matrix API:
-// base address > destination at the departure time, destination > base address at the
-// return time, both traffic-aware. Used by /api/pricing/travel-time (public estimator +
-// calculator), the parse-job route, the booking snapshot, and the late-cancel invoice.
-// lookupRoundTripDistance asks with no departure time instead, so the trips log gets the
-// same km for an address whenever it looks one up.
-// lookupStoreRun times a mid-job client > store > client detour the same way.
-// Never throws - returns a discriminated status so the caller can decide whether to skip
-// the travel charge or surface an error.
+// Round-trip drive distance and duration via Google Distance Matrix, each leg traffic-aware
+// at its own departure time. Never throws; returns a discriminated status.
 
 import { getIdentity } from "@/shared/lib/business-identity.server";
 
@@ -15,8 +8,7 @@ interface DistanceMatrixElement {
   status: string;
   duration: { value: number; text: string };
   distance: { value: number; text: string };
-  // Present only when departure_time is set on the request - reflects Google's
-  // traffic prediction at that time.
+  // Present only when the request sets departure_time.
   duration_in_traffic?: { value: number; text: string };
 }
 
@@ -25,9 +17,7 @@ interface DistanceMatrixResponse {
   rows: { elements: DistanceMatrixElement[] }[];
 }
 
-/**
- * Result of a successful one-leg lookup. Both fields are positive numbers.
- */
+/** Result of a successful one-leg lookup. */
 interface DriveDistance {
   /** Drive duration in minutes (rounded). */
   durationMins: number;
@@ -44,9 +34,8 @@ interface DriveRoundTrip {
 }
 
 /**
- * Discriminated outcome from {@link lookupDriveRoundTrip}. Lets callers
- * distinguish "the API or env is broken" (should surface to the operator)
- * from "we asked and got nothing" (charge $0 travel and move on).
+ * Outcome from {@link lookupDriveRoundTrip}: misconfig/error should surface to the
+ * operator; no_match means charge $0 travel.
  */
 export type DriveRoundTripResult =
   | { status: "ok"; data: DriveRoundTrip }
@@ -61,12 +50,8 @@ type LegResult = { status: "ok"; data: DriveDistance } | { status: "no_match" | 
 const DEFAULT_JOB_DURATION_MS = 60 * 60 * 1000;
 
 /**
- * One Distance Matrix call for a single leg. With a departure time it is traffic-aware
- * on the best_guess model: Google's most-likely duration for that departure time.
- * (Pessimistic was trialled and over-quoted rush-hour legs by ~50%; free-flow
- * with no departure_time under-quoted. best_guess tracked real trips closest.)
- * Without one, Google routes on typical conditions with no traffic, so the same
- * address always gives the same route and distance.
+ * One Distance Matrix leg. With a departure time it uses best_guess traffic (pessimistic
+ * over-quoted rush hour by ~50%); without one, the same address always gives the same route.
  * @param origin - Leg origin address.
  * @param destination - Leg destination address.
  * @param apiKey - Google Maps server key.
@@ -96,9 +81,7 @@ async function lookupLeg(
     const element = data?.rows?.[0]?.elements?.[0];
     if (element?.status !== "OK") return { status: "no_match" };
 
-    // Prefer the traffic-aware duration when Google returned one; fall back
-    // to free-flow duration otherwise. Google may omit duration_in_traffic
-    // for far-future departure times outside its prediction horizon.
+    // Google omits duration_in_traffic beyond its prediction horizon; fall back to free-flow.
     const durationValue = element.duration_in_traffic?.value ?? element.duration?.value;
     const distanceValue = element.distance?.value;
     if (typeof durationValue !== "number" || typeof distanceValue !== "number") {
@@ -119,8 +102,7 @@ async function lookupLeg(
 }
 
 /**
- * The base address, the server Maps key and the destination as Google is sent it, or
- * the status a lookup returns when one is missing.
+ * The base address, server Maps key and NZ-suffixed destination, or a failure status.
  * @param destination - Free-text destination address.
  * @returns The lookup inputs, or a failure status.
  */
@@ -132,9 +114,7 @@ async function roundTripInputs(
 > {
   // Travel origin is the unified business base address (defaults to HOME_ADDRESS env).
   const origin = (await getIdentity()).baseAddress.line || process.env.HOME_ADDRESS;
-  // Server-only key, no fallback to GOOGLE_MAPS_API_KEY: next.config.ts
-  // publishes that one to the browser, so falling back would spend a publicly
-  // readable key on server-side quota.
+  // No fallback to GOOGLE_MAPS_API_KEY: next.config.ts publishes that one to the browser.
   const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY;
   if (!origin || !apiKey) return { status: "misconfig" };
 
@@ -144,9 +124,8 @@ async function roundTripInputs(
 }
 
 /**
- * Combines two leg results. Outbound failure keeps its own status, and a failed return
- * leg mirrors the outbound figures - the symmetric assumption the single-lookup doubling
- * made, so a flaky second call can never quote worse.
+ * Combines two legs. A failed return leg mirrors the outbound, so a flaky second call
+ * can never quote worse.
  * @param there - Base > destination leg.
  * @param back - Destination > base leg.
  * @returns The round trip, or the outbound leg's failure status.
@@ -160,21 +139,12 @@ function roundTripFrom(there: LegResult, back: LegResult): DriveRoundTripResult 
 }
 
 /**
- * Looks up both legs of the drive between the business base address and the
- * given destination. Appends ", New Zealand" to the destination string so the
- * Distance Matrix API resolves NZ addresses reliably. Always traffic-aware:
- * each leg quotes Google's best_guess prediction at its own departure time.
- * A missing or past `departAt` means "leaving about now"; a missing
- * `returnAt` defaults to one billable hour after departure (the estimators'
- * fallback job length) and is clamped to never precede the outbound leg.
- * When the outbound leg resolves but the return leg fails, the return
- * mirrors the outbound figures - the same symmetric assumption the old
- * single-lookup doubling made, so a flaky second call can never quote worse.
+ * Looks up both traffic-aware legs between the base address and a destination. The
+ * return is clamped to never precede the outbound.
  * @param destination - Free-text destination address (1-100 chars).
  * @param departAt - Outbound departure time; omitted or past means now.
  * @param returnAt - Return departure time; omitted means departure + 60 min.
- * @returns Discriminated result so callers can tell misconfig (operator
- *   error, should surface) from a legitimate no-match (charge $0 travel).
+ * @returns Discriminated result: misconfig, no_match, error or ok.
  */
 export async function lookupDriveRoundTrip(
   destination: string,
@@ -185,9 +155,7 @@ export async function lookupDriveRoundTrip(
   if (inputs.status !== "ok") return inputs;
   const { origin, apiKey, fullDestination } = inputs;
 
-  // Distance Matrix only accepts a future departure_time, and without one Google omits
-  // duration_in_traffic entirely, silently degrading the quote to free-flow times. Clamp
-  // both legs forward, keeping the return at or after the outbound.
+  // Distance Matrix needs a future departure_time or it silently drops traffic; clamp forward.
   const departMs = Math.max(departAt?.getTime() ?? 0, Date.now() + 60_000);
   const returnMs = returnAt
     ? Math.max(returnAt.getTime(), departMs)
@@ -201,10 +169,8 @@ export async function lookupDriveRoundTrip(
 }
 
 /**
- * Round-trip driving distance between the business base address and the destination,
- * with no departure time and so no traffic. Google then routes on typical conditions,
- * so an address gives the same km whenever it is looked up - what a km log for the IRD
- * rate needs. The durations are free-flow, so this is not for quoting drive time.
+ * Round-trip km with no departure time, so an address always gives the same km (for the
+ * IRD km log). Durations are free-flow; not for quoting drive time.
  * @param destination - Free-text destination address (1-100 chars).
  * @returns Discriminated result, the same statuses as {@link lookupDriveRoundTrip}.
  */
@@ -220,10 +186,8 @@ export async function lookupRoundTripDistance(destination: string): Promise<Driv
 }
 
 /**
- * Looks up a mid-job store run: the client's place > the store > back. Same leg
- * lookup and statuses as {@link lookupDriveRoundTrip}, but the trip starts at the
- * client rather than the business base. Both legs quote "leaving about now"; a store
- * run is a short local drive, so the time of day barely moves it.
+ * Looks up a mid-job store run (client > store > client), both legs leaving about now.
+ * Same statuses as {@link lookupDriveRoundTrip}.
  * @param from - The client's address.
  * @param store - The store, by name and branch or by address.
  * @returns Discriminated result; "there" is client > store, "back" is store > client.

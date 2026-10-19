@@ -1,10 +1,7 @@
 "use client";
 // src/features/reviews/components/admin/ReviewAskPeople.tsx
-// "Who you can ask" on the admin reviews page: every contact, with whether a review ask
-// can go to them and when they were last asked, filtered by where they stand. Each row
-// sends (or re-sends) the Google-first ask by email, or composes a text for phone-only
-// contacts. Rows with an email can be ticked and sent to in one go. Opted-out people are
-// listed so it's clear why they have no button.
+// "Who you can ask" on the admin reviews page: every contact with their review-ask status
+// and last ask, a per-row send (email or text) and bulk email send for ticked rows.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
@@ -94,8 +91,7 @@ function inFilter(status: AskPersonStatus, filter: Filter): boolean {
 }
 
 /**
- * Whether a row can be ticked for a bulk send. Bulk goes by email only: a text has to
- * be copied and sent from the phone one at a time.
+ * Whether a row can be ticked for a bulk send (email only; texts go one at a time).
  * @param p - The row.
  * @returns True when the row gets a checkbox.
  */
@@ -127,8 +123,7 @@ export function ReviewAskPeople({
   const [bulk, setBulk] = useState<BulkState>({ kind: "closed" });
 
   /**
-   * Moves matching rows to "Asked recently" (or keeps "Reviewed on your site") straight
-   * away after a send, rather than waiting for a reload.
+   * Moves just-asked rows to "Asked recently" (keeping "Reviewed on your site") at once.
    * @param match - Picks the rows that were just asked.
    */
   function markAsked(match: (p: AskPerson) => boolean): void {
@@ -196,9 +191,8 @@ export function ReviewAskPeople({
   }
 
   /**
-   * Sends the ask to every ticked person, one at a time through the same route as a
-   * single send, so opt-outs made since the page loaded are still refused. Anyone who
-   * fails stays ticked for another go.
+   * Sends to every ticked person one at a time via the single-send route, which still
+   * refuses fresh opt-outs. Failures stay ticked.
    */
   async function sendBulk(): Promise<void> {
     const list = chosen;

@@ -1,17 +1,11 @@
 // src/features/reviews/lib/revalidate.ts
-// ISR revalidation for the public review pages. Call after any review status change so
-// the home page, review routes and service detail pages pick up the latest approved reviews.
+// ISR revalidation for the public review pages, called after any review status change.
 
 import { revalidatePath, revalidateTag } from "next/cache";
 
 /**
- * Triggers ISR revalidation for all public review pages, including the service detail
- * pages that quote pinned reviews.
- * Call after any review status change (approve, revoke, delete).
- * {@link revalidateTag}("reviews") clears the unstable_cache entry on the home page
- * so ISR regeneration picks up the latest approved reviews immediately.
- * The second argument ({}) is a Next.js 16 CacheLifeConfig - the fields are
- * optional but the argument itself is required.
+ * Revalidates every public review page, including service pages quoting pinned reviews.
+ * {@link revalidateTag} needs its second `{}` argument in Next.js 16.
  */
 export function revalidateReviewPaths(): void {
   revalidateTag("reviews", {});

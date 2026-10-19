@@ -1,12 +1,9 @@
 // src/features/reviews/lib/gridColumns.ts
-// Splits newest-first reviews into two balanced columns for the gap-free masonry grid on
-// the reviews page.
+// Splits newest-first reviews into two balanced masonry columns for the reviews page.
 
 /**
- * Estimate a review card's relative height for balancing the columns. Adds a
- * fixed per-card overhead (padding, attribution line, gap) to the wrapped text;
- * without it a column of short reviews looks emptier than it renders. Constants
- * are tuned to the 2-column card width from `sm` up.
+ * Estimate a review card's relative height: wrapped text plus fixed per-card overhead.
+ * Constants are tuned to the 2-column card width from `sm` up.
  * @param text - Whitespace-collapsed review text.
  * @returns Estimated relative card height.
  */
@@ -33,10 +30,8 @@ export interface ReviewColumns<T> {
 }
 
 /**
- * Deal newest-first reviews into two columns, each going to the currently
- * shorter column so both pack to roughly equal height with the newest at the
- * top of each. Each review keeps its date index so mobile can restore a single
- * newest-first list via CSS `order`.
+ * Deal newest-first reviews into whichever column is shorter. Each keeps its date index
+ * so mobile can restore one newest-first list via CSS `order`.
  * @param reviews - Reviews already sorted newest-first.
  * @returns The reviews split into a left and right column.
  */

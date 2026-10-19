@@ -1,8 +1,6 @@
 // src/app/booking/page.tsx
-// Booking page with duration-aware slot availability. The static shell (heading, sidebar,
-// skeleton) renders immediately while the slot data is streamed in via a Suspense
-// boundary, so TTFB stays constant even when the calendar cache is cold and slot data has
-// to come from the live Google Calendar API.
+// Booking page. The static shell renders at once and slot data streams in via Suspense,
+// so TTFB stays flat on a cold calendar cache.
 
 import BookingForm from "@/features/booking/components/BookingForm";
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
@@ -41,9 +39,7 @@ export const metadata: Metadata = {
   openGraph: pageOpenGraph({ title: TITLE, description: DESCRIPTION, url: "/booking" }),
 };
 
-// Always render fresh - slot availability is time-sensitive and ISR can serve
-// stale pages indefinitely on low-traffic routes (Vercel only revalidates on
-// the next request *after* the window, not proactively).
+// Slots are time-sensitive; ISR can serve stale pages indefinitely on low-traffic routes.
 export const dynamic = "force-dynamic";
 
 interface CalendarFetchResult {
@@ -52,14 +48,12 @@ interface CalendarFetchResult {
   degraded: boolean;
 }
 
-// How far past its TTL a cached event stays servable. Two hours covers many
-// missed cron runs while keeping a hard bound on how stale the availability
-// picture can get; the submit-time conflict check still guards double-booking.
+// How long past its TTL a cached event stays servable; covers missed cron runs.
+// The submit-time conflict check still guards double-booking.
 const STALE_SERVE_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 /**
- * Fetches live calendar events and repopulates the cache in the background.
- * Shared by the blocking cold-cache path and the stale-serve background refresh.
+ * Fetch live calendar events and repopulate the cache in the background.
  * @param now - Current date
  * @param maxDate - Maximum booking date
  * @returns Live events from the Google Calendar API.
@@ -71,7 +65,6 @@ async function fetchLiveAndCache(
   const liveEvents = await fetchAllCalendarEvents(now, maxDate);
   console.log(`[booking/page] Fetched ${liveEvents.length} live calendar events`);
 
-  // Populate cache in background so the next request is fast.
   // Matches the cron writer's 30-min TTL (cron runs every 15 min).
   const cacheExpiry = new Date(now.getTime() + 30 * 60 * 1000);
   void Promise.all(
@@ -100,9 +93,8 @@ async function fetchLiveAndCache(
 }
 
 /**
- * Get calendar events: fresh cache first, then stale-while-revalidate (serve
- * expired-but-recent rows and refresh in the background), and only block on
- * the live API when the cache holds nothing usable.
+ * Get calendar events: fresh cache, then stale-while-revalidate, blocking on the live
+ * API only when nothing usable is cached.
  * @param now - Current date
  * @param maxDate - Maximum booking date
  * @returns Events plus a `degraded` flag for the no-data state.
@@ -125,8 +117,7 @@ async function getCalendarEvents(now: Date, maxDate: Date): Promise<CalendarFetc
   if (cachedEvents.length > 0) {
     const hasExpired = cachedEvents.some((e) => e.expiresAt <= now);
     if (hasExpired) {
-      // Stale-while-revalidate: render from the recent-but-expired rows now,
-      // bring the cache current in the background (missed-cron case).
+      // Missed cron: serve the expired rows, refresh in the background.
       console.log(
         `[booking/page] Serving ${cachedEvents.length} stale cached calendar events; refreshing in background`,
       );
@@ -249,15 +240,13 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
     minHoursNotice,
     sameDayCutoffHour,
   } = await getAvailableDays();
-  // Pricing context for the inline "get a rough estimate" affordance.
   // A failed promo lookup shows the code box rather than hiding a code that works.
   const [settings, showPromoCode, pricedDays] = await Promise.all([
     getSettings(),
     hasActivePromoCode().catch(() => true),
     withDateSurcharges(days),
   ]);
-  // Explain the same-day closure from the live availability settings rather
-  // than baked-in defaults, so editing either value updates the banner.
+  // Explain the same-day closure from live settings.
   const sameDayReasons: string[] = [];
   if (minHoursNotice > 0) {
     sameDayReasons.push(`${minHoursNotice} hour${minHoursNotice === 1 ? "" : "s"} notice required`);
@@ -323,8 +312,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
 }
 
 /**
- * Skeleton shown while {@link BookingFormIsland} streams in. Matches the rough
- * visual height of the real form to avoid layout shift on hydration.
+ * Skeleton for {@link BookingFormIsland}; must match the real form's height to avoid layout shift.
  * @returns Skeleton placeholder element.
  */
 function BookingFormSkeleton(): React.ReactElement {

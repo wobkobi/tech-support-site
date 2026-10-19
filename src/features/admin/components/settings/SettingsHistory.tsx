@@ -1,9 +1,7 @@
 "use client";
 // src/features/admin/components/settings/SettingsHistory.tsx
-// Collapsible per-group change-history panel shared by every settings tab. Lazily fetches
-// the recent SettingAudit rows on first open and lets the operator load a prior version
-// back into the editor draft (via onRestore) to review and re-save - the re-save records
-// its own audit row, so a revert is just another tracked change.
+// Collapsible per-group change-history panel. Lazily fetches SettingAudit rows and loads a
+// prior version into the draft; re-saving it records its own audit row.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { TEXT_ACTION_CLS } from "@/features/business/components/calculator/calculator-classes";

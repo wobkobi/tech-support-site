@@ -1,7 +1,6 @@
 // src/features/business/lib/invoice-recipient.ts
-// Whether an invoice went to a person or to their company. Invoice.clientName holds whichever
-// name the operator addressed it to, so "68 Ltd" on Michael Smith's linked contact means it went
-// to his company - and the emails should still greet Michael, not "68".
+// Whether an invoice went to a person or their company: "68 Ltd" on Michael Smith's contact
+// went to his company, and the emails still greet Michael.
 
 import { looksLikeBusinessName } from "@/features/business/lib/payment-fields";
 
@@ -45,10 +44,8 @@ function firstWord(name: string): string {
 }
 
 /**
- * Works out whether an invoice is addressed to the linked contact's company. It is when the
- * client name matches the contact's stored company, or - for contacts whose company isn't on
- * file - when the name differs from the contact's and reads as a business ("Acme Plumbing Ltd").
- * A differing name that doesn't read as one ("Mike" on Michael Smith) is treated as the person.
+ * Whether an invoice is addressed to the contact's company: the name matches the stored
+ * company, or differs from the contact's and reads as a business ("Mike" stays the person).
  * @param clientName - The name the invoice is addressed to.
  * @param contact - The linked contact, or null when the invoice has none.
  * @returns Company flag, the person to mark it for the attention of, and who to greet.

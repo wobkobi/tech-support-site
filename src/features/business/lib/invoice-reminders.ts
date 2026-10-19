@@ -21,15 +21,13 @@ export interface ReminderSendResult {
 }
 
 /**
- * Emails the nudge (OVERDUE-watermarked PDF attached) and stamps the reminder
- * fields ONLY after Resend accepts - stamping first would silently drop the
- * chase forever on a transient send failure.
+ * Emails the overdue nudge with its PDF, stamping the reminder fields only after Resend
+ * accepts so a failed send is retried.
  * @param invoice - The full invoice row (must be SENT and past due; callers gate).
  * @returns Whether the send happened and which reminder number it was.
  */
 export async function sendOverdueReminder(invoice: PrismaInvoice): Promise<ReminderSendResult> {
-  // Already paid can cover the whole total before anyone marks the invoice paid; a
-  // reminder for $0.00 would chase someone who has paid in full.
+  // Already-paid money can cover the whole total before the invoice is marked paid.
   if (balanceDue(invoice) <= 0) return { ok: false, error: "Nothing left owing - mark it paid" };
 
   // Null reads as 0 (Mongo optional-field rule).
@@ -59,10 +57,8 @@ export async function sendOverdueReminder(invoice: PrismaInvoice): Promise<Remin
 }
 
 /**
- * Emails the "sorry, you'd already paid" note and stamps `apologySentAt` only
- * once Resend accepts, so a transient failure leaves the invoice eligible for a
- * later attempt instead of silently swallowing the apology. Callers gate on
- * reminderChasedPaidInvoice (invoice-apology.ts) and the comms setting first.
+ * Emails the "sorry, you'd already paid" note, stamping `apologySentAt` only once Resend
+ * accepts. Callers gate on reminderChasedPaidInvoice and the comms setting.
  * @param invoice - The invoice row that was wrongly chased.
  * @param paidAt - The recorded payment date (earlier than the last reminder).
  * @returns True when the apology was sent and stamped.

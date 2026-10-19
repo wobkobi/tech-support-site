@@ -1,6 +1,5 @@
 // src/app/api/admin/reviews/[id]/route.ts
-// Admin API for approving, revoking, and deleting reviews. Protected by ADMIN_SECRET via
-// constant-time comparison.
+// Admin API for approving, revoking and deleting reviews.
 
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
@@ -11,9 +10,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * PATCH /api/admin/reviews/[id] - admin-auth gated.
- * `{ action: "approve" | "revoke" }` moderates; approve also best-effort
- * upserts + links a Contact from the booking/review-request (never blocking).
- * `{ contactId: string | null }` updates the link directly.
+ * `{ action: "approve" | "revoke" }` moderates (approve also best-effort links a Contact);
+ * `{ contactId: string | null }` sets the link directly.
  * @param request - Incoming request.
  * @param params - Route segment params wrapper.
  * @param params.params - Promise resolving to the route segment containing the review ID.
@@ -41,9 +39,7 @@ export async function PATCH(
     const newContactId = body.contactId ?? null;
 
     try {
-      // MongoDB has no FK enforcement, so a bad contactId would silently orphan
-      // the review (contact-scoped views drop it and matchReviewsToContacts only
-      // re-homes contactId==null rows). Require a live contact when linking.
+      // No FK enforcement in MongoDB, so require a live contact when linking.
       if (newContactId) {
         const target = await prisma.contact.findFirst({
           where: { id: newContactId, deletedAt: null },
@@ -104,9 +100,7 @@ export async function PATCH(
           email = booking?.email ?? null;
           contactName = booking?.name ?? null;
         } else if (review.customerRef) {
-          // Standalone reviews carry the token from the Contact magic link;
-          // look the contact up directly rather than going through email. The
-          // token may be a merge-inherited alt on the surviving contact.
+          // Standalone reviews carry the magic-link token (possibly a merge-inherited alt).
           const linkedContact = await prisma.contact.findFirst({
             where: {
               OR: [
@@ -153,7 +147,7 @@ export async function PATCH(
 
 /**
  * DELETE /api/admin/reviews/[id]
- * Permanently deletes a review. Requires an admin session (cookie or X-Admin-Secret header).
+ * Permanently deletes a review.
  * @param request - Incoming request.
  * @param params - Route segment params wrapper.
  * @param params.params - Promise resolving to the route segment containing the review ID.
@@ -176,9 +170,7 @@ export async function DELETE(
     });
     await prisma.review.delete({ where: { id } });
 
-    // Clear the source's "submitted" flag so review-send eligibility/cooldown
-    // don't suppress the customer for a review that no longer exists - but only
-    // when no other review still references that booking/contact.
+    // Clear the source's "submitted" flag unless another review still references it.
     if (review?.bookingId) {
       const others = await prisma.review.count({ where: { bookingId: review.bookingId } });
       if (others === 0) {

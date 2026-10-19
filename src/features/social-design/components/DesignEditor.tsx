@@ -1,10 +1,7 @@
 "use client";
 // src/features/social-design/components/DesignEditor.tsx
-// The post maker editor: toolbar, size tabs, layers panel, canvas (or every size side
-// by side) and properties panel around one design. Holds the design with undo and
-// redo, the selection, the size on screen, whether moves reach every size, and the
-// view settings, autosaves, and turns keyboard shortcuts and panel actions into edits
-// from editor-ops. Loaded only in the browser (Konva has no server build).
+// The post maker editor: holds one design with undo, selection and view state, autosaves,
+// and turns shortcuts and panel actions into edits. Browser-only (Konva has no server build).
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
@@ -95,8 +92,7 @@ import {
   FaWandMagicSparkles,
 } from "react-icons/fa6";
 
-// Photos for designs keep more pixels than the composer's 1200px: a full-bleed photo
-// on a 1080x1920 story needs them.
+// More pixels than the composer's 1200px: a full-bleed 1080x1920 story needs them.
 const PHOTO_EDGE = 2400;
 
 /** What the photo picker is choosing a photo for. */
@@ -268,8 +264,7 @@ export function DesignEditor({
   const checks = useStyleChecks(tabDoc, bound, family);
 
   /**
-   * Changes the selection. Picking one member of a group picks the whole group;
-   * `additive` (Shift) toggles the picked layers in or out.
+   * Changes the selection; one group member picks the whole group.
    * @param ids - Picked layer ids.
    * @param additive - Whether to toggle rather than replace.
    */
@@ -291,8 +286,7 @@ export function DesignEditor({
   );
 
   /**
-   * Adds an element from the Add menu, centred on the size on screen. A backdrop
-   * covers the whole picture and goes to the bottom of the stack.
+   * Adds an element from the Add menu, centred; a backdrop goes to the bottom of the stack.
    * @param add - What to add.
    */
   const addElement = useCallback(
@@ -325,8 +319,7 @@ export function DesignEditor({
   }
 
   /**
-   * Places a photo: as a new photo layer, a new photo backdrop, or in place of an
-   * existing layer's photo (filling an empty frame keeps the frame).
+   * Places a photo as a new layer or backdrop, or in place of an existing layer's photo.
    * @param target - What the photo is for.
    * @param url - Photo address.
    * @param size - The photo's pixel size.
@@ -374,10 +367,7 @@ export function DesignEditor({
     }
   }
 
-  /**
-   * Copies this design into a new template, or starts a new design from this template.
-   * Waiting changes are saved first so the copy has them.
-   */
+  /** Copies this design into a new template, or a template into a new design, saving first. */
   async function copyAs(): Promise<void> {
     setCopying(true);
     const saved = await save.saveNow();
@@ -426,11 +416,8 @@ export function DesignEditor({
   }
 
   /**
-   * Fills an AI draft into the design as one undo step. Words that come out longer or
-   * shorter than what they replace move the layers under them and resize their card
-   * on every size ({@link makeRoom}). A design with no word layers gets a headline and
-   * a short line, stacked about the middle of the size on screen; the text re-measure
-   * that runs on every edit then sets their real heights.
+   * Fills an AI draft in as one undo step; length changes shift the layers below via
+   * {@link makeRoom}. With no word layers, adds a centred headline and short line.
    * @param draft - The draft.
    */
   function fillAiDraft(draft: DesignDraft): void {
@@ -438,8 +425,7 @@ export function DesignEditor({
     const f = FORMATS[format];
     apply((d) => {
       const filled = fillDraft(d, draft);
-      // History holds measured designs, so `d` is the before; measure the new words and
-      // move what's under them, so a longer quote doesn't run into the stars.
+      // `d` is the measured before; measure the new words and move what's under them.
       const measured = family ? makeRoom(d, reflowText(filled.doc, bound, family)) : filled.doc;
       const added = filled.missing.map((role) => {
         const { layer, share, ratio } = makeLayer({ kind: "text", preset: role });
@@ -843,8 +829,7 @@ export function DesignEditor({
         <>
           <TipStrip />
 
-          {/* 15rem covers the admin top bar, page header and toolbar, so at Fit the whole
-          picture shows without scrolling once the tips are dismissed. */}
+          {/* 15rem covers the admin top bar, page header and toolbar. */}
           <div className="grid min-h-0 grid-cols-1 gap-3 lg:h-[calc(100dvh-15rem)] lg:min-h-136 lg:grid-cols-[15rem_minmax(0,1fr)_18rem]">
             <aside className="order-2 max-h-80 overflow-y-auto rounded-lg border border-admin-border bg-admin-surface lg:order-0 lg:max-h-none">
               <LayersPanel
@@ -1127,8 +1112,7 @@ export function DesignEditor({
 }
 
 /**
- * One line under the toolbar saying how the apps treat this size as a post picture,
- * shown with the app-crop boxes.
+ * One line under the toolbar on how the apps crop this size, shown with the crop boxes.
  * @param props - Component props.
  * @param props.format - Size on screen.
  * @returns Note element.

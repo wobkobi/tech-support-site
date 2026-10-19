@@ -1,12 +1,6 @@
 // src/features/business/lib/task-taxonomy.server.ts
-// Renames a task-template tag (device or action) across every row that uses it - the safe
-// way to fix a drifted or misspelt tag, since clearing one is permanent (parse-job may only
-// reuse tags from the live vocabulary these fields build). A rename that collides with an
-// existing (device, action) pair MERGES rather than silently shadowing a row.
-//
-// Tags are case-insensitive identities (see task-taxonomy.ts), so a case-only rename is the
-// supported fix for a split spelling and every path below has to survive `from` and `to`
-// matching the same rows.
+// Renames a task-template tag across every row, merging on a (device, action) collision.
+// Tags are case-insensitive, so `from` and `to` may match the same rows (a case-only rename).
 
 import { composeDescription } from "@/features/business/lib/business";
 import type { TaxonomyAxis } from "@/features/business/lib/task-taxonomy";
@@ -22,12 +16,8 @@ export interface RenameResult {
 }
 
 /**
- * Renames one taxonomy tag across every task template that uses it, merging any
- * row that would collide with an existing (device, action) pair. The stored
- * description is recomposed so it never drifts from the tags it was built from.
- * Every touched row - merge survivors included - lands on the exact casing of
- * `to`, so a case-only rename settles a split spelling instead of leaving half
- * the rows on the old one.
+ * Renames one tag across every template, merging collisions and recomposing descriptions.
+ * Every touched row, merge survivors included, lands on the exact casing of `to`.
  * @param axis - Whether to rename a device tag or an action tag.
  * @param from - The current tag value (matched case-insensitively).
  * @param to - The replacement tag value.
@@ -48,9 +38,7 @@ export async function renameTaxonomyTag(
       ? { device: { equals: value, mode: "insensitive" } }
       : { action: { equals: value, mode: "insensitive" } };
 
-  // One query for both halves. Two would alias each other on a case-only rename -
-  // "Pc" and "PC" match the same rows - and a row folded away early in the pass
-  // would still look like a live merge target later on.
+  // One query for both: two would alias each other on a case-only rename ("Pc" vs "PC").
   const affected = await prisma.taskTemplate.findMany({
     where: { OR: [match(from), match(to)] },
   });
@@ -59,10 +47,8 @@ export async function renameTaxonomyTag(
   const moving = affected.filter((row) => (row[axis] ?? "").toLowerCase() === fromLower);
   if (moving.length === 0) return { renamed: 0, merged: 0 };
 
-  // Once the rename lands every row in play sits on `to`, so the OTHER axis alone
-  // decides a collision. Rows already parked on the target seed the map; rows
-  // renamed during this pass join it, so two sources folding onto one target
-  // collapse instead of recreating the duplicate.
+  // Every row ends on `to`, so the OTHER axis decides a collision. Renamed rows join the map
+  // so two sources folding onto one target collapse.
   const otherAxis: TaxonomyAxis = axis === "device" ? "action" : "device";
   /**
    * Collision key for a row: the axis NOT being renamed, lowercased.
@@ -88,8 +74,7 @@ export async function renameTaxonomyTag(
         where: { id: twin.id },
         data: {
           usageCount: twin.usageCount + row.usageCount,
-          // Normalise the survivor too, or a case-only rename leaves the old
-          // casing standing on exactly the rows it was meant to fix.
+          // Normalise the survivor's casing too.
           ...renameData(axis, to, twin),
         },
       });
@@ -111,8 +96,7 @@ export async function renameTaxonomyTag(
 }
 
 /**
- * Builds the update payload that moves one row onto a tag, recomposing the
- * description from the tag pair the row will carry.
+ * Builds the update moving one row onto a tag, recomposing its description.
  * @param axis - Which axis the rename targets.
  * @param to - The replacement tag value.
  * @param row - The row being moved.

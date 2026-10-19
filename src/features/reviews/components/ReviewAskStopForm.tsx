@@ -1,8 +1,7 @@
 "use client";
 // src/features/reviews/components/ReviewAskStopForm.tsx
 // The button on the public "stop asking me for reviews" page. Nothing changes until it's
-// pressed: email security scanners open every link in a message, and a page that opted
-// out on load would quietly drop people who never asked.
+// pressed, since email security scanners open every link.
 
 import { Button } from "@/shared/components/Button";
 import React, { useState } from "react";

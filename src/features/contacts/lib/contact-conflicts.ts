@@ -1,8 +1,6 @@
 // src/features/contacts/lib/contact-conflicts.ts
-// Helpers for recording and resolving sync conflicts between the site DB and Google
-// Contacts. A conflict is created when a single-value field (name, email, address) has
-// different values on each side AND both sides have changed since the last successful
-// sync, so auto-resolution isn't safe.
+// Records and resolves site-vs-Google Contacts conflicts: a single-value field that
+// differs AND changed on both sides since the last sync.
 
 import { prisma } from "@/shared/lib/prisma";
 import type { ContactField } from "@prisma/client";
@@ -11,16 +9,9 @@ import type { ContactField } from "@prisma/client";
 export type { ContactField };
 
 /**
- * Prisma where-fragment for conflicts still awaiting a decision. MUST be this
- * OR shape: {@link recordContactConflict} omits `resolvedAt` on create, so Mongo
- * stores no key at all, and Prisma compiles a bare `resolvedAt: null` to
- * "exists AND is null" - which matches none of them. Every reader used the bare
- * form, so recorded conflicts were invisible: the admin list and badge read
- * zero, the dedup check below never matched (so each sync filed another
- * duplicate), and clearContactConflict never auto-cleared anything.
- *
- * Spread into a `where` that has no OR of its own (wrap in AND otherwise).
- * Mirrors NOT_A_QUOTE_FILTER in invoice-status.ts.
+ * Where-fragment for unresolved conflicts. Must be this OR shape: rows have no
+ * `resolvedAt` key, and a bare `resolvedAt: null` means "exists AND is null" in
+ * Prisma/Mongo. Spread into a `where` with no OR of its own (else wrap in AND).
  */
 export const UNRESOLVED_CONFLICT_FILTER = {
   // Plain mutable shape (no `as const`): Prisma's where input needs a mutable OR.
@@ -28,9 +19,8 @@ export const UNRESOLVED_CONFLICT_FILTER = {
 };
 
 /**
- * Records (or refreshes) a pending conflict for a contact's field. If an
- * unresolved row already exists for the same contactId + field, its values
- * are updated in place so the admin always sees the latest both-sides state.
+ * Records a pending conflict for a contact's field, updating an existing
+ * unresolved row in place.
  * @param args - Conflict inputs.
  * @param args.contactId - Local Contact id.
  * @param args.field - Which field is in conflict.
@@ -68,9 +58,7 @@ export async function recordContactConflict(args: {
 }
 
 /**
- * Clears any pending conflict for this contact + field. Called when the field
- * resolves itself (values now match) so the admin's conflict list doesn't
- * show stale entries.
+ * Clears any pending conflict for this contact + field once the values match.
  * @param contactId - Local Contact id.
  * @param field - Which field is no longer in conflict.
  * @returns Promise that resolves when any pending row is marked resolved.

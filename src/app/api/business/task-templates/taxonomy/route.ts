@@ -1,12 +1,7 @@
 // src/app/api/business/task-templates/taxonomy/route.ts
-// Admin task-template taxonomy endpoint. GET returns the device and action tags in use
-// across all templates - one entry per case-insensitive tag, sorted alphabetically - to
-// power the manage-tags modal.
-//
-// Casing does not make a second tag: everything downstream matches tags
-// case-insensitively, so listing "PC" and "Pc" as two rows would offer two handles on one
-// tag and let a Clear aimed at either take both. Rival casings ride along in `variants`
-// so a split spelling stays visible and the operator can rename it away.
+// Admin task-template taxonomy endpoint for the manage-tags modal. Tags collapse
+// case-insensitively (downstream matching is case-insensitive); rival casings ride
+// along in `variants` so they can be renamed away.
 
 import { collectTaxonomyTags } from "@/features/business/lib/task-taxonomy";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -16,9 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/business/task-templates/taxonomy
- * Returns the device + action tags currently in use across all task templates,
- * collapsed to one entry per case-insensitive tag and sorted alphabetically.
- * Powers the manage-tags modal.
+ * Returns the device + action tags in use, one per case-insensitive tag, sorted.
  * @param request - Incoming Next.js request.
  * @returns JSON with `{ ok, devices: TaxonomyTag[], actions: TaxonomyTag[] }`.
  */

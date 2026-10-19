@@ -9,17 +9,13 @@ import { requireEnv } from "@/shared/lib/env";
 import { dateKeyParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
 
 /**
- * Cache tag invalidated by routes that mutate bookings or blocked days so the
- * schedule page picks up changes within one render cycle. Stays separate
- * from the underlying {@link fetchAllCalendarEvents} so non-schedule callers (the
- * booking-slot availability check, etc.) can keep doing live reads.
+ * Cache tag busted by booking and blocked-day mutations. Only the schedule page
+ * caches; other callers of {@link fetchAllCalendarEvents} read live.
  */
 export const SCHEDULE_CALENDAR_TAG = "schedule-calendar-events";
 
 /**
- * The calendar where new booking events are created.
- * Set BOOKING_CALENDAR_ID in env (e.g. a dedicated "Tech Support" calendar).
- * Falls back to "primary" if not set.
+ * Calendar for new booking events: BOOKING_CALENDAR_ID, else "primary".
  * @returns Booking calendar ID string.
  */
 export function getBookingCalendarId(): string {
@@ -27,16 +23,14 @@ export function getBookingCalendarId(): string {
 }
 
 /**
- * Returns the configured calendar IDs from environment variables.
- * Using explicit env-var calendars prevents subscribed Google calendars
- * (Holidays, Birthdays, etc.) from unexpectedly blocking booking slots.
+ * Configured calendar IDs from env. Explicit IDs stop subscribed calendars
+ * (Holidays, Birthdays) from blocking booking slots.
  * @returns Array of calendar ID strings.
  */
 function fetchAccessibleCalendarIds(): string[] {
   const ids = [
     process.env.BOOKING_CALENDAR_ID,
-    // Car calendar (renamed from Work); fall back to the old env name during
-    // the transition window.
+    // Car calendar; the Work env name is still accepted as a fallback.
     process.env.CAR_CALENDAR_ID ?? process.env.WORK_CALENDAR_ID,
     process.env.PERSONAL_CALENDAR_ID,
   ].filter((id): id is string => Boolean(id));
@@ -48,9 +42,8 @@ function fetchAccessibleCalendarIds(): string[] {
  * @returns Authenticated OAuth2 client
  */
 export function getOAuth2Client(): OAuth2Client {
-  // Per-var named asserts (non-empty) so a blanked credential - e.g. an
-  // unescaped $ swallowed by dotenv-expand - fails with the offending var name
-  // instead of a generic "missing credentials". Matches the env-layer convention.
+  // Per-var asserts so a blanked credential (e.g. a $ eaten by dotenv-expand)
+  // fails with the offending var name.
   const clientId = requireEnv("GOOGLE_OAUTH_CLIENT_ID");
   const clientSecret = requireEnv("GOOGLE_OAUTH_CLIENT_SECRET");
   const redirectUri = requireEnv("GOOGLE_OAUTH_REDIRECT_URI");
@@ -81,8 +74,7 @@ export interface CalendarEvent {
   calendarEmail: string; // Which calendar this event is from
   /** Google Calendar "open in Calendar" URL, when the API returns one. */
   htmlLink?: string;
-  // Parent series ID when this event is a recurring instance (from Google Calendar
-  // singleEvents expansion). Stable across all occurrences of the same series.
+  // Parent series ID for a recurring instance; stable across the series.
   recurringEventId?: string;
 }
 
@@ -152,12 +144,8 @@ export async function createBookingEvent(params: {
 }
 
 /**
- * Moves an existing booking event to a new time window.
- *
- * Patches start/end only, so the event id, description, location and attendee
- * all survive. The customer-facing edit flow deletes and recreates because it
- * rewrites the whole event; doing that here would cancel and re-issue the
- * invite every time a finish time is nudged by ten minutes.
+ * Moves a booking event to a new time window. Patches start/end only so a
+ * nudged finish time does not cancel and re-issue the invite.
  * @param params - Patch parameters.
  * @param params.eventId - Calendar event ID to move (Booking.calendarEventId).
  * @param params.startAt - New start time (UTC).
@@ -190,8 +178,7 @@ export async function patchBookingEvent(params: {
  * Deletes a calendar event
  * @param params - Delete parameters
  * @param params.eventId - Calendar event ID to delete
- * @param params.notifyAttendees - Whether Google emails the attendee a cancellation.
- *   Defaults to true; a no-show passes false, since the visit was not called off.
+ * @param params.notifyAttendees - Whether Google emails a cancellation (default true; false for a no-show).
  * @returns Promise that resolves when deleted
  */
 export async function deleteBookingEvent(params: {
@@ -227,9 +214,8 @@ export type BookingEventLookup =
   | { state: "unreadable" };
 
 /**
- * True for a Google API error that means "no such event". googleapis surfaces
- * the HTTP status differently depending on the transport layer that threw, so
- * all three shapes are checked; anything else must not be read as a deletion.
+ * True for a Google API 404. googleapis puts the status in one of three shapes
+ * depending on the transport; anything else must not read as a deletion.
  * @param err - The thrown value.
  * @returns Whether the error is a 404.
  */
@@ -240,11 +226,8 @@ function isEventNotFound(err: unknown): boolean {
 }
 
 /**
- * Reads one timed event from the booking calendar by id - live, not via the
- * schedule cache, so just-made time corrections are certain to be current.
- * Separates a deleted event from an unreadable one: only the former means the
- * job is off, and pausing a customer's emails on a quota blip would be worse
- * than sending them.
+ * Reads one booking-calendar event live (bypassing the schedule cache). Keeps
+ * deleted apart from unreadable: only a deletion means the job is off.
  * @param eventId - Google Calendar event id (as stored on Booking.calendarEventId).
  * @returns Which of the three states the event is in.
  */
@@ -278,9 +261,8 @@ export async function lookupBookingEvent(eventId: string): Promise<BookingEventL
 }
 
 /**
- * Fetches one timed event from the booking calendar by id. Collapses
- * {@link lookupBookingEvent} to "usable times or nothing" for callers that only
- * need the window, such as the calculator's "Bill in calculator" prefill.
+ * {@link lookupBookingEvent} collapsed to "usable times or nothing", for callers
+ * that only need the window.
  * @param eventId - Google Calendar event id (as stored on Booking.calendarEventId).
  * @returns Event details, or null when missing, cancelled, all-day, or on any API failure.
  */
@@ -290,10 +272,8 @@ export async function fetchBookingEvent(eventId: string): Promise<BookingEventDe
 }
 
 /**
- * Creates an all-day "Busy" event on the booking calendar to block out the day
- * for new bookings. The existing {@link fetchAllCalendarEvents} path treats non-personal
- * all-day events as full-day blockers, so this matches the shape of a manually
- * created all-day Busy event.
+ * Creates an all-day "Busy" event on the booking calendar, which
+ * {@link fetchAllCalendarEvents} treats as a full-day blocker.
  * @param params - Create parameters.
  * @param params.dateKey - NZ-local YYYY-MM-DD for the day to block.
  * @param params.summary - Event title (defaults to "Busy").
@@ -324,9 +304,8 @@ export interface BlockedDayRange {
 }
 
 /**
- * Reads an all-day "Busy" block's date span. Returns null when the event is
- * missing, cancelled, or not an all-day event (a timed event has no `start.date`),
- * so callers can fall back to a whole-event delete.
+ * Reads an all-day block's date span; null when missing, cancelled or timed,
+ * so callers fall back to a whole-event delete.
  * @param eventId - Google Calendar event id.
  * @returns The block's date span, or null.
  */
@@ -350,9 +329,8 @@ export async function getBlockedDayRange(eventId: string): Promise<BlockedDayRan
 }
 
 /**
- * Repoints an existing all-day event to a new [start, end) span (end exclusive).
- * Used to trim/shorten a block when a day is unblocked off its edge, or to keep
- * the before-portion when a middle day is unblocked.
+ * Repoints an all-day event to a new [start, end) span, to trim a block when a
+ * day is unblocked from it.
  * @param params - Patch parameters.
  * @param params.eventId - Google Calendar event id.
  * @param params.startDateKey - New inclusive start (YYYY-MM-DD).
@@ -376,9 +354,8 @@ export async function patchBlockedDayRange(params: {
 }
 
 /**
- * Inserts an all-day "Busy" block spanning [startDateKey, endDateKey) (end
- * exclusive). Backs {@link createBlockedDayEvent} and the after-portion of a
- * middle-day unblock split.
+ * Inserts an all-day "Busy" block spanning [startDateKey, endDateKey). Backs
+ * {@link createBlockedDayEvent} and unblock splits.
  * @param params - Insert parameters.
  * @param params.startDateKey - Inclusive start (YYYY-MM-DD).
  * @param params.endDateKey - Exclusive end (YYYY-MM-DD).
@@ -407,9 +384,8 @@ export async function insertBlockedDayRange(params: {
 }
 
 /**
- * Lists all-day events on the booking calendar overlapping [fromDateKey,
- * toDateKey). Used to find blocks adjacent to a newly blocked day so contiguous
- * blocks can be merged into one span. Timed events are excluded.
+ * Lists all-day events overlapping [fromDateKey, toDateKey), so adjacent blocks
+ * can merge into one span.
  * @param fromDateKey - Window start (inclusive, YYYY-MM-DD).
  * @param toDateKey - Window end (exclusive, YYYY-MM-DD).
  * @returns All-day blocks in the window with their date spans (end exclusive).
@@ -439,18 +415,13 @@ export async function listBlockedDayRanges(
 /** Events plus the calendars that failed, for callers that must tell "no events" from "no answer". */
 export interface CalendarFetchResult {
   events: CalendarEvent[];
-  /**
-   * Calendars whose fetch threw. Their events are absent from `events`, so a
-   * caller must NOT read that absence as "these events no longer exist".
-   */
+  /** Calendars whose fetch threw; their missing events are NOT deletions. */
   failedCalendarIds: string[];
 }
 
 /**
- * Fetches all calendar events from specified calendars (no list permission
- * needed), reporting which calendars failed. Prefer this over
- * {@link fetchAllCalendarEvents} when absence of an event drives a delete:
- * a partial failure otherwise looks identical to a cancelled event.
+ * Fetches events from every configured calendar, reporting which failed. Use
+ * over {@link fetchAllCalendarEvents} when an event's absence drives a delete.
  * @param startDate - Start of range
  * @param endDate - End of range
  * @returns Events from every calendar that answered, plus the ids of those that didn't.
@@ -466,15 +437,13 @@ export async function fetchAllCalendarEventsDetailed(
 
   const personalCalendarId = process.env.PERSONAL_CALENDAR_ID ?? "";
 
-  // Fetch every calendar concurrently - pagination within one calendar stays
-  // sequential (nextPageToken chains). Failures stay per-calendar (null) so
-  // one bad calendar cannot blank out the rest.
+  // Calendars run concurrently; a failure is a per-calendar null so one bad
+  // calendar cannot blank out the rest.
   const perCalendarResults = await Promise.all(
     calendarIds.map(async (calendarId): Promise<CalendarEvent[] | null> => {
       try {
-        // Page through the calendar: events.list caps a page at 2500 (default 250) and
-        // returns nextPageToken when truncated. Without the loop a busy calendar would
-        // silently drop events past page one, leaving those times treated as free.
+        // events.list caps a page at 2500 (default 250); without paging, events
+        // past page one would read as free time.
         const events: calendar_v3.Schema$Event[] = [];
         let pageToken: string | undefined;
         do {
@@ -515,15 +484,13 @@ export async function fetchAllCalendarEventsDetailed(
               recurringEventId: event.recurringEventId || undefined,
             });
           } else if (event.start?.date && event.end?.date && !isPersonal) {
-            // All-day event from a non-personal calendar - block the full NZ day(s).
-            // All-day events use date strings ("YYYY-MM-DD"); end.date is exclusive.
-            // Convert NZ calendar midnight > UTC so slot checking works correctly.
+            // Non-personal all-day event: block the full NZ day(s). end.date is
+            // exclusive; convert NZ midnight > UTC.
             const startDateStr = event.start.date;
             const endDateStr = event.end.date;
             const [sYear, sMonth, sDay] = dateKeyParts(startDateStr);
             const [eYear, eMonth, eDay] = dateKeyParts(endDateStr);
-            // Each boundary resolves its own offset: an all-day block spanning a
-            // DST change has a different offset at its end than at its start.
+            // Each boundary gets its own offset, since a block can span a DST change.
             const startAt = nzMidnightUtc(sYear, sMonth, sDay);
             const endAt = nzMidnightUtc(eYear, eMonth, eDay);
             processedEvents.push({
@@ -552,8 +519,7 @@ export async function fetchAllCalendarEventsDetailed(
 
   const allEvents: CalendarEvent[] = [];
   const failedCalendarIds: string[] = [];
-  // perCalendarResults is index-aligned with calendarIds (both come off the
-  // same map), so a null marks exactly which calendar went missing.
+  // Index-aligned with calendarIds, so a null names the failed calendar.
   perCalendarResults.forEach((result, i) => {
     if (result === null) failedCalendarIds.push(calendarIds[i]!);
     else allEvents.push(...result);
@@ -572,9 +538,8 @@ export async function fetchAllCalendarEventsDetailed(
 }
 
 /**
- * Events from every accessible calendar, discarding which ones failed. Callers
- * that delete records based on an event's absence must use
- * {@link fetchAllCalendarEventsDetailed} instead.
+ * Events from every calendar, dropping failure info. Deletes driven by absence
+ * must use {@link fetchAllCalendarEventsDetailed}.
  * @param startDate - Start of range
  * @param endDate - End of range
  * @returns Array of calendar events from all specified calendars.
@@ -587,14 +552,8 @@ export async function fetchAllCalendarEvents(
 }
 
 /**
- * Cached wrapper around {@link fetchAllCalendarEvents} for the admin schedule page.
- * 30-second TTL with revalidation on booking/blocked-day mutations via
- * {@link SCHEDULE_CALENDAR_TAG}. The schedule's client-side auto-poll (the
- * ScheduleAutoRefresh component) reads Google live instead of this cache, since a
- * once-a-minute read of a 30s entry rewrote it on every tick, and busts the tag
- * when the window's fingerprint moves, so externally-made calendar changes surface
- * within ~60s; the operator's own edits still bust the cache immediately. Takes ISO
- * strings (not Date objects) so the cache key is deterministically serialisable.
+ * Cached {@link fetchAllCalendarEvents} for the schedule page: 30s TTL, busted via
+ * {@link SCHEDULE_CALENDAR_TAG}. ISO string args keep the cache key serialisable.
  * @param startIso - ISO 8601 start of range.
  * @param endIso - ISO 8601 end of range.
  * @returns Cached array of calendar events.

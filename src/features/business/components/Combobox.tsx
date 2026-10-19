@@ -1,9 +1,7 @@
 "use client";
 // src/features/business/components/Combobox.tsx
-// Open-vocabulary text input with a suggestions panel. Type to filter the suggestions;
-// press Enter, click a suggestion, or just keep typing a brand-new value. The dropdown
-// opens on focus and closes on blur, Escape, or outside-click. Suggestions guide without
-// restricting, so the operator is never limited to a fixed enum.
+// Open-vocabulary text input with a suggestions panel; suggestions guide without
+// restricting to a fixed enum.
 
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { cn } from "@/shared/lib/cn";
@@ -28,9 +26,8 @@ interface Props {
 }
 
 /**
- * Open-vocabulary combobox. The typed value is always the answer; suggestions
- * filter by case-insensitive substring and a "Use «typed»" row makes
- * keep-as-typed explicit when the value isn't in the list.
+ * Open-vocabulary combobox: the typed value is always the answer, and suggestions filter
+ * by case-insensitive substring.
  * @param props - Component props.
  * @param props.value - Current text value (controlled).
  * @param props.onChange - Typed-value change handler.
@@ -73,8 +70,7 @@ export function Combobox({
     ...filtered.map((s) => ({ value: s, label: s, isCreate: false })),
   ];
 
-  // Clamp the raw highlight so option-list changes never strand the user on
-  // an out-of-bounds row, without needing a setState-in-effect.
+  // Clamp the highlight so a shrinking option list never strands it out of bounds.
   const highlight = Math.min(rawHighlight, Math.max(0, options.length - 1));
 
   // Close on outside click.

@@ -1,8 +1,7 @@
 "use client";
 // src/features/business/components/tax/HomeOfficeForm.tsx
-// Home office, IRD rate, car total km and ACC rate inputs for one financial year. Saves
-// through PUT /api/business/tax-years/[fyKey], then refreshes the server page so the
-// estimate recomputes. A filed year shows the values read-only.
+// Home office, IRD rate, car total km and ACC rate inputs for one FY. Saves through PUT
+// /api/business/tax-years/[fyKey]; a filed year shows the values read-only.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -96,8 +95,7 @@ function toPct(fraction: number): number {
 }
 
 /**
- * Draft strings for the inputs: blank for a value that isn't set. The ACC rate is stored
- * as a fraction and typed as a percent.
+ * Draft strings for the inputs: blank when unset; the ACC fraction becomes a percent.
  * @param values - Saved values.
  * @returns Input text per field.
  */
@@ -111,9 +109,8 @@ function toDraft(values: TaxYearFormValues): Draft {
 }
 
 /**
- * Parses the inputs. A blank field becomes null; anything that isn't a number of 0 or
- * more is an error, and the car's total km must be above 0 (blank means "not known").
- * The route checks the same rules.
+ * Parses the inputs, matching the route's rules: blank becomes null, anything not a number
+ * of 0 or more is an error, and car total km must be above 0.
  * @param draft - Input text per field.
  * @returns Parsed values and any field errors.
  */
@@ -151,8 +148,8 @@ function parseDraft(draft: Draft): { values: TaxYearFormValues; errors: FieldErr
 }
 
 /**
- * The fields whose parsed value differs from what this tab last saw saved. Sending only
- * these keeps a stale tab from clearing a value another tab has saved since.
+ * Fields that differ from what this tab last saw saved, so a stale tab can't clear
+ * another tab's newer value.
  * @param values - Parsed form values.
  * @param baseline - Values as last loaded or saved in this tab.
  * @returns Changed fields only (empty when nothing changed).
@@ -169,9 +166,8 @@ function changedFields(
 }
 
 /**
- * Warning for a total km entry below the business km already logged. It doesn't block
- * the save: the km claim treats such a total as missing, so the save is harmless but
- * the figure is almost certainly a typo.
+ * Non-blocking warning for a total km below the business km already logged (likely a typo;
+ * the km claim treats it as missing).
  * @param raw - Total km input text.
  * @param businessKm - Business km the FY's claim counts.
  * @returns Warning text, or undefined when the entry is blank, invalid or plausible.
@@ -213,8 +209,7 @@ function homeFields(defaults: RateDefaults): FieldSpec[] {
 }
 
 /**
- * Car inputs: the year's two kilometre rates, then its total km, which sets the
- * business share of Tier 1.
+ * Car inputs: the year's two km rates, then total km, which sets the Tier 1 business share.
  * @param defaults - IRD's rates for the year.
  * @param fuel - Readable fuel type, e.g. "petrol".
  * @returns Field specs.
@@ -299,8 +294,7 @@ export function HomeOfficeForm({
   }
 
   /**
-   * Validates, saves the changed fields, then refreshes the page so every figure
-   * recomputes.
+   * Validates, saves the changed fields, then refreshes the page.
    * @param e - Form submit event.
    */
   async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>): Promise<void> {

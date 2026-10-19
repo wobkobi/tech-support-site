@@ -1,8 +1,7 @@
 "use client";
 // src/features/business/components/SubscriptionsListRows.tsx
-// The subscriptions list, as cards below lg and a table from lg, with overdue rows tinted
-// amber and the Active pill doubling as the pause/activate toggle. SubscriptionsView owns
-// the data, the form, the record/toggle/delete handlers and the delete confirm.
+// Subscriptions list: cards below lg, table from lg, overdue rows tinted amber.
+// SubscriptionsView owns the data and handlers.
 
 import {
   PINNED_CELL_CLS,
@@ -137,8 +136,7 @@ function SubscriptionRowActions({
 }
 
 /**
- * Phone card list - the desktop table is too wide for phones with seven columns
- * including the action buttons.
+ * Phone card list; the seven-column table is too wide for phones.
  * @param props - Component props.
  * @param props.subs - Subscriptions to list.
  * @param props.recording - Id whose payment is being recorded.
@@ -207,9 +205,8 @@ export function SubscriptionsListCards({
 }
 
 /**
- * Desktop table. The Actions column is pinned right so Record, Edit and Delete stay
- * reachable when the table scrolls sideways; its background repeats the row's tint
- * (an amber layer over an opaque surface for the half-tint) so scrolled cells pass under.
+ * Desktop table. Actions is pinned right with the row's tint repeated on an opaque
+ * base, so scrolled cells pass under it.
  * @param props - Component props.
  * @param props.subs - Subscriptions to list.
  * @param props.recording - Id whose payment is being recorded.

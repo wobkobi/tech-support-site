@@ -1,7 +1,5 @@
 // src/app/admin/login/page.tsx
-// Admin login. Single password field, posts to /api/admin/login, follows the `?next=`
-// query param on success (defaults to /admin). Plain server component shell; the form is
-// a tiny client component below.
+// Admin login: one password field posting to /api/admin/login, then `?next=` (default /admin).
 
 import { LoginForm } from "@/features/admin/components/LoginForm";
 import { Card } from "@/features/admin/components/ui/Card";
@@ -16,8 +14,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Admin login page. Reads `?next=` to forward the operator back to where they
- * were trying to go after a successful sign-in.
+ * Admin login page; `?next=` is where to go after sign-in.
  * @param root0 - Page props.
  * @param root0.searchParams - URL params with optional `next` redirect path.
  * @returns Login page element.
@@ -28,8 +25,7 @@ export default async function AdminLoginPage({
   searchParams: Promise<{ next?: string }>;
 }): Promise<React.ReactElement> {
   const { next } = await searchParams;
-  // Only accept same-origin relative paths starting with `/admin` so a tainted
-  // `?next=` can't bounce the operator to an external site.
+  // Only same-origin `/admin` paths, so `?next=` can't redirect off-site.
   const nextPath = next && next.startsWith("/admin") ? next : "/admin";
 
   return (

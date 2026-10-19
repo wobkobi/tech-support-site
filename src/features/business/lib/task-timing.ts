@@ -1,14 +1,12 @@
 // src/features/business/lib/task-timing.ts
-// Task-line minute maths - fitting parsed tasks to the job window, snapping to the billing
-// grid, and the whole-job minimum-billable floor. Re-exported through business.ts.
+// Task-line minute maths: window fitting, grid snapping and the minimum-billable floor.
 
 import { MIN_BILLABLE_MINS } from "@/features/business/lib/pricing-policy";
 import type { TaskLine } from "@/features/business/types/business";
 import { roundCents } from "@/shared/lib/money";
 
 /**
- * Total minutes contributed by hourly tasks. Flat-rate tasks (Travel, etc.)
- * carry no time so they're excluded.
+ * Total minutes from hourly tasks; flat-rate tasks carry no time.
  * @param tasks - Task lines from the calculator.
  * @returns Sum of hourly task minutes (`qty * 60`).
  */
@@ -17,10 +15,8 @@ export function hourlyTaskMinutes(tasks: TaskLine[]): number {
 }
 
 /**
- * Overshoot allowance for operator-stated tasks: each explicit task's stated
- * duration rounds UP to the snap grid, so pinned tasks can exceed the raw
- * window by one step apiece. Overshoot within this allowance is rounding, not
- * an over-estimate to rebalance or warn on.
+ * Overshoot allowance for explicit tasks: each rounds UP to the grid, so one snap step apiece
+ * over the window is rounding, not an over-estimate.
  * @param tasks - Task lines to assess.
  * @param snapMins - Live billing increment in minutes; defaults to the code fallback.
  * @returns Allowance in minutes (explicit hourly task count * snap step).
@@ -36,20 +32,14 @@ export function explicitRoundingAllowanceMins(
 export type TaskWindowMismatch = "floor" | "over" | "under";
 
 /**
- * Whether the tasks disagree with the job window enough to offer a Fix, and which way.
- *
- * The window is judged on the billing grid, the total Fix fits to, so a 79-min window
- * billed as 80 min of tasks is a match, not a minute over. Explicit tasks round UP to
- * the grid and Fix never moves them, so an overshoot inside
- * {@link explicitRoundingAllowanceMins} is let through - but only when every task is
- * pinned. With a floating task present, Fix shrinks it to absorb the overshoot: moving
- * a 10:00 start to 10:05 on a job with one stated task must still be flagged.
+ * Whether the tasks disagree with the grid-snapped window enough to offer a Fix, and which
+ * way. Overshoot inside {@link explicitRoundingAllowanceMins} passes only when every task is
+ * pinned; a floating task could absorb it.
  * @param tasks - Current task lines (hourly + flat).
  * @param windowMin - Job window in minutes (slot sum plus follow-up).
  * @param minBillableMins - Minimum billable labour minutes.
  * @param snapMins - Live billing increment in minutes; defaults to the code fallback.
- * @returns "floor" for a job under the minimum, "over" or "under" against the window, or
- * null when the tasks already fit.
+ * @returns "floor", "over" or "under", or null when the tasks already fit.
  */
 export function taskWindowMismatch(
   tasks: TaskLine[],
@@ -77,9 +67,7 @@ export function taskWindowMismatch(
 }
 
 /**
- * Live task-timing values threaded in from pricing settings. Every consumer
- * reads the operator's settings; {@link TASK_TIMING_FALLBACK} is the in-code
- * default only, so editing Settings changes the apportionment everywhere.
+ * Live task-timing values from pricing settings; {@link TASK_TIMING_FALLBACK} is only the default.
  */
 export interface TaskTimingConfig {
   /** Rounding granularity for task qty; the live `billingIncrementMins`. */
@@ -91,9 +79,8 @@ export interface TaskTimingConfig {
 }
 
 /**
- * Fallbacks matching the settings defaults. Literals rather than reads of
- * BILLING_INCREMENT_MINS et al: importing those here re-introduces a
- * circular-import TDZ with the pricing-policy module.
+ * Fallbacks matching the settings defaults. Literals, since importing BILLING_INCREMENT_MINS
+ * et al causes a circular-import TDZ with pricing-policy.
  */
 export const TASK_TIMING_FALLBACK: TaskTimingConfig = {
   snapMins: 5,
@@ -102,17 +89,9 @@ export const TASK_TIMING_FALLBACK: TaskTimingConfig = {
 };
 
 /**
- * Fits task lines to the listed job window, in both directions.
- * Pinned tasks (isShort or isExplicit) keep their parser-emitted qty - short
- * tasks at the live `shortTaskMins`, explicit tasks at whatever the operator
- * stated, with a one-snap-step-per-task overshoot allowance (see
- * {@link explicitRoundingAllowanceMins}) before an explicit task is dropped
- * for not fitting. The remaining floating tasks scale proportionally to fill what's
- * left of the window, so an over-long primary task absorbs more of the
- * correction than a correctly-sized one. Floating tasks that would scale
- * below the live `minTaskMins` are dropped, then the rest rescale. Snaps
- * qty to the live billing increment and parks any rounding remainder on the
- * largest floating survivor so totals match exactly. Flat-rate tasks pass through.
+ * Fits task lines to the job window in both directions. Pinned tasks keep their qty (within
+ * {@link explicitRoundingAllowanceMins}); floating ones scale proportionally, dropping any
+ * below `minTaskMins`, and the snap remainder lands on the largest survivor.
  * @param tasks - Task lines to collapse.
  * @param windowMin - Target window in minutes (`durationMins`).
  * @param timing - Live task-timing settings; defaults to {@link TASK_TIMING_FALLBACK}.
@@ -128,14 +107,11 @@ export function collapseToWindow(
   const flat = tasks.filter((t) => !isHourlyTask(t));
   if (hourlyIn.length === 0) return { tasks, dropped: 0, rescaled: false };
 
-  // The classification below splits tasks into short / explicit / floating groups, so the
-  // survivors have to be restored to the operator's order - otherwise a quick task leads
-  // the invoice and the main work sinks. Clones carry their position via {@link derive}.
+  // Grouping reorders tasks, so survivors are restored to the operator's order via derive.
   const orderOf = new Map<TaskLine, number>();
   tasks.forEach((t, i) => orderOf.set(t, i));
   /**
-   * {@link withMinutes} that carries the source task's input position onto the
-   * clone, so {@link inInputOrder} can still place it.
+   * {@link withMinutes} that carries the source task's input position onto the clone.
    * @param task - Source task line.
    * @param mins - New duration in minutes.
    * @returns Updated task line, registered at the source task's position.
@@ -155,27 +131,20 @@ export function collapseToWindow(
 
   const hourlyMin = sumTaskMinutes(hourlyIn);
 
-  // Exactly right - nothing to move in either direction.
   if (hourlyMin === windowMin) {
     return { tasks, dropped: 0, rescaled: false };
   }
 
-  // Short of the window. The event end is the actual finish, so the difference
-  // is real time on the job that the parsed durations did not account for -
-  // typically because a description rounds to "an hour and a half". Grown to
-  // meet the window, mirroring how an overflow is scaled down to match it
-  // exactly; leaving it would quietly bill less than the job took.
+  // Short of the window: the event end is the actual finish, so grow tasks to meet it.
   if (hourlyMin < windowMin) {
     const floatingUp = hourlyIn.filter((t) => !t.isShort && !t.isExplicit);
     let grown: TaskLine[];
     if (floatingUp.length > 0) {
-      // Floating tasks carry no stated duration, so they absorb the difference
-      // first and pinned ones keep the operator's own measurement.
+      // Floating tasks absorb the difference; pinned ones keep the operator's measurement.
       const pinned = hourlyIn.filter((t) => t.isShort || t.isExplicit);
       const target = windowMin - sumTaskMinutes(pinned);
       const floatingMin = sumTaskMinutes(floatingUp);
-      // All floating lines at 0 min have no proportions to scale (and would
-      // divide by zero), so they split the target evenly instead.
+      // All-zero floating lines split evenly (no proportions, and no divide by zero).
       grown = [
         ...pinned,
         ...floatingUp.map((t) =>
@@ -191,22 +160,16 @@ export function collapseToWindow(
         ),
       ];
     } else if (hourlyIn.every((t) => t.isShort && !t.isExplicit)) {
-      // Every task is a quick-task guess - the description gave no times - so none
-      // of them is the main job and they share the window evenly. The snap
-      // remainder still lands on the largest line below.
+      // All quick-task guesses with no times stated: share the window evenly.
       grown = hourlyIn.map((t) =>
         derive(t, snapMinutes(windowMin / hourlyIn.length, timing.snapMins)),
       );
     } else {
-      // Every task is pinned and at least one duration was stated. The largest line
-      // takes the remainder, which is the one case where a stated duration is
-      // overridden - preferred to billing under the window, since the window is
-      // what the job actually ran.
+      // All pinned with a stated duration: the largest line takes the remainder anyway,
+      // since the window is what the job actually ran.
       grown = [...hourlyIn];
     }
-    // Park what the snap grid left over on the largest adjustable line, so the
-    // billed total lands on the window exactly - the same reconciliation the
-    // collapse path below does.
+    // Park the snap remainder on the largest adjustable line so the total hits the window.
     const adjustable =
       floatingUp.length > 0 ? grown.filter((t) => !t.isShort && !t.isExplicit) : grown;
     const error = windowMin - sumTaskMinutes(grown);
@@ -221,9 +184,7 @@ export function collapseToWindow(
     return { tasks: inInputOrder([...grown, ...flat]), dropped: 0, rescaled: true };
   }
 
-  // Pin short tasks at the operator's quick-task time and drop any that don't fit.
-  // isExplicit beats isShort - a stated duration is the operator's own measurement, so it
-  // keeps its qty. The parser emits the flags exclusive; this is the guard.
+  // Pin short tasks at the quick-task time, dropping any that don't fit. isExplicit beats isShort.
   const short: TaskLine[] = hourlyIn
     .filter((t) => t.isShort && !t.isExplicit)
     .map((t) => derive(t, timing.shortTaskMins));
@@ -233,9 +194,7 @@ export function collapseToWindow(
     dropped++;
   }
 
-  // Explicit tasks keep their parser-emitted qty. Stated durations round UP to
-  // the snap grid, so tolerate one step of overshoot per explicit task; drop
-  // (newest first) only genuine overflow beyond that.
+  // Explicit tasks keep their qty with one snap step of overshoot each; drop newest first beyond.
   const explicit: TaskLine[] = hourlyIn.filter((t) => t.isExplicit);
   const shortMin = short.length * timing.shortTaskMins;
   while (
@@ -251,9 +210,7 @@ export function collapseToWindow(
   const remainingMin = windowMin - pinnedMin;
 
   if (floating.length === 0) {
-    // Nothing floating: pinned tasks stand as-is, so only report a rescale
-    // when something was actually dropped - otherwise the caller would toast
-    // "Rebalanced tasks" over an untouched list.
+    // Nothing floating: report a rescale only if something was dropped.
     return {
       tasks: inInputOrder([...short, ...explicit, ...flat]),
       dropped,
@@ -271,9 +228,7 @@ export function collapseToWindow(
     };
   }
 
-  // Scale floating tasks proportionally to fill remainingMin; drop tasks that
-  // would land below the operator's smallest-task time and rescale until
-  // everything fits.
+  // Scale floating tasks to remainingMin, dropping the smallest below minTaskMins until all fit.
   while (floating.length > 0) {
     const sum = sumTaskMinutes(floating);
     if (sum <= remainingMin) break;
@@ -323,9 +278,7 @@ function snapMinutes(mins: number, snapMins: number = TASK_TIMING_FALLBACK.snapM
 }
 
 /**
- * A task's billed minutes. Prefers the authoritative `minutes`, falling back to
- * the decimal-hour `qty` for rows that predate it (manual flat lines, legacy
- * drafts).
+ * A task's billed minutes: `minutes`, else the decimal-hour `qty`.
  * @param task - Task line.
  * @returns Billed minutes.
  */
@@ -343,13 +296,8 @@ function sumTaskMinutes(arr: TaskLine[]): number {
 }
 
 /**
- * Returns a clone of `task` billed for `mins` whole minutes.
- *
- * `minutes` is the authoritative figure; `qty` is it in hours, deliberately
- * NOT rounded to 2 dp. Two decimals cannot represent a 5-minute grid - only
- * 15/30/45/60 land exactly - so rounding here is what used to make a 140-minute
- * job bill 139.8 or 140.4 and never 140. Carrying full precision keeps
- * `qty * unitPrice` exact everywhere it is summed.
+ * Returns a clone of `task` billed for `mins` whole minutes. `qty` is NOT rounded to 2 dp:
+ * two decimals can't hold a 5-min grid (140 min would bill 139.8 or 140.4).
  * @param task - Source task line.
  * @param mins - New duration in minutes; rounded to a whole minute.
  * @returns Updated task line.
@@ -366,17 +314,11 @@ function withMinutes(task: TaskLine, mins: number): TaskLine {
 }
 
 /**
- * Enforces the whole-job minimum-billable floor. When the hourly task lines
- * carry some time but sum below minBillableMins, grows the most significant
- * line so the billed labour is at least the minimum - the largest floating
- * (neither operator-stated nor quick) task, or the largest hourly task when
- * every line is pinned. A job with no hourly time stays at 0 so the floor never invents a
- * charge on an empty or parts-only job. Applied by both calcJobTotal
- * and jobToLineItems (business.ts) so the on-screen total and the issued invoice
- * agree, mirroring the MIN_TRAVEL_CHARGE floor.
- * @param tasks - Task lines (`qty` in decimal hours); flat-rate lines pass through untouched.
- * @param minBillableMins - Minimum billable labour minutes (live pricing setting); defaults to the code const.
- * @returns Task list with the floor applied, or the input unchanged when already at/above the minimum.
+ * Enforces the whole-job minimum-billable floor by growing the largest floating task (else
+ * largest hourly). A job with no hourly time stays at 0. Used by calcJobTotal and jobToLineItems.
+ * @param tasks - Task lines; flat-rate lines pass through.
+ * @param minBillableMins - Live minimum billable labour minutes.
+ * @returns Task list with the floor applied, or the input when already at the minimum.
  */
 export function enforceMinBillable(
   tasks: TaskLine[],
@@ -386,8 +328,6 @@ export function enforceMinBillable(
   const hourly = tasks.filter(isHourlyTask);
   const totalMin = sumTaskMinutes(hourly);
   if (totalMin <= 0 || totalMin >= minBillableMins) return tasks;
-  // Land the deficit on the most significant line: the largest floating task,
-  // falling back to the largest hourly task when every line is pinned.
   const floating = hourly.filter((t) => !t.isExplicit && !t.isShort);
   const pool = floating.length > 0 ? floating : hourly;
   let biggest = pool[0];
@@ -398,11 +338,8 @@ export function enforceMinBillable(
 }
 
 /**
- * Whether a task line counts as labour - the one classifier every pricing and timing
- * path uses. Hourly tasks (an explicit base rate, or no rate config at all, which is a
- * "No base" row priced by hand per hour) are labour; flat-rate rows like Travel and flat
- * fees never are, so they're excluded from the minimum floor, window fitting, the
- * surcharge, promos and the unsuccessful-work discount.
+ * Whether a task line is labour, the one classifier for pricing and timing: a base rate, or
+ * no rate config ("No base" per-hour row). Flat fees never are.
  * @param task - Task line to classify.
  * @returns True when the line is hourly labour.
  */

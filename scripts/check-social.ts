@@ -1,9 +1,6 @@
 // scripts/check-social.ts
-// Social posting logic that has to be right before anything goes public: each
-// platform's validator, the Google post body, promo placeholder filling, turning an email into a post, the
-// JPEG size reader, how per-platform outcomes roll up into the post status, how a
-// take-down is recorded, and the composer's PATCH parsing. Pure logic, no database
-// and no network.
+// Social posting logic: platform validators, Google post body, promo placeholders, email to
+// post, JPEG size reader, status roll-up, take-downs and PATCH parsing. Pure logic, no DB.
 // Run with: npm test -- social
 
 import { postFromEmail } from "@/features/social/lib/from-email";

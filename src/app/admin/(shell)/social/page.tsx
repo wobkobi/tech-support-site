@@ -1,7 +1,5 @@
 // src/app/admin/(shell)/social/page.tsx
-// Admin social posts page: starting a post, the post being written, and the posting
-// history, all on one page. `?post=<id>` picks which post is open in the composer.
-// Seeds the starter presets on the first visit.
+// Admin social posts page: new post, composer (`?post=<id>`) and history. Seeds presets on first visit.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
@@ -39,8 +37,7 @@ export default async function AdminSocialPage({
 
   const { post: wanted } = await searchParams;
   const openId = typeof wanted === "string" ? parseObjectId(wanted) : null;
-  // Newest created first. Ids grow with creation time, so the order holds still while
-  // posts are edited, and presets made together keep the order they were made in.
+  // Newest first by id, which grows with creation time and ignores edits.
   const posts = await prisma.socialPost.findMany({ orderBy: { id: "desc" } });
   const found = openId ? posts.find((p) => p.id === openId) : undefined;
   const open = found ? await loadOpenPost(found) : null;

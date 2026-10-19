@@ -1,7 +1,6 @@
 // src/features/business/lib/promo-tiers.ts
-// Which discount a job of a given size earns. Kept out of promos.ts because the
-// invoice calculator needs this rule too, and promos.ts carries the Prisma
-// client - business.ts is imported by client components and must not.
+// Which discount a job of a given size earns. Kept out of promos.ts (Prisma) because
+// client-imported business.ts needs it too.
 
 /** One spend band of a tiered promo. */
 export interface PromoTierValues {
@@ -26,20 +25,8 @@ export interface SpendGated {
 }
 
 /**
- * Narrows a promo to what a job of this size actually earns.
- *
- * Two rules, both from the spec and both easy to get backwards:
- *
- * A tiered promo takes the highest band the job reaches. Reaching none means
- * the promo does not apply at all, rather than falling back to a smaller
- * discount the operator never offered.
- *
- * Bands and `minSpend` are judged against the LOW end of the pre-discount
- * total. A job quoted $90-$140 sits below a $100 threshold at one end and above
- * it at the other; taking the low end quotes the discount the customer is
- * certain to get, and a job that lands higher simply earns more at invoice
- * time. Taking the high end would advertise a discount the job may not reach,
- * which is the same failure as a quote that comes in over.
+ * Narrows a promo to what a job of this size earns: the highest band reached (none = no promo),
+ * judged against the LOW end of the pre-discount total so the quote never over-promises.
  * @param promo - The resolved promo, or null.
  * @param preDiscountLow - Low end of the undiscounted total, labour plus travel.
  * @returns The promo with its earned values, or null when the job earns nothing.
@@ -53,17 +40,14 @@ export function promoForSpend<T extends SpendGated>(
   const tiers = promo.tiers ?? [];
   if (tiers.length === 0) return promo;
 
-  // Reduced rather than sorted: resolution must not depend on the stored order,
-  // and validation already rejects duplicate floors so there is one winner.
+  // Order-independent; validation rejects duplicate floors, so there is one winner.
   const earned = tiers.reduce<PromoTierValues | null>((best, tier) => {
     if (preDiscountLow < tier.minSpend) return best;
     return best === null || tier.minSpend > best.minSpend ? tier : best;
   }, null);
   if (!earned) return null;
 
-  // The band replaces the promo's own columns wholesale. Merging them would let
-  // a half-filled tier silently inherit the parent's value and discount by an
-  // amount that appears in neither.
+  // The band replaces the promo's columns wholesale, so a half-filled tier inherits nothing.
   return {
     ...promo,
     flatHourlyRate: earned.flatHourlyRate,

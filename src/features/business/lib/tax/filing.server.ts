@@ -1,7 +1,5 @@
 // src/features/business/lib/tax/filing.server.ts
-// Marks a financial year filed or unfiled. Filing freezes the year's live figures into
-// TaxYear.snapshot and stamps filedAt; unfiling clears both, so the year goes back to live
-// figures and the next year's opening asset values are recalculated.
+// Marks a FY filed (freezes TaxYear.snapshot, stamps filedAt) or unfiled (clears both).
 
 import "server-only";
 
@@ -16,9 +14,8 @@ export type FilingOutcome =
   { ok: true; filedAt: string | null } | { ok: false; error: string; status: 404 | 409 };
 
 /**
- * Saves a year's current figures as its filed snapshot. Refuses a year that is still
- * running (its figures are part-year) and a year that is already filed (unfile first,
- * so an amendment is a deliberate step).
+ * Saves a year's current figures as its filed snapshot. Refuses a running year, and an
+ * already-filed one (unfile first, so an amendment is deliberate).
  * @param fyKey - Key like "2025-26".
  * @param now - Reference instant; also the filing time.
  * @returns The outcome, with the filing time on success.
@@ -44,8 +41,7 @@ export async function fileTaxYear(fyKey: string, now: Date): Promise<FilingOutco
 
   const filedAt = now.toISOString();
   const { snapshot } = await buildLiveSnapshot(fy, now, filedAt);
-  // TaxYearSnapshot is an interface, which TS won't treat as an index-signature JSON
-  // object, hence the cast through unknown. The value is plain JSON by construction.
+  // Interfaces lack an index signature, so cast through unknown; the value is plain JSON.
   const json = snapshot as unknown as Prisma.InputJsonValue;
   /**
    * Creates the year's row filed, or stamps the existing one.
@@ -61,9 +57,8 @@ export async function fileTaxYear(fyKey: string, now: Date): Promise<FilingOutco
   try {
     await upsert();
   } catch (err) {
-    // A first save from the home office form racing this one can also take the create
-    // path; the loser hits the fyKey unique index (P2002). Retry once: the row now
-    // exists, so the retry updates it.
+    // A racing first save from the home office form can win the create (P2002 on fyKey);
+    // retry once, which now updates.
     if (!isUniqueConflict(err)) throw err;
     await upsert();
   }

@@ -1,7 +1,6 @@
 // src/features/reviews/lib/review-ask-rules.ts
-// When an invoice's automatic review ask goes out, and why it doesn't. Pure, so the
-// daily job, the admin "Upcoming review asks" list and the check script all read the
-// same decision: what the admin list forecasts is exactly what the job then does.
+// When an invoice's automatic review ask goes out, and why not. Pure, so the job and the
+// admin forecast always agree.
 
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import {
@@ -65,10 +64,7 @@ export interface InvoiceReviewAskInfo {
   gapDays: number;
   /** The skip that will apply on the due date if nothing changes, or null when it sends. */
   skip: ReviewAskSkipReason | null;
-  /**
-   * `asked_recently` only: the ask that blocks this one. `queued` when it hasn't gone out
-   * yet - another invoice's ask that is due first.
-   */
+  /** `asked_recently` only: the blocking ask; `queued` when it is another invoice's ask due first. */
   blockingAsk: { label: string; queued: boolean } | null;
 }
 
@@ -80,9 +76,8 @@ export interface ReviewAskClockFields {
 }
 
 /**
- * When the review-ask clock starts: the moment the invoice was emailed. An invoice
- * marked paid without ever being emailed (cash on the day, no receipt sent) starts
- * at the payment instead, so those jobs are still asked.
+ * When the review-ask clock starts: the invoice email, else the payment for an invoice
+ * paid without ever being emailed.
  * @param invoice - Status and stamps.
  * @returns Clock start, or null when the invoice has neither (drafts, legacy rows).
  */
@@ -93,10 +88,8 @@ export function reviewAskClockStart(invoice: ReviewAskClockFields): Date | null 
 }
 
 /**
- * The first moment the ask may go out: NZ midnight `delayDays` calendar days after the
- * clock start, so "2 days" means the 10am run two days later however late the invoice
- * went out. Built from the DST-safe NZ date helpers, so the changeover days in April
- * and September don't shift it by an hour.
+ * First moment the ask may go out: NZ midnight `delayDays` calendar days after the clock
+ * start. Uses the DST-safe NZ date helpers.
  * @param start - Clock start from {@link reviewAskClockStart}.
  * @param delayDays - Settings reviews.reviewAskDelayDays.
  * @returns Due instant (UTC).
@@ -122,9 +115,8 @@ export function contactAddresses(contact: ReviewAskContactAddresses): string[] {
 }
 
 /**
- * Which address the ask goes to: the invoice's own address when it is one of the
- * contact's, otherwise the contact's primary email. An invoice can carry a company
- * accounts address or a stale one; the contact is who actually had the job done.
+ * The invoice's address when it belongs to the contact, else the contact's primary
+ * (invoices can carry a company accounts or stale address).
  * @param clientEmail - Invoice.clientEmail.
  * @param contact - The resolved contact.
  * @returns Normalised address, or null when the contact has none.
@@ -192,13 +184,8 @@ function personSkip(input: ReviewAskInput, gapDays: number, at: Date): ReviewAsk
 }
 
 /**
- * Decides an undecided invoice's review ask.
- *
- * Waiting is checked before the person-level skips on purpose: an invoice that isn't
- * due yet stays undecided, so adding the customer to Contacts or clearing an opt-out
- * before the due date still gets them asked. The skip that would apply is carried as
- * `forecast` so the admin list can warn ahead of time; its gap check is judged at the
- * due date, since an earlier ask may have aged out by then.
+ * Decides an undecided invoice's review ask. Waiting is checked before person-level skips
+ * so fixes before the due date still count; the would-be skip rides along as `forecast`.
  * @param input - Gathered invoice and contact state.
  * @param timing - Delay and gap from settings.
  * @param now - Current instant.
@@ -219,15 +206,8 @@ export function decideReviewAsk(
 }
 
 /**
- * Where a contact stands for a hand-sent review ask, for the admin "Who you can ask"
- * list. The opt-outs block; everything else only changes how the row reads.
- * - `ready` - has an email, hasn't reviewed on the site, not asked inside the gap.
- * - `recent` - asked inside the gap; Send again still works.
- * - `reviewed` - already reviewed on the site; the ask leads with Google, so it's
- *   the "post it on Google too" nudge.
- * - `text_only` - no email but a phone, so the ask goes as a copied text.
- * - `review_opt_out` / `mailing_opt_out` - can't be emailed an ask.
- * - `no_details` - neither an email nor a phone on file.
+ * A contact's standing for a hand-sent review ask. Only the opt-outs block; `reviewed` is
+ * the "post on Google too" nudge, `text_only` has a phone but no email.
  */
 export type AskPersonStatus =
   | "ready"
@@ -251,9 +231,8 @@ export interface AskPersonInput {
 }
 
 /**
- * Classifies one contact for the hand-sent review ask list. Opt-outs come first
- * because they block outright. A mailing unsubscribe only blocks email, so a contact
- * with a phone falls through to `text_only`.
+ * Classifies one contact for the hand-sent ask list. A mailing unsubscribe only blocks
+ * email, so a contact with a phone falls through to `text_only`.
  * @param input - The contact's ask state.
  * @param gapDays - Minimum days between asks from settings; 0 turns `recent` off.
  * @param now - Current instant.

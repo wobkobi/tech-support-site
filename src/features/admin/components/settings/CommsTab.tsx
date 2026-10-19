@@ -1,8 +1,7 @@
 "use client";
 // src/features/admin/components/settings/CommsTab.tsx
-// Editor for the comms & automation group: which emails send (confirmation, reminder)
-// and their timings. Saves through the shared settings form hook. Review requests aren't
-// here: they go out with the invoice email.
+// Editor for the comms & automation group: which emails and pushes send, and their timings.
+// Review requests aren't here: they go out with the invoice email.
 
 import {
   NumberField,
@@ -46,10 +45,8 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
   const set = (patch: Partial<CommsSettings>): void => setDraft((p) => ({ ...p, ...patch }));
 
   /**
-   * Applies an email-toggle change, then confirms if it has just turned the LAST
-   * remaining customer email off. The switch flips right away so the dialog
-   * reflects what was done; Cancel restores both emails to their saved
-   * state (see the dialog's onCancel).
+   * Applies an email-toggle change, then confirms if it just turned the LAST customer email
+   * off. Cancel restores both emails to their saved state.
    * @param patch - The single email-toggle change.
    */
   const setNotify = (patch: Partial<CommsSettings>): void => {
@@ -80,10 +77,8 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
         />
       </div>
 
-      {/* Operator-facing, unlike the emails above. Uses plain `set`: the
-          last-one-off guard exists to stop the customer going dark, and turning
-          every push off is a legitimate choice. Devices are enrolled separately
-          on /admin/notifications - these only gate what gets sent. */}
+      {/* Operator-facing, so plain `set`: turning every push off is legitimate. Devices
+          are enrolled on /admin/notifications - these only gate what gets sent. */}
       <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Which push notifications you get</h3>
       <div className="mt-2 divide-y divide-admin-border">
         <ToggleField
@@ -222,8 +217,7 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
         tone="danger"
         onConfirm={() => setConfirmAllOff(false)}
         onCancel={() => {
-          // Restore both email switches to their last-SAVED state (baseline,
-          // not the page-load value), so a mid-session save of one as off is kept.
+          // Restore to the last-SAVED baseline so a mid-session save of one as off is kept.
           setConfirmAllOff(false);
           set({
             notifyConfirmation: baseline.notifyConfirmation,

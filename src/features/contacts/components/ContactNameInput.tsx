@@ -1,8 +1,6 @@
 "use client";
 // src/features/contacts/components/ContactNameInput.tsx
-// A customer name box that suggests saved contacts as you type, through the same
-// filterContacts search the calculator's Client card uses. Free text still works, so a
-// walk-in or someone not in contacts can be typed as-is.
+// Customer name box that suggests saved contacts via filterContacts; free text still works.
 
 import type { GoogleContact } from "@/features/business/types/business";
 import { filterContacts } from "@/features/contacts/lib/contact-search";
@@ -13,8 +11,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 const MAX_SUGGESTIONS = 6;
 
 /**
- * Loads the operator's Google contacts once for {@link ContactNameInput}. A failed
- * fetch leaves the list empty, so the box falls back to plain typing.
+ * Loads the Google contacts once for {@link ContactNameInput}; a failed fetch
+ * leaves the list empty.
  * @returns The contacts, empty until loaded.
  */
 export function useGoogleContacts(): GoogleContact[] {
@@ -40,10 +38,7 @@ interface Props {
   onChange: (name: string) => void;
   /** Saved contacts to suggest from. */
   contacts: GoogleContact[];
-  /**
-   * Handles a picked suggestion in place of `onChange`, so a form can set the name and
-   * other fields (e.g. email) in one update. Without it, the pick sets the name.
-   */
+  /** Handles a pick in place of `onChange`, so a form can set name and email at once. */
   onPick?: (contact: GoogleContact) => void;
   placeholder?: string;
   disabled?: boolean;
@@ -55,9 +50,7 @@ interface Props {
 }
 
 /**
- * Name input with a contact suggestion list under it. Arrow keys move through the
- * list, Enter picks the highlighted one (or keeps the typed name when none is), Escape
- * closes.
+ * Name input with a contact suggestion list: arrows move, Enter picks, Escape closes.
  * @param props - Component props.
  * @param props.id - Input id, for its label.
  * @param props.value - Current name.
@@ -86,8 +79,7 @@ export function ContactNameInput({
   describedBy,
 }: Props): React.ReactElement {
   const [open, setOpen] = useState(false);
-  // -1 = nothing highlighted, so Enter keeps the typed name until the operator arrows
-  // into the list.
+  // -1 = nothing highlighted, so Enter keeps the typed name.
   const [highlight, setHighlight] = useState(-1);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -105,8 +97,7 @@ export function ContactNameInput({
   }, [open, value, contacts]);
 
   /**
-   * Fills the name from a suggestion. Cancels the pending blur-close so the pick
-   * lands before the list hides.
+   * Fills the name from a suggestion, cancelling the pending blur-close.
    * @param c - The chosen contact.
    */
   function pick(c: GoogleContact): void {

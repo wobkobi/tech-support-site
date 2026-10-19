@@ -1,8 +1,6 @@
 // scripts/eval-ai/context.ts
-// Reads live pricing context (benchmarks, min-billable, increment, rates, templates) so
-// expected values track the operator's own settings and the eval never goes stale against
-// a config change. Read-only, and resolved via the EXPORTED pure resolveSettings - not
-// the unstable_cache-wrapped getSettings, which throws outside a Next.js request.
+// Reads live pricing context so expectations track current settings. Uses the pure
+// resolveSettings, since getSettings throws outside a Next.js request.
 
 import { prisma } from "@/shared/lib/prisma";
 import { resolveSettings, SETTINGS_KEY_PREFIX } from "@/shared/lib/settings/get-settings";
@@ -25,10 +23,8 @@ export interface LiveContext {
 }
 
 /**
- * Resolves settings the way the server does but without the unstable_cache
- * wrapper: reads the `settings:*` rows directly and merges them through the
- * exported pure {@link resolveSettings}, so the merge stays the single source
- * of truth. Mirrors the private `loadSettings` in get-settings.ts.
+ * Resolves settings like the server, without unstable_cache: reads `settings:*` rows and
+ * merges them through {@link resolveSettings}.
  * @returns Fully-resolved settings (defaults + DB overrides).
  */
 async function loadSettingsUncached(): Promise<Settings> {

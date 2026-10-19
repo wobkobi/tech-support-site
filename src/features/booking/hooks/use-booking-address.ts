@@ -34,32 +34,23 @@ export interface BookingAddressState {
  * @returns Address state, setters and candidate-prompt handlers.
  */
 export function useBookingAddress(initialAddress: string): BookingAddressState {
-  // Unit kept separate so Places autocomplete can predict the street part
-  // (NZ "N/" prefixes break predictions). Re-combined on submit, split on
-  // pre-fill, so saved addresses stay in "12/160 Kepa Road Orakei" shape.
+  // Unit kept separate: NZ "N/" prefixes break Places predictions. Saved as "12/160 Kepa Road".
   const initialSplit = splitUnitFromAddress(initialAddress);
   const [unit, setUnit] = useState(initialSplit.unit);
   const [address, setAddress] = useState(initialSplit.rest);
-  // True after picking an autocomplete suggestion (or pre-filled in edit mode);
-  // any keystroke resets it. Drives the green-tick hint + submit-time geocode.
+  // True after picking a suggestion (or edit-mode pre-fill); any keystroke resets it.
   const [addressVerified, setAddressVerified] = useState(Boolean(initialAddress));
-  // True after a failed submit-time geocode so a second click submits as-is.
-  // Resets on any address change to re-check different mistypes.
+  // A failed geocode lets the next click submit as-is; resets on address change.
   const [addressOverrideAcked, setAddressOverrideAcked] = useState(false);
-  // Google candidates for a typed-but-not-picked address. null = no prompt, one
-  // entry = "did you mean?", several = "which did you mean?" - never auto-picked.
+  // Google candidates for a typed address (null = no prompt); never auto-picked.
   const [addressCandidates, setAddressCandidates] = useState<string[] | null>(null);
-  // Apt/Unit is hidden by default (most customers are in a house) so nobody types
-  // their street number into it; revealed on request, pre-revealed in edit mode.
+  // Apt/Unit hidden by default so nobody types their street number into it.
   const [showUnit, setShowUnit] = useState(Boolean(initialSplit.unit));
-  // True once AddressAutocomplete reports the Maps API is unavailable. The
-  // form then skips the "must pick a suggestion" gate.
+  // Maps API unavailable: skip the "must pick a suggestion" gate.
   const [mapsFallback, setMapsFallback] = useState(false);
 
   /**
-   * Applies a Google address candidate the customer picked from the "did you
-   * mean?" prompt: splits any unit prefix back into its own field, marks the
-   * address verified so it won't re-prompt, and dismisses the prompt.
+   * Applies a picked Google candidate: splits out any unit and marks the address verified.
    * @param candidate - The chosen canonical address (may carry a "unit/" prefix).
    */
   function applyAddressCandidate(candidate: string): void {
@@ -72,10 +63,7 @@ export function useBookingAddress(initialAddress: string): BookingAddressState {
     setAddressOverrideAcked(false);
   }
 
-  /**
-   * Dismisses the address prompt and keeps the customer's typed text, letting the
-   * next submit go through as-is (some genuine new addresses don't geocode).
-   */
+  /** Dismisses the prompt; the next submit goes through with the typed text. */
   function keepTypedAddress(): void {
     setAddressCandidates(null);
     setAddressOverrideAcked(true);

@@ -1,7 +1,5 @@
 // src/features/social/lib/insertables.ts
-// What the composer's "Add" menu offers. Add an entry here and it shows up in the
-// menu; no other change is needed. Page links are plain addresses, since Facebook and
-// Instagram show text exactly as typed.
+// The composer's "Add" menu entries; adding one here is all it takes. Links are plain addresses.
 
 import type { InsertGroup } from "@/features/admin/components/ui/InsertMenu";
 import {

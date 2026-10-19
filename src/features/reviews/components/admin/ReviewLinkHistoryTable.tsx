@@ -1,8 +1,7 @@
 "use client";
 // src/features/reviews/components/admin/ReviewLinkHistoryTable.tsx
-// Review link history: cards up to xl and a table from xl, with inline editing of a
-// contact's email/phone, Send again for anyone with an email on file, and revoke for links
-// not yet used. Rows that resolve to no contact at all (Legacy) are read-only.
+// Review link history (cards below xl, table from xl) with inline contact editing, Send
+// again and revoke. Rows with no contact (Legacy) are read-only.
 
 import {
   ROW_CLS,
@@ -38,11 +37,8 @@ import { useSendReviewAsk } from "./use-send-review-ask";
 const CELL_CLS = cn(TD_CLS, "px-3");
 
 /**
- * Which channel the review link went out on. The first four are tracked sends
- * with a real send date; the last two are reconstructed from the review itself,
- * so their date is when the review landed, not when the ask went out.
- * - `Linked` - a review attached to a contact with no send on record.
- * - `Legacy` - a review nobody in the contact book answers for.
+ * Which channel the review link went out on. `Linked` (contact, no send on record) and
+ * `Legacy` (no contact) are rebuilt from the review, so their date is the review's.
  */
 export type LinkSource = "Auto" | "Manual email" | "Manual SMS" | "Invoice" | "Linked" | "Legacy";
 
@@ -73,9 +69,8 @@ interface ReviewLinkHistoryTableProps {
 }
 
 /**
- * Renders the review link history: cards on phones and narrow desktops, a table from xl.
- * The list sits in the page's two-thirds column, which below xl is too narrow for three
- * columns. Any row that resolves to a contact can have its email/phone edited inline.
+ * Renders the review link history: cards below xl, where the two-thirds column is too
+ * narrow for three columns, and a table from xl.
  * @param props - Component props.
  * @param props.entries - History rows to display.
  * @returns History table element.
@@ -86,10 +81,7 @@ export function ReviewLinkHistoryTable({
   const { toast } = useToast();
   const [entries, setEntries] = useState(initialEntries);
   const [query, setQuery] = useState("");
-  /**
-   * Key used to track which row is being edited. Review-derived rows key on the
-   * review first, so two reviews resolving to one contact stay distinct rows.
-   */
+  /** Row being edited; review-derived rows key on the review so they stay distinct. */
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editEmail, setEditEmail] = useState("");
   const [editPhoneInput, setEditPhoneInput] = useState("");
@@ -168,8 +160,7 @@ export function ReviewLinkHistoryTable({
     if (!entry.id) return;
     setSaving(true);
     try {
-      // PATCH the Contact row - email/phone live there. Rows with no contact
-      // behind them are read-only, so `entry.id` is the gate above.
+      // Email/phone live on the Contact row; `entry.id` above gates contact-less rows.
       const res = await fetch(`/api/admin/contacts/${entry.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -218,8 +209,7 @@ export function ReviewLinkHistoryTable({
   }
 
   /**
-   * Starts a fresh email ask to a row's person. A review-derived row has no send on
-   * record, so it passes no last-asked date.
+   * Starts a fresh email ask to a row's person; review-derived rows pass no last-asked date.
    * @param entry - The row to ask again.
    */
   function sendAgain(entry: LinkHistoryEntry): void {
@@ -276,8 +266,7 @@ export function ReviewLinkHistoryTable({
             {visibleEntries.map((entry) => {
               const key = entryKey(entry);
               const isEditing = key !== null && editingKey === key;
-              // Only contact-backed rows are editable; booking sends and rows with
-              // nobody behind them display read-only, their fields living elsewhere.
+              // Only contact-backed rows are editable.
               const canEdit = entry.id !== null;
 
               return (
@@ -319,8 +308,7 @@ export function ReviewLinkHistoryTable({
             })}
           </div>
 
-          {/* Wide desktop: one table row per entry. Editing swaps the contact and
-              action cells for the editor, so the name stays in view. */}
+          {/* Wide desktop: editing swaps the contact and action cells so the name stays. */}
           <div className="hidden max-h-128 overflow-y-auto rounded-lg border border-admin-border xl:block">
             <table className={cn(TABLE_CLS, "table-fixed")}>
               <colgroup>
@@ -387,8 +375,7 @@ export function ReviewLinkHistoryTable({
         </>
       )}
 
-      {/* One dialog for the list rather than a confirm pair per row: the entry
-          is looked up from the pending key, so only one can be in flight. */}
+      {/* One dialog for the list; the entry is looked up from the pending key. */}
       <ConfirmDialog
         open={confirmRevokeKey !== null}
         title="Revoke this review link?"

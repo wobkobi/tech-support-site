@@ -1,7 +1,6 @@
 // src/features/business/components/promo-list-helpers.ts
 // Lifecycle status, overlap detection and display phrases for the admin promo list,
-// shared by PromosView and its row/card markup, plus the restriction tag style the list
-// rows and the form's Advanced options summary share.
+// plus the restriction tag style shared with the form's Advanced options summary.
 
 import type { PromoRow } from "@/app/admin/(shell)/promos/page";
 import type { StatusTone } from "@/features/admin/components/ui/StatusPill";
@@ -70,9 +69,7 @@ function rangesOverlap(a: PromoRow, b: PromoRow): boolean {
   const bStart = new Date(b.startAt).getTime();
   const bEnd = new Date(b.endAt).getTime();
   if (aStart >= bEnd || bStart >= aEnd) return false;
-  // Sharing a date range is not competing if they run on different days. A
-  // Tuesday promo and a Thursday one never meet, and warning about them would
-  // train the operator to ignore the warning that matters.
+  // Promos on different weekdays never meet, so a shared date range isn't a clash.
   if (a.activeWeekdays.length > 0 && b.activeWeekdays.length > 0) {
     return a.activeWeekdays.some((d) => b.activeWeekdays.includes(d));
   }
@@ -80,11 +77,8 @@ function rangesOverlap(a: PromoRow, b: PromoRow): boolean {
 }
 
 /**
- * IDs of active promos whose ranges overlap each other.
- *
- * Compared within a kind only. A code promo and an automatic one can share a
- * window without competing - a valid code always wins, and only for whoever
- * entered it - so pairing them would raise a warning about nothing.
+ * IDs of active promos whose ranges overlap each other. Compared within a kind
+ * only: a valid code always wins over an automatic promo, so they never compete.
  * @param promos - All promos.
  * @returns Set of overlapping IDs.
  */
@@ -103,9 +97,7 @@ export function findOverlaps(promos: PromoRow[]): {
       if (!rangesOverlap(a, b)) continue;
       ids.add(a.id);
       ids.add(b.id);
-      // Resolved through the shared selector, and on createdAt rather than
-      // startAt, so the warning can never name a different winner than the
-      // query that actually picks the promo.
+      // Same selector and createdAt order as the live query, so the named winner matches.
       const winner = pickWinningPromo([
         {
           id: a.id,
@@ -136,11 +128,8 @@ export interface PromoStats {
 }
 
 /**
- * One-line usage summary for a promo.
- *
- * Reports rows with no recorded value separately rather than counting them as
- * zero: a promo redeemed before value tracking would otherwise read as "$0
- * discounted", which looks like a promo nobody benefited from.
+ * One-line usage summary for a promo. Rows with no recorded value are reported
+ * apart so they don't read as "$0 discounted".
  * @param stats - Totals for this promo, or undefined when it has none.
  * @returns A sentence describing usage.
  */
@@ -178,8 +167,8 @@ export function overlapNote(
 }
 
 /**
- * Short operator-facing description of what a promo does, used by both the
- * table and the mobile card so the two cannot drift.
+ * Short operator-facing description of what a promo does, shared by the table
+ * and the mobile card.
  * @param p - Stored promo row.
  * @returns A phrase like "$60.00/hr" or "Free travel".
  */

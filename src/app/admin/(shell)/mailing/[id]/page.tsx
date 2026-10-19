@@ -1,7 +1,5 @@
 // src/app/admin/(shell)/mailing/[id]/page.tsx
-// Admin editor for one mailing-list email or preset. Loads the email, who it went
-// to (once sent), the presets for the template dropdown, the quiet-hours window, the
-// Add menu's contents and which env vars sending still needs.
+// Admin editor for one mailing-list email or preset, with its recipients, presets and send setup.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { insertDetailsOf } from "@/features/admin/lib/insertables";
@@ -54,8 +52,7 @@ async function loadSends(campaignId: string): Promise<SendRow[]> {
 }
 
 /**
- * Templates for the dropdown on a draft: blank first, then the presets oldest first
- * so the starter set keeps its order.
+ * Templates for the dropdown: blank first, then presets oldest first.
  * @returns Blank plus every preset.
  */
 async function loadTemplates(): Promise<Template[]> {
@@ -101,8 +98,7 @@ export default async function AdminMailingEditPage({
         title={campaign.name}
         breadcrumbs={[{ label: "Mailing list", href: "/admin/mailing" }, { label: campaign.name }]}
       />
-      {/* Keyed on status and last save: router.refresh() after a send or schedule
-          change remounts the editor with the new state instead of keeping stale fields. */}
+      {/* Keyed on status and last save so router.refresh() remounts with fresh state. */}
       <CampaignEditor
         key={`${row.status}-${row.updatedAt}`}
         initial={row}

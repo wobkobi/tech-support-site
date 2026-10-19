@@ -1,10 +1,7 @@
 // src/shared/lib/ai/json-completion.ts
-// One JSON-reply model call for the AI routes, sent to OpenAI or Claude. AI_PROVIDER picks
-// the provider ("openai" unless set to "anthropic"), and AI_PROVIDER_<FEATURE> overrides it
-// for one feature (AI_PROVIDER_PARSE_JOB="openai" keeps the job parser on gpt-4.1 while the
-// rest run on Claude). ANTHROPIC_MODEL picks the Claude model and ANTHROPIC_EFFORT whether
-// Claude thinks first, so the eval harness can run the same routes against any of them
-// without code changes.
+// One JSON-reply model call to OpenAI or Claude. AI_PROVIDER picks the provider ("openai" unless
+// "anthropic"); AI_PROVIDER_<FEATURE> overrides per feature. ANTHROPIC_MODEL and ANTHROPIC_EFFORT
+// tune Claude, so the eval harness can switch without code changes.
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
@@ -12,10 +9,7 @@ import OpenAI from "openai";
 /** Claude model used when ANTHROPIC_MODEL isn't set. */
 const DEFAULT_ANTHROPIC_MODEL = "claude-haiku-5-5";
 
-/**
- * Output room for Claude. The OpenAI budgets are sized to gpt-4.1's terse replies; Claude
- * writes a little more around the same JSON, and a cut-off reply is a failed parse.
- */
+/** Claude output room: it writes a little more than gpt-4.1 around the same JSON, and a cut reply fails to parse. */
 const ANTHROPIC_MIN_MAX_TOKENS = 4000;
 
 /** Output room when Claude thinks first: the thinking counts against max_tokens too. */
@@ -67,8 +61,7 @@ export interface JsonCompletionResult {
 }
 
 /**
- * Whether a feature sends its calls to Claude instead of OpenAI. The feature's own
- * AI_PROVIDER_<FEATURE> setting wins when set; otherwise AI_PROVIDER decides.
+ * Whether a feature uses Claude: AI_PROVIDER_<FEATURE> wins, else AI_PROVIDER.
  * @param feature - The calling feature.
  * @returns True when the provider for that feature is "anthropic".
  */
@@ -78,8 +71,7 @@ export function usesAnthropic(feature: AiFeature): boolean {
 }
 
 /**
- * Names a feature's provider, Claude model and effort, for cache keys that must not hand
- * one setup's stored answer back when another is active.
+ * Names a feature's provider, model and effort, so cache keys never cross setups.
  * @param feature - The calling feature.
  * @returns "openai", or "anthropic:" plus the Claude model id and effort.
  */
@@ -103,8 +95,7 @@ function hasKey(provider: AiProvider): boolean {
 }
 
 /**
- * Whether any AI provider has its API key set. One is enough for every feature: a call whose
- * provider has no key, or fails on the provider's side, goes to the other one.
+ * Whether any AI provider key is set; one is enough, as calls fall back to the other.
  * @returns True when at least one key is present.
  */
 export function aiConfigured(): boolean {
@@ -112,9 +103,8 @@ export function aiConfigured(): boolean {
 }
 
 /**
- * Whether an error is an upstream 429 rate limit from either provider. Both SDK errors carry
- * the response headers the rate-limit response reads its retry hint from. OpenAI also sends
- * a 429 for a used-up quota, which waiting never clears, so that one doesn't count.
+ * Whether an error is a 429 rate limit from either SDK. OpenAI's used-up-quota 429 doesn't
+ * count, since waiting never clears it.
  * @param err - The caught error.
  * @returns True for a rate-limit error from either SDK.
  */
@@ -124,12 +114,8 @@ export function isAiRateLimitError(err: unknown): err is { headers?: unknown } {
 }
 
 /**
- * Whether a failed call should go once to the other provider: the trouble is on the
- * provider's side, so the other one can still answer. That covers used-up credit (Claude's
- * billing_error or its older "credit balance is too low" 400, OpenAI's insufficient_quota
- * 429), a rejected key, a rate limit, an unreachable host and a server fault (5xx, including
- * Claude's 529 overloaded). Timeouts and aborts don't qualify - the time budget is already
- * spent - and nor do bad requests or unusable replies.
+ * Whether a failure should go once to the other provider: provider-side trouble (out of credit,
+ * bad key, rate limit, unreachable, 5xx incl. 529). Not timeouts, aborts, bad requests or bad replies.
  * @param err - The caught error.
  * @returns True when the other provider should be tried.
  */
@@ -156,9 +142,8 @@ function shouldFallBack(err: unknown): boolean {
 }
 
 /**
- * Pulls the JSON object out of a reply. Claude has no JSON mode and can wrap the object in a
- * markdown code fence or a sentence, so this keeps the outermost braces; OpenAI's
- * json_object replies pass through unchanged.
+ * Pulls the JSON object out of a reply by its outermost braces, since Claude may wrap it in a
+ * code fence or sentence.
  * @param text - Raw reply text.
  * @returns The JSON object text, or the input when no braces are found.
  */
@@ -169,11 +154,8 @@ export function extractJsonObject(text: string): string {
 }
 
 /**
- * Thinking setting per Claude model. With an effort set, the model thinks adaptively at
- * that effort before answering. Without one, these routes get gpt-4.1's answer-straight-away
- * behaviour where the model allows it: Haiku 5.5 takes "disabled", Sonnet 5.5 rejects that
- * and takes "between_tools", which skips thinking when no tools are in play. Other models
- * keep their default.
+ * Thinking setting per Claude model: adaptive at the given effort, or none where allowed
+ * (Haiku 5.5 "disabled", Sonnet 5.5 "between_tools"); other models keep their default.
  * @param model - Claude model id.
  * @param effort - Effort level, or null for no thinking.
  * @returns The thinking parameter, or undefined to omit it.
@@ -275,11 +257,8 @@ async function callOpenAi(req: JsonCompletionRequest): Promise<JsonCompletionRes
 }
 
 /**
- * Sends one call that should come back as a JSON object. It goes to the calling feature's
- * provider, or straight to the other one when that provider has no key. When the provider
- * fails on its own side (see {@link shouldFallBack}) the call is sent once more to the
- * other provider, so running out of credit with one doesn't take the AI features down.
- * The answering model comes back in the result, so logs show when the other one answered.
+ * Sends one JSON call to the feature's provider (or the other when it has no key), retrying once
+ * on the other provider per {@link shouldFallBack}. The answering model is returned for logs.
  * @param req - The feature, prompt, limits and the OpenAI model.
  * @returns The JSON text, the answering model and token usage.
  */

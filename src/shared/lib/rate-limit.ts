@@ -1,10 +1,6 @@
 // src/shared/lib/rate-limit.ts
-// In-memory fixed-window rate limiter for public POST routes.
-//
-// Vercel serverless instances each hold their own bucket map, so the effective global
-// limit per IP is roughly N_instances times the per-instance limit. For a low-traffic
-// site this is acceptable; swap for an Upstash/Redis-backed limiter if/when stricter
-// global enforcement becomes necessary.
+// In-memory fixed-window rate limiter for public POST routes. Per-instance, so the real limit is
+// about N_instances x limit; fine at this traffic.
 
 import { NextRequest, NextResponse } from "next/server";
 
@@ -17,9 +13,7 @@ const buckets = new Map<string, Bucket>();
 const MAX_BUCKETS = 10_000;
 
 /**
- * Records a hit against the named bucket and reports whether it is allowed.
- * Uses a simple fixed window: the first hit starts a window of `windowMs`,
- * and the bucket is reset once the window expires.
+ * Records a hit and reports whether it is allowed, in a fixed window started by the first hit.
  * @param key - Bucket identifier (typically `route:ip`).
  * @param limit - Maximum allowed hits within the window.
  * @param windowMs - Window length in milliseconds.
@@ -52,10 +46,7 @@ function rateLimit(
 }
 
 /**
- * Extracts the client IP from a request, preferring `x-forwarded-for` (set by
- * Vercel's edge), falling back to `x-real-ip`, then to the literal `"unknown"`.
- * Multiple IPs in `x-forwarded-for` are split and the first (originating) one
- * is returned.
+ * Client IP from the first `x-forwarded-for` entry, then `x-real-ip`, else "unknown".
  * @param request - Incoming request.
  * @returns Client IP string.
  */
@@ -69,9 +60,7 @@ export function getClientIp(request: NextRequest): string {
 }
 
 /**
- * Dev-only escape hatch: outside production, a request presenting the admin
- * secret skips rate limiting so the eval harness can batch the public route.
- * Cannot be true in production - the environment check gates it.
+ * Outside production only, a matching admin secret skips rate limiting for the eval harness.
  * @param nodeEnv - `process.env.NODE_ENV`.
  * @param headerSecret - The request's `x-admin-secret` header value (or null).
  * @param adminSecret - `process.env.ADMIN_SECRET` (or undefined when unset).
@@ -88,9 +77,7 @@ function isRateLimitBypassed(
 }
 
 /**
- * Convenience wrapper that runs {@link rateLimit} and, when blocked, returns a
- * 429 response carrying a `Retry-After` header. Returns null when the request
- * should proceed.
+ * Runs {@link rateLimit}; returns a 429 with `Retry-After` when blocked, else null.
  * @param request - Incoming request used to derive the client IP.
  * @param scope - Short identifier for the route (combined with IP into the bucket key).
  * @param limit - Maximum allowed hits within the window.

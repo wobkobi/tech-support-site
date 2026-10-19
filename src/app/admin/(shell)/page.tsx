@@ -1,12 +1,6 @@
 // src/app/admin/(shell)/page.tsx
-// Admin dashboard. Loads everything through loadDashboardData, then renders the header
-// (date, bookings today), on phones the next job and quick action tiles first, the KPI
-// strip (revenue with a 12-month sparkline, outstanding, bookings today, pending reviews),
-// alerts for overdue invoices and held bookings, the work column (upcoming bookings, the
-// income vs expenses chart, events to complete) beside the next job, pending reviews,
-// retainers due and the review-link form, the running totals strip, then recent activity
-// and system status. Counts link to the list filtered to what they count (?status=held),
-// and rows to their record.
+// Admin dashboard from loadDashboardData: KPIs, alerts, upcoming work, next job and recent
+// activity. Counts link to their filtered list, rows to their record.
 
 import { BarChart } from "@/features/admin/components/charts/BarChart";
 import { incomeExpenseSeries } from "@/features/admin/components/charts/series";
@@ -85,8 +79,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     {
       label: "Revenue this month",
       value: formatNZD(monthRevenue),
-      // Money received: once registered the chart below counts income excl. GST, so say
-      // which side this figure is on.
+      // Once registered the chart counts income excl. GST, so say which side this is.
       sub: data.gstRegistered ? "Incl. GST" : undefined,
       href: `/admin/business`,
       urgent: false,
@@ -96,8 +89,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       label: "Outstanding",
       value: formatNZD(outstandingTotal),
       sub: `${outstandingInvoices.length} invoice${outstandingInvoices.length === 1 ? "" : "s"}${overdueInvoices.length > 0 ? `, ${overdueInvoices.length} overdue` : ""}`,
-      // Overdue ones are the ones to chase; otherwise the list's own cards split
-      // drafts from sent.
+      // Link to overdue when there are any, else the plain list.
       href:
         overdueInvoices.length > 0
           ? `/admin/business/invoices?status=overdue`
@@ -154,8 +146,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
 
   const todayCount = data.todaysBookings.length;
   /**
-   * The next job panel, shared by the phone copy (top of the page) and the desktop copy
-   * (top of the side column).
+   * The next job panel, rendered once for phones and once for desktop.
    * @param className - Classes that hide the copy at the other size.
    * @returns The panel element.
    */
@@ -208,8 +199,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
 
       <DashboardAlerts overdueCount={overdueInvoices.length} heldCount={heldCount} />
 
-      {/* What needs doing comes first: upcoming work and the chart on the left, the next
-          job and anything waiting on a decision on the right. History sits below. */}
+      {/* What needs doing first; history below. */}
       <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="flex min-w-0 flex-col gap-6 lg:col-span-8">
           <UpcomingBookingsPanel laterBookings={data.laterBookings} />

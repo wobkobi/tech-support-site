@@ -1,7 +1,5 @@
 // src/app/api/admin/social/designs/[id]/renders/route.ts
-// Stores one size's exported picture. The browser draws each size at its exact pixel
-// size and sends them one at a time, so a failed upload is retried for that size alone.
-// The file is kept as drawn: never shrunk, since it is already the size the app wants.
+// Stores one size's exported picture, sent one size at a time and kept exactly as drawn.
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import { parseDesignDoc } from "@/features/social-design/lib/doc";
@@ -29,9 +27,7 @@ interface Ctx {
 }
 
 /**
- * POST /api/admin/social/designs/[id]/renders - multipart form with `format`,
- * `docHash` (the design's fingerprint as drawn) and `file` (a JPEG at the size's exact
- * pixel size).
+ * POST /api/admin/social/designs/[id]/renders - multipart `format`, `docHash` and `file` (JPEG).
  * @param request - Incoming request.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the design id.
@@ -60,8 +56,7 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
   }
   if (file.size > MAX_BYTES) return errorResponse("That picture is over 4 MB.", 400);
 
-  // The stored size is what the file really is, checked against the size it's for:
-  // Instagram's width rules are judged on these numbers.
+  // Store the file's real size; Instagram's width rules are judged on it.
   const bytes = new Uint8Array(await file.arrayBuffer());
   const size = jpegSize(bytes);
   const want = FORMATS[format];

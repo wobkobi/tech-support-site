@@ -1,8 +1,6 @@
 // scripts/check-contact-emails.ts
-// Unioning a contact's email addresses across the site and Google. The import
-// used to read only emailAddresses[0] and the push used to write a
-// single-element array, so every address after the first was dropped one way
-// and deleted the other. These cases pin both directions.
+// Union a contact's email addresses across the site and Google, so no address after the
+// first is dropped on import or deleted on push.
 // Run with: npm test -- contact-emails
 
 import { mergeEmails } from "@/features/contacts/lib/merge-emails";
@@ -27,8 +25,7 @@ function main(): void {
     ["pat.lee@example.com", "pat.lee@example.net"],
   );
 
-  // The push direction: an address the site knows must not be dropped from
-  // Google just because Google has not seen it yet.
+  // Push direction: a site-only address must not be dropped
   expectEqual(
     "site-only address survives",
     mergeEmails(["a@x.co.nz", "b@x.co.nz"], ["a@x.co.nz"], "a@x.co.nz"),
@@ -41,8 +38,7 @@ function main(): void {
     ["b@x.co.nz", "a@x.co.nz"],
   );
 
-  // Stored lowercased, and a case-only difference is the same address - the
-  // sync already compares emails lowercased for exactly this reason.
+  // Stored lowercased; a case-only difference is the same address
   expectEqual(
     "case-only duplicates collapse",
     mergeEmails(["A@X.co.nz"], ["a@x.CO.NZ"], "A@X.co.nz"),

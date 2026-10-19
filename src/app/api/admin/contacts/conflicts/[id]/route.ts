@@ -1,8 +1,6 @@
 // src/app/api/admin/contacts/conflicts/[id]/route.ts
-// Admin endpoint to resolve a ContactConflict by picking a winner (site / google /
-// custom). Writes the chosen value to the site Contact row, marks the conflict resolved,
-// and triggers a fresh sync to push the chosen value to Google (which lets the
-// cross-stamping in lastSyncedAt + lastGoogleEtag catch up).
+// Admin endpoint to resolve a ContactConflict: writes the winning value to the Contact,
+// marks it resolved, and re-syncs to Google.
 
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -16,7 +14,6 @@ import { NextRequest, NextResponse } from "next/server";
  * - winner "site" - keeps the site value, marks resolved, pushes to Google.
  * - winner "google" - copies Google value to site contact, marks resolved.
  * - winner "custom" - writes `customValue` to site, marks resolved, pushes.
- * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @param ctx - Route ctx with the conflict id.
  * @param ctx.params - Resolved Next.js dynamic route params.
@@ -58,12 +55,10 @@ export async function POST(
         ? conflict.googleValue
         : customValue;
 
-  // Write the chosen value to the site contact. conflict.field is the
-  // ContactField enum so name/email/address are the only possible values.
+  // conflict.field is the ContactField enum: name, email or address.
   const field = conflict.field;
 
-  // Contact.name is a required column, so a null/blank chosen value for the name
-  // field would make Prisma throw and leave the conflict permanently unresolvable.
+  // Contact.name is required, so a blank name would make Prisma throw.
   if (field === "name" && !chosenValue?.trim()) {
     return errorResponse("A name value is required to resolve this conflict.", 400);
   }
@@ -71,9 +66,7 @@ export async function POST(
   try {
     await prisma.contact.update({
       where: { id: conflict.contactId },
-      // Clearing lastSyncedAt forces the next syncContactToGoogle to treat
-      // both sides as freshly changed, so the chosen value reliably propagates
-      // to Google regardless of who appeared to "change last".
+      // Clearing lastSyncedAt forces the chosen value to push to Google.
       data: { [field]: chosenValue, lastSyncedAt: null },
     });
 
@@ -82,8 +75,7 @@ export async function POST(
       data: { resolvedAt: new Date(), resolution: winner },
     });
 
-    // Fire a fresh sync to push the chosen value to Google. Best-effort -
-    // syncContactToGoogle never throws.
+    // Push the chosen value to Google; syncContactToGoogle never throws.
     await syncContactToGoogle(conflict.contactId);
 
     return NextResponse.json({ ok: true });

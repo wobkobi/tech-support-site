@@ -1,7 +1,6 @@
 // src/app/api/business/trips/suggest/route.ts
-// Admin "jobs without a trip" endpoint. GET returns the completed, past confirmed and
-// no-show in-person bookings in an FY (?fy=2026-27, default the current FY) that have no
-// trip yet, one per job, with a km prefill where a trip to the same address exists.
+// Admin "jobs without a trip" endpoint: past in-person bookings in an FY with no trip
+// yet, with a km prefill from earlier trips to the same address.
 
 import { fyKeyOf } from "@/features/business/lib/financial-year";
 import { loadAllFys } from "@/features/business/lib/tax/load";

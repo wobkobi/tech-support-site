@@ -1,8 +1,7 @@
 "use client";
 // src/app/admin/(shell)/business/invoices/[id]/SendInvoiceModal.tsx
-// Send flow for the invoice detail page: the state + requests behind the send-to-client
-// preview, and the modal with the editable greeting/body, the automatic review ask
-// checkbox, and the "add to contacts" prompt when the ask would otherwise be skipped.
+// Send flow for the invoice detail page: preview state and requests, and the modal with
+// editable copy, the review ask checkbox and an "add to contacts" prompt.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -55,9 +54,8 @@ export interface InvoiceSendFlow {
 const headers = { "Content-Type": "application/json" };
 
 /**
- * Why no review ask will go out for this invoice, in place of the checkbox. A missing
- * contact isn't covered: the checkbox stays, with an "add to contacts" prompt, since
- * adding them before the due date still gets them asked.
+ * Why no review ask will go out, shown in place of the checkbox. A missing contact keeps
+ * the checkbox, with an "add to contacts" prompt.
  * @param info - Review ask forecast from the preview route.
  * @returns The note, or null when the checkbox shows.
  */
@@ -73,8 +71,7 @@ function reviewAskSkipText(info: InvoiceReviewAskInfo): string | null {
 }
 
 /**
- * Owns the send preview's state and the preview/send requests, and opens the
- * preview once on mount when asked to (calculator "Save & send").
+ * Owns the send preview's state and requests; opens once on mount when asked.
  * @param opts - Hook options.
  * @param opts.invoiceId - Invoice id used by the preview-email and send-email routes.
  * @param opts.invoiceNumber - Used in the success toast.
@@ -118,11 +115,9 @@ export function useInvoiceSend({
   const [sentLocal, setSentLocal] = useState<boolean>(sentAt != null);
   // Operator-typed greeting override. Empty = the preview's defaultGreeting.
   const [greetingName, setGreetingName] = useState("");
-  // Recipient override (the stored address bounced). The send route saves a changed
-  // address to the invoice and the contact.
+  // Recipient override; the send route saves a changed address to invoice and contact.
   const [toEmail, setToEmail] = useState(clientEmail);
-  // Editable email body, pre-populated with the default copy (quote wording
-  // when the row is a quote).
+  // Editable email body, seeded with the default (or quote) copy.
   const [customBody, setCustomBody] = useState(
     isQuote ? DEFAULT_QUOTE_EMAIL_BODY : DEFAULT_INVOICE_EMAIL_BODY,
   );
@@ -132,8 +127,7 @@ export function useInvoiceSend({
   const [showAddContact, setShowAddContact] = useState(false);
 
   /**
-   * Opens the send modal and fetches the rendered email preview. Only spins on
-   * the FIRST load so edit re-fetches keep the preview visible.
+   * Opens the send modal and fetches the preview; only the first load spins.
    */
   const openPreview = useCallback(
     async function openPreviewImpl(): Promise<void> {
@@ -170,8 +164,7 @@ export function useInvoiceSend({
         setLoading(false);
       }
     },
-    // greetingName/customBody/preview are read fresh each call so the preview
-    // matches the operator's current edits.
+    // Read fresh each call so the preview matches current edits.
     [invoiceId, greetingName, customBody, preview],
   );
 
@@ -430,9 +423,7 @@ export function SendInvoiceModal({
           onClose={(newContactId) => {
             setShowAddContact(false);
             if (newContactId) {
-              // Backfill the invoice's contactId (parity with the calculator's
-              // save flow, so a "Save & send" invoice still links the contact).
-              // Best-effort - the send proceeds without the FK if this fails.
+              // Best-effort backfill of the invoice's contactId, like the calculator's save.
               void fetch(`/api/business/invoices/${invoiceId}`, {
                 method: "PATCH",
                 headers,

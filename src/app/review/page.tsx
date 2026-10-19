@@ -1,7 +1,6 @@
 // src/app/review/page.tsx
-// The review page a review ask links to. Leads with the Google review button; the site's
-// own form (token-gated) sits behind "No Google account?", or opens straight away with
-// ?form=1 (the email's fallback link). With no Google URL set, it's the site form alone.
+// Review page: Google button first, the token-gated site form behind "No Google account?"
+// (or open with ?form=1). With no Google URL set, only the site form shows.
 
 import ReviewFormProtected from "@/features/reviews/components/ReviewForm";
 import { Button } from "@/shared/components/Button";
@@ -14,7 +13,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
 
-// This page reads searchParams so it is always dynamic - revalidate has no effect.
 export const dynamic = "force-dynamic";
 
 // Token-gated form, not a landing page: keep it out of search results.
@@ -77,10 +75,8 @@ export default async function ReviewPage({
     isAnonymous: boolean;
   } | null = null;
 
-  // If token provided, validate against both Booking and Contact in parallel.
-  // The contact lookup accepts the primary reviewToken OR an inherited alt
-  // token (folded in by contact merges) and prefers the live contact, so a
-  // link sent before a merge still resolves to the surviving person.
+  // Check Booking and Contact in parallel; the contact match includes merged-in alt
+  // tokens so pre-merge links still resolve.
   if (token) {
     const contactSelect = {
       id: true,
@@ -107,8 +103,7 @@ export default async function ReviewPage({
         select: { id: true, text: true, firstName: true, lastName: true, isAnonymous: true },
       }),
     ]);
-    // Legacy fallback: a soft-deleted contact whose token was never folded into
-    // a live one still renders (submission handles the orphan case).
+    // Fallback: a soft-deleted contact's unmerged token still renders.
     const contact =
       liveContact ??
       (await prisma.contact.findFirst({ where: { reviewToken: token }, select: contactSelect }));
@@ -128,10 +123,8 @@ export default async function ReviewPage({
       prefillEmail = contact.email;
       prefillPhone = contact.phone;
       tokenValid = true;
-      // Mirror POST's one-review-per-contactId guard: a review left via a BOOKING link
-      // sets Review.contactId but not Contact.reviewLinkSubmittedAt, so keying off that
-      // flag alone would render a create form POST then 409s. Keyed by contactId, not by
-      // token, so the existing review is found (and editable) through any of their links.
+      // Mirror POST's one-review-per-contactId guard: a booking-link review doesn't set
+      // reviewLinkSubmittedAt, so key by contactId or the create form would 409.
       const contactReview =
         maybeExistingReview ??
         (await prisma.review.findFirst({
@@ -224,8 +217,7 @@ export default async function ReviewPage({
                 </p>
               </section>
 
-              {/* Offered to every past reviewer, whatever they wrote: Google bans
-                  asking only happy customers. */}
+              {/* Every past reviewer: Google bans asking only happy customers. */}
               {alreadyReviewed && googleUrl && (
                 <section className={cn(CARD, "space-y-3")}>
                   <h2 className="text-xl font-bold text-russian-violet sm:text-2xl">

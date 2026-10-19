@@ -1,9 +1,6 @@
 // src/features/reviews/lib/review-ask-run.server.ts
-// Sends the review asks that are due and stamps every decision on its invoice. Run by
-// the daily cron and by the admin "Send now" button. Each send claims its invoice first
-// (outcome "sending"), so the cron and a Send now press can't both email the same
-// person, and a run that dies mid-send is recovered as "failed" an hour later instead of
-// sitting in "sending" for ever.
+// Sends due review asks and stamps each decision, for the daily cron and "Send now". Each
+// send claims its invoice first ("sending"); a claim left by a dead run becomes "failed".
 
 import { ensureContactReviewToken } from "@/features/business/lib/contact-review-token";
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
@@ -40,11 +37,7 @@ export interface ReviewAskRunResult {
 export interface ReviewAskRunOptions {
   /** Only this invoice (local testing, Send now). */
   onlyInvoiceId?: string;
-  /**
-   * Send now: send whatever the delay and the gap say, and even with automatic asks
-   * switched off. Opt-outs still apply, and a person-level skip is reported back
-   * rather than stamped, so the operator can fix it (add the contact) and press again.
-   */
+  /** Send now: ignore delay, gap and the auto switch. Opt-outs apply; person-level skips are reported, not stamped. */
   force?: boolean;
 }
 
@@ -86,9 +79,8 @@ async function stampSkip(invoiceId: string, reason: ReviewAskSkipReason, now: Da
 }
 
 /**
- * Whether this person was asked through another invoice since the loader ran: one of
- * their other invoices is mid-send, or (unless forced) was sent inside the gap. Covers
- * the cron and Send now overlapping, and one person billed under two addresses.
+ * Whether another of this person's invoices is mid-send or (unless forced) was asked
+ * inside the gap since the loader ran.
  * @param candidate - The claimed candidate (has a contact).
  * @param gapDays - Minimum days between asks; ignored when forced.
  * @param force - Send now.

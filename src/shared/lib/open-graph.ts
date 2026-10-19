@@ -1,7 +1,5 @@
 // src/shared/lib/open-graph.ts
-// Site-wide Open Graph fields every page's `openGraph` spreads in. Next replaces a
-// parent's `openGraph` wholesale when a page sets its own (no deep merge), so without
-// this a shared /pricing or /booking link has no preview image, site name or type.
+// Site-wide Open Graph fields. Next replaces a parent's `openGraph` wholesale, so pages spread these in.
 
 /** Share-preview image, generated into public/ by scripts/build-icons. */
 const OG_IMAGE = {
@@ -26,16 +24,13 @@ export const SITE_OPEN_GRAPH = {
 };
 
 /**
- * A page's `openGraph`, built from the same title and description as its search
- * tags, so a shared link reads like the search result and each page has one string
- * to keep current. The root title template ("%s | To the Point Tech") is not applied
- * to og:title, so the suffix is added here to match the browser tab.
+ * A page's `openGraph` from its search title and description. og:title skips the root title
+ * template, so the " | To the Point Tech" suffix is added here.
  * @param page - Page details.
  * @param page.title - The page's metadata title, before the template suffix.
  * @param page.description - The page's meta description.
  * @param page.url - Page path, e.g. "/pricing".
- * @param page.absoluteTitle - The title is already complete (an `absolute` title),
- *   so no suffix is added.
+ * @param page.absoluteTitle - The title is already complete, so no suffix is added.
  * @returns Open Graph metadata for the page.
  */
 export function pageOpenGraph({

@@ -1,7 +1,6 @@
 "use client";
 // src/features/business/components/BreakdownModal.tsx
-// Modal that explains how a dashboard total was computed - either by listing the entries
-// that summed to it, or by showing the calculation steps.
+// Modal explaining a dashboard total by its entries or its calculation steps.
 
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { formatNZD } from "@/features/business/lib/business";
@@ -23,9 +22,7 @@ export interface BreakdownRow {
   amount: number;
 }
 
-/**
- * One step in a breakdown that walks through a calculation rather than listing rows.
- */
+/** One step in a calculation walk-through. */
 interface BreakdownCalcStep {
   label: string;
   value: string;
@@ -58,9 +55,7 @@ interface BreakdownModalProps {
 }
 
 /**
- * Modal that visualises the contributors to a dashboard total. Body scrolls
- * when the row list is long; the shared {@link Modal} shell supplies the
- * backdrop, Escape handling and focus management.
+ * Modal listing the contributors to a dashboard total, in the shared {@link Modal} shell.
  * @param props - Component props.
  * @param props.data - The breakdown payload to render.
  * @param props.onClose - Called when the user dismisses the modal.

@@ -1,9 +1,7 @@
 "use client";
 // src/features/business/components/trips/TripSuggestions.tsx
-// "Jobs without a trip": completed jobs in the FY with no trip logged. Each row shows
-// where the job was (the booking's address, else the contact's), takes the round-trip km
-// (prefilled from the last trip to the same address, or fetched from Google) and adds a
-// trip linked to the booking; "Add all" adds every row that has km filled in.
+// "Jobs without a trip": completed jobs in the FY with no trip logged. Each row takes
+// round-trip km (prefilled or fetched from Google) and adds a trip linked to the booking.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -41,8 +39,7 @@ interface TripSuggestionsProps {
 }
 
 /**
- * Hint under a job: the booked drive time, where a prefilled km came from, and the
- * no-show reason it is listed at all.
+ * Hint under a job: booked drive time, where a prefilled km came from, and any no-show reason.
  * @param s - The suggestion.
  * @returns The hint text, or "" when there is nothing to add.
  */

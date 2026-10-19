@@ -1,7 +1,6 @@
 // src/features/business/components/tax/FiledChangesNotice.tsx
-// Shown on a filed year's Tax page: every figure where a fresh calculation now differs from
-// the saved snapshot, which is what an amended return would change. Also covers a snapshot
-// that can't be read and the all-clear when nothing has moved.
+// Filed year's Tax page notice: every figure a fresh calculation now differs on from the
+// saved snapshot, plus the unreadable-snapshot and all-clear cases.
 
 import { formatNZD } from "@/features/business/lib/business-format";
 import type { SnapshotChange } from "@/features/business/lib/tax/snapshot";

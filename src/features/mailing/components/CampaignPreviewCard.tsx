@@ -1,8 +1,7 @@
 "use client";
 // src/features/mailing/components/CampaignPreviewCard.tsx
-// The editor's preview card: the rendered email in a sandboxed frame at desktop or phone
-// width, the template dropdown on a draft, and any problems the renderer found. The
-// frame shows the server's real email HTML, so it keeps a white canvas like an inbox.
+// The editor's preview card: the real email HTML in a sandboxed white frame, the draft's
+// template dropdown, and any renderer problems.
 
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";

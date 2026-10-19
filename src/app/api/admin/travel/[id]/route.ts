@@ -1,8 +1,6 @@
 // src/app/api/admin/travel/[id]/route.ts
-// Admin endpoint to update a TravelBlock's transport mode, custom origin, or custom
-// travel-back destination. A travel-affecting change reprices the block's two legs
-// immediately - the 15-min cron only maintains upcoming events, so a past job would
-// otherwise sit blank after the change.
+// Updates a TravelBlock's mode, origin or return destination and reprices both legs now,
+// since the cron only maintains upcoming events.
 
 import {
   recomputeTravelBlock,
@@ -17,9 +15,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const VALID_MODES = new Set<string>(Object.values(TransportMode));
 
 /**
- * Updates the transport mode and/or custom origin for a travel block, then
- * reprices its travel-there / travel-back minutes immediately so the change
- * lands even on a past job the cron won't revisit.
+ * Updates a travel block's mode and/or origin, then reprices both legs immediately.
  * @param request - Incoming admin request.
  * @param root0 - Route params.
  * @param root0.params - Route params with id.
@@ -71,8 +67,7 @@ export async function PATCH(
           customTravelBackDestination: body.customTravelBackDestination ?? null,
         }),
         ...(hasIgnored && { ignored: body.ignored }),
-        // Clear the stale minutes up front; the recompute below refills them
-        // (they stay blank as a safe fallback only if that call fails).
+        // Clear stale minutes; the recompute below refills them.
         rawTravelMinutes: null,
         roundedMinutes: null,
         rawTravelBackMinutes: null,
@@ -80,17 +75,13 @@ export async function PATCH(
       },
     });
 
-    // When toggling ignored=true, eagerly purge the event's calendar cache
-    // entry so the booking page unblocks immediately rather than waiting for
-    // the next cron run. When toggling back to false, the cron will repopulate.
+    // Ignoring purges the cache entry now so the booking page unblocks; the cron repopulates on un-ignore.
     if (hasIgnored && body.ignored === true) {
       try {
         await prisma.calendarEventCache.deleteMany({
           where: { eventId: block.sourceEventId, calendarEmail: block.calendarEmail },
         });
-        // The windows either side are separate synthetic rows
-        // (travel-before:/travel-after:), and the cron skips an ignored event -
-        // so leaving them kept those slots unbookable until their TTL lapsed.
+        // Also purge the travel-before:/travel-after: rows, which the cron skips once ignored.
         const syntheticIds = [block.beforeEventId, block.afterEventId].filter(
           (eventId): eventId is string => eventId !== null,
         );
@@ -104,8 +95,7 @@ export async function PATCH(
       }
     }
 
-    // Transport-mode overrides apply to the whole series - persist + cascade
-    // to siblings. customOrigin stays per-instance (origins vary by occurrence).
+    // Transport mode cascades to the series; customOrigin stays per-instance.
     if (hasMode && mode !== undefined && block.recurringEventId) {
       await prisma.recurringTravelPreference.upsert({
         where: {
@@ -138,16 +128,13 @@ export async function PATCH(
       });
     }
 
-    // Refill the minutes now, from the block's stored endpoints, rather than
-    // waiting on a cron that only touches upcoming events. An ignored-only
-    // toggle changes no route, so it skips the repricing.
+    // Refill the minutes now; an ignored-only toggle skips repricing.
     let travel: RecomputedTravel | null = null;
     if (hasMode || hasOrigin || hasBackDest) {
       try {
         travel = await recomputeTravelBlock(id);
       } catch (err) {
-        // The field change already saved; leave the minutes blank and let the
-        // operator retry (an upcoming job also self-heals on the next cron).
+        // The field change saved; leave minutes blank for a retry.
         console.error("[travel/[id]] Immediate recompute failed:", err);
       }
     }

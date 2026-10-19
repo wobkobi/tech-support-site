@@ -1,7 +1,6 @@
 // src/app/api/admin/mailing/[id]/schedule/route.ts
-// Schedules a draft to send later (the publish-scheduled cron sends it), or cancels the
-// schedule, which turns it back into an editable draft. A time inside quiet hours moves
-// to the end of them.
+// Schedules a draft for the publish-scheduled cron, or cancels back to a draft. Quiet-hours
+// times move to the end of them.
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import { audienceOf } from "@/features/mailing/lib/audience";
@@ -52,8 +51,7 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
 
   const campaign = await prisma.campaign.findUnique({ where: { id } });
   if (!campaign || campaign.isPreset) return errorResponse("Email not found.", 404);
-  // A promo can start after the schedule is set, so promo placeholders are only
-  // checked when it actually sends.
+  // Promo placeholders are checked at send time, since a promo may start later.
   const problems = listProblems(campaign, true, audienceOf(campaign.audience));
   if (problems.length > 0) return errorResponse(problems.join(" "), 400);
 

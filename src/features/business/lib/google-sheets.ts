@@ -1,7 +1,5 @@
 // src/features/business/lib/google-sheets.ts
-// Google Sheets v4 helpers for the invoice counter. Reads the prefix, financial year, and
-// last-issued number from the SETTINGS tab and writes back the incremented counter. Cell
-// layout matches the current template.
+// Google Sheets v4 helpers for the invoice and quote counters on the SETTINGS tab.
 
 import { withRetry } from "@/features/business/lib/google-retry";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
@@ -34,11 +32,8 @@ export function getSheetId(): string {
 }
 
 /**
- * Reads the current invoice counter state from the Google Sheet SETTINGS tab.
- * Cell layout (current template):
- *   - B8: Invoice Prefix (e.g. "TTP")
- *   - B11: Financial Year (e.g. "2026-27")
- *   - B19: Invoice counter (last issued number; blank = 0)
+ * Reads the invoice counter from SETTINGS: B8 prefix ("TTP"), B11 financial year ("2026-27"),
+ * B19 last issued number (blank = 0).
  * @returns Invoice counter data including next formatted number
  */
 export async function getInvoiceCounter(): Promise<InvoiceCounterData> {
@@ -57,9 +52,7 @@ export async function getInvoiceCounter(): Promise<InvoiceCounterData> {
   const yearRaw = ((ranges[1]?.values?.[0]?.[0] as string | undefined) ?? "").trim();
   const lastRaw = ranges[2]?.values?.[0]?.[0];
   const yearCode = yearRaw.replace("-", "");
-  // Guard against mistyped SETTINGS cells (a blank B11, a "#REF!", a non-numeric B19).
-  // Throwing hands off to the Prisma fallback in getNextInvoiceNumber rather than minting
-  // a poisoned "TTP--0001" or "TTP-...-0NaN" that then gets written back to the sheet.
+  // Throw on mistyped cells so getNextInvoiceNumber falls back to Prisma, not "TTP--0001".
   if (!/^\d{4,6}$/.test(yearCode)) {
     throw new Error(`Invoice counter: SETTINGS!B11 financial year is malformed ("${yearRaw}")`);
   }
@@ -81,12 +74,8 @@ export interface QuoteCounterData {
 }
 
 /**
- * Reads the quote counter state from the SETTINGS tab. Quotes number from
- * their own cell (B12) so they never consume the invoice counter; the format
- * is `Q-{yearCode}-{NNNN}` (no operator prefix - "Q" IS the prefix).
- * Cell layout (current template):
- *   - B11: Financial Year (shared with the invoice counter)
- *   - B12: Quote counter (last issued number; blank = 0)
+ * Reads the quote counter (`Q-{yearCode}-{NNNN}`) from SETTINGS: B11 financial year (shared),
+ * B12 last issued number (blank = 0), separate from the invoice counter.
  * @returns Quote counter data including next formatted number
  */
 export async function getQuoteCounter(): Promise<QuoteCounterData> {
@@ -104,8 +93,7 @@ export async function getQuoteCounter(): Promise<QuoteCounterData> {
   const yearRaw = ((ranges[0]?.values?.[0]?.[0] as string | undefined) ?? "").trim();
   const lastRaw = ranges[1]?.values?.[0]?.[0];
   const yearCode = yearRaw.replace("-", "");
-  // Same malformed-cell guards as the invoice counter: throwing hands off to
-  // the DB-max fallback instead of minting a poisoned number.
+  // Throw on mistyped cells so the caller falls back to the DB max.
   if (!/^\d{4,6}$/.test(yearCode)) {
     throw new Error(`Quote counter: SETTINGS!B11 financial year is malformed ("${yearRaw}")`);
   }

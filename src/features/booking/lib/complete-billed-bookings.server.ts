@@ -1,7 +1,6 @@
 // src/features/booking/lib/complete-billed-bookings.server.ts
-// Marks the bookings behind a freshly billed invoice as completed. Raising an invoice for a
-// booked timeslot is the operator saying the job happened, so the booking shouldn't sit
-// on "confirmed" waiting for a separate Complete click.
+// Marks the bookings behind a freshly billed invoice as completed: billing a timeslot
+// means the job happened.
 
 import { SCHEDULE_CALENDAR_TAG } from "@/features/calendar/lib/google-calendar";
 import { prisma } from "@/shared/lib/prisma";
@@ -15,14 +14,8 @@ export interface BilledBookingRefs {
 }
 
 /**
- * Completes every confirmed, already-started booking the invoice bills. A merged job can
- * span several bookings but the invoice holds one bookingId, so the rest are found by
- * their calendar event ids. Held, cancelled and future bookings are left alone: a hold
- * is not a job, and releasing a future slot would let someone else book over it.
- *
- * No review email goes out here: the review ask follows the invoice on its own, a few
- * days after it is sent.
- * Never throws; a failure is logged and the invoice stands.
+ * Completes every confirmed, already-started booking the invoice bills, matching merged
+ * jobs by calendar event id. Future slots stay so nobody books over them. Never throws.
  * @param refs - Booking id and calendar event ids from the invoice.
  * @param logTag - Log prefix of the calling route.
  * @returns How many bookings were marked completed.

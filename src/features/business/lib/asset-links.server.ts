@@ -1,7 +1,6 @@
 // src/features/business/lib/asset-links.server.ts
-// Database checks for an asset's expense link: the expense must exist, and must not
-// already back another asset, since one expense row can only be depreciated once.
-// The schema only indexes Asset.expenseId, so this is where uniqueness is enforced.
+// Database checks for an asset's expense link: the expense must exist and back no other
+// asset. The schema doesn't enforce uniqueness, so this does.
 
 import { prisma } from "@/shared/lib/prisma";
 import "server-only";

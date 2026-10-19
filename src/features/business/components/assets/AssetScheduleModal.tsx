@@ -1,8 +1,6 @@
 // src/features/business/components/assets/AssetScheduleModal.tsx
-// One asset's depreciation schedule in a dialog, a row per financial year: months
-// counted, opening and closing tax value, the full depreciation, the business share
-// claimed, and any write-off, Investment Boost or disposal result. Cards on phones, a
-// table from md.
+// One asset's depreciation schedule in a dialog, a row per financial year. Cards on
+// phones, a table from md.
 
 import {
   TABLE_CLS,

@@ -1,8 +1,5 @@
 // src/app/booking/layout.tsx
-// Booking route segment layout. AddressAutocomplete injects the Google Maps script lazily
-// when the address input becomes visible (and only for in-person bookings). The
-// preconnect hint warms the TLS handshake so the lazy injection feels instant when it
-// fires.
+// Booking layout: preconnect to Google Maps so AddressAutocomplete's lazy script load is fast.
 
 import type React from "react";
 

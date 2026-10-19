@@ -1,20 +1,14 @@
 // src/shared/lib/normalise-address.ts
-// Server-side address canonicalisation via the Google Geocoding API. Covers
-// paths that bypass the Places autocomplete (hand-typed Google Contacts
-// imports, legacy rows). Callers normalise at write time so steady-state API
-// usage stays near zero.
+// Server-side address canonicalisation via Google Geocoding, for paths that bypass Places
+// autocomplete. Normalised at write time to keep API usage near zero.
 
 /** Result types precise enough to overwrite a stored address with. */
 const PRECISE_TYPES = new Set(["street_address", "premise", "subpremise"]);
 const PRECISE_LOCATION_TYPES = new Set(["ROOFTOP", "RANGE_INTERPOLATED"]);
 
 /**
- * Outcome of one Geocoding attempt. `ok: false` means the lookup never ran or
- * failed (blank input, missing key, HTTP or network error, non-OK API status),
- * which is deliberately distinct from a call that succeeded and matched
- * nothing - that is `ok: true` with an empty list. Callers that flag addresses
- * for review depend on the distinction: treating an outage as "no such
- * address" would flag every contact in a sync pass.
+ * One Geocoding attempt. `ok: false` means the lookup failed or never ran, distinct from
+ * `ok: true` with no matches, so an outage doesn't flag every contact.
  */
 type GeocodeOutcome = { ok: true; candidates: string[] } | { ok: false };
 
@@ -32,12 +26,10 @@ export type AddressResolution =
   | { status: "skipped" };
 
 /**
- * Geocodes a free-text address (Auckland, NZ constrained) and returns every
- * confident, precise NZ candidate in Google's formatted form, deduped. A
- * leading unit like "2/15" is preserved when Google drops it. Never throws.
+ * Geocodes an Auckland-constrained address into deduped, precise NZ candidates, keeping a
+ * leading unit like "2/15" Google drops. Never throws.
  * @param raw - Free-text address to geocode.
- * @returns The candidates on a successful call, or `{ ok: false }` when the
- *   lookup could not be made or failed.
+ * @returns The candidates on a successful call, or `{ ok: false }` when it failed.
  */
 async function geocode(raw: string | null | undefined): Promise<GeocodeOutcome> {
   const trimmed = raw?.trim();
@@ -129,10 +121,8 @@ async function geocode(raw: string | null | undefined): Promise<GeocodeOutcome> 
 }
 
 /**
- * Geocodes a free-text address and returns every confident, precise NZ
- * candidate in Google's formatted form, deduped. Empty on blank input, missing
- * key, failure, or nothing precise in NZ - so callers can tell "not found" (0),
- * "unambiguous" (1), and "ambiguous" (>1) apart. Never throws.
+ * Geocodes an address into deduped, precise NZ candidates; empty on blank, failure or no match.
+ * Never throws.
  * @param raw - Free-text address to geocode.
  * @returns Confident candidate addresses; empty when none resolve.
  */
@@ -142,10 +132,8 @@ export async function geocodeAddressCandidates(raw: string | null | undefined): 
 }
 
 /**
- * Resolves a free-text address, reporting why it did not produce a canonical
- * value so callers can flag it for operator review. Use this over
- * {@link normaliseAddress} when the difference between "matched nothing" and
- * "the lookup failed" matters. Never throws.
+ * Resolves an address with a reason when not canonical, telling "matched nothing" from "lookup
+ * failed". Never throws.
  * @param raw - Free-text address to resolve.
  * @returns The resolution status and, where relevant, the address or candidates.
  */
@@ -160,10 +148,8 @@ export async function resolveAddress(raw: string | null | undefined): Promise<Ad
 }
 
 /**
- * Canonicalises a free-text address to Google's formatted form, but only when
- * the match is UNAMBIGUOUS: null on zero candidates OR more than one, so it
- * never guesses between two same-named streets. Callers keep their original
- * value on null. Never throws.
+ * Canonicalises an address only on exactly one match, never guessing between same-named
+ * streets. Never throws.
  * @param raw - Free-text address to normalise.
  * @returns Canonical formatted address, or null when no single confident match exists.
  */
@@ -209,14 +195,8 @@ const ADDRESS_NOISE = new Set([
 ]);
 
 /**
- * Reduces an address to the set of words that actually identify it, so two
- * spellings of one place compare equal.
- *
- * A unit number is kept welded to its street number: `x/y` means unit x AT
- * number y, so the two halves must never become interchangeable tokens - split
- * them and "12/160 Kepa Rd" would read as the same place as plain "160 Kepa
- * Rd". Google Contacts often puts the unit on its own first line instead, so
- * that shape is rejoined into `x/y` before anything else happens.
+ * Reduces an address to its identifying words. A unit stays welded to its number (`x/y`), so
+ * "12/160 Kepa Rd" never equals "160 Kepa Rd"; a unit on its own first line is rejoined first.
  * @param value - Address in any format.
  * @returns Identifying words, or null when there is no address.
  */
@@ -235,15 +215,8 @@ function addressTokens(value: string | null): Set<string> | null {
 }
 
 /**
- * Whether `canonical` is the same address as `other`, only more completely
- * stated. True when every identifying word in `other` appears in `canonical`.
- *
- * The site stores the Geocoding API's canonical form, which spells out the
- * street type and adds the suburb and postcode; Google Contacts keeps whatever
- * was typed. Comparing those as raw strings made every canonicalised address
- * look like a two-sided disagreement. Subsumption is deliberately one-way: an
- * address carrying detail the canonical form lacks (a unit number, a different
- * street) is NOT a match and stays a real conflict.
+ * Whether `canonical` is `other` more completely stated: every identifying word of `other` is
+ * in it. One-way, so extra detail in `other` (a unit, another street) stays a conflict.
  * @param canonical - The richer, canonicalised address (the site's).
  * @param other - The other form to test against it (Google's).
  * @returns True when `other` says nothing `canonical` doesn't already say.

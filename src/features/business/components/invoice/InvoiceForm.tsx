@@ -1,12 +1,7 @@
 "use client";
 // src/features/business/components/invoice/InvoiceForm.tsx
-// Presentational edit form for an invoice's client, dates, line items, notes and any
-// amount already paid. It owns
-// the field state and mirrors every change to the parent via `onChange` (so a live
-// preview can render alongside); the PARENT owns submission. Creation stays in the
-// calculator - this form only edits an existing DRAFT. Totals use calcInvoiceTotals (the
-// same fn the server recomputes with). Client name and email problems show under their
-// fields; line-item and total problems show above the save button.
+// Edit form for an existing DRAFT invoice. Owns field state and mirrors changes via
+// `onChange` for the live preview; the parent owns submission.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -84,10 +79,7 @@ interface InvoiceFormProps {
   onSubmit: (data: InvoiceFormData) => void;
   /** Called on every field change so the parent can mirror a live preview. */
   onChange?: (data: InvoiceFormData) => void;
-  /**
-   * Optional block rendered above the line items (the AI description box). Receives the
-   * current form data and a patcher that goes through the same change path as typing.
-   */
+  /** Optional block above the line items (the AI box), given the form data and a patcher. */
   renderAssist?: (
     form: InvoiceFormData,
     apply: (patch: Partial<InvoiceFormData>) => void,
@@ -100,13 +92,11 @@ const FIELD_IDS = { name: "invoice-client-name", email: "invoice-client-email" }
 const OTHER_IDS = { issue: "invoice-issue-date", due: "invoice-due-date", notes: "invoice-notes" };
 
 /**
- * Adds `days` to an ISO YYYY-MM-DD date, returning ISO YYYY-MM-DD. Works on the
- * date string alone: reading a local midnight back through toISOString (UTC)
- * lands on the day before anywhere east of Greenwich, NZ included.
+ * Adds `days` to a YYYY-MM-DD date on the string alone, since a local midnight read
+ * back through toISOString lands a day early in NZ.
  * @param iso - Base date (YYYY-MM-DD).
  * @param days - Days to add.
- * @returns The shifted date, or the input unchanged when it isn't a full date
- *   (a cleared date input gives "").
+ * @returns The shifted date, or the input unchanged when it isn't a full date.
  */
 function addDaysISO(iso: string, days: number): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? addDaysToDateKey(iso, days) : iso;
@@ -143,8 +133,7 @@ export function InvoiceForm({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<ContactFieldErrors>({});
   const contacts = useGoogleContacts();
-  // Saving routes away client-side, which never fires beforeunload, so the
-  // prompt only ever guards edits that haven't gone in.
+  // Saving routes away client-side without beforeunload, so this guards only unsaved edits.
   useUnsavedChangesWarning(JSON.stringify(form) !== JSON.stringify(initial));
 
   /**
@@ -263,8 +252,7 @@ export function InvoiceForm({
             type="date"
             value={form.issueDate}
             onChange={(e) =>
-              // Re-derive the due date off the net terms; the operator can still
-              // override it afterwards for a custom due date.
+              // Re-derive the due date off the net terms; still overridable.
               update({
                 issueDate: e.target.value,
                 dueDate: addDaysISO(e.target.value, paymentTermsDays),

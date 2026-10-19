@@ -23,10 +23,7 @@ import { formatDateShort } from "@/shared/lib/date-format";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
 
-/**
- * Subset of the Invoice row needed to render the email body.
- * Kept as a structural type so callers can pass a Prisma row directly without coupling.
- */
+/** Structural subset of the Invoice row needed to render the email body. */
 export interface InvoiceEmailData {
   number: string;
   clientName: string;
@@ -41,10 +38,7 @@ export interface InvoiceEmailData {
   isQuote?: boolean | null;
   /** Quote validity end; shown in place of the due date. */
   quoteValidUntil?: Date | null;
-  /**
-   * Who the email greets when the operator types no override: the person behind a
-   * company invoice (see invoiceRecipient). Unset falls back to the client name's first word.
-   */
+  /** Default greeting target (person behind a company invoice); unset uses the client's first name. */
   defaultGreeting?: string | null;
 }
 
@@ -67,9 +61,8 @@ interface BuildInvoiceEmailArgs {
 }
 
 /**
- * Renders the invoice email subject + HTML body without sending. Carries no review ask:
- * that goes out on its own a few days later (review-ask-run.server.ts). Shared by
- * the preview modal and the send route so the preview matches what's sent.
+ * Renders the invoice email subject + HTML body without sending. Shared by the preview
+ * modal and send route so the preview matches what's sent.
  * @param args - Render inputs.
  * @param args.invoice - Invoice row fields needed for the body.
  * @param args.greetingName - Optional greeting target (e.g. person inside a company).
@@ -86,11 +79,9 @@ export async function buildInvoiceEmail({
   const isQuote = invoice.isQuote === true;
   const defaultBody = isQuote ? DEFAULT_QUOTE_EMAIL_BODY : DEFAULT_INVOICE_EMAIL_BODY;
   const bodyText = (customBody ?? defaultBody).trim();
-  // pre-wrap preserves line breaks the operator typed; escape first so the
-  // body can never inject markup, then linkify so a typed URL is clickable.
+  // Escape first so the body can't inject markup, then linkify.
   const safeBody = linkifyEscaped(escapeHtml(bodyText || defaultBody));
-  // Greeting: the operator's typed override wins; otherwise the person behind a
-  // company invoice, else the first word of clientName.
+  // Typed override > person behind a company invoice > first word of clientName.
   const greetingTarget = greetingName?.trim() || defaultGreetingFor(invoice);
   const safeGreeting = escapeHtml(greetingTarget);
   const safeNumber = escapeHtml(invoice.number);
@@ -105,8 +96,7 @@ export async function buildInvoiceEmail({
     ? `<p style="margin:0 0 16px;font-size:14px;color:#555">An online copy is also here: <a href="${escapeHtml(invoice.driveWebUrl)}" style="color:#43bccd">view ${isQuote ? "quote" : "invoice"}</a>.</p>`
     : "";
 
-  // Quote emails swap the due line for validity and drop the bank block -
-  // payment details come with the invoice after acceptance.
+  // Quotes show validity instead of due date and no bank block.
   const dateLine = isQuote
     ? invoice.quoteValidUntil
       ? `<p style="margin:0"><strong>Valid until:</strong> ${escapeHtml(formatDateShort(invoice.quoteValidUntil))}</p>`
@@ -122,8 +112,7 @@ export async function buildInvoiceEmail({
       Code: <strong>${escapeHtml(bankCode(invoice.number))}</strong>
     </p>`;
 
-  // Append " Tech" to match the signature and body brand name, so the subject
-  // and the rest of the same email show one consistent business name.
+  // Append " Tech" to match the signature and body brand name.
   const subject = isQuote
     ? `Your quote from ${brandName(identity)} (${invoice.number})`
     : `Your invoice from ${brandName(identity)} (${invoice.number})`;
@@ -226,8 +215,7 @@ interface SendInvoiceReminderEmailArgs {
 }
 
 /**
- * Sends an overdue-invoice nudge with the PDF attached. No review-link
- * machinery - chasing money and asking for a review don't mix. Never throws.
+ * Sends an overdue-invoice nudge with the PDF attached. Never throws.
  * @param args - Send inputs.
  * @param args.invoice - Invoice row fields needed for the body.
  * @param args.pdfBytes - Raw PDF bytes (OVERDUE watermark already applied by the caller's generate).
@@ -325,10 +313,8 @@ interface SendPaymentApologyEmailArgs {
 }
 
 /**
- * Apologises for chasing an invoice the client had already paid, sent when the
- * payment is finally recorded. Deliberately short and attachment-free - the
- * client already has the invoice, and a receipt would bury the apology. Never
- * throws.
+ * Apologises for chasing an already-paid invoice, sent once the payment is recorded.
+ * Attachment-free on purpose. Never throws.
  * @param args - Send inputs.
  * @param args.invoice - Invoice row fields needed for the body.
  * @param args.reminderSentAt - When the wrongly-sent reminder went out.
@@ -380,9 +366,7 @@ export async function sendPaymentApologyEmail({
 `);
 
   try {
-    // Resend SDK v3+ returns { data, error } instead of throwing on API-level
-    // failures, so check error explicitly - a rejected send must leave
-    // apologySentAt unstamped rather than reporting success.
+    // Resend returns { error } rather than throwing; a rejection must leave apologySentAt unstamped.
     const result = await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
@@ -409,9 +393,8 @@ interface BuildVoidEmailArgs {
 }
 
 /**
- * Renders the "your invoice has been voided" email subject + body. Mirrors
- * {@link buildInvoiceEmail} but drops the bank-transfer block - voided invoices never
- * request payment.
+ * Renders the "your invoice has been voided" email. Like {@link buildInvoiceEmail}
+ * without the bank-transfer block.
  * @param args - Render inputs.
  * @param args.invoice - Invoice row fields needed for the body.
  * @param args.greetingName - Optional operator-typed greeting target.
@@ -463,9 +446,8 @@ interface SendVoidNotificationArgs {
 }
 
 /**
- * Sends the void notification with the VOID-stamped PDF attached.
- * Logs + returns false on failure rather than throwing so the void endpoint
- * can report `notified: false` without rolling back the status change.
+ * Sends the void notification with the VOID-stamped PDF attached. Returns false on
+ * failure so the void endpoint can report `notified: false` without rolling back.
  * @param args - Send inputs.
  * @param args.invoice - Invoice row fields needed for the body.
  * @param args.pdfBytes - PDF bytes (already VOID-stamped).
@@ -495,9 +477,7 @@ export async function sendVoidNotification({
 
   const { subject, html } = await buildVoidEmail({ invoice, greetingName, customBody });
   try {
-    // Resend SDK v3+ returns { data, error } instead of throwing on API-level
-    // failures (invalid sender, rate limit, etc.). Check error explicitly so a
-    // rejected call isn't silently reported as "Client notified".
+    // Resend returns { error } rather than throwing; don't report a rejection as notified.
     const result = await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,

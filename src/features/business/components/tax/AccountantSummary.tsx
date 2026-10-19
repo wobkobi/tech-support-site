@@ -1,8 +1,6 @@
 // src/features/business/components/tax/AccountantSummary.tsx
-// Accountant handover for one financial year on the Tax page: IR3 net income and the IR10
-// box figures, that year's asset depreciation schedule and the trip total, with a CSV of
-// the same figures. Renders whatever snapshot it's given, so a filed year shows its saved
-// figures. Phones get cards; the schedule becomes a table from md.
+// Accountant handover for one FY: IR3/IR10 figures, the depreciation schedule and the trip
+// total, plus a CSV. Renders whatever snapshot it's given, so a filed year shows saved figures.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import {
@@ -81,8 +79,7 @@ function summaryDescription(filed: boolean, unreadable: boolean, fyLabel: string
  * @param props.view - The year's snapshot (saved when filed, otherwise live).
  * @param props.fyKey - FY key for the CSV download.
  * @param props.fyLabel - FY display label.
- * @param props.unreadable - True when the year is filed but its saved figures couldn't be
- *   read, so `view` holds fresh figures.
+ * @param props.unreadable - True when the year is filed but its saved figures couldn't be read.
  * @returns The card.
  */
 export function AccountantSummary({
@@ -108,7 +105,7 @@ export function AccountantSummary({
         title="Accountant summary"
         description={summaryDescription(view.filedAt !== null, unreadable, fyLabel)}
         actions={<TaxExportButton fyKey={fyKey} />}
-        // Stack on phones so the description isn't squeezed into a narrow column beside the button.
+        // Stack on phones so the description isn't squeezed beside the button.
         className="max-sm:flex-col"
       />
 

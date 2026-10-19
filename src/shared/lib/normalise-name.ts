@@ -1,14 +1,10 @@
 // src/shared/lib/normalise-name.ts
-// Light-touch cleanup + plausibility check for customer-entered names. Names are
-// otherwise stored exactly as typed, so casing/spacing drift ("john   SMITH")
-// and obvious junk ("a", "123") get through. Deliberately conservative: it never
-// rejects a name that could be real and never re-cases intentional mixed case.
+// Conservative cleanup and plausibility check for customer names; never rejects a possible name
+// or re-cases intentional mixed case.
 
 /**
- * Re-cases a single name token only when it carries no intentional casing
- * (entirely lower "john" or entirely upper "SMITH"); mixed case ("McDonald",
- * "DeVries", "O'Brien") is returned untouched. Capitalises each
- * hyphen/apostrophe-separated part so "mary-jane" > "Mary-Jane".
+ * Re-cases a token only when all lower or all upper, per hyphen/apostrophe part ("mary-jane" >
+ * "Mary-Jane"); mixed case like "McDonald" is untouched.
  * @param token - A single whitespace-delimited name token.
  * @returns The re-cased token.
  */
@@ -22,10 +18,7 @@ function recaseToken(token: string): string {
 }
 
 /**
- * Tidies a customer name: collapses runs of whitespace and re-cases only tokens
- * that are entirely one case ("john" > "John", "SMITH" > "Smith"). Tokens with
- * intentional mixed case ("McDonald", "DeVries", "O'Brien") are left as typed so
- * real names aren't mangled.
+ * Collapses whitespace and re-cases single-case tokens ("SMITH" > "Smith"), leaving mixed case.
  * @param raw - Raw name input.
  * @returns Tidied name, or empty string when the input is blank.
  */
@@ -36,10 +29,8 @@ export function normaliseName(raw: string): string {
 }
 
 /**
- * Cheap sanity check that an entered name could plausibly be real. Requires at
- * least two trimmed characters, at least one letter, and rejects digits-only
- * input. Kept lenient on purpose: gibberish like "asdf" is accepted because no
- * rule catches it without also rejecting genuine short or unusual names.
+ * Lenient name check: 2+ characters, a letter, not digits only. "asdf" passes, as no rule
+ * catches it without rejecting real names.
  * @param raw - Raw name input.
  * @returns Whether the value is plausibly a name.
  */

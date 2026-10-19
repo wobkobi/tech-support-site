@@ -1,8 +1,7 @@
 "use client";
 // src/features/admin/components/settings/SettingsView.tsx
-// Tabbed shell for the admin settings panel. Renders the group tab bar and the active
-// tab's editor. Every settings group has a tab, plus a Rates tab for the RateConfig rows,
-// which live in their own collection rather than a settings group.
+// Tabbed shell for the admin settings panel: one tab per settings group, plus a Rates tab
+// for the RateConfig rows, which live in their own collection.
 
 import { SettingsSearch } from "@/features/admin/components/settings/SettingsSearch";
 import { SettingsAllContext } from "@/features/admin/components/settings/useSettingsForm";
@@ -34,8 +33,7 @@ function TabLoading(): React.ReactElement {
   return <p className="py-8 text-center text-sm text-admin-faint">Loading…</p>;
 }
 
-// Tab editors load on demand: only the active tab's chunk ships, instead of
-// bundling all nine editors into the settings page's first load.
+// Tab editors load on demand so only the active tab's chunk ships.
 const AvailabilityTab = dynamic(
   () =>
     import("@/features/admin/components/settings/AvailabilityTab").then((m) => m.AvailabilityTab),
@@ -181,10 +179,8 @@ export function SettingsView({
     setFocusTarget({ id: fieldKey, nonce: Date.now() });
   };
 
-  // After a search jump, scroll + focus the target once the (possibly just-switched) tab
-  // has rendered. Search indexes the full meta key but a tab renders nested fields under
-  // the last segment alone, so "cancellation.callOutFee" must also try "callOutFee" or
-  // nested fields would switch tabs without ever scrolling.
+  // After a search jump, scroll + focus the target once the tab has rendered. Nested
+  // fields render under their last segment, so "cancellation.callOutFee" also tries "callOutFee".
   useEffect(() => {
     if (!focusTarget) return;
     const t = setTimeout(() => {
@@ -225,8 +221,7 @@ export function SettingsView({
           className="mb-3"
         />
 
-        {/* The active tab already names the section, so the card leads with its blurb.
-            The md padding (16px, 20px from sm) is what the save bar's negative margins undo. */}
+        {/* The md padding (16px, 20px from sm) is what the save bar's negative margins undo. */}
         <Card>
           <p className="text-sm text-admin-muted">{meta.blurb}</p>
           <div className="mt-1">

@@ -1,8 +1,6 @@
 // src/app/api/unsubscribe/[token]/route.ts
-// Public unsubscribe endpoint. Mail apps hit it directly through the List-Unsubscribe
-// header (RFC 8058 one-click: a form POST with `List-Unsubscribe=One-Click`), and the
-// /unsubscribe page posts JSON `{ action }` to it. POST only: link scanners fetch every
-// URL in an email with GET, and that must never unsubscribe anyone.
+// Public unsubscribe endpoint for RFC 8058 one-click and the /unsubscribe page.
+// POST only: link scanners GET every URL in an email.
 
 import { optOutContact, resubscribeContact } from "@/features/mailing/lib/opt-out";
 import { verifyUnsubscribeToken } from "@/features/mailing/lib/unsubscribe-token";
@@ -13,8 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 const PREVIEW_TOKEN = "preview";
 
 /**
- * Works out what the caller wants. A JSON body is the page; anything else is a mail
- * app's one-click POST, which always means unsubscribe.
+ * Read the action: JSON is the page; anything else is a one-click POST, meaning unsubscribe.
  * @param request - Incoming request.
  * @returns The requested action, or null for an unknown JSON action.
  */

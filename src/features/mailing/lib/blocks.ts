@@ -1,8 +1,6 @@
 // src/features/mailing/lib/blocks.ts
-// The block editor's view of an email body. The body text stays the saved format: this
-// reads it into blocks and writes blocks back. renderBody renders from these same
-// blocks, so the editor and the sent email always agree on the block structure, and a
-// parse and re-serialise always renders the same email. Pure and client-safe.
+// Parses an email body into blocks and writes them back. renderBody uses the same blocks,
+// so the editor and sent email agree. Pure and client-safe.
 
 import {
   BOX_LINE_RE,
@@ -68,8 +66,7 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
 let idCounter = 0;
 
 /**
- * A fresh block id. Not crypto.randomUUID: that is missing on plain-http
- * origins, such as the admin opened on a phone over the local network.
+ * A fresh block id. Not crypto.randomUUID, which plain-http origins (LAN phone testing) lack.
  * @returns A unique id for this page session.
  */
 export function newBlockId(): string {
@@ -105,15 +102,9 @@ export function emptyBlock(type: BlockType): Block {
 }
 
 /**
- * Parses a body into blocks; renderBody renders the email from this too. A blank
- * line ends a paragraph, list or quote, and every other block stands alone on its
- * line. Text that isn't any block, including an unknown `::word`, becomes a Text
- * block, so nothing the operator typed is lost (the email renders an unknown
- * `::word` as nothing).
- *
- * Ids are the prefix plus the position, so the server render and hydration give the
- * same ids for the same body. Pass a fresh prefix when re-parsing on the client, so
- * new blocks never reuse an old block's id (and with it React's state for that card).
+ * Parses a body into blocks. A blank line ends a paragraph, list or quote; anything else
+ * unrecognised (even an unknown `::word`) becomes a Text block so nothing is lost.
+ * Ids are prefix + position for stable hydration; re-parse with a fresh prefix on the client.
  * @param body - Body text.
  * @param idPrefix - Start of every id.
  * @returns The blocks, top to bottom.
@@ -158,8 +149,7 @@ export function parseBlocks(body: string, idPrefix = "p"): Block[] {
     list = [];
   }
   /**
-   * Closes the quote being collected. A first line of only stars is the rating and a
-   * last `- Name` line is who said it.
+   * Closes the quote being collected: a leading stars line is the rating, a last `- Name` the author.
    */
   function flushQuote(): void {
     if (quote.length === 0) return;
@@ -178,8 +168,7 @@ export function parseBlocks(body: string, idPrefix = "p"): Block[] {
     });
   }
   /**
-   * Adds a block that stands alone on its line, closing any open paragraph first so
-   * the ids stay in order.
+   * Adds a standalone block, closing any open paragraph first so ids stay in order.
    * @param block - The block, minus its id.
    */
   function push(block: DistributiveOmit<Block, "id">): void {
@@ -294,9 +283,8 @@ function linesOf(text: string): string[] {
 }
 
 /**
- * The body text for one block, or an empty string when the block is still empty
- * and should be left out. A button with a label but no link is kept, so the
- * problems list can point it out instead of it silently vanishing.
+ * The body text for one block, or "" when empty. A button with a label but no link is
+ * kept so the problems list can flag it.
  * @param block - The block.
  * @returns Its lines.
  */
@@ -329,8 +317,7 @@ export function serializeBlock(block: Block): string {
     }
     case "picture": {
       const url = block.url.trim();
-      // No picture yet: a described one stays as a placeholder for later (a template's
-      // header picture); a blank new block is simply empty.
+      // No picture yet: a described one stays as a placeholder; a blank one is empty.
       if (!url) return block.alt.trim() ? `![${bracketSafe(block.alt)}]()` : "";
       const img = `![${bracketSafe(block.alt)}](${url}${block.small ? ' "small"' : ""})`;
       const link = block.link.trim();
@@ -348,8 +335,7 @@ export function serializeBlock(block: Block): string {
       ].join("\n");
     }
     case "box": {
-      // The headline is what makes it a box: without one the block stays empty, and
-      // the photo or button picked so far waits in the editor until it has one.
+      // No headline, no box: the photo and button wait in the editor until it has one.
       const headline = block.headline.replace(/\s+/g, " ").trim();
       if (!headline) return "";
       const photo = block.photo.trim();
@@ -375,8 +361,7 @@ export function serializeBlock(block: Block): string {
 }
 
 /**
- * Writes blocks back to body text, one blank line between blocks. Empty blocks
- * are left out.
+ * Writes blocks back to body text, one blank line apart, leaving out empty blocks.
  * @param blocks - The blocks, top to bottom.
  * @returns Body text.
  */
@@ -385,8 +370,7 @@ export function serializeBlocks(blocks: readonly Block[]): string {
 }
 
 /**
- * Whether a block has nothing in it yet, so the editor shows a hint and the
- * body leaves it out.
+ * Whether a block is still empty (the editor hints; the body leaves it out).
  * @param block - The block.
  * @returns True when empty.
  */

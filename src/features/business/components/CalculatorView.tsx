@@ -1,8 +1,7 @@
 "use client";
 // src/features/business/components/CalculatorView.tsx
-// Job-pricing calculator and invoice builder. Assembles client, tasks, parts, travel, and
-// rate config into line items, supports AI parsing of a plain-English job description,
-// and renders a live invoice preview.
+// Job-pricing calculator and invoice builder: line items from tasks, parts and travel,
+// AI parsing of a job description, and a live invoice preview.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
@@ -87,16 +86,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 interface CalculatorViewProps {
   /** Live business identity, threaded into the invoice preview. */
   identity: IdentitySettings;
-  /**
-   * Live pricing (GST, min travel, travel $/hr from settings) for the job
-   * calculations, plus the event picker's merge-suggestion window.
-   */
+  /** Live pricing for the job calculations, plus the event picker's merge-suggestion window. */
   pricing: JobPricing & { travelRatePerHour: number; mergeSuggestGapMins: number };
-  /**
-   * Live cancellation policy driving cancel mode: the notice windows decide
-   * whether a fee and the round trip apply, and callOutFee is the amount. Sits
-   * outside {@link JobPricing} because none of it is a calcJobTotal input.
-   */
+  /** Live cancellation policy for cancel mode; not part of {@link JobPricing}. */
   cancellation: CancellationPolicy;
   /** Rate configs resolved server-side so the calculator renders without a fetch waterfall. */
   initialRates: RateConfig[];
@@ -112,13 +104,11 @@ interface CalculatorViewProps {
   quoteMode: boolean;
 }
 
-// The prefill shapes live in the shared business types so the event picker
-// can read them without importing back from this module.
+// Prefill shapes live in shared types so the event picker needn't import this module.
 export type { EventPrefill, EventPrefillSlot } from "@/features/business/types/business";
 
 /**
- * Interactive job calculator that lets an admin build a job quote using AI parsing, time tracking,
- * tasks, parts, and client details, then save it as income or convert it to an invoice.
+ * Job calculator that builds a quote, then saves it as income or converts it to an invoice.
  * @param props - Component props.
  * @param props.identity - Live business identity for the invoice preview.
  * @param props.pricing - Live pricing for the job calculations.
@@ -144,10 +134,8 @@ export function CalculatorView({
 }: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
 
-  // Draft restore runs in the mount effect below: reading localStorage during render made
-  // server HTML and hydration disagree. State starts at server-consistent defaults.
-  // The ref reads true once a meaningful draft was restored, and is usable inside async
-  // .then() callbacks without becoming a React dependency.
+  // Draft restore runs in the mount effect to keep hydration consistent. The ref marks a
+  // restored draft for async callbacks without becoming a dependency.
   const draftLoadedRef = useRef(false);
   // Captured once to keep timeAgo() pure for the toast label.
   const [mountedAt] = useState(() => Date.now());
@@ -156,25 +144,19 @@ export function CalculatorView({
   // Server-resolved; rates are edited on the Settings > Rates tab, so a reload picks up changes.
   const rates = initialRates;
   const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>(initialTaskTemplates);
-  // Multiple time slots all lump into one billable duration. AI parse populates
-  // one slot per detected HH:MM-HH:MM segment; operators can add/remove rows
-  // via the Time card. No labels, dates, or per-slot travel - it's all flat.
+  // Time slots lump into one billable duration; the AI parse adds one per HH:MM-HH:MM segment.
   const [timeRanges, setTimeRanges] = useState<ParsedRange[]>(() => {
-    // One slot per merged event. The slot sum ignores the gaps between them,
-    // so billing two events an hour apart charges the two visits, not the wait.
+    // One slot per merged event; the gaps between them aren't billed.
     if (eventPrefill) {
       return eventPrefill.slots.map((s) => ({ startTime: s.startTime, endTime: s.endTime }));
     }
     return [{ startTime: "", endTime: "" }];
   });
-  // Whether the Time card holds real times (typed, edited on a booked job, restored from a
-  // draft, or read off the description) rather than a placeholder: the "now to an hour
-  // from now" a blank form seeds, a booking's own windows, or a window the parse made up
-  // from a bare duration. Only real times go to the parser, or a placeholder gets billed.
+  // Whether the Time card holds real times rather than a seeded placeholder. Only real
+  // times go to the parser, or a placeholder gets billed.
   const [timesSet, setTimesSet] = useState(false);
   /**
-   * Applies a Time card edit. Changing or removing an existing row makes the times real;
-   * appending a row (which starts with no end) leaves the rest as they were.
+   * Applies a Time card edit; changing or removing a row makes the times real, appending doesn't.
    * @param next - The card's new ranges.
    */
   function handleTimeRangesChange(next: ParsedRange[]): void {
@@ -186,12 +168,10 @@ export function CalculatorView({
     setTimeRanges(next);
     if (edited) setTimesSet(true);
   }
-  // Out-of-session work (a call after the visit, a remote fix later) billed on
-  // top of the slot sum. The AI parse seeds it from outOfSessionMins.
+  // Out-of-session work billed on top of the slot sum.
   const [followUpMins, setFollowUpMins] = useState(0);
-  // Every travel charge (auto-lookup + manual) together; jobToLineItems sums them into
-  // one "Round-trip travel" line. An event prefill seeds from the frozen TravelBlock /
-  // booking snapshot - a fresh lookup on a past job could only quote tomorrow's traffic.
+  // Every travel charge, summed into one line. An event prefill seeds from the frozen
+  // TravelBlock, since a fresh lookup on a past job would quote tomorrow's traffic.
   const [travelEntries, setTravelEntries] = useState<TravelEntry[]>(() => {
     if (!eventPrefill?.travelMinsThere || eventPrefill.travelMinsThere <= 0) return [];
     const there = eventPrefill.travelMinsThere;
@@ -217,8 +197,7 @@ export function CalculatorView({
   const [paidCash, setPaidCash] = useState(false);
   // Part of the bill handed over on the day: shown on the invoice, recorded in income.
   const [alreadyPaid, setAlreadyPaid] = useState<AlreadyPaidState>(EMPTY_ALREADY_PAID);
-  // Client, save buttons and preview. The phone total bar stands down while
-  // any of it is on screen, since the real buttons and total are showing.
+  // Client, save buttons and preview; the phone total bar hides while any is on screen.
   const finishRef = useRef<HTMLDivElement>(null);
   const [finishInView, setFinishInView] = useState(false);
   useEffect(() => {
@@ -235,22 +214,18 @@ export function CalculatorView({
   const [clientName, setClientName] = useState(
     () => eventPrefill?.clientName ?? reissue?.clientName ?? "",
   );
-  // Normalised on seed as well as on typing: a Booking row written before
-  // emails were normalised can still carry capitals, and the invoice preview
-  // must show exactly what gets saved.
+  // Normalised on seed too, so the preview shows exactly what gets saved.
   const [clientEmail, setClientEmail] = useState(() =>
     normaliseEmail(eventPrefill?.clientEmail ?? reissue?.clientEmail),
   );
-  // Address-to state: the operator picks Name/Company/Custom once and the
-  // choice rides through to the invoice without re-picking.
+  // Address-to choice (Name/Company/Custom) carries through to the invoice.
   const [pickedContactName, setPickedContactName] = useState<string | null>(null);
   const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(null);
   const [pickedContactGoogleId, setPickedContactGoogleId] = useState<string | null>(null);
   const [addressMode, setAddressModeState] = useState<"name" | "company" | "custom">("custom");
   // "Also update the contact" box, shown once a picked contact's name is edited.
   const [renameContact, setRenameContact] = useState(true);
-  // The typed name, when it is a hand edit of a picked contact's name (adding a last
-  // name, say) rather than the contact's own name or company again.
+  // The typed name, when it is a hand edit of a picked contact's name.
   const typedClientName = clientName.trim();
   const contactRenameOffer =
     pickedContactName &&
@@ -266,10 +241,8 @@ export function CalculatorView({
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
   /**
-   * Loads the calculator for a set of calendar events, keeping a part-typed
-   * description across the remount the navigation forces. The page keys this
-   * component by the id set, so choosing events MUST remount it - the prefill
-   * only lands through useState initialisers, never a prop update.
+   * Loads the calculator for a set of calendar events, keeping a part-typed description.
+   * Must remount: the prefill only lands through useState initialisers.
    * @param eventIds - Google Calendar event ids to bill as one job.
    */
   function handleBillEvents(eventIds: string[]): void {
@@ -278,8 +251,7 @@ export function CalculatorView({
     } catch {
       // Storage unavailable; the description won't carry over.
     }
-    // Unticking the last event leaves nothing to bill: fall back to a blank
-    // calculator rather than an empty eventIds= that would resolve to null.
+    // No events left: fall back to a blank calculator.
     if (eventIds.length === 0) {
       router.push("/admin/business/calculator");
       return;
@@ -301,9 +273,8 @@ export function CalculatorView({
 
   // Travel lookup
   const [jobAddress, setJobAddress] = useState(() => eventPrefill?.jobAddress ?? "");
-  // Drove or walked, for the trip an invoice save logs. null follows the job: travel charged
-  // to the client (anything but a store run) means you drove, wherever it was. Otherwise a job
-  // in your own suburb (the base address's locality) counts as walked, anywhere else as driven.
+  // Drove or walked, for the logged trip. null follows the job: charged travel means drove,
+  // otherwise the base suburb counts as walked.
   const [walkedChoice, setWalkedChoice] = useState<boolean | null>(null);
   const homeLocality = identity.baseAddress.locality.trim().toLowerCase();
   const travelCharged = travelEntries.some((e) => e.kind !== "storeRun" && e.cost > 0);
@@ -317,22 +288,17 @@ export function CalculatorView({
 
   // Per-job promo skip flag (not persisted).
   const [skipPromo, setSkipPromo] = useState(false);
-  // Two fields, not one: the box the operator types in, and the code actually
-  // applied. Only the applied one is in the lookup's deps, so the job is not
-  // repriced on every keystroke.
+  // Typed box and applied code are separate so the job isn't repriced on every keystroke.
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [promoCode, setPromoCode] = useState("");
 
-  // Job date drives the surcharge + promo lookup so a past job is priced by what
-  // applied THEN, not today. Persisted in the draft; defaults to today (NZ).
-  // A re-issue with no event falls back to the voided invoice's issue date, so the promo is
-  // priced for when the job was billed.
+  // Job date drives the surcharge + promo lookup, so a past job is priced by what applied
+  // then. Defaults to today (NZ), or a re-issue's voided invoice date.
   const [jobDate, setJobDate] = useState<string>(
     () => eventPrefill?.jobDate ?? reissue?.issueDate ?? todayISO(),
   );
 
-  // The job's earliest start, so a time-of-day promo is judged at the real start
-  // rather than the lookup's midday default. HH:MM strings sort as times.
+  // Earliest start, for time-of-day promos; HH:MM strings sort as times.
   const jobStartTime =
     timeRanges
       .map((r) => r.startTime)
@@ -420,8 +386,8 @@ export function CalculatorView({
     setParts,
   });
 
-  // Where you drove, for the trip an invoice save logs: any job with an address, travel
-  // charged or not, except a walk, a remote event or a cancellation that bills no round trip.
+  // Where you drove, for the logged trip: any addressed job except a walk, remote event or
+  // a cancellation without a round trip.
   const tripAddress =
     jobAddress.trim() &&
     !walked &&
@@ -431,8 +397,7 @@ export function CalculatorView({
       : null;
 
   /**
-   * Edits the job address. A new address goes back to the suburb default for drove or
-   * walked, since a choice made for the old address may not hold for the new one.
+   * Edits the job address and resets drove/walked to the suburb default.
    * @param value - Address text.
    */
   function changeJobAddress(value: string): void {
@@ -440,14 +405,12 @@ export function CalculatorView({
     setWalkedChoice(null);
   }
 
-  // A cancellation fee is a flat charge, not labour: no date surcharge on it, and no
-  // promo, which would also spend a redemption on a job that never happened.
+  // A cancellation fee is flat: no date surcharge and no promo redemption.
   const pricedPromo = cancelMode ? null : activePromo;
   const surcharge = cancelMode ? null : dateSurcharge;
 
   /**
-   * Applies a picked Places suggestion: keep the full formatted address and
-   * drop the stale trip, edited or not (manual entries survive).
+   * Applies a picked Places suggestion and drops the stale trip (manual entries survive).
    * @param formattedAddress - The selected address.
    */
   function handleAddressSelected(formattedAddress: string): void {
@@ -455,13 +418,11 @@ export function CalculatorView({
     setTravelEntries((prev) => prev.filter((e) => !isTripDrive(e)));
   }
 
-  // Mount seeding + contacts fetch. The "now" times must seed in an effect - nzNowTime() at
-  // render would mismatch between server render and hydration. Contacts stay a client
-  // fetch: the People API pages through every connection, far too slow to block on.
+  // Mount seeding + contacts fetch. "now" seeds in an effect to avoid a hydration mismatch;
+  // contacts stay a client fetch as the People API is too slow to block on.
   useEffect(() => {
-    // Restore the saved draft after mount (localStorage is client-only). An event prefill
-    // is a deliberate fresh billing task and outranks any draft; a non-meaningful draft
-    // (just auto-seeded times) reseeds "now" rather than restoring stale timestamps.
+    // Restore the draft after mount. An event prefill outranks it; a draft of only seeded
+    // times reseeds "now".
     const draft = eventPrefill || reissue ? null : loadDraft();
     if (draft && isMeaningfulDraft(draft)) {
       draftLoadedRef.current = true;
@@ -474,8 +435,7 @@ export function CalculatorView({
       setPromoCode(draft.promoCode ?? "");
       setPromoCodeInput(draft.promoCode ?? "");
       setTimeRanges(draft.timeRanges ?? [{ startTime: "", endTime: "" }]);
-      // Drafts saved before the flag existed count their times as real unless they are
-      // the lone one-hour row a blank form seeds.
+      // Without the flag, times count as real unless they're the lone seeded one-hour row.
       setTimesSet(draft.timesSet ?? !isPlaceholderHour(draft.timeRanges));
       setFollowUpMins(draft.followUpMins ?? 0);
       setTravelEntries(draft.travelEntries ?? []);
@@ -496,10 +456,8 @@ export function CalculatorView({
       const now = nzNowTime();
       setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
     }
-    // The prefill outranks the draft for dates/client/travel, but the description is the
-    // operator's own words, so it survives: prefer the picker's sessionStorage stash
-    // (fresher than the 500ms-debounced draft), else the draft text, which covers the
-    // schedule's "Bill in calculator" path. Read before the draft writer's first tick.
+    // The description survives a prefill: prefer the picker's sessionStorage stash (fresher
+    // than the debounced draft), else the draft text. Read before the writer's first tick.
     try {
       const handoff = sessionStorage.getItem(AI_INPUT_HANDOFF_KEY);
       if (handoff) sessionStorage.removeItem(AI_INPUT_HANDOFF_KEY);
@@ -517,9 +475,8 @@ export function CalculatorView({
       .then((d: { ok: boolean; contacts: GoogleContact[] }) => {
         if (!d.ok) return;
         setContacts(d.contacts);
-        // A job billed from the schedule arrives as typed text, with no contact
-        // picked, so the Name/Company switch never showed. Pick the Google contact
-        // whose email the booking used, when the booking's name is theirs too.
+        // Pick the Google contact matching the booking's email and name, so the
+        // Name/Company switch shows.
         const seeded = eventPrefill ?? reissue;
         const email = normaliseEmail(seeded?.clientEmail);
         const match = email ? d.contacts.find((c) => normaliseEmail(c.email) === email) : undefined;
@@ -533,13 +490,11 @@ export function CalculatorView({
       .catch(() => {
         /* picker stays empty; manual client entry still works */
       });
-    // Run once on mount - eventPrefill is fixed per page load, and re-running
-    // would clobber edited state and refetch contacts.
+    // Run once on mount; re-running would clobber edited state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Debounced draft writer. Any change to a persisted form field schedules a
-  // write 500ms later; rapid edits coalesce into one localStorage hit.
+  // Debounced draft writer (500ms).
   useEffect(() => {
     const t = setTimeout(() => {
       saveDraft({
@@ -594,13 +549,10 @@ export function CalculatorView({
     return () => clearTimeout(t);
   }, [draftRestoredAt]);
 
-  // Derived durations and rate groupings. Billable window = slot sum plus any
-  // out-of-session follow-up minutes.
+  // Billable window = slot sum plus out-of-session minutes.
   const sumRangesMin = timeRanges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
   const durationMins = sumRangesMin + followUpMins;
-  // Aggregate first start / last end - used for the travel departure ISOs.
-  // Sorted by startTime so out-of-order operator entries still produce
-  // sensible bounds.
+  // First start / last end for the travel departure ISOs, sorted to handle out-of-order rows.
   const sortedRanges = [...timeRanges]
     .filter((r) => r.startTime)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -608,17 +560,14 @@ export function CalculatorView({
   const aggregateEnd = sortedRanges[sortedRanges.length - 1]?.endTime ?? "";
   // Base hourly rates (e.g. Standard $65/hr) used as the per-task base rate.
   const baseRates = rates.filter((r) => r.ratePerHour !== null);
-  // Modifier rates: signed $/hr deltas (Business +$20, At home -$15, Remote -$10),
-  // toggled per task to shift the effective rate. The percent rows (Public Holiday)
-  // stay off the chips: the date surcharge already adds that uplift as its own line,
-  // so a chip on top would charge it twice.
+  // Signed $/hr modifier chips per task. Percent rows stay off: the date surcharge already
+  // adds that uplift.
   const modifierRates = rates
     .filter((r) => r.hourlyDelta !== null)
     .sort((a, b) => a.label.localeCompare(b.label));
   const flatRates = rates.filter((r) => r.flatRate !== null);
 
-  // Assemble the job and totals. Labour bills entirely through the per-task
-  // base + modifier rates; durationMins is the rebalance window, not a charge.
+  // Labour bills through per-task rates; durationMins is the rebalance window, not a charge.
   const job: JobCalculation = {
     durationMins,
     tasks,
@@ -629,15 +578,11 @@ export function CalculatorView({
     clientEmail,
   };
 
-  // Apply the date surcharge to labour (public holiday or weekend, none otherwise),
-  // and tell the totals which modifier marks business labour so a promo skips
-  // it - promos are a home-rate offer.
-  // Same predicate getPublicPricing uses to derive the business rate, so the
-  // page and the invoice cannot disagree about which modifier means business.
+  // Date surcharge on labour, and the business modifier a (home-rate) promo skips - the
+  // same predicate getPublicPricing uses.
   const businessModifierId =
     rates.find((r) => r.label === "Business" && r.unit === "modifier")?.id ?? null;
-  // The Standard rate a flat promo cuts from, picked the same way
-  // getPublicPricing picks the base rate.
+  // The Standard rate a flat promo cuts from, picked as getPublicPricing does.
   const standardRate =
     rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
     rates.find((r) => r.ratePerHour !== null && r.unit === "hour")?.ratePerHour ??
@@ -651,9 +596,7 @@ export function CalculatorView({
   };
   const totals = calcJobTotal(job, !skipPromo ? pricedPromo : null, jobPricing);
   const showTotalBar = !finishInView && totals.total > 0;
-  // Memoise the flattened line items so the preview panel's React.memo can
-  // skip re-render when unrelated parent state changes (e.g. typing in the
-  // AI input box). Recomputes when any meaningful input shifts.
+  // Memoised so the preview's React.memo skips unrelated re-renders.
   const previewLineItems = useMemo(
     () => jobToLineItems(job, surcharge, pricing.minTravelCharge, pricing.minBillableMins),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -667,9 +610,7 @@ export function CalculatorView({
       clientName,
       clientEmail,
       notes,
-      // Both feed jobToLineItems above. Omitted, a settings change that
-      // re-rendered this component without remounting left the preview on stale
-      // line items while `totals` below recomputed - the two then disagree.
+      // Both feed jobToLineItems; omitting them leaves the preview stale against `totals`.
       pricing.minTravelCharge,
       pricing.minBillableMins,
     ],
@@ -708,8 +649,7 @@ export function CalculatorView({
   });
 
   /**
-   * Switches address-to mode and updates clientName accordingly. Custom mode
-   * keeps whatever clientName already has so the operator can keep editing.
+   * Switches address-to mode and updates clientName; Custom keeps the current name.
    * @param mode - Target mode.
    */
   function setAddressMode(mode: "name" | "company" | "custom"): void {
@@ -727,13 +667,8 @@ export function CalculatorView({
   }
 
   /**
-   * Resets every form field - persisted and session-only - back to a blank
-   * calculator and drops the saved draft. Single source of truth for "start
-   * fresh": also rewinds the job date to today, un-skips the promo, drops any
-   * promo code, resets the
-   * cancel-policy inputs, and clears any error banners. When billing a
-   * calendar event, navigates off `?eventId=` so the keyed view remounts
-   * without the prefill.
+   * Resets every field to a blank calculator and drops the draft. When billing a calendar
+   * event, navigates off `?eventId=` so the keyed view remounts without the prefill.
    */
   function resetFormState(): void {
     const now = nzNowTime();
@@ -759,8 +694,7 @@ export function CalculatorView({
     setPickedContactGoogleId(null);
     setAddressModeState("custom");
     setRenameContact(true);
-    // The description plus the non-persisted parse-session results, still part
-    // of "starting fresh".
+    // Description and parse-session results.
     clearAiInput();
     setDraftRestoredAt(null);
     // Cancel mode and its policy inputs go back to their mount defaults.
@@ -770,9 +704,7 @@ export function CalculatorView({
     // Transient dialog state.
     setShowTaxonomyModal(false);
     clearDraft();
-    // Billing a booked job: the prefill is a server prop keyed by eventId, so
-    // state resets alone can't remove the banner - drop the query param and
-    // let the remount start truly blank.
+    // The prefill is a server prop, so drop the query param to remount blank.
     if (eventPrefill || reissue) {
       router.replace(
         quoteMode ? "/admin/business/calculator?quote=1" : "/admin/business/calculator",
@@ -781,15 +713,13 @@ export function CalculatorView({
   }
 
   /**
-   * Looks up the drive to the job address and replaces the trip entry, even one whose
-   * price was typed over (manual entries survive). See {@link lookupAutoTravel} for how
-   * each leg's departure is chosen.
+   * Looks up the drive and replaces the trip entry, even a typed-over one; see
+   * {@link lookupAutoTravel} for leg departures.
    */
   async function handleTravelLookup(): Promise<void> {
     if (!jobAddress.trim()) return;
     setLookingUpTravel(true);
-    // Drop any stale auto entry up-front so the chip disappears while the
-    // lookup is in flight; manual entries survive.
+    // Drop the stale auto entry while the lookup runs; manual entries survive.
     setTravelEntries((prev) => prev.filter((e) => !isTripDrive(e)));
     try {
       const entry = await lookupAutoTravel({
@@ -814,8 +744,7 @@ export function CalculatorView({
     <>
       {pendingInvoiceId && (
         <AddToContactsModal
-          // The person, not the addressed-to name: a company invoice would
-          // otherwise save a contact named "68 Ltd".
+          // The person, not the addressed-to name (a company invoice).
           name={pickedContactName ?? clientName}
           company={pickedContactCompany}
           email={clientEmail}
@@ -1068,8 +997,7 @@ export function CalculatorView({
             contacts={contacts}
             onSelectContact={(c) => {
               const company = c.company?.trim() || null;
-              // Found by typing the company ("68"), not the person: address it to
-              // the company. clientName still holds the search text at this point.
+              // Found by typing the company: address it to the company.
               const byCompany = matchedByCompanyOnly(c, clientName);
               setClientName(byCompany && company ? company : c.name);
               setClientEmail(normaliseEmail(c.email));
@@ -1077,9 +1005,7 @@ export function CalculatorView({
               setPickedContactCompany(company);
               setPickedContactGoogleId(c.id || null);
               setRenameContact(true);
-              // Bypass the setAddressMode wrapper - it reads pickedContactName
-              // from this same render's closure (still null), which would flip
-              // the mode to "custom". The name is already set explicitly above.
+              // Bypass setAddressMode: its stale closure would flip the mode to "custom".
               setAddressModeState(byCompany ? "company" : "name");
             }}
             onClearContact={() => {

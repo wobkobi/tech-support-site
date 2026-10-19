@@ -1,9 +1,6 @@
 // src/shared/lib/business-identity.server.ts
-// Server-only accessor for the live business identity (defaults + settings override). The
-// constants in `business-identity.ts` stay the defaults (and remain client-safe); server
-// consumers read `getIdentity()` so an operator edit in the settings panel flows through
-// to invoices, emails, SEO, and the travel origin. Identity secrets (bank account, GST#)
-// default from env, so this is behaviour-preserving until the operator saves an override.
+// Server-only live business identity (defaults merged with settings). Constants in
+// business-identity.ts stay the client-safe defaults.
 
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { IdentitySettings } from "@/shared/lib/settings/types";

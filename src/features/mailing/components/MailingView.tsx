@@ -1,8 +1,6 @@
 "use client";
 // src/features/mailing/components/MailingView.tsx
-// Mailing list home: emails by stage (drafts, scheduled, sent) plus the editable
-// presets, and the subscribers panel. New email opens a blank draft straight in the
-// editor, where the template dropdown swaps between presets.
+// Mailing list home: emails by stage, editable presets, and the subscribers panel.
 
 import {
   ROW_CLS,

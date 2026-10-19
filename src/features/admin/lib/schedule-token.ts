@@ -1,17 +1,12 @@
 // src/features/admin/lib/schedule-token.ts
-// Shared by the admin schedule page and /api/admin/schedule/version: both derive
-// the token from the same event list, so the two only agree while the rendered
-// grid is still current.
+// Schedule freshness token, shared by the schedule page and /api/admin/schedule/version.
 
 import type { CalendarEvent } from "@/features/calendar/lib/google-calendar";
 import { createHash } from "node:crypto";
 
 /**
- * Hashes the grid-visible fields of a calendar event list into a short token.
- * Lines are sorted first because events arrive interleaved per calendar in no
- * guaranteed order - hashing the raw order would flip the token on most polls
- * and refresh forever. Only rendered fields count, so an unrelated Google
- * metadata edit (attendees, description) doesn't force a needless reload.
+ * Hashes the grid-visible fields of an event list into a short token. Sorted because
+ * events arrive in no fixed order; unrendered fields are ignored.
  * @param events - Calendar events covering the page's buffered window.
  * @returns Hex token, stable across renders for identical schedule content.
  */

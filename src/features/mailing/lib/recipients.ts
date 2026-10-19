@@ -1,9 +1,6 @@
 // src/features/mailing/lib/recipients.ts
-// Who a mailing-list email goes to: every live contact with an email who hasn't
-// unsubscribed, less anyone the operator unticked. The "site reviewers" audience narrows
-// that to contacts who left a review on the site, and also leaves out anyone who stopped
-// review asks, since that email is itself a review ask. The selection itself is pure so
-// the check script can cover it without a database.
+// Who a mailing-list email goes to: live, subscribed contacts with an email, less anyone
+// unticked. "Site reviewers" also skips anyone who stopped review asks.
 
 import type { CampaignAudience } from "@/features/mailing/lib/audience";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
@@ -56,16 +53,12 @@ export interface RecipientSelection {
 }
 
 /**
- * Splits the contact pool into recipients, unticked contacts and unsubscribed
- * ones. A contact counts as unsubscribed when their primary address OR their
- * contact id is on the opt-out list: the id catches someone who unsubscribed
- * and later had their email changed. Two contacts sharing an address get one
- * copy, sent to whichever comes first.
+ * Splits the pool into recipients, unticked and unsubscribed. An opted-out address OR
+ * contact id counts (the id survives an email change); a shared address gets one copy.
  * @param pool - Live contacts.
  * @param optOuts - Opt-out rows.
  * @param excludedIds - Contact ids unticked in the send dialog.
- * @param onlyIds - When given, contacts outside it are left out of every group (the
- *   audience narrowed the list, so they aren't "unticked" or "unsubscribed").
+ * @param onlyIds - When given, contacts outside it are left out of every group.
  * @returns The three groups.
  */
 export function selectRecipients(
@@ -103,10 +96,8 @@ export function selectRecipients(
 }
 
 /**
- * Each live contact's latest review from the site. A review belongs to a contact by its
- * contactId, or by its customerRef matching one of the contact's review tokens (current
- * or inherited through a merge); reviews left through an old booking link have only the
- * latter.
+ * Each live contact's latest site review, matched by contactId or by customerRef against
+ * the contact's current or merged review tokens.
  * @param contactIds - Only these contacts; omitted for everyone.
  * @returns Map from contact id to review text.
  */

@@ -1,9 +1,7 @@
 "use client";
 // src/features/business/components/invoice/EditInvoiceView.tsx
-// DRAFT-invoice editor: InvoiceForm on the left, a live InvoicePreviewPanel (real invoice
-// number, sticky on lg+) on the right. Submitting PATCHes the full-update branch of
-// /api/business/invoices/[id] (which re-validates line items, recomputes totals with the
-// discounts, and re-syncs the Drive PDF), then routes back to the detail page.
+// DRAFT-invoice editor: form plus live preview. Submitting PATCHes the full update of
+// /api/business/invoices/[id], then routes back to the detail page.
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import {
@@ -29,10 +27,7 @@ interface EditInvoiceViewProps {
   invoiceNumber: string;
   /** Initial form values (dates already ISO YYYY-MM-DD). */
   initial: InvoiceFormData;
-  /**
-   * Discounts from creation, shown in totals and the preview. Both change only when the
-   * AI box rebuilds the lines and re-prices them.
-   */
+  /** Discounts from creation; only an AI box rebuild re-prices them. */
   preservedDiscounts: PreservedDiscounts;
   /** Live business identity for the preview. */
   identity: IdentitySettings;
@@ -79,8 +74,7 @@ export function EditInvoiceView({
   const unsuccessfulChanged =
     (discounts.unsuccessfulDiscount ?? 0) !== (preservedDiscounts.unsuccessfulDiscount ?? 0);
   const promoChanged = (discounts.promoDiscount ?? 0) !== (preservedDiscounts.promoDiscount ?? 0);
-  // Saved lines carry no rate tags, so a hand edit cannot re-price the discounts. Say so
-  // rather than let a promo worked out on 2 hours quietly ride on 4.
+  // Saved lines carry no rate tags, so a hand edit can't re-price the discounts; warn.
   const discountsStale =
     ((discounts.promoDiscount ?? 0) > 0 || (discounts.unsuccessfulDiscount ?? 0) > 0) &&
     JSON.stringify(preview.lineItems) !== JSON.stringify(pricedLines);
@@ -152,8 +146,7 @@ export function EditInvoiceView({
               context={aiContext}
               currentItems={form.lineItems}
               disabled={busy}
-              // Parsed notes only fill an empty field, so a hand-written note survives. A
-              // stated cash amount ("paid $47 in cash") fills Already paid.
+              // Parsed notes fill only an empty field; a stated cash amount fills Already paid.
               onApply={(lineItems, notes, cashPaid, repriced) => {
                 setDiscounts((d) => ({ ...d, ...repriced }));
                 setPricedLines(lineItems);

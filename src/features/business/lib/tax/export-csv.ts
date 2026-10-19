@@ -1,8 +1,6 @@
 // src/features/business/lib/tax/export-csv.ts
-// The accountant's CSV for one financial year: a summary with the IR3 and IR10 figures,
-// the deductions, the asset register with that year's depreciation schedule, the trip log
-// and the home office claim. Pure, so the export route and the check-tax fixtures share it.
-// Dates are NZ day-first (DD/MM/YYYY); amounts are bare numbers so a spreadsheet can sum them.
+// The accountant's CSV for one FY: IR3/IR10 summary, deductions, asset schedule, trips, home office.
+// Dates are DD/MM/YYYY; amounts are bare numbers so a spreadsheet can sum them.
 
 import { roundCents, roundKm } from "@/features/business/lib/tax/helpers";
 import {
@@ -69,9 +67,8 @@ const ASSET_HEADERS = [
 ] as const;
 
 /**
- * Quotes a text cell. A leading =, +, -, @, tab or CR makes a spreadsheet run the cell
- * as a formula, and asset names and trip purposes are typed by hand, so those get a
- * leading apostrophe to stay plain text.
+ * Quotes a text cell, prefixing an apostrophe when it starts with =, +, -, @, tab or CR
+ * so a spreadsheet doesn't run it as a formula.
  * @param value - Cell text.
  * @returns The quoted cell.
  */
@@ -100,8 +97,7 @@ function csvKm(km: number): string {
 }
 
 /**
- * Plain number cell (a percentage on the 0-100 scale, or a floor area), to two decimal
- * places.
+ * Plain number cell (0-100 percentage or floor area), to two decimal places.
  * @param value - The number.
  * @returns The number as text.
  */
@@ -110,9 +106,7 @@ function csvNumber(value: number): string {
 }
 
 /**
- * Rate cell ($/km or $/m²), unrounded: the Tax page takes a rate to any precision, and
- * the cell must show the exact rate the claim was worked from. A finite number never
- * starts with a formula character, so it needs no guard beyond staying a bare number.
+ * Rate cell ($/km or $/m²), unrounded so it shows the exact rate the claim was worked from.
  * @param rate - The rate.
  * @returns The number as text.
  */
@@ -121,8 +115,7 @@ function csvRate(rate: number): string {
 }
 
 /**
- * Cell for an input that may not have been entered: the formatted number, or a
- * "Not entered" text cell.
+ * Cell for an optional input: the formatted number, or "Not entered".
  * @param value - The input, or null.
  * @param format - Cell formatter for a number.
  * @returns The cell.
@@ -132,8 +125,7 @@ function csvOptional(value: number | null, format: (n: number) => string): strin
 }
 
 /**
- * DD/MM/YYYY for a ledger date. Ledger dates are UTC midnight of the NZ day, so their
- * UTC parts are the NZ date.
+ * DD/MM/YYYY for a ledger date (UTC midnight of the NZ day, so UTC parts are the NZ date).
  * @param iso - ISO ledger date.
  * @returns The quoted date cell.
  */
@@ -207,8 +199,8 @@ function assetLine(row: AssetYearRow, asset: SnapshotAsset | undefined): string 
  * @param meta - Labels for the header block.
  * @param meta.fyLabel - FY display label, e.g. "FY 2025-26 (partial)".
  * @param meta.generatedAt - When the file was produced.
- * @param meta.unreadableFiledAt - ISO filing instant when the year is filed but its saved
- * snapshot couldn't be read, so `view` holds fresh figures; null or absent otherwise.
+ * @param meta.unreadableFiledAt - ISO filing instant when the saved snapshot couldn't be read
+ * (so `view` is fresh); null or absent otherwise.
  * @returns The CSV text, BOM first, CRLF line endings.
  */
 export function buildTaxCsv(
@@ -218,8 +210,7 @@ export function buildTaxCsv(
   const { result } = view;
   const lines: string[] = [];
 
-  // Header block. A filed year with an unreadable snapshot exports fresh figures, and
-  // the status says so rather than claiming the year isn't filed.
+  // Header block. A filed year with an unreadable snapshot still says filed, with fresh figures.
   lines.push(line(csvText("Tax summary"), csvText(meta.fyLabel)));
   const status = view.filedAt
     ? `Filed ${nzSlashDate(new Date(view.filedAt))}`
@@ -271,9 +262,8 @@ export function buildTaxCsv(
   for (const row of result.assets) lines.push(assetLine(row, assetsById.get(row.assetId)));
   lines.push("");
 
-  // Trip log and the tier split. The car's total km sets the Tier 1 share, so it sits
-  // just above the tier rows; "Not entered" means the first 14,000 business km were Tier 1.
-  // Each tier's rate follows its km so the claim can be worked by hand.
+  // Trip log and tier split. Total km sits above the tiers since it sets the Tier 1 share
+  // ("Not entered" = first 14,000 business km are Tier 1).
   const year = view.yearInputs;
   lines.push(csvText("Vehicle trips"));
   lines.push(line(csvText("Date"), csvText("Km"), csvText("Purpose")));

@@ -1,8 +1,7 @@
 "use client";
 // src/features/business/components/assets/AssetsView.tsx
-// Client side of the Assets page: summary cards, the write-off rule, the register list,
-// and the add/edit, schedule and delete dialogs. The server works out every schedule, so
-// a save or delete refreshes the route instead of patching local state.
+// Client side of the Assets page. The server computes every schedule, so a save or delete
+// refreshes the route.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";

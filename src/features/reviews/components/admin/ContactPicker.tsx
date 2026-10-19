@@ -1,10 +1,7 @@
 "use client";
 // src/features/reviews/components/admin/ContactPicker.tsx
-// Searchable contact picker for linking a review to someone in the contact book.
-// Replaces a bare <select> over the whole book: that could not show which contact
-// was already linked, could not unlink (re-picking the selected option fires no
-// change event), and hid every contact who had reviewed, so a wrong link could
-// never be moved to the right person.
+// Searchable contact picker for linking a review to someone in the contact book, with
+// the current link marked and an explicit unlink row.
 
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { cn } from "@/shared/lib/cn";
@@ -74,8 +71,7 @@ export function ContactPicker({
       (c) =>
         !q || c.name.toLowerCase().includes(q) || (c.email?.toLowerCase().includes(q) ?? false),
     );
-    // The linked contact sorts to the top so its "currently linked" marker is
-    // visible without hunting, and unlinking is always the first row.
+    // Linked contact first, so its marker shows without hunting.
     const sorted = [...matches].sort((a, b) => {
       if (a.id === value) return -1;
       if (b.id === value) return 1;
@@ -101,8 +97,7 @@ export function ContactPicker({
     };
   }, [contacts, query, value]);
 
-  // Clamp rather than reset in an effect, so a shrinking list never strands the
-  // highlight out of bounds between renders.
+  // Clamp rather than reset in an effect, so a shrinking list never strands the highlight.
   const highlight = Math.min(rawHighlight, Math.max(0, options.length - 1));
 
   useEffect(() => {

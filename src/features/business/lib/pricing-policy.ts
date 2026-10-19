@@ -1,13 +1,6 @@
 // src/features/business/lib/pricing-policy.ts
-// Single source of truth for every billable rule customers and operators see:
-// travel-charge math, cancellation windows, minimum billable time, GST mode, plus the
-// copy shared by the pricing page, booking confirmation emails, and the FAQ.
-//
-// The constants here are the DEFAULTS. The live, settings-backed values are resolved by
-// `getPolicy()` in `pricing-policy.server.ts`; server consumers read
-// `(await getPolicy()).X` and client consumers receive resolved values as props. The copy
-// generators take their figures as arguments so the rendered text always matches the live
-// policy. Keep this module client-safe (no Prisma).
+// Billable rules (travel, cancellation, minimums, GST) and their shared customer copy.
+// Constants are DEFAULTS; live values come from getPolicy() in pricing-policy.server.ts. Client-safe (no Prisma).
 
 import {
   MIN_TRAVEL_CHARGE,
@@ -22,16 +15,12 @@ import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 export const GST_RATE = 0.15;
 
 /**
- * When false (today) every invoice prints with no GST line. When flipped to
- * true (future, once registration crosses the $60k threshold) displayed
- * rates are treated as GST-inclusive; the invoice shows an "Includes GST of
- * $X" line via back-calc. The live flag comes from the pricing settings; set
- * the GST number in the identity settings so the invoice header switches to
- * "TAX INVOICE".
+ * Default GST flag. When true, rates are GST-inclusive and invoices show an "Includes GST"
+ * line; the live flag is a pricing setting, and the identity GST number makes it a "TAX INVOICE".
  */
 export const GST_REGISTERED = false;
 
-/** Minimum a WHOLE job bills once any billable work happens - never a per-task floor (see `enforceMinBillable`); 15 is a multiple of BILLING_INCREMENT_MINS so the floor + round don't double-snap. */
+/** Minimum a WHOLE job bills (not per task); a multiple of BILLING_INCREMENT_MINS so floor + round don't double-snap. */
 export const MIN_BILLABLE_MINS = 15;
 
 /** Round-to-nearest step for billable time; mirrors {@link billableMins} in business.ts. */
@@ -61,12 +50,8 @@ export const FALLBACK_BASE_RATE = 65;
 export const FALLBACK_BUSINESS_DELTA = 20;
 
 /**
- * Default RateConfig rows, seeded by the rates route when a label is missing.
- * One base hourly rate (Standard), $/hr modifiers, and a percentage one (Public
- * Holiday). No separate Complex tier - everything bills at Standard plus
- * modifiers. The travel $/hr is a pricing setting, not a rate row. Standard and
- * Business read the fallback constants above, so the seed and the fallbacks
- * cannot disagree.
+ * Default RateConfig rows, seeded by the rates route when a label is missing: Standard plus
+ * $/hr and percentage modifiers. Standard and Business read the fallbacks above so they agree.
  */
 export const DEFAULT_RATE_ROWS = [
   {
@@ -79,9 +64,7 @@ export const DEFAULT_RATE_ROWS = [
     isDefault: true,
   },
   {
-    // Business callouts: on-site work for companies bills above the home
-    // Standard rate. Surfaced on /business as baseRate + this delta; kept off
-    // the consumer pricing accordion.
+    // Company on-site work; shown on /business, kept off the consumer pricing accordion.
     label: "Business",
     ratePerHour: null,
     flatRate: null,
@@ -109,9 +92,7 @@ export const DEFAULT_RATE_ROWS = [
     isDefault: false,
   },
   {
-    // Phone-delivered work: no screen share, no travel - cheaper again than
-    // Remote. Quick calls are often not charged at all (operator's call);
-    // this rate covers the ones long enough to bill.
+    // Phone work, cheaper than Remote; for calls long enough to bill.
     label: "Phone",
     ratePerHour: null,
     flatRate: null,
@@ -139,10 +120,8 @@ export const NZ_REGION = "NZ";
 export const HOME_REGION = "Auckland";
 
 /**
- * Cancellation rules. In-person and remote are priced separately: an on-site
- * visit costs a slot plus a drive across Auckland, a remote session only costs
- * the slot, so remote gets a shorter free window and a smaller flat fee with no
- * call-out tier at all.
+ * Cancellation rules. Remote only costs the slot (no drive), so it gets a shorter free
+ * window, a smaller flat fee and no call-out tier.
  */
 export interface CancellationPolicy {
   /** In-person cancellations made more than this many hours before the booking are free. */
@@ -151,11 +130,11 @@ export interface CancellationPolicy {
   travelChargeHours: number;
   /** Flat fee for an in-person cancellation inside freeNoticeHours but outside travelChargeHours. */
   callOutFee: number;
-  /** Full call-out billed for an in-person cancellation inside travelChargeHours, or on a no-show. Replaces callOutFee rather than stacking on it, and travel is added on top. */
+  /** Full call-out for an in-person cancellation inside travelChargeHours or a no-show; replaces callOutFee, plus travel. */
   fullCallOutFee: number;
   /** Remote cancellations made more than this many hours before the booking are free. */
   remoteFreeNoticeHours: number;
-  /** Flat fee for a remote cancellation inside remoteFreeNoticeHours, or a remote no-show. There is no drive, so no call-out tier and no travel. */
+  /** Flat fee for a remote cancellation inside remoteFreeNoticeHours or a remote no-show; never travel. */
   remoteFee: number;
   /** When true, a customer self-cancel via the website auto-sends the fee invoice instead of leaving it as a draft. */
   autoSendCancellationInvoice: boolean;
@@ -175,10 +154,8 @@ export const CANCELLATION: CancellationPolicy = {
 export type CancellationReason = "late-cancellation" | "no-show";
 
 /**
- * Whether the cancelled booking was on site or remote. The fee is the same
- * either way - it covers the held slot - but only an in-person booking has a
- * drive to bill, so {@link CANCELLATION.travelChargeHours} never applies to a
- * remote session.
+ * Whether the cancelled booking was on site or remote; only in-person has a drive, so
+ * {@link CANCELLATION.travelChargeHours} never applies to remote.
  */
 export type CancelMeetingType = "in-person" | "remote";
 
@@ -193,14 +170,8 @@ export interface CancellationCharge {
 }
 
 /**
- * Applies the cancellation policy to one booking. Single source of truth for
- * which tier a cancel lands in, shared by the auto-draft and the calculator's
- * cancel mode so they cannot drift apart. In person, three tiers: outside
- * freeNoticeHours free; inside it the flat callOutFee; inside travelChargeHours
- * (or a no-show) the full call-out plus the round trip. Remote is its own
- * two-tier rule: free outside remoteFreeNoticeHours, else the flat remoteFee -
- * no drive, so never travel. A no-show has no notice to measure, so it always
- * lands in the charged tier.
+ * Applies the cancellation policy to one booking. In person: free, then callOutFee, then full
+ * call-out plus travel inside travelChargeHours. Remote: free or remoteFee. No-shows always pay.
  * @param bookingStart - When the booking was due to start.
  * @param cancelledAt - When the client called it off; ignored for a no-show.
  * @param options - Booking shape.
@@ -241,9 +212,7 @@ export function assessCancellation(
 }
 
 /**
- * Invoice line wording for a cancellation fee. Shared by the automated
- * booking-cancel draft and the calculator's cancel mode so the two cannot drift
- * apart.
+ * Invoice line wording for a cancellation fee, shared by the auto-draft and the calculator.
  * @param reason - Which fee this is.
  * @param date - The cancelled booking's original start.
  * @returns Line description, e.g. "Late cancellation fee - 15 Jul 2026".
@@ -278,11 +247,8 @@ export interface TravelChargeBreakdown {
 }
 
 /**
- * Step-by-step travel-charge math. Single source of truth for both
- * {@link calcTravelCharge} and the operator-side breakdown display, so the
- * displayed math always matches what's billed. Callers with only one leg
- * figure pass it for both, which doubles the one-way drive. Returns
- * zeros for no travel (remote, or geocoded to origin).
+ * Step-by-step travel-charge math behind {@link calcTravelCharge} and the operator breakdown,
+ * so both match. Returns zeros for no travel (remote, or geocoded to origin).
  * @param thereMins - Outbound drive time in minutes.
  * @param backMins - Return drive time in minutes; pass thereMins again when no separate figure exists.
  * @param travelRatePerHour - Travel hourly rate, sourced from the pricing settings.
@@ -363,10 +329,8 @@ export function isWithinTravelWindow(
 }
 
 /**
- * Snaps to the nearest billing increment, applies the minimum-billable floor,
- * then optionally caps at a ceiling. A zero/negative raw value floors to the
- * minimum rather than staying at 0. Shared by the public
- * estimate route and the admin job parser so both bill identically.
+ * Snaps to the billing increment, applies the minimum floor (even to 0), then optionally caps.
+ * Shared by the public estimate route and the admin job parser.
  * @param rawMins - Raw duration in minutes (may be 0 or negative).
  * @param minBillableMins - Minimum billable floor (live setting; defaults to the const).
  * @param incrementMins - Rounding increment (live setting; defaults to the const).
@@ -385,13 +349,10 @@ export function clampBillableMins(
 }
 
 // > Copy generators
-// Inputs are passed explicitly so the rendered text always matches the live values. Key
-// figures are wrapped in `**…**` so the pricing page can emit `<strong>` while emails and
-// FAQs pass the markers through as plain-text emphasis.
+// Figures are passed in so text matches live values; `**…**` marks bold for the pricing page.
 
 /**
- * Renders an hour count for customer-facing copy. The windows are settings, so
- * a value of 1 is reachable and "1 hours" would read as a bug to a client.
+ * Renders an hour count for customer-facing copy, singular at 1.
  * @param n - Number of hours.
  * @returns e.g. "1 hour", "12 hours".
  */
@@ -400,8 +361,7 @@ function hours(n: number): string {
 }
 
 /**
- * Renders a day count for customer-facing copy. The window is a setting, so a
- * value of 1 is reachable and "1 days" would read as a bug to a client.
+ * Renders a day count for customer-facing copy, singular at 1.
  * @param n - Number of days.
  * @returns e.g. "1 day", "30 days".
  */
@@ -410,9 +370,7 @@ function days(n: number): string {
 }
 
 /**
- * Renders a minute count for customer-facing copy. The grace period is a
- * setting, so whole-hour values are reachable and "60 minutes" reads worse to a
- * client than "1 hour".
+ * Renders a minute count for customer-facing copy, as hours when whole ("1 hour", not "60 minutes").
  * @param n - Number of minutes.
  * @returns e.g. "30 minutes", "1 hour", "90 minutes".
  */
@@ -431,9 +389,8 @@ export function cancellationTiersCopy(p: CancellationPolicy = CANCELLATION): str
 }
 
 /**
- * FAQ answer for a missed appointment. A no-show bills the same tier as a
- * cancel inside travelChargeHours, so the notice line must not promise that
- * any warning at all avoids travel - only notice beyond that window does.
+ * FAQ answer for a missed appointment. A no-show bills like a cancel inside travelChargeHours,
+ * so only notice beyond that window avoids travel.
  * @param p - Cancellation policy (defaults to the module constant).
  * @returns The charge sentence and the how-to-avoid-it sentence.
  */
@@ -477,9 +434,7 @@ export function cancellationCopy(
     `applies.`;
   const closing = `Please cancel using the link in your confirmation email, or by phone or text.`;
 
-  // A booking already knows which kind it is, so a confirmation email can show
-  // just the tier that binds this customer. Pages that describe the policy in
-  // general (pricing, FAQ) pass nothing and get both.
+  // A booking's emails show just its own tier; general pages (pricing, FAQ) get both.
   const tiers =
     opts?.only === "in_person"
       ? [inPerson]
@@ -491,18 +446,9 @@ export function cancellationCopy(
 }
 
 /**
- * Fixed-or-discounted definition of the unsuccessful-visit rule: full rate
- * only when the problem is put right; an unfixed visit discounts the labour
- * even when it ends with a clear diagnosis, and buys the customer a free
- * opening stretch on the visit that comes back to finish it (on site or
- * remote). Both the charge phrase and the grace period track their live
- * settings so the copy never disagrees with the bill; a grace of 0 drops that
- * sentence rather than promising "0 minutes".
- *
- * Which visits qualify is stated, not computed: no booking field records why a
- * return was booked, so the difference between coming back to a job that
- * failed and coming back to one that merely ran out of slot is the operator's
- * call at invoicing time.
+ * Unsuccessful-visit rule copy: full rate only when fixed, discounted labour otherwise, plus a
+ * free grace period on the return visit (sentence dropped when 0). Which returns qualify is the
+ * operator's call at invoicing, since no booking field records it.
  * @param factor - Unsuccessful-visit charge fraction (defaults to the constant).
  * @param freeMins - Minutes covered free at the start of a return visit (defaults to the constant).
  * @returns Multi-paragraph copy describing the unsuccessful-visit rule.
@@ -530,12 +476,8 @@ export function unsuccessfulWorkCopy(
 }
 
 /**
- * Workmanship-guarantee text (pricing accordion + FAQ). Distinct from the
- * unsuccessful-work rule, which covers the outcome of the current visit; this
- * one stands behind work already delivered - fallout from a prior visit's own
- * changes is put right free inside the window. Takes the live window so the
- * copy never disagrees with the promise; callers hide the section entirely
- * when the window is 0.
+ * Workmanship-guarantee text (pricing accordion + FAQ): fallout from a prior visit's changes is
+ * fixed free inside the window. Callers hide it when the window is 0.
  * @param windowDays - Days after a visit the guarantee covers (defaults to the constant).
  * @returns Copy describing the workmanship guarantee.
  */
@@ -563,8 +505,7 @@ export function partsCopy(): string {
 }
 
 /**
- * Travel-policy text. Caller passes the live Travel rate so the page always
- * quotes the figure the operator is actually billing.
+ * Travel-policy text, quoting the live travel rate.
  * @param travelRatePerHour - Current travel rate from the pricing settings.
  * @param minTravelCharge - Live minimum travel charge (defaults to the constant).
  * @returns Copy describing the travel charge model.
@@ -574,8 +515,7 @@ export function travelCopy(
   minTravelCharge: number = MIN_TRAVEL_CHARGE,
 ): string {
   return (
-    // Formatted, not interpolated raw: a promo can halve these into cents, and
-    // bare arithmetic prints "$7.5", which is not a price.
+    // Formatted: a promo can halve these into cents, and raw maths prints "$7.5".
     `Travel is **one round trip** billed at **${formatMoneyCompact(travelRatePerHour)}/hr** - a separate, ` +
     `lower rate than labour. ` +
     `**Minimum ${formatMoneyCompact(minTravelCharge)}** when there is any travel at all. ` +
@@ -649,9 +589,8 @@ export interface DateSurcharge {
 }
 
 /**
- * The labour surcharge for a job's date. A public holiday wins over a weekend, so a
- * holiday Saturday bills the holiday surcharge alone and the two never stack. A holiday
- * set to 0% bills normal rates even on a weekend.
+ * The labour surcharge for a job's date. A public holiday wins over a weekend (never stacked),
+ * even when set to 0%.
  * @param holidayName - The NZ public holiday on the job date, or null.
  * @param weekday - NZ weekday of the job, 0 = Sunday through 6 = Saturday.
  * @param uplifts - Live surcharge fractions from the pricing settings.
@@ -680,8 +619,7 @@ export function dateSurcharge(
 }
 
 /**
- * Customer-facing note for a booking day that carries a date surcharge, shown when
- * the day is picked so the higher labour rate is never a surprise on the invoice.
+ * Customer-facing note shown when a surcharged booking day is picked.
  * @param surcharge - The day's surcharge from {@link dateSurcharge}.
  * @returns One plain sentence naming the reason, the percent and what it leaves alone.
  */
@@ -717,12 +655,8 @@ export function gstCopy(registered: boolean = GST_REGISTERED): string {
 }
 
 /**
- * Bundle of every policy value. The constants in this module are the DEFAULTS;
- * the live, settings-backed values are resolved by `getPolicy()` in
- * `pricing-policy.server.ts`. Defined as a type (not an eager const) so this
- * client-safe module never reads its cross-module constants at evaluation time -
- * {@link MIN_TRAVEL_CHARGE} comes from business.ts, which imports back from here, so an
- * eager read would hit the circular-import temporal dead zone.
+ * Bundle of every policy value, resolved live by `getPolicy()`. A type, not an eager const:
+ * {@link MIN_TRAVEL_CHARGE} comes from business.ts, which imports back from here (circular TDZ).
  */
 export interface Policy {
   GST_REGISTERED: boolean;

@@ -1,7 +1,6 @@
 // src/app/api/business/store-run/route.ts
 // Admin-only drive lookup for a mid-job store run: the client's place > the store > back.
-// Kept off the public travel-time route because it takes any start point, which would
-// let anyone spend the Google Maps quota on arbitrary routes.
+// Admin-only because it takes any start point, which could burn the Maps quota.
 
 import { lookupStoreRun } from "@/features/business/lib/travel-distance";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";

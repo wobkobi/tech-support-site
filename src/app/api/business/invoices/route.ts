@@ -1,10 +1,6 @@
 // src/app/api/business/invoices/route.ts
-// Admin invoices collection endpoint. GET lists every invoice (newest issue date first).
-// POST creates one: validates line items, allocates the next TTP-YYYY-XXXX number (or
-// Q-YYYY-XXXX from the quote counter when `isQuote`), computes totals via
-// calcInvoiceTotals (promo + unsuccessful-work discounts reduce the taxable amount),
-// writes back the matching Sheets counter, logs the job's trip when you drove there,
-// then renders the PDF and uploads it to Drive.
+// Admin invoices collection. POST allocates a TTP- (or Q- quote) number, computes totals,
+// logs the job's trip when driven, and uploads the PDF to Drive.
 
 import { completeBilledBookings } from "@/features/booking/lib/complete-billed-bookings.server";
 import {
@@ -57,8 +53,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const rows = await prisma.invoice.findMany({ orderBy: { issueDate: "desc" } });
 
-  // Attach each linked contact, so the list can search by the person behind a
-  // company invoice and mark who it was for.
+  // Linked contacts let the list search by the person behind a company invoice.
   const contactIds = [...new Set(rows.map((r) => r.contactId).filter((id) => id !== null))];
   const contacts = contactIds.length
     ? await prisma.contact.findMany({
@@ -102,27 +97,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     promoTitle,
     promoDiscount,
     promoId,
-    // Optional unsuccessful-work flag + discount snapshot. Audit trail so
-    // the admin dashboard can count how often the half-price clause fires.
+    // Unsuccessful-work snapshot, so the dashboard can count the half-price clause.
     unsuccessful,
     unsuccessfulDiscount,
     // Optional match back to the billed job (calculator event-prefill flow).
     bookingId,
     calendarEventId,
     calendarEventIds,
-    // Quote mode: Q- number from the quote counter, QUOTE PDF, no payment
-    // until converted to a real invoice.
+    // Quote mode: Q- number, QUOTE PDF, no payment until converted.
     isQuote,
     quoteValidUntil,
-    // Money handed over before the invoice went out, and the date its income entry
-    // records against (the calculator's job date; defaults to the issue date).
+    // Money paid before the invoice; its income date defaults to the issue date.
     alreadyPaid,
     alreadyPaidMethod,
     alreadyPaidDate,
     // NZ day the job was done, kept so a draft edit prices the surcharge for that day.
     jobDate,
-    // Sent by the calculator when you drove to the job, travel charged or not: the job
-    // address and NZ day, so the job's trip is logged at Google's round-trip km.
+    // Sent when the job was driven to (travel charged or not), to log the trip.
     trip,
   } = body as {
     clientName?: string;
@@ -152,31 +143,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!clientName || !clientEmail || !Array.isArray(lineItems)) {
     return errorResponse("Missing required fields", 400);
   }
-  // Guard each item before it reaches calcInvoiceTotals / prisma.create - a
-  // non-finite qty/unitPrice/lineTotal would persist NaN totals.
+  // A non-finite numeric would persist NaN totals.
   if (!lineItems.every(isValidLineItem)) {
     return errorResponse("Invalid line item", 400);
   }
-  // Line totals are re-derived here, never trusted from the body, so the stored lines
-  // always add up to the stored subtotal under the shared cent split.
+  // Re-derive line totals so they always add up to the subtotal.
   const lines = withSplitLineTotals(lineItems);
 
-  // Default issue + due dates server-side so the calculator's direct-save path
-  // doesn't need to send them. Operators can still override either by sending
-  // explicit issueDate / dueDate values.
+  // Server-side date defaults for the calculator's direct-save path.
   const issueDateValue = issueDate ? new Date(issueDate) : new Date();
   const identity = await getIdentity();
   const dueDateValue = dueDate
     ? new Date(dueDate)
     : new Date(Date.now() + identity.paymentTermsDays * 24 * 60 * 60 * 1000);
-  // Guarded like quoteValidUntil below: an unparseable date ("14/09/2026") reaches
-  // prisma.create as an Invalid Date and throws outside any try/catch, 500ing with no
-  // message - after getNextInvoiceNumber has already burnt a number off the counter.
+  // An unparseable date ("14/09/2026") would 500 after burning an invoice number.
   if (Number.isNaN(issueDateValue.getTime()) || Number.isNaN(dueDateValue.getTime())) {
     return errorResponse("Enter a valid issue date and due date", 400);
   }
-  // Quote validity: explicit date wins; default 30 days out. dueDate still
-  // gets a value (schema requires one) but quotes never render or enforce it.
+  // Quote validity defaults to 30 days. Quotes never render or enforce dueDate.
   const quoteValidValue = isQuote
     ? quoteValidUntil
       ? new Date(quoteValidUntil)
@@ -186,9 +170,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Invalid quote validity date", 400);
   }
 
-  // Validate the optional discount snapshots through the shared money parser so
-  // a non-finite or absurd magnitude (e.g. Infinity, 1e12) can't reach the
-  // persisted promoDiscount / unsuccessfulDiscount fields and print on the PDF.
+  // Reject non-finite or absurd discounts (Infinity, 1e12) before they print on the PDF.
   let discount = 0;
   if (promoDiscount != null) {
     const parsed = parseAmount(promoDiscount);
@@ -225,9 +207,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ),
     ),
   );
-  // GST mode comes from the live pricing settings, never the request body. Promo and
-  // unsuccessful discounts both reduce the taxable amount before GST (IRD treatment of
-  // price reductions), so they sum into one argument but persist as separate fields.
+  // GST mode comes from live settings, never the body. Both discounts reduce the taxable
+  // amount before GST (IRD treatment of price reductions).
   const { GST_REGISTERED } = await getPolicy();
   const { subtotal, gstAmount, total } = calcInvoiceTotals(
     lines,
@@ -235,9 +216,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     GST_REGISTERED,
   );
 
-  // Retry on a unique-number collision: concurrent creates or a stale sheet counter can
-  // mint the same number, and the index rejects the loser. getNextInvoiceNumber then
-  // re-allocates above the new DB max rather than 500ing.
+  // Retry on a number collision (concurrent creates or a stale sheet counter).
   let invoice: Awaited<ReturnType<typeof prisma.invoice.create>> | null = null;
   let sheetNextCount: number | null = null;
   let sheetSyncWarning = false;
@@ -270,15 +249,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           notes: notes ?? null,
           alreadyPaid: prepaid.amount,
           alreadyPaidMethod: prepaid.method,
-          // Prisma throws on a malformed ObjectId, so check the shape here rather than
-          // 500 the create; calendarEventId is a free-form Google id, not an ObjectId.
+          // Prisma throws on a malformed ObjectId; calendarEventId is a free-form Google id.
           contactId: parseObjectId(contactId),
           bookingId: parseObjectId(bookingId),
           calendarEventId:
             typeof calendarEventId === "string" && calendarEventId ? calendarEventId : null,
-          // Merged jobs bill several events; calendarEventId above is the earliest.
-          // Left empty below 2 so readers can treat "empty" as "see calendarEventId"
-          // rather than as a second copy of it.
+          // Merged jobs only; empty means "see calendarEventId" (the earliest).
           calendarEventIds: mergedEventIds.length > 1 ? mergedEventIds : [],
         },
       });
@@ -300,13 +276,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Could not allocate a unique invoice number", 500);
   }
 
-  // What the promo was actually worth, now that a real invoice says so. The
-  // booking-time redemption was recorded without a value, because the discount
-  // is not known until the work is priced; this settles that row rather than
-  // adding a second, so one job counts as one redemption against a cap.
-  //
-  // Quotes are excluded: a quote is not a use of the promo, and counting one
-  // would burn a redemption on work that may never happen.
+  // Settle the booking-time redemption with its real value, so one job is one use.
+  // A quote is not a use of the promo.
   const billedBookingId = parseObjectId(bookingId);
   if (!isQuote && promoId && discount > 0) {
     await settlePromoRedemption({
@@ -317,13 +288,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       discountValue: discount,
     });
   } else if (!isQuote && billedBookingId) {
-    // Billed with no promo discount (skipped, or the job fell short of the
-    // spend floor), so the booking-time redemption was never really used.
+    // Billed with no promo discount, so the booking-time redemption went unused.
     await releaseBookingRedemptions(billedBookingId);
   }
 
-  // Invoicing a booked timeslot means the job happened. A quote bills nothing yet, so
-  // its booking completes on conversion instead.
+  // Invoicing means the job happened; a quote's booking completes on conversion.
   if (!isQuote) {
     await completeBilledBookings(
       {
@@ -335,8 +304,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // One trip per job, logged once the invoice is saved; absent from the reply when the
-  // calculator asked for none.
+  // One trip per job, logged once the invoice is saved.
   let tripResult: AutoTripResult | undefined;
   if (tripRequest) {
     tripResult = await autoLogJobTrip({
@@ -355,25 +323,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
   }
 
-  // Record the part payment in income now, so marking the invoice paid later only
-  // records the balance.
+  // Record the part payment now, so marking paid later records only the balance.
   let incomeSheetWarning = false;
   if (prepaid.amount) {
     incomeSheetWarning = (await syncAlreadyPaidIncome(invoice.id, prepaidDate)).sheetSyncWarning;
   }
 
-  // Keep the Sheets counter in sync; the helper swallows + logs failures so the
-  // just-saved invoice isn't compromised by a transient Sheets hiccup. Quotes
-  // write back their own counter (SETTINGS!B12), invoices B19.
+  // Helpers swallow failures. Quotes use SETTINGS!B12, invoices B19.
   if (isQuote) {
     await writeBackQuoteCounter(sheetNextCount);
   } else {
     await writeBackInvoiceCounter(sheetNextCount);
   }
 
-  // Awaited, not fire-and-forget: Vercel freezes the instance once the response is sent,
-  // so a detached promise may never run. Failures are swallowed so a Drive hiccup never
-  // blocks invoice creation.
+  // Awaited: Vercel freezes the instance after the response. Failures are swallowed.
   try {
     const pdfBuffer = await generateInvoicePdf(serialiseInvoice(invoice));
     await syncInvoicePdfToDrive(invoice, pdfBuffer, "[invoices]");

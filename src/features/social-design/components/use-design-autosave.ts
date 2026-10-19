@@ -1,7 +1,6 @@
 // src/features/social-design/components/use-design-autosave.ts
-// Saves the open design 1.2s after the last change, like the post composer. Each save
-// sends the updatedAt the editor last saw; a 409 means another tab saved since, and
-// saving stops (rather than overwriting that work) until the page is reloaded.
+// Saves the open design 1.2s after the last change. A 409 means another tab saved since,
+// so saving stops until reload.
 
 import type { DesignKind } from "@/features/social-design/lib/design-row";
 import type { DesignDoc } from "@/features/social-design/lib/doc";

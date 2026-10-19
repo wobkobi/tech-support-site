@@ -1,9 +1,6 @@
 // src/app/api/admin/send-review-link/route.ts
-// Admin endpoint to send a review request link to a past client. Lands a Contact
-// (creating one if needed), ensures Contact.reviewToken is set, stamps
-// Contact.reviewLinkSentAt, then sends the email/SMS. All send-state lives on the Contact
-// row. Someone already asked gets their existing link back unless the request says
-// `resend`, which sends the ask again under the same token so older links keep working.
+// Sends a review link to a past client, with all send-state on the Contact. Someone already
+// asked gets their link back unless `resend`, which re-sends under the same token.
 
 import {
   findOrCreateContactByEmail,
@@ -25,13 +22,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/admin/send-review-link
- * Sends a review link to a past client via email or SMS and stamps the state
- * onto their Contact row. Requires an admin session (cookie or X-Admin-Secret header).
+ * Sends a review link via email or SMS and stamps the state onto the Contact.
  * @param request - The incoming request.
- * @returns JSON with reviewUrl (and `existing: true` plus `askedAt` when they were
- * already asked and `resend` wasn't set). The SMS path also returns the ready-to-send
- * `smsText`, composed here so the operator's name and business name come from
- * the live identity settings rather than being hardcoded in the admin form.
+ * @returns JSON with reviewUrl (`existing` and `askedAt` when already asked); SMS also
+ * returns `smsText` built from live identity settings.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
@@ -79,9 +73,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ? await findOrCreateContactByEmail(normalisedEmail, { name: name.trim() })
       : await findOrCreateContactByPhone(normalisedPhone!, { name: name.trim() });
 
-    // Dedup: if this contact has already been sent a link, return the same URL
-    // rather than rotating the token (so old emails keep working). `resend` skips
-    // both checks - the operator has seen the earlier ask and wants another.
+    // Already sent: return the same URL so old emails keep working, unless `resend`.
     if (!resend && contact.reviewLinkSentAt && contact.reviewToken) {
       const reviewUrl = `${siteUrl}/review?token=${contact.reviewToken}`;
       return NextResponse.json({
@@ -120,14 +112,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const blockedBy = await reviewAskBlockedBy(contact.id);
 
     if (mode === "sms") {
-      // A mailing-list unsubscribe is about email, so it doesn't stop a text the
-      // operator sends by hand; "stop asking me for reviews" does.
+      // A mailing unsubscribe doesn't stop a hand-sent text; a review opt-out does.
       if (blockedBy === "review_opt_out") {
         return errorResponse("They've asked not to get review requests.", 409);
       }
-      // No SMS provider yet: persist the token only, never the send-state. Stamping
-      // reviewLinkSentAt would suppress the customer from future auto-sends when
-      // nothing was actually sent.
+      // No SMS provider yet: persist the token only, since nothing was actually sent.
       // TODO: wire a real SMS provider, then stamp send-state like the email path.
       if (!contact.reviewToken) {
         await prisma.contact.update({ where: { id: contact.id }, data: { reviewToken } });
@@ -138,8 +127,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const greeting =
         `Hi ${first.includes("@") ? "there" : first}, ${identity.name.split(" ")[0]} here from ` +
         `${identity.company} Tech. Thanks for having me out, I hope everything's still working well.`;
-      // Google first, same as the email: one tap from the text straight to the review
-      // box. Their own /review link stays as the fallback for anyone without Google.
+      // Google first, like the email; their /review link is the fallback.
       const googleUrl = reviews.googleReviewUrl.trim();
       const smsText = googleUrl
         ? `${greeting} If you've got a minute, a quick Google review would really help ` +
@@ -159,9 +147,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Stamp the send-state only after a successful send: stamping first would mark the
-    // customer "review requested" even on a Resend failure, so every retry would
-    // short-circuit at the dedup guard above without re-sending.
+    // Stamp only after a successful send, or retries short-circuit at the dedup guard.
     const result = await sendReviewAsk({
       to: normalisedEmail!,
       firstName: name.trim().split(" ")[0] ?? "",
@@ -170,8 +156,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     if (result !== "sent") {
-      // Persist the token so a retry reuses the same link, but leave the
-      // send-state unstamped so the retry actually re-sends.
+      // Keep the token for the retry but leave send-state unstamped.
       if (!contact.reviewToken) {
         await prisma.contact.update({ where: { id: contact.id }, data: { reviewToken } });
       }

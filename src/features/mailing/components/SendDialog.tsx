@@ -1,10 +1,7 @@
 "use client";
 // src/features/mailing/components/SendDialog.tsx
-// The last step before an email goes out: everyone on the list starts ticked, the
-// operator unticks anyone who shouldn't get it, then sends now or picks a time.
-// Mirrors the server's quiet-hours rules so the operator sees them before confirming:
-// inside quiet hours Send now becomes a send at the end of them (with "Send now anyway"
-// beside it), and a scheduled time inside them moves to the end of them.
+// Pick recipients (all ticked to start), then send now or schedule. Mirrors the server's
+// quiet-hours rules: a send inside them moves to their end unless sent "anyway".
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
@@ -97,8 +94,7 @@ export function SendDialog({
     }
   }
 
-  // The list is fetched fresh on every open, so someone who unsubscribed a
-  // minute ago is already greyed out.
+  // Fetch fresh on every open so recent unsubscribes show greyed out.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -165,8 +161,7 @@ export function SendDialog({
 
   /**
    * Sends or schedules with the current selection.
-   * @param kind - Schedule (Send now inside quiet hours schedules for the end of them),
-   *   send now, or send now anyway inside quiet hours.
+   * @param kind - Schedule, send now, or send now anyway inside quiet hours.
    */
   async function submit(kind: SubmitKind): Promise<void> {
     // Only ids still on the list count; anyone who unsubscribed since is skipped anyway.

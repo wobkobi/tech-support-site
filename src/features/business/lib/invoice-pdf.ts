@@ -1,7 +1,6 @@
 // src/features/business/lib/invoice-pdf.ts
-// Generates the A4 invoice PDF with pdf-lib. Colours mirror the web Tailwind palette so
-// the PDF reads as the same document as the on-screen InvoicePreviewPanel; keep the two
-// layouts in sync.
+// Generates the A4 invoice PDF with pdf-lib. Must match the on-screen InvoicePreviewPanel
+// layout and palette.
 
 import {
   balanceDue,
@@ -90,8 +89,8 @@ function wrapText(text: string, maxW: number, size: number, font: PDFFont): stri
 }
 
 /**
- * Parses the wordmark SVG into PDF vector paths. Each path tracks its enclosing
- * `<g transform="translate(0 Y)">` offset so the caller can re-apply after scaling.
+ * Parses the wordmark SVG into PDF vector paths, each with its enclosing
+ * `<g transform="translate(0 Y)">` offset to re-apply after scaling.
  * @returns Parsed paths in source order.
  */
 function parseWordmarkPaths(): LogoPath[] {
@@ -114,10 +113,8 @@ function parseWordmarkPaths(): LogoPath[] {
 }
 
 /**
- * Serialises a Prisma Invoice row (Date columns) into the string-dated
- * {@link Invoice} DTO that {@link generateInvoicePdf} and the web renderers
- * expect. Explicit field mapping (not a spread) so a new schema column can't
- * silently leak in with the wrong shape, and so every Date is converted.
+ * Serialises a Prisma Invoice row into the string-dated {@link Invoice} DTO. Fields are
+ * mapped explicitly so a new schema column can't leak in unconverted.
  * @param inv - Prisma Invoice row.
  * @returns The Invoice DTO with ISO-string dates.
  */
@@ -157,14 +154,12 @@ export function serialiseInvoice(inv: PrismaInvoice): Invoice {
 }
 
 /**
- * Draws the diagonal PAID / VOID / OVERDUE watermark. Painted first so subsequent
- * sections sit on top of it. No-op when the invoice is in a neutral state.
+ * Draws the diagonal QUOTE / PAID / VOID / OVERDUE watermark, first so everything sits on top.
  * @param ctx - PDF drawing context.
  * @param invoice - Invoice being rendered.
  */
 function drawStatusWatermark(ctx: PdfCtx, invoice: Invoice): void {
-  // Quotes short-circuit: a quote is never PAID/OVERDUE, and even a voided
-  // quote reads better watermarked QUOTE with the VOID status line beside it.
+  // A quote always watermarks QUOTE, even voided (the status line says VOID).
   const isOverdue = !invoice.isQuote && isInvoiceOverdue(invoice);
   const text = invoice.isQuote
     ? "QUOTE"
@@ -203,8 +198,7 @@ function drawStatusWatermark(ctx: PdfCtx, invoice: Invoice): void {
 }
 
 /**
- * Draws the page header: wordmark vector logo on the left and the
- * invoice-number / status / GST# block on the right.
+ * Draws the header: wordmark on the left, title / number / status / GST# on the right.
  * @param ctx - PDF drawing context.
  * @param invoice - Invoice being rendered.
  * @param logoPaths - Pre-parsed wordmark vector paths.
@@ -223,8 +217,7 @@ function drawHeader(ctx: PdfCtx, invoice: Invoice, logoPaths: LogoPath[]): numbe
   }
 
   const rightX = MARGIN + CONTENT_W;
-  // IRD requires "Tax invoice" wording when GST-registered; a quote is never
-  // a tax document, so QUOTE wins regardless of registration.
+  // IRD requires "Tax invoice" when GST-registered; a quote is never a tax document.
   const invTitle = invoice.isQuote ? "QUOTE" : ctx.identity.gstNumber ? "TAX INVOICE" : "INVOICE";
   let rightY = HEADER_TOP - 20;
   ctx.page.drawText(invTitle, {
@@ -242,10 +235,8 @@ function drawHeader(ctx: PdfCtx, invoice: Invoice, logoPaths: LogoPath[]): numbe
     font: ctx.font,
     color: DARK,
   });
-  // The DRAFT/SENT lifecycle is internal bookkeeping and never printed - a DRAFT stamp on
-  // an invoice someone has been asked to pay reads as a mistake. Invoices show only the
-  // states that change what the reader should do (PAID, OVERDUE, VOID); quotes show their
-  // validity date instead.
+  // DRAFT/SENT are internal and never printed; only PAID, OVERDUE and VOID change what the
+  // reader should do. Quotes show their validity date instead.
   const statusText = invoice.isQuote
     ? invoice.status === "VOIDED"
       ? "VOID"
@@ -267,8 +258,7 @@ function drawHeader(ctx: PdfCtx, invoice: Invoice, logoPaths: LogoPath[]): numbe
         : invoice.isQuote
           ? BRAND
           : OVERDUE_COLOUR;
-  // Only consume the line when there is something to say, so the GST number
-  // moves up rather than leaving a blank gap under the invoice number.
+  // Skip the line when empty so the GST number moves up.
   if (statusText) {
     rightY -= 16;
     ctx.page.drawText(statusText, {
@@ -295,8 +285,7 @@ function drawHeader(ctx: PdfCtx, invoice: Invoice, logoPaths: LogoPath[]): numbe
 }
 
 /**
- * Draws the Bill-to column on the left and the Issued/Due dates column on the
- * right, followed by a thin separator line.
+ * Draws Bill-to on the left, Issued/Due dates on the right, then a separator line.
  * @param ctx - PDF drawing context.
  * @param invoice - Invoice being rendered.
  * @param y - Top of the block.
@@ -327,8 +316,7 @@ function drawBillToBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
   });
 
   /**
-   * Draws one label/value row in the dates column, right-aligned to a fixed
-   * x position so issued/due rows line up.
+   * Draws one label/value row in the dates column at fixed x positions.
    * @param label - Field label (e.g. "Issued:").
    * @param val - Pre-formatted value.
    * @param dy - Vertical offset from infoY (negative = lower).
@@ -351,8 +339,7 @@ function drawBillToBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
   };
   drawDateRow("Issued:", formatDateShort(invoice.issueDate), 0);
   if (invoice.isQuote) {
-    // A quote has no payment due date - the second row shows how long the
-    // quoted prices are honoured instead.
+    // A quote has no due date; show how long its prices hold.
     if (invoice.quoteValidUntil) {
       drawDateRow("Valid to:", formatDateShort(invoice.quoteValidUntil), -18);
     }
@@ -371,8 +358,7 @@ function drawBillToBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
 }
 
 /**
- * Draws the line-items table: header row, body rows with word-wrapped
- * descriptions and right-aligned numeric columns, then a thin bottom border.
+ * Draws the line-items table with wrapped descriptions and right-aligned numbers.
  * @param ctx - PDF drawing context.
  * @param invoice - Invoice being rendered.
  * @param y - Top of the table.
@@ -482,9 +468,7 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
 }
 
 /**
- * Draws the totals block: Subtotal, optional promo line, optional GST, and a
- * bold final Total. Long labels are auto-truncated so they never overlap the
- * right-aligned value column.
+ * Draws Subtotal, optional discount and GST rows, then a bold Total.
  * @param ctx - PDF drawing context.
  * @param invoice - Invoice being rendered.
  * @param y - Top of the block.
@@ -496,9 +480,7 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
   const totalsValueX = MARGIN + CONTENT_W;
 
   /**
-   * Draws one totals row, label on the left and right-aligned value on the
-   * right. Truncates the label with an ellipsis if it would otherwise overlap
-   * the value column.
+   * Draws one totals row, truncating the label with an ellipsis before it hits the value.
    * @param label - Row label (e.g. "Subtotal").
    * @param value - Pre-formatted value string (e.g. "$120.00").
    * @param opts - Variant flags.
@@ -543,8 +525,7 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
       { isPromo: true },
     );
   }
-  // Gate on gstAmount (not the legacy `gst` boolean) so the row lights up
-  // automatically when GST_REGISTERED flips and the engine emits an inclusive amount.
+  // Gate on gstAmount, not the `gst` boolean, so the row appears once GST_REGISTERED flips.
   if (invoice.gstAmount > 0) {
     drawRow("Includes GST", formatNZD(invoice.gstAmount));
     // IRD requires a GST number on the header when an invoice carries GST.
@@ -581,9 +562,7 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
 }
 
 /**
- * Draws the tinted "Bank transfer" call-out box with payee, account, the payer's
- * Particulars and Code, and the due date. Sized to its fixed 6-line content so
- * callers don't need to know its height up-front.
+ * Draws the "Bank transfer" box: payee, account, Particulars, Code and due date.
  * @param ctx - PDF drawing context.
  * @param invoice - Invoice being rendered.
  * @param y - Top of the block.
@@ -736,8 +715,7 @@ function drawNotes(ctx: PdfCtx, invoice: Invoice, y: number): void {
 }
 
 /**
- * Draws the sender-contact footer anchored to the page bottom with a page-wide
- * thin top border above it.
+ * Draws the sender-contact footer at the page bottom under a thin border.
  * @param ctx - PDF drawing context.
  */
 function drawFooter(ctx: PdfCtx): void {
@@ -761,10 +739,7 @@ function drawFooter(ctx: PdfCtx): void {
 }
 
 /**
- * Generates a clean professional A4 PDF for the given invoice using pdf-lib.
- * Header is the wordmark logo on the left and the INVOICE/TAX INVOICE title,
- * number, status, and optional GST# on the right. The PAID/VOID/OVERDUE watermark
- * sits underneath as a functional status indicator.
+ * Generates the A4 PDF for an invoice or quote.
  * @param invoice - The invoice record to render.
  * @returns PDF content as a Buffer.
  */
@@ -791,8 +766,8 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
 }
 
 /**
- * Extracts the fiscal year code from an invoice number (e.g. "TTP-2627-0042" > "2627").
- * Falls back to deriving the current fiscal year if the number doesn't match.
+ * Extracts the fiscal year code from an invoice number ("TTP-2627-0042" > "2627"), falling
+ * back to the current fiscal year.
  * @param invoiceNumber - Invoice number string.
  * @returns Two-digit fiscal year code (e.g. "2627").
  */

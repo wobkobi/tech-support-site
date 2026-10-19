@@ -1,8 +1,6 @@
 "use client";
 // src/features/social-design/components/TipStrip.tsx
-// First-open tips for the post maker. Dismissing it is remembered in this browser only;
-// with storage blocked it simply shows again next time. The editor only ever renders in
-// the browser (ssr: false), so storage can be read while rendering.
+// First-open post maker tips; dismissal is per browser. Editor is ssr: false, so storage reads in render.
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";

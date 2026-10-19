@@ -58,9 +58,7 @@ function editDistance(a: string, b: string): number {
 }
 
 /**
- * Suggest a corrected email if the local part is fine but the domain is one
- * edit away from a common provider. Returns null when there's no good match,
- * the input is empty, or the input is already exactly a common domain.
+ * Suggests a fix when the domain is one edit from a common provider; null otherwise.
  * @param email - Raw user input.
  * @returns Suggested email or null.
  */

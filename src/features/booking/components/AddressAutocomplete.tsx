@@ -1,8 +1,6 @@
 // src/features/booking/components/AddressAutocomplete.tsx
-// Places AutocompleteSuggestion input with a component-owned combobox dropdown. One
-// session token per lookup (concluded by fetchFields, discarded on abandonment, never
-// reused). Any failure falls back to a plain input + warning; typing retries, and
-// recovery fires onRecovered.
+// Places autocomplete input with its own combobox; one session token per lookup, never
+// reused. Failures fall back to a plain input; typing retries.
 
 "use client";
 
@@ -18,11 +16,7 @@ const FETCH_DEBOUNCE_MS = 250;
 /** Minimum typed characters before suggestions are fetched. */
 const MIN_FETCH_CHARS = 2;
 
-/**
- * Suggestions come only from the greater Auckland region (the service area).
- * A soft locationBias still ranked same-named Levin/Christchurch streets first;
- * out-of-area addresses can always be typed in full.
- */
+/** Restrict suggestions to greater Auckland; a soft bias still ranked other cities first. */
 const LOCATION_RESTRICTION = {
   north: -35.9,
   south: -37.35,
@@ -45,8 +39,7 @@ interface SelectedPlace {
 }
 
 /**
- * Reads one address component's long text by type from a new-Places components
- * array. Returns undefined when absent.
+ * Reads one address component's long text by type.
  * @param components - The place's addressComponents (or undefined).
  * @param type - The component type to find (e.g. "locality").
  * @returns The component's long text, or undefined.
@@ -73,8 +66,7 @@ interface SuggestionItem {
 }
 
 /**
- * Renders a suggestion's main line with the typed-input matches highlighted,
- * mirroring the legacy widget's `.pac-matched` treatment (coquelicot, bold).
+ * Renders a suggestion's main line with typed-input matches highlighted.
  * @param text - The full main line.
  * @param matches - Matched ranges within it.
  * @returns Interleaved plain / highlighted spans.
@@ -99,9 +91,7 @@ function renderHighlighted(
   return out;
 }
 
-/**
- * Props for the {@link AddressAutocomplete} component.
- */
+/** Props for the {@link AddressAutocomplete} component. */
 export interface AddressAutocompleteProps {
   /** Current address value */
   value: string;
@@ -109,17 +99,9 @@ export interface AddressAutocompleteProps {
   onChange: (value: string) => void;
   /** Fired when a suggestion is selected, with the normalised payload. */
   onPlaceSelected?: (place: SelectedPlace) => void;
-  /**
-   * When true, also fetch the place's location + address components (lat/lng,
-   * locality, postcode) on selection. Off by default so the common booking
-   * lookup stays on the cheapest field set.
-   */
+  /** Also fetch lat/lng, locality and postcode on selection (off: cheapest field set). */
   fetchDetails?: boolean;
-  /**
-   * Fired when the Places API can't be used (missing key, script load failure,
-   * or a failing suggestion fetch) so the parent can bypass any "must pick a
-   * suggestion" gates. Fires once per outage - a recovery re-arms it.
-   */
+  /** Fired once per outage when Places can't be used, so the parent can drop its gates. */
   onFallbackMode?: () => void;
   /** Fired when autocomplete comes back after a failure, so the parent can restore its gates. */
   onRecovered?: () => void;
@@ -183,8 +165,7 @@ export default function AddressAutocomplete({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
   const [scriptError, setScriptError] = useState(false);
-  // Lazy init avoids the "setState inside an effect" lint and is correct because
-  // the env var is inlined at build time - it can't change between renders.
+  // Lazy init is safe: the env var is inlined at build time.
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   const [apiKeyMissing] = useState(() => !apiKey);
   // Latch so onFallbackMode fires at most once per mount.
@@ -201,8 +182,7 @@ export default function AddressAutocomplete({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Monotonic fetch counter so a slow response can't overwrite a newer one.
   const fetchSeqRef = useRef(0);
-  // Ref mirror of scriptError so async handlers see the current value, and a
-  // guard against overlapping load retries.
+  // Ref mirror of scriptError for async handlers, plus a retry guard.
   const errorRef = useRef(false);
   const loadingLibRef = useRef(false);
 
@@ -296,8 +276,7 @@ export default function AddressAutocomplete({
   }
 
   /**
-   * Fetches suggestions for the typed input under the current session token.
-   * A failure shows the plain-input fallback warning; a later success clears it.
+   * Fetches suggestions under the current session token; failure shows the fallback warning.
    * @param input - The typed address fragment.
    */
   async function fetchSuggestions(input: string): Promise<void> {
@@ -364,8 +343,7 @@ export default function AddressAutocomplete({
   }
 
   /**
-   * Applies a suggestion: resolves the full formatted address (concluding the
-   * billing session via fetchFields) and pushes it to the parent.
+   * Applies a suggestion: resolves the address via fetchFields (ending the billing session).
    * @param item - The chosen suggestion.
    */
   async function selectSuggestion(item: SuggestionItem): Promise<void> {
@@ -378,9 +356,7 @@ export default function AddressAutocomplete({
     let details: Omit<SelectedPlace, "formattedAddress"> = {};
     try {
       const place = item.prediction.toPlace();
-      // The session token rides into this first fetchFields automatically,
-      // closing the session at session rates. Only pull the extra
-      // location/component fields when the caller opted in.
+      // The session token rides into this fetchFields, closing the session.
       await place.fetchFields({
         fields: fetchDetails
           ? ["formattedAddress", "location", "addressComponents"]
@@ -410,8 +386,7 @@ export default function AddressAutocomplete({
   }
 
   /**
-   * Combobox keyboard handling; unconsumed keys fall through to the parent's
-   * handler so the calculator's Enter-to-look-up keeps working.
+   * Combobox keyboard handling; unconsumed keys fall through to the parent.
    * @param e - Keydown event.
    */
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>): void {
@@ -428,8 +403,7 @@ export default function AddressAutocomplete({
       }
       if (e.key === "Enter" && activeIndex >= 0) {
         e.preventDefault();
-        // activeIndex is only bounded below, so a list that shrank between the
-        // keypress and this read leaves it past the end.
+        // activeIndex can be past the end if the list shrank.
         const picked = suggestions[activeIndex];
         if (picked) void selectSuggestion(picked);
         return;
@@ -491,8 +465,7 @@ export default function AddressAutocomplete({
               id={s.id}
               role="option"
               aria-selected={i === activeIndex}
-              // preventDefault so the input's blur doesn't close the list
-              // before the click lands.
+              // Stop the input's blur closing the list before the click lands.
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => void selectSuggestion(s)}
               onMouseEnter={() => setActiveIndex(i)}

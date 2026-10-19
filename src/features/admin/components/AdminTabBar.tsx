@@ -1,8 +1,6 @@
 "use client";
 // src/features/admin/components/AdminTabBar.tsx
-// Phone bottom bar (below lg): Home, Schedule, the + that opens QuickActionsSheet,
-// Invoices, and Menu for the full sidebar drawer. Sits where a thumb rests. A page with
-// its own phone action bar hides it and gets the floating + back (globals.css).
+// Phone bottom bar (below lg). A page with its own phone action bar hides it (globals.css).
 
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";

@@ -85,8 +85,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           400,
         );
       }
-      // The operator may have reworded or deleted the promo preset; fall back to the
-      // starter wording only when it's gone.
+      // Starter wording only when the promo preset is gone.
       const preset =
         (await prisma.campaign.findFirst({
           where: { isPreset: true, presetKey: PROMO_PRESET_KEY },

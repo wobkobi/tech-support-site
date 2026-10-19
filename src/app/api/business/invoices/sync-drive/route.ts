@@ -1,9 +1,6 @@
 // src/app/api/business/invoices/sync-drive/route.ts
-// Admin endpoint that links archived Drive PDFs to existing invoice records. POST scans
-// every invoice PDF in Drive, matches each by filename to an invoice number, and
-// back-fills driveFileId + driveWebUrl on the matched record. Unlike import-drive it
-// never creates or re-parses records. Returns counts of matched, not-found and skipped
-// (unparseable filename) files.
+// Links archived Drive PDFs to existing invoices by filename. Never creates or
+// re-parses records (that's import-drive).
 
 import {
   invoiceNumberCandidates,
@@ -16,8 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/business/invoices/sync-drive
- * Searches Google Drive for existing invoice PDFs and back-fills driveFileId + driveWebUrl
- * on matching invoice records. Matches by filename against invoice number.
+ * Back-fill driveFileId + driveWebUrl on invoices matched by PDF filename.
  * @param request - Incoming Next.js request.
  * @returns JSON with counts of matched and unmatched Drive files.
  */

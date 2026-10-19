@@ -1,18 +1,13 @@
 // scripts/run-checks.ts
-// Runs the fixture checks (scripts/check-*.ts) in parallel, one tsx process each, and
-// prints one line per check plus the full output of any that fail. Every check is offline
-// (fetch and transports are stubbed, nothing reads the database), so they all run on
-// every commit and in CI.
-//
+// Runs the offline fixture checks (scripts/check-*.ts) in parallel, one line each plus
+// full output for failures.
 // Usage:
 //   npm test                      # every check
 //   npm test -- promo-pricing     # an exact name runs just that check
 //   npm test -- promo             # anything else runs every check containing it
 //   npm test -- tax trips         # several filters combine
 //   npm test -- --list            # the check names
-//
-// A check's name is its filename without "check-" and ".ts", so a new
-// scripts/check-<name>.ts is picked up with no registration step.
+// A check's name is its filename minus "check-" and ".ts"; new files need no registration.
 
 import { spawn } from "child_process";
 import fs from "fs";
@@ -82,8 +77,7 @@ async function main(): Promise<void> {
   }
 
   /**
-   * Checks one filter selects. An exact name selects only that check, so "tax" doesn't
-   * drag in tax-load and tax-page; anything else selects every name containing it.
+   * Checks one filter selects: an exact name selects only itself, else every name containing it.
    * @param f - One CLI filter.
    * @returns The matching check names.
    */

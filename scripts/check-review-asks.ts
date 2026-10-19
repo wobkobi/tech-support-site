@@ -1,8 +1,6 @@
 // scripts/check-review-asks.ts
-// When an invoice's automatic review ask goes out, and why it doesn't: every skip reason,
-// waiting before skipping, the paid-without-emailing clock, due dates across the NZ
-// daylight-saving changes, the gap boundary, which address the ask goes to, and that a
-// "stop asking me" link and a mailing unsubscribe link can't stand in for each other.
+// When an invoice's automatic review ask goes out or is skipped: clock start, DST-safe
+// due dates, the gap, the address used, and stop vs unsubscribe tokens.
 // Run with: npm test -- review-asks
 
 import {

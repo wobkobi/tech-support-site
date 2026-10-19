@@ -23,8 +23,7 @@ import Link from "next/link";
 import type React from "react";
 import { Fragment } from "react";
 
-// ISR so rate edits propagate via the rate-config tag purge without a redeploy. The
-// daily timer is only a fallback: each regeneration costs ~100 billed ISR write units.
+// Rate edits purge via the rate-config tag; the daily timer is a fallback (~100 ISR write units each).
 export const revalidate = 86400;
 
 const TITLE = "Computer Repairs & Tech Help in Auckland";
@@ -41,9 +40,7 @@ export const metadata: Metadata = {
 const siteUrl = getSiteUrl();
 
 /**
- * Lets a slash-joined example ("Chromecast/AirPlay") wrap after a slash. Browsers
- * treat the whole run as one word, so the half-width phone column otherwise
- * breaks it mid-word.
+ * Let "Chromecast/AirPlay" wrap after the slash instead of mid-word on phones.
  * @param text - Example text.
  * @returns The text with a break opportunity after each slash.
  */

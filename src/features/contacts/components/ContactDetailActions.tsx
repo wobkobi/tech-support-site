@@ -1,10 +1,7 @@
 "use client";
 // src/features/contacts/components/ContactDetailActions.tsx
-// Header actions for the customer-360 detail page: edit the core fields, sync to Google,
-// send a review link, and soft-delete. The edit modal uses the shared email, phone and
-// address inputs and shows name, email and phone problems under their fields. Edits and
-// the sync PATCH/POST the same routes the contacts list uses; a delete routes back to the
-// list, since the contact no longer exists to show.
+// Header actions for the customer-360 page: edit, sync to Google, send a review link and
+// soft-delete (which routes back to the list). Uses the contacts list's API routes.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
@@ -104,8 +101,7 @@ export function ContactDetailActions({
   const { toast } = useToast();
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  // Ticked by default: deleting a contact here normally means dropping the person
-  // altogether, and leaving the Google entry would let the sync pull them back.
+  // Ticked by default: a surviving Google entry would let the sync pull them back.
   const [deleteGoogle, setDeleteGoogle] = useState(true);
   const [busy, setBusy] = useState<null | "save" | "sync" | "delete">(null);
   const [fieldErrors, setFieldErrors] = useState<ContactFieldErrors>({});
@@ -312,8 +308,7 @@ export function ContactDetailActions({
             />
           </AdminField>
 
-          {/* Retainer arrangement: tier gates the rest - no tier means not a
-              retainer client and clears the other fields on save. */}
+          {/* Retainer: no tier means no retainer, clearing the other fields on save. */}
           <div className="mt-2 border-t border-admin-border pt-3">
             <p className="mb-2 text-sm font-bold text-admin-text">Retainer</p>
             <div className="flex flex-col gap-3">

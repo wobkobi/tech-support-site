@@ -1,8 +1,7 @@
 "use client";
 // src/features/business/components/calculator/JobDetailsSection.tsx
-// Time card. Multiple Start/End slots sum into the billable window, with slotIssue
-// flagging zero-length or cross-midnight slots. A follow-up minutes field adds work done
-// outside the slots (a call after the visit, a remote fix later) on top of the slot sum.
+// Time card: Start/End slots sum into the billable window, plus follow-up minutes for
+// work outside them.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -24,10 +23,8 @@ interface SlotIssue {
 }
 
 /**
- * Classifies a slot for inline flagging. Only complete, parseable slots are
- * judged - a half-typed row stays silent. A zero-length slot is a likely
- * mistake; an End before Start now rolls past midnight, so it's surfaced as an
- * info note in case the operator meant same-day and fat-fingered AM/PM.
+ * Classifies a complete slot for inline flagging: zero-length is an error, End before
+ * Start rolls past midnight and gets an info note in case of an AM/PM slip.
  * @param range - Slot to check.
  * @returns Issue to display, or null when the slot reads fine.
  */
@@ -59,8 +56,7 @@ interface Props {
 }
 
 /**
- * Time card. Multiple Start/End slots sum into the billable window; the
- * follow-up field adds out-of-session minutes (a call after the visit) on top.
+ * Time card: slots sum into the billable window, plus follow-up minutes.
  * @param props - Component props.
  * @param props.timeRanges - Time slots (always at least one).
  * @param props.onTimeRangesChange - Replaces the slots array.
@@ -94,8 +90,7 @@ export function JobDetailsSection({
   }
 
   /**
-   * Removes the slot at `index`. Disabled when only one slot remains so the
-   * card always has at least one row to edit.
+   * Removes the slot at `index`; disabled for the last slot.
    * @param index - Slot index to drop.
    */
   function removeRange(index: number): void {

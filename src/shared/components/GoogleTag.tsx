@@ -19,10 +19,8 @@ const CALL_LABEL = process.env.NEXT_PUBLIC_GOOGLE_ADS_CALL_LABEL;
 const loaderId = ADS_ID ?? GA4_ID;
 
 /**
- * Injects the Google tag and reports phone-link taps as conversions and
- * email-link taps as GA4 events. Renders nothing when no measurement IDs are
- * set (dev, preview) or on /admin pages, so back-office browsing never
- * pollutes GA4/Ads data.
+ * Injects the Google tag and reports tel: taps as conversions and mailto: taps as GA4
+ * events. Renders nothing without IDs or on /admin, keeping back-office traffic out.
  * @returns The gtag script tags, or null when unconfigured or on admin pages.
  */
 export function GoogleTag(): React.ReactElement | null {
@@ -30,10 +28,8 @@ export function GoogleTag(): React.ReactElement | null {
   // Admin pages are operator-only; keep them out of analytics entirely.
   const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
 
-  // Unmounting doesn't unload gtag.js, and GA4 enhanced measurement fires a page_view on
-  // every history change, so navigating into /admin would still send a path carrying
-  // invoice and contact IDs. `ga-disable-<ID>` is checked per hit, so toggling it
-  // suppresses those hits even with the tag already live.
+  // gtag.js stays loaded after unmount and fires page_view on every history change, so /admin
+  // paths (with invoice and contact IDs) would still send. `ga-disable-<ID>` is checked per hit.
   useEffect(() => {
     if (!GA4_ID) return;
     (window as unknown as Record<string, boolean>)[`ga-disable-${GA4_ID}`] = isAdmin;
@@ -45,8 +41,7 @@ export function GoogleTag(): React.ReactElement | null {
   useEffect(() => {
     if (!loaderId || isAdmin) return;
     /**
-     * Reports a tel: link tap to GA4 (and to Ads when a call label is set), and
-     * a mailto: link tap to GA4.
+     * Reports a tel: tap to GA4 (and Ads with a call label) and a mailto: tap to GA4.
      * @param event - The bubbled document click.
      */
     const onClick = (event: MouseEvent): void => {

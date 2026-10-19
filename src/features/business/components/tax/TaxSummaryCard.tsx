@@ -1,7 +1,6 @@
 // src/features/business/components/tax/TaxSummaryCard.tsx
-// Compact tax card on the business overview: what to set aside for the selected scope,
-// the weekly pace for the current FY, GST to pay when registered, and a link to the Tax
-// page for the workings. Server-safe.
+// Compact tax card on the business overview: set-aside total, weekly pace, GST to pay
+// and a link to the Tax page. Server-safe.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
@@ -30,9 +29,8 @@ interface TaxSummaryCardProps {
 }
 
 /**
- * Renders the overview's tax card. For all time the taxable figure is each FY's taxable
- * profit added up, and a loss year counts as $0 in that sum, so it is never described as
- * one profit figure.
+ * Renders the overview's tax card. All time sums each FY's taxable profit (a loss year
+ * counts as $0), so it isn't described as one profit figure.
  * @param props - Component props.
  * @param props.scopeLabel - Scope label.
  * @param props.isAllTime - True for the all-time scope.

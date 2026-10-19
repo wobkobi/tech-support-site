@@ -1,8 +1,7 @@
 "use client";
 // src/features/mailing/components/blocks/BlockEditor.tsx
-// The email body as a stack of blocks. The body text stays the saved form: it's parsed
-// into blocks on open and written back only after a real block edit, so opening an email
-// or switching tabs never rewrites it (template matching compares body strings).
+// The email body as a stack of blocks. The body is written back only after a real block edit,
+// since template matching compares body strings.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
@@ -60,8 +59,7 @@ interface FocusTarget {
  * @param props.insertGroups - The Add menu for Text blocks.
  * @param props.promo - Today's promo wording, for the promo card.
  * @param props.linkTargets - Pages buttons and pictures can link to.
- * @param props.draft - Turns on "Draft with AI": the email's linked promo, and where the
- *   drafted subject and preview text go. Null when OpenAI isn't set up.
+ * @param props.draft - Linked promo and subject callback for "Draft with AI"; null when OpenAI isn't set up.
  * @returns The editor.
  */
 export function BlockEditor({
@@ -91,9 +89,8 @@ export function BlockEditor({
   const { blocks, commit, undo, redo, reset, canUndo, canRedo } = useBlockHistory(() =>
     parseBlocks(body),
   );
-  // The body this editor last wrote (or was opened with). A different body arriving means
-  // it changed outside (template switch, the plain text tab), so re-parse and start a
-  // fresh history.
+  // A body other than the one last written changed outside (template, plain text tab):
+  // re-parse and start a fresh history.
   const [emitted, setEmitted] = useState(body);
   if (body !== emitted) {
     setEmitted(body);
@@ -140,8 +137,7 @@ export function BlockEditor({
   }, [focus]);
 
   /**
-   * Writes the body for a new block list, if the text it gives actually changed (an
-   * empty block added or removed leaves the body as it was).
+   * Writes the body for a new block list, if its text changed (an empty block may not).
    * @param next - The blocks.
    */
   function emit(next: Block[]): void {

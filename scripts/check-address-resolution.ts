@@ -1,13 +1,11 @@
 // scripts/check-address-resolution.ts
-// Feeds fixture Geocoding API responses through resolveAddress and asserts each of the
-// four statuses. fetch is stubbed per case, so this costs no network and no quota.
+// Assert resolveAddress's four statuses against stubbed Geocoding responses (no network).
 // Run with: npm test -- address-resolution
 
 import { resolveAddress } from "@/shared/lib/normalise-address";
 import { expectEqual, finish } from "./lib/harness.js";
 
-// normalise-address reads the key inside the request function, not at module
-// load, so setting it here still takes effect despite import hoisting.
+// Read per request, not at load, so this survives import hoisting
 process.env.GOOGLE_MAPS_SERVER_KEY ??= "fixture-key";
 
 /** Shape of one Geocoding API result, trimmed to the fields the parser reads. */
@@ -92,8 +90,7 @@ async function main(): Promise<void> {
   stubFetch({ status: "ZERO_RESULTS", results: [] });
   expectEqual("no matches at all", (await resolveAddress("not a real place")).status, "unresolved");
 
-  // Google matched something, but only at locality precision - storing it would
-  // replace a street address with a suburb.
+  // Locality precision only: storing it would swap a street address for a suburb
   stubFetch({
     status: "OK",
     results: [
@@ -111,8 +108,7 @@ async function main(): Promise<void> {
     "unresolved",
   );
 
-  // A precise match that resolved outside NZ must not count - "27 maryland
-  // street" resolving to Houston is the case the country guard exists for.
+  // A precise match outside NZ must not count
   stubFetch({
     status: "OK",
     results: [
@@ -130,8 +126,7 @@ async function main(): Promise<void> {
     "unresolved",
   );
 
-  // The outage cases. An API failure must never look like "no such address",
-  // or one bad sync pass would flag every contact in the database for review.
+  // Outages must be "skipped", not "unresolved", or one bad sync flags every contact
   stubFetch({ status: "OVER_QUERY_LIMIT", results: [] });
   expectEqual("API over quota", (await resolveAddress("4 name street")).status, "skipped");
 

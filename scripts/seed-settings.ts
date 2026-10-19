@@ -1,21 +1,12 @@
 // scripts/seed-settings.ts
-// One-shot, idempotent seed for the env > DB business-identity handoff. Creates the
-// `settings:identity` row from the code defaults - which read the current bank-account /
-// GST# / HOME_ADDRESS env vars - ONLY when the row doesn't already exist, so it never
-// clobbers operator edits made in the admin panel. After running this against production
-// and verifying the row, the `NEXT_PUBLIC_BUSINESS_*` and `HOME_ADDRESS` Vercel env vars
-// can be deleted; the DB row is then the single source of truth.
-//
-// Only `identity` is seeded: every other settings group intentionally stays absent so it
-// keeps tracking the code defaults until the operator edits it.
-//
+// One-shot idempotent seed of `settings:identity` from the env-backed code defaults, only
+// when the row is missing. Other groups stay absent so they track code defaults.
 // Run with: npm run settings:seed   (dotenv-cli loads .env.local first)
 
 import { PrismaClient } from "@prisma/client";
 import { DEFAULT_SETTINGS } from "../src/shared/lib/settings/defaults";
 
-// Mirrors SETTINGS_KEY_PREFIX in src/shared/lib/settings/get-settings.ts. Not
-// imported: that module pulls in next/cache, which can't run outside Next.
+// Mirrors SETTINGS_KEY_PREFIX in get-settings.ts, which can't be imported outside Next.
 const SETTINGS_KEY_PREFIX = "settings:";
 
 const db = new PrismaClient();
@@ -33,9 +24,7 @@ async function main(): Promise<void> {
   }
 
   const { identity } = DEFAULT_SETTINGS;
-  // Bare create with no SettingAudit row: this one-shot seed records the env-derived
-  // starting point, not an operator edit, so it stays out of the audit trail.
-  // saveSettingsGroup, which does audit, can't be imported - it pulls in next/cache.
+  // No SettingAudit row: this is the starting point, not an operator edit.
   await db.setting.create({ data: { key, value: JSON.stringify(identity) } });
 
   console.log(`[seed-settings] Created ${key} from the current env defaults:`);

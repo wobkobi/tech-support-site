@@ -1,7 +1,5 @@
 // src/app/api/admin/contacts/enrich-from-reviews/route.ts
-// Admin trigger that returns review-sourced name conflicts (where a reviewer's full name
-// differs from the linked Contact's stored name) for manual resolution. The comparison
-// lives in the shared contacts maintenance module.
+// Admin trigger returning contacts whose reviewer name differs from the stored name.
 
 import { enrichContactsFromReviews } from "@/features/contacts/lib/maintenance";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -10,8 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/admin/contacts/enrich-from-reviews
- * Returns a name conflict per Contact whose reviewer display name differs from
- * the stored name. Requires an admin session (cookie or X-Admin-Secret header).
+ * Returns a name conflict per Contact whose reviewer name differs from the stored name.
  * @param request - Incoming request.
  * @returns JSON with a conflicts array for manual resolution.
  */

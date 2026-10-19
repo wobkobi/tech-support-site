@@ -1,8 +1,6 @@
 // src/app/api/business/trips/distance/route.ts
-// Admin Google km lookup for the trip form. POST takes an address and returns the
-// round-trip driving km from the base address (there plus back) via driveRoundTripKm.
-// Each call costs two Google Distance Matrix elements, so it only runs when the operator
-// asks, and is rate limited in case a script or a stuck button repeats it.
+// Admin round-trip km lookup for the trip form. Each call costs two Distance Matrix
+// elements, so it runs on demand only and is rate limited.
 
 import { driveRoundTripKm } from "@/features/business/lib/trips.server";
 import { errorResponse, noStore, okResponse } from "@/shared/lib/api-response";

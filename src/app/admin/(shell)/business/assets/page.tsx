@@ -1,9 +1,6 @@
 // src/app/admin/(shell)/business/assets/page.tsx
-// Asset register page. Loads the current FY's tax inputs (assets, expenses, GST status,
-// filed closing values, the write-off threshold) through the same loader as the Tax page,
-// works out every asset's depreciation schedule and hands plain data to AssetsView.
-// `?fromExpense=<id>` opens the asset already linked to that expense, or a new asset
-// filled in from it.
+// Asset register: loads the FY's tax inputs via the Tax page loader and works out each
+// asset's depreciation. `?fromExpense=<id>` opens or prefills an asset from an expense.
 
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
@@ -84,8 +81,7 @@ export default async function AssetsPage({
   const labels = new Map(options.map((o) => [o.id, o.label]));
   const assets = rows.map((r) => toAssetView(r, schedules.get(r.id) ?? [], currentFyKey, labels));
 
-  // ?fromExpense: an expense that already backs an asset opens that asset; otherwise a
-  // new asset is filled in from the expense on its GST basis.
+  // ?fromExpense: open the expense's asset, or prefill a new one on its GST basis.
   let prefill: AssetPrefill | null = null;
   let initialEditId: string | null = null;
   let fromExpenseMissing = false;

@@ -23,10 +23,7 @@ import type React from "react";
 import { FaCalendarCheck, FaCheck, FaDownload, FaPhone } from "react-icons/fa6";
 
 export const metadata: Metadata = {
-  // Self-canonical only. A lone en-NZ hreflang with no x-default and no sibling
-  // locales is malformed (hreflang describes multi-locale clusters, which this
-  // single-language site does not have) and only muddies Google's signals, so
-  // match every other page and emit just the canonical.
+  // Self-canonical only: a lone en-NZ hreflang with no siblings is malformed.
   alternates: { canonical: "/" },
 };
 
@@ -35,12 +32,10 @@ export const metadata: Metadata = {
 export const revalidate = 86400;
 
 /**
- * Cached review query, tagged so revalidateReviewPaths() can invalidate it.
- * Caching the query separately from the page means repeated ISR regenerations
- * within the TTL window skip the DB round-trip entirely.
+ * Cached review query, tagged so revalidateReviewPaths() can invalidate it; ISR
+ * regenerations within the TTL skip the DB.
  */
-// Cache a generous pool; the home page slices it to the operator's configured
-// featured count so changing that count takes effect without busting this cache.
+// Cache a generous pool; the page slices it to the featured count, so changing that needs no bust.
 const getApprovedReviews = unstable_cache(
   async () =>
     prisma.review.findMany({
@@ -56,8 +51,7 @@ const getApprovedReviews = unstable_cache(
 /** The home page shows at most this many quotes; the full list lives on /reviews. */
 const HOME_REVIEW_LIMIT = 3;
 
-// For a text link standing on its own line: a 44px row, so it is easy to tap. Not on
-// TEXT_LINK itself, which also sits inside running paragraphs.
+// A 44px tap row for a text link on its own line (TEXT_LINK also sits inside paragraphs).
 const TAP_LINK = "inline-flex min-h-11 items-center";
 
 /** Short ticked points under the hero buttons. */
@@ -130,8 +124,7 @@ export default async function Home(): Promise<React.ReactElement> {
           src="/source/backdrop.jpg"
           alt=""
           fill
-          // The mobile LCP element. Eager + high priority rather than preload: Next 16's
-          // preload link carries no fetchpriority hint, which the LCP audit flags.
+          // Mobile LCP element: eager + high priority, since Next 16's preload has no fetchpriority.
           loading="eager"
           fetchPriority="high"
           sizes="100vw"

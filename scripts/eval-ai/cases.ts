@@ -1,13 +1,6 @@
 // scripts/eval-ai/cases.ts
-// Static golden cases for the eval harness. Single-task estimate cases are generated from
-// the live benchmarks at runtime (see index.ts); this file holds the authored parse cases,
-// a wide estimate set, the cross-route set, the travel set, the mailing draft set and the
-// post maker draft set.
-//
-// Parse cases carry only the input - the expected duration comes from the CANONICAL
-// calcSessionMins(input) at evaluation time, so auditor and route read ranges from one
-// implementation. "exact" cases hard-gate on that total (adversarial ones included, like
-// a bare "9-5" or an injection attempt); "info" cases only assert the run doesn't crash.
+// Authored golden cases for the eval harness (single-task estimates come from live benchmarks).
+// Parse expectations come from calcSessionMins(input); "exact" cases gate on it, "info" only on not crashing.
 
 import type { DraftRoom } from "@/features/social-design/lib/ai-draft";
 
@@ -27,9 +20,7 @@ export interface EstimateCase {
 }
 
 /**
- * A travel-decision case. destination and noTravelCharge are one decision in
- * the prompt, so both are pinned together - a run that names a destination and
- * then refuses to charge it is exactly the contradiction being guarded.
+ * A travel-decision case. destination and noTravelCharge are pinned together so they can't contradict.
  */
 export interface TravelCase {
   id: string;
@@ -37,15 +28,12 @@ export interface TravelCase {
   /** Expected noTravelCharge: true only when the operator stated a non-chargeable trip. */
   noTravelCharge: boolean;
   /**
-   * null when the job must bill no trip, otherwise a lowercase substring the
-   * returned destination has to contain. Only the place is pinned: the model
-   * echoes the operator's own spelling ("PB Tech St Lukes" one run, "PB Tech
-   * St. Luke's" the next), and both geocode to the same store.
+   * null when the job bills no trip, else a lowercase substring of the destination
+   * (the model's spelling varies run to run).
    */
   destination: string | null;
   /**
-   * Lowercase substrings, one per store run the job must return ([] = none). Omitted
-   * when the case doesn't pin store runs.
+   * Lowercase substrings, one per store run ([] = none); omitted when not pinned.
    */
   storeRuns?: string[];
   /** Why this case exists, printed beside the result. */
@@ -85,11 +73,9 @@ export const PARSE_CASES: ParseCase[] = [
   { id: "parse-midnight-straddle", input: "11:45pm-12:15am\nCutover to new NAS" },
   // Noon to midnight, the mirror of 12am-12pm. 720.
   { id: "parse-noon-to-midnight", input: "12pm-12am\nMarathon rebuild day" },
-  // Zero-length: same start and end. Must not return 0 or 1440; expect floor
-  // at minimum billable (or a validation error), never a 24h roll.
+  // Zero-length: expect the minimum billable floor, never 0 or a 24h roll.
   { id: "parse-zero-length", input: "9am-9am\nQuick check-in" },
-  // End before start with BOTH meridiems stated: genuinely overnight. 2pm-9am = 1140,
-  // which should trip the wall-clock cap if one exists below 19h.
+  // Both meridiems stated, end before start: overnight. 2pm-9am = 1140.
   { id: "parse-explicit-overnight", input: "2pm-9am\nOvernight RAID rebuild babysit" },
   // Sub-minimum range: 10:00-10:10 = 10 min raw; expect floor to min billable.
   { id: "parse-below-floor", input: "10-10:10am\nSwap a mouse over" },
@@ -104,8 +90,7 @@ export const PARSE_CASES: ParseCase[] = [
     id: "parse-fragmented-day",
     input: "8:45-9am\n9:30 to 10am\n11-11:30am\n1\u20131:30pm\nFour short visits, one client",
   },
-  // Range plus a contradictory stated duration in prose. Canonical range (120)
-  // must beat the claimed "about 4 hours".
+  // The range (120) must beat a contradictory "about 4 hours".
   {
     id: "parse-range-vs-claim",
     input: "9-11am\nFull tune-up, took about 4 hours all up",
@@ -185,8 +170,7 @@ export const PARSE_CASES: ParseCase[] = [
   },
   // Empty description line after the range.
   { id: "parse-range-only", input: "9-11am\n", expectMode: "info" },
-  // A booked Wednesday window with a later visit named mid-sentence: both bill (60 + 19),
-  // and the MacBook line stays its own task pinned to its 19 min.
+  // Booked window plus a later visit mid-sentence: both bill (60 + 19).
   {
     id: "parse-booked-plus-later-visit",
     input:
@@ -339,8 +323,7 @@ export const ESTIMATE_CASES: EstimateCase[] = [
   },
 ];
 
-// Sent to BOTH routes. Stated ranges wildly disagree with the scope on purpose,
-// so estimate-vs-parse drift is guaranteed and visible in the report.
+// Sent to BOTH routes; ranges deliberately disagree with the scope to surface drift.
 export const CROSS_ROUTE_CASES: CrossRouteCase[] = [
   // Huge stated range, trivial scope: parse ~480 vs estimate ~30.
   { id: "xroute-long-range-tiny-job", input: "9am-5pm\nQuick password reset" },
@@ -361,9 +344,7 @@ export const CROSS_ROUTE_CASES: CrossRouteCase[] = [
   },
 ];
 
-// Travel decisions: a job bills ONE round trip or none, and destination + noTravelCharge
-// must always agree. Every case here is one the parser once got wrong - silence read as
-// free, a walk hiding a later drive, a warranty errand billed to the client.
+// Travel decisions: ONE round trip or none, and destination + noTravelCharge must agree.
 export const TRAVEL_CASES: TravelCase[] = [
   {
     id: "travel-unspecified",
@@ -434,8 +415,7 @@ export interface DraftCase {
   forbid?: { pattern: RegExp; why: string }[];
 }
 
-// Mailing drafts: one per kind that carries a rule worth guarding - figures that must come
-// from the brief, a scam warning that mustn't invent what a company does, and an injection.
+// Mailing drafts: one per kind with a rule worth guarding, plus an injection.
 export const DRAFT_CASES: DraftCase[] = [
   {
     id: "draft-tip-steps",
@@ -511,9 +491,8 @@ const REVIEW_ROOM: DraftRoom = {
   name: true,
 };
 
-// Post maker drafts: figures from the brief, ticked points, the review guard both ways
-// (real words cut, no words refused outright), a paid ad that must drop contact details,
-// and an injection asking for a made-up review.
+// Post maker drafts: brief figures, ticked points, the review guard, a paid ad without
+// contact details, and an injection asking for a made-up review.
 export const POST_DRAFT_CASES: PostDraftCase[] = [
   {
     id: "post-announcement-figures",

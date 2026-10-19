@@ -1,8 +1,6 @@
 // src/features/business/lib/quick-estimate.ts
-// Client-safe one-shot price estimate for the booking form's inline "get a rough
-// estimate" affordance. Orchestrates the same public endpoints the /pricing wizard uses
-// and reuses priceRangeFor so the two stay in sync, then logs the estimate for the
-// booking to snapshot.
+// Client-safe one-shot estimate for the booking form, using the /pricing wizard's endpoints
+// and priceRangeFor so they stay in sync; logs it for the booking snapshot.
 
 import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
 import { calcTravelCharge, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
@@ -28,28 +26,15 @@ export interface QuickEstimateInput {
   /** Travel $/hr (live pricing setting); prices the round trip. */
   travelRatePerHour: number;
   lowEndFloorFactor: number;
-  /**
-   * When the customer has already picked a slot, the drive is quoted at that
-   * time so the estimate matches what the booking will snapshot. Omitted before
-   * a slot is chosen, in which case the route prices a representative weekday.
-   */
+  /** Picked slot's start, so the drive matches the booking snapshot; omitted prices a typical weekday. */
   departureTimeIso?: string;
   /** End of the visit; the return leg is quoted from here. */
   returnDepartureTimeIso?: string;
-  /**
-   * Labour uplift for the picked day (weekend or public holiday) as a fraction,
-   * e.g. 0.1. Omitted or 0 when none applies or no day is picked yet.
-   */
+  /** Weekend or public holiday labour uplift as a fraction (e.g. 0.1); omitted or 0 for none. */
   surchargeUplift?: number;
-  /**
-   * A promo code the customer entered. A valid one beats the automatic promo;
-   * an invalid one is ignored and the automatic promo still applies.
-   */
+  /** Entered promo code; a valid one beats the automatic promo, an invalid one is ignored. */
   promoCode?: string | null;
-  /**
-   * The email being booked with, when entered, so a per-customer code is
-   * judged against this customer as the booking will judge it.
-   */
+  /** Booking email, so a per-customer code is judged as the booking will judge it. */
   email?: string | null;
 }
 
@@ -150,16 +135,11 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     promoRes.status === "fulfilled" ? (promoRes.value.promo ?? null) : null;
   const codePromo: ActivePromo | null =
     codeRes.status === "fulfilled" && codeRes.value.valid ? (codeRes.value.promo ?? null) : null;
-  // Same precedence as resolvePromo on the server: a valid code wins, an
-  // invalid one falls through rather than blocking the automatic promo. This is
-  // the displayed figure only - /api/booking/request re-resolves the code
-  // itself and prices from that, so a fabricated code buys nothing.
+  // Same precedence as server resolvePromo. Display only: /api/booking/request re-resolves
+  // the code, so a fabricated one buys nothing.
   const resolved: ActivePromo | null = codePromo ?? autoPromo;
-  // A promo restricted to certain days is priced in only once a slot is picked,
-  // because that is the appointment it has to be checked against. Before then it
-  // is advertised but not applied, so the estimate never promises a discount the
-  // booking will not honour. A customer-limited one waits on the email the same
-  // way - both endpoints judged it against the email when there was one.
+  // Day-restricted promos apply only once a slot is picked, customer-limited ones only once
+  // an email is entered, so the estimate never promises a discount the booking won't honour.
   const dateGated = promoForAppointment(resolved, startAt ? new Date(startAt) : null, {
     customerChecked: email != null,
   });
@@ -178,9 +158,7 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
         ? (travelRes.value.durationMinsBack ?? travelMins)
         : 0;
 
-  // Resolve the live base + remote delta regardless of the AI duration call's
-  // outcome, so a failed/timed-out estimate still prices against the operator's
-  // current rate instead of the shared fallback rate.
+  // Live base + remote delta, resolved even when the AI duration call fails.
   const baseStandard =
     rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
     rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
@@ -206,9 +184,8 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     travelRatePerHour,
     minTravelCharge,
   );
-  // Priced undiscounted first: a spend threshold and a tier band are judged
-  // against that total, on its low end, so the customer is quoted the discount
-  // they are certain to get rather than one the job may not reach.
+  // Price undiscounted first: spend thresholds and tiers are judged on its low end,
+  // so the quoted discount is one the job is certain to reach.
   const undiscounted = priceRangeFor(
     effectiveMins,
     fullRate,
@@ -216,9 +193,8 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     estimatorRange,
     lowEndFloorFactor,
   );
-  // The date surcharge is a cut of full-rate labour that no promo discounts, and the
-  // spend threshold is judged with it included - the order calcJobTotal bills in.
-  // Whole dollars like the band: the low end rounds down, the high end up.
+  // Date surcharge: full-rate labour no promo discounts, counted towards the spend threshold
+  // (calcJobTotal's order). Low rounds down, high up.
   const uplift = Math.max(0, input.surchargeUplift ?? 0);
   const surchargeLow = Math.floor(undiscounted.low * uplift);
   const surchargeHigh = Math.ceil(undiscounted.high * uplift);
@@ -232,24 +208,19 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     estimatorRange,
     lowEndFloorFactor,
   );
-  // Quote-level promo types act here, after the band and travel are priced.
-  // The rate-based types already applied above and are a no-op at this stage.
+  // Quote-level promo types apply here; rate-based ones already applied above.
   const discounted = applyPromoToQuote(
     { labourLow: band.low, labourHigh: band.high, travel: rawTravel },
     promo,
   );
   const travel = discounted.travel;
-  // The labour band is the range shown to the customer; travel is a mostly fixed add-on on
-  // its own line rather than folded in. The logged price below stays the all-in total, so
-  // the booking snapshot is unchanged.
+  // The customer sees the labour band with travel on its own line; the log keeps the all-in total.
   const low = discounted.labourLow + surchargeLow;
   const high = discounted.labourHigh + surchargeHigh;
   const totalLow = low + travel;
   const totalHigh = high + travel;
 
-  // Labour-time band from the same confidence factors that widen the price, rounded to
-  // 5-min steps so the card's range ("15 - 30 min") lines up with the price range. Travel
-  // is excluded - it's a price add-on, not on-site time.
+  // Labour-time band from the price's confidence factors, in 5-min steps; travel excluded.
   const timeBand = estimatorRange[confidence] ?? estimatorRange.medium;
   const minsLow = Math.max(5, Math.round((effectiveMins * timeBand.lowFactor) / 5) * 5);
   const minsHigh = Math.max(minsLow + 5, Math.round((effectiveMins * timeBand.highFactor) / 5) * 5);

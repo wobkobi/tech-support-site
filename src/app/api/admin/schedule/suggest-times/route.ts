@@ -1,9 +1,6 @@
 // src/app/api/admin/schedule/suggest-times/route.ts
-// Admin "find open times" tool: returns the next N genuinely- bookable slots for a job
-// length + date range. Reuses the PUBLIC availability engine (buildAvailableDays) so
-// suggestions match exactly what the booking page would allow, and injects TravelBlock
-// rows as occupied padding so a suggested slot leaves room for the drive to/from nearby
-// jobs.
+// Admin "find open times": the next bookable slots via the public availability engine, with
+// TravelBlocks as occupied padding.
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import { buildAvailableDays, type ExistingBooking } from "@/features/booking/lib/booking";
@@ -15,15 +12,12 @@ import { prisma } from "@/shared/lib/prisma";
 import { addDaysToDateKey, dateKeyParts, nzWallClockUtc } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
-// Cap results so a wide range doesn't return hundreds of rows; the operator only
-// needs a handful of times to read out over the phone.
+// Cap results: a handful of times to read out over the phone.
 const DEFAULT_LIMIT = 8;
 const MAX_LIMIT = 30;
-// Default search/fetch window when no explicit range - bounds the Google fetch so
-// the always-on schedule bar doesn't pull weeks of events on every page load.
+// Default window when no range is given, bounding the Google fetch.
 const HORIZON_DAYS = 28;
-// Cap suggestions per day so the list spreads across several days instead of
-// offering a single busy day's worth of hours.
+// Per-day cap so suggestions spread across several days.
 const PER_DAY_LIMIT = 3;
 
 interface SuggestPayload {
@@ -35,9 +29,7 @@ interface SuggestPayload {
   /** Max slots to return (1..MAX_LIMIT). */
   limit?: number;
   /**
-   * New customer's address (typed or from a looked-up contact). When set, slots
-   * are gated by the real drive from the preceding located job to here and on to
-   * the following one - so only times that actually fit the travel are returned.
+   * New customer's address; when set, only slots that fit the real drive are returned.
    */
   address?: string;
 }
@@ -62,8 +54,7 @@ interface LocatedCommitment {
   location: string;
 }
 
-// Cap how many candidates get priced with Google when gating by address, so a
-// wide search can't fan out into an unbounded number of Distance Matrix calls.
+// Cap Distance Matrix pricing when gating by address.
 const GATE_CAP = 12;
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -81,9 +72,7 @@ function timeLabel(hour: number, minute: number): string {
 }
 
 /**
- * Picks up to `n` items evenly spread across `items` (always including the first
- * and last), so a capped-per-day set of suggestions covers the morning-to-afternoon
- * span rather than clustering at the start of the day.
+ * Picks up to `n` items evenly spread across `items`, including the first and last.
  * @param items - Candidate items in chronological order.
  * @param n - Maximum items to pick.
  * @returns Up to `n` evenly-spaced items.
@@ -99,8 +88,7 @@ function spreadEvenly<T>(items: T[], n: number): T[] {
 }
 
 /**
- * A booking's job address: the dedicated field, else an "Address:" line parsed
- * from its notes (where the booking flows store it).
+ * A booking's job address: the dedicated field, else the notes' "Address:" line.
  * @param b - Booking to read a location from.
  * @param b.address - The booking's dedicated address field, if set.
  * @param b.notes - The booking's notes, which may carry an "Address:" line.
@@ -113,10 +101,8 @@ function bookingLocation(b: { address: string | null; notes: string | null }): s
 }
 
 /**
- * Filters candidate slots to those that fit the real drive to a new customer's
- * address: reachable from the preceding located job in time, leaving in time
- * for the following one. Prices only the first GATE_CAP candidates (bounded
- * Distance Matrix calls) and annotates survivors with the incoming drive.
+ * Keeps slots that fit the real drive from the previous job and on to the next, pricing
+ * at most GATE_CAP candidates and annotating survivors with the incoming drive.
  * @param rawSlots - Candidate slots in chronological order.
  * @param address - The new job's address.
  * @param durationMin - Job length in minutes, for the slot's end time.
@@ -161,8 +147,7 @@ async function gateByTravel(
         if (c.endMs <= startMs) prev = c;
         else if (c.startMs >= endMs && !next) next = c;
       }
-      // Price both legs at once - departing the previous job at its end, and the
-      // new job at its end. Driving uses a known departure, so no arrive-by needed.
+      // Price both legs at once from known departure times.
       const [driveIn, driveOut] = await Promise.all([
         prev
           ? calculateTravelMinutes(prev.location, address, new Date(prev.endMs), {
@@ -203,8 +188,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const address = typeof body?.address === "string" ? body.address.trim() : "";
 
   const now = new Date();
-  // Admin tool: use the availability CONFIG but ignore the public accepting-bookings
-  // master switch - the operator books on behalf even while public booking is paused.
+  // Ignore the public accepting-bookings switch; the operator books even while paused.
   const { config } = await getAvailabilityConfig();
   const durationMin = duration === "long" ? config.durations.long : config.durations.short;
 
@@ -212,12 +196,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const maxDate = new Date(now.getTime() + (searchDays + 1) * 24 * 60 * 60 * 1000);
   const todayNzKey = now.toLocaleDateString("en-CA", { timeZone: config.timeZone });
   const horizonKey = addDaysToDateKey(todayNzKey, searchDays);
-  // Never suggest a day past the fetched window - its events aren't loaded, so it
-  // would look falsely free. A caller-supplied toDateKey only tightens this.
+  // Never suggest past the fetched window, where days would look falsely free.
   const effectiveToKey = toDateKey && toDateKey < horizonKey ? toDateKey : horizonKey;
 
-  // Existing commitments: DB bookings (held/confirmed, still upcoming) + calendar
-  // events + travel padding, all fed to the same slot engine the public flow uses.
+  // Existing commitments: upcoming bookings, calendar events and travel padding.
   const [existingBookings, rawEvents, travelBlocks] = await Promise.all([
     prisma.booking.findMany({
       where: { status: { in: ["held", "confirmed"] }, endAt: { gte: now } },
@@ -257,9 +239,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const calendarEvents = rawEvents.map((e) => ({ id: e.id, start: e.start, end: e.end }));
 
-  // Inject travel as synthetic occupied blocks. isSlotFree spots the `travel-before:` /
-  // `travel-after:` prefixes and adds NO buffer - the rounded minutes already include it.
-  // Same guards as the schedule grid: minutes must be set, suppressed return legs skipped.
+  // Travel as synthetic occupied blocks; isSlotFree adds no buffer to `travel-*:` ids.
+  // Same guards as the schedule grid.
   for (const b of travelBlocks) {
     if (b.beforeEventId && b.roundedMinutes != null && b.roundedMinutes > 0) {
       calendarEvents.push({
@@ -284,9 +265,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const { days } = buildAvailableDays(existingForSlots, calendarEvents, now, config);
 
-  // Flatten to the next `limit` slots. Days arrive chronologically, windows by start hour,
-  // sub-slots by minute, so first-come iteration yields the soonest times. With an address
-  // the candidate pool widens to GATE_CAP so travel-gating still leaves enough survivors.
+  // Flatten to the soonest slots; with an address the pool widens to GATE_CAP for gating.
   const rawSlots: SuggestedSlot[] = [];
   const cap = address ? Math.max(limit, GATE_CAP) : limit;
   for (const day of days) {
@@ -296,9 +275,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const [y, m, d] = dateKeyParts(day.dateKey);
 
-    // One candidate per hour: the EARLIEST free start in the hour, so a clean :00
-    // is preferred and :15/:30 only surface when :00 is taken - never a run of
-    // "3:15, 3:30, 3:45", which is noise to read out.
+    // One candidate per hour, the earliest free start, so :00 is preferred.
     const candidates: Array<{ startHour: number; minute: number }> = [];
     for (const win of day.timeWindows) {
       const sub = win.subSlots.find((s) =>
@@ -307,8 +284,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (sub) candidates.push({ startHour: win.startHour, minute: sub.minute });
     }
 
-    // Cap per day + spread the picks across the day, so the list offers varied
-    // times over several days rather than one day's morning.
+    // Cap per day and spread the picks across it.
     for (const c of spreadEvenly(candidates, PER_DAY_LIMIT)) {
       const startUtc = nzWallClockUtc(y, m, d, c.startHour, c.minute);
       rawSlots.push({

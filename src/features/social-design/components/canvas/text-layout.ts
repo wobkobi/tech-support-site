@@ -1,7 +1,5 @@
 // src/features/social-design/components/canvas/text-layout.ts
-// How text-holding layers lay out, shared by the canvas (which draws them) and the
-// reflow step (which measures them on every size so each layer's box height matches its
-// words). Both go through the same Konva text maths, so a measured box always fits
+// Text layer layout shared by the canvas and the reflow step, so a measured box always fits
 // what is drawn.
 
 import { boundText } from "@/features/social-design/lib/bound";
@@ -73,9 +71,8 @@ function textLayerSpec(layer: TextLayer, g: Geometry): TextSpec {
 }
 
 /**
- * Attributes of any single-block text layer: text, contact details or promo wording.
- * A shrink-to-fit text layer gets the largest font (down to its set size) that fits
- * its box height.
+ * Attributes of a text, contact or promo layer. Shrink-to-fit takes the largest font (down
+ * to its set size) that fits the box height.
  * @param layer - Text, contact or promo layer.
  * @param g - Its geometry on the size drawn.
  * @param bound - Live values for contact and promo layers.
@@ -131,9 +128,8 @@ export interface BulletsLayout {
 }
 
 /**
- * Lays out a bullet list: a round tick badge, then the words wrapped beside it, each
- * row as tall as its words, with a gap of under half a line between rows. The badge
- * centres on the first line of its row.
+ * Lays out a bullet list: tick badge centred on the first line, words wrapped beside it, under
+ * half a line between rows.
  * @param layer - Bullets layer.
  * @param g - Its geometry on the size drawn.
  * @param family - Font-family list.
@@ -167,8 +163,7 @@ export function bulletsLayout(layer: BulletsLayer, g: Geometry, family: string):
 }
 
 /**
- * Re-measures every auto-height text layer on every listed size and writes the heights
- * into the layouts. Shrink-to-fit text keeps the box height the operator set.
+ * Re-measures every auto-height text layer on every size; shrink-to-fit keeps its set height.
  * @param doc - Design.
  * @param bound - Live values.
  * @param family - Font-family list.

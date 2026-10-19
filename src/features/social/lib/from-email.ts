@@ -1,7 +1,6 @@
 // src/features/social/lib/from-email.ts
-// Turns a mailing-list email body (the editor's markdown-lite) into a starting point for
-// a social post. Facebook and Instagram show markdown as typed, so formatting is stripped,
-// the first button becomes the post's link, and the first picture becomes its image.
+// Turns a mailing-list email body into a social post start: formatting stripped (apps show
+// markdown as typed), first button as link, first picture as image.
 
 import {
   BOX_LINE_RE,
@@ -30,13 +29,9 @@ export interface PostFromEmail {
 }
 
 /**
- * Converts an email body to post text plus a link and picture. The promo card
- * becomes a `{promo}` line, which the post fills with the live promo when it
- * publishes; spacers, dividers and the social links row are dropped, and a
- * review quote loses its `> ` markers (or goes entirely when it quotes the
- * recipient's own review). A big box loses its `>> ` markers too: its words are
- * post text and its button can be the link, but its photo is skipped, since it was
- * darkened to sit behind the box's words.
+ * Converts an email body to post text, link and picture. The promo card becomes `{promo}`;
+ * spacers, dividers and social links drop; review quotes and big boxes lose their `> `/`>> `
+ * markers (a recipient's own review and a big box's darkened photo are skipped).
  * @param emailBody - The email's body text.
  * @returns Plain-text body, the first button's URL and the first picture.
  */

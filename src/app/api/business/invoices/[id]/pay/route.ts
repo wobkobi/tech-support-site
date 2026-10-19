@@ -1,9 +1,6 @@
 // src/app/api/business/invoices/[id]/pay/route.ts
-// Records a payment against an invoice: atomically claims the PAID stamp (idempotent
-// under double-clicks / retries), creates or updates the linked income-ledger entry,
-// re-syncs the PAID-watermarked PDF to Drive, and apologises when an overdue reminder had
-// chased a payment that already landed. The DB stamp is authoritative; the income, Drive
-// and apology steps are best-effort and never roll back the payment.
+// Records a payment: atomically claims the PAID stamp, then best-effort income entry,
+// Drive PDF and reminder apology - none of which roll back the payment.
 
 import { balanceDue } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
@@ -25,12 +22,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/business/invoices/[id]/pay
- * Body: `{ paidAt?, method, reference?, createIncome?, sendApology?, adoptIncomeId? }`. `method`
- * must be an INCOME_METHODS value; `paidAt` defaults to now; `createIncome` and
- * `sendApology` both default true except on an already-PAID invoice (where a
- * non-dialog caller must not silently create a second ledger row or email about
- * a long-settled bill). `adoptIncomeId` names an unlinked income row (typed into the
- * Cashbook sheet) that is this payment; it gets linked instead of a second row being made.
+ * Body: `{ paidAt?, method, reference?, createIncome?, sendApology?, adoptIncomeId? }`.
+ * `adoptIncomeId` links an unlinked sheet-typed income row instead of making a second.
  * @param request - Next.js request (admin-auth gated).
  * @param ctx - Route ctx with the invoice id.
  * @param ctx.params - Resolved Next.js dynamic route params.
@@ -76,18 +69,13 @@ export async function POST(
   const reference =
     typeof body.reference === "string" && body.reference.trim() ? body.reference.trim() : null;
   const alreadyPaid = invoice.status === "PAID";
-  // Defaults true, but false on an already-PAID invoice so a non-dialog caller
-  // can't double-count a ledger row that was entered by hand.
+  // Both default false on an already-PAID invoice, so a non-dialog caller can't add a
+  // second ledger row or apologise for a long-settled bill.
   const createIncome = typeof body.createIncome === "boolean" ? body.createIncome : !alreadyPaid;
-  // Same default as createIncome, and for the same reason: backfilling paidAt
-  // onto a legacy PAID row must not email an apology for a bill that was
-  // settled - and acknowledged - months ago.
   const sendApology = typeof body.sendApology === "boolean" ? body.sendApology : !alreadyPaid;
 
-  // Atomic claim: stamp only where paidAt is still empty, so a double-click or a re-pay
-  // hits count 0 and never writes a second income row. "Empty" must match an explicit
-  // null AND a missing key - Prisma compiles a bare `paidAt: null` to "exists AND is
-  // null" ($ne $$REMOVE), which silently skips rows written before paidAt existed.
+  // Atomic claim so a double-click hits count 0. Match null AND a missing key - a bare
+  // `paidAt: null` compiles to "exists AND is null" and skips older rows.
   const claim = await prisma.invoice.updateMany({
     where: { id, OR: [{ paidAt: null }, { paidAt: { isSet: false } }] },
     data: { status: "PAID", paidAt, paymentMethod: method, paymentReference: reference },
@@ -104,15 +92,11 @@ export async function POST(
     });
   }
 
-  // Income step (only the claim winner reaches here). The already-paid entry is not the
-  // payment, so it is never updated here and never stops the balance being recorded.
+  // Only the claim winner reaches here. The already-paid entry is never touched.
   let existingIncome = await prisma.incomeEntry.findFirst({
     where: balanceIncomeWhere(invoice),
   });
-  // The page matched a sheet-entered row to this invoice and the operator confirmed it
-  // is this payment: link it, so the update path below refreshes it instead of a second
-  // row being booked. Only an unlinked row can be taken, so another invoice's income
-  // is never stolen.
+  // Adopt the operator-confirmed sheet row; only an unlinked row can be taken.
   if (!existingIncome && adoptIncomeId) {
     const adopted = await prisma.incomeEntry.updateMany({
       where: { id: adoptIncomeId, OR: [{ invoiceId: null }, { invoiceId: { isSet: false } }] },
@@ -128,16 +112,13 @@ export async function POST(
   let sheetWarning = false;
 
   if (existingIncome) {
-    // Update ONLY the fields the dialog collects (date, method, reference note);
-    // never amount/customer/description, which the operator may have edited in
-    // the ledger or the sheet.
+    // Only the dialog's fields; amount/customer/description may have been hand-edited.
     incomeEntry = await prisma.incomeEntry.update({
       where: { id: existingIncome.id },
       // A blank reference keeps whatever note the row already has (often typed in the sheet).
       data: { date: paidAt, method, notes: reference ?? existingIncome.notes },
     });
-    // Write those fields through to the existing sheet row (no new row). Null
-    // cells preserve the sheet's customer/description/amount.
+    // Null cells preserve the sheet's own values.
     try {
       const spreadsheetId = await resolveSheetIdForDate(incomeEntry.date);
       if (!spreadsheetId) {
@@ -189,9 +170,8 @@ export async function POST(
   // Re-sync the PAID-watermarked PDF to Drive (awaited; best-effort).
   await syncInvoicePdfToDriveById(id, "[invoice-pay]");
 
-  // Apologise when a reminder chased money that had already arrived. Re-checked here
-  // rather than trusted from the body, and best-effort: a failed send leaves apologySentAt
-  // null (retryable) and never unwinds the recorded payment.
+  // Apologise when a reminder chased money already paid. A failed send leaves
+  // apologySentAt null, so it stays retryable.
   let apologySent = false;
   if (
     sendApology &&

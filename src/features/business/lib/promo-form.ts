@@ -12,11 +12,8 @@ export const PROMO_INPUT_CLASS =
 export type PromoType = "flat" | "percent" | "fixed" | "travel";
 
 /**
- * The stored columns for one amount of a given type.
- *
- * Shared by the promo's own value and every tier, so a band cannot be stored
- * differently from the promo it belongs to - the travel inversion in particular
- * is easy to apply once and forget the second time.
+ * The stored columns for one amount of a given type, shared by the promo and its tiers so
+ * both store values (and the travel inversion) the same way.
  * @param type - The form's discount type.
  * @param amount - The number the operator typed.
  * @returns The four value columns, exactly one of them set.
@@ -34,8 +31,7 @@ export function discountColumns(
     flatHourlyRate: type === "flat" ? amount : null,
     percentDiscount: type === "percent" ? amount / 100 : null,
     fixedAmount: type === "fixed" ? amount : null,
-    // The operator enters "% off travel"; the column stores the fraction still
-    // charged, so 100% off is 0.
+    // Entered as "% off"; stored as the fraction still charged (100% off = 0).
     travelPercent: type === "travel" ? 1 - amount / 100 : null,
   };
 }
@@ -134,11 +130,7 @@ export interface FormState {
   activeTo: string;
   /** Floor for the pre-discount total. Blank for none. */
   minSpend: string;
-  /**
-   * Spend bands, held as strings for the inputs. Empty is the ordinary
-   * single-value promo; the amount is read the same way the top-level one is,
-   * so a percent band is entered as "20" and stored as 0.2.
-   */
+  /** Spend bands as input strings; empty for a single-value promo. Amounts read like the top-level one. */
   tiers: { minSpend: string; amount: string }[];
 }
 
@@ -221,12 +213,8 @@ export function endIsoToInclusiveDate(iso: string): string {
 }
 
 /**
- * Turns the form into the promo shape the customer-facing helpers read, so the
- * preview below is produced by the same code that writes the real banner.
- *
- * Null until there is an amount to describe - a half-typed form would otherwise
- * preview "Limited offer", which is the fallback for a misconfigured promo and
- * would read as a warning.
+ * Turns the form into the promo shape the customer-facing helpers read, so the preview matches
+ * the real banner. Null until there is an amount, so it never previews "Limited offer".
  * @param form - Current form state.
  * @returns A promo to describe, or null when the form is not ready.
  */

@@ -19,8 +19,7 @@ interface ContactPatchBody {
   phone?: string;
   address?: string;
   /**
-   * Clears the address review flags. Sent with an `address` when the operator
-   * picks or types a value, and on its own to dismiss a row unchanged.
+   * Clears the address review flags, with a new `address` or alone to dismiss.
    */
   addressReviewed?: boolean;
   /** Retainer tier label, or null/"" to clear the retainer arrangement. */
@@ -36,10 +35,7 @@ interface ContactPatchBody {
 
 /**
  * PATCH /api/admin/contacts/[id]
- * Updates a contact's name, phone, address, and/or retainer arrangement in the
- * local DB, then best-effort syncs the updated contact to Google Contacts
- * (retainer fields stay local - the Google mapping doesn't carry them).
- * Requires an admin session (cookie or X-Admin-Secret header).
+ * Updates a contact's details and retainer, then best-effort syncs to Google (retainer stays local).
  * @param request - Incoming request with optional name, phone, address fields.
  * @param params - Route parameters containing the contact ID.
  * @param params.params - Promise resolving to the dynamic route params object.
@@ -59,9 +55,7 @@ export async function PATCH(
     return errorResponse("Invalid request body.", 400);
   }
 
-  // Reject unknown/malformed ids and soft-deleted contacts up front so a missing
-  // row returns 404 (not a P2025 500) and a PATCH can't edit or re-sync a hidden
-  // contact.
+  // Missing, malformed or soft-deleted ids return 404 up front.
   let existing: { id: string } | null;
   try {
     existing = await prisma.contact.findFirst({
@@ -89,8 +83,7 @@ export async function PATCH(
         where: {
           id: { not: id },
           deletedAt: null,
-          // Collide against another contact's primary OR alt emails so the same
-          // address can't live as a primary on one contact and an alt on another.
+          // Check other contacts' primary and alt emails for a collision.
           OR: [
             { email: { equals: trimmedEmail, mode: "insensitive" } },
             { altEmails: { has: trimmedEmail } },
@@ -128,9 +121,7 @@ export async function PATCH(
   if (body.name !== undefined) updateData.name = body.name.trim();
   if (body.email !== undefined) updateData.email = normaliseEmailOrNull(body.email);
   if (body.phone !== undefined) updateData.phone = toE164NZ(body.phone) || null;
-  // Canonicalise before storing so an address typed here matches the shape the
-  // import and booking paths produce. An ambiguous or failed lookup keeps the
-  // typed text - the operator has already made the call by typing it.
+  // Canonicalise like import and booking do; a failed lookup keeps the typed text.
   if (body.address !== undefined) {
     const typed = body.address.trim() || null;
     const resolution = typed ? await resolveAddress(typed) : null;
@@ -181,12 +172,8 @@ export async function PATCH(
 
 /**
  * DELETE /api/admin/contacts/[id]
- * Soft-deletes a contact by stamping `deletedAt`. Soft (not hard) delete because
- * backfillContactsFromBookings would otherwise re-create the contact from its
- * still-present booking on the next sync; the stamped row suppresses that. Removes
- * the linked Google contact best-effort, unless `?deleteGoogle=false` asks to
- * leave it - dropping the local row is not always meant to wipe the phone entry.
- * Requires an admin session (cookie or X-Admin-Secret header).
+ * Soft-deletes a contact (so the booking backfill can't re-create it) and best-effort
+ * removes the Google contact unless `?deleteGoogle=false`.
  * @param request - Incoming request.
  * @param params - Route parameters containing the contact ID.
  * @param params.params - Promise resolving to the dynamic route params object.
@@ -213,16 +200,13 @@ export async function DELETE(
     return NextResponse.json({ ok: true, alreadyDeleted: true });
   }
 
-  // Unlink the contact's reviews in the same write as the soft-delete: left pointing at a
-  // hidden contact they never resurface, since matchReviewsToContacts only re-homes
-  // contactId==null. Nulled, they show as unlinked and can re-match to a live contact.
+  // Unlink its reviews in the same write so they can re-match to a live contact.
   await prisma.$transaction([
     prisma.review.updateMany({ where: { contactId: id }, data: { contactId: null } }),
     prisma.contact.update({ where: { id }, data: { deletedAt: new Date() } }),
   ]);
 
-  // Kept out of the transaction above deliberately: Google is best-effort and
-  // must never roll back the local delete.
+  // Outside the transaction: Google is best-effort and must never roll back the delete.
   const deleteGoogle = request.nextUrl.searchParams.get("deleteGoogle") !== "false";
   if (contact.googleContactId && deleteGoogle) {
     await deleteContactFromGoogle(contact.googleContactId);

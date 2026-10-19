@@ -1,8 +1,6 @@
 // src/shared/components/ThryvTag.tsx
-// Loads the Thryv (Yellow) Marketing Center tag. Thryv's Tealium container
-// (utag.js) installs Thryv's own Google Tag Manager container for their GA4
-// reporting, and for visitors arriving from a Thryv ad (a `utm_campaign` like
-// "x.123") swaps the shown phone number for a call-tracking number.
+// Loads the Thryv Marketing Center tag, which installs Thryv's GTM container and swaps in a
+// call-tracking number for visitors from a Thryv ad.
 
 import { ThryvAdminMute } from "@/shared/components/ThryvTagClient";
 import type React from "react";
@@ -11,11 +9,8 @@ import type React from "react";
 // load no tag and test traffic never reaches Thryv's reports.
 const THRYV_UID = process.env.NEXT_PUBLIC_THRYV_UID;
 
-// Thryv's snippet, with the business ID injected. `Parameters.ExternalUid` must be
-// set before utag.js runs its tags; Thryv's GTM tag polls for it for 5 seconds.
-// utag.js is injected after window load so the container and everything it pulls
-// in stays off the critical path, and never on /admin pages so back-office
-// browsing stays out of Thryv's reports.
+// Thryv's snippet with the business ID. `Parameters.ExternalUid` must exist before utag.js runs
+// (Thryv's GTM polls 5s). utag.js loads after window load and never on /admin.
 const loaderCode = `window.utag_data = window.utag_data || {};
 window.Parameters = window.Parameters || { ExternalUid: ${JSON.stringify(THRYV_UID ?? "")} };
 (function(){if(/^\\/admin(\\/|$)/.test(location.pathname))return;
@@ -25,9 +20,8 @@ a=b.getElementsByTagName(c)[0];a.parentNode.insertBefore(d,a);})();}
 if(document.readyState==='complete')load();else window.addEventListener('load',load);})();`;
 
 /**
- * Renders Thryv's snippet as a plain inline script, so it sits in the server HTML
- * before </body> where Thryv's website check looks for it. Renders nothing when
- * NEXT_PUBLIC_THRYV_UID is unset (dev, preview).
+ * Renders Thryv's snippet as a plain inline script in the server HTML, where Thryv's site check
+ * looks. Nothing when NEXT_PUBLIC_THRYV_UID is unset.
  * @returns The tag's loader script, or null when unconfigured.
  */
 export function ThryvTag(): React.ReactElement | null {

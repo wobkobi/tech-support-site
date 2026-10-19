@@ -1,9 +1,6 @@
 // src/features/contacts/lib/maintenance.ts
-// Single source of truth for contact maintenance: backfilling contacts from bookings,
-// merging duplicates (by Google link, then email, then mobile), linking reviews, and
-// surfacing field conflicts for the admin. The cron, the admin routes and the contacts
-// page all call these, and every merge folds through one helper, so no path can drift in
-// what it preserves off the deleted row. Every reader excludes soft-deleted contacts.
+// Contact maintenance: booking backfill, duplicate merges (Google link, email, mobile), review
+// linking and conflict surfacing. Every merge folds through one helper; readers skip soft-deleted rows.
 
 import { optOutRepointOps } from "@/features/reviews/lib/review-ask-opt-out";
 import { isNZMobileKey, normaliseContactPhone } from "@/shared/lib/normalise-phone";
@@ -36,11 +33,8 @@ function parseAddressFromNotes(notes: string | null): string | null {
 }
 
 /**
- * Stamps an explicit `deletedAt: null` on any contact missing the field.
- * MongoDB gotcha: Prisma's `deletedAt: null` filter only matches documents
- * where the field exists and equals null - docs created before the field was
- * added (or via a raw path) have no field at all and vanish from every
- * `deletedAt: null` reader. Cheap no-op when all docs are normalised.
+ * Stamps an explicit `deletedAt: null` on any contact missing the field, since a
+ * `deletedAt: null` filter doesn't match an absent Mongo key.
  * @returns The number of contacts normalised.
  */
 export async function normaliseSoftDeleteField(): Promise<number> {
@@ -90,17 +84,9 @@ interface MergeableContact {
 }
 
 /**
- * Folds `dup` into `keeper` and hard-deletes it: the keeper's blank fields are
- * filled from the dup, and the phone, email and review-token sets are unioned so
- * nothing only the dup knew becomes unmatchable. Reassign-then-delete must be
- * atomic - a delete without the review reassignment orphans the dup's reviews
- * onto a now-missing contactId, since Review.contactId is a bare ObjectId, not a
- * relation, so nothing cleans it up.
- *
- * Google is never touched: dupes typically share the keeper's googleContactId,
- * so a remote delete would remove the real contact. `keeper` is mutated to match
- * what was written, so folding a third row into the same keeper sees the
- * post-merge state instead of a stale copy.
+ * Folds `dup` into `keeper` (blank-fill, union phones/emails/tokens) and hard-deletes it in one
+ * transaction, since Review.contactId is a bare ObjectId nothing cleans up. Google is never
+ * touched: dupes often share the keeper's googleContactId.
  * @param keeper - The row that survives; updated in place to reflect the merge.
  * @param dup - The row being merged away.
  * @returns Whether the merge committed.
@@ -111,13 +97,10 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
   if (!keeper.address && dup.address) fill.address = dup.address;
   if (!keeper.company && dup.company) fill.company = dup.company;
   if (!keeper.reviewToken && dup.reviewToken) fill.reviewToken = dup.reviewToken;
-  // A phone-only keeper adopts the dup's email rather than throwing it away.
-  // The email pass can't reach this line - it buckets on a shared email, so both
-  // rows have one - but the Google-link and mobile passes can.
+  // A phone-only keeper adopts the dup's email (reachable from the Google-link and mobile passes).
   if (!keeper.email && dup.email) fill.email = dup.email.toLowerCase();
 
-  // Fold the dup's numbers into altPhones so the second number stays
-  // matchable locally (Google keeps the full union either way).
+  // Fold the dup's numbers into altPhones so they stay matchable locally.
   const keeperPrimary =
     normaliseContactPhone(fill.phone as string | undefined) ?? normaliseContactPhone(keeper.phone);
   const altSet = new Set(keeper.altPhones);
@@ -127,8 +110,7 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
   }
   if (altSet.size !== keeper.altPhones.length) fill.altPhones = { set: [...altSet] };
 
-  // Fold the dup's emails into the keeper so any address only the dup knew stays
-  // matchable (the shared primary is excluded; all lowercased).
+  // Fold the dup's emails into altEmails, lowercased, excluding the primary.
   const keeperPrimaryEmail =
     ((fill.email as string | undefined) ?? keeper.email)?.toLowerCase() ?? null;
   const seenEmail = new Set<string>();
@@ -139,9 +121,7 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
     seenEmail.add(lower);
     mergedAltEmails.push(lower);
   }
-  // Compare contents, not just length: this list is rebuilt from scratch, so a
-  // keeper alt dropped for equalling the primary can be replaced one-for-one by
-  // one of the dup's and leave the count unchanged.
+  // Compare contents, not length: a dropped alt can be swapped one-for-one.
   const keeperAlts = keeper.altEmails.map((e) => e.toLowerCase());
   if (
     mergedAltEmails.length !== keeperAlts.length ||
@@ -149,16 +129,12 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
   ) {
     fill.altEmails = { set: mergedAltEmails };
   }
-  // Adopt the dup's Google link when the keeper has none, so a dup-only
-  // googleContactId isn't forgotten when the row is hard-deleted below.
+  // Adopt the dup's Google link when the keeper has none.
   if (!keeper.googleContactId && dup.googleContactId) {
     fill.googleContactId = dup.googleContactId;
   }
-  // Carry the review-link history across. Not a blank-fill like the rest: the
-  // later ask is the one the send cooldown and the "already asked" picker gate
-  // must see, so the newer timestamp wins and brings its own mode. Dropping it
-  // loses the ask with the row, and an invoice-era reviewer then resurfaces
-  // in the link history as "Legacy".
+  // Newer review-link ask wins (with its mode): the send cooldown and "already asked"
+  // gate must see the latest one.
   if (
     dup.reviewLinkSentAt &&
     (!keeper.reviewLinkSentAt || dup.reviewLinkSentAt > keeper.reviewLinkSentAt)
@@ -171,8 +147,7 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
     fill.reviewLinkSubmittedAt = dup.reviewLinkSubmittedAt;
   }
 
-  // Fold the dup's review tokens too, so links already sent under the dup
-  // keep resolving to the keeper.
+  // Fold review tokens so links sent under the dup still resolve.
   const keeperToken = (fill.reviewToken as string | undefined) ?? keeper.reviewToken ?? null;
   const tokenSet = new Set(keeper.altReviewTokens);
   for (const t of [dup.reviewToken, ...dup.altReviewTokens]) {
@@ -188,9 +163,7 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
         where: { contactId: dup.id },
         data: { contactId: keeper.id },
       }),
-      // ContactConflict.contactId has no relation, so nothing cascades on the
-      // delete below. Left behind, the conflict points at a missing row: renders
-      // as "Unknown", 500s on every resolve, and the count never returns to zero.
+      // ContactConflict.contactId has no relation, so nothing cascades on delete.
       prisma.contactConflict.updateMany({
         where: { contactId: dup.id },
         data: { contactId: keeper.id },
@@ -226,13 +199,7 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
 }
 
 /**
- * Merges live contacts that share the same googleContactId into one. A Google
- * person can only be one contact, so a shared resource name is the strongest
- * duplicate signal available - stronger than email or phone, which drift in case
- * and formatting. The oldest row is kept and the rest are folded into it.
- *
- * This is the pass that clears up an import which ran while the existing rows
- * were unmatchable and re-created every Google contact as a second row.
+ * Merges live contacts sharing a googleContactId (the strongest duplicate signal) into the oldest.
  * @returns The number of duplicate contacts merged away.
  */
 export async function mergeDuplicateGoogleContacts(): Promise<number> {
@@ -265,12 +232,8 @@ export async function mergeDuplicateGoogleContacts(): Promise<number> {
 }
 
 /**
- * Merges live contacts that share the same (case-insensitive) email into one:
- * the oldest row is kept (it carries the original reviewToken and history),
- * dupes' reviews are reassigned to it, its blank fields are filled from the
- * dupes, and the dupes are hard-deleted. Catches the pairs the Google-link pass
- * can't - two rows for one person that were never linked to the same Google
- * contact, or to Google at all.
+ * Merges live contacts sharing a case-insensitive email into the oldest, which carries
+ * the original reviewToken and history.
  * @returns The number of duplicate contacts merged away.
  */
 export async function mergeDuplicateEmailContacts(): Promise<number> {
@@ -303,11 +266,8 @@ export async function mergeDuplicateEmailContacts(): Promise<number> {
 }
 
 /**
- * Merges contacts that share a normalised mobile number into one. An
- * email-bearing row is always the keeper and any phone-only rows fold into it;
- * where every row in the bucket is phone-only the oldest one wins, which is what
- * collapses the pairs left behind by an import that couldn't match its own rows.
- * Runs before backfill so the post-merge contact set is accurate.
+ * Merges contacts sharing a mobile: phone-only rows fold into the email-bearing one, else
+ * the oldest. Runs before backfill so the post-merge set is accurate.
  * @returns The set of contact ids that were merged away (deleted).
  */
 export async function mergePhoneOnlyContacts(): Promise<Set<string>> {
@@ -317,8 +277,7 @@ export async function mergePhoneOnlyContacts(): Promise<Set<string>> {
     orderBy: { createdAt: "asc" },
   });
 
-  // Bucket by normalised phone (primary + alts): one email-bearing "keeper" +
-  // any phone-only rows, oldest first.
+  // Bucket by normalised phone (primary + alts), oldest first.
   const phoneBuckets = new Map<
     string,
     { withEmail: (typeof contacts)[number] | null; phoneOnly: (typeof contacts)[number][] }
@@ -326,8 +285,7 @@ export async function mergePhoneOnlyContacts(): Promise<Set<string>> {
   for (const c of contacts) {
     const keys = [normaliseContactPhone(c.phone), ...c.altPhones.map(normaliseContactPhone)];
     for (const norm of keys) {
-      // Only merge identity on a MOBILE match; a shared landline may belong to
-      // two different people (a household), so it must not collapse them into one.
+      // Mobiles only: a household landline may belong to two people.
       if (!norm || !isNZMobileKey(norm)) continue;
       if (!phoneBuckets.has(norm)) phoneBuckets.set(norm, { withEmail: null, phoneOnly: [] });
       const bucket = phoneBuckets.get(norm)!;
@@ -338,14 +296,11 @@ export async function mergePhoneOnlyContacts(): Promise<Set<string>> {
 
   const deletedIds = new Set<string>();
   for (const { withEmail, phoneOnly } of phoneBuckets.values()) {
-    // With no email-bearing row the oldest phone-only row is the keeper - two
-    // phone-only rows on one mobile are the same person either way.
     const keeper = withEmail ?? phoneOnly[0];
     const dupes = withEmail ? phoneOnly : phoneOnly.slice(1);
     if (!keeper || dupes.length === 0) continue;
     for (const dup of dupes) {
-      // A person reachable on two mobiles sits in two buckets; skip the pair
-      // once either side has already been merged away by an earlier bucket.
+      // Two mobiles put a person in two buckets; skip a pair already merged away.
       if (deletedIds.has(keeper.id) || deletedIds.has(dup.id)) continue;
       if (await foldContactInto(keeper, dup)) deletedIds.add(dup.id);
     }
@@ -354,11 +309,8 @@ export async function mergePhoneOnlyContacts(): Promise<Set<string>> {
 }
 
 /**
- * Creates a Contact for every unique booking email that has no live Contact yet.
- * A soft-deleted contact for that email suppresses re-creation (otherwise a
- * deleted contact would resurrect on the next run). When a booking's phone
- * matches an existing phone-only contact, the email is merged into it instead
- * of creating a duplicate.
+ * Creates a Contact for each booking email with no live Contact. A soft-deleted match
+ * suppresses re-creation; a phone-only mobile match gets the email instead.
  * @returns The number of contacts created.
  */
 export async function backfillContactsFromBookings(): Promise<number> {
@@ -373,8 +325,7 @@ export async function backfillContactsFromBookings(): Promise<number> {
   ]);
 
   const live = allContacts.filter((c) => !c.deletedAt);
-  // Every email a live contact owns (primary + alts) - a booking under any of
-  // these already has a home, so don't create a duplicate.
+  // Every email a live contact owns (primary + alts).
   const liveEmails = new Set<string>();
   for (const c of live) {
     if (c.email) liveEmails.add(c.email.toLowerCase());
@@ -392,9 +343,7 @@ export async function backfillContactsFromBookings(): Promise<number> {
   for (const c of live) {
     if (c.email) continue;
     const norm = normaliseContactPhone(c.phone);
-    // Mobile-only, the same gate mergePhoneOnlyContacts applies: a shared landline may
-    // belong to two people in one household. Without it a son booking on the family
-    // landline gets his email written onto his mother's contact and never gets his own.
+    // Mobiles only, as in mergePhoneOnlyContacts: a household landline may belong to two people.
     if (norm && isNZMobileKey(norm)) phoneOnlyByNorm.set(norm, c);
   }
 
@@ -436,9 +385,7 @@ export async function backfillContactsFromBookings(): Promise<number> {
       });
       if (!exists) {
         await prisma.contact
-          // Explicit null, not omitted: Mongo stores no key for an omitted optional
-          // field, so `where: { deletedAt: null }` would not match this contact and it
-          // would be invisible to every reader. find-or-create.ts does the same.
+          // Explicit null: `where: { deletedAt: null }` won't match an absent Mongo key.
           .create({ data: { ...d, deletedAt: null } })
           .then(() => (created += 1))
           .catch(() => null);
@@ -449,19 +396,12 @@ export async function backfillContactsFromBookings(): Promise<number> {
 }
 
 /**
- * Links reviews with no contactId to their matching Contact. Booking-linked
- * reviews resolve via the booking's email (primary) or phone (fallback);
- * standalone reviews resolve by customerRef matching Contact.reviewToken.
- *
- * Ambiguous-phone guard: if a normalised phone maps to more than one live
- * contact, phone matching is skipped for that number (the review is left
- * unlinked) and the collision is logged, because silently linking to whichever
- * contact loaded first attaches the review to a possibly-wrong person.
+ * Links unlinked reviews to a Contact: booking reviews by email then phone, standalone ones by
+ * customerRef > reviewToken. A phone shared by several contacts is logged and left unlinked.
  * @returns The number of reviews newly linked.
  */
 export async function matchReviewsToContacts(): Promise<number> {
-  // MongoDB gotcha: `contactId: null` only matches documents where the field
-  // exists and equals null; pre-schema rows have no field at all, hence the OR.
+  // `contactId: null` misses rows with no field at all, hence the OR.
   const unlinked = await prisma.review.findMany({
     where: { OR: [{ contactId: null }, { contactId: { isSet: false } }] },
     select: { id: true, bookingId: true, customerRef: true },
@@ -497,15 +437,13 @@ export async function matchReviewsToContacts(): Promise<number> {
     if (norm) bookingPhoneById.set(b.id, norm);
   }
 
-  // Index every email a contact owns (primary + alts) so a review from any of a
-  // person's addresses links to the one contact.
+  // Index every email a contact owns (primary + alts).
   const contactIdByEmail = new Map<string, string>();
   for (const c of contacts) {
     if (c.email) contactIdByEmail.set(c.email.toLowerCase(), c.id);
     for (const alt of c.altEmails) contactIdByEmail.set(alt.toLowerCase(), c.id);
   }
-  // Collect ALL contact ids per phone (primary + alts) so shared numbers can be
-  // flagged ambiguous.
+  // ALL contact ids per phone, so shared numbers can be flagged ambiguous.
   const contactIdsByPhone = new Map<string, string[]>();
   for (const c of contacts) {
     const keys = new Set(
@@ -519,8 +457,7 @@ export async function matchReviewsToContacts(): Promise<number> {
       contactIdsByPhone.set(norm, list);
     }
   }
-  // Index primary AND inherited (merge-folded) review tokens so reviews
-  // submitted under a merged-away contact's old link still resolve.
+  // Primary and merge-folded tokens, so a merged-away contact's old link resolves.
   const contactIdByToken = new Map<string, string>();
   for (const c of contacts) {
     if (c.reviewToken) contactIdByToken.set(c.reviewToken, c.id);
@@ -563,9 +500,7 @@ export async function matchReviewsToContacts(): Promise<number> {
 }
 
 /**
- * Trims a name and collapses internal runs of whitespace to a single space, so
- * a stray, doubled, or non-breaking space - invisible once HTML renders it -
- * cannot be mistaken for a real difference between two otherwise-equal names.
+ * Trims a name and collapses whitespace runs (including non-breaking spaces) to one space.
  * @param name - Raw name.
  * @returns The name with surrounding and repeated whitespace normalised.
  */
@@ -573,9 +508,8 @@ function collapseWhitespace(name: string): string {
   return name.replace(/\s+/g, " ").trim();
 }
 /**
- * Auto-fills missing contact fields (phone, address, full name) from the most
- * recent matching Booking and returns booking-sourced field conflicts for the
- * admin to resolve. Only touches live contacts.
+ * Fills missing phone, address and full name on live contacts from the latest matching
+ * Booking, and returns booking-sourced conflicts.
  * @returns Booking-sourced conflict entries.
  */
 export async function enrichContactsFromBookings(): Promise<ConflictEntry[]> {
@@ -685,8 +619,7 @@ export async function enrichContactsFromBookings(): Promise<ConflictEntry[]> {
       ) {
         conflictFields.push("name");
       }
-      // A booking phone that matches ANY of the contact's numbers (primary or
-      // alt) is not a conflict - only a genuinely unknown number is flagged.
+      // Only a number matching none of the contact's phones is a conflict.
       const knownPhones = new Set(
         [existingPhone, ...contact.altPhones.map(normaliseContactPhone)].filter(Boolean),
       );
@@ -726,11 +659,8 @@ export async function enrichContactsFromBookings(): Promise<ConflictEntry[]> {
 }
 
 /**
- * Compares reviews against their linked Contact and returns a name conflict per
- * contact where the reviewer's full name differs from the stored name. Only
- * reviews carrying a customerRef (standalone/contact-token reviews) are checked;
- * a review with only a first name is not treated as a suggestion to drop the
- * contact's last name.
+ * Returns a name conflict per contact whose customerRef review gives a different full name.
+ * A first-name-only review is skipped.
  * @returns Review-sourced conflict entries.
  */
 export async function enrichContactsFromReviews(): Promise<ConflictEntry[]> {

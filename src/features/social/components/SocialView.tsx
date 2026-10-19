@@ -1,9 +1,7 @@
 "use client";
 // src/features/social/components/SocialView.tsx
-// The whole Social page. Starting a post comes first: a blank post or any preset, and
-// drafts and scheduled posts to pick back up. The open post is written right below in
-// the composer. What has already gone out folds away under Posted, and the connection
-// check sits at the bottom, run once when the page opens.
+// The Social page: start options, then the composer, then Posted folded away and the connection
+// check at the bottom.
 
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { Card } from "@/features/admin/components/ui/Card";
@@ -24,10 +22,7 @@ import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
-/**
- * Posts that still need something: being written, waiting to go out, or stuck
- * partway. Only posts that are done (up, or taken down) fold away under Posted.
- */
+/** Posts still needing something; only finished (up or taken down) posts fold under Posted. */
 const IN_PROGRESS = new Set(["draft", "scheduled", "posting", "partial", "failed", "removing"]);
 
 /**
@@ -94,12 +89,9 @@ export function SocialView({
    */
   const isBusy = (key: string): boolean => busyId === key || (opening && openingKey === key);
 
-  // When another post opens, bring it into view if it's off screen or well down it
-  // (the start options above are short, so usually nothing moves), and put keyboard
-  // focus on its heading, since the button that opened it may have been swapped out.
-  // On close, focus goes back to Start a post. The page loading doesn't count.
-  // The first 56px sit under the sticky admin top bar (AdminTopBar, h-14), so a top
-  // edge there counts as off screen.
+  // When another post opens, scroll it into view if needed and focus its heading (the opener may
+  // have been swapped out); on close, focus Start a post. The top 56px sit under the sticky
+  // AdminTopBar, so count them as off screen.
   const shownId = useRef(openId);
   useEffect(() => {
     if (shownId.current === openId) return;
@@ -116,10 +108,8 @@ export function SocialView({
     composerHeadingRef.current?.focus({ preventScroll: true });
   }, [openId]);
 
-  // Back and Forward reuse the page as it was first loaded, which can be older than
-  // what autosave has written since; editing that stale copy would save old text over
-  // new. Reload from the server after any history step, and whenever the open post
-  // turns out to have changed since this render.
+  // Back/Forward reuse the first-loaded page, which may be older than autosave's writes; reload
+  // after a history step or when the open post changed, so stale text never saves over new.
   useEffect(() => {
     /** Reloads after a Back or Forward. */
     const onPop = (): void => {
@@ -144,8 +134,8 @@ export function SocialView({
   }, [open, router]);
 
   /**
-   * Shows another post in the composer, or none. Any edit still waiting for autosave
-   * is saved first; if that fails the current post stays open with its error showing.
+   * Opens another post (or none) in the composer after saving pending edits; on save failure
+   * the current post stays open.
    * @param id - Post to open, or null to close the composer.
    * @param key - Busy marker of the button that asked, kept spinning until it opens.
    */
@@ -161,8 +151,7 @@ export function SocialView({
   }
 
   /**
-   * Creates a post or preset and opens it in the composer. The open post's pending
-   * edits are saved first, so a copy of it includes them.
+   * Creates a post or preset and opens it, saving pending edits first so a copy includes them.
    * @param body - POST body for the create route.
    * @param key - Busy marker while the request runs.
    */
@@ -230,8 +219,7 @@ export function SocialView({
   }
 
   /**
-   * Opens the delete confirmation with take-down ticked, so a fresh dialog never
-   * carries over an unticked box from the last one.
+   * Opens the delete confirmation with take-down ticked fresh each time.
    * @param row - Post to delete.
    */
   function askDelete(row: SocialPostRow): void {
@@ -240,10 +228,8 @@ export function SocialView({
   }
 
   /**
-   * Deletes the post waiting in the confirm dialog. The server takes it down first
-   * unless the box was unticked, judging from the stored post rather than this row,
-   * which may predate a scheduled post going out. A refused delete reloads the row to
-   * show where it is now.
+   * Deletes the post in the confirm dialog. The server takes it down first (unless unticked),
+   * judging from the stored post; a refused delete reloads the row.
    */
   async function confirmDelete(): Promise<void> {
     if (!deleting) return;

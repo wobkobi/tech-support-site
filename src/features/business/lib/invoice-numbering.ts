@@ -1,8 +1,6 @@
 // src/features/business/lib/invoice-numbering.ts
-// Shared invoice-numbering helper. Both the admin invoice create flow and the
-// auto-drafted late-cancellation invoice flow have to agree on the next number so they
-// never collide on the unique `Invoice.number` index. Sheets is the source of truth when
-// reachable; Prisma is the fallback when it's not.
+// Shared invoice/quote numbering so every create flow agrees on the unique `Invoice.number`.
+// Sheets is the source of truth when reachable; Prisma is the fallback.
 
 import { nextInvoiceNumber } from "@/features/business/lib/business";
 import { nzFinancialYearCode } from "@/features/business/lib/financial-year";
@@ -17,34 +15,28 @@ import { prisma } from "@/shared/lib/prisma";
 export interface NextInvoiceNumber {
   /** Formatted number ready to drop on the new invoice (e.g. TTP-2627-0042). */
   number: string;
-  /** Numeric counter to write back to Sheets after the row is created, or null when Sheets was unreachable. */
+  /** Counter to write back to Sheets after the row is created; null when Sheets was unreachable. */
   sheetNextCount: number | null;
   /** True when the Sheets fetch failed and Prisma had to be used instead. */
   sheetSyncWarning: boolean;
 }
 
 /**
- * Fetches the next invoice number as `max(sheet counter, highest existing DB
- * number)`, so a stale Sheets B19 or a row created since the last write-back
- * can't hand out an already-used number - the caller's collision-retry loop
- * then converges upward. Falls back to the DB max alone when Sheets is
- * unreachable. Callers pass `sheetNextCount` to {@link writeBackInvoiceCounter}
- * after the row is created so the Sheets counter stays in sync.
+ * Next invoice number as `max(sheet counter, highest DB number)`, so a stale Sheets B19
+ * can't reuse a number; DB max alone when Sheets is down. Pass `sheetNextCount` to
+ * {@link writeBackInvoiceCounter} after the row is created.
  * @returns Next number plus the write-back counter (or null on fallback).
  */
 export async function getNextInvoiceNumber(): Promise<NextInvoiceNumber> {
   try {
     const data = await getInvoiceCounter();
-    // Quote rows share the table and unique index but number from their own counter, so
-    // exclude them or a Q- number could seed the invoice sequence. isQuote catches
-    // converted rows; the prefix filter catches legacy ones.
+    // Quotes share the table but have their own counter; keep Q- numbers out of this one.
     const last = await prisma.invoice.findFirst({
       where: { NOT: { number: { startsWith: "Q-" } } },
       orderBy: { number: "desc" },
       select: { number: true },
     });
-    // Trailing "-NNNN" is the sequence; the year segment can't leak in (\d+
-    // stops at the hyphen). Missing/legacy > 0 so the sheet counter wins.
+    // Trailing "-NNNN" is the sequence; no match > 0 so the sheet counter wins.
     const dbMatch = last?.number.match(/-(\d+)$/);
     const dbNext = (dbMatch ? parseInt(dbMatch[1] ?? "", 10) : 0) + 1;
     const nextNumber = Math.max(data.nextNumber, dbNext);
@@ -68,11 +60,8 @@ export async function getNextInvoiceNumber(): Promise<NextInvoiceNumber> {
 }
 
 /**
- * Fetches the next QUOTE number as `max(sheet quote counter, highest existing
- * Q- number in the DB)` - the same convergence rule as invoices, against the
- * dedicated SETTINGS!B12 counter. Falls back to the DB max alone when Sheets
- * is unreachable. Callers pass `sheetNextCount` to
- * {@link writeBackQuoteCounter} after the row is created.
+ * Next quote number, same rule as {@link getNextInvoiceNumber} against the SETTINGS!B12
+ * counter. Pass `sheetNextCount` to {@link writeBackQuoteCounter} after the row is created.
  * @returns Next Q- number plus the write-back counter (or null on fallback).
  */
 export async function getNextQuoteNumber(): Promise<NextInvoiceNumber> {
@@ -103,8 +92,7 @@ export async function getNextQuoteNumber(): Promise<NextInvoiceNumber> {
 }
 
 /**
- * Writes the just-used quote counter back to SETTINGS!B12. Same no-op /
- * swallow semantics as {@link writeBackInvoiceCounter}.
+ * Writes the just-used quote counter back to SETTINGS!B12, like {@link writeBackInvoiceCounter}.
  * @param count - The numeric counter that was just consumed.
  */
 export async function writeBackQuoteCounter(count: number | null): Promise<void> {
@@ -117,10 +105,8 @@ export async function writeBackQuoteCounter(count: number | null): Promise<void>
 }
 
 /**
- * Writes the just-used counter back to Sheets. No-op when `count` is null
- * (Sheets fell over during fetch - sync will recover on the next successful
- * fetch + write cycle). Failures are caught and logged; the caller's invoice
- * is already saved and the counter drift is recoverable.
+ * Writes the just-used counter back to Sheets. No-op on null; failures are only logged,
+ * since the invoice is already saved and counter drift self-corrects.
  * @param count - The numeric counter that was just consumed.
  */
 export async function writeBackInvoiceCounter(count: number | null): Promise<void> {

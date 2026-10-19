@@ -10,11 +10,8 @@ import { prisma } from "@/shared/lib/prisma";
 const SCHEDULE_HORIZON_DAYS = 7;
 
 /**
- * Returns a departure time the Distance Matrix transit API can reliably use.
- * If {@link departureTime} is more than {@link SCHEDULE_HORIZON_DAYS} in the future,
- * returns the nearest upcoming date with the same UTC day-of-week and time-of-day,
- * preserving weekday vs. weekend transit patterns without using a date whose
- * schedule data is not yet published.
+ * Departure time the transit API can use: beyond {@link SCHEDULE_HORIZON_DAYS},
+ * the nearest upcoming date with the same UTC weekday and time-of-day.
  * @param departureTime - The intended departure time.
  * @param now - Current time reference.
  * @returns A departure time within the reliable scheduling horizon.
@@ -35,8 +32,7 @@ function toReliableDeparture(departureTime: Date, now: Date): Date {
   const daysToAdd = (targetDow - candidate.getUTCDay() + 7) % 7;
   candidate.setUTCDate(candidate.getUTCDate() + daysToAdd);
 
-  // Safety: if the candidate somehow landed in the past (e.g. time-of-day
-  // already passed today), bump forward a full week
+  // If the candidate is still in the past, bump forward a week
   if (candidate.getTime() <= now.getTime() + 60 * 60 * 1000) {
     candidate.setUTCDate(candidate.getUTCDate() + 7);
   }
@@ -54,10 +50,8 @@ const UNROUTABLE_KEY = "travel:unroutable";
 const UNROUTABLE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Per-process copy of the unroutable set, loaded once and written through.
- * The calendar refresh recomputes every future event twice an hour, so without
- * this an address Google cannot route is re-queried indefinitely - 4 failing
- * legs cost ~192 wasted Distance Matrix calls a day.
+ * Per-process copy of the unroutable set. Without it the twice-hourly refresh
+ * re-queries dead routes (4 failing legs = ~192 wasted calls a day).
  */
 let unroutable: Record<string, string> | null = null;
 
@@ -123,12 +117,8 @@ async function rememberUnroutable(key: string): Promise<void> {
 }
 
 /**
- * Travel time between two addresses, in minutes (ceiling). Driving lookups use
- * Google's traffic prediction (duration_in_traffic) for the sampled departure.
- * Arrive-by (useArrivalTime) differs by mode: Distance Matrix supports
- * arrival_time only for TRANSIT; for DRIVING Google ignores it, so the drive
- * is priced departing AT the target arrival, then re-priced departing that
- * many minutes earlier so the sampled traffic matches the real leave time.
+ * Travel time in minutes (ceiling), traffic-aware for driving. Google ignores
+ * arrival_time for driving, so arrive-by drives are iterated (see below).
  * @param origin - Starting address or coordinates.
  * @param destination - Destination address or coordinates.
  * @param departureTime - Departure time, or the target arrival when useArrivalTime is set.
@@ -143,29 +133,23 @@ export async function calculateTravelMinutes(
   departureTime: Date,
   options?: { useArrivalTime?: boolean; mode?: TransportMode },
 ): Promise<number | null> {
-  // Server-only key, no fallback to GOOGLE_MAPS_API_KEY: next.config.ts
-  // publishes that one to the browser, so falling back would spend a publicly
-  // readable key on Distance Matrix quota.
+  // Server-only key; GOOGLE_MAPS_API_KEY is published to the browser, so no fallback.
   const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY;
   if (!apiKey) {
     console.warn("[travel-time] No GOOGLE_MAPS_SERVER_KEY set - skipping travel time calculation");
     return null;
   }
-  // apiKey is a string past the guard, but TS won't carry that narrowing into the
-  // nested query() closure, so capture the narrowed value here.
+  // TS drops the narrowing inside the query() closure, so capture it.
   const key = apiKey;
 
   const mode: TransportMode = options?.mode ?? "driving";
   const wantArrival = options?.useArrivalTime === true;
-  // Google rejects a past time anchor. A retained past job (kept on the schedule for
-  // the record) is priced at a near-future proxy - drive time between fixed points
-  // barely changes - so its block still gets a sensible length.
+  // Google rejects a past anchor, so a past job is priced at a near-future proxy.
   const anchor =
     departureTime.getTime() > Date.now() ? departureTime : new Date(Date.now() + 30 * 60_000);
 
   /**
-   * One Distance Matrix lookup at a fixed anchor time. Prefers Google's
-   * traffic-aware prediction (driving + departure_time) over free-flow duration.
+   * One Distance Matrix lookup at a fixed anchor time, traffic-aware when available.
    * @param timeParam - Which time anchor to send.
    * @param epochSeconds - The anchor as a Unix timestamp (seconds).
    * @returns Travel minutes (ceiling), or null on failure.
@@ -182,9 +166,7 @@ export async function calculateTravelMinutes(
     url.searchParams.set("destinations", destination);
     url.searchParams.set("mode", mode);
     url.searchParams.set(timeParam, Math.floor(epochSeconds).toString());
-    // best_guess traffic: Google's most-likely duration for the departure time. The
-    // travelRoundBufferMin setting already pads blocks for bad runs, so pessimistic on top
-    // double-counts the safety margin. traffic_model only applies to driving departures.
+    // best_guess, not pessimistic: travelRoundBufferMin already pads for bad runs.
     if (mode === "driving" && timeParam === "departure_time") {
       url.searchParams.set("traffic_model", "best_guess");
     }
@@ -204,8 +186,7 @@ export async function calculateTravelMinutes(
           elements: Array<{
             status: string;
             duration: { value: number }; // seconds
-            // Present for driving lookups with a future departure_time -
-            // Google's traffic prediction for that time.
+            // Present for driving with a future departure_time.
             duration_in_traffic?: { value: number };
           }>;
         }>;
@@ -219,9 +200,8 @@ export async function calculateTravelMinutes(
       const element = data.rows[0]?.elements[0];
       if (!element || element.status !== "OK") {
         const status = element?.status ?? "missing";
-        // ZERO_RESULTS and NOT_FOUND are properties of the addresses, not of this
-        // moment, so retrying them on a 30-minute cycle never succeeds. Anything
-        // else (a transient element error) stays retryable.
+        // ZERO_RESULTS and NOT_FOUND are address faults that never recover on
+        // retry; other element errors stay retryable.
         console.warn(`[travel-time] Element status: ${status} for "${origin}" > "${destination}"`);
         if (status === "ZERO_RESULTS" || status === "NOT_FOUND") {
           await rememberUnroutable(key0);
@@ -229,8 +209,7 @@ export async function calculateTravelMinutes(
         return null;
       }
 
-      // Prefer the traffic-aware prediction when Google returned one; free-flow
-      // duration is the fallback. The settings travel-round buffer pads on top.
+      // Traffic-aware prediction first, free-flow duration as fallback.
       const seconds = element.duration_in_traffic?.value ?? element.duration.value;
       return Math.ceil(seconds / 60);
     } catch (error) {
@@ -246,10 +225,8 @@ export async function calculateTravelMinutes(
     return query(wantArrival ? "arrival_time" : "departure_time", effective.getTime() / 1000);
   }
 
-  // Driving "arrive by": Google ignores arrival_time for driving, so iterate the
-  // departure. Price it leaving AT the target arrival for a rough duration, then re-price
-  // leaving that many minutes earlier so the traffic sampled is for the real departure.
-  // Clamped to just ahead of now, since Distance Matrix rejects a past departure_time.
+  // Driving arrive-by: price leaving AT the arrival, then re-price leaving that many
+  // minutes earlier so traffic matches. Clamped ahead of now (no past departure_time).
   if (mode === "driving" && wantArrival) {
     const targetSec = anchor.getTime() / 1000;
     const rough = await query("departure_time", targetSec);

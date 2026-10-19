@@ -1,8 +1,6 @@
 // src/features/social/lib/validate.ts
-// What each platform will refuse, checked before anything is sent. Pure and free of
-// server imports, so the composer runs the same rules live that publishing enforces.
-// The limits come from the Graph API docs (Instagram content publishing, Pages posts)
-// and the Business Profile localPosts reference.
+// What each platform will refuse, checked before sending. Pure, so the composer runs the same
+// rules live. Limits from the Graph API and Business Profile localPosts docs.
 
 import type { PromoWording } from "@/features/mailing/lib/render";
 
@@ -28,9 +26,8 @@ export const GOOGLE_CTA_LABEL: Record<GooglePostCta, string> = {
 };
 
 /**
- * One platform's settings as the rules see them. A picture here replaces the post's
- * picture on that platform only. cropApprovedFor holds the picture URL the operator
- * agreed may be cut off there, so swapping the picture asks again.
+ * One platform's settings. Its picture overrides the post's there; cropApprovedFor holds the
+ * URL whose cut was OK'd, so a new picture asks again.
  */
 export interface DraftTarget {
   platform: string;
@@ -43,9 +40,8 @@ export interface DraftTarget {
 }
 
 /**
- * The parts of a post the rules look at. The Google fields are optional so a draft
- * without them reads as a plain update with no button. Offer dates arrive as Dates
- * from the database and as YYYY-MM-DD from the composer; {@link dateKey} reads both.
+ * The parts of a post the rules read. Google fields are optional; offer dates come as Dates
+ * or YYYY-MM-DD, both read by {@link dateKey}.
  */
 export interface PostDraft {
   body: string;
@@ -81,17 +77,14 @@ const PLACEHOLDER_RE = /\{(\w+)\}/g;
 // A hashtag or @mention starts a word, so an email address's "@" doesn't count.
 const HASHTAG_RE = /(?:^|\s)#[\p{L}\p{N}_]+/gu;
 const MENTION_RE = /(?:^|\s)@[\w.]+/g;
-// A run of digits with phone-style separators (spaces, dashes, brackets, a leading
-// +). Slashes, dots and colons aren't separators, so dates like "14/10/2026" and
-// opening hours like "10.00-17.00" never match; the digit count check in
-// hasPhoneNumber drops prices and short numbers.
+// Digits with phone separators (spaces, dashes, brackets, leading +). Slashes, dots and colons
+// aren't separators, so "14/10/2026" and "10.00-17.00" never match.
 const PHONE_CANDIDATE_RE = /\+?\(?\d[\d\s()-]{5,}\d/g;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
 
 /**
- * Whether text holds something that reads as a phone number: 7 to 15 digits in one
- * run, which covers NZ landlines, mobiles, 0800 numbers and +64 forms.
+ * Whether text holds a phone number: 7 to 15 digits in one run (NZ landlines, mobiles, 0800, +64).
  * @param text - Text to scan.
  * @returns True when a phone number is found.
  */
@@ -106,8 +99,7 @@ export function hasPhoneNumber(text: string): boolean {
 }
 
 /**
- * A Date or YYYY-MM-DD string as YYYY-MM-DD. Offer dates are stored at UTC midnight
- * of the calendar day, so the UTC date is the day itself.
+ * A Date or YYYY-MM-DD as YYYY-MM-DD; stored at UTC midnight, so the UTC date is the day.
  * @param value - Stored Date, composer string, or nothing.
  * @returns The date key, or null when unset or blank.
  */
@@ -117,8 +109,7 @@ export function dateKey(value: Date | string | null | undefined): string | null 
 }
 
 /**
- * The text a platform gets before placeholders are filled: its override when one
- * has been typed, otherwise the shared body.
+ * A platform's unfilled text: its override if typed, else the shared body.
  * @param post - The post.
  * @param platform - Platform key.
  * @returns Unfilled text.
@@ -129,9 +120,8 @@ export function textFor(post: PostDraft, platform: string): string {
 }
 
 /**
- * Fills the promo placeholders. Used by both the composer preview and publishing,
- * so what the preview shows is what goes out. Name placeholders and unknown `{word}`s
- * stay visible; the validator blocks them before anything is posted.
+ * Fills promo placeholders, for both preview and publishing. Name placeholders and unknown
+ * `{word}`s stay visible for the validator to block.
  * @param text - Unfilled text.
  * @param promo - Promo wording, or null (promo placeholders then go blank).
  * @returns The filled text.
@@ -146,8 +136,7 @@ export function fillPromo(text: string, promo: PromoWording | null): string {
 }
 
 /**
- * Placeholder problems shared by every platform. Only the promo placeholders mean
- * anything in a post, since it isn't addressed to one person.
+ * Placeholder problems for every platform; only promo placeholders are valid in a post.
  * @param text - Unfilled text.
  * @param hasPromo - Whether a promo will be there to fill the promo placeholders.
  * @returns Issues found.
@@ -206,11 +195,8 @@ export function pictureFor(
 }
 
 /**
- * Shapes each platform shows whole, as width / height. Outside the range a picture is
- * cut to the nearest edge. Instagram's range is its API's accepted range (it refuses,
- * rather than cuts, anything outside); Facebook's feed cuts tall pictures to 4:5 and
- * wide ones to 1.91:1; Google shows post pictures at 4:3. Facebook's and Google's are
- * observed in the apps, not documented.
+ * Shapes each platform shows whole (width / height); outside, it cuts to the nearest edge.
+ * Instagram refuses outside its API range; Facebook and Google values are observed, not documented.
  */
 export const PICTURE_FIT: Record<SocialPlatformKey, { min: number; max: number }> = {
   facebook: { min: 4 / 5, max: 1.91 },
@@ -240,8 +226,7 @@ export function cropOf(
 }
 
 /**
- * The shape a platform shows a picture at: its own when it fits, otherwise the edge of
- * the range it's cut to. The previews draw the picture at this shape.
+ * The shape a platform shows a picture at: its own if it fits, else the nearest range edge.
  * @param platform - Platform key.
  * @param width - Picture width, or null when unknown.
  * @param height - Picture height, or null when unknown.
@@ -258,9 +243,8 @@ export function shownRatio(
 }
 
 /**
- * Facebook and Google cut a picture that doesn't fit their shape, so it's blocked
- * until the operator either uploads a picture for that platform or OKs the cut for
- * this exact picture. An unknown size blocks too, since the cut can't be checked.
+ * Facebook and Google crop misfit pictures, so they block until a platform picture is uploaded
+ * or the cut is OK'd for this picture. An unknown size blocks too.
  * @param platform - Facebook or Google.
  * @param post - The post.
  * @returns Issues found.
@@ -294,8 +278,7 @@ function cropIssues(platform: "facebook" | "google", post: PostDraft): Issue[] {
 }
 
 /**
- * Facebook rules: something to post, under the length limit, and a picture it won't
- * cut without the operator's OK.
+ * Facebook rules: something to post, within the length limit, no un-OK'd crop.
  * @param text - Unfilled text.
  * @param post - The post.
  * @returns Issues found.
@@ -312,9 +295,8 @@ function facebookIssues(text: string, post: PostDraft): Issue[] {
 }
 
 /**
- * Instagram rules: a JPEG of an accepted shape and width, and a caption within the
- * character, hashtag and mention limits. A picture outside the accepted shape can't be
- * OK'd, because Instagram refuses it rather than cutting it.
+ * Instagram rules: an accepted-shape JPEG and a caption within its limits. Shape can't be OK'd,
+ * as Instagram refuses rather than cuts.
  * @param text - Unfilled text.
  * @param post - The post.
  * @returns Issues found.
@@ -375,12 +357,8 @@ function instagramIssues(text: string, post: PostDraft): Issue[] {
 }
 
 /**
- * Google rules: text under the length limit with no phone numbers or email addresses
- * (Google removes posts with contact details in the text; the Call button is the
- * allowed way to give a number), and an offer's title and dates. An offer ignores the
- * button and takes the link as its "Redeem online" link; an update shows a link only
- * through the Book or Learn more button. The picture's shape is checked by
- * {@link cropIssues}.
+ * Google rules: within the length limit, no phone numbers or emails in the text (Google removes
+ * those posts), and an offer's title and dates. Shape is checked by {@link cropIssues}.
  * @param text - Unfilled text.
  * @param post - The post.
  * @returns Issues found.
@@ -478,8 +456,7 @@ export function validatePost(
 }
 
 /**
- * Whether anything blocks publishing: an error on any enabled platform, or no
- * platform enabled at all.
+ * What blocks publishing: an error on any enabled platform, or no platform enabled.
  * @param issues - Output of {@link validatePost}.
  * @returns The blocking messages, prefixed with the platform name.
  */

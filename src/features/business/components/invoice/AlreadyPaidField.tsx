@@ -1,8 +1,7 @@
 "use client";
 // src/features/business/components/invoice/AlreadyPaidField.tsx
-// The "Already paid" box: an amount and Cash or Bank, with the balance it leaves. Shared
-// by the calculator and the invoice edit page. The method never shows on the invoice; it
-// only decides how the income entry is recorded.
+// The "Already paid" box: amount, Cash or Bank, and the balance left. The method only
+// decides how the income entry is recorded, never shown on the invoice.
 
 import {
   SEGMENTED_GROUP_CLS,
@@ -87,8 +86,7 @@ export function AlreadyPaidField({
           disabled={disabled}
           className={cn(inputClassName, "w-28 flex-none")}
         />
-        {/* Segmented toggle, the same look as the schedule's Short/Long switch, so the
-            selected method never reads as a second coquelicot primary beside Save. */}
+        {/* Segmented toggle, so the method never reads as a second primary beside Save. */}
         <div className={SEGMENTED_GROUP_CLS}>
           {ALREADY_PAID_METHODS.map((m) => (
             <button

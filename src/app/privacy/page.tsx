@@ -1,7 +1,5 @@
 // src/app/privacy/page.tsx
-// Privacy policy: what the site collects, how it is used, the analytics/ad tools it runs
-// (Google, Meta Pixel incl. hashed advanced matching), sharing, retention, and visitors'
-// rights under the NZ Privacy Act 2020.
+// Privacy policy: collection, analytics/ad tools, sharing, retention and Privacy Act 2020 rights.
 
 import { PageHead } from "@/shared/components/PageHead";
 import { PageShell } from "@/shared/components/PageLayout";

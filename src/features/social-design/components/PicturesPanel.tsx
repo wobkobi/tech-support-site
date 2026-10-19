@@ -1,8 +1,7 @@
 "use client";
 // src/features/social-design/components/PicturesPanel.tsx
-// The Pictures dialog: whether the stored pictures match the design, Update pictures
-// (with a retry per failed size), downloads of any size as JPEG or PNG at 1x or 2x,
-// the paid-ad switch, the words that go into the post, and Use in post.
+// The Pictures dialog: stored-picture status and update, downloads, the paid-ad switch,
+// post words, and Use in post.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
@@ -91,8 +90,7 @@ export function PicturesPanel({
   const busy = progress !== null;
 
   /**
-   * Draws and downloads sizes one after another, straight from the design: nothing is
-   * stored, so this works with uploads off.
+   * Draws and downloads sizes in turn straight from the design, so it works with uploads off.
    * @param formats - Sizes to download.
    * @param which - What the busy spinner shows on.
    */

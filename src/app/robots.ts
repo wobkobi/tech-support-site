@@ -15,16 +15,13 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        // Admin, booking, review and poster pages are deliberately NOT disallowed: they
-        // carry noindex instead, and Google only honours noindex on pages it is allowed
-        // to crawl - blocking them here would leave a linked URL indexed URL-only. Only
-        // the API, never a search surface, is blocked outright.
+        // Private pages use noindex, not disallow: Google only honours noindex on
+        // pages it may crawl. Only the API is blocked.
         allow: ["/"],
         disallow: ["/api/"],
       },
     ],
-    // No `host`: it is a Yandex-only directive that Googlebot ignores and Search
-    // Console flags as an ignored rule. The canonical host comes from per-page canonicals.
+    // No `host`: Yandex-only, and Search Console flags it as ignored.
     sitemap: `${siteUrl}/sitemap.xml`,
   };
 }

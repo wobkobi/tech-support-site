@@ -1,7 +1,5 @@
 // src/app/api/admin/social/[id]/schedule/route.ts
-// Schedules a draft to post later (the publish-scheduled cron posts it), or cancels the
-// schedule, which turns it back into an editable draft. Unlike email, a time inside quiet
-// hours stays where it was put.
+// Schedules a draft for the publish-scheduled cron, or cancels back to a draft. Quiet hours don't apply.
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import { scheduleProblems } from "@/features/social/lib/publish";

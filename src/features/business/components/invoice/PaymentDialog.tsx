@@ -1,12 +1,7 @@
 "use client";
 // src/features/business/components/invoice/PaymentDialog.tsx
-// Records a payment against an invoice via POST /pay. Collects the date, method
-// (INCOME_METHODS), an optional reference, whether to write an income-ledger entry (or link
-// a matching one typed into the sheet), and - when a reminder went out after the payment
-// date - whether to apologise for the chase.
-// Shared by the invoices list and the invoice detail page. Mount it fresh per payment
-// (conditional render or key by invoice id) so the form resets - it holds no reset
-// effect.
+// Records a payment against an invoice via POST /pay, with an optional income entry and
+// chase apology. Has no reset effect, so mount it fresh per payment.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -54,10 +49,7 @@ interface PaymentDialogProps {
   invoice: PaymentDialogInvoice;
   /** Whether the invoice already has a linked income entry (affects the copy). */
   hasLinkedIncome?: boolean;
-  /**
-   * An unlinked income row (usually typed into the Cashbook sheet) that matches this
-   * invoice's customer and balance. Offered for linking so the payment isn't booked twice.
-   */
+  /** An unlinked income row matching this invoice, offered for linking to avoid a double booking. */
   likelyIncome?: LikelyIncome | null;
   /** Called on close; `recorded` is true when a payment was recorded. */
   onClose: (recorded: boolean) => void;
@@ -83,8 +75,7 @@ export function PaymentDialog({
   const { toast } = useToast();
   const id = useId();
   const alreadyPaid = invoice.status === "PAID";
-  // A matched row is the payment the operator is recording, so its date and method
-  // are the starting point. Ledger rows sit at UTC midnight, so the ISO day is the NZ day.
+  // Start from a matched row's date and method; ledger rows sit at UTC midnight, so the ISO day is the NZ day.
   const [date, setDate] = useState(likelyIncome ? likelyIncome.date.slice(0, 10) : todayISO());
   const [method, setMethod] = useState<string>(
     likelyIncome && (INCOME_METHODS as readonly string[]).includes(likelyIncome.method)
@@ -93,15 +84,12 @@ export function PaymentDialog({
   );
   const [adoptLikely, setAdoptLikely] = useState(likelyIncome != null);
   const [reference, setReference] = useState("");
-  // Default ON, but OFF when already PAID - a legacy backfill must not create a
-  // second ledger row for a payment that was entered by hand.
+  // OFF when already PAID, so a backfill can't duplicate a hand-entered ledger row.
   const [createIncome, setCreateIncome] = useState(!alreadyPaid);
   const [sendApology, setSendApology] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  // Recomputed as the operator edits the date: backdating the payment past the
-  // last reminder is exactly what reveals the wrongly-sent chase. Suppressed on
-  // an already-PAID row, where this is a backfill rather than a fresh payment.
+  // Backdating past the last reminder reveals a wrong chase; suppressed on a PAID backfill.
   const wronglyChased =
     !alreadyPaid &&
     reminderChasedPaidInvoice({
@@ -112,9 +100,7 @@ export function PaymentDialog({
   const apologyRequested = wronglyChased && sendApology;
   const adopting = likelyIncome != null && adoptLikely;
 
-  /**
-   * Submits the payment to the /pay route, toasts the result, and closes.
-   */
+  /** Submits the payment to the /pay route, toasts the result, and closes. */
   async function submit(): Promise<void> {
     setBusy(true);
     try {

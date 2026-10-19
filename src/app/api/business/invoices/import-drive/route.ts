@@ -1,10 +1,6 @@
 // src/app/api/business/invoices/import-drive/route.ts
-// Admin endpoint that back-fills invoice records from archived Drive PDFs. POST scans
-// every invoice PDF in Drive, extracts text (decoding the legacy Google Sheets 2-byte
-// shifted font encoding), and parses client name, email, dates and totals. Drive files
-// with no DB match create a new PAID invoice; stub records (zero total / garbled name, no
-// line items) are re-parsed and updated in place. Returns counts of created, updated,
-// skipped and errored records.
+// Back-fills invoices from archived Drive PDFs (legacy Google Sheets template). Unmatched
+// files become PAID invoices; stub records are re-parsed in place.
 
 import {
   downloadDriveFile,
@@ -29,9 +25,8 @@ function estimateIssueDate(invoiceNumber: string): Date {
 }
 
 /**
- * Decodes a raw PDF string that uses 2-byte font encoding with a -29 glyph offset.
- * Google Sheets-generated PDFs encode each character as 0x00 + (realCharCode - 29).
- * Detection: if more than 30% of code units are NUL (0x00), treat as 2-byte shifted.
+ * Decode Google Sheets' 2-byte font encoding: each char is 0x00 + (realCharCode - 29).
+ * Treated as shifted when more than 30% of code units are NUL.
  * @param s - Raw string from a PDF Tj/TJ text operator
  * @returns Decoded plain-text string
  */
@@ -48,21 +43,15 @@ function decodePdfString(s: string): string {
       const decoded = cp + 29;
       if (decoded >= 32 && decoded <= 126) out += String.fromCharCode(decoded);
     }
-    // Byte 92 ('\') decodes to 'y' (92+29=121). When the PDF escape handler captures
-    // '\' + next_byte, both pass through decode and produce spurious 'y' between
-    // uppercase letters (e.g. "HyELP" > "HELP", "DUyE" > "DUE").
+    // A captured escape '\' (92+29=121) decodes to a spurious 'y': "HyELP" > "HELP".
     return out.replace(/([A-Z])y([A-Z])/g, "$1$2");
   }
   return s;
 }
 
 /**
- * Normalises font-artifact capitalisation in a single word.
- * Google Sheets PDFs sometimes encode runs so that an interior letter decodes
- * as uppercase when the surrounding letters are lowercase, e.g. "BIll".
- * Detection: an uppercase letter that both (a) is preceded by an uppercase
- * letter and (b) is followed by a lowercase letter.  Only title-case the word
- * when that pattern is found; all-caps acronyms (e.g. "HELP") are left alone.
+ * Title-case a word with a font-artifact capital ("BIll": upper after upper, before
+ * lower). All-caps acronyms are left alone.
  * @param word - Single word token to normalise
  * @returns Word with artifact capitalisation corrected
  */
@@ -105,8 +94,7 @@ function extractTextOps(content: string): string[] {
 }
 
 /**
- * Extracts plain text from a PDF buffer.
- * Tries every stream segment: raw text operators first, then zlib decompression.
+ * Extract text from every PDF stream: raw text operators first, then zlib-inflated.
  * @param buffer - Raw PDF bytes.
  * @returns Concatenated text content from all content streams.
  */
@@ -160,10 +148,9 @@ function parseAmount(text: string, pattern: RegExp): number {
  * @returns Partial invoice data extracted from the text
  */
 function parseLegacyInvoiceText(text: string): ParsedInvoiceData {
-  // Allow optional spaces after the dollar sign to handle elements joined with spaces
   const subtotal = parseAmount(text, /Subtotal\s*\$?\s*([\d,]+\.?\d{0,2})/i);
   let total = parseAmount(text, /TOTAL\s+DUE\s*\$?\s*([\d,]+\.?\d{0,2})/i);
-  // Fall back to subtotal if TOTAL DUE line not matched (no-GST invoices are equal anyway)
+  // No-GST invoices have total == subtotal anyway.
   if (total === 0 && subtotal > 0) total = subtotal;
 
   // Extract email first - needed by the secondary name lookup below.
@@ -259,8 +246,7 @@ function parseLegacyInvoiceText(text: string): ParsedInvoiceData {
     }
   }
 
-  // Tertiary: column-by-column PDF ordering, email is extracted before the "Bill To" label.
-  // In this layout the client name sits immediately before the email in the text stream.
+  // Tertiary: column-by-column ordering puts the name just before the email.
   if (!clientName && clientEmail) {
     const emailPos = text.indexOf(clientEmail);
     if (emailPos > 0 && (billToPos < 0 || emailPos < billToPos)) {
@@ -273,8 +259,7 @@ function parseLegacyInvoiceText(text: string): ParsedInvoiceData {
     }
   }
 
-  // Fourth: collect consecutive name-words directly after "Bill To", stopping at the first
-  // non-name token. "To" (from "To the Point") acts as the natural stop in these PDFs.
+  // Fourth: consecutive name-words after "Bill To"; "To" (from "To the Point") stops it.
   if (!clientName && billToPos >= 0) {
     const afterBillTo = text.slice(billToPos).replace(/^bill\s+to\s+/i, "");
     const tokens = afterBillTo.split(/\s+/);
@@ -303,13 +288,10 @@ function parseLegacyInvoiceText(text: string): ParsedInvoiceData {
   }
 
   if (!clientName) {
-    // Diagnostic only - do not log the email or the raw "Bill To" snippet; both
-    // carry customer PII (name/address) into server logs. billToPos alone is
-    // enough to tell whether the marker was found.
+    // Never log the email or "Bill To" snippet - both carry customer PII.
     console.log("[import-drive] name miss. billToPos=%d", billToPos);
   }
 
-  // Extract issue and due dates
   let issueDate: Date | null = null;
   const issueDateMatch = text.match(/Invoice\s*#?\s+\S+\s+Date\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
   if (issueDateMatch) {
@@ -344,10 +326,7 @@ async function downloadAndParse(fileId: string): Promise<{ data: ParsedInvoiceDa
 
 /**
  * POST /api/business/invoices/import-drive
- * Creates invoice records for Drive PDFs with no matching DB entry.
- * Downloads each PDF, decodes the 2-byte shifted font encoding, and extracts
- * total, client name, email, and dates. Existing stubs (total=0, no line items)
- * are re-parsed and updated in-place.
+ * Create invoices for unmatched Drive PDFs and re-parse existing stubs in place.
  * @param request - Incoming Next.js request.
  * @returns JSON with counts of created, updated, skipped, and errored records.
  */
@@ -357,7 +336,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    // Fetch all invoice PDFs from Drive
     const files = await searchAllInvoicePdfs();
     let created = 0;
     let skipped = 0;
@@ -373,7 +351,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
 
-      // Match the filename to an existing invoice
       let existing = null;
       for (const number of candidates) {
         existing = await prisma.invoice.findFirst({ where: { number } });
@@ -401,8 +378,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             data: {
               driveFileId: file.fileId,
               driveWebUrl: file.webUrl,
-              // When re-parsing a stub, always write clientName (even empty) to clear garbled values.
-              // For driveUrl-only updates (parsed=null), leave clientName untouched.
+              // A re-parsed stub always writes clientName (even empty) to clear garbled values.
               ...(parsed && {
                 clientName: parsed.clientName,
                 ...(parsed.clientEmail && { clientEmail: parsed.clientEmail }),

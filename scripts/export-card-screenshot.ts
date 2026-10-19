@@ -1,9 +1,6 @@
 // scripts/export-card-screenshot.ts
-// Exports the /card page as print-ready business card PDFs (90x55mm, the standard NZ
-// size) by screenshotting each face via Puppeteer and embedding the result into a pdf-lib
-// document, front on page 1 and back on page 2. Capture and PDF assembly come from
-// scripts/lib/print-export.ts, shared with the poster exporter; this file owns the card's
-// dimensions and CLI.
+// Exports /card as 90x55mm business card PDFs (front page 1, back page 2). Capture and
+// PDF assembly live in scripts/lib/print-export.ts.
 // Run with: npm run build:card [-- --local] [--variant=digital|print]
 
 import { logSummary, renderVariants, type PageConfig } from "./lib/print-export.js";
@@ -26,10 +23,8 @@ interface ExportOptions {
 /* ---------- Dimensions ---------- */
 
 /**
- * Card trim size in millimetres. 90x55 is what NZ and Australian printers quote
- * as standard; the US 3.5x2in card is 88.9x50.8. Change these two numbers and
- * the page CSS (src/app/card/page.tsx) together - the layout is sized in pixels
- * at 300 DPI, so it does not follow this constant on its own.
+ * Card trim size in millimetres (NZ standard). Change together with the pixel-sized
+ * CSS in src/app/card/page.tsx.
  */
 const TRIM_MM = { width: 90, height: 55 } as const;
 
@@ -40,8 +35,7 @@ const BLEED_MM = 3 as const;
 const DPI = 300 as const;
 
 /**
- * Converts millimetres to whole CSS pixels at {@link DPI}, rounding up so the
- * captured artwork is never a fraction of a pixel short of the bleed box.
+ * Converts millimetres to whole CSS pixels at {@link DPI}, rounding up to cover the bleed box.
  * @param mm - Length in millimetres.
  * @returns Length in whole pixels.
  */
@@ -64,13 +58,8 @@ const SIDES = ["front", "back"] as const;
 /* ---------- Page configs ---------- */
 
 /**
- * Builds the page config for one variant, with both faces as pages of one PDF.
- *
- * The print variant grows the viewport by the bleed on all four edges; the page
- * itself widens its outer padding to match, so the artwork extends under the
- * trim line instead of the layout simply shrinking. It carries no crop marks:
- * at 3mm of bleed they would land on the artwork's bleed edge, and the PDF's
- * TrimBox already tells the printer where to cut.
+ * Builds the page config for one variant, both faces in one PDF. Print adds bleed on
+ * every edge and no crop marks (the TrimBox marks the cut).
  * @param variant - "digital" for trim size, "print" for 3mm bleed.
  * @returns The {@link PageConfig} for that variant.
  */
@@ -141,9 +130,7 @@ function readFlag(
 }
 
 /**
- * Parses CLI flags from `process.argv`.
- *
- * Flags:
+ * Parses CLI flags from `process.argv`:
  * - `--local`              Use the local dev server instead of production.
  * - `--url=<value>`        Override the target URL entirely.
  * - `--variant=<value>`    Export variant: "digital", "print", or "both" (default: "both").

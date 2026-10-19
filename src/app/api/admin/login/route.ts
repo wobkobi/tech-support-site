@@ -1,7 +1,5 @@
 // src/app/api/admin/login/route.ts
-// Admin login endpoint. Verifies the operator-supplied secret against `ADMIN_SECRET`,
-// then sets a signed session cookie. Rate-limited per IP via the shared rateLimitOrReject
-// helper so a brute-force on the secret stops fast.
+// Admin login: checks the secret against `ADMIN_SECRET` and sets a signed cookie. Rate-limited per IP.
 
 import {
   ADMIN_SESSION_COOKIE,
@@ -33,16 +31,12 @@ function matchesAdminSecret(candidate: string): boolean {
 
 /**
  * POST /api/admin/login
- * Body: `{ secret: string }`. On match sets the session cookie and returns
- * `{ ok: true }`; on mismatch returns 401 with a generic message. The
- * shared per-IP limiter caps brute-force attempts at 10/minute.
+ * Body: `{ secret: string }`. Sets the session cookie on match, else 401.
  * @param request - Incoming login request.
  * @returns JSON response.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  // Tight cap on this route specifically - much lower than the global admin
-  // failure budget because no legitimate operator types the wrong password
-  // 10 times in a minute.
+  // Tighter than the global admin failure budget.
   const limited = rateLimitOrReject(request, "admin-login", 10, 60_000);
   if (limited) return limited;
 

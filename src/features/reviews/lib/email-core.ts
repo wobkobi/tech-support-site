@@ -1,9 +1,6 @@
 // src/features/reviews/lib/email-core.ts
-// Shared Resend utility for sending transactional emails, plus the escaping, layout
-// and signature helpers every email family renders with. Every send goes out through
-// one of two doors: sendNow for owner mail and the replies a customer is waiting on,
-// sendOutreach for everything the site initiates, which Resend holds until the
-// quiet-hours window closes.
+// Shared Resend sending plus the escaping, layout and signature helpers. sendNow is for owner
+// mail and replies a customer is waiting on; sendOutreach is held past quiet hours.
 
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
@@ -25,10 +22,8 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-// Bare http(s) URL inside ALREADY-ESCAPED text. `&amp;` stays in the match (a real query
-// separator the operator typed); any other entity ends it, since &quot; / &#39; / &lt; /
-// &gt; came from punctuation AROUND the link. http(s) only, so javascript: and data: can
-// never become anchors. Case-insensitive: a phone keyboard autocapitalises "Https://".
+// Bare http(s) URL in ALREADY-ESCAPED text. `&amp;` stays in the match; any other entity ends
+// it (punctuation around the link). Case-insensitive for autocapitalised "Https://".
 const ESCAPED_URL_RE = /https?:\/\/(?:&amp;|[^\s&])+/gi;
 
 /** Sentence punctuation that belongs to the prose, not to a trailing URL. */
@@ -45,22 +40,14 @@ function countChar(haystack: string, char: string): number {
 }
 
 /**
- * Turns bare http(s) URLs in already-escaped text into anchors, so a link the
- * operator types into a message box is clickable in the email rather than inert
- * text.
- *
- * MUST run AFTER {@link escapeHtml}, never before: the input has no live markup
- * left, so the anchors this adds are the only tags in the result and a pasted
- * `<a href>` still renders as visible text. Escaped `&amp;` passes through into
- * the href unchanged, which is what an HTML attribute expects.
+ * Turns bare http(s) URLs in already-escaped text into anchors. MUST run AFTER
+ * {@link escapeHtml} so the added anchors are the only live tags.
  * @param escaped - Text that has already been through {@link escapeHtml}.
  * @returns The same text with bare URLs wrapped in anchors.
  */
 export function linkifyEscaped(escaped: string): string {
   return escaped.replace(ESCAPED_URL_RE, (match) => {
-    // Trim what reads as prose: "see https://x.co/a." and "(https://x.co/a)"
-    // should link the URL alone. Brackets only come off when unbalanced, so a
-    // URL that legitimately contains "(...)" survives intact.
+    // Trim prose punctuation ("(https://x.co/a)."); brackets only come off when unbalanced.
     let url = match.replace(URL_TRAILING_PUNCT_RE, "");
     while (
       (url.endsWith(")") && countChar(url, ")") > countChar(url, "(")) ||
@@ -68,18 +55,14 @@ export function linkifyEscaped(escaped: string): string {
     ) {
       url = url.slice(0, -1).replace(URL_TRAILING_PUNCT_RE, "");
     }
-    // Nothing left past the scheme - leave the text alone rather than emit an
-    // anchor pointing at "https://".
+    // Nothing left past the scheme - leave the text alone.
     if (!/^https?:\/\/\S/i.test(url)) return match;
     return `<a href="${url}" style="color:#43bccd">${url}</a>${match.slice(url.length)}`;
   });
 }
 
 /**
- * Customer-facing brand name: the identity company plus the " Tech" suffix the
- * signature, subjects, and bodies all share. Centralised so renaming the
- * business in Settings moves every email at once, and so the suffix lives in
- * one place rather than being spelled out at each use.
+ * Customer-facing brand name: the identity company plus the shared " Tech" suffix.
  * @param identity - Live business identity (only `company` is read).
  * @param identity.company - Trading name from the identity settings.
  * @returns Brand name for customer-facing copy.
@@ -89,11 +72,8 @@ export function brandName(identity: { company: string }): string {
 }
 
 /**
- * Plain-text fallback derived from the rendered HTML, so every email ships a
- * text/plain part alongside the HTML one: clients that refuse HTML still show
- * something readable, and an HTML-only message is a mild spam-filter signal.
- * Anchors keep their destination as "label (url)", since a text reader cannot
- * follow a link it cannot see.
+ * Plain-text part derived from the rendered HTML (HTML-only mail is a spam signal).
+ * Anchors become "label (url)".
  * @param html - Rendered email HTML.
  * @returns Plain-text equivalent.
  */
@@ -111,16 +91,14 @@ export function htmlToText(html: string): string {
       .replace(/<br\s*\/?>/gi, "\n")
       .replace(/<\/(?:p|div|h1|h2|h3|tr|li)>/gi, "\n\n")
       .replace(/<[^>]+>/g, "")
-      // Reverse escapeHtml. &amp; comes LAST so an escaped "&amp;lt;" does not
-      // decode twice into a live "<".
+      // Reverse escapeHtml; &amp; LAST so "&amp;lt;" doesn't decode twice into "<".
       .replace(/&nbsp;/g, " ")
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">")
       .replace(/&amp;/g, "&")
-      // The HTML templates are indented for readability; that indentation would
-      // otherwise show up as ragged leading whitespace on every text line.
+      // Strip template indentation.
       .replace(/^[ \t]+/gm, "")
       .replace(/[ \t]+\n/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
@@ -129,8 +107,7 @@ export function htmlToText(html: string): string {
 }
 
 /**
- * Renders a pricing-policy `**…**` copy string as email-safe HTML. Non-marker
- * segments are HTML-escaped as cheap insurance against future user input.
+ * Renders a pricing-policy `**…**` copy string as email-safe HTML, escaping the rest.
  * @param text - Copy string containing zero or more `**…**` segments.
  * @returns HTML fragment ready to drop into an email body.
  */
@@ -145,9 +122,7 @@ export function renderEmphasisedHtml(text: string): string {
 }
 
 /**
- * Placeholder values the signature block can interpolate, each already safe to
- * drop into HTML. The contactable ones come back as anchors so a phone number or
- * address stays tappable wherever the operator chooses to place it.
+ * HTML-safe placeholder values for the signature block; contactable ones are anchors.
  * @param identity - Live identity settings.
  * @param siteUrl - Absolute site URL.
  * @returns Map from placeholder name to ready-to-insert HTML.
@@ -167,11 +142,8 @@ function signaturePlaceholders(
 }
 
 /**
- * Signature block: the logo, then the operator's own lines from
- * `identity.emailSignature`. Escaping runs before placeholder substitution, so
- * the anchors those placeholders expand to survive while anything the operator
- * types stays inert text. An unknown `{token}` is left visible rather than
- * dropped, so a typo shows up in the email instead of silently blanking a line.
+ * Signature block: logo, then `identity.emailSignature` lines. Escape before placeholder
+ * substitution so only placeholder anchors are live; unknown `{token}`s stay visible.
  * @param siteUrl - Absolute site URL used for the logo and website links.
  * @returns HTML fragment appended to the end of an email body.
  */
@@ -185,8 +157,7 @@ export async function buildEmailSignature(siteUrl: string): Promise<string> {
       if (!line.trim()) return `<div style="height:8px"></div>`;
       const html = renderEmphasisedHtml(line)
         .replace(/\{(\w+)\}/g, (whole, key: string) => placeholders[key] ?? whole)
-        // renderEmphasisedHtml is shared with body copy, so the brand colour for
-        // bold is applied here rather than baked into that helper.
+        // Brand colour for bold applied here; renderEmphasisedHtml is shared with body copy.
         .replace(/<strong>/g, '<strong style="color:#0c0a3e">');
       return `<p style="margin:0 0 3px;font-size:13px;color:#555">${html}</p>`;
     })
@@ -202,11 +173,8 @@ export async function buildEmailSignature(siteUrl: string): Promise<string> {
 }
 
 /**
- * Wraps body HTML in the notification email shell (560px card, soft shadow,
- * system font stack) used by the owner/customer notices. Pins the document to a
- * light colour scheme: the signature logo is a transparent PNG whose chip mark
- * is deep navy, so a client that auto-inverts the card to dark would leave the
- * mark all but invisible against it.
+ * Wraps body HTML in the notification email shell (560px card). Pinned to light scheme:
+ * the navy logo mark vanishes on an auto-inverted dark card.
  * @param bodyHtml - Inner HTML for the card.
  * @returns A complete HTML document.
  */
@@ -224,11 +192,8 @@ ${bodyHtml}
 }
 
 /**
- * Wraps body HTML in the document email shell (600px card, no shadow, Apple /
- * Segoe font stack) used by the invoice, quote and void emails.
- * Kept separate from {@link renderNotificationEmail} rather than parameterised:
- * the two differ in width, shadow, font stack and padding, so a single shell
- * with flags would misrepresent them as one design.
+ * Wraps body HTML in the document email shell (600px card, no shadow) for invoice,
+ * quote and void emails. A distinct design from {@link renderNotificationEmail}.
  * @param bodyHtml - Inner HTML for the card.
  * @returns A complete HTML document.
  */
@@ -263,9 +228,8 @@ type MailResult = Awaited<ReturnType<Resend["emails"]["send"]>>;
 export type MailOptions = Parameters<Resend["emails"]["send"]>[1];
 
 /**
- * Sends immediately. For mail to the operator, and for the replies a customer is
- * sitting waiting on - their own booking confirmation, manage-booking links, an
- * enquiry acknowledgement. Holding those would read as the site being broken.
+ * Sends immediately: operator mail and replies a customer is waiting on (confirmations,
+ * manage links, enquiry acks).
  * @param payload - The Resend send payload.
  * @param options - Optional request options (idempotency key).
  * @returns Resend's send response.
@@ -281,13 +245,8 @@ export type BatchMailPayload = Parameters<Resend["batch"]["send"]>[0][number];
 export type BatchMailOutcome = { ok: true; id: string } | { ok: false; error: string };
 
 /**
- * Sends up to 100 emails in one Resend call, for the mailing list. Permissive
- * validation lets one bad address fail on its own instead of sinking the batch,
- * and the idempotency key makes a re-sent batch a no-op on Resend's side.
- *
- * Resend answers with the ids of the emails it accepted, in payload order, and a
- * separate list of the indexes it rejected, so the ids are matched back by
- * skipping the rejected indexes.
+ * Sends up to 100 mailing-list emails in one call with permissive validation. Resend
+ * returns accepted ids in order plus rejected indexes; ids map back by skipping those.
  * @param payloads - The emails, at most 100.
  * @param idempotencyKey - Stable key for this exact batch.
  * @returns One outcome per payload, in payload order.
@@ -316,19 +275,12 @@ export async function sendBatch(
 }
 
 /**
- * Sends outreach - mail the customer did not just ask for. Inside the quiet-hours
- * window the send is handed to Resend with a `scheduledAt` for the moment the
- * window closes, so a job finished at 11pm doesn't buzz a phone at 11pm.
- *
- * Resend does the waiting, so there is no queue here to drain or retry, and the
- * call resolves now either way: the caller's "sent" stamp still lands at click
- * time, which is what stops the crons sending a second copy.
+ * Sends outreach. Inside quiet hours Resend holds it via `scheduledAt`; the call still
+ * resolves now, so the caller's "sent" stamp stops crons sending twice.
  * @param payload - The Resend send payload.
- * @param bookingId - The booking the email is about, when a later cancel or
- *   reschedule would make it wrong. A held send is recorded on the booking so
+ * @param bookingId - Booking a later cancel/reschedule would invalidate; recorded so
  *   {@link cancelHeldBookingEmails} can recall it.
- * @param options - Optional request options (idempotency key), passed through on both
- *   the immediate and the held path.
+ * @param options - Optional request options (idempotency key).
  * @returns Resend's send response.
  */
 export async function sendOutreach(
@@ -345,8 +297,7 @@ export async function sendOutreach(
       endHour: comms.quietHoursEnd,
     });
   } catch (err) {
-    // Settings unreadable (no request context, DB blip). Send now rather than
-    // lose the mail - being early is a smaller fault than being missing.
+    // Settings unreadable - send now; early beats missing.
     console.warn("[email] Couldn't read quiet hours, sending immediately:", err);
   }
   if (!holdUntil) return sendNow(payload, options);
@@ -360,8 +311,7 @@ export async function sendOutreach(
   );
   const heldId = result.data?.id;
   if (bookingId && heldId) {
-    // Best-effort: the email is already queued, and failing to record it only
-    // costs the ability to recall it.
+    // Best-effort: failing to record only costs the ability to recall it.
     await prisma.booking
       .update({
         where: { id: bookingId },
@@ -375,11 +325,8 @@ export async function sendOutreach(
 }
 
 /**
- * Recalls the customer emails Resend is still holding for a booking's quiet
- * window. For a cancel or reschedule that makes them wrong: otherwise the
- * customer wakes to a reminder for a visit that was called off, or a "moved"
- * notice showing a time that has since changed again. Clears the record
- * either way. Never throws.
+ * Recalls customer emails Resend is holding for a booking that was cancelled or
+ * rescheduled, then clears the record. Never throws.
  * @param bookingId - The booking whose held emails to recall.
  */
 export async function cancelHeldBookingEmails(bookingId: string): Promise<void> {
@@ -390,8 +337,7 @@ export async function cancelHeldBookingEmails(bookingId: string): Promise<void> 
     });
     if (!row || row.heldEmails.length === 0) return;
     const now = Date.now();
-    // One at a time: a booking holds one or two at most, and Resend's rate
-    // limit counts cancels.
+    // One at a time: Resend's rate limit counts cancels.
     for (const held of row.heldEmails) {
       if (held.sendAt.getTime() <= now) continue; // already sent
       const { error } = await getResend().emails.cancel(held.id);
@@ -404,9 +350,7 @@ export async function cancelHeldBookingEmails(bookingId: string): Promise<void> 
 }
 
 /**
- * Names the given email env vars that are unset or blank, so a "not configured"
- * skip log says exactly which var to fix. The email layer deliberately skips
- * (never throws) when unconfigured; this only makes the cause visible.
+ * Names the given email env vars that are unset or blank, for the "not configured" skip log.
  * @param names - Env var names the calling send path needs.
  * @returns Comma-joined list of the blank vars.
  */

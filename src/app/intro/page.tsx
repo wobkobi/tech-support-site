@@ -1,15 +1,7 @@
 // src/app/intro/page.tsx
-// Social intro artwork - 1080x1350 (4:5), Meta's recommended feed ratio, captured by
-// scripts/export-social-screenshot.ts. Built for ORGANIC posts (community groups),
-// which is why it carries contact details on the image: unlike a paid placement there is
-// no Meta CTA button beneath it, so the image is the only thing a reader can act on.
-// Pass ?variant=photo for the portrait version, ?variant=v3 for the portrait without the
-// name headline, ?variant=type (default) for logo-only. ?variant=v3-wide is v3 laid out
-// side by side for a 1200x900 (4:3) viewport, the shape Google Business Profile posts
-// display at: a 4:5 image there loses its top and bottom fifth, which is the portrait's
-// head and the whole contact block.
-// Every call to action stays typographic - a flat image has nothing clickable, and
-// button-shaped artwork misleads readers and trips Meta's ad review.
+// Social intro artwork, 1080x1350 (4:5), for organic posts, so contact details sit on the
+// image. ?variant=photo|v3|type (default); v3-wide is 1200x900 for Google Business Profile,
+// which crops 4:5. CTAs stay typographic: button-shaped art trips Meta's ad review.
 
 import { cn } from "@/shared/lib/cn";
 import { SERVICE_AREAS } from "@/shared/lib/service-areas";
@@ -27,20 +19,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/**
- * Wordmark without the tagline. At feed size the tagline is too small to read,
- * and the headline beneath already says what the business does.
- */
+/** Wordmark without the tagline, which is unreadable at feed size. */
 const LOGO_SRC = "/source/logo-wordmark.svg";
 
 /** Portrait used by the photo variant, relative to the public directory. */
 const PHOTO_PUBLIC_PATH = "/source/harrison-2026.jpg";
 
-/**
- * First-person intro, condensed from the poster's About Me so the two pieces of
- * artwork speak with one voice. Three short sentences: at feed size anything
- * longer stops being read.
- */
+/** Intro condensed from the poster's About Me; kept to three sentences for feed size. */
 const introText =
   "I grew up in Point Chev. I fix what’s broken, explain what went wrong in plain English, and won’t sell you anything you don’t need.";
 
@@ -54,22 +39,12 @@ const CARD_CLASS =
 /** Hairline rule between the text blocks. */
 const RULE_CLASS = "h-px w-full bg-seasalt-200/80";
 
-// Lead with the six most recognisable areas rather than all twelve: the full set
-// turns into a wall of small text at feed size. SERVICE_AREAS is ordered by
-// prominence already, so the slice tracks any reordering there.
-// Each label renders inside its own nowrap span so breaks land on the separators.
-// A non-breaking space is not enough: "Wi-Fi" also offers a break at its hyphen,
-// which strands a "Wi-" at the end of a line.
+// Top six areas (SERVICE_AREAS is ordered by prominence); all twelve is a wall of text.
 const serviceLabels = SERVICE_AREAS.slice(0, 6).map((area) => area.homeLabel);
 
 /**
- * Report whether the portrait has been added to the public directory.
- *
- * Reads the filesystem rather than trusting the URL so a missing file renders a
- * visible placeholder instead of a broken image. Aimed at local capture: on
- * Vercel the public directory is served by the CDN and is not guaranteed to be
- * readable from the function filesystem, so a false here just means the
- * placeholder shows.
+ * Report whether the portrait exists, so a missing file shows a placeholder. Aimed at
+ * local capture; on Vercel public/ may not be readable, which just shows the placeholder.
  * @returns True when the portrait file is present and readable.
  */
 function hasPortrait(): boolean {
@@ -132,8 +107,7 @@ function ServiceList({ className }: { className: string }): React.ReactElement {
     >
       {serviceLabels.map((label, i) => (
         <Fragment key={label}>
-          {/* Separator sits outside the span: its surrounding spaces are the only
-              break opportunities the line gets. */}
+          {/* Nowrap labels so breaks land only on separators ("Wi-Fi" breaks at its hyphen). */}
           {i > 0 && " · "}
           <span className="whitespace-nowrap">{label}</span>
         </Fragment>
@@ -143,9 +117,7 @@ function ServiceList({ className }: { className: string }): React.ReactElement {
 }
 
 /**
- * Phone, email then website, stacked in the poster's order and with its icons, so
- * every piece of artwork presents contact the same way. Stacked rather than inline:
- * all three side by side overrun the card at this weight.
+ * Phone, email, website stacked in the poster's order; inline would overrun the card.
  * @param props - Component props.
  * @param props.phone - Business phone number.
  * @param props.email - Business email address.
@@ -200,8 +172,7 @@ export default async function IntroPage({
 }): Promise<React.ReactElement> {
   const { variant } = await searchParams;
   const { identity } = await getSettings();
-  // v3 is the photo layout cut down to what the business does: no name headline
-  // and no intro paragraph, with the service list back in their place.
+  // v3: photo layout with the service list in place of the name headline and intro.
   const isWide = variant === "v3-wide";
   const isV3 = variant === "v3" || isWide;
   const showPhoto = variant === "photo" || isV3;
@@ -210,9 +181,7 @@ export default async function IntroPage({
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
-      {/* Backdrop - the same blurred image the site sits on. The scrim tames the
-          sunburst in the middle of the photo, which otherwise reads straight
-          through the frosted card and competes with the headline. */}
+      {/* Site backdrop; the scrim tames the sunburst showing through the card. */}
       <div className="absolute inset-0 -z-10">
         <Image
           src="/source/backdrop.jpg"
@@ -227,8 +196,7 @@ export default async function IntroPage({
 
       <div className="flex h-full w-full flex-col p-10">
         {isWide ? (
-          // 4:3: portrait on the left, everything else stacked on the right and
-          // left-aligned, so the column reads top to bottom like the 4:5 card.
+          // 4:3: portrait left, everything else stacked and left-aligned on the right.
           <div className={cn(CARD_CLASS, "items-center gap-14 px-14 py-10")}>
             <Portrait ready={portraitReady} className="size-96 shrink-0" />
             <div className="flex min-w-0 flex-1 flex-col items-start gap-5">
@@ -251,11 +219,8 @@ export default async function IntroPage({
             </div>
           </div>
         ) : (
-          // Centre the content as one mass with even gaps. Spreading the blocks to
-          // the card edges leaves a void in the middle at this aspect ratio. The
-          // portrait costs roughly 400px that the wordmark alone does not, so the
-          // photo variant drops the service list and runs tighter gaps to stay
-          // inside 1350px.
+          // Centred as one mass. The portrait costs ~400px, so the photo variant
+          // drops the service list and tightens gaps to fit 1350px.
           <div
             className={cn(
               CARD_CLASS,
@@ -263,8 +228,7 @@ export default async function IntroPage({
               showPhoto ? "gap-6 py-10" : "gap-14 py-14",
             )}
           >
-            {/* Top block: the portrait carries the introduction when there is one,
-                otherwise the wordmark does. Both keep the brand mark on the image. */}
+            {/* Top block: portrait plus wordmark, or the wordmark alone. */}
             <div className="flex flex-col items-center gap-5">
               {showPhoto ? (
                 <>
@@ -293,8 +257,7 @@ export default async function IntroPage({
             {/* Introduction */}
             <div className="flex flex-col items-center gap-4 text-center">
               {isV3 ? (
-                // With no name headline, this line is the first thing read, so it
-                // takes the headline's weight rather than sitting as a subtitle.
+                // No name headline, so this line takes the headline's weight.
                 <h1 className="text-[64px] leading-tight font-extrabold tracking-tight text-balance text-russian-violet">
                   Computer &amp; IT help across Auckland
                 </h1>
@@ -315,17 +278,11 @@ export default async function IntroPage({
               )}
             </div>
 
-            {/* Coverage, proof and contact travel together as one bottom block:
-                spreading them apart leaves voids at this aspect ratio. Everything
-                here is plain text between rules - the image is flat, so anything
-                shaped like a control would be a dead target. */}
+            {/* Coverage, proof and contact as one bottom block, plain text only. */}
             <div className="flex w-full flex-col items-center gap-6">
               <div className={RULE_CLASS} />
 
-              {/* The photo variant spends this block's height on a larger portrait:
-                  a face does more for an intro than a service list, and the
-                  headline already says what the business does. v3 has the room
-                  back from dropping the intro paragraph, so it keeps the list. */}
+              {/* Photo variant spends this height on the portrait; v3 has room for the list. */}
               {(!showPhoto || isV3) && (
                 <>
                   <ServiceList className="max-w-205 text-center" />

@@ -1,9 +1,6 @@
 // src/features/business/lib/ledger-chart.ts
-// Bar groups for the income vs expenses charts on the dashboard and the business page:
-// one group per NZ month, or one per financial year for the all-time view. Every row in
-// scope lands in exactly one group, so a chart's totals equal the matching stat cards'.
-// Income and expenses arrive already on the GST basis (basisIncomeRows, basisExpenseRows),
-// the same figures the cards sum.
+// Income vs expenses bar groups, per NZ month or per FY (all-time). Every in-scope row lands
+// in exactly one group, on the GST basis, so chart totals match the stat cards.
 
 import type { BarGroup } from "@/features/admin/components/charts/BarChart";
 import {
@@ -33,8 +30,7 @@ export interface LedgerRows {
 }
 
 /**
- * Expense rows on the GST basis for {@link LedgerRows}: GST-inclusive while not registered
- * (or dated before registration took effect), GST-exclusive once registered.
+ * Expense rows on the GST basis for {@link LedgerRows}.
  * @param rows - Expense rows with both amounts.
  * @param gst - Registration status.
  * @returns One `{ date, amount }` per row, in the same order.
@@ -47,9 +43,7 @@ export function basisExpenseRows(
 }
 
 /**
- * Income rows on the GST basis for {@link LedgerRows}: the GST-inclusive amount as
- * received while not registered (or dated before registration took effect), with its GST
- * backed out to the cent once registered.
+ * Income rows on the GST basis for {@link LedgerRows}: GST backed out once registered.
  * @param rows - Income rows (GST-inclusive amounts).
  * @param gst - Registration status.
  * @returns One `{ date, amount }` per row, in the same order, each keeping its own date.
@@ -107,15 +101,9 @@ export function ledgerMonthGroups(
 }
 
 /**
- * Monthly groups for one financial year. The FY's 12 months are trimmed at the front to
- * the business start month and at the back to the current month, so a partial or running
- * year shows no empty run of months that couldn't have data - but the trim never passes
- * a month that holds a row, so nothing in scope drops off the chart.
- *
- * The page scopes rows with plain ISO comparisons against UTC-midnight 1 April bounds. A
- * row stamped with a real instant between NZ midnight and UTC midnight on 1 April (a
- * payment recorded at 9am that day) passes the closing FY's window yet sits in April NZ
- * time, so such rows are counted in the FY's last month, where the FY cards count them.
+ * Monthly groups for one FY, trimmed to business start and the current month but never past a row.
+ * A real instant early on NZ 1 April passes the closing FY's UTC window, so it counts in the
+ * FY's last month, matching the FY cards.
  * @param rows - Ledger rows already filtered to the FY.
  * @param fy - The FY window as ISO strings (start inclusive, end exclusive).
  * @param fy.startISO - First instant of the FY.
@@ -158,9 +146,8 @@ export function fyMonthGroups(
 }
 
 /**
- * One group per financial year for the all-time view, oldest first. Starts from the
- * listed FYs and adds the FY of any row that falls outside them, so the groups always sum
- * to the all-time totals.
+ * One group per FY for the all-time view, oldest first, adding any row's FY missing from
+ * `listed` so groups sum to the all-time totals.
  * @param rows - Every ledger row.
  * @param listed - The FYs the business has run through (any order).
  * @param businessStart - Business start date, for FY labels.
@@ -175,8 +162,7 @@ export function fyTotalGroups(
 ): BarGroup[] {
   const byStart = new Map(listed.map((fy) => [fy.start.toISOString(), fy]));
   for (const r of [...rows.income, ...rows.expenses]) {
-    // Read the FY off the row's UTC day, the same scale as the ISO `inFy` windows below;
-    // the NZ day of a real instant early on 1 April would name the next FY.
+    // UTC day, matching the ISO `inFy` windows below (an NZ day early on 1 April names the next FY).
     const utcDay = new Date(`${isoOf(r.date).slice(0, 10)}T00:00:00.000Z`);
     const fy = getFinancialYear(utcDay, now, businessStart);
     if (!byStart.has(fy.start.toISOString())) byStart.set(fy.start.toISOString(), fy);

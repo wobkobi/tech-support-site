@@ -18,10 +18,7 @@ export function formatNZD(amount: number): string {
 }
 
 /**
- * Money for customer-facing prose: whole dollars stay whole ("$65"), cents
- * appear only when they exist ("$7.50"). {@link formatNZD} always prints cents,
- * which reads wrong in a rate like "$65.00/hr", while bare arithmetic prints
- * "$7.5", which is not a price.
+ * Money for customer-facing prose: "$65" or "$7.50", unlike {@link formatNZD}'s "$65.00".
  * @param amount - Dollar amount.
  * @returns The formatted amount.
  */
@@ -42,9 +39,7 @@ export function formatMins(mins: number): string {
 }
 
 /**
- * Returns today's date as a YYYY-MM-DD string in NZ (Pacific/Auckland) time.
- * The ledger/invoice forms that default to "today" run for a NZ operator, and
- * UTC would show yesterday every NZ morning.
+ * Today as YYYY-MM-DD in Pacific/Auckland; UTC would show yesterday every NZ morning.
  * @returns ISO date string for today in NZ.
  */
 export function todayISO(): string {
@@ -52,10 +47,8 @@ export function todayISO(): string {
 }
 
 /**
- * Formats billed time for an invoice's quantity column as h:mm ("2:20", "0:45").
- * Chosen over decimal hours because the column then visibly sums to the session
- * length, and over a bare minute count because nothing invites a reader to
- * multiply it by the hourly rate.
+ * Formats billed time for an invoice's quantity column as h:mm ("2:20", "0:45"), so the
+ * column visibly sums to the session length.
  * @param mins - Billed minutes.
  * @returns h:mm string.
  */
@@ -65,9 +58,7 @@ export function formatBilledTime(mins: number): string {
 }
 
 /**
- * Quantity column text for one invoice line: h:mm for hourly labour, the plain
- * count for flat rows (travel, parts, a surcharge) and for invoices issued
- * before minutes were recorded.
+ * Quantity column text for one invoice line: h:mm for hourly labour, else the plain count.
  * @param item - Invoice line item.
  * @param item.qty - Decimal quantity (hours on labour rows, a count on flat rows).
  * @param item.minutes - Billed minutes; present only on hourly labour rows. Null on rows Prisma read back without the field.
@@ -90,9 +81,8 @@ export function minsToHoursLabel(mins: number): string {
 }
 
 /**
- * Composes the line-item description from device + action + optional details.
- * Single source of truth so AI-generated and operator-entered tasks all read
- * identically on the invoice and in the calculator preview.
+ * Composes the line-item description from device + action + optional details, shared by
+ * AI-generated and operator-entered tasks.
  * @param device - Device tag (e.g. "Phone").
  * @param action - Action tag (e.g. "Setup").
  * @param details - Optional free-text qualifier appended after " - ".
@@ -110,11 +100,8 @@ export function composeDescription(
 }
 
 /**
- * Whether one comma item of a task's details only restates the line it hangs off, as in
- * "Printer setup - new printer". Matched against the line's own device and action tags, a
- * trailing plural "s" allowed. "New" / "brand new" count as a restatement only on a Setup
- * line, since Setup already means first-time setup. Anything more ("new Canon printer")
- * carries information and is kept whole.
+ * Whether one comma item of a task's details only restates its device/action tags, as in
+ * "Printer setup - new printer". "New" counts only on a Setup line; "new Canon printer" stays.
  * @param item - One trimmed comma item from details.
  * @param device - The line's device tag.
  * @param action - The line's action tag.
@@ -136,9 +123,8 @@ export function restatesTaskLine(
 }
 
 /**
- * Totals-block label for an invoice's promo line. No "labour only" suffix: a Free travel
- * promo comes off travel, and the invoice keeps only the promo's title, not its type.
- * Shared by the PDF, the calculator preview and the invoice page so all three agree.
+ * Totals-block label for an invoice's promo line, shared by the PDF, preview and invoice
+ * page. No "labour only" suffix, since a Free travel promo comes off travel.
  * @param title - The promo's title, when the invoice kept one.
  * @returns The label text.
  */

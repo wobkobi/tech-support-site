@@ -163,8 +163,7 @@ export function TextFields({
     setLink({ start, end, text: block.text.slice(start, end) });
   }
 
-  // Rough height so a paragraph shows whole without scrolling: each line counts once per
-  // ~40 characters, about a phone-width row. Wider screens just get a little spare room.
+  // Rough height so a paragraph shows whole: one row per ~40 characters (a phone-width row).
   const rows = block.text
     .split("\n")
     .reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / 40)), 1);
@@ -511,8 +510,7 @@ export function PictureFields({
   const [designsOpen, setDesignsOpen] = useState(false);
 
   /**
-   * Points the block at a design's picture. The design's own description replaces the
-   * old one, since it describes this picture; without one, the same rule as an upload.
+   * Points the block at a design's picture, taking the design's description when it has one.
    * @param picked - The size picked.
    */
   function pickDesign(picked: PickedDesign): void {
@@ -527,8 +525,7 @@ export function PictureFields({
   async function pick(file: File): Promise<void> {
     const url = await upload(file);
     if (fileRef.current) fileRef.current.value = "";
-    // A template's placeholder words describe the picture wanted, not the one uploaded,
-    // so a first upload clears them and the hint asks for a real description.
+    // A first upload clears the template's placeholder description.
     if (url) onChange(block.url ? { url } : { url, alt: "" });
   }
 
@@ -731,9 +728,8 @@ const LONG_BOX_HEADLINE = 40;
 const BOX_SHADOW_CLS = "[text-shadow:0_1px_3px_rgba(0,0,0,.45)]";
 
 /**
- * Big box controls: a small copy of the box, the photo behind it (uploaded, the
- * operator's own, or none for the plain colour), the headline, smaller lines and an
- * optional button. Photos are darkened as they upload, so white words read on them.
+ * Big box controls: a small preview, the photo behind it (darkened on upload so white
+ * words read), the headline, smaller lines and an optional button.
  * @param props - Component props.
  * @param props.block - The box.
  * @param props.onChange - Reports a change.

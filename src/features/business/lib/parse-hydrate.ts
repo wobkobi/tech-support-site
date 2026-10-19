@@ -1,6 +1,6 @@
 // src/features/business/lib/parse-hydrate.ts
-// Pure helpers that turn a parse-job request/response into billable job pieces. Shared by
-// the calculator and the draft-invoice editor so a description bills the same either way.
+// Pure helpers turning a parse-job request/response into billable job pieces, shared by the
+// calculator and the draft-invoice editor so a description bills the same either way.
 
 import {
   billableMins,
@@ -35,17 +35,12 @@ import type {
 import { roundCents } from "@/shared/lib/money";
 import { timeParts } from "@/shared/lib/timezone-utils";
 
-/**
- * A known time window for the job: a booked event's slot, or a range typed into the
- * calculator's Time card. Only the day and times matter to the parse.
- */
+/** A known job window: a booked event's slot, or a range typed on the Time card. */
 export type WindowSlot = Pick<EventPrefillSlot, "date" | "startTime" | "endTime">;
 
 /**
- * Whether the description's own times leave the known window standing. Times with no day
- * named, or on a window's own weekday, restate the visit and replace it, so operator times
- * win. Times that all sit on other named days ("MacBook printer set up Friday, 1:46 pm to
- * 2:05 pm" on a Wednesday booking) are a later visit, billed on top of the window.
+ * Whether the window survives the description's own times. Times on no named day or the
+ * window's weekday replace it; times all on other named days are a later visit billed on top.
  * @param aiInput - The operator's description.
  * @param slots - Known windows.
  * @returns True when the window should still be sent.
@@ -58,19 +53,9 @@ function windowSurvivesStatedTimes(aiInput: string, slots: WindowSlot[]): boolea
 }
 
 /**
- * Builds the parse-job `input` for a description. With a known window (a booking, or real
- * times on the Time card), prepends it as digit-led "HH:MM-HH:MM" lines so the parser bills
- * the real session length instead of falling back to the minimum. When the description
- * states its own times the window goes in only if {@link windowSurvivesStatedTimes}, and
- * then without any slot the description already states: a re-parse reads the later visit
- * back off the Time card, and sending it twice would bill it twice. A merged job gets one
- * line per event under a date line per day; extractRanges sums them server-side excluding
- * the gaps.
- *
- * A date line goes in whenever the day changes so the parser buckets each day on its own.
- * Without it a second day's window sitting inside the first day's hours merges away and
- * those minutes never bill. Only actual RANGES in the description count as stated times:
- * an incidental "drove to PB Tech @ 10:30 am" must not drop the window.
+ * Builds the parse-job `input`, prepending known windows as "HH:MM-HH:MM" lines (under a date
+ * line per day, so days don't merge) when {@link windowSurvivesStatedTimes}. Slots the text
+ * already states are skipped so they don't bill twice; only stated ranges count, not "@ 10:30".
  * @param aiInput - The operator's description.
  * @param slots - Known windows (booked slots or typed times), date-ordered; empty when none.
  * @returns The input string to send.
@@ -109,10 +94,7 @@ export function addMinsToTime(t: string, mins: number): string {
 export interface ParsedWindow {
   /** Slots to show, or null when the parse leaves the current slots alone. */
   timeRanges: ParsedRange[] | null;
-  /**
-   * Whether the slots are times the input stated (ranges, or a start and end), rather than
-   * a window built from a bare duration or an open start.
-   */
+  /** Whether the slots are times the input stated, not built from a duration or open start. */
   stated: boolean;
   /** Billable window in minutes: slot time plus out-of-session follow-up. */
   windowMins: number;
@@ -121,10 +103,8 @@ export interface ParsedWindow {
 }
 
 /**
- * The parsed ranges left over once every slot is matched off, i.e. a later visit
- * ("printer Friday, 1:46 pm to 2:05 pm") sent alongside a merged booking. Empty unless
- * every slot comes back: missing slots mean the description restated the times and the
- * window was never sent, so nothing in the reply sits on top of it.
+ * Parsed ranges left once every slot is matched off (a later visit beside a merged booking).
+ * Empty unless every slot comes back, since a missing slot means the window was never sent.
  * @param ranges - The parse reply's ranges.
  * @param slots - The merged booking's slots.
  * @returns The ranges beyond the slots.
@@ -143,15 +123,12 @@ function rangesBeyondSlots(
 }
 
 /**
- * Works out the billable window from a parse. Prefers the per-range list, then a
- * start/end pair, then a bare duration anchored to the booked slot (or to `now`).
- * A merged job keeps its slots - they come from several corrected calendar windows,
- * exact and not reconstructable from free text - plus any later visit on another day.
+ * Works out the billable window: ranges, then start/end, then a duration anchored to the slot
+ * (or `now`). A merged job keeps its exact calendar slots plus any later visit.
  * @param result - The parse response.
  * @param slots - Known windows (booked slots or typed times); empty when none.
  * @param now - Current NZ wall-clock HH:MM, the anchor when no booked slot exists.
- * @param merged - Whether the slots are a merged booking to keep as-is. Defaults to more
- * than one slot; the calculator passes false for typed ranges, which the parse may correct.
+ * @param merged - Whether the slots are a merged booking to keep as-is (default: 2+ slots).
  * @returns The window, follow-up minutes, and any slots to show.
  */
 export function parsedWindow(
@@ -170,15 +147,13 @@ export function parsedWindow(
   let timeRanges: ParsedRange[] | null = null;
   let stated = false;
   let windowMins = followUpMins;
-  // A start with no end closes at the booked end, else now. Measured on the clock, not
-  // rolled overnight: "got there at 3pm" parsed at 9am the next day is not an 18-hour job.
+  // An open start closes at the booked end, else now; never rolled overnight into an 18h job.
   const openEnd = anchor?.endTime ?? now;
   const openSpan =
     result.startTime && !result.endTime ? clockMins(openEnd) - clockMins(result.startTime) : 0;
   if (merged) {
     windowMins += slots.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
-    // The later visit shows on the Time card after the slots. Not marked stated, so the
-    // next parse sends the booking's slots again and reads the visit back off the text.
+    // Not marked stated, so the next parse resends the slots and rereads the later visit.
     const later = rangesBeyondSlots(
       (result.ranges ?? []).map((r) => ({ startTime: r.startTime, endTime: r.endTime })),
       slots,
@@ -199,22 +174,17 @@ export function parsedWindow(
     stated = true;
     windowMins += timeDiffMins(result.startTime, result.endTime);
   } else if (result.startTime && openSpan > 0) {
-    // Start stated but no end: close at the booked event's end, else at now. Anchoring a
-    // past job to now would end it at today's wall clock instead of inside its window.
     timeRanges = [{ startTime: result.startTime, endTime: openEnd }];
     windowMins += openSpan;
   } else if (durationMins !== null) {
-    // Duration only ("was there about 2 hours"): anchor to the booked start, else end now.
-    // Also where a start-only job lands when its end would come before its start.
+    // Duration only (or an open start ending before it starts): anchor to the slot, else now.
     const inSessionMins = Math.max(0, durationMins - followUpMins);
     const startTime = anchor ? anchor.startTime : addMinsToTime(now, -inSessionMins);
     const endTime = anchor ? addMinsToTime(anchor.startTime, inSessionMins) : now;
     timeRanges = [{ startTime, endTime }];
     windowMins = followUpMins + inSessionMins;
   }
-  // The server's durationMins is the billable figure after its clamps: free work the
-  // description states is already subtracted, and the longest-billable-day ceiling
-  // applied. Fitting the tasks to the raw range sum would grow them back over both.
+  // durationMins is already clamped (free work removed, day ceiling applied); don't regrow it.
   if (!merged && durationMins !== null && durationMins > 0 && durationMins < windowMins) {
     windowMins = durationMins;
   }
@@ -242,15 +212,10 @@ export function hydrateParsedTasks(result: ParseJobResponse): TaskLine[] {
     const device = t.device ?? null;
     const action = t.action ?? null;
     const details = t.details?.trim() ? t.details.trim() : null;
-    // The server already composes the description; composing locally keeps it right if
-    // an older route shape sneaks through.
     const description = composeDescription(device, action, details) || t.description || "";
-    // Same rule as isHourlyTask: a baseRateId, or no rateConfigId at all, is labour. A
-    // stray AI rateConfigId beside a baseRateId is dropped to keep the promo maths
-    // classifying it correctly.
+    // Same rule as isHourlyTask; a stray rateConfigId beside a baseRateId is dropped.
     const isHourly = t.baseRateId != null || t.rateConfigId == null;
-    // Hourly tasks arrive snapped to the billing grid in whole minutes; carry those as
-    // the billed unit with qty unrounded so line quantities sum to the session.
+    // Bill hourly tasks in grid minutes with qty unrounded so lines sum to the session.
     const minutes = isHourly ? (t.minutes ?? Math.round(t.qty * 60)) : undefined;
     const qty = minutes != null ? minutes / 60 : Math.round(t.qty * 100) / 100;
     return {
@@ -281,13 +246,8 @@ export interface FittedTasks {
 }
 
 /**
- * Rebalances tasks proportionally to fit the window - over-long tasks absorb more of the
- * correction, tasks scaling below the minimum drop - then floors the whole job so a
- * sub-minimum one bills at the minimum.
- *
- * The window snaps to the billing grid first, the same rounding the parse route's
- * clampBillableMins applies. Fitting to the raw clock sum would shave an on-grid split
- * back to it: a 79-min visit the route splits 30/30/20 would bill 29/30/20.
+ * Rebalances tasks to fit the grid-snapped window, then floors the job at the minimum. Snap
+ * first as clampBillableMins does, or a 79-min 30/30/20 split would bill 29/30/20.
  * @param tasks - Hydrated task lines.
  * @param windowMins - Billable window from {@link parsedWindow}, or the Time card's total.
  * @param timing - Live task-timing settings.
@@ -323,9 +283,8 @@ export function describeFit(fit: FittedTasks, windowMins: number): string | null
 }
 
 /**
- * The auto travel entry for a parse with drive time, or null when there was none (remote,
- * or geocoded to origin). {@link calcTravelCharge} applies the minimum, so a 1-min drive
- * still bills the published floor.
+ * The auto travel entry for a parse with drive time, or null when none. {@link calcTravelCharge}
+ * applies the minimum charge.
  * @param result - The parse response.
  * @param travelRatePerHour - Live travel rate.
  * @param minTravelCharge - Live minimum travel charge.
@@ -355,8 +314,7 @@ export function parsedAutoTravel(
 }
 
 /**
- * Out-of-pocket disbursements (parking, tolls) from a parse, passed through at the stated
- * cost. isParsedCost lets a reparse replace them while a manual re-lookup leaves them.
+ * Parking and tolls from a parse at stated cost; isParsedCost lets a reparse replace them.
  * @param result - The parse response.
  * @returns One travel entry per stated cost.
  */
@@ -369,8 +327,7 @@ export function parsedCostEntries(result: ParseJobResponse): TravelEntry[] {
 }
 
 /**
- * Store runs from a parse, priced at the travel rate with no minimum charge. Marked
- * isParsedCost so a reparse replaces them, the same as parsed parking and tolls.
+ * Store runs from a parse at the travel rate, no minimum; isParsedCost lets a reparse replace them.
  * @param result - The parse response.
  * @param travelRatePerHour - Live travel rate.
  * @returns One store-run entry per timed run.
@@ -418,11 +375,8 @@ export interface ExistingInvoiceTravel {
 }
 
 /**
- * The drive part of an existing travel line, as an auto entry. The line total also holds
- * any parking or tolls from the last parse, which the new parse re-adds, so a line that
- * records its drive minutes is re-priced from those minutes alone. One without minutes
- * ("Round-trip travel") holds no measured drive at all, only costs the new parse adds
- * back, so there is nothing to keep.
+ * The drive part of an existing travel line, re-priced from its drive minutes alone (the
+ * new parse re-adds parking and tolls). A line with no minutes has no drive to keep.
  * @param line - The invoice's travel line.
  * @param pricing - Live pricing inputs.
  * @returns The kept drive as a travel entry, or null when the line records no drive.
@@ -450,26 +404,16 @@ function sameAddressKey(address: string | null | undefined): string {
 }
 
 /**
- * Turns a parse straight into invoice line items, for editing an existing invoice where
- * there is no calculator state to hydrate.
- *
- * A booked job keeps the invoice's measured drive in two cases, as the calculator does:
- * the description never mentions the trip (silence is not evidence it didn't happen), or
- * it parses to the booked address again (Google's live quote drifts between calls, so a
- * re-parse must not silently move the price). noTravelCharge still drops it.
- *
- * Both discounts come from {@link calcJobTotal}, the calculator's own totals, so a
- * rebuilt draft prices exactly as a fresh calculator job would: the promo re-applied to
- * the new lines (a free-travel promo cuts no labour, a flat-rate one cuts per hour), and
- * each unsuccessful line halved after its promo share, surcharge included.
+ * Turns a parse straight into invoice line items for editing an existing invoice. A booked
+ * job keeps its measured drive when the text skips the trip or parses to the booked address
+ * (Google's quote drifts). Discounts come from {@link calcJobTotal}, as in the calculator.
  * @param result - The parse response.
  * @param slots - Booked event slots; empty for an unbooked job.
  * @param now - Current NZ wall-clock HH:MM.
  * @param pricing - Live pricing inputs.
  * @param existing - The invoice's current travel line and booked address.
  * @param promo - The invoice's promo terms, or null when it has none.
- * @returns Line items, the window fit (for a rebalance toast), and the promo and
- * unsuccessful-work discounts for the new lines.
+ * @returns Line items, the window fit, and the promo and unsuccessful-work discounts.
  */
 export function parsedJobToLineItems(
   result: ParseJobResponse,

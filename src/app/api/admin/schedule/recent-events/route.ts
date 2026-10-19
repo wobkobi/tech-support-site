@@ -1,8 +1,5 @@
 // src/app/api/admin/schedule/recent-events/route.ts
-// Admin endpoint listing recent booking-calendar events for the calculator's "Bill a
-// calendar event" picker. GET returns the last two weeks up to now (future bookings are
-// excluded - a job isn't billable until it has started), newest first, so the operator
-// can jump straight to billing a just-finished job with its corrected times.
+// Recent booking-calendar events for the calculator's "Bill a calendar event" picker.
 
 import {
   getBookingCalendarId,
@@ -22,14 +19,8 @@ const NZ_DAY = new Intl.DateTimeFormat("en-CA", {
 });
 
 /**
- * GET /api/admin/schedule/recent-events - Booking-calendar events from the
- * last 14 days through to the end of today (NZ), newest first, capped at 30.
- * Later jobs on the current day are included: they are what the calculator's
- * merge suggestion offers alongside a just-finished one, and by the time an
- * operator bills the morning they are usually done too. Anything on a future
- * day is still excluded - you bill a job after it happens, not before.
- * Day-rounded window boundaries keep the underlying schedule cache key stable
- * across requests, so repeat opens of the picker stay cache-warm.
+ * GET /api/admin/schedule/recent-events - Booking-calendar events from the last 14 days to
+ * the end of today (NZ), newest first, max 30. Day-rounded bounds keep the cache key stable.
  * @param request - Incoming Next.js request
  * @returns JSON with `{ events: [{ id, summary, start, end, location }] }`
  */
@@ -42,9 +33,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const now = Date.now();
   const todayStart = Math.floor(now / day) * day;
   const from = new Date(todayStart - 14 * day);
-  // Two UTC days of headroom because NZ is UTC+12/13: at 1am NZ the current NZ day runs
-  // past UTC midnight, and a one-day bound would hide that afternoon's jobs. The NZ-day
-  // filter below is what excludes tomorrow; this only has to avoid losing today.
+  // Two UTC days of headroom for NZ's +12/13 offset; the NZ-day filter below excludes tomorrow.
   const to = new Date(todayStart + 2 * day);
   const todayKey = NZ_DAY.format(new Date(now));
 
@@ -53,8 +42,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const all = await getCachedScheduleEvents(from.toISOString(), to.toISOString());
     const events = all
       .filter((e) => e.calendarEmail === bookingCalId)
-      // Started already, or still to come today - a later job on the same day is
-      // a merge candidate for the one being billed. A future DAY is not.
+      // Started, or later today (a merge candidate); never a future day.
       .filter((e) => {
         const start = new Date(e.start);
         return start.getTime() <= now || NZ_DAY.format(start) === todayKey;
@@ -66,8 +54,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         summary: e.summary ?? "(no title)",
         start: e.start,
         end: e.end,
-        // Feeds the picker's merge suggestion: two events at the same address
-        // are one trip, so they are offered pre-ticked.
+        // Same-address events are one trip, so the merge suggestion pre-ticks them.
         location: e.location ?? null,
       }));
     return NextResponse.json({ ok: true, events });

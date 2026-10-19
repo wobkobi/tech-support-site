@@ -1,8 +1,6 @@
 // scripts/export-sign-screenshot.ts
-// Exports the /sign page as print-ready 600x900mm yard sign PDFs (corflute on an H-stake)
-// by screenshotting the page via Puppeteer and embedding the result into a pdf-lib
-// document. Capture, PDF assembly and crop marks come from scripts/lib/print-export.ts,
-// shared with the poster and card exporters; this file owns the sign's dimensions and CLI.
+// Exports /sign as 600x900mm yard sign PDFs. Capture, assembly and crop marks live in
+// scripts/lib/print-export.ts.
 // Run with: npm run build:sign [-- --local] [--variant=digital|print]
 
 import { logSummary, renderVariants, type PageConfig } from "./lib/print-export.js";
@@ -25,10 +23,8 @@ interface ExportOptions {
 /* ---------- Dimensions ---------- */
 
 /**
- * Sign trim size in millimetres - the common portrait corflute size NZ sign shops
- * stock for H-stake yard signs. Change these two numbers and the page CSS
- * (src/app/sign/page.tsx) together - the layout is sized in pixels at
- * {@link PX_PER_MM}, so it does not follow this constant on its own.
+ * Sign trim size in millimetres (standard NZ corflute). Change together with the CSS in
+ * src/app/sign/page.tsx, which is sized at {@link PX_PER_MM}.
  */
 const TRIM_MM = { width: 600, height: 900 } as const;
 
@@ -36,9 +32,8 @@ const TRIM_MM = { width: 600, height: 900 } as const;
 const BLEED_MM = 3 as const;
 
 /**
- * CSS pixels per millimetre. 3px/mm keeps the viewport at 1800x2700; the shared
- * 2x device scale factor then captures at 6px/mm (~152 DPI), enough for a sign
- * read from metres away without a 300 DPI capture Chrome would refuse to allocate.
+ * CSS pixels per millimetre: 1800x2700 viewport, captured at 2x = ~152 DPI (Chrome
+ * refuses to allocate a 300 DPI capture this size).
  */
 const PX_PER_MM = 3 as const;
 
@@ -63,11 +58,7 @@ function mmToPt(mm: number): number {
 /* ---------- Page configs ---------- */
 
 /**
- * Builds the page config for one variant.
- *
- * The print variant grows the viewport by the bleed on all four edges; the page
- * itself widens its outer padding to match, so the background extends under the
- * trim line instead of the layout simply shrinking.
+ * Builds the page config for one variant; print grows the viewport by the bleed on every edge.
  * @param variant - "digital" for trim size, "print" for bleed plus crop marks.
  * @returns The {@link PageConfig} for that variant.
  */
@@ -138,9 +129,7 @@ function readFlag(
 }
 
 /**
- * Parses CLI flags from `process.argv`.
- *
- * Flags:
+ * Parses CLI flags from `process.argv`:
  * - `--local`              Use the local dev server instead of production.
  * - `--url=<value>`        Override the target URL entirely.
  * - `--variant=<value>`    Export variant: "digital", "print", or "both" (default: "both").

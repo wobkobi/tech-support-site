@@ -11,25 +11,16 @@ import type {
   TravelEntry,
 } from "@/features/business/types/business";
 
-/**
- * localStorage key for the calculator draft. Bump the version suffix when
- * CalculatorDraft fields change so stale shapes can't crash the form.
- */
+/** localStorage key for the calculator draft; bump the version when its shape changes. */
 const DRAFT_KEY = "calculator-draft-v2";
 
 /**
- * sessionStorage key for the one-shot "Describe the job" handoff across the
- * event picker's navigation. The page keys this component by eventId, so
- * picking an event remounts it and resets all state; a part-typed description
- * is stashed here just before the push and consumed on the next mount.
+ * sessionStorage key carrying a part-typed "Describe the job" across the remount that
+ * picking an event causes. Consumed on the next mount.
  */
 export const AI_INPUT_HANDOFF_KEY = "calculator-ai-input-handoff";
 
-/**
- * Subset of CalculatorView state persisted across refreshes. Excludes
- * server-fetched data, UI flags, and the AI-parse session; the "Describe the
- * job" text itself IS persisted (`aiInput`).
- */
+/** CalculatorView form state persisted across refreshes (no server data or UI flags). */
 export interface CalculatorDraft {
   v: 2;
   savedAt: number;
@@ -40,10 +31,7 @@ export interface CalculatorDraft {
   /** Applied promo code, uppercase, or "" for none. */
   promoCode: string;
   timeRanges: ParsedRange[];
-  /**
-   * False while `timeRanges` is still the blank form's placeholder hour. Optional so
-   * drafts saved before it existed still load (read as true).
-   */
+  /** False while `timeRanges` is the blank form's placeholder hour; missing reads as true. */
   timesSet?: boolean;
   /** Out-of-session minutes added to the slot sum (0 = none). */
   followUpMins: number;
@@ -101,9 +89,8 @@ export function isPlaceholderHour(ranges: ParsedRange[] | undefined): boolean {
 }
 
 /**
- * Reads the saved draft from localStorage. Returns null when missing, corrupt,
- * or schema-version mismatched (old shapes are ignored, not crashed on).
- * @returns Parsed draft, or null.
+ * Reads the saved draft from localStorage.
+ * @returns Parsed draft, or null when missing, corrupt or an old version.
  */
 export function loadDraft(): CalculatorDraft | null {
   if (typeof window === "undefined") return null;
@@ -119,8 +106,7 @@ export function loadDraft(): CalculatorDraft | null {
 }
 
 /**
- * Writes the draft to localStorage with a fresh savedAt timestamp. Failures
- * (quota, private mode etc) are swallowed so persistence never blocks editing.
+ * Writes the draft to localStorage with a fresh savedAt; failures are swallowed.
  * @param draft - Form-state fields to persist (savedAt + v are added here).
  */
 export function saveDraft(draft: Omit<CalculatorDraft, "v" | "savedAt">): void {
@@ -144,8 +130,7 @@ export function clearDraft(): void {
 }
 
 /**
- * Renders a "X min ago" label given a stable now timestamp for the
- * draft-restored toast.
+ * "X min ago" label for the draft-restored toast.
  * @param savedAt - When the draft was saved.
  * @param now - Reference now (captured once at mount to keep render pure).
  * @returns Display label.

@@ -1,8 +1,6 @@
 // src/features/business/lib/invoice-apology.ts
-// Decides whether an overdue reminder chased a bill the client had already
-// paid. Pure and isomorphic on purpose: the payment dialog needs it to show the
-// apology tick-box as the operator changes the payment date, and POST /pay
-// re-checks it server-side before anything is emailed.
+// Whether an overdue reminder chased a bill already paid. Isomorphic: the payment dialog
+// and POST /pay both run it.
 
 import { nzDateKey } from "@/shared/lib/timezone-utils";
 
@@ -17,14 +15,8 @@ export interface ApologyCheckInput {
 }
 
 /**
- * Whether a reminder went out on a later NZ calendar day than the payment
- * landed - i.e. the client was chased for money they had already sent.
- *
- * Compared by NZ calendar day rather than by instant for two reasons: the
- * payment date arrives as a bare "YYYY-MM-DD" with no time of day, and a
- * reminder that crosses a same-day bank transfer needs no apology (the reminder
- * copy already tells the client to ignore it in that case). The keys are
- * zero-padded YYYY-MM-DD, so a plain string comparison orders them correctly.
+ * Whether a reminder went out on a later NZ day than the payment. By day, not instant: the
+ * payment date has no time, and a same-day crossing needs no apology. Keys compare as strings.
  * @param input - Reminder, payment, and prior-apology stamps.
  * @returns True when an apology is warranted and none has been sent yet.
  */

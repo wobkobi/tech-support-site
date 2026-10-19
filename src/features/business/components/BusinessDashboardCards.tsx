@@ -1,16 +1,7 @@
 "use client";
 // src/features/business/components/BusinessDashboardCards.tsx
-// Renders the overview stat cards for the business dashboard, scoped to whatever FY (or
-// "All time") was selected by the parent page. Each card is a button that opens a
-// BreakdownModal listing the contributing rows (or showing the calculation steps), so any
-// value that looks off can be inspected without leaving the page.
-//
-// Past-FY scopes hide the "This month" cards, since the current calendar month falls
-// outside the FY window and would always show zero.
-//
-// Income and expense figures are on the GST basis the page computes per row (basisAmount,
-// gstClaimable): incl. GST while not registered, so the GST card and the "(excl. GST)"
-// labels show only once registered.
+// Overview stat cards for the selected FY or All time; each opens a BreakdownModal.
+// Past FYs hide "This month"; figures are on the per-row GST basis (incl. GST until registered).
 
 import { StatCard, type StatTone } from "@/features/admin/components/ui/StatCard";
 import { lastCardSpan, StatStrip } from "@/features/admin/components/ui/StatStrip";
@@ -181,10 +172,7 @@ export function BusinessDashboardCards({
   const monthExpenses = inRange(expenses, monthStartISO, monthEndISO);
 
   const showThisMonthCards = scope.isAllTime || scope.isCurrentFy;
-  // Card titles read more naturally as "Income" / "Expenses" inside an FY
-  // scope, but stay as "Total income" / "Total expenses" in the all-time view.
-  // "(excl. GST)" only while registered: unregistered income and expenses count with their
-  // GST in.
+  // "Total" prefix only on All time; "(excl. GST)" only while registered.
   const gstSuffix = scope.gstRegistered ? " (excl. GST)" : "";
   const incomePrefix = (scope.isAllTime ? "Total income" : "Income") + gstSuffix;
   const expensesPrefix = (scope.isAllTime ? "Total expenses" : "Expenses") + gstSuffix;
@@ -216,12 +204,8 @@ export function BusinessDashboardCards({
   };
 
   /**
-   * Calculation walk-through for "Tax to set aside", from the Tax page's estimate. Its
-   * income and deductions are the tax figures (depreciation, km claim, home office and
-   * exclusions applied), so they can differ from the Income and Expenses cards.
-   * All time adds up finished FY figures, and a loss FY's taxable profit is $0, so on All
-   * time the income and deductions are listed as plain totals rather than subtracted into
-   * taxable.
+   * "Tax to set aside" walk-through from the Tax page's estimate, so its figures can differ
+   * from the Income/Expenses cards. All time lists plain totals, since loss FYs floor at $0.
    */
   const taxBreakdown: BreakdownData = {
     title: "Tax to set aside",

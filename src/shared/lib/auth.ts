@@ -1,7 +1,5 @@
 // src/shared/lib/auth.ts
-// Shared authentication utilities for admin routes and pages. Browser sessions go through
-// a signed cookie (see `admin-session.ts`); scripts + cron still pass the header so curl
-// / cron-job.org keep working.
+// Admin auth: browser sessions via a signed cookie (admin-session.ts); scripts and cron pass the header.
 
 import { ADMIN_SESSION_COOKIE, verifySessionCookieValue } from "@/shared/lib/admin-session";
 import { getClientIp } from "@/shared/lib/rate-limit";
@@ -37,8 +35,7 @@ const AUTH_FAIL_WINDOW_MS = 60_000;
 const AUTH_FAIL_MAX_BUCKETS = 1_000;
 
 /**
- * Returns true when the given IP is currently over its failed-auth budget.
- * Read-only check; does not increment.
+ * Whether the IP is over its failed-auth budget. Read-only.
  * @param ip - Client IP from {@link getClientIp}.
  * @returns Whether to fast-fail this request.
  */
@@ -49,8 +46,7 @@ function isOverAuthFailLimit(ip: string): boolean {
 }
 
 /**
- * Records one failed admin-auth attempt against the IP's bucket. Also runs an
- * opportunistic eviction pass so a burst of unique IPs can't leak memory.
+ * Records a failed admin-auth attempt for the IP, evicting stale buckets to cap memory.
  * @param ip - Client IP from {@link getClientIp}.
  */
 function recordAuthFail(ip: string): void {
@@ -69,12 +65,8 @@ function recordAuthFail(ip: string): void {
 }
 
 /**
- * Checks if a request has valid admin credentials. Accepts either the signed
- * session cookie (browser path) or the X-Admin-Secret header (scripts / cron).
- * Failed attempts are rate-limited per-IP - after 30 failures in a minute,
- * further checks from that IP fast-fail without running the comparison.
- * Successful attempts never count, so the operator's legitimate traffic is
- * unaffected.
+ * Checks for valid admin credentials: signed cookie or X-Admin-Secret header. After 30 failures
+ * a minute an IP fast-fails; successes never count.
  * @param req - The incoming request.
  * @returns True if the request has valid admin credentials.
  */
@@ -91,11 +83,8 @@ export async function isAdminRequest(req: NextRequest): Promise<boolean> {
 }
 
 /**
- * Server-component / server-action gate. Accepts the signed session cookie
- * (browser path) or the X-Admin-Secret header (scripts), matching
- * {@link isAdminRequest}, and redirects to `/admin/login?next=...` when neither
- * is valid. Defence-in-depth alongside the proxy guard - keeps individual pages
- * safe even if the proxy matcher misses something.
+ * Server component/action gate matching {@link isAdminRequest}; redirects to
+ * `/admin/login?next=...`. Defence in depth behind the proxy.
  * @param redirectPath - Path to land back on after login (defaults to `/admin`).
  */
 export async function requireAdminAuth(redirectPath = "/admin"): Promise<void> {
@@ -104,10 +93,8 @@ export async function requireAdminAuth(redirectPath = "/admin"): Promise<void> {
   const ok = await verifySessionCookieValue(value);
   if (ok) return;
 
-  // Same X-Admin-Secret path isAdminRequest accepts, so a script fetching an admin page
-  // gets the page rather than a login redirect that still carries its metadata. Browsers
-  // can't set the header on a navigation, so the cookie stays the only browser path.
-  // Rate-limited per IP as on the API side - this puts secret guessing in front of pages.
+  // Accept X-Admin-Secret too, so scripts get the page instead of a login redirect (browsers can't
+  // set it on navigation). Rate-limited per IP as on the API side.
   const headerStore = await headers();
   const ip =
     headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -122,8 +109,7 @@ export async function requireAdminAuth(redirectPath = "/admin"): Promise<void> {
 }
 
 /**
- * Validates a Bearer token from an Authorization header against CRON_SECRET
- * using constant-time comparison.
+ * Checks a Bearer token against CRON_SECRET in constant time.
  * @param authHeader - Raw Authorization header value (e.g. "Bearer xyz") or null.
  * @returns True if the token matches CRON_SECRET.
  */
@@ -144,8 +130,7 @@ function isValidCronBearer(authHeader: string | null): boolean {
 }
 
 /**
- * Validates cron authorization. Bearer-token-only; cron-job.org is the sole
- * scheduler.
+ * Validates cron authorisation; Bearer token only, as cron-job.org is the sole scheduler.
  * @param request - The incoming request to verify.
  * @returns True if authorised, false otherwise.
  */

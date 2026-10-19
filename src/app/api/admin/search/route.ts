@@ -14,9 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/admin/search?q=<text>
- * Trims `q` and cuts it to {@link MAX_QUERY_LENGTH} characters. Under
- * {@link MIN_QUERY_LENGTH} it returns four empty groups without touching the
- * database.
+ * Trims `q` to {@link MAX_QUERY_LENGTH}; under {@link MIN_QUERY_LENGTH} returns empty groups.
  * @param request - Incoming Next.js request.
  * @returns JSON `{ ok: true, groups }`, or `{ ok: false, error }` on failure.
  */

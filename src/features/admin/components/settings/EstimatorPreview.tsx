@@ -1,9 +1,7 @@
 "use client";
 // src/features/admin/components/settings/EstimatorPreview.tsx
-// Live worked example for the estimator settings: a sample job run through the shared
-// priceRangeFor at each confidence level, so the range factors + low-end floor read as
-// real dollars while the operator edits. Mirrors the Availability/Pricing preview
-// affordances.
+// Live worked example for the estimator settings: a sample job through the shared
+// priceRangeFor at each confidence level, so the range factors read as real dollars.
 
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";

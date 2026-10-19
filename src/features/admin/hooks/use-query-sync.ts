@@ -1,8 +1,6 @@
 "use client";
 // src/features/admin/hooks/use-query-sync.ts
-// Mirrors a list page's filters into the address bar, so a reload, a shared link, a
-// dashboard deep link or Back from a record lands on the same view. The page reads the
-// query back from its searchParams and hands it to the list as starting state.
+// Mirrors a list page's filters into the URL so reloads, links and Back keep the view.
 
 import { useEffect } from "react";
 
@@ -10,8 +8,7 @@ import { useEffect } from "react";
 export type PageQuery = Record<string, string | string[] | undefined>;
 
 /**
- * Reads one query value as a plain string ("" when absent). A repeated key
- * keeps its first value.
+ * Reads one query value as a string ("" when absent; first value of a repeated key).
  * @param query - The page's resolved searchParams.
  * @param key - Query key.
  * @returns The value, or "".
@@ -22,11 +19,8 @@ export function queryValue(query: PageQuery, key: string): string {
 }
 
 /**
- * Writes `params` into the current URL whenever they change. An empty value
- * drops its key, so an unfiltered list keeps a bare URL; keys not listed are
- * left alone. Uses replaceState, not a router navigation: typing in a search box
- * shouldn't stack up Back steps, and a navigation would re-run the server page
- * and refetch the whole list.
+ * Writes `params` into the URL on change; an empty value drops its key. Uses
+ * replaceState so typing adds no Back steps and the server page doesn't re-run.
  * @param params - Query keys and their current values ("" to omit).
  */
 export function useQuerySync(params: Record<string, string>): void {

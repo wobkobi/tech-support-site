@@ -8,10 +8,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/booking/contact-lookup?email=<email>
- * Returns name, phone, and address for a known contact email so the booking
- * form can pre-fill. This exposes PII (phone + address) for any email that is
- * known, so it is kept on a tight per-IP rate limit to blunt enumeration.
- * Returns 404 (ok: false) if not found - never exposes other contact fields.
+ * Name, phone and address for a known email. Exposes PII, so a tight per-IP
+ * rate limit blunts enumeration.
  * @param request - Incoming request.
  * @returns JSON with contact fields or not-found response.
  */

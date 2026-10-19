@@ -1,6 +1,5 @@
 // src/features/booking/lib/booking-form.ts
-// Pure helpers, constants and types for the public BookingForm: field anchors,
-// duration labels, the saved-draft shape and submit-time field validation.
+// Pure helpers, constants and types for the public BookingForm.
 
 import {
   BOOKING_FIELD_LIMITS,
@@ -26,8 +25,7 @@ export const NOTES_WARN_GAP = 50;
 export const DAY_ANCHOR = "booking-day";
 
 /**
- * Field-error key > the element id it points at, in form order. The order
- * matters: the mobile "N issues" link jumps to the first key with an error.
+ * Field-error key > element id, in form order (the "N issues" link jumps to the first).
  */
 export const FIELD_ANCHORS: Record<string, string> = {
   duration: "booking-duration",
@@ -42,9 +40,8 @@ export const FIELD_ANCHORS: Record<string, string> = {
 };
 
 /**
- * Moves focus to the field an error names. A button group has no single
- * input, so focus lands on its selected button, else its first enabled one. A
- * bare #anchor jump would scroll without focusing anything.
+ * Moves focus to the field an error names; a button group focuses its selected (or
+ * first enabled) button.
  * @param key - Field-error key from {@link FIELD_ANCHORS}.
  */
 export function focusField(key: string): void {
@@ -75,8 +72,7 @@ export function durationText(mins: number): string {
 }
 
 /**
- * Compact duration label ("45m", "1h", "1h 15m") - hours and minutes rather
- * than a raw "75 min", so over-an-hour estimates read naturally.
+ * Compact duration label ("45m", "1h", "1h 15m").
  * @param mins - Duration in minutes.
  * @returns Compact label.
  */
@@ -89,9 +85,7 @@ function compactDuration(mins: number): string {
 }
 
 /**
- * Formats a low/high minute band as a compact range ("15 - 30m",
- * "45m - 1h 15m"). Collapses to a single label when the ends match, and shares
- * the "m" unit when both ends are under an hour.
+ * Formats a minute band as a compact range ("15 - 30m", "45m - 1h 15m"); equal ends collapse.
  * @param low - Low end in minutes.
  * @param high - High end in minutes.
  * @returns Human range label.
@@ -125,8 +119,7 @@ export interface DurationOption {
 }
 
 /**
- * Duration choices built from the live settings; labels reflect the operator's
- * configured short/long lengths. Descriptions stay as fixed copy.
+ * Duration choices labelled with the live short/long lengths.
  * @param durations - Live job lengths in minutes.
  * @param durations.short - Standard job length.
  * @param durations.long - Extended job length.
@@ -200,9 +193,7 @@ export function isSlotAvailable(
 }
 
 /**
- * A saved draft after validation. Each field is present only when it should be
- * applied to the form, so a stale or hand-edited draft never overwrites a field
- * with junk.
+ * A validated saved draft; each field is present only when safe to apply.
  */
 export interface RestoredBookingDraft {
   duration?: JobDuration;
@@ -222,8 +213,7 @@ export interface RestoredBookingDraft {
 }
 
 /**
- * Validates a raw localStorage draft against the fields' allowed values and
- * today's availability.
+ * Validates a raw localStorage draft against allowed values and today's availability.
  * @param raw - JSON as written by {@link saveBookingDraft}.
  * @param availableDays - Current bookable days; the saved slot is dropped unless it is still free.
  * @returns The fields worth restoring. Throws on malformed JSON.
@@ -249,8 +239,7 @@ export function parseBookingDraft(raw: string, availableDays: BookableDay[]): Re
     out.accessNotes = draft.accessNotes;
   }
 
-  // Restore the pick only if it is still bookable, so the customer never sees a
-  // misleading pre-selected slot.
+  // Restore the pick only if it is still bookable.
   if (draft.dateKey && draft.timeOfDay) {
     const day = availableDays.find((d) => d.dateKey === draft.dateKey);
     const minute = draft.startMinute ?? 0;
@@ -285,9 +274,7 @@ export interface BookingFieldValues {
 }
 
 /**
- * Collects all submit-time failures so the user fixes them in one pass. Keys
- * match {@link FIELD_ANCHORS} (and the input ids used for aria-describedby +
- * summary anchors).
+ * Collects all submit-time failures, keyed as in {@link FIELD_ANCHORS}.
  * @param values - Current form values.
  * @returns Field-error key > message; empty when the form is valid.
  */
@@ -329,8 +316,7 @@ export function validateBookingFields(values: BookingFieldValues): Record<string
 }
 
 /**
- * Writes the new-booking draft to localStorage. Quota / private-mode failures
- * are swallowed: persistence is best-effort.
+ * Writes the new-booking draft to localStorage (best-effort).
  * @param json - The current form values as a serialised {@link BookingDraft}.
  */
 export function saveBookingDraft(json: string): void {
@@ -363,8 +349,7 @@ export interface BookingContactLookup {
  * Looks up a returning customer by email for the form's pre-fill.
  * @param email - Trimmed, lower-cased email.
  * @param signal - Aborts the request when a newer lookup supersedes it.
- * @returns The lookup result, or null on a non-OK response. Rejects on network
- *   failure or abort.
+ * @returns The lookup result, or null on a non-OK response; rejects on failure or abort.
  */
 export async function lookupBookingContact(
   email: string,
@@ -380,9 +365,8 @@ export async function lookupBookingContact(
 /**
  * Asks Google for matches to a typed-but-not-picked address before booking.
  * @param address - Full address, unit included.
- * @returns Candidate addresses (empty when nothing precise matched), or null
- *   when verification could not run. Callers submit anyway on null so a Google
- *   API hiccup never blocks a real booking.
+ * @returns Candidates (empty when nothing precise matched), or null when verification
+ *   couldn't run; callers submit anyway on null.
  */
 export async function verifyBookingAddress(address: string): Promise<string[] | null> {
   try {

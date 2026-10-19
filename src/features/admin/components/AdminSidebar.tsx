@@ -1,8 +1,6 @@
 "use client";
 // src/features/admin/components/AdminSidebar.tsx
-// Admin navigation sidebar, controlled by AdminShell. Fixed on the left at lg+, where it
-// can collapse to an icon rail; below lg it slides in as a drawer over a backdrop. Auth
-// rides the admin session cookie, so no token threads through the hrefs.
+// Admin navigation sidebar: fixed (collapsible to icons) at lg+, a drawer below lg.
 
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
 import { useDialogKeys } from "@/features/admin/hooks/use-dialog-keys";
@@ -73,8 +71,7 @@ interface NavItem {
   path: string;
 }
 
-// Ordered by how often each page is opened: the day's jobs first, then the
-// people behind them, then the occasional tools.
+// Ordered by how often each page is opened.
 const NAV_ITEMS: NavItem[] = [
   {
     page: "dashboard",
@@ -120,9 +117,7 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-// Overview heads the group; the rest follow the billing flow: price the job,
-// invoice it, then the ledger it lands in and the tax on it, then the gear the
-// business owns and the km it drives.
+// Overview first, then the billing flow: price, invoice, ledger, tax, assets, km.
 const BUSINESS_NAV_ITEMS: NavItem[] = [
   {
     page: "business",
@@ -242,11 +237,8 @@ const TOOL_NAV_ITEMS: NavItem[] = [
 const ALL_NAV_PATHS = [...NAV_ITEMS, ...BUSINESS_NAV_ITEMS, ...TOOL_NAV_ITEMS].map((i) => i.path);
 
 /**
- * The nav path that best matches the current URL: exact for the dashboard ("/admin"),
- * otherwise the longest path that is a prefix of the pathname (so
- * `/admin/business/invoices/[id]/edit` still highlights Invoices, not Overview). A path
- * with a query (Quotes is the invoice list at `?status=quote`) matches only its own page
- * with every one of its params set, and then beats the bare path.
+ * The nav path that best matches the URL: exact for "/admin", else the longest prefix.
+ * A path with a query (Quotes at `?status=quote`) needs all its params and beats the bare path.
  * @param pathname - The current pathname from usePathname.
  * @param search - The current query from useSearchParams.
  * @param paths - All nav-item paths.
@@ -278,10 +270,8 @@ function activeNavPath(pathname: string, search: URLSearchParams, paths: string[
 }
 
 /**
- * Classes for one sidebar row (nav link or footer action). The active row's
- * moonstone rule is a pseudo-element, so the label does not shift when it
- * appears. Collapsed rows centre the icon; the collapse only applies at lg+,
- * so the phone drawer always shows full labels.
+ * Classes for one sidebar row. The active rule is a pseudo-element so the label
+ * doesn't shift; the collapse applies at lg+ only.
  * @param active - Whether the row is the current page.
  * @param collapsed - Whether the desktop sidebar is collapsed to icons.
  * @returns Class string.
@@ -297,8 +287,7 @@ function rowClasses(active: boolean, collapsed: boolean): string {
 }
 
 /**
- * Row label. Collapsed at lg+ it stays in the accessibility tree (sr-only) so the
- * row keeps its accessible name while only the icon shows.
+ * Row label; sr-only when collapsed so the row keeps its accessible name.
  * @param props - Component props.
  * @param props.collapsed - Whether the desktop sidebar is collapsed to icons.
  * @param props.children - Label text.
@@ -327,11 +316,8 @@ interface AdminSidebarProps {
 }
 
 /**
- * Admin navigation sidebar. On `lg+` (>=1024px) it stays fixed on the left,
- * full width or collapsed to icons. Below `lg` it is a drawer that slides in
- * over a backdrop; Escape, the close button or the backdrop dismiss it, and
- * Tab stays inside it while open. Following a link closes it too. The active
- * item is derived from the current pathname.
+ * Admin navigation sidebar. Fixed at lg+; below lg a drawer that traps Tab and
+ * closes on Escape, the backdrop, the close button or following a link.
  * @param props - Component props.
  * @param props.drawerOpen - Whether the phone drawer is open.
  * @param props.onDrawerClose - Closes the drawer, optionally returning focus to the menu button.
@@ -397,8 +383,7 @@ export function AdminSidebar({
         data-open={drawerOpen || undefined}
         className={cn(
           "fixed inset-y-0 left-0 z-40 flex w-56 flex-col overflow-hidden bg-russian-violet lg:translate-x-0 print:hidden",
-          // `.app-admin-drawer` (globals.css) owns the translate and width transitions,
-          // and below lg hides the closed drawer (no data-open) so Tab skips it.
+          // globals.css: owns the transitions and hides the closed drawer from Tab below lg.
           "app-admin-drawer",
           collapsed && "lg:w-16",
           drawerOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",

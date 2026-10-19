@@ -1,9 +1,7 @@
 "use client";
 // src/features/admin/components/settings/RatesTab.tsx
-// Rate editor on the Settings page: every RateConfig row grouped by kind (hourly base,
-// per-hour adjustment, percentage adjustment, flat fee), edited in place with a per-row
-// Save, plus an add-rate row and a reset to the shipped defaults. Talks straight to the
-// /api/business/rates routes; rates aren't a settings group, so there's no save bar.
+// Rate editor: RateConfig rows grouped by kind with per-row Save, add and reset. Talks to
+// /api/business/rates directly; rates aren't a settings group, so there's no save bar.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
@@ -473,8 +471,7 @@ export function RatesTab({ initialRates }: Props): React.ReactElement {
                               Make base
                             </AdminButton>
                           ))}
-                        {/* Outline, not primary: a row Save can sit beside the danger
-                            Delete, and Add rate stays the tab's one primary. */}
+                        {/* Outline so Add rate stays the tab's one primary. */}
                         {dirty && (
                           <>
                             <AdminButton

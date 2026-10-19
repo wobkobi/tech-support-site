@@ -1,8 +1,6 @@
 // src/features/business/components/tax/IncomeTaxWorkings.tsx
-// Income tax workings for one FY: the tax on each NZ bracket the profit reaches, the
-// independent earner tax credit, ACC, the total to set aside, and KiwiSaver shown apart
-/// because it is savings paid to a provider, not tax. A filed year shows its saved figures,
-// so every label there comes from those figures rather than from Settings. Server-safe.
+// Income tax workings for one FY: tax per bracket, IETC, ACC, the total to set aside, and
+// KiwiSaver apart since it's savings, not tax. A filed year labels from its saved figures.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { WorkingRow } from "@/features/business/components/tax/WorkingRow";
@@ -60,8 +58,7 @@ export function IncomeTaxWorkings({
   accRate: yearAccRate,
   filed,
 }: IncomeTaxWorkingsProps): React.ReactElement {
-  // A filed year keeps its saved income tax, so the live band rows only show while
-  // the brackets in Settings still give that total.
+  // Live band rows only show for a filed year while Settings brackets still give its total.
   const showBands = !filed || bracketsMatchFiled(result, settings.brackets);
   const bands = bandBreakdown(result.taxable, settings.brackets).filter((b) => b.taxedAmount > 0);
   const accRate = filed ? filedRateLabel(result.acc, result.taxable) : formatRatePct(yearAccRate);

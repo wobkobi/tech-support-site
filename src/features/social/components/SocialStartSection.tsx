@@ -1,8 +1,7 @@
 "use client";
 // src/features/social/components/SocialStartSection.tsx
-// "Start a post" at the top of the Social page: a blank post or any preset, as roomy
-// cards while nothing is open and a compact row of buttons beside a post being written.
-// In preset editing the same buttons open each preset instead.
+// "Start a post": blank or preset, as roomy cards when nothing is open, else compact buttons.
+// In preset editing the buttons open presets instead.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
@@ -121,8 +120,7 @@ export function SocialStartSection({
 }
 
 /**
- * One way to start a post: a roomy card with a hint while nothing is open, or a
- * compact button beside a post being written.
+ * One way to start a post: a roomy card with a hint, or a compact button beside an open post.
  * @param props - Component props.
  * @param props.label - What it starts.
  * @param props.hint - A line on what's in it; only shown on the roomy card.

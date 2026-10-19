@@ -1,8 +1,6 @@
 "use client";
 // src/features/business/components/SheetImportButton.tsx
-// Previews then imports Cashbook (income) and Expenses rows from Google Sheets. The
-// preview is a dry run; the import POSTs and writes to the database. Shows per-sheet
-// counts and errors.
+// Previews (dry run) then imports Cashbook and Expenses rows from Google Sheets.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";

@@ -1,8 +1,7 @@
 "use client";
 // src/features/business/components/invoice/InvoiceAiBox.tsx
-// "Describe the job" box for the draft-invoice editor. Sends the description through the
-// same parse-job route and parse helpers as the calculator, then hands back replacement
-// line items with the promo and unsuccessful-work discounts re-priced for them.
+// "Describe the job" box for the draft-invoice editor: parses like the calculator and
+// returns replacement line items with re-priced discounts.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -42,10 +41,7 @@ export interface InvoiceAiContext {
   /** Job address to quote travel from when the description names none. */
   fallbackDestination: string | null;
   pricing: ParsedJobPricing;
-  /**
-   * The invoice's promo terms, re-applied to the rebuilt lines; null when it has no
-   * promo.
-   */
+  /** The invoice's promo terms, re-applied to the rebuilt lines; null for none. */
   promo: JobPromo | null;
 }
 
@@ -62,10 +58,7 @@ interface InvoiceAiBoxProps {
   currentItems: LineItem[];
   /** Whether the parent form is saving. */
   disabled?: boolean;
-  /**
-   * Receives the parsed line items, any parsed notes, any cash amount already paid and
-   * the promo and unsuccessful-work discounts for the new lines.
-   */
+  /** Receives the parsed line items, notes, cash already paid and re-priced discounts. */
   onApply: (
     lineItems: LineItem[],
     notes: string | null,
@@ -100,8 +93,7 @@ export function InvoiceAiBox({
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
   /**
-   * Parses the description and applies the result as the invoice's line items. When the
-   * AI needs more detail it returns questions instead.
+   * Parses the description into the invoice's line items, or shows the AI's questions.
    * @param withAnswers - Answers to the previous round of questions.
    */
   async function parse(withAnswers?: Record<string, string>): Promise<void> {

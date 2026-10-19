@@ -1,8 +1,6 @@
 // src/app/admin/(shell)/schedule/page.tsx
-// Admin schedule page. Resolves the requested week from `?day=` or `?weekStart=`,
-// prefetches a BUFFER_WEEKS-week buffer of calendar and travel events so day/week
-// stepping stays client-side, and renders the desktop WeekView grid and mobile
-// DayAgendaView.
+// Admin schedule page: prefetches a buffer of weeks around `?day=` / `?weekStart=` so
+// stepping stays client-side.
 
 import { DayAgendaView } from "@/features/admin/components/DayAgendaView";
 import { ScheduleAutoRefresh } from "@/features/admin/components/ScheduleAutoRefresh";
@@ -29,18 +27,14 @@ export const metadata: Metadata = {
 };
 
 /**
- * Weeks of events to prefetch on each side of the requested week. Larger =
- * fewer server round-trips when stepping through weeks; smaller = faster
- * initial load.
+ * Weeks to prefetch either side of the requested week.
  */
 const BUFFER_WEEKS = 3;
 const BUFFER_DAYS_BEFORE = BUFFER_WEEKS * 7;
 const BUFFER_DAYS_AFTER = (BUFFER_WEEKS + 1) * 7;
 
 /**
- * Admin week schedule page. Renders a 7-day grid showing booking, work, personal,
- * and travel events for the requested week. Empty slots are clickable to create a
- * manual booking from the modal.
+ * Admin week schedule page; empty slots create a manual booking.
  * @param root0 - Page props.
  * @param root0.searchParams - URL params: optional `?weekStart=YYYY-MM-DD` + `?day=YYYY-MM-DD`.
  * @returns Schedule page element.
@@ -52,24 +46,18 @@ export default async function AdminSchedulePage({
 }): Promise<React.ReactElement> {
   await requireAdminAuth("/admin/schedule");
   const { weekStart, day } = await searchParams;
-  // Live past-edit lock window so the grid's pre-disable + copy match the
-  // server-enforced value (scheduling.pastEditLockHours).
+  // Live past-edit lock window, matching the server's.
   const { scheduling } = await getSettings();
   const lockHours = scheduling.pastEditLockHours;
 
   const now = new Date();
-  // Prefer ?day=YYYY-MM-DD when set so the buffered fetch centres on the
-  // user's currently-viewed day's week; ?weekStart= is the desktop-grid
-  // fallback. Falls through to today's week when neither is provided.
+  // Prefer ?day=, then ?weekStart=, then today's week.
   const resolvedWeekStartParam = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? mondayOf(day) : weekStart;
   const weekStartDate = resolveWeekStart(resolvedWeekStartParam, now);
-  // Prefetch BUFFER_WEEKS either side so the mobile agenda can step day-by-day and the
-  // desktop grid week-by-week without a round-trip until the user walks past the buffer.
+  // Prefetch BUFFER_WEEKS either side.
   const bufferStartDate = addDays(weekStartDate, -BUFFER_DAYS_BEFORE);
   const bufferEndDate = addDays(weekStartDate, BUFFER_DAYS_AFTER);
-  // Hoisted so the event fetch and the auto-refresh poll share byte-identical
-  // bounds - they key the same cache entry, and a mismatch would have the poll
-  // comparing tokens from two different windows, so it would refresh every tick.
+  // The fetch and the poll must share identical bounds (same cache key), or it refreshes every tick.
   const bufferStartIso = bufferStartDate.toISOString();
   const bufferEndIso = bufferEndDate.toISOString();
 
@@ -77,9 +65,7 @@ export default async function AdminSchedulePage({
   const carCalId = process.env.CAR_CALENDAR_ID ?? process.env.WORK_CALENDAR_ID ?? "";
   const personalCalId = process.env.PERSONAL_CALENDAR_ID ?? "";
 
-  // All configured calendars across the 3-week buffer, so day-stepping over the
-  // visible-week boundary stays client-side. Travel blocks are queried separately -
-  // synthetic cache entries don't carry their parent context.
+  // All calendars across the buffer; travel blocks are queried separately.
   const [rawEvents, travelBlocks] = await Promise.all([
     getCachedScheduleEvents(bufferStartIso, bufferEndIso).catch(() => []),
     prisma.travelBlock.findMany({
@@ -117,9 +103,7 @@ export default async function AdminSchedulePage({
     return "personal";
   }
 
-  // Join booking-kind events to their Booking row so the day agenda can expand customer
-  // details and drive quick actions from the card. Only booking-calendar events have a
-  // matching row; travel/personal/car ones don't.
+  // Join booking-calendar events to their Booking row for the agenda card.
   const bookingCalEventIds = rawEvents
     .filter((e) => e.calendarEmail === bookingCalId)
     .map((e) => e.id);
@@ -155,12 +139,9 @@ export default async function AdminSchedulePage({
       startAt: e.start,
       endAt: e.end,
       location: e.location ?? null,
-      // Booking-calendar events open on click: those with a DB row go to the in-app
-      // detail page (via `booking` below); those without one (added straight into
-      // Google Calendar) fall back to this link. Car/personal get none - not openable.
+      // Booking events without a DB row open via this link; car/personal aren't openable.
       htmlLink: kind === "booking" ? (e.htmlLink ?? null) : null,
-      // fetchAllCalendarEvents converts all-day Google events to 24h timed events
-      // spanning NZ midnight > midnight; treat anything >= 23h as a banner item.
+      // All-day events arrive as 24h timed events; treat >= 23h as a banner item.
       isAllDay: durationMs >= 23 * 60 * 60 * 1000,
       booking: matchedBooking
         ? {
@@ -177,10 +158,7 @@ export default async function AdminSchedulePage({
     });
   }
 
-  // Anchor each leg to its event's CURRENT times (via sourceEventId), not the block's
-  // cached ones: the operator edits event ends to the actual finish, so a stale cached
-  // end would strand the travel bar inside another event. Length can lag a cron cycle
-  // behind the real minutes; position never does.
+  // Anchor each leg to its event's current times, since ends get edited to the actual finish.
   const rawEventById = new Map(rawEvents.map((e) => [e.id, e]));
 
   for (const b of travelBlocks) {
@@ -213,9 +191,7 @@ export default async function AdminSchedulePage({
     }
   }
 
-  // Span the full buffered window so holiday badges render across the prefetched range
-  // without another fetch. One batched read - the per-day variant costs a DB round-trip
-  // per buffered day.
+  // Holidays for the whole buffer in one batched read.
   const bufferedDayKeys: string[] = [];
   for (let i = -BUFFER_DAYS_BEFORE; i < BUFFER_DAYS_AFTER; i++) {
     bufferedDayKeys.push(nzDateKey(addDays(weekStartDate, i)));
@@ -227,16 +203,12 @@ export default async function AdminSchedulePage({
   for (const [key, h] of holidaysByKey) {
     holidaysByDateKey[key] = h.name;
   }
-  // Current week's seven day keys - used to fall back to the week's first
-  // day when the URL has no valid ?day=. The current week sits in the
-  // middle of the buffer at index [BUFFER_DAYS_BEFORE, BUFFER_DAYS_BEFORE+7).
+  // Current week's day keys, at [BUFFER_DAYS_BEFORE, BUFFER_DAYS_BEFORE+7) of the buffer.
   const dayKeysInWeek = bufferedDayKeys.slice(BUFFER_DAYS_BEFORE, BUFFER_DAYS_BEFORE + 7);
 
   const todayKey = nzDateKey(now);
   const weekStartKey = nzDateKey(weekStartDate);
-  // Pick the user-requested day when valid (inside the visible week);
-  // otherwise prefer today if it falls inside the buffer; otherwise fall
-  // back to the current-week's first day.
+  // Requested day if in the visible week, else today if buffered, else the week's first day.
   const initialDayKey =
     day && /^\d{4}-\d{2}-\d{2}$/.test(day) && bufferedDayKeys.includes(day)
       ? day
@@ -256,9 +228,7 @@ export default async function AdminSchedulePage({
       {/* Next-open-times bar - shared across the mobile agenda + desktop grid. */}
       <ScheduleFindTimes />
       <div className={"lg:hidden"}>
-        {/* Key on weekStartKey so a cross-buffer navigation reseeds the client
-            state with the new initialDayKey - useState would otherwise keep
-            the old selected day after the URL changes. */}
+        {/* Keyed on weekStartKey so a new buffer reseeds useState. */}
         <DayAgendaView
           key={weekStartKey}
           initialDayKey={initialDayKey}
@@ -270,8 +240,7 @@ export default async function AdminSchedulePage({
         />
       </div>
       <div className={"hidden lg:block"}>
-        {/* Same key strategy as DayAgendaView - remount when the server has
-            built a fresh buffer around a new week. */}
+        {/* Same key strategy as DayAgendaView. */}
         <WeekView
           key={weekStartKey}
           initialWeekStartIso={weekStartDate.toISOString()}

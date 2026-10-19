@@ -1,7 +1,5 @@
 // src/app/api/admin/social/route.ts
-// Social posts: list them, or create one - blank, as a copy of another (starting from a
-// preset, duplicating, or "save as preset"), from a promo via "Post this promo", or from
-// a mailing-list email via "Share to social".
+// Social posts: list them, or create one blank, as a copy, from a promo or from a mailing email.
 
 import { findAdvertisablePromo, promoLastDay } from "@/features/business/lib/promos";
 import { parseObjectId } from "@/features/business/lib/validation";
@@ -115,8 +113,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           400,
         );
       }
-      // The operator may have reworded or deleted the promo preset; fall back to the
-      // starter wording only when it's gone.
+      // Starter wording only when the promo preset is gone.
       const preset =
         (await prisma.socialPost.findFirst({
           where: { isPreset: true, presetKey: PROMO_POST_PRESET_KEY },

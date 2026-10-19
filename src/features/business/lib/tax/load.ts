@@ -1,8 +1,6 @@
 // src/features/business/lib/tax/load.ts
-// Server loader for the tax maths: reads every ledger row, the asset register, the km log,
-// the per-FY TaxYear records and the live settings, and shapes them into the TaxYearInput
-// computeTaxYear takes. Each table is read once per request (React cache), however many
-// FYs a page computes.
+// Server loader shaping ledger, assets, trips, TaxYear rows and settings into TaxYearInput.
+// Each table is read once per request (React cache), however many FYs a page computes.
 
 import "server-only";
 
@@ -30,10 +28,7 @@ import type { TaxSettings } from "@/shared/lib/settings/types";
 import type { Asset, Prisma } from "@prisma/client";
 import { cache } from "react";
 
-/**
- * The TaxYear fields the loader reads. fyKey, filedAt and snapshot feed the
- * filed-year ATV carry-forward.
- */
+/** The TaxYear fields the loader reads; fyKey, filedAt and snapshot feed the filed ATV carry-forward. */
 const TAX_YEAR_SELECT = {
   fyKey: true,
   officeSqm: true,
@@ -53,8 +48,7 @@ const TAX_YEAR_SELECT = {
 export type TaxYearRow = Prisma.TaxYearGetPayload<{ select: typeof TAX_YEAR_SELECT }>;
 
 /**
- * One stored asset as the maths reads it. Free-text columns are narrowed to their unions,
- * with the safe reading for anything else: "purchased", diminishing value, no km method.
+ * One stored asset as the maths reads it; unknown free-text values fall back to purchased, DV, no km.
  * @param a - Asset row.
  * @returns The asset input.
  */
@@ -79,8 +73,7 @@ export function toAssetInput(a: Asset): AssetInput {
 }
 
 /**
- * The `settings.tax` fields the maths reads, copied so nothing downstream can mutate the
- * cached settings object.
+ * The `settings.tax` fields the maths reads, copied so nothing mutates the cached settings.
  * @param tax - Live tax settings.
  * @returns The rules for computeTaxYear.
  */
@@ -98,8 +91,7 @@ export function taxRulesFrom(tax: TaxSettings): TaxRulesSettings {
 }
 
 /**
- * IRD's km rates for a fuel type. A fuel outside the union (a hand-edited settings
- * document) reads as petrol rather than crash.
+ * IRD's km rates for a fuel type; an unknown fuel reads as petrol.
  * @param ird - One year's IRD rates.
  * @param fuel - settings.tax.vehicleFuel.
  * @returns The Tier 1 and Tier 2 rates.
@@ -109,10 +101,8 @@ export function kmRatesFor(ird: IrdYearRates, fuel: VehicleFuel): KmTierRates {
 }
 
 /**
- * A year's inputs: what the TaxYear record stores, with any blank rate taken from IRD's
- * published rates for that year (or the latest year before it) and the settings' fuel type.
- * An unset total vehicle km stays null (the km claim then skips the Tier 1 scaling), and
- * an unset ACC rate stays null (the maths then uses the Settings rate).
+ * A year's inputs: the stored TaxYear record, with blank rates filled from IRD's rates for
+ * that year and fuel. Unset total km and ACC rate stay null.
  * @param fyKey - FY key, e.g. "2026-27".
  * @param stored - The year's TaxYear row, if one exists.
  * @param fuel - settings.tax.vehicleFuel.
@@ -139,8 +129,7 @@ export function yearRecordFor(
 }
 
 /**
- * Every row the tax maths reads, once per request. Ledger rows cover all years:
- * computeTaxYear filters to its FY with the half-open ISO window.
+ * Every row the tax maths reads, once per request, across all years.
  * @returns Income, expenses, assets, trips and TaxYear rows.
  */
 const loadTaxRows = cache(
@@ -183,8 +172,7 @@ const loadTaxRows = cache(
 );
 
 /**
- * Every stored TaxYear row, from the same once-per-request read the tax inputs use, so a
- * page that also needs the raw record or the filed snapshot reads the table once.
+ * Every stored TaxYear row, from the same once-per-request read the tax inputs use.
  * @returns The TaxYear rows.
  */
 export async function loadTaxYearRows(): Promise<TaxYearRow[]> {
@@ -192,9 +180,8 @@ export async function loadTaxYearRows(): Promise<TaxYearRow[]> {
 }
 
 /**
- * Everything computeTaxYear needs for one FY, plus the FY's raw TaxYear row from the same
- * read. Route handlers get no React cache, so a caller that needs both (the CSV export)
- * takes them from here rather than reading the tables a second time.
+ * Everything computeTaxYear needs for one FY, plus its raw TaxYear row from the same read
+ * (route handlers get no React cache).
  * @param fy - The FY (from {@link loadAllFys}).
  * @param now - Current instant.
  * @returns The tax-year input and the FY's TaxYear row, or null when none is stored.
@@ -236,8 +223,7 @@ export async function loadTaxInputs(fy: FinancialYear, now: Date): Promise<TaxYe
 }
 
 /**
- * Every FY from the business start through the current one, most recent first (the
- * order {@link listFinancialYears} gives and the FY tabs show).
+ * Every FY from the business start through the current one, via {@link listFinancialYears}.
  * @param now - Current instant.
  * @returns The FYs, most recent first.
  */

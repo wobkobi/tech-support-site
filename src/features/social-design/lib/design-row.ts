@@ -96,9 +96,8 @@ export function toDesignSummary(design: SocialDesign): DesignSummary {
 }
 
 /**
- * Editor shape of a stored design. A stored document that no longer passes the checks
- * (hand-edited in the database, or saved by a buggy build) opens as a blank design
- * rather than crashing the page; the bad one stays in the database until the next save.
+ * Editor shape of a stored design. A document failing the checks opens blank instead of
+ * crashing; the bad copy stays stored until the next save.
  * @param design - Stored design.
  * @returns Editor row.
  */

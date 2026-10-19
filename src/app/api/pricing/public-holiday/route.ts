@@ -1,6 +1,5 @@
 // src/app/api/pricing/public-holiday/route.ts
-// Public endpoint exposing the NZ-local stat-day lookup so the wizard can auto-apply the
-// Public Holiday modifier when the customer's chosen booking time falls on a holiday.
+// Public NZ stat-day lookup so the wizard can auto-apply the Public Holiday modifier.
 
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
@@ -9,9 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/pricing/public-holiday?date=YYYY-MM-DD
- * Returns `{ holiday: { name, region } | null }` for the given NZ-local date.
- * Empty / malformed `date` returns `holiday: null` rather than 400 so the
- * wizard never blocks on a malformed query.
+ * Malformed `date` returns `holiday: null`, not 400, so the wizard never blocks.
  * @param request - Incoming request with `date` query string.
  * @returns JSON `{ holiday }` or rate-limit response.
  */

@@ -1,8 +1,6 @@
 // src/features/social-design/lib/doc.ts
-// The post maker's design document: one set of layers shared by every size, and a
-// layout per size saying where each layer sits there. Also the parser that checks a
-// saved document, the version step that upgrades old ones, and the hash that tells
-// when exported pictures are out of date. Pure and client-safe.
+// The post maker document (shared layers, per-size layouts), its parser, version upgrade and
+// out-of-date hash. Pure and client-safe.
 
 import {
   isColourKey,
@@ -43,10 +41,7 @@ export interface Geometry {
   /** Font size on this size, for layers that hold text. */
   fontSize?: number;
   hidden?: boolean;
-  /**
-   * Linked layers follow edits made on other sizes; a layer moved with "This size
-   * only" is unlinked on that size until it is re-linked.
-   */
+  /** Linked layers follow edits on other sizes; "This size only" unlinks on that size. */
   linked: boolean;
 }
 
@@ -530,9 +525,8 @@ function parseGeometry(raw: unknown, path: string, textLike: boolean): Geometry 
 }
 
 /**
- * Upgrades a document saved by an older version of the editor to the current shape.
- * Version 1 is the first, so this only fills a missing version for now; each future
- * change adds one step here, so old designs keep opening.
+ * Upgrades an older saved document to the current shape. Version 1 is the first, so this
+ * only fills a missing version; future changes add a step here.
  * @param raw - Stored document.
  * @returns The document in the current version's shape (not yet checked).
  */
@@ -542,9 +536,8 @@ export function migrateDoc(raw: Record<string, unknown>): Record<string, unknown
 }
 
 /**
- * Checks a whole design document, dropping unknown fields.
- * Every layer must have a geometry on every listed size; layouts for sizes not listed
- * are kept, so turning a size off and on again brings back its hand-made layout.
+ * Checks a design document, dropping unknown fields. Layouts for unlisted sizes are kept so
+ * toggling a size brings back its hand-made layout.
  * @param raw - Parsed JSON from a request or the database.
  * @returns The document, or the first problem found.
  */
@@ -621,8 +614,7 @@ export function parseDesignDoc(raw: unknown): { doc: DesignDoc } | { error: stri
 }
 
 /**
- * Bound values a document actually draws, so a change to an unused one (a new promo
- * when the design shows only the phone number) doesn't mark its pictures out of date.
+ * Bound values a document draws, so an unused value changing doesn't stale its pictures.
  * @param doc - Design.
  * @param bound - Every live value.
  * @returns Only the values some layer uses.
@@ -646,8 +638,7 @@ function usedBound(doc: DesignDoc, bound: BoundValues): Partial<BoundValues> {
 }
 
 /**
- * JSON with object keys sorted at every level, so equal documents give equal text
- * regardless of key order.
+ * JSON with keys sorted at every level, so equal documents give equal text.
  * @param value - Any JSON value.
  * @returns Canonical JSON text.
  */
@@ -663,11 +654,8 @@ function canonicalJson(value: unknown): string {
 }
 
 /**
- * Fingerprint of everything that shows in the exported pictures: the layers, the
- * layouts of exported sizes, the paid-ad switch and the live values the layers draw.
- * Stored with each export; a different hash later means "Pictures are out of date".
- * Two 32-bit FNV-1a passes with different seeds, so it stays synchronous (no
- * crypto.subtle) and collisions are vanishingly unlikely for this use.
+ * Fingerprint of everything in the exported pictures; a later mismatch means "Pictures are out
+ * of date". Two seeded 32-bit FNV-1a passes keep it synchronous (no crypto.subtle).
  * @param doc - Design.
  * @param bound - Live values.
  * @returns 16 hex characters.

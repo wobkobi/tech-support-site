@@ -1,10 +1,7 @@
 "use client";
 // src/features/contacts/components/ContactAdminList.tsx
-// Admin component listing contacts saved from booking submissions, with inline editing
-// and Google Places autocomplete for the address field. Contacts are split into
-// sections: new (last 7 days), unsynced (needs attention) and synced (already linked to
-// Google Contacts, shown in a collapsible drawer). Phones show each contact as a
-// ContactCard; from lg each section is a ContactTable.
+// Admin contacts list with inline editing, split into new (last 7 days), unsynced and
+// synced (collapsible) sections. Cards on phones, a ContactTable from lg.
 
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
@@ -43,9 +40,7 @@ const PAGE_LOAD_TIME = Date.now();
 const BATCH = 25;
 
 /**
- * Editable list of contacts captured from booking submissions.
- * Unsynced contacts (no Google Contact link) are shown prominently at the top.
- * Synced contacts are grouped in a collapsible section below.
+ * Editable contacts list: unsynced contacts up top, synced ones collapsed below.
  * @param props - Component props.
  * @param props.contacts - Contact rows to display.
  * @param props.query - The page's searchParams, the starting filters.
@@ -80,8 +75,7 @@ export function ContactAdminList({
   const [syncedOpen, setSyncedOpen] = useState(true);
   // The search, chips and sort start from the URL and write back to it.
   const [query, setQuery] = useState(() => queryValue(pageQuery, "q"));
-  // Filter chips, AND-combined with the search. Sync is tri-state (all/one/other)
-  // since a contact is exactly one of synced or not.
+  // Filter chips, AND-combined with the search. Sync is tri-state (all/synced/not).
   const [syncFilter, setSyncFilter] = useState<SyncFilter>(() => {
     const v = queryValue(pageQuery, "sync");
     return v === "synced" || v === "unsynced" ? v : "all";
@@ -104,12 +98,10 @@ export function ContactAdminList({
     sort: sort === "name" ? "" : sort,
   });
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  // Ticked by default: deleting a contact normally means dropping the person
-  // altogether, and leaving the Google entry would let the sync pull them back.
+  // Ticked by default: a surviving Google entry would let the sync pull them back.
   const [deleteGoogle, setDeleteGoogle] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  // Contact currently selected to merge away; while set, every other card offers
-  // to become the survivor. Null when no merge is in progress.
+  // Contact selected to merge away; while set, every other card offers to survive.
   const [mergeSourceId, setMergeSourceId] = useState<string | null>(null);
   // The survivor picked for that merge, held while the confirm dialog is open.
   const [mergeTargetId, setMergeTargetId] = useState<string | null>(null);
@@ -180,8 +172,7 @@ export function ContactAdminList({
   const rest = filtered.filter((c) => !isNew(c));
   const unsynced = rest.filter((c) => !c.googleContactId).sort(bySort);
   const synced = rest.filter((c) => !!c.googleContactId).sort(bySort);
-  // Only the synced group is capped: it holds nearly everyone, while the new and
-  // needs-syncing groups are short and are the ones that want attention.
+  // Only the synced group is capped: it holds nearly everyone.
   const syncedPager = useShowMore(
     synced,
     BATCH,
@@ -221,9 +212,8 @@ export function ContactAdminList({
   }
 
   /**
-   * Downloads the full contacts CSV via the admin API and triggers a browser save dialog.
-   * Uses fetch + blob rather than a plain download link, so a failed export is reported
-   * instead of the browser saving the error page as contacts.csv.
+   * Downloads the contacts CSV via fetch + blob, so a failed export is reported
+   * instead of saving the error page as contacts.csv.
    */
   async function exportContacts(): Promise<void> {
     setExporting(true);
@@ -251,8 +241,7 @@ export function ContactAdminList({
   }
 
   /**
-   * Syncs a contact to Google Contacts via the admin API.
-   * On success, updates the local state to reflect synced status.
+   * Syncs a contact to Google Contacts and marks it synced locally.
    * @param id - Contact ID to sync.
    */
   async function syncToGoogle(id: string): Promise<void> {
@@ -353,8 +342,8 @@ export function ContactAdminList({
   }
 
   /**
-   * Opens the delete confirmation for a contact. Resets the Google choice with
-   * each open, so an earlier untick can't silently carry over to the next one.
+   * Opens the delete confirmation, resetting the Google choice so an earlier
+   * untick does not carry over.
    * @param id - Contact ID being confirmed for deletion.
    */
   function requestDelete(id: string): void {
@@ -378,8 +367,7 @@ export function ContactAdminList({
         setContacts((prev) => prev.filter((c) => c.id !== id));
         toast("Contact deleted.", { tone: "success" });
       } else {
-        // Say so. Acting only on ok left a failed delete completely silent: the
-        // row stayed put with no explanation, which reads as a dead button.
+        // Report the failure, or the unchanged row reads as a dead button.
         toast(data.error ?? "Couldn't delete that contact - try again.", { tone: "error" });
       }
     } catch (err) {
@@ -415,9 +403,7 @@ export function ContactAdminList({
         setContacts((prev) => prev.filter((c) => c.id !== secondaryId));
         toast("Contacts merged.", { tone: "success" });
       } else {
-        // A merge folds one contact into another and deletes it, so a silent
-        // failure is the worst kind: the operator cannot tell whether the two
-        // were combined or nothing happened at all.
+        // A silent merge failure leaves the operator unsure whether anything happened.
         toast(data.error ?? "Couldn't merge those contacts - try again.", { tone: "error" });
       }
     } catch (err) {

@@ -1,9 +1,6 @@
 // src/shared/lib/settings/field-meta.ts
-// UI metadata for the settings panel - the plain-English title, description, unit, and
-// (for optional rules) the "what happens when it's off"
-// note shown above each field. Kept here, beside the defaults and validators,
-// so the help text and the rules never drift apart. Authored per group as each
-// tab is built; GROUP_META covers all groups so the tab bar can render.
+// Settings panel UI metadata (title, description, unit, off-note), kept beside the defaults and
+// validators so help text and rules never drift.
 
 import type { VehicleFuel } from "@/features/business/lib/tax/types";
 import type { SettingsGroup } from "@/shared/lib/settings/types";

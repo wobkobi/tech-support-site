@@ -1,8 +1,7 @@
 "use client";
 // src/features/social/components/PostActionBar.tsx
-// The composer's save-and-post bar: where autosave is at, whether the post is ready, and
-// Schedule / Post now. The composer places it twice, pinned under the top bar on wide
-// screens and to the bottom on narrower ones, so it holds no state of its own.
+// The composer's save-and-post bar. Rendered twice (top on wide screens, bottom on narrow), so
+// it holds no state.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";

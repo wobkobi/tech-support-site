@@ -1,8 +1,6 @@
 // src/features/business/lib/assets.ts
-// Asset register helpers shared by the assets API routes, the Assets page and its client
-// view: request-body validation (parseAssetBody), every asset's depreciation schedule
-// (assetSchedules), the expense prefill and link list, and the plain shapes handed to
-// the browser. Pure: no Prisma, no React, so scripts/check-assets.ts runs it under tsx.
+// Asset register helpers: body validation, depreciation schedules, expense prefill and
+// browser shapes. Pure (no Prisma, no React) so scripts/check-assets.ts runs it under tsx.
 
 import { formatNZD } from "@/features/business/lib/business-format";
 import {
@@ -164,9 +162,7 @@ function optionalText(value: unknown, maxLen: number): string | null | undefined
 }
 
 /**
- * Whether a body value has a type a number field accepts. parseAmount and parseRate run
- * values through Number(), which reads true as 1 and false as 0, so anything other than a
- * number or a string is refused before they see it.
+ * Whether a body value is a number or string, since Number() would read true as 1.
  * @param value - Raw value from a request body.
  * @returns True for a number or a string.
  */
@@ -198,9 +194,7 @@ export function defaultRate(classKey: string, method: DepreciationMethod): numbe
 }
 
 /**
- * Whether a class key names the motor vehicle class, the only class that can be claimed
- * on IRD kilometre rates instead of depreciation. Compares against
- * {@link VEHICLE_CLASS_KEY}, the key the tax maths uses.
+ * Whether a class key is {@link VEHICLE_CLASS_KEY}, the only class that can use km rates.
  * @param classKey - Asset class key.
  * @returns True for the motor vehicle class.
  */
@@ -209,22 +203,9 @@ export function isVehicleClass(classKey: string): boolean {
 }
 
 /**
- * Validates an asset create or full-replace body. The rules:
- * - name, class, origin and in-service date are required; dates are YYYY-MM-DD.
- * - number fields (cost, rate, business use, sale amount) are numbers or numeric strings;
- *   a boolean or object is refused, not read as 1 or 0.
- * - cost or market value is more than $0 after rounding to cents.
- * - a blank rate takes the IR265 rate for the class and method; an unlisted class must
- *   bring its own rate (0-100%, more than 0).
- * - business use is 0-100 (blank = 100).
- * - km rates only on the motor vehicle class; Investment Boost only on bought items not
- *   on km rates, first used on or after 22 May 2025.
- * - an expense link is a valid ObjectId on a bought item (existence and uniqueness are
- *   database checks, done by the route).
- * - a sale price needs a disposal date; a disposal date with no price is a $0 sale; a
- *   disposal can't predate the in-service date.
- * Each origin keeps only its own detail (supplier for bought, valuation note for brought
- * in), so switching origin can't leave stale text behind.
+ * Validates an asset create or full-replace body. Key rules: a blank rate takes the IR265
+ * rate; Investment Boost needs a bought item off km rates first used on or after 22 May 2025;
+ * a disposal date with no price is a $0 sale.
  * @param body - Parsed JSON request body.
  * @returns The data to store, or the first problem found.
  */
@@ -350,11 +331,8 @@ export function parseAssetBody(body: unknown): AssetBodyResult {
 }
 
 /**
- * Depreciation schedule for every asset. The low-value grouping (same supplier, same day,
- * same rate tested together) is worked out across the whole register first, so a lone
- * asset's schedule depends on its neighbours; never call assetSchedule on one asset in
- * isolation. Filed closing values replace the computed opening value of the next year,
- * through the same {@link filedAtvFor} pin computeTaxYear uses.
+ * Depreciation schedule for every asset. Low-value grouping spans the whole register, so
+ * never schedule one asset alone. Filed closing values pin via {@link filedAtvFor}.
  * @param assets - Every asset on the register.
  * @param fys - Financial years, oldest first.
  * @param opts - Business start, write-off threshold and filed closing values.
@@ -414,8 +392,7 @@ export function expenseOptions(
 }
 
 /**
- * Form values for turning an expense into an asset. The cost follows the GST basis on
- * the expense's date: GST-inclusive while unregistered, exclusive once registered.
+ * Form values for turning an expense into an asset, with cost on the expense date's GST basis.
  * @param e - The expense.
  * @param gst - GST registration status.
  * @returns The prefill.
@@ -432,7 +409,7 @@ export function assetPrefillFromExpense(e: LedgerExpense, gst: GstStatus): Asset
 
 /**
  * A stored asset as the browser gets it. Dates are UTC midnight of the NZ day, so the
- * first ten characters of the ISO string are that day.
+ * ISO string's first ten characters are that day.
  * @param row - The stored asset.
  * @param schedule - Its schedule from {@link assetSchedules}.
  * @param currentFyKey - Current FY key, e.g. "2026-27".

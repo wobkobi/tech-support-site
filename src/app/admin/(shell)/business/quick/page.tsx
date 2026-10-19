@@ -1,9 +1,6 @@
 // src/app/admin/(shell)/business/quick/page.tsx
-// Quick price page for settling up on site: address plus start/end time in, one total out,
-// for a customer paying cash or by bank transfer on the spot. Priced as a job done today,
-// so the rates, promo and date surcharge (public holiday or weekend) are resolved for now.
-// Today's booking calendar is matched too: the job in progress (or `?eventId=`) prefills
-// the address, times and frozen travel through the calculator's own buildEventPrefill.
+// Quick price page for settling up on site: address and times in, one total out, priced as
+// today. The job in progress (or `?eventId=`) prefills via buildEventPrefill.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import {
@@ -47,9 +44,7 @@ export const metadata: Metadata = {
 const EARLY_ARRIVAL_MS = 15 * 60_000;
 
 /**
- * How long after an event's booked end the operator is still treated as on site. Inside
- * it the end time defaults to now (the job ran over or is only just being settled);
- * past it the booked end stands, since the job is being priced after the fact.
+ * How long after an event's booked end the end time still defaults to now.
  */
 const STILL_ON_SITE_MS = 90 * 60_000;
 
@@ -62,9 +57,7 @@ const NZ_HHMM = new Intl.DateTimeFormat("en-NZ", {
 });
 
 /**
- * Today's booking-calendar events, earliest first. Served from the 30s schedule cache
- * with day-aligned bounds, so repeat opens stay warm. Never throws: a calendar outage
- * just leaves the page as a plain form.
+ * Today's booking-calendar events, earliest first, from the schedule cache. Never throws.
  * @param now - Reference instant.
  * @returns Today's events with their raw ISO bounds.
  */
@@ -91,9 +84,7 @@ async function loadTodayEvents(
 }
 
 /**
- * Picks the event the operator is most likely standing in: the latest one that has
- * started (allowing an early arrival), so a job in progress beats the morning's
- * finished one. Later jobs today are never auto-picked.
+ * Picks the latest event that has started (allowing an early arrival); later jobs never.
  * @param events - Today's events, earliest first.
  * @param now - Reference instant.
  * @returns The matched event id, or null when nothing has started yet.
@@ -106,9 +97,7 @@ function autoMatch(events: { id: string; start: string }[], now: Date): string |
 }
 
 /**
- * Travel for the matched event. Frozen drive minutes (TravelBlock or booking snapshot)
- * win, exactly as the calculator seeds them; with none on file the address is looked up
- * at the event's own times.
+ * Travel for the matched event: frozen drive minutes win, else a lookup at the event's times.
  * @param prefill - The matched event's prefill.
  * @param start - Event start instant.
  * @param end - Event end instant.
@@ -147,8 +136,7 @@ async function travelForPrefill(
 }
 
 /**
- * Quick price page: resolves today's pricing context and calendar match server-side
- * and hands them to the client view.
+ * Quick price page: resolves today's pricing and calendar match for the client view.
  * @param props - Page props.
  * @param props.searchParams - Optional `eventId` to price a specific event, or "none" for a blank form.
  * @returns Quick price page element.
@@ -179,8 +167,7 @@ export default async function QuickPricePage({
 
   let prefill: QuickPrefill | null = null;
   if (eventPrefill && slot) {
-    // Live event bounds when today's list has it; a picked event from another day
-    // falls back to its prefill slot, which is enough to price it.
+    // Live event bounds when listed today, else the prefill slot.
     const startAt = matched ? new Date(matched.start) : now;
     const endAt = matched ? new Date(matched.end) : now;
     const onSite =

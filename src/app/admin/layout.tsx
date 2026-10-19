@@ -1,17 +1,12 @@
 // src/app/admin/layout.tsx
-// Admin route segment layout. Sets `Referrer-Policy: no-referrer` so per-record customer
-// tokens embedded in admin-rendered links (`cancelToken`, `reviewToken`) don't leak via
-// the Referer header when the operator clicks through to external services - Google Drive
-// PDFs, Maps links inside expanded booking cards, the "Back to site" link, etc. Renders no
-// chrome; the sidebar, top bar and content column live in AdminShell (rendered by
-// (shell)/layout.tsx), which the login page sits outside.
+// Admin route segment layout. `Referrer-Policy: no-referrer` keeps customer tokens in admin
+// links from leaking to external sites. No chrome; that's AdminShell in (shell)/layout.tsx.
 
 import type { Metadata } from "next";
 import { IBM_Plex_Sans } from "next/font/google";
 import type React from "react";
 
-// Body and figures face for the admin only: plainer than Exo at dense sizes, with even
-// digits for money columns. Headings keep Exo (see the .app-admin rules in globals.css).
+// Admin body font: plainer than Exo at dense sizes, with even digits. Headings keep Exo.
 const plex = IBM_Plex_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
@@ -25,9 +20,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Admin route-segment layout. The `app-admin` wrapper scopes the admin-only
- * rules in globals.css (focus ring, touch-screen field sizing, scroll padding
- * under the top bar, phone action bars) to every `/admin/*` page, login included.
+ * Admin route-segment layout; `app-admin` scopes the admin-only globals.css rules.
  * @param props - Layout props.
  * @param props.children - Page content.
  * @returns Admin layout element.

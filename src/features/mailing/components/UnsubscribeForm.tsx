@@ -1,8 +1,6 @@
 "use client";
 // src/features/mailing/components/UnsubscribeForm.tsx
-// The button on the public unsubscribe page. Nothing changes until it's pressed:
-// email security scanners open every link in a message, and a page that
-// unsubscribed on load would quietly drop people who never asked.
+// The public unsubscribe button. Nothing changes on load, since email scanners open every link.
 
 import { Button } from "@/shared/components/Button";
 import React, { useState } from "react";

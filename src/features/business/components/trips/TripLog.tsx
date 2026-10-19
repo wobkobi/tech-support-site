@@ -1,10 +1,7 @@
 "use client";
 // src/features/business/components/trips/TripLog.tsx
-// The FY's trip log: a table from md up with a km total, stacked cards on phones. Each row
-// shows where the trip went when an address was saved, rows logged from a job carry a
-// "From a job" tag, and rows that earn no km claim carry a tag
-// saying why (before the km-rate car, or no km-rate vehicle that day); edit and delete
-// hand the row to TripsView.
+// The FY's trip log: a table from md up with a km total, stacked cards on phones. Rows
+// carry "From a job" and "Not claimed" tags; edit and delete hand the row to TripsView.
 
 import {
   ROW_CLS,
@@ -25,8 +22,8 @@ import type React from "react";
 import { FaLocationDot, FaPlus } from "react-icons/fa6";
 
 /**
- * Why a trip earns no km claim: dated before the first km-rate vehicle went into service
- * (a borrowed or shared car, expected), or on a day with no km-rate vehicle after that.
+ * Why a trip earns no km claim: before the first km-rate vehicle (expected), or a later
+ * day with no km-rate vehicle.
  */
 export type UnclaimedReason = "beforeVehicle" | "noVehicle";
 
@@ -47,10 +44,8 @@ interface TripLogProps {
 }
 
 /**
- * Status pills for one trip: "From a job" when it was logged from a booking, and a "Not
- * claimed" pill when its km earn nothing. A trip before the km-rate car is expected, so
- * it gets a neutral pill; a gap after it is a warning. The words carry the meaning; the
- * colour only backs them up.
+ * Status pills for one trip: "From a job", and "Not claimed" (neutral before the km-rate
+ * car, a warning after it).
  * @param props - Component props.
  * @param props.trip - The trip.
  * @param props.unclaimed - Why the trip earns no km claim, or undefined when it does.

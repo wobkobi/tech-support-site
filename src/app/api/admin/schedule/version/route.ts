@@ -1,14 +1,6 @@
 // src/app/api/admin/schedule/version/route.ts
-// Change-detection endpoint for the admin schedule's auto-refresh: returns a
-// token fingerprinting the calendar events in a window so the client can skip
-// router.refresh() when nothing has moved. See docs/CRON.md for the wider
-// function-CPU budget this serves.
-//
-// Reads Google live rather than through getCachedScheduleEvents: the poll runs every
-// 60s against a 30s cache, so a cached read rewrote the ~26 KB entry (4 billed ISR
-// write units) on every tick. Instead the cache is only busted when the live token
-// differs from the one the client was rendered with, so the refresh that follows
-// renders fresh data and writes the entry once per real change.
+// Change detection for the schedule's auto-refresh: a fingerprint of the window's events.
+// Reads Google live, busting the cache only on a real change (a cached read rewrote it every poll).
 
 import { scheduleEventsToken } from "@/features/admin/lib/schedule-token";
 import {
@@ -20,17 +12,13 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
-// The response must never be cached: the whole job is observing the underlying
-// event cache move, and a cached token would pin the grid to stale data.
+// Never cache the response, or the token pins the grid to stale data.
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/admin/schedule/version?from=<iso>&to=<iso>&token=<seen>
- * Fingerprints the calendar events in the window. `from`/`to` must be the exact
- * ISO strings the page rendered with - they form the page's cache key, so a
- * different window yields a token that can never agree with the page's. `token` is
- * the fingerprint the client currently shows; when the live one differs, the
- * schedule cache is busted so the client's refresh doesn't render the old entry.
+ * Fingerprints the window's events. `from`/`to` must match the page's cache key exactly;
+ * when the live token differs from `token`, the schedule cache is busted.
  * @param request - Incoming Next.js request.
  * @returns JSON with `{ ok: true, token }`.
  */

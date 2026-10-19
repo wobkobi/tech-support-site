@@ -1,7 +1,6 @@
 // scripts/check-tax-settings.ts
-// Tax and GST settings validation: the shipped defaults pass, and each new rule rejects a
-// shape the Tax page couldn't use (unordered bands, an open-ended middle band, an IETC
-// range out of order, a business-use share over 100%, a bad registration date).
+// Tax and GST settings validation: defaults pass, and each rule rejects a shape the Tax
+// page can't use.
 // Run with: npm test -- tax-settings
 
 import type { VehicleFuel } from "@/features/business/lib/tax/types";
@@ -108,8 +107,7 @@ function main(): void {
     taxErrors({ brackets: [{ upTo: null, rate: 0.2 }] }),
     [],
   );
-  // A thrown TypeError would surface as a 500 from the settings route, so record it as
-  // a result instead of letting it end the run.
+  // A thrown TypeError would be a 500 from the settings route; record it as a result.
   let nullBand: string[] | string;
   try {
     nullBand = taxErrors({

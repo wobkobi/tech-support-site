@@ -1,8 +1,7 @@
 "use client";
 // src/features/admin/components/DayAgendaHeader.tsx
-// Sticky header band of the mobile day agenda: the mini 7-day strip and the day-picker bar
-// (prev/next, date picker, booking count, Today). DayAgendaView owns the state; this only
-// renders it and reports taps back.
+// Sticky header band of the mobile day agenda: mini week strip and day-picker bar.
+// DayAgendaView owns the state.
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -51,8 +50,7 @@ interface DayAgendaHeaderProps {
 }
 
 /**
- * Stops pointer events from bubbling out of the band so the agenda's swipe handler never
- * sees them - chevron taps always fire as clicks.
+ * Hides pointer events from the agenda's swipe handler so chevron taps fire as clicks.
  * @param e - Pointer event.
  */
 function stopPointer(e: React.PointerEvent<HTMLElement>): void {
@@ -93,18 +91,14 @@ export function DayAgendaHeader({
   onDateChange,
 }: DayAgendaHeaderProps): React.ReactElement {
   return (
-    // Pinned to the top of the viewport while the events list scrolls under it. The band
-    // sits at `top-14`, just under the shell's 56px sticky top bar, and `-mx-4` / `-mx-6`
-    // so the page background covers the page edges as content scrolls behind.
+    // top-14 sits under the shell's 56px top bar; negative margins cover the page edges.
     <div
       data-no-swipe
       onPointerDown={stopPointer}
       onPointerUp={stopPointer}
       className="sticky top-14 z-10 -mx-4 mb-4 bg-admin-bg px-4 pt-1 pb-2 sm:-mx-6 sm:px-6"
     >
-      {/* Mini 7-day strip - visible week containing the selected day. Dots
-          indicate booking count per day (capped at 4). Compact so it
-          reads as glance-only; primary nav stays in the picker below. */}
+      {/* Mini week strip; dots show bookings per day, capped at 4. */}
       <div className="mb-3 grid grid-cols-7 gap-1">
         {weekDays.map((wd) => {
           const isSelected = wd.key === selectedDayKey;
@@ -147,8 +141,7 @@ export function DayAgendaHeader({
         })}
       </div>
 
-      {/* Day-picker bar. Generous spacing between the chevrons and the
-          central label/today chip so finger-fat taps don't go wrong. */}
+      {/* Day-picker bar, spaced wide for fingers. */}
       <div className="flex items-center justify-between gap-3 rounded-lg border border-admin-border bg-admin-surface px-2 py-2">
         <button
           type="button"

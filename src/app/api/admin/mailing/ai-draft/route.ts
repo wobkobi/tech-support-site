@@ -1,7 +1,5 @@
 // src/app/api/admin/mailing/ai-draft/route.ts
-// Writes a first draft of a mailing email from a one-line brief: subject, preview text,
-// heading, paragraphs, bullet points and button words, in the operator's voice. The
-// editor fills them into the blocks; nothing is saved or sent from here.
+// Drafts a mailing email from a one-line brief for the editor; nothing is saved or sent.
 
 import { BRIEF_MAX, DRAFT_KINDS, readDraft } from "@/features/mailing/lib/ai-draft";
 import { promoWording } from "@/features/mailing/lib/context";
@@ -17,8 +15,7 @@ import { getSiteUrl } from "@/shared/lib/site-url";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * The system prompt. Live values (who's writing, whether a promo runs, the placeholder
- * list) come in as arguments so nothing here goes stale.
+ * The system prompt; live values come in as arguments.
  * @param who - Who is writing.
  * @param kindGuide - What this kind of email is for.
  * @param promoLine - Whether a promo is running, and which placeholders describe it.
@@ -75,9 +72,8 @@ Paragraphs and bullets are plain text: you may use **bold** for a few words, but
 
 /**
  * POST /api/admin/mailing/ai-draft
- * Body: `{ brief, kind, promoId, buttonUrl }` - the brief is at most {@link BRIEF_MAX}
- * characters, `kind` is a {@link DRAFT_KINDS} key, `promoId` the email's linked promo or
- * null, `buttonUrl` where the email's first button goes ("" for none).
+ * Body: `{ brief, kind, promoId, buttonUrl }`: brief up to {@link BRIEF_MAX} chars, a
+ * {@link DRAFT_KINDS} key, the linked promo or null, the first button's link or "".
  * @param request - Incoming request.
  * @returns JSON `{ draft }`, a 429 with a retry hint when the AI provider is rate limited, or an error.
  */
@@ -99,8 +95,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const kind = DRAFT_KINDS.find((k) => k.key === body.kind) ?? DRAFT_KINDS[0]!;
   const promoId =
     typeof body.promoId === "string" && /^[a-f0-9]{24}$/i.test(body.promoId) ? body.promoId : null;
-  // The fill keeps an existing button's link and swaps only its words, so the words have
-  // to describe that link. A placeholder link like {bookingUrl} is passed through as is.
+  // The fill keeps an existing button's link, so the words must describe it.
   const buttonUrl =
     typeof body.buttonUrl === "string" && body.buttonUrl.length <= 300 ? body.buttonUrl.trim() : "";
 
@@ -109,9 +104,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const [settings, { promo }] = await Promise.all([getSettings(), promoWording(promoId)]);
     const { name, company, location } = settings.identity;
-    // With no link yet the model picks one from the editor's own link choices (the
-    // review-box link read live from settings), so the button arrives working; anything
-    // off the list is dropped below.
+    // With no link yet the model picks from the editor's link choices; others are dropped below.
     const targets = emailLinkTargets(getSiteUrl(), settings.reviews.googleReviewUrl);
     const buttonLine = buttonUrl
       ? `The email's button goes to ${buttonUrl}. INVARIANT: the button words say what the reader gets at that link (a booking page: "Book a time"), never something else, whatever the email is about. "buttonUrl" is "".`

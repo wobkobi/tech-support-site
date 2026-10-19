@@ -1,8 +1,6 @@
 // scripts/check-booking-spam.ts
-// The checks that stop a junk public booking: a phone number that can't be dialled,
-// a description with no words in it, and an email domain that can't take mail. The
-// fixtures include the fields of a real junk booking alongside real formats that
-// must keep passing.
+// Junk-booking checks: undiallable phone, wordless description, email domain that can't
+// take mail. Includes a real junk booking alongside formats that must keep passing.
 // Run with: npm test -- booking-spam
 
 import { checkDescription, validateBookingPayloadFields } from "@/features/booking/lib/booking";
@@ -20,8 +18,7 @@ function dnsError(code: string): NodeJS.ErrnoException {
 }
 
 /**
- * Stub resolver answering from a fixed table. A domain missing from a table
- * answers ENOTFOUND; a value of "timeout" answers ETIMEOUT.
+ * Stub resolver from a fixed table: missing domain = ENOTFOUND, "timeout" = ETIMEOUT.
  * @param mx - Domain > MX hosts.
  * @param a - Domain > A records.
  * @returns The resolver.

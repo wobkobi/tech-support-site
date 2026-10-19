@@ -1,7 +1,5 @@
 // src/features/social-design/lib/versions.ts
-// Saved copies of a design for its History menu. Undo only lasts while the editor is
-// open; these let the operator go back to how a design looked before an editing
-// session, days later.
+// Saved copies for a design's History menu, outlasting the editor's in-session undo.
 
 import { prisma } from "@/shared/lib/prisma";
 import type { Prisma } from "@prisma/client";
@@ -12,12 +10,10 @@ const VERSION_GAP_MS = 5 * 60_000;
 export const MAX_VERSIONS = 20;
 
 /**
- * Saves the design as it is right now, before a save overwrites it, unless a copy was
- * saved in the last 5 minutes. Runs before the save, so the copy holds the design as it
- * stood at the start of an editing session rather than after its first change.
+ * Saves the design before a save overwrites it, unless copied in the last 5 minutes, so the copy
+ * holds the start of an editing session.
  * @param designId - Design id.
- * @param always - Skip the 5-minute gap, for "Use in post": the copy then holds exactly
- *   the design a post's pictures came from.
+ * @param always - Skip the 5-minute gap, for "Use in post".
  */
 export async function snapshotBeforeSave(designId: string, always = false): Promise<void> {
   const latest = always

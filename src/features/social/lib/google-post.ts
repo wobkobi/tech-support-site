@@ -40,12 +40,9 @@ function dateParts(key: string): DateParts {
 }
 
 /**
- * The localPosts body for a post. An offer (or event) carries its title and whole-day
- * schedule; Google's TimeInterval is only valid with every field set, so the times run
- * from the start of the first day to the end of the last. callToAction is ignored on
- * offers, so an offer's link goes in offer.redeemOnlineUrl instead, and an update's
- * link only goes out with a Book or Learn more button. CALL takes no URL: it dials the
- * profile's own number.
+ * The localPosts body. Offers carry title and a whole-day schedule (TimeInterval needs every
+ * field) and their link as redeemOnlineUrl, since callToAction is ignored on offers. Updates
+ * send a link only with Book or Learn more; CALL takes no URL.
  * @param input - Filled text, picture, link and Google settings.
  * @returns Request body.
  */

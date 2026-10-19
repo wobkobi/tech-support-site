@@ -1,14 +1,9 @@
 // src/features/business/lib/promo-redemption.ts
-// Records one use of a promo. Bookkeeping only: it never throws, because a
-// customer's booking must not depend on analytics succeeding.
+// Promo redemption bookkeeping. Never throws: bookings and invoices must not depend on it.
 
 import { prisma } from "@/shared/lib/prisma";
 
-/**
- * Matches a redemption no invoice has settled. The explicit unset branch is
- * there because a row written without the field has none at all, and a Mongo
- * null match does not see a missing field.
- */
+/** Matches a redemption no invoice has settled; Mongo's null match misses an unset field. */
 const UNSETTLED = { OR: [{ invoiceId: null }, { invoiceId: { isSet: false } }] };
 
 /** One promo use to record. */
@@ -26,9 +21,8 @@ export interface RedemptionInput {
 }
 
 /**
- * Records a promo redemption, swallowing every error. Callers await this only
- * so it runs before Vercel freezes the instance, never so its result can block
- * them.
+ * Records a promo redemption, swallowing every error. Awaited only so it runs before Vercel
+ * freezes the instance.
  * @param input - The redemption to record.
  * @returns Promise that resolves once the write has been attempted.
  */
@@ -63,21 +57,9 @@ export interface SettleInput {
 }
 
 /**
- * Records what a promo was really worth, once an invoice says so.
- *
- * A booked job already recorded a redemption at booking time with no value -
- * the discount is not known until the work is priced. That row is updated
- * rather than a second one written, so one job is one redemption and a cap
- * counts jobs rather than touchpoints. A job that never came from a booking
- * (walk-up, phone) has no row yet and gets one here, which is also what makes
- * calculator jobs count toward a cap at all.
- *
- * A job billed under a different promo from the one it was booked with (a code
- * given at the job, say) releases the booking-time row, so the promo the
- * customer did not end up using stops counting against them.
- *
- * Bookkeeping only: it never throws, because saving an invoice must not fail
- * over analytics.
+ * Records what a promo was really worth once invoiced. Updates the booking-time row (so one job
+ * is one redemption) or creates one for walk-up jobs, and releases the booking's rows for any
+ * other promo. Never throws.
  * @param input - The redemption to settle.
  * @returns Promise that resolves once the write has been attempted.
  */
@@ -122,17 +104,8 @@ export async function settlePromoRedemption(input: SettleInput): Promise<void> {
 }
 
 /**
- * Releases the redemption a booking recorded when it was made, once it is
- * clear the promo will not be used: the booking was cancelled or no-showed, or
- * its job was billed with no promo discount.
- *
- * Left in place, the row keeps counting against the promo's cap and the
- * customer's own limit, so someone who cancels and rebooks is refused the promo
- * they never used. Only unsettled rows go - a row an invoice has settled
- * records a discount that was really given.
- *
- * Bookkeeping only: it never throws, because a cancellation must not fail over
- * analytics.
+ * Releases a booking's unsettled redemptions once the promo won't be used (cancelled,
+ * no-show, or billed without it), so a rebooking isn't refused it. Never throws.
  * @param bookingId - The booking whose unsettled redemptions to release.
  * @returns Promise that resolves once the delete has been attempted.
  */
@@ -145,12 +118,8 @@ export async function releaseBookingRedemptions(bookingId: string): Promise<void
 }
 
 /**
- * Releases the redemption a voided invoice settled, since a void means the discount was
- * never really given. A row that came from a booking goes back to its booking-time state
- * (no invoice, no value), so a re-issued invoice for the same job settles it again and
- * the job still counts once. A row the invoice created on its own is deleted.
- *
- * Bookkeeping only: it never throws, because a void must not fail over analytics.
+ * Releases what a voided invoice settled: booking rows revert to their booking-time state
+ * (so a re-issue still counts once), invoice-only rows are deleted. Never throws.
  * @param invoiceId - The voided invoice.
  * @returns Promise that resolves once the writes have been attempted.
  */

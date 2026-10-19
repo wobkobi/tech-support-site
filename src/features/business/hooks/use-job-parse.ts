@@ -1,8 +1,7 @@
 "use client";
 // src/features/business/hooks/use-job-parse.ts
-// The calculator's AI parse session: the "Describe the job" text, the parse-job call
-// with its clarifying-question round, and hydration of a parse result into the
-// calculator's time, travel, tasks, parts, notes and the paid-in-cash tick.
+// The calculator's AI parse session: the parse-job call with its clarifying questions, and
+// hydration of the result into time, travel, tasks, parts, notes and payment.
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import type { AlreadyPaidState } from "@/features/business/lib/already-paid-input";
@@ -130,20 +129,13 @@ export function useJobParse({
   const [hasParsed, setHasParsed] = useState(false);
   const [clarifyQuestions, setClarifyQuestions] = useState<ParseJobQuestion[]>([]);
   const [clarifyAnswers, setClarifyAnswers] = useState<Record<string, string>>({});
-  // Bumped by every parse and by Clear, so a reply that lands after either is dropped
-  // instead of overwriting the form.
+  // Bumped by every parse and by Clear, so a late reply is dropped.
   const requestId = useRef(0);
 
   /**
-   * The job's known windows. A booked event's own slots, unless the operator has edited
-   * the times; then (or with no booking) the complete ranges on the Time card, provided
-   * they are real times. Without a window, a description with no times parses to none and
-   * the tasks stay at their quick-task guesses.
-   *
-   * A Time card holding nothing but ranges the description itself states has not edited
-   * the booking: it is a later visit ("Friday, 1:46 pm to 2:05 pm") read back by an
-   * earlier parse that dropped the booked window. The booking's slots go back in ahead of
-   * it so the booked visit still bills; buildParseInput then skips the restated range.
+   * The job's known windows: the booked slots unless the times were edited, else the Time
+   * card's real ranges. Ranges the description itself states (an earlier parse's read-back)
+   * don't count as an edit, so the booked slots go back in ahead of them.
    * @returns The windows, and whether they are a merged booking to keep as-is.
    */
   function knownWindow(): { slots: WindowSlot[]; merged: boolean } {
@@ -168,10 +160,8 @@ export function useJobParse({
   }
 
   /**
-   * Applies a parsed job response to the calculator state, hydrating time +
-   * tasks + parts + notes from the AI parse result. The auto travel entry is
-   * created whenever the parser found any drive time; calcTravelCharge
-   * applies the $10 minimum so a 1-min drive still bills the published floor.
+   * Applies a parse result to the calculator. Any drive time creates the auto travel entry;
+   * calcTravelCharge applies the $10 minimum.
    * @param result - The parsed job response returned by the AI.
    * @param known - The known windows the description was sent with.
    * @param known.slots - Booked slots or real Time card ranges; empty when none.
@@ -183,19 +173,14 @@ export function useJobParse({
   ): void {
     const span = parsedWindow(result, known.slots, nzNowTime(), known.merged);
     setFollowUpMins(span.followUpMins);
-    // A merged job's slots are the corrected calendar windows, so the parse fills
-    // everything but the times. On a single event the description wins, and "Reset to
-    // event times" undoes a bad guess. Stated times count as real for the next parse; a
-    // window made up from a bare duration doesn't, or a later "about 3 hours" would be
-    // capped to the made-up one.
+    // A merged job keeps its calendar times; otherwise the description wins. Only stated
+    // times count as real, so a window made up from a bare duration can't cap a later parse.
     if (span.timeRanges) {
       setTimeRanges(span.timeRanges);
       setTimesSet(span.stated);
     }
 
-    // A reparse is the new truth for the auto travel entry, the parsed out-of-pocket
-    // costs (parking, tolls) and the parsed store runs. Operator-typed manual entries
-    // survive it, so they don't have to be re-typed after every AI tweak.
+    // A reparse replaces the auto travel entry, parsed costs and store runs; manual entries survive.
     setJobAddress(result.destination ?? "");
     const parsedCosts = [
       ...parsedCostEntries(result),
@@ -204,10 +189,8 @@ export function useJobParse({
     const freshAuto = parsedAutoTravel(result, pricing.travelRatePerHour, pricing.minTravelCharge);
     if (freshAuto) {
       setTravelEntries((prev) => {
-        // Google's live predictions drift between calls (minutes, and even the
-        // route), so a reparse of the same destination keeps the existing trip
-        // rather than silently moving the price - including a price the operator
-        // typed over. "Look up" is the refresh. Either way there is one trip.
+        // Google's predictions drift between calls, so the same destination keeps the
+        // existing trip and price. "Look up" is the refresh.
         const existingTrip = prev.find(isTripDrive);
         const sameDestination =
           existingTrip?.destination?.trim().toLowerCase() ===
@@ -219,14 +202,8 @@ export function useJobParse({
         ];
       });
     } else {
-      // No drive time from the parse (remote, or geocoded to origin): drop the stale auto
-      // entry, keep manual ones, and still carry parsed disbursements - a walking-distance
-      // job can still have parking.
-      //
-      // Booked jobs are the exception: their auto entry comes from the frozen TravelBlock,
-      // a drive that was actually measured, and a description that just never mentions the
-      // trip is not evidence it did not happen. noTravelCharge still wins - that is the
-      // parser being told the trip was on foot or on the house, not an omission.
+      // No drive time: drop the auto entry but keep parsed disbursements (parking). A booked
+      // job keeps its measured TravelBlock entry unless noTravelCharge says otherwise.
       const keepSeededTravel = eventPrefill !== null && !result.noTravelCharge;
       setTravelEntries((prev) => [
         ...(keepSeededTravel ? prev.filter(isTripDrive) : []),
@@ -246,16 +223,14 @@ export function useJobParse({
     if (fitNote) toast(fitNote, { tone: "info" });
     setParts(result.parts.map((p) => ({ description: p.description, cost: p.cost })));
     if (result.notes) setNotes(result.notes);
-    // Only ever fills: a description that doesn't mention payment says nothing either way.
-    // A stated amount may cover only part of the bill, so it goes in Already paid and the
-    // rest stays owing; cash with no amount means the whole bill.
+    // Only ever fills. A stated amount goes in Already paid; cash with no amount is the whole bill.
     if (result.cashPaid) setAlreadyPaid({ amount: result.cashPaid.toFixed(2), method: "Cash" });
     else if (result.paidCash) setPaidCash(true);
   }
 
   /**
-   * Submits the free-text AI input to the parse-job API and applies the result to the calculator
-   * state. If the AI needs clarification it returns questions instead of a result.
+   * Sends the description to the parse-job API and applies the result, or shows its
+   * clarifying questions.
    * @param answers - Optional answers to previous clarifying questions to include in the request.
    */
   async function handleParse(answers?: Record<string, string>): Promise<void> {
@@ -270,9 +245,7 @@ export function useJobParse({
       const known = knownWindow();
       const input = buildParseInput(aiInput, known.slots);
       const body: Record<string, unknown> = { input, jobDate };
-      // Typed descriptions rarely repeat the address, so hand the current job address
-      // (event prefill or Travel card) to the route as a travel fallback. The AI's own
-      // extracted destination still wins, and a remote booking sends nothing.
+      // Current job address as a travel fallback; the AI's own destination still wins.
       const fallbackDestination = jobAddress.trim();
       if (fallbackDestination && eventPrefill?.meetingType !== "remote") {
         body.fallbackDestination = fallbackDestination;

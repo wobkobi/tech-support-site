@@ -1,8 +1,6 @@
 // src/app/api/cron/sync-sheets/route.ts
-// Cron endpoint (Bearer-authorised) that reconciles the Cashbook and Expenses Google
-// Sheets tabs with MongoDB via runSheetsImport (sheet wins; matched by the hidden
-// column-Z Sync ID) and self-heals site entries whose sheet append failed. GET runs
-// hourly via cron-job.org and returns 503 when the sync fails.
+// Hourly cron reconciling the Cashbook and Expenses sheets with MongoDB (sheet wins,
+// matched by the column-Z Sync ID) and healing failed sheet appends.
 
 import { runSheetsImport } from "@/features/business/lib/sheets-import";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -12,7 +10,6 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * GET /api/cron/sync-sheets
  * Reconciles the Cashbook and Expenses Google Sheets tabs with MongoDB.
- * Run hourly via cron-job.org with Authorization: Bearer <CRON_SECRET>.
  * @param request - Incoming cron request.
  * @returns JSON with counts of records imported, updated, skipped, and healed.
  */

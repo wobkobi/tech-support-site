@@ -1,7 +1,6 @@
 // src/features/business/lib/tax/asset-classes.ts
-// The IR265 (March 2026) depreciation classes a one-person IT support business uses.
-// Picking a class fills in the rate; the register can still override it per asset.
-// Full list and anything not here: https://www.ird.govt.nz/rate-finder
+// IR265 (March 2026) depreciation classes this business uses; rates can be overridden per asset.
+// Full list: https://www.ird.govt.nz/rate-finder
 
 import type { AssetClass } from "@/features/business/lib/tax/types";
 
@@ -10,8 +9,7 @@ export const VEHICLE_CLASS_KEY = "vehicle";
 
 /** Built-in IR265 subset, in picker order. Rates are fractions. */
 export const ASSET_CLASSES: readonly AssetClass[] = [
-  // Computer monitors have no row of their own in the March 2026 IR265; they sit under
-  // the computer equipment default until the accountant says otherwise.
+  // IR265 has no monitor row, so monitors sit under computer equipment.
   {
     key: "computer",
     label: "Computer, laptop or monitor",

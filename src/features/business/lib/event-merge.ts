@@ -1,8 +1,6 @@
 // src/features/business/lib/event-merge.ts
-// Decides which other calendar events the calculator offers to bill alongside
-// the one being billed. Suggestion only - nothing merges without the operator
-// ticking it, and the gap between merged events is never billed (each event
-// lands as its own time slot, and the slot sum ignores what sits between them).
+// Suggests other calendar events to bill alongside the current one. Nothing merges unticked,
+// and gaps between merged events are never billed.
 
 import { MERGE_SUGGEST_GAP_MINS } from "@/features/business/lib/pricing-policy";
 import { NZ_TZ } from "@/shared/lib/timezone-utils";
@@ -27,11 +25,7 @@ export interface MergeSuggestion {
   sameClient: boolean;
   /** Same job address as the anchor event. */
   sameAddress: boolean;
-  /**
-   * Pre-ticked in the picker. Client or address match is strong enough to
-   * assume one job; a bare time-proximity match is offered unticked so two
-   * unrelated customers can never merge by a stray Enter.
-   */
+  /** Pre-ticked on a client or address match; a time-only match starts unticked. */
   preselected: boolean;
   /** Operator-facing reason chip, e.g. "20m gap · same address". */
   reason: string;
@@ -46,9 +40,7 @@ const NZ_DAY = new Intl.DateTimeFormat("en-CA", {
 });
 
 /**
- * NZ-local calendar day of an ISO timestamp. The gap rule is same-day, and
- * "same day" has to mean the operator's day, not UTC's - a 9pm job is still
- * the same NZ day as a 10am one but a different UTC day for half the year.
+ * NZ-local calendar day of an ISO timestamp; the same-day rule means the operator's day, not UTC's.
  * @param iso - ISO timestamp.
  * @returns NZ-local YYYY-MM-DD.
  */
@@ -57,10 +49,8 @@ export function nzDayKey(iso: string): string {
 }
 
 /**
- * Normalises an event title or location for comparison: case-folded, with
- * punctuation and repeated whitespace flattened. Calendar entries for the same
- * client drift ("Jane Smith" vs "Jane  Smith -"), and a literal compare would
- * miss the match that matters most.
+ * Normalises a title or location for comparison (case, punctuation, whitespace), since
+ * entries drift ("Jane Smith" vs "Jane  Smith -").
  * @param value - Raw title or location, possibly null.
  * @returns Comparison key; empty string when there is nothing to compare.
  */
@@ -74,10 +64,8 @@ function comparisonKey(value: string | null): string {
 }
 
 /**
- * Minutes between two events, measured from the earlier one's end to the later
- * one's start. Overlapping events give 0, not a negative gap - an overlap is a
- * calendar mistake, and treating it as "no gap" keeps it offerable rather than
- * silently dropping it below the threshold test.
+ * Minutes from the earlier event's end to the later one's start; an overlap gives 0 so it
+ * stays offerable.
  * @param a - One event.
  * @param b - The other event.
  * @returns Whole minutes of gap, floored at 0.
@@ -113,14 +101,8 @@ function describe(gapMins: number, sameClient: boolean, sameAddress: boolean): s
 }
 
 /**
- * Finds the events worth offering alongside the ones already being billed:
- * same NZ day, and within `gapLimitMins` of an anchor or of anything already
- * chained onto one. The chaining is what lets three or four short visits in an
- * afternoon come through as one suggestion - each hop only has to clear the
- * threshold against its neighbour, not against the first event of the day.
- *
- * Candidates are returned in start order with the anchors excluded. A zero
- * `gapLimitMins` disables suggestions entirely.
+ * Finds same-NZ-day events within `gapLimitMins` of an anchor or anything chained onto one,
+ * so each hop only clears its neighbour. Anchors excluded; a zero limit disables it.
  * @param anchors - The events already being billed (at least one).
  * @param all - Every recent event available to the picker.
  * @param gapLimitMins - Largest offerable gap; defaults to the code fallback.
@@ -136,8 +118,7 @@ export function findMergeSuggestions(
   const earliest = [...anchors].sort((a, b) => a.start.localeCompare(b.start))[0];
   if (!earliest) return [];
   const day = nzDayKey(earliest.start);
-  // Match against ANY anchor: a merged run can span two calendar titles for
-  // the same customer, and either one is evidence for the next hop.
+  // Match ANY anchor: a merged run can span two titles for one customer.
   const anchorClients = new Set(anchors.map((a) => comparisonKey(a.summary)).filter(Boolean));
   const anchorAddresses = new Set(anchors.map((a) => comparisonKey(a.location)).filter(Boolean));
 
@@ -145,9 +126,7 @@ export function findMergeSuggestions(
     .filter((e) => !anchorIds.has(e.id) && nzDayKey(e.start) === day)
     .sort((a, b) => a.start.localeCompare(b.start));
 
-  // Grow the chain outward from the anchors: an event joins when it is within
-  // the threshold of any event already in the chain, then becomes a stepping
-  // stone for the next one. Repeats until a pass adds nothing.
+  // Grow the chain until a pass adds nothing; each joiner becomes a stepping stone.
   const chain: MergeCandidateEvent[] = [...anchors];
   const gaps = new Map<string, number>();
   let grew = true;

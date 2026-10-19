@@ -22,13 +22,8 @@ export const BACKDROP = "public/source/backdrop.jpg"; // Background image
 /* ---------- Favicon Specs ---------- */
 
 /**
- * Specification for a single favicon variant.
- *
- * Only browser-tab favicons (`favicon-16/32`) get a `-dark` variant: those are
- * the only icons where `prefers-color-scheme` actually works (via the
- * `media` attribute on `<link rel="icon">`). iOS does not honour `media` on
- * `apple-touch-icon`, and the PWA manifest does not support media-query icons,
- * so generating dark variants for those is dead weight.
+ * Specification for a single favicon variant. Only tab favicons get a `-dark` variant:
+ * iOS touch icons and the PWA manifest ignore `media` queries.
  */
 export interface IconSpec {
   /** Output filename without extension. */
@@ -272,24 +267,18 @@ export interface AdditionalAsset {
   /** Output file format. */
   format: "png" | "jpg";
   /**
-   * Solid fill painted behind the art instead of leaving it transparent, with
-   * `plateRadius` rounding the corners. For assets that land on a background
-   * this file cannot control - a mail client in dark mode, say - where the
-   * deep-navy mark on a dark backdrop reads as nothing.
+   * Solid fill behind the art, for backgrounds outside the site's control (dark-mode mail clients
+   * would swallow the navy mark).
    */
   plate?: string;
   /** Corner radius in pixels for {@link AdditionalAsset.plate}. Ignored without it. */
   plateRadius?: number;
 }
 
-// public/assets/email-signature-400x135.png is deliberately absent from this list and must
-// not be deleted: already-delivered emails hotlink it and fetch it on open, so it has to
-// keep resolving. build:icons only writes, never prunes, so the orphan is stable.
+// Never delete public/assets/email-signature-400x135.png: delivered emails still hotlink it
 export const ADDITIONAL_ASSETS: AdditionalAsset[] = [
-  // Email signature logo, for the app's emails and for pasting into a mail client's own
-  // signature. Carries a white plate so the deep-navy mark stays readable in a dark-mode
-  // client. 280px because a pasted signature renders at natural width and anything wider
-  // than an iPhone compose viewport gets a scrollbar - also exactly 2x the 140px display.
+  // Email signature: white plate for dark-mode clients; 280px (2x the 140px display) so a
+  // pasted signature fits an iPhone compose viewport
   {
     name: "email-signature-280x95",
     width: 280,
@@ -333,12 +322,9 @@ export interface BackdropVariant {
 }
 
 export const BACKDROP_VARIANTS: BackdropVariant[] = [
-  // Primary backdrop for AVIF-capable browsers via <picture>. Heavily blurred (radius 35)
-  // and scaled 110%, so 1440px upscales invisibly on wide screens at roughly a quarter the
-  // bytes of a 2560px source. q90 + effort=9 stays visually lossless.
+  // Heavy blur (radius 35) lets 1440px upscale invisibly at ~1/4 the bytes of 2560px
   { name: "backdrop-blur", width: 1440, quality: 90, format: "avif" },
-  // WebP fallback for iOS 15 / older Safari (iPhone 7 etc.) - no AVIF support
-  // there. Higher quality since the audience that hits this is small.
+  // WebP fallback for iOS 15 / older Safari (no AVIF)
   { name: "backdrop-blur", width: 1440, quality: 90, format: "webp" },
 ];
 
@@ -357,9 +343,8 @@ export interface LegacyImage {
 }
 
 /**
- * public/legacy.html is served as a static file, so it can't use the Next image
- * optimiser and the browsers it serves decode neither AVIF nor WebP. These JPEGs
- * stand in for the full-size originals (1.1 MB and 700 KB).
+ * Small JPEGs for static public/legacy.html, whose browsers decode neither AVIF nor WebP
+ * and which bypasses the Next image optimiser.
  */
 export const LEGACY_IMAGES: LegacyImage[] = [
   { source: BACKDROP, name: "legacy-hero", width: 1600, quality: 72 },

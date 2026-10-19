@@ -1,12 +1,7 @@
 "use client";
 // src/features/business/components/ExpensesView.tsx
-// Records, edits, and lists expense entries against /api/business/expenses. The add form
-// (ExpenseForm) doubles as the edit form and previews the GST split. The list has search,
-// FY + method + category filters, a missing-receipt toggle, sortable columns, filter-aware
-// summary cards with a per-category breakdown drill-in, a "Migrate to subscription" row
-// action, and "Turn into an asset" on rows over the low-value write-off threshold ("View
-// asset" once one is linked). The rows render in ExpensesListRows.
-// Totals use the GST basis, and a new expense defaults to 0% GST while not registered.
+// Records, edits and lists expenses against /api/business/expenses, with filters,
+// summary cards and row actions. Totals use the GST basis.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
@@ -111,11 +106,9 @@ export function ExpensesView({
     description: "",
     category: "Other",
     amountIncl: "",
-    // No GST to claim while unregistered, so a new expense isn't split; an edit keeps
-    // its own rate (startEdit).
+    // No GST split while unregistered; an edit keeps its own rate.
     gstRate: isGstRegisteredOn(todayISO(), gst) ? "0.15" : "0",
-    // Cast to string so the field stays widenable; the const-array element is a
-    // literal type, which would otherwise pin `method` and reject edits.
+    // Widen to string, or the literal type pins `method`.
     method: PAYMENT_METHODS[0] as string,
     receipt: false,
     notes: "",
@@ -124,11 +117,9 @@ export function ExpensesView({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  // Phones only: the form starts folded so the list isn't pushed a screen down.
-  // lg+ always shows it.
+  // Phones start with the form folded; lg+ always shows it.
   const [formOpen, setFormOpen] = useState(false);
-  // The mobile + button links here with ?new=<stamp>; each fresh stamp opens the form,
-  // including when this page is already showing and only the query changed.
+  // Each fresh ?new=<stamp> from the mobile + button opens the form.
   const newStamp = useSearchParams().get("new");
   const [openedFor, setOpenedFor] = useState<string | null>(null);
   if (newStamp && newStamp !== openedFor) {
@@ -150,9 +141,8 @@ export function ExpensesView({
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [migrateTarget, setMigrateTarget] = useState<ExpenseEntry | null>(null);
-  // Group keys that already have an active subscription, so their rows offer no
-  // second Migrate - the subscription records each payment, and a copy doubles it.
-  // Null until loaded: with no answer, Migrate stays hidden rather than guessing.
+  // Group keys with an active subscription, so Migrate isn't offered twice. Null until
+  // loaded, which hides Migrate.
   const [subscribedKeys, setSubscribedKeys] = useState<Set<string> | null>(null);
   const [subsLoadKey, setSubsLoadKey] = useState(0);
   // A failed load shows a banner with Try again, never an empty ledger or $0 totals.
@@ -258,8 +248,7 @@ export function ExpensesView({
         setEntries((prev) =>
           editingId ? prev.map((en) => (en.id === editingId ? d.entry : en)) : [d.entry, ...prev],
         );
-        // A sheet-sync failure is the more useful message, so it replaces the
-        // plain confirmation rather than stacking a second toast on top of it.
+        // A sheet-sync failure replaces the plain confirmation.
         if (d.sheetSyncWarning) {
           toast("Saved, but the Expenses sheet update didn't go through.", { tone: "warning" });
         } else {
@@ -408,8 +397,7 @@ export function ExpensesView({
     ].join("|"),
   );
 
-  // GST basis: a row dated before registration (or any row while unregistered) costs its
-  // GST-inclusive amount, and none of its GST is claimable.
+  // GST basis: rows before registration cost incl. GST with none claimable.
   const totalExpenses = filtered.reduce((s, e) => s + expenseTaxBasis(e, gst), 0);
   const totalGst = filtered.reduce(
     (s, e) => s + (isGstRegisteredOn(e.date, gst) ? e.gstAmount : 0),

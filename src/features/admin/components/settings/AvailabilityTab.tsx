@@ -1,10 +1,7 @@
 "use client";
 // src/features/admin/components/settings/AvailabilityTab.tsx
-// Editor for the availability group: the master accepting-bookings switch + paused
-// message, the per-weekday hours (with optional midday break and day-off), the
-// booking-window rules, job durations, and daily caps. Saves through the shared settings
-// form hook; guardrails (e.g. a day too short for a job) come back from the API and
-// surface inline.
+// Editor for the availability group: booking switch, weekly hours, booking rules, durations,
+// daily caps and morning guards. API guardrails surface inline.
 
 import { AvailabilityPreview } from "@/features/admin/components/settings/AvailabilityPreview";
 import {
@@ -368,9 +365,8 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
         />
       </div>
 
-      {/* Morning guards - protect early slots once the night-before arrives.
-          id matches the `morningGuards` field-meta key so search can scroll
-          here; the repeating rows have no single input to carry it. */}
+      {/* Morning guards. The id matches the `morningGuards` field-meta key so search can
+          scroll here; the repeating rows have no single input to carry it. */}
       <h3 id="morningGuards" tabIndex={-1} className={cn("mt-5", ADMIN_EYEBROW_CLS)}>
         Morning guards
       </h3>

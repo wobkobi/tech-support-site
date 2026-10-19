@@ -1,7 +1,6 @@
 // src/app/api/business/rates/[id]/route.ts
-// Admin single-rate endpoint. PATCH applies a sparse update, clearing the default flag on
-// other rows when isDefault is set; DELETE removes the rate but blocks deletion of the
-// last remaining one. Both return 404 when the rate does not exist.
+// Admin single-rate endpoint: sparse PATCH (isDefault is exclusive) and DELETE, which
+// refuses to remove the last rate.
 
 import { RATE_CONFIG_TAG } from "@/features/business/lib/pricing-policy.server";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -29,9 +28,7 @@ export async function PATCH(
   const body = await request.json();
   const { label, ratePerHour, flatRate, hourlyDelta, percentDelta, unit, isDefault } = body;
 
-  // Reject non-finite numerics before they reach Prisma (NaN from an empty form
-  // field, Infinity from a crafted body) - these values feed the public
-  // estimator and the AI calculator, so a bad rate must never persist.
+  // Reject NaN/Infinity: rates feed the public estimator and AI calculator.
   for (const [key, val] of Object.entries({ ratePerHour, flatRate, hourlyDelta, percentDelta })) {
     if (val !== undefined && val !== null && !Number.isFinite(val)) {
       return errorResponse(`Invalid ${key}`, 400);
@@ -51,9 +48,8 @@ export async function PATCH(
         ...(isDefault !== undefined && { isDefault }),
       },
     });
-    // Clear the default flag on the other rows only after the target update
-    // succeeds - a stale or deleted id must not wipe every default and then
-    // 404, leaving zero default rates for the public estimator to fall through.
+    // Clear other defaults only after the update succeeds, so a stale id can't
+    // leave zero default rates.
     if (isDefault) {
       await prisma.rateConfig.updateMany({
         where: { id: { not: id } },

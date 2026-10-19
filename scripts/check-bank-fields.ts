@@ -1,7 +1,6 @@
 // scripts/check-bank-fields.ts
-// The Particulars value on the invoice's bank-transfer call-out, which is what names the payer
-// on the operator's statement. A business reference must still identify it: "68 Ltd" as "68"
-// alone doesn't.
+// The invoice's bank-transfer Particulars, which names the payer on the statement
+// ("68 Ltd" cut to "68" wouldn't).
 // Run with: npm test -- bank-fields
 
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";

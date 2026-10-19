@@ -1,23 +1,14 @@
 // scripts/smoke-test.ts
-// Optionally builds the Next.js app, starts it, then visits every page with Puppeteer to
-// collect failed responses, console errors and navigation timing. Each page must also end
-// on the URL it asked for and render no leaked raw values (NaN, undefined); the 404 page
-// and the public JSON endpoints are checked alongside.
-//
+// Builds and starts the app (or targets a deployment), then visits every page with Puppeteer
+// for failed responses, console errors, wrong final URLs, leaked raw values and timing.
 // Usage:
 //   npx tsx scripts/smoke-test.ts              # build > start > test
 //   npx tsx scripts/smoke-test.ts --skip-build # start > test (reuse existing .next)
 //   npx tsx scripts/smoke-test.ts --port=3001
 //   npx tsx scripts/smoke-test.ts --base-url=https://deploy.example.com
 //     # test a deployed URL, no local build or server (--url is an alias)
-//
-// Secrets: ADMIN_SECRET unlocks admin pages (remotely it must match the DEPLOYED value) and
-// VERCEL_AUTOMATION_BYPASS_SECRET clears the Deployment Protection wall. Both go ONLY to
-// the target's own origin via request interception, never to third-party hosts (maps,
-// fonts, the Meta pixel). The bypass is also primed as a session cookie before any page is
-// measured (see primeBypassCookie), since headers alone leave redirected sub-resources
-// looping through SSO.
-//
+// Secrets: ADMIN_SECRET (must match the deployed value) and VERCEL_AUTOMATION_BYPASS_SECRET,
+// sent only to the target origin.
 // Exit codes:
 //   0  every page and endpoint passed
 //   1  a check failed, or the arguments were invalid
@@ -63,9 +54,7 @@ interface ApiCheck {
 }
 
 /**
- * Auth context when testing a deployed URL (`--base-url`). Headers here are attached
- * ONLY to requests whose origin matches {@link RemoteAuth.origin}, via request
- * interception, so the admin secret never leaks to third-party hosts.
+ * Auth context for a deployed URL; headers go only to {@link RemoteAuth.origin}.
  */
 interface RemoteAuth {
   /** Deployment base URL (trailing slash stripped). */
@@ -81,14 +70,12 @@ interface RemoteAuth {
 /* --------------------------------------------------------------- constants */
 
 /**
- * Per-route overrides for auto-discovered pages. Keyed by the discovered URL
- * path. Anything not listed uses the auto-generated name and no ignores.
+ * Per-route overrides for auto-discovered pages, keyed by URL path.
  */
 const PAGE_OVERRIDES: Record<string, { name?: string; ignoreErrors?: string[] }> = {
   "/": { name: "Home" },
   "/booking/cancel": {
-    // With no token the page early-returns before any fetch and just renders
-    // the "Missing cancel token." message - no API call, no error to ignore.
+    // With no token the page renders "Missing cancel token." without any fetch.
     name: "Booking Cancel (no token)",
   },
   "/booking/success": { name: "Booking Success (no token)" },
@@ -98,23 +85,18 @@ const PAGE_OVERRIDES: Record<string, { name?: string; ignoreErrors?: string[] }>
   "/admin/business": { name: "Admin Business Overview" },
   "/admin/business/calculator": {
     name: "Admin Calculator",
-    // Maps API key restrictions can 4xx locally; legacy widget also logs a
-    // deprecation warning that's expected.
+    // Maps key restrictions can 4xx locally; the widget logs an expected deprecation warning.
     ignoreErrors: ["maps.googleapis.com", "google.maps.places.Autocomplete"],
   },
 };
 
 /**
- * Discovered URL paths to skip - internal-only surfaces, or routes that crash
- * without sample data the test can't fabricate. Dynamic routes (`[id]`) and
- * collisions are already filtered automatically; this is for everything else.
+ * Discovered paths to skip: internal-only surfaces or routes needing sample data.
  */
 const SKIP_PATHS: ReadonlySet<string> = new Set([]);
 
 /**
- * Path prefixes considered admin. Marked specs get the X-Admin-Secret header
- * attached at request time (scripts and cron use the header path; the admin
- * UI uses the session cookie).
+ * Path prefixes considered admin; their specs get the X-Admin-Secret header.
  */
 const ADMIN_PREFIXES: ReadonlyArray<string> = ["/admin"];
 
@@ -131,31 +113,21 @@ const TTFB_WARN_MS = 1_500;
 const TTFB_FAIL_MS = 10_000;
 
 /**
- * URL substrings for resources that are expected to 404 locally.
- * Vercel Analytics and Speed Insights only exist on the Vercel platform.
+ * URL substrings expected to 404 locally (Vercel-only Analytics and Speed Insights).
  */
 const IGNORE_404_URLS = ["/_vercel/insights/", "/_vercel/speed-insights/"];
 
 /**
- * Console-error substrings ignored on EVERY page: CSP violations that can fire on any
- * route, unlike the per-page ignoreErrors overrides. Both are the CSP working, not a
- * page defect.
- *
- * - connect.facebook.net: the Meta pixel detects Puppeteer as bot traffic and tries to
- *   beacon its own error log there, which the CSP blocks. It fires on random pages.
- * - vercel.live: Vercel injects its toolbar (vercel.live/_next-live/feedback/feedback.js)
- *   into preview deployments and the production CSP doesn't allow that host, so every
- *   preview page logs it. Production never carries the script.
- * - tags.tiqcdn.com/dle/: Thryv's tag fetches a per-business settings file there, which
- *   Thryv serves without CORS headers until they set up reporting for the account, so
- *   the browser blocks the read. Thryv's side, not a page defect.
+ * Console-error substrings ignored on every page: expected CSP/CORS blocks, not page defects.
+ * - connect.facebook.net: the Meta pixel's bot-traffic error beacon.
+ * - vercel.live: the preview-only Vercel toolbar.
+ * - tags.tiqcdn.com/dle/: Thryv's settings file, served without CORS headers.
  */
 const IGNORE_CONSOLE_GLOBAL = ["connect.facebook.net", "vercel.live", "tags.tiqcdn.com/dle/"];
 
 /**
- * Pages auto-discovery can't produce. A path that matches no route must answer a real
- * 404 with the themed not-found page, not a 200 soft-404 or a crash. The requested path
- * is asserted too: it is read client-side, so it proves hydration finished cleanly.
+ * Pages auto-discovery can't produce. An unknown path must answer a real themed 404; its
+ * client-rendered path proves hydration finished.
  */
 const EXTRA_PAGES: ReadonlyArray<PageSpec> = [
   {
@@ -173,9 +145,7 @@ const EXTRA_PAGES: ReadonlyArray<PageSpec> = [
 ];
 
 /**
- * Text that must never appear in a rendered page: a formatter or template that leaked
- * a raw value. Checked against `document.body.innerText`, so script bundles and input
- * values don't count. Case-sensitive, so ordinary prose won't trip "NaN".
+ * Leaked raw values that must never appear in `document.body.innerText` (case-sensitive).
  */
 const FORBIDDEN_TEXT: ReadonlyArray<string> = [
   "NaN",
@@ -185,9 +155,7 @@ const FORBIDDEN_TEXT: ReadonlyArray<string> = [
 ];
 
 /**
- * Public endpoints the booking flow and marketing pages read. Array fields may be
- * empty: rates fall back to hardcoded defaults, and days is empty while bookings are
- * paused, so only the shape is asserted.
+ * Public endpoints the booking flow and marketing pages read; only the shape is asserted.
  */
 const API_CHECKS: ReadonlyArray<ApiCheck> = [
   { path: "/api/health", okFlag: true },
@@ -198,22 +166,16 @@ const API_CHECKS: ReadonlyArray<ApiCheck> = [
 ];
 
 /**
- * Chrome echoes every 4xx/5xx sub-resource as a console error starting with this. The
- * response handler already records those with the real URL, so an echo only counts
- * when no response event was seen for its URL (browser-initiated fetches such as the
- * manifest can bypass page response events).
+ * Prefix of Chrome's console echo of a 4xx/5xx sub-resource; it only counts when no
+ * response event was seen for that URL.
  */
 const STATUS_ECHO_PREFIX = "Failed to load resource: the server responded with a status of";
 
 /* ---------------------------------------------------------------- helpers */
 
 /**
- * Walks the App Router tree and turns every `page.{tsx,ts,jsx,js}` into a route.
- * - Route groups `(...)` are stripped from the URL.
- * - Dynamic segments `[id]`, `[...slug]` are skipped (no sample data to test).
- * - Paths in {@link SKIP_PATHS} are filtered out.
- * - Names default to a Title-Cased version of the path; {@link PAGE_OVERRIDES}
- *   supplies friendlier names + per-page ignoreErrors.
+ * Turns every App Router page into a route: groups stripped, dynamic segments and
+ * {@link SKIP_PATHS} skipped, names from {@link PAGE_OVERRIDES} where given.
  * @returns Discovered routes split into public and admin.
  */
 function discoverPages(): { publicPages: PageSpec[]; adminPages: PageSpec[] } {
@@ -283,8 +245,7 @@ function routeToName(route: string): string {
 }
 
 /**
- * Resolves to a free TCP port chosen by the OS, avoiding conflicts with any
- * already-running server (e.g. `next dev` on 3000).
+ * Resolves to a free OS-chosen TCP port.
  * @returns Available port number.
  */
 function getFreePort(): Promise<number> {
@@ -308,16 +269,9 @@ function usageError(message: string): never {
 }
 
 /**
- * Parses the CLI arguments: `--skip-build`, plus `--port` and `--base-url` (alias
- * `--url`, matching the other scripts) in both `--flag=value` and `--flag value` form.
- *
- * An unknown flag or a bad value exits with a message instead of being ignored. A
- * misspelt target flag or an empty `--base-url=` would otherwise start a full local
- * build when a deployment was meant, and a schemeless URL would throw from `new URL`
- * outside main's try block as an unhandled rejection.
- * @returns Parsed flags. `port` is `null` when not specified - caller should
- *   call {@link getFreePort} to pick an available port automatically. `url` is
- *   the deployed target for remote mode, or `null` for the local build+server run.
+ * Parses `--skip-build`, `--port` and `--base-url` (alias `--url`); an unknown flag or
+ * bad value exits rather than silently starting a local build.
+ * @returns Parsed flags; `port` null means use {@link getFreePort}, `url` null means local.
  */
 function parseArgs(): { skipBuild: boolean; port: number | null; url: string | null } {
   const args = process.argv.slice(2);
@@ -374,16 +328,13 @@ function runBuild(): void {
 }
 
 /**
- * Spawns the production server (`next start`) on the given port and returns
- * the child process. Serves .next/ and public/ directly, so no asset copying
- * is needed.
+ * Spawns `next start` on the given port.
  * @param port - Port to listen on.
  * @returns Spawned child process.
  */
 function startServer(port: number): ChildProcess {
   console.log(`▶ Starting server on port ${port}…`);
-  // Invoke the Next.js bin through the current Node executable so the spawn
-  // works without a shell on Windows and Unix alike.
+  // Run the Next.js bin through Node so no shell is needed on any platform.
   return spawn(
     process.execPath,
     [path.join("node_modules", "next", "dist", "bin", "next"), "start", "-p", String(port)],
@@ -421,9 +372,7 @@ async function waitForServer(port: number, timeoutMs = 30_000): Promise<void> {
 }
 
 /**
- * Whether a request URL shares an origin (scheme + host + port) with the target
- * server. Used to scope auth headers so they never ride along on cross-origin
- * requests (maps, fonts, the Meta pixel).
+ * Whether a request URL shares the target's origin, to scope auth headers.
  * @param requestUrl - The outgoing request URL.
  * @param origin - The target origin to match against.
  * @returns True when the origins match; false for a blank or unparsable URL.
@@ -437,22 +386,9 @@ function isSameOrigin(requestUrl: string, origin: string): boolean {
 }
 
 /**
- * Establishes the Vercel Deployment Protection bypass cookie for the whole
- * browser session.
- *
- * The per-request headers attached in {@link checkPage} cover requests the
- * interceptor sees as same-origin, but that is not every request the browser
- * makes. A same-origin request that 302s out to the Vercel SSO host returns as
- * a cross-origin request, which is deliberately left unauthenticated so the
- * admin secret cannot leak; SSO then bounces it back to the deployment origin
- * and the chain repeats until Chrome aborts with ERR_TOO_MANY_REDIRECTS. That
- * shows up as a sub-resource failure on a page whose document loaded fine.
- *
- * Hitting the origin once with the bypass supplied as query parameters plus
- * `x-vercel-set-bypass-cookie` sets the `_vercel_jwt` cookie, which then rides
- * every later request that sends credentials, however it was initiated. The web
- * manifest is fetched without credentials, so it still loops; {@link checkPage}
- * filters that one case.
+ * Sets the Vercel bypass `_vercel_jwt` cookie for the whole session. Headers alone miss
+ * requests that bounce via SSO and loop to ERR_TOO_MANY_REDIRECTS; the uncredentialed
+ * web manifest still loops and {@link checkPage} filters it.
  * @param browser - Puppeteer browser instance.
  * @param remote - Remote-deployment auth context.
  */
@@ -479,9 +415,8 @@ async function primeBypassCookie(browser: Browser, remote: RemoteAuth): Promise<
 }
 
 /**
- * Visits a page with Puppeteer and fails it on a 4xx/5xx response, a console or page
- * error, a wrong document status, landing on a different URL, or leaked raw values in
- * the rendered text. Also collects TTFB, FCP and load timing.
+ * Visits a page and fails it on bad responses, console/page errors, a wrong status or
+ * final URL, or leaked raw values; collects timing.
  * @param browser - Puppeteer browser instance.
  * @param baseUrl - Server base URL.
  * @param spec - Page specification.
@@ -500,10 +435,8 @@ async function checkPage(
   const page = await browser.newPage();
 
   try {
-    // Attach secrets through interception scoped to the target origin, locally too:
-    // setExtraHTTPHeaders is page-wide and would send them to Google Maps, fonts and the
-    // Meta pixel. The bypass rides every origin request (public pages sit behind SSO too);
-    // the admin secret rides admin specs only.
+    // Attach secrets via origin-scoped interception (setExtraHTTPHeaders would leak them).
+    // The bypass goes on every origin request, the admin secret on admin specs only.
     const origin = remote?.origin ?? new URL(baseUrl).origin;
     const bypassSecret = remote?.bypassSecret ?? null;
     const localAdminSecret = process.env.ADMIN_SECRET || null;
@@ -524,8 +457,7 @@ async function checkPage(
       });
     }
 
-    // URLs that produced a 4xx/5xx response event, so the console echo of the same
-    // failure can be dropped instead of double-counted.
+    // 4xx/5xx URLs already recorded, so their console echo isn't double-counted.
     const failedResponseUrls = new Set<string>();
     const statusEchoes: { text: string; locUrl: string }[] = [];
 
@@ -552,9 +484,7 @@ async function checkPage(
       errors.push(`[pageerror] ${text}`);
     });
 
-    // React 19 hydration mismatches, error-boundary logging and app-level console.error
-    // land on this channel, not pageerror, so a page can pass the checks above and still
-    // be broken. The same known-missing URLs and per-page ignores are filtered.
+    // Hydration mismatches and app console.error land here, not on pageerror.
     page.on("console", (msg) => {
       if (msg.type() !== "error") return;
       const text = msg.text();
@@ -562,10 +492,7 @@ async function checkPage(
       if (IGNORE_404_URLS.some((s) => text.includes(s) || locUrl.includes(s))) return;
       if (IGNORE_CONSOLE_GLOBAL.some((s) => text.includes(s) || locUrl.includes(s))) return;
       if (spec.ignoreErrors?.some((s) => text.includes(s) || locUrl.includes(s)) ?? false) return;
-      // Deployment Protection loops the web manifest on a protected remote: the browser
-      // fetches it with credentials omitted (so the primed cookie never rides) and outside
-      // reliable interception. Limited to *.webmanifest so a real redirect loop on any
-      // other same-origin resource still fails the run.
+      // The uncredentialed web manifest loops on a protected remote; only *.webmanifest is excused.
       if (
         remote?.bypassSecret &&
         text.includes("ERR_TOO_MANY_REDIRECTS") &&
@@ -579,8 +506,7 @@ async function checkPage(
         statusEchoes.push({ text, locUrl });
         return;
       }
-      // Include the resource URL: "Failed to load resource" on its own names no
-      // culprit, which makes sub-resource failures undiagnosable from CI logs.
+      // Include the resource URL so the failure is diagnosable from CI logs.
       errors.push(locUrl ? `[console] ${text} (${locUrl})` : `[console] ${text}`);
     });
 
@@ -598,8 +524,7 @@ async function checkPage(
       errors.push(`document answered HTTP ${docStatus ?? "none"}, expected ${spec.expectStatus}`);
     }
 
-    // Where the browser ended up: a server redirect (an admin page bouncing to
-    // /admin/login) or a client-side router.replace never shows in the document status.
+    // Final URL catches redirects the document status doesn't show.
     const landed = new URL(page.url());
     const finalPath = `${landed.pathname}${landed.search}`;
     if (finalPath !== spec.path) errors.push(`landed on ${finalPath}, expected ${spec.path}`);
@@ -658,9 +583,8 @@ async function checkPage(
 }
 
 /**
- * Fetches each {@link API_CHECKS} endpoint directly and reports it like a page: HTTP
- * 200 with a JSON object, `ok: true` and array fields where expected. Only the bypass
- * header is sent (these routes are public), and only to the deployment origin.
+ * Fetches each {@link API_CHECKS} endpoint and expects 200 JSON with `ok: true` and the
+ * expected array fields.
  * @param baseUrl - Server base URL.
  * @param remote - Remote-deployment auth context, or null for the local server.
  * @returns One result per endpoint.
@@ -678,8 +602,7 @@ async function checkApis(baseUrl: string, remote: RemoteAuth | null): Promise<Pa
     try {
       const res = await fetch(`${baseUrl}${check.path}`, {
         headers,
-        // A protected deployment answers an SSO redirect; following it would parse
-        // the login HTML and hide the real cause behind a JSON error.
+        // Don't follow an SSO redirect, or the login HTML hides the real cause.
         redirect: "manual",
         signal: AbortSignal.timeout(30_000),
       });
@@ -769,9 +692,7 @@ function printTable(results: PageResult[]): void {
 (async () => {
   const { skipBuild, port: rawPort, url } = parseArgs();
 
-  // Remote mode: test a deployed URL, skipping the local build + server. Auth
-  // and protection-bypass secrets come from the environment and are scoped to
-  // the deployment origin inside checkPage.
+  // Remote mode: test a deployed URL, skipping the local build and server.
   const remote: RemoteAuth | null = url
     ? {
         baseUrl: url.replace(/\/$/, ""),
@@ -810,19 +731,13 @@ function printTable(results: PageResult[]): void {
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
-    // Clear the Deployment Protection wall for the whole session before any
-    // page is measured; per-request headers alone leave redirected sub-resources
-    // looping through SSO.
+    // Clear Deployment Protection for the whole session before measuring.
     if (remote) await primeBypassCookie(browser, remote);
 
-    // Auto-discover every page.tsx under src/app; route groups stripped,
-    // dynamic segments skipped, admin routes split out. New pages get tested
-    // automatically - no manual list to maintain.
+    // Auto-discover every page.tsx under src/app.
     const { publicPages, adminPages } = discoverPages();
 
-    // Admin pages need ADMIN_SECRET, which rides along as the X-Admin-Secret header
-    // (attached inside checkPage). Without it the proxy redirects every admin page to
-    // /admin/login, which would just measure the login page repeatedly.
+    // Admin pages need ADMIN_SECRET, else every one redirects to /admin/login.
     const adminToken = process.env.ADMIN_SECRET;
     const adminPagesAuthed: PageSpec[] = adminToken
       ? adminPages.map((spec) => ({ ...spec, isAdmin: true }))
@@ -842,8 +757,7 @@ function printTable(results: PageResult[]): void {
       const result = await checkPage(browser, baseUrl, spec, remote);
       results.push(result);
       const icon = result.status === "pass" ? "✓" : "✗";
-      // \x1b[2K clears the entire line so the new (shorter) line doesn't leave
-      // fragments of the longer "Loading..." message behind.
+      // \x1b[2K clears the line so no fragments of the longer message remain.
       process.stdout.write(
         `\r\x1b[2K  ${icon} ${spec.path.padEnd(40)} ${result.ttfbMs ?? "-"}ms TTFB\n`,
       );
@@ -874,10 +788,8 @@ function printTable(results: PageResult[]): void {
   } finally {
     await browser?.close();
     if (server?.pid) {
-      // On Windows SIGTERM doesn't reach child processes, so taskkill the whole tree to
-      // release the Prisma DLL before npm can update it. Flags take a single slash:
-      // execSync runs through cmd.exe, which rejects the Git Bash `//F` spelling as an
-      // invalid option. On other platforms taskkill is absent and SIGTERM does the job.
+      // Windows SIGTERM misses child processes, so taskkill the tree to free the Prisma DLL.
+      // Single-slash flags: execSync runs through cmd.exe, which rejects `//F`.
       try {
         execSync(`taskkill /F /T /PID ${server.pid}`, { stdio: "ignore" });
       } catch {

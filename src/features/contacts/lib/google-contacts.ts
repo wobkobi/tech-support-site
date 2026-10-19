@@ -1,9 +1,6 @@
 // src/features/contacts/lib/google-contacts.ts
-// Google People API bidirectional sync. Phones merge as a union (never overwrite).
-// Single-value fields (name, email, address) are latest-wins via `lastSyncedAt` +
-// `lastGoogleEtag`; if both sides changed and differ, a `ContactConflict` is recorded and
-// the admin resolves it. First-time sync (lastSyncedAt null) lets Google win for any
-// field it has populated.
+// Google People API two-way sync. Phones merge as a union; name, email and address are
+// latest-wins via `lastSyncedAt` + `lastGoogleEtag`, recording a `ContactConflict` when both changed.
 
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
@@ -25,11 +22,8 @@ function getPeopleClient(): people_v1.People {
 }
 
 /**
- * Maps a geocoder resolution onto the Contact address columns. A confident
- * match stores the canonical form and clears the review flags; an ambiguous or
- * unmatched address stores the raw text and raises them. A failed lookup
- * returns the raw text with no flag keys at all, so a Geocoding outage cannot
- * mark a whole sync pass for review or clear a flag that is still valid.
+ * Maps a geocoder resolution onto the Contact address columns. A failed lookup returns
+ * no flag keys, so a Geocoding outage neither raises nor clears review flags.
  * @param raw - Address text as it arrived from Google.
  * @returns Address columns to spread into a Contact create or update.
  */
@@ -52,9 +46,8 @@ async function addressFields(raw: string): Promise<{
 }
 
 /**
- * Best-effort deletion of a Google contact by resource name. Used when a local
- * contact is deleted or merged away so the Google side doesn't keep a stale row.
- * Never throws - a failure here must not fail the local operation.
+ * Best-effort deletion of a Google contact by resource name. Never throws, so the
+ * local delete or merge still succeeds.
  * @param resourceName - Google People API resource name (e.g. "people/c123").
  */
 export async function deleteContactFromGoogle(resourceName: string): Promise<void> {
@@ -66,28 +59,9 @@ export async function deleteContactFromGoogle(resourceName: string): Promise<voi
 }
 
 /**
- * Pulls a single saved Google contact into the local table, matched by email.
- *
- * The local table only mirrors Google Contacts as often as the sync cron runs,
- * so someone added to the phone minutes ago is missing from every lookup that
- * reads it - and the invoice flow then offers to add a person who is already a
- * contact. This closes that window for the one address being looked up.
- *
- * Reads `connections.list` rather than `searchContacts`: the search endpoint
- * answers from a per-account cache that a separate empty query has to warm, so
- * a cold call can report no match for a contact that exists. Listing is a
- * single request for an address book this size and can never disagree with what
- * a full import would have found.
- *
- * Finding the person by this email is Google confirming the address is theirs,
- * so a local row that is merely missing it gets it attached rather than
- * prompted for - the same write the next import would make. Matching (email,
- * then Google link, then NZ mobile) is delegated to
- * {@link findOrCreateContactByEmail} so this path lands on the same row the
- * sync would. Callers are expected to have missed on email locally already.
- *
- * Never throws: a People API failure returns null and leaves the caller on
- * whatever path it would have taken without this lookup.
+ * Pulls one Google contact into the local table by email, covering contacts added since
+ * the last sync cron. Uses `connections.list` because `searchContacts` reads a cache that
+ * can miss on a cold call. Matching goes through {@link findOrCreateContactByEmail}. Never throws.
  * @param email - Address to match, compared case-insensitively.
  * @returns The local contact id, or null when Google has no such person.
  */
@@ -133,11 +107,8 @@ export async function importGoogleContactByEmail(
       googleContactId: resourceName,
     });
 
-    // A fresh row holds Google's values verbatim, so stamp it as synced: without
-    // the etag and timestamp the next push reads both sides as changed and
-    // conflicts every field - the canonicalised address against Google's raw one
-    // first. One Date for both stamps, or an auto @updatedAt lands a few ms later
-    // and re-dirties the row. An attach is a genuine local change and stays dirty.
+    // Stamp a fresh row as synced or the next push conflicts every field. One Date for
+    // both stamps, or @updatedAt lands ms later and re-dirties it. An attach stays dirty.
     if (created) {
       const stampedAt = new Date();
       await prisma.contact.update({
@@ -151,27 +122,16 @@ export async function importGoogleContactByEmail(
     }
     return { contactId: contact.id };
   } catch (err) {
-    // Address passed as an argument, not interpolated: it arrives from a query
-    // string, and console treats its first argument as a format string.
+    // Not interpolated: the address comes from a query string and arg 1 is a format string.
     console.error("[google-contacts] importGoogleContactByEmail failed for %s:", needle, err);
     return null;
   }
 }
 
 /**
- * Imports all contacts from Google Contacts into the local database.
- * Paginates through all People API connections and links each Google person to
- * its local row by stored Google link, then email, then phone. Rows whose stored
- * `googleContactId` + `lastGoogleEtag` already match are skipped - the etag only
- * changes when Google's copy changes, and the skip keeps `updatedAt` untouched
- * so unchanged rows stay out of the push dirty set. Stores the Google resource
- * name as `googleContactId`.
- *
- * Matching happens in memory against normalised keys rather than in the query.
- * A Mongo equality filter only matches the stored string exactly, so a contact
- * saved as "Pat.Lee@Example.com" or "0210000000" never matched Google's
- * lowercased email or E.164 phone and was re-created as a duplicate on every
- * single run.
+ * Imports all Google contacts, linking each to a local row by Google link, then email,
+ * then phone. Rows with an unchanged etag are skipped. Matching is in memory on normalised
+ * keys, since a Mongo equality filter misses "Pat.Lee@Example.com" or "0210000000".
  * @returns The number of contacts created or updated (skipped rows not counted).
  */
 export async function importFromGoogleContacts(): Promise<number> {
@@ -192,9 +152,7 @@ export async function importFromGoogleContacts(): Promise<number> {
       lastGoogleEtag: string | null;
     }
 
-    // Index every live contact once, under each key a Google person can be
-    // matched on. The whole live set is loaded because the normalised forms
-    // can't be expressed as a query filter.
+    // Index every live contact under each key a Google person can match on.
     const liveContacts = await prisma.contact.findMany({
       where: { deletedAt: null },
       select: {
@@ -214,8 +172,7 @@ export async function importFromGoogleContacts(): Promise<number> {
     const byGoogleId = new Map<string, MatchRow>();
     const byEmail = new Map<string, MatchRow>();
     const byPhoneKey = new Map<string, MatchRow>();
-    // Phone > email, so a phone-only Google contact can be matched to a known
-    // email and imported.
+    // Phone > email, so a phone-only Google contact can pick up a known email.
     const emailByMobileKey = new Map<string, string>();
 
     for (const c of liveContacts) {
@@ -241,9 +198,7 @@ export async function importFromGoogleContacts(): Promise<number> {
         const key = normaliseContactPhone(p);
         if (!key) continue;
         if (!byPhoneKey.has(key)) byPhoneKey.set(key, row);
-        // Only resolve a phone-only Google contact to an email by a MOBILE match;
-        // landlines are often shared, so a landline hit would give the Google
-        // contact the wrong person's email (and merge them).
+        // Mobiles only: a shared landline would hand over the wrong person's email.
         if (c.email && isNZMobileKey(key) && !emailByMobileKey.has(key)) {
           emailByMobileKey.set(key, c.email);
         }
@@ -265,16 +220,12 @@ export async function importFromGoogleContacts(): Promise<number> {
       const connections = response.data.connections ?? [];
       pageToken = response.data.nextPageToken ?? undefined;
 
-      // Writes stay sequential so a page that contains the same email/phone twice
-      // (rare but possible) doesn't race itself into duplicate records. The
-      // indexes are updated after each create so later iterations see the new row.
+      // Sequential writes with index updates, so a repeated email/phone can't race into duplicates.
       for (const person of connections) {
         const resourceName = person.resourceName;
         if (!resourceName) continue;
 
-        // Every address Google holds, not just the first. An address after the
-        // first is still a way this person can be recognised on a booking,
-        // review or invoice, and reading only [0] silently threw the rest away.
+        // Every address, not just [0]: any of them can identify the person on a booking.
         const emailList = (person.emailAddresses ?? [])
           .map((e) => e.value?.trim().toLowerCase())
           .filter((v): v is string => !!v);
@@ -292,37 +243,25 @@ export async function importFromGoogleContacts(): Promise<number> {
         const email = emailEntry ?? (normPhone ? (emailByMobileKey.get(normPhone) ?? null) : null);
         const etag = person.etag ?? null;
 
-        // The stored Google link is tried first: it survives an email or phone
-        // edit on either side, so it holds the pair together when the other
-        // keys drift apart.
+        // Google link first: it survives email or phone edits on either side.
         const googleMatch = byGoogleId.get(resourceName);
         const emailMatch = email ? byEmail.get(email) : undefined;
-        // A landline stands in as the identity only when Google offers nothing better:
-        // it is often shared, so matching an email-bearing person onto a household
-        // landline would hijack whoever else lives there. A mobile always counts.
+        // A shared landline only counts when Google has no email; a mobile always counts.
         const phoneMatch =
           normPhone && (!emailEntry || isNZMobileKey(normPhone))
             ? byPhoneKey.get(normPhone)
             : undefined;
         const existing = googleMatch ?? emailMatch ?? phoneMatch;
-        // A rename is only trusted when the row was found by its Google link,
-        // its email, or a mobile - a bare landline hit is often another member
-        // of the same household, and linking the id already stops the duplicate.
+        // Trust a rename only on a link, email or mobile match; a landline may be a housemate.
         const renameTrusted = Boolean(googleMatch ?? emailMatch) || isNZMobileKey(normPhone);
         try {
           if (existing) {
-            // Nothing to pull when the stored link and etag both match - the etag only
-            // moves when Google's copy changes. Skipping the rewrite leaves updatedAt
-            // alone, so unchanged rows never enter the push dirty set.
+            // Unchanged etag: skip, so updatedAt stays put and the row stays out of the push set.
             if (existing.googleContactId === resourceName && existing.lastGoogleEtag === etag) {
               continue;
             }
-            // First-sync pull: Google wins for any field it has populated, but blank
-            // values never overwrite site data. Stamping lastSyncedAt + lastGoogleEtag is
-            // critical - without it the next push reads the etag as changed and conflicts
-            // every field. Pass ONE Date for both stamps: an auto @updatedAt lands a few
-            // ms later, and the strict updatedAt > lastSyncedAt check would then re-push
-            // every row until the cron times out.
+            // Google wins for populated fields; blanks never overwrite. Stamp with ONE Date,
+            // or @updatedAt lands ms later and every row re-pushes until the cron times out.
             const stampedAt = new Date();
             const updates: Record<string, unknown> = {
               googleContactId: resourceName,
@@ -330,22 +269,16 @@ export async function importFromGoogleContacts(): Promise<number> {
               updatedAt: stampedAt,
               lastGoogleEtag: etag,
             };
-            // Fill a placeholder name freely; a real local name is only
-            // overwritten on a trusted match.
+            // Fill a placeholder name freely; overwrite a real one only on a trusted match.
             const namePlaceholder = existing.name === phone || existing.name === normPhone;
             if (name && (namePlaceholder || (name !== existing.name && renameTrusted))) {
               updates.name = name;
             }
-            // Adopt Google's email when the row has none, so a phone-only row
-            // and its email-bearing Google twin can't drift into two rows.
+            // Adopt Google's email when the row has none, so the twins can't drift apart.
             if (emailEntry && !existing.email && renameTrusted) updates.email = emailEntry;
-            // Writing the E.164 form back also repairs a number stored in
-            // domestic form, which the import cannot match.
+            // Writing E.164 back also repairs a domestic-form number.
             if (phone && phone !== existing.phone) updates.phone = phone;
-            // Add, never replace: contact merges also write altEmails, and
-            // setting the list here would discard what a merge folded in. An
-            // email adopted as the primary just above is already known, or it
-            // would land in both places.
+            // Push, never set: contact merges also write altEmails. Skip a just-adopted primary.
             const knownEmails = new Set([
               ...(existing.email ? [existing.email.toLowerCase()] : []),
               ...(typeof updates.email === "string" ? [updates.email] : []),
@@ -353,18 +286,14 @@ export async function importFromGoogleContacts(): Promise<number> {
             ]);
             const newAlts = emailList.filter((e) => !knownEmails.has(e));
             if (newAlts.length > 0) updates.altEmails = { push: newAlts };
-            // Canonicalise hand-typed Google addresses, but only when the value
-            // actually changed - keeps Geocoding calls near zero on repeat
-            // imports. Flags ride along in the same stamped update.
+            // Geocode only a changed address, keeping repeat imports near zero calls.
             if (address && address !== existing.address) {
               Object.assign(updates, await addressFields(address));
             }
             if (company && company !== existing.company) updates.company = company;
             await prisma.contact.update({ where: { id: existing.id }, data: updates });
 
-            // Mirror the write onto the indexed row: two Google people can
-            // resolve to one local contact, and the second must compare against
-            // what the first just wrote rather than the pre-run state.
+            // Mirror the write onto the index: a second Google person may resolve to this row.
             existing.googleContactId = resourceName;
             existing.lastGoogleEtag = etag;
             if (typeof updates.name === "string") existing.name = updates.name;
@@ -375,8 +304,7 @@ export async function importFromGoogleContacts(): Promise<number> {
             if (newAlts.length > 0) existing.altEmails = [...existing.altEmails, ...newAlts];
             byGoogleId.set(resourceName, existing);
           } else {
-            // Nothing to match this person on - skip rather than store a row no
-            // later run could link back to its Google contact.
+            // Skip a person with no matchable key; no later run could link it.
             const displayName = name ?? email ?? phone;
             if ((!email && !normPhone) || !displayName) continue;
             // Same-instant stamp as the update branch above.
@@ -388,15 +316,11 @@ export async function importFromGoogleContacts(): Promise<number> {
               data: {
                 name: displayName,
                 email,
-                // Whatever Google holds beyond the primary, so any of them
-                // resolves back to this contact.
                 altEmails: emailList.filter((e) => e !== email),
                 phone,
                 ...addressData,
                 company,
-                // Explicit null: an omitted optional field has no key in
-                // MongoDB, and `where: { deletedAt: null }` doesn't match a
-                // missing key - the imported contact would be invisible.
+                // Explicit null: `where: { deletedAt: null }` won't match an absent Mongo key.
                 deletedAt: null,
                 googleContactId: resourceName,
                 lastSyncedAt: stampedAt,
@@ -409,8 +333,6 @@ export async function importFromGoogleContacts(): Promise<number> {
               id: created.id,
               name: created.name,
               email,
-              // Mirror what the create just wrote, so a second Google person
-              // resolving to this contact compares against the full set.
               altEmails: emailList.filter((e) => e !== email),
               phone,
               address: created.address,
@@ -440,15 +362,12 @@ export async function importFromGoogleContacts(): Promise<number> {
 }
 
 /**
- * Compares site + Google values of a single-value field, considering which
- * sides changed since the last sync, and returns the action the sync should
- * take. See file header for the policy.
+ * Decides the sync action for a single-value field from which sides changed since the last sync.
  * @param siteValue - Current site value (possibly null).
  * @param googleValue - Current Google value (possibly null).
  * @param siteChanged - Whether the site row was updated since last sync.
  * @param googleChanged - Whether Google's etag differs from the stored one.
- * @returns "noop" if values match, "push" / "pull" for latest-wins,
- *   "conflict" when both sides changed and values diverge.
+ * @returns "noop", "push" / "pull" for latest-wins, or "conflict" when both changed.
  */
 function compareSingleField(
   siteValue: string | null,
@@ -462,17 +381,14 @@ function compareSingleField(
   if (siteChanged && !googleChanged) return "push";
   if (!siteChanged && googleChanged) return "pull";
   if (siteChanged && googleChanged) return "conflict";
-  // Neither changed but values diverge (e.g. first sync ever, or external
-  // tampering). Prefer Google so the admin's manual edits aren't trampled.
+  // Neither changed but values diverge (e.g. first sync): prefer Google.
   if (b) return "pull";
   if (a) return "push";
   return "noop";
 }
 
 /**
- * Returns the union of site + Google phone numbers, deduplicated by
- * normalised E.164 form. The order is preserved: Google's existing phones
- * first (so its primary stays primary), then any new ones the site added.
+ * Unions site + Google phones, de-duplicated by E.164 form; Google's come first so its primary stays.
  * @param sitePhones - Site's phone numbers (primary first, then alts; nulls skipped).
  * @param googlePhones - All values from Google's phoneNumbers array.
  * @returns Merged phone array suitable for pushing back to Google.
@@ -501,11 +417,8 @@ function mergePhones(sitePhones: Array<string | null>, googlePhones: string[]): 
 }
 
 /**
- * Bidirectional sync between a site Contact and its Google counterpart.
- * Phones merge as a union; name/email/address use latest-wins via lastSyncedAt
- * + etag, recording a ContactConflict when both sides changed and diverge.
- * Company only flows Google > site, except on first create.
- * Stamps lastSyncedAt + lastGoogleEtag on success. Never throws.
+ * Two-way sync between a site Contact and its Google counterpart (policy in the file header).
+ * Company only flows Google > site, except on first create. Never throws.
  * @param contactId - The local DB contact ID to sync.
  */
 export async function syncContactToGoogle(contactId: string): Promise<void> {
@@ -518,9 +431,7 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       return;
     }
     if (contact.deletedAt) {
-      // A soft-deleted contact is already gone from Google. Pushing it re-creates it (the
-      // stored googleContactId 404s, so the push falls through to createContact) and the
-      // next import pulls it back live. Guarded here so every caller path is covered.
+      // Pushing a soft-deleted contact would re-create it in Google and the import would revive it.
       return;
     }
     if (!contact.email) {
@@ -530,9 +441,7 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
 
     const people = getPeopleClient();
 
-    // Locate the Google contact: prefer the stored resource name, fall back
-    // to email search. If neither finds one, create a fresh Google contact
-    // using site values - that's an unambiguous first sync.
+    // Find by stored resource name, then email search; else create from site values.
     let resourceName = contact.googleContactId;
     let googlePerson: {
       etag?: string | null;
@@ -623,8 +532,7 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
     const googleEmailList = (googlePerson.emailAddresses ?? [])
       .map((e) => e.value?.trim())
       .filter((v): v is string => !!v);
-    // The primary for conflict purposes is still Google's first address; the
-    // rest are carried alongside rather than discarded.
+    // Google's first address is the primary for conflict purposes.
     const googleEmail = googleEmailList[0] || null;
     const googleAddress = googlePerson.addresses?.[0]?.formattedValue?.trim() || null;
     const googleCompany = googlePerson.organizations?.[0]?.name?.trim() || null;
@@ -640,18 +548,14 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
 
     // Single-value fields - latest-wins or conflict
     const nameAction = compareSingleField(contact.name, googleName, siteChanged, googleChanged);
-    // Emails compare lowercased: a case-only difference is not a change, and
-    // treating it as one would push, pull or raise a conflict on every run.
+    // Lowercased: a case-only difference is not a change.
     const emailAction = compareSingleField(
       contact.email?.toLowerCase() ?? null,
       googleEmail?.toLowerCase() ?? null,
       siteChanged,
       googleChanged,
     );
-    // Emails union like phones, but the primary is decided by emailAction above
-    // rather than by list order: Contact.email is the display and send address,
-    // not merely one of a set. Without this the push replaced Google's list
-    // with a single address and deleted every other one the customer uses.
+    // Emails union like phones, but emailAction picks the primary (the send address).
     const primaryEmail =
       emailAction === "pull" && googleEmail ? googleEmail : (contact.email ?? googleEmail);
     const mergedEmails = mergeEmails(
@@ -663,9 +567,8 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       mergedEmails.length !== googleEmailList.length ||
       mergedEmails.some((e, i) => e !== googleEmailList[i]?.toLowerCase());
 
-    // Addresses compare by meaning, not text: the site stores the Geocoding canonical form
-    // while Google keeps what was typed, so a plain comparison flags every one as a
-    // conflict. Push when the site's form only states the same place more fully.
+    // Compare by meaning: the site stores the geocoded form, Google the typed one.
+    // Push when the site's form only states the same place more fully.
     const addressAction = addressCovers(contact.address, googleAddress)
       ? "push"
       : compareSingleField(contact.address, googleAddress, siteChanged, googleChanged);
@@ -691,9 +594,7 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       updateFields.push("addresses");
     }
 
-    // Track push success so a failed write to Google is not stamped as synced,
-    // which would drop the contact from the dirty set and strand the admin's
-    // local edit (never retrying the push).
+    // A failed push must not be stamped as synced, or the local edit never retries.
     let pushOk = true;
     if (updateFields.length > 0 && currentEtag) {
       try {
@@ -715,23 +616,17 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       googleContactId: resourceName,
       lastGoogleEtag: googlePerson.etag ?? currentEtag,
     };
-    // Only stamp lastSyncedAt when the push actually succeeded, so a failure stays in the
-    // dirty set and retries next run. Pass ONE Date for both stamps: an auto @updatedAt
-    // lands a few ms later, and the strict updatedAt > lastSyncedAt check would then
-    // re-dirty the row and re-push the whole list every run until the cron times out.
+    // ONE Date for both stamps: @updatedAt lands ms later, and the strict
+    // updatedAt > lastSyncedAt check would re-push every row until the cron times out.
     if (pushOk) {
       const stampedAt = new Date();
       siteUpdate.lastSyncedAt = stampedAt;
       siteUpdate.updatedAt = stampedAt;
     }
     if (nameAction === "pull" && googleName) siteUpdate.name = googleName;
-    // Stored lowercased - the import matches on the lowercased form, so a
-    // mixed-case row here comes back as a duplicate on the next pull.
+    // Lowercased, or the import's lowercased match creates a duplicate.
     if (emailAction === "pull" && googleEmail) siteUpdate.email = googleEmail.toLowerCase();
-    // Same shape as altPhones below: the primary stays on Contact.email for the
-    // app to display and send to, and every other address lands in altEmails so
-    // a booking, review or invoice raised under it still resolves to this
-    // person. mergedEmails already unions both sides, so nothing is lost.
+    // Primary stays on Contact.email; every other address goes to altEmails so it still matches.
     const emailTail = mergedEmails.filter((e) => e !== primaryEmail?.trim().toLowerCase());
     if (
       emailTail.length !== contact.altEmails.length ||
@@ -742,13 +637,10 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
     // Company is Google-owned: take Google's value whenever it has one, never blank the site's.
     if (googleCompany && googleCompany !== contact.company) siteUpdate.company = googleCompany;
     if (addressAction === "pull" && googleAddress) {
-      // Canonicalise the hand-typed Google address before it lands on the site,
-      // flagging it for review when it doesn't resolve to one confident match.
+      // Canonicalise, flagging for review without one confident match.
       Object.assign(siteUpdate, await addressFields(googleAddress));
     }
-    // Keep the site's phone first so the app (which reads Contact.phone as primary) still
-    // sees the primary, and store the tail as altPhones so every number is matchable.
-    // mergedPhones already unions site primary + alts + Google's list, so nothing is lost.
+    // Primary on Contact.phone; the tail goes to altPhones so every number matches.
     if (mergedPhones[0] && mergedPhones[0] !== contact.phone) {
       siteUpdate.phone = mergedPhones[0];
     }

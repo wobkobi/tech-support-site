@@ -1,9 +1,6 @@
 // src/app/admin/(shell)/contacts/page.tsx
-// Admin contacts hub. Surfaces booking-sourced field conflicts via
-// enrichContactsFromBookings, counts pending Google-sync conflicts, loads all contacts
-// plus their linked reviews, and renders the ContactsAdminView list. The heavier
-// dedup/merge/backfill passes run on the sync-contacts cron and the standalone admin
-// routes, not per page load.
+// Admin contacts hub: booking and Google-sync conflicts plus the contact list. Heavy
+// dedup and merge passes run on the cron, not per load.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
@@ -26,8 +23,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Admin contacts hub page. Enriches contacts from bookings (for the conflict
- * banner) and loads the list in one parallel pass.
+ * Admin contacts hub page, loaded in one parallel pass.
  * @param props - Page props.
  * @param props.searchParams - The list's filters (q, sync, reviewed, retainer, noemail, nophone, sort).
  * @returns Contacts hub page element.
@@ -40,9 +36,7 @@ export default async function AdminContactsPage({
   await requireAdminAuth();
   const query = await searchParams;
 
-  // Everything is independent, so run in one parallel pass. Fields enrich
-  // writes this pass show on the next load - acceptable lag for a rare write,
-  // and the returned conflict list itself is always current.
+  // One parallel pass; fields enrich writes show on the next load.
   const [initialConflicts, pendingConflictsCount, allContacts, reviews] = await Promise.all([
     enrichContactsFromBookings(),
     prisma.contactConflict.count({
@@ -117,8 +111,7 @@ export default async function AdminContactsPage({
     reviews: reviewsByContactId.get(c.id) ?? [],
   }));
 
-  // Booking-field conflicts (amber panel) + Google-sync conflicts (top banner)
-  // are both "needs a decision", so the stat counts them together.
+  // Both conflict kinds need a decision, so the stat counts them together.
   const unsynced = allContacts.filter((c) => !c.googleContactId).length;
   const openConflicts = pendingConflictsCount + initialConflicts.length;
   const reviewCovered = contactRows.filter((c) => c.reviews.length > 0).length;

@@ -1,9 +1,7 @@
 "use client";
 // src/features/social/components/PlatformPreview.tsx
-// Look-alike Facebook and Instagram feed posts and Google Business Profile updates for
-// the composer. They copy each app's light-mode layout, type sizes and colours, and the
-// feeds' "See more" / "more" cut-off, so the operator sees roughly where a long post
-// folds before it goes out.
+// Look-alike Facebook, Instagram and Google Business posts for the composer, copying each app's
+// light-mode layout and "See more" fold so the operator sees where a long post cuts.
 
 import type { GoogleFields } from "@/features/social/lib/adapter";
 import { GOOGLE_CTA_LABEL, shownRatio } from "@/features/social/lib/validate";
@@ -69,8 +67,7 @@ function foldText(
 }
 
 /**
- * Renders text with the parts the app turns blue: hashtags and mentions, plus web
- * addresses where they're clickable.
+ * Renders text with the parts the app turns blue: hashtags, mentions and optionally URLs.
  * @param text - Text to render.
  * @param linkClass - Colour for the highlighted parts.
  * @param withUrls - Whether web addresses are highlighted too.
@@ -107,9 +104,8 @@ function domainOf(url: string): string {
 }
 
 /**
- * A Facebook Page post as it appears in the feed. A photo post carries the link at
- * the end of its caption, the same way publishing sends it; a text post shows the
- * link as a preview card.
+ * A Facebook Page feed post. Photo posts carry the link at the end of the caption, as
+ * publishing sends it; text posts show a link card.
  * @param props - Component props.
  * @param props.post - Filled post content.
  * @param props.pageName - The Page's name.
@@ -213,9 +209,8 @@ export function FacebookPreview({
 }
 
 /**
- * An Instagram post as it appears in the feed: the picture at the shape Instagram
- * will show it, the action row, then the caption under the username. Links stay
- * plain text because Instagram doesn't make them clickable.
+ * An Instagram feed post: picture at Instagram's shape, action row, then caption. Links stay
+ * plain text, as Instagram shows them.
  * @param props - Component props.
  * @param props.post - Filled post content.
  * @param props.username - The account's username, without the "@".
@@ -297,10 +292,8 @@ function offerDay(key: string): string {
 }
 
 /**
- * A Business Profile post as it shows under Updates on Google Search and Maps. An
- * offer shows its title, dates, coupon code and "Redeem online" link the way
- * publishing sends them; an update shows its button only when it will be sent (Book
- * and Learn more need the link).
+ * A Business Profile post as shown under Updates. Offers show title, dates, code and "Redeem
+ * online" as published; updates show a button only when it will be sent.
  * @param props - Component props.
  * @param props.post - Filled post content.
  * @param props.businessName - The profile's business name.

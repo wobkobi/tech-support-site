@@ -1,10 +1,7 @@
 "use client";
 // src/features/business/components/calculator/ClientPickerSection.tsx
-// Right-rail "Client" card. Typing the name inline-searches saved contacts via
-// filterContacts; picking one fills name + email. A Name/Company/Custom segmented control
-// appears after a pick, and typing over the picked name (adding a last name, say) switches
-// it to Custom and offers to rename the contact too. "Clear" resets so the operator can
-// search again.
+// Right-rail "Client" card: inline contact search, then a Name/Company/Custom control
+// once picked. Editing the picked name switches to Custom and offers a contact rename.
 
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
@@ -41,11 +38,8 @@ interface Props {
 const MAX_SUGGESTIONS = 6;
 
 /**
- * Right-rail "Client" card. Type into Name to inline-search saved contacts -
- * a dropdown of matches surfaces below; click one to fill name + email. The
- * Name/Company/Custom segmented control appears after a pick, and editing the
- * filled name switches it to Custom so the edit sticks. "x Clear" resets so
- * the operator can search again or stay typing a custom name.
+ * Right-rail "Client" card. Name searches saved contacts; a pick fills name + email
+ * and shows the Name/Company/Custom control.
  * @param props - Component props.
  * @param props.clientName - Current Name value.
  * @param props.onClientNameChange - Name setter; fires on every keystroke.
@@ -83,8 +77,7 @@ export function ClientPickerSection({
   const [highlight, setHighlight] = useState(0);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Inline autocomplete only fires before a pick, so editing a picked contact's name
-  // doesn't keep nagging with suggestions.
+  // Autocomplete only before a pick.
   const searching = pickedContactName === null;
 
   const suggestions = useMemo(() => {
@@ -93,8 +86,7 @@ export function ClientPickerSection({
   }, [searching, focused, clientName, contacts]);
 
   /**
-   * Commits a suggestion. Cancels the pending blur-close so the click lands
-   * on the parent handler instead of being swallowed by the dropdown hiding.
+   * Commits a suggestion, cancelling the pending blur-close so the click lands.
    * @param c - The chosen contact.
    */
   function pick(c: GoogleContact): void {
@@ -168,8 +160,7 @@ export function ClientPickerSection({
           placeholder="Name"
           value={clientName}
           onChange={(e) => {
-            // A hand edit no longer matches the contact's name or company, so mark it
-            // Custom; picking Name again puts the contact's own name back.
+            // A hand edit becomes Custom; picking Name again restores the contact's name.
             if (!searching && addressMode !== "custom") onAddressModeChange("custom");
             onClientNameChange(e.target.value);
             setHighlight(0);
@@ -189,8 +180,7 @@ export function ClientPickerSection({
                 <button
                   key={c.id || `${c.name}-${c.email}-${i}`}
                   type="button"
-                  // onMouseDown beats the input's onBlur, so the pick lands
-                  // before the dropdown is hidden by the deferred close.
+                  // onMouseDown beats the input's onBlur, so the pick lands first.
                   onMouseDown={(e) => {
                     e.preventDefault();
                     pick(c);

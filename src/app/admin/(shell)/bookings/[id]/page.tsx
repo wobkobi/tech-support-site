@@ -1,11 +1,6 @@
 // src/app/admin/(shell)/bookings/[id]/page.tsx
-// Detail page for a single booking - the Booking model is the app's richest row
-// (price/promo/rate snapshots, travel mins, cancellation metadata, reminder/review
-// stamps) and this surfaces it. Two-column on lg+: the editable customer + times cards
-// and the price snapshot on the left, a context rail (actions, timeline, linked records)
-// on the right. Batch 1 loads the booking; batch 2 runs the linked-record lookups
-// (contact / invoices / review) and the settings read in parallel. Both are Server-Timing
-// instrumented.
+// Booking detail page: editable cards and price snapshot left, context rail right. Loads
+// the booking, then linked records and settings in parallel (Server-Timing instrumented).
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
@@ -81,9 +76,8 @@ export default async function BookingDetailPage({
   const booking = await timer.measure("batch1", () => prisma.booking.findUnique({ where: { id } }));
   if (!booking) notFound();
 
-  // Batch 2: linked records, all keyed on the booking so they run in parallel.
-  // Contact matches the primary or any alt email (case-insensitive), skipping
-  // soft-deleted rows - the same rule the booking>contact sync uses.
+  // Batch 2: linked records in parallel. Contact matches primary or alt email, case-insensitive,
+  // skipping soft-deleted rows (same rule as the booking>contact sync).
   const [contact, invoices, review, settings] = await timer.measure("batch2", () =>
     Promise.all([
       booking.email
@@ -121,10 +115,7 @@ export default async function BookingDetailPage({
 
   const isTest = booking.name.toLowerCase().includes("test");
   const tone = STATUS_TONE[booking.status] ?? "neutral";
-  // Bookings predating the column - every manual one created before the admin
-  // route started writing it - state the meeting type only in the notes text.
-  // Without the fallback the chip is the one place it was visible, so it would
-  // simply vanish for those rows.
+  // Older bookings state the meeting type only in the notes text.
   const meetingType = booking.meetingType ?? meetingTypeFromNotes(booking.notes);
   // A voided invoice leaves the job unbilled, so Bill comes back.
   const liveInvoice = invoices.find((inv) => inv.status !== "VOIDED") ?? null;
@@ -138,11 +129,8 @@ export default async function BookingDetailPage({
     booking.promoTitleAtBooking != null ||
     booking.publicHolidayName != null;
 
-  // percentDiscount is stored as a fraction, so it has to be scaled before the
-  // "%" is added - printed raw, a 15% promo reads as "0.15% off".
-  //
-  // Only the two rate columns are snapshotted, so a fixed-amount or travel
-  // promo shows its title alone rather than a wrong figure.
+  // percentDiscount is a fraction (0.15 = 15%). Only rate promos are snapshotted, so
+  // others show their title alone.
   const promoSummary = booking.promoTitleAtBooking
     ? [
         booking.promoTitleAtBooking,
@@ -171,9 +159,7 @@ export default async function BookingDetailPage({
         description={`${formatDateTimeShort(booking.startAt)} - ${formatDateTimeShort(booking.endAt)}`}
       />
 
-      {/* The reconcile cron found no calendar event behind this row, so both
-          email crons are holding off. Sits above everything: it means a job the
-          site still thinks is on has been called off in Calendar. */}
+      {/* No calendar event behind this row, so both email crons are holding off. */}
       {booking.calendarEventMissingAt && booking.status !== "cancelled" && (
         <Notice tone="warn" onGrey className="mb-4 text-[0.9375rem] text-admin-text">
           <p className="font-semibold text-coquelicot-700">This booking has no calendar event.</p>

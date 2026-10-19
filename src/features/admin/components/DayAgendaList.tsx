@@ -1,8 +1,6 @@
 "use client";
 // src/features/admin/components/DayAgendaList.tsx
-// Timed-events list of the mobile day agenda: event cards, "free" gap rows between
-// bookings and the current-time marker. Booking cards expand on tap and report long-presses
-// back to DayAgendaView, which owns the expand and action-sheet state.
+// Timed-events list of the mobile day agenda: event cards, free-gap rows and the now marker.
 
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import {
@@ -48,9 +46,7 @@ function formatGap(minutes: number): string {
 }
 
 /**
- * Notes row on a booking card, showing only what the person actually typed. The
- * rest of the blob is the machine-written metadata mirror, and its Address line
- * already renders as its own row above this one.
+ * Notes row on a booking card: only what the person typed, not the metadata mirror.
  * @param props - Component props.
  * @param props.notes - Raw booking notes blob.
  * @returns The notes row, or null when nothing was typed.

@@ -1,8 +1,6 @@
 // src/shared/lib/ai/voice-rules.ts
-// How anything the AI writes for customers should sound: the operator's own plain, direct
-// voice, NZ English, and no made-up facts. Shared by the mailing draft route and, later,
-// the social post maker, so both write the same way. Written as explicit YES/NO branches
-// and INVARIANT lines because gpt-4.1 skips a condition buried inside a sentence.
+// Voice rules for AI-written customer text: plain, direct, NZ English, no made-up facts. Written as
+// YES/NO branches and INVARIANT lines because gpt-4.1 skips conditions buried in sentences.
 
 /**
  * The voice rules, ready to drop into a system prompt.

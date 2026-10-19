@@ -1,18 +1,8 @@
 "use client";
 // src/features/admin/components/ScheduleAutoRefresh.tsx
-// Keeps the admin schedule current without a manual reload, so externally-made calendar
-// changes (a new booking landing, or a block made directly in Google Calendar) surface on
-// their own. Each tick asks `/api/admin/schedule/version` for a fingerprint of the
-// rendered window and only calls router.refresh() when it differs from the token the page
-// was built with; refreshing unconditionally would re-run a full server render of the
-// seven-week grid every tick. Polling pauses while the tab is hidden and checks once on
-// re-show so a backgrounded tab catches up. Rendered once by the schedule page;
-// router.refresh() preserves client state (open modals, form input) so a refresh is
-// non-disruptive.
-//
-// Travel-bar minutes are not part of the fingerprint: they are recomputed by the travel
-// cron and can lag a cycle behind their event either way, so they ride along on the next
-// calendar-driven refresh.
+// Polls a calendar fingerprint and calls router.refresh() only when it changes, since an
+// unconditional refresh re-renders the seven-week grid. Pauses while the tab is hidden.
+// Travel minutes aren't fingerprinted; they ride along on the next calendar refresh.
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
@@ -45,8 +35,7 @@ export function ScheduleAutoRefresh({
   intervalMs = 60_000,
 }: ScheduleAutoRefreshProps): null {
   const router = useRouter();
-  // Token the visible grid was built from. Kept in a ref so the polling effect
-  // doesn't tear down and re-subscribe on every server render.
+  // A ref so the poll doesn't re-subscribe on every server render.
   const seenToken = useRef(token);
   useEffect(() => {
     seenToken.current = token;
@@ -62,13 +51,10 @@ export function ScheduleAutoRefresh({
       const data: unknown = await res.json();
       const next = (data as { token?: unknown }).token;
       if (typeof next !== "string" || next === seenToken.current) return;
-      // Deliberately not stamping seenToken here: the refreshed render supplies
-      // the new token via props. If the refresh fails to land, the ref stays on
-      // the old value and the next tick retries instead of silently giving up.
+      // Don't stamp seenToken: the new render supplies it, so a lost refresh retries.
       router.refresh();
     } catch {
-      // Offline or a transient upstream failure - keep the current view and
-      // try again on the next tick.
+      // Offline or transient failure: retry on the next tick.
     }
   }, [fromIso, toIso, router]);
 

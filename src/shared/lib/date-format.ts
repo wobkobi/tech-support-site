@@ -80,11 +80,8 @@ export function formatDateSlash(input: Date | string, opts: { utc?: boolean } = 
 }
 
 /**
- * Parses a spreadsheet date cell into a Date.
- *
- * Sheets carry NZ day-first slashes ("7/9/2026" is 7 September), which the
- * Date constructor reads month-first, so those are rewritten to ISO before
- * parsing. Anything else is handed to the constructor as-is.
+ * Parses a sheet date cell. NZ day-first slashes ("7/9/2026" = 7 September) are rewritten to
+ * ISO first, since Date reads them month-first.
  * @param raw - Cell text.
  * @returns The parsed date, or null when it is not a date at all.
  */
@@ -102,10 +99,8 @@ export function parseSheetDate(raw: string): Date | null {
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Parses a "YYYY-MM-DD" date key to UTC midnight of that day, the scale ledger dates are
- * stored on. Surrounding whitespace is ignored. The round trip through toISOString
- * refuses days the calendar doesn't have: the Date constructor would roll 2026-02-30
- * forward into March.
+ * Parses "YYYY-MM-DD" to UTC midnight. The toISOString round trip rejects days like
+ * 2026-02-30 that Date would roll into March.
  * @param value - Raw value, e.g. from a request body or a settings field.
  * @returns The date, or null when the value isn't a real YYYY-MM-DD day.
  */

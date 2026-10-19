@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/ui/InsertMenu.tsx
-// "Add" dropdown for editors: a searchable, grouped list of things to drop into a text
-// box at the cursor. Each item says what it inserts, so the list doubles as the help text.
+// "Add" dropdown for editors: a searchable, grouped list of things to insert at the cursor.
 
 import { cn } from "@/shared/lib/cn";
 import React, { useEffect, useId, useRef, useState } from "react";
@@ -27,9 +26,8 @@ export interface InsertGroup {
 }
 
 /**
- * Narrows the groups to items matching every word of a search. A word can match the
- * item's label, its hint or its group's name, so "symbol" lists every symbol and
- * "phone" finds both the number and the phone emoji.
+ * Narrows the groups to items matching every word of a search, against the item's
+ * label, hint or group name.
  * @param groups - All groups.
  * @param query - What was typed.
  * @returns Groups with only matching items; empty groups are dropped.
@@ -49,9 +47,8 @@ function filterGroups(groups: InsertGroup[], query: string): InsertGroup[] {
 }
 
 /**
- * Dropdown of insertable items with a search box. Closes on a pick, Escape or a click
- * outside. Enter in the search adds the first match; arrow keys move between the
- * search and the items.
+ * Dropdown of insertable items with a search box. Closes on a pick, Escape or an
+ * outside click.
  * @param props - Component props.
  * @param props.groups - Sections and their items.
  * @param props.onInsert - Puts a picked item's text into the text box.
@@ -107,10 +104,8 @@ export function InsertMenu({
   }, [open]);
 
   /**
-   * Keyboard handling for the open menu. Escape closes and returns focus to the
-   * button. In the search box, Enter adds the first match and Down moves into the
-   * list (Home and End stay with the text). In the list, the arrows step through the
-   * items, and Up from the first one goes back to the search.
+   * Keyboard handling: Escape closes; in the search, Enter adds the first match and Down
+   * enters the list; Up from the first item returns to the search.
    * @param e - The key event.
    */
   function onKeyDown(e: React.KeyboardEvent): void {

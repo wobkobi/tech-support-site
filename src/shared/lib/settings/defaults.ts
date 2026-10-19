@@ -1,12 +1,6 @@
 // src/shared/lib/settings/defaults.ts
-// Canonical default for every settings group, transcribed from the constants that lived
-// in code before the settings panel. `get-settings.ts` merges DB overrides on top of
-// these, so an empty/missing/unreachable Setting row always falls back to today's
-// behaviour. Kept dependency-free (no Prisma, no next/cache) so the seed script and
-// client code can both import it.
-//
-// Identity secrets default from the existing env vars so the panel self-seeds with the
-// current values until the one-shot seed hands them to the DB.
+// Default for every settings group; get-settings.ts merges DB overrides on top, so a missing row
+// falls back here. Dependency-free for the seed script and client. Identity secrets default from env.
 
 import type {
   DayWindow,
@@ -19,8 +13,7 @@ import type {
 const BANK_ACCOUNT_PLACEHOLDER = "[BANK ACCOUNT NOT SET - configure in admin settings]";
 
 /**
- * Builds the default weekly window: every day open 10:00-20:00, no break
- * (today's behaviour before per-weekday hours).
+ * Default weekly window: every day open 10:00-20:00, no break.
  * @returns A seven-day schedule with every day enabled.
  */
 function defaultSchedule(): WeeklySchedule {

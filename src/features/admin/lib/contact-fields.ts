@@ -1,7 +1,5 @@
 // src/features/admin/lib/contact-fields.ts
-// Checks the name, email and phone an admin form is about to save and returns one
-// message per bad field, so each form can show the problem under the field it belongs
-// to instead of in a toast. Shared by the booking, contact and invoice edit forms.
+// Per-field validation for the name, email and phone on admin edit forms.
 
 import { validateEmail } from "@/features/booking/lib/booking";
 import { validatePhone } from "@/shared/lib/normalise-phone";
@@ -16,9 +14,7 @@ export type ContactFieldErrors = Partial<Record<ContactField, string>>;
 const FIELD_ORDER: readonly ContactField[] = ["name", "email", "phone"];
 
 /**
- * Checks whichever of the fields a form has. A field left out (undefined) isn't
- * checked. A blank phone is always fine; a blank email only when the form
- * doesn't need one.
+ * Checks the fields a form has (undefined is skipped). A blank phone is always fine.
  * @param fields - The form's current values.
  * @param fields.name - Name, required when present.
  * @param fields.email - Email address.

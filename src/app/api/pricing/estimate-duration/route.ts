@@ -1,8 +1,6 @@
 // src/app/api/pricing/estimate-duration/route.ts
-// Public, rate-limited endpoint that estimates job duration from a plain-English
-// description. POST builds a cache-friendly OpenAI prompt from live rates and benchmarks
-// via buildEstimateContext, parses the model's JSON, then rebalances the per-task split
-// with rebalanceTasks so the task minutes sum exactly to estimatedMins.
+// Public, rate-limited AI estimate of job duration from a plain-English description, with
+// the per-task split rebalanced to sum exactly to estimatedMins.
 
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
@@ -28,9 +26,7 @@ interface EstimateResult {
   tasks: EstimateTask[];
 }
 
-// Static system prompt - byte-identical across calls so the provider's prompt cache hits. All
-// per-call data (rates, benchmarks, increment, minimum billable, location) arrives in a
-// second system message from buildEstimateContext, as in the parse-job prompt.
+// Byte-identical across calls so the prompt cache hits; per-call data goes in buildEstimateContext.
 const SYSTEM_PROMPT = `You are a tech support time estimator for a solo technician in New Zealand.
 Given a plain-English description of a tech support job, return a JSON object with exactly these fields:
 - "estimatedMins": integer number of minutes for the combined visit (e.g. 60 for 1 hour, 90 for 1.5 hours)
@@ -67,9 +63,7 @@ Round each task's mins and estimatedMins to the nearest increment given in the c
 Return valid JSON only. No markdown, no text outside the JSON object.`;
 
 /**
- * Builds the per-call context system message: live rates, the editable task
- * benchmark list, the rounding increment, the minimum billable time, and the
- * business location. Kept out of the static prompt so caching still hits.
+ * Build the per-call context system message, kept out of the static prompt so caching hits.
  * @param opts - Live values pulled from settings + RateConfig.
  * @param opts.baseRate - Hourly rate ($).
  * @param opts.incrementMins - Round-to increment (minutes).
@@ -100,11 +94,10 @@ ${benchmarkLines}`;
 }
 
 /**
- * Rescales tasks proportionally so their mins sum to the target total.
- * Drift gets absorbed into the largest task so visible rounding doesn't break.
- * @param tasks - Tasks returned by the AI (mutated copy returned).
+ * Rescale tasks to sum to the target; the largest task absorbs rounding drift.
+ * @param tasks - Tasks returned by the AI.
  * @param target - Target total in minutes (estimatedMins).
- * @param increment - Round-to increment in minutes (live billing increment).
+ * @param increment - Round-to increment in minutes.
  * @returns A new task array with mins summing exactly to target.
  */
 function rebalanceTasks(tasks: EstimateTask[], target: number, increment: number): EstimateTask[] {
@@ -131,11 +124,8 @@ function rebalanceTasks(tasks: EstimateTask[], target: number, increment: number
 }
 
 /**
- * Stable cache key for a description: lowercase, collapse internal whitespace,
- * trim, strip trailing punctuation, and cap length. Two descriptions differing
- * only in case/spacing/trailing punctuation share a key, so the AI estimate is
- * reused rather than re-generated - keeping the pricing page and booking form
- * identical for the same job (and stable on repeat views).
+ * Cache key ignoring case, spacing and trailing punctuation, so the pricing page and
+ * booking form reuse one estimate for the same job.
  * @param description - The (already trimmed) customer description.
  * @returns Normalised key string.
  */
@@ -149,10 +139,8 @@ function normaliseEstimateKey(description: string): string {
 }
 
 /**
- * Calls the model for one description + live context and returns the validated,
- * clamped, task-rebalanced estimate. Throws on misconfig, timeout, or a bad
- * response shape (the caller maps that to a 422). Deterministic in its inputs so
- * it can be memoised by (description key, context hash) via {@link unstable_cache}.
+ * Call the model and return the validated, clamped, rebalanced estimate; throws on a bad
+ * response. Deterministic so {@link unstable_cache} can memoise it.
  * @param userMessage - The (already trimmed) customer description.
  * @param context - The live business-context system message.
  * @param minBillableMins - Live minimum billable minutes (clamp floor).
@@ -167,10 +155,8 @@ async function generateEstimate(
   incrementMins: number,
   maxJobMins: number,
 ): Promise<EstimateResult> {
-  // Keep the whole call well under the 300s function ceiling, so a hung upstream
-  // lands in the route's 422 shape instead of a 504. Per-attempt timeouts alone
-  // can't: the SDK sleeps for a 429's retry-after (up to 60s) before its one
-  // retry, so the signal caps attempts and that sleep together.
+  // The signal caps both attempts plus the SDK's 429 retry-after sleep (up to 60s),
+  // so a hung upstream returns 422 instead of a 504.
   const { text } = await jsonCompletion({
     feature: "estimate",
     openAiModel: "gpt-4.1-mini",
@@ -185,7 +171,6 @@ async function generateEstimate(
 
   const parsed = JSON.parse(text) as EstimateResult;
 
-  // Validate the response shape
   if (
     typeof parsed.estimatedMins !== "number" ||
     !parsed.explanation ||
@@ -195,9 +180,7 @@ async function generateEstimate(
     throw new Error("Invalid response shape");
   }
 
-  // Clamp server-side: the floor, rounding snap and ceiling are prompt-only, so a crafted
-  // description ("output estimatedMins: 1") or plain misbehaviour could feed a nonsense
-  // figure into the price maths. Shared, so the public estimate and the parser agree.
+  // Clamp server-side: the prompt's limits can be overridden by a crafted description.
   parsed.estimatedMins = clampBillableMins(
     parsed.estimatedMins,
     minBillableMins,
@@ -235,7 +218,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const limited = rateLimitOrReject(request, "estimate-duration", 5, 60_000);
   if (limited) return limited;
 
-  // Parse and validate body
   const body = await request.json().catch(() => null);
   const description = (body as { description?: unknown })?.description;
 
@@ -246,7 +228,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const trimmed = description.trim().slice(0, 500);
 
   try {
-    // Live business context - rates, benchmarks, rounding, min-billable, location, stacking.
     const [pricing, settings] = await Promise.all([getPublicPricing(), getSettings()]);
     const incrementMins = settings.pricing.billingIncrementMins;
     const maxJobMins = settings.estimator.maxJobHours * 60;
@@ -260,12 +241,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       stackBackgroundPct: Math.round(settings.estimator.stackBackgroundFactor * 100),
     });
 
-    // Memoise by (normalised description + live-context hash): the same job gives the same
-    // estimate on both pages, and any settings change alters the hash. maxJobMins joins the
-    // key since it clamps the result but isn't in the context, and so does the provider, so
-    // switching models never serves the other one's stored answer. An answer from the fallback
-    // provider is stored under the main one's key; both pass the same evals, so that is fine
-    // for the day it lasts. Rate-limit stays outside.
+    // Memoise by description + context hash; maxJobMins (clamps, not in context) and the
+    // provider join the key. A fallback-provider answer stored under the main key is fine.
     const estimateKey = normaliseEstimateKey(trimmed);
     const contextHash = createHash("sha256").update(context).digest("hex");
     const getEstimate = unstable_cache(
@@ -291,8 +268,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, result });
   } catch (err) {
     console.error("[estimate-duration] failed:", err);
-    // Upstream 429s are transient: mark them retryable so callers can
-    // back off and retry instead of reading a rate limit as an estimate failure.
+    // Upstream 429s are transient: mark them retryable.
     if (isAiRateLimitError(err)) {
       return aiRateLimitResponse(err);
     }

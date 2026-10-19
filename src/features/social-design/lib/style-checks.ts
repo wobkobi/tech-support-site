@@ -1,11 +1,7 @@
 // src/features/social-design/lib/style-checks.ts
-// Style checks for a post maker design: words too small to read in a feed, too many
-// pieces of text, words where an app covers or cuts the picture, anything that reads
-// like a button, emoji, and words that are hard to read against what's behind them.
-// They warn and never block. Contrast works from real pixels (a drawing of the size
-// with the words taken out, made by the editor), so it covers photos and the blurred
-// backdrop alike; everything else is worked out from the design alone. Pure and
-// client-safe, so check-social-design covers them.
+// Post maker style checks: small words, too much text, words in cropped areas, button lookalikes,
+// emoji and low contrast. Warnings only. Contrast reads real pixels of the size drawn without
+// words; the rest works from the design alone. Pure; check-social-design covers them.
 
 import { boundText } from "@/features/social-design/lib/bound";
 import { hexOf, type ColourKey } from "@/features/social-design/lib/brand";
@@ -120,9 +116,8 @@ export function wordLayersOn(
 }
 
 /**
- * Whether a box reaches outside the part of a size every app shows: a story's top and
- * bottom bands where the app draws its own name and buttons, a banner's sides cut on
- * phones, or the corners a profile picture loses to its circle.
+ * Whether a box reaches outside the area every app shows (story bands, banner sides on
+ * phones, profile picture corners).
  * @param g - Layer geometry.
  * @param format - Size.
  * @returns True when part of it may be covered or cut.
@@ -158,8 +153,7 @@ function coveredReason(format: FormatKey): string {
 }
 
 /**
- * Whether a shape under a short line of words makes the pair look like a button: a
- * filled or outlined rectangle that is small next to the picture and holds the words.
+ * Whether a small filled or outlined rectangle under short words makes them look like a button.
  * @param doc - Design.
  * @param format - Size.
  * @param layer - The words.
@@ -203,8 +197,7 @@ function note(
 }
 
 /**
- * Every check that works from the design alone (all but contrast), on every size.
- * One issue per layer and kind, listing the sizes it happens on.
+ * Every design-only check (all but contrast) on every size, one issue per layer and kind.
  * @param doc - Design.
  * @param bound - Live values for contact and promo layers.
  * @returns Issues, in the order the checks run.
@@ -334,10 +327,8 @@ function inkOf(layer: Layer): ColourKey | null {
 }
 
 /**
- * How well a layer's words stand out from what's behind them: the contrast against
- * the worst tenth of the pixels under its box, so a pale patch behind part of a
- * headline counts even when the rest is fine. Words on a highlight band are measured
- * against the band.
+ * Contrast of a layer's words against the worst tenth of the pixels under its box, so a pale
+ * patch counts. Words on a highlight band are measured against the band.
  * @param layer - Word layer.
  * @param g - Its geometry on the size the pixels are of.
  * @param pixels - The size drawn without its words, at any scale.

@@ -1,7 +1,6 @@
 "use client";
 // src/features/reviews/components/ReviewsList.tsx
-// Public reviews grid. Reveals a batch at a time rather than rendering every approved
-// review at once, with each review's date and name.
+// Public reviews grid, revealed a batch at a time.
 
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import { splitReviewsIntoColumns } from "@/features/reviews/lib/gridColumns";
@@ -26,9 +25,8 @@ export interface PublicReview {
 const BATCH_SIZE = 20;
 
 /**
- * Reviews longer than this clamp to six lines on phones behind a "Read more"
- * toggle. It is about eight lines at phone width, so whenever the button shows,
- * the clamp is hiding some of the text.
+ * Reviews longer than this clamp to six lines on phones behind "Read more". About eight
+ * lines at phone width, so the button only shows when text is hidden.
  */
 const CLAMP_CHARS = 320;
 
@@ -59,8 +57,7 @@ function readHash(): string {
 export function ReviewsList({ reviews }: { reviews: PublicReview[] }): React.ReactElement {
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
-  // A home page review card links to /reviews#review-<id> so its full text can be
-  // read; that review is never clamped.
+  // The review a home page card links to (/reviews#review-<id>) is never clamped.
   const hash = useSyncExternalStore(subscribeToHash, readHash, () => "");
 
   const visible = reviews.slice(0, visibleCount);
@@ -82,9 +79,8 @@ export function ReviewsList({ reviews }: { reviews: PublicReview[] }): React.Rea
 
   return (
     <>
-      {/* Two balanced masonry columns (see splitReviewsIntoColumns). On mobile both
-          <ul>s collapse via display:contents into one flex column, where the CSS
-          `order` (date index) restores a single newest-first list. */}
+      {/* Two balanced masonry columns; on mobile display:contents merges them and CSS
+          `order` restores newest-first. */}
       <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
         {[columns.left, columns.right].map((column, columnIndex) => (
           <ul key={columnIndex} className="contents sm:flex sm:flex-1 sm:flex-col sm:gap-6">

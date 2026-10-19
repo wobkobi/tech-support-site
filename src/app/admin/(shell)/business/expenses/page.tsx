@@ -1,10 +1,6 @@
 // src/app/admin/(shell)/business/expenses/page.tsx
-// Admin expenses page. Renders ExpensesPageView, which pairs the expenses ledger with the
-// subscriptions list below and refreshes the latter when an expense is migrated into a
-// subscription. Reads the GST registration so new expenses default to 0% GST and the
-// totals count GST in while the business isn't registered, plus the live write-off
-// threshold and which expenses already back an asset, for the ledger's "Turn into an
-// asset" row action.
+// Admin expenses page: expenses ledger plus subscriptions, with GST status, the write-off
+// threshold and asset links for the "Turn into an asset" action.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { ExpensesPageView } from "@/features/business/components/ExpensesPageView";

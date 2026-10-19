@@ -1,7 +1,6 @@
 // src/shared/lib/quiet-hours.ts
-// Decides whether a customer-facing email may leave now or has to wait for
-// morning. The window is stored as two NZ hours and normally wraps midnight
-// (21:00 > 07:00), so "inside the window" is two arcs of the clock, not one.
+// Whether a customer email may send now or waits for morning. The NZ-hour window usually wraps
+// midnight (21:00 > 07:00), so it is two arcs of the clock.
 
 import { nzDateParts, nzMinuteOfDay, nzWallClockUtc } from "@/shared/lib/timezone-utils";
 

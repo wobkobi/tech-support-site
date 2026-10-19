@@ -1,14 +1,11 @@
 // src/app/api/pricing/rates/route.ts
-// Public rates endpoint (no auth). GET returns the rate configs stripped to the
-// customer-safe fields (label, ratePerHour, flatRate, hourlyDelta, unit, isDefault),
-// ordered by label.
+// Public rates endpoint (no auth): rate configs stripped to customer-safe fields.
 
 import { getRateRows } from "@/features/business/lib/pricing-policy.server";
 import { NextResponse } from "next/server";
 
 /**
- * GET /api/pricing/rates - Public endpoint returning rate labels and amounts (no auth required).
- * Served from the tag-cached rate rows, so it skips Mongo on warm requests.
+ * GET /api/pricing/rates - served from tag-cached rate rows, so warm requests skip Mongo.
  * @returns JSON with public rates array stripped of internal fields
  */
 export async function GET(): Promise<NextResponse> {

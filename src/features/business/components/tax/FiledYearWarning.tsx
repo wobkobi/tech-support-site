@@ -1,7 +1,6 @@
 // src/features/business/components/tax/FiledYearWarning.tsx
-// Warning for the asset and trip forms: names every filed financial year the record being
-// edited or deleted reaches. It never blocks the save; the filed figures stay as saved and
-// the Tax page lists the difference.
+// Warning for the asset and trip forms naming every filed FY the record reaches. Never
+// blocks the save; the Tax page lists the difference.
 
 import {
   filedYearsTouched,
@@ -17,8 +16,7 @@ import type React from "react";
  * @param props - Component props.
  * @param props.filedYears - Every filed year, oldest first.
  * @param props.spans - The record's saved and edited date spans.
- * @param props.variant - "edit" (default) for one record in a form or delete confirm;
- *   "page" for a list where adding needs no dialog, worded as a standing note.
+ * @param props.variant - "edit" (default) for a form or delete confirm; "page" for a standing note on a list.
  * @param props.className - Extra classes.
  * @returns The notice, or null when no filed year is reached.
  */

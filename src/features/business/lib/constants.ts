@@ -1,7 +1,6 @@
 // src/features/business/lib/constants.ts
-// Fixed enumerations for the business ledger - subscription frequencies, expense
-// categories, and payment/income methods - used to populate form selects and validate
-// entries.
+// Fixed ledger enumerations (frequencies, expense categories, payment and income methods)
+// for form selects and validation.
 
 export const VALID_FREQUENCIES = [
   "weekly",
@@ -11,8 +10,7 @@ export const VALID_FREQUENCIES = [
   "annually",
 ] as const;
 
-// Order mirrors the Expenses sheet's category dropdown exactly so the app's
-// select and the sheet read the same list top to bottom.
+// Order must match the Expenses sheet's category dropdown.
 export const EXPENSE_CATEGORIES = [
   "Fuel",
   // Rego, WOF, servicing, tyres, car insurance. Not deducted while on km rates.
@@ -24,9 +22,7 @@ export const EXPENSE_CATEGORIES = [
   "Marketing",
   "Phone/Internet",
   "Travel",
-  // Subscriptions post here when a recurring subscription is recorded (its
-  // category flows straight to the Expenses sheet), so it must be a valid
-  // category + a Data-Validation option in the Expenses category column.
+  // Recorded subscriptions post here, so it must also be a sheet Data-Validation option.
   "Subscriptions",
   "Bank fees",
   "Repairs",
@@ -40,6 +36,5 @@ export const EXPENSE_CATEGORIES = [
 
 export const PAYMENT_METHODS = ["Business Account", "Personal then Reimburse", "Cash"] as const;
 
-// Bank first: it is both the most common and the default the income form,
-// the payment dialog and the calculator all take from INCOME_METHODS[0].
+// Bank first: forms default to INCOME_METHODS[0].
 export const INCOME_METHODS = ["Bank", "Cash", "Mixed"] as const;

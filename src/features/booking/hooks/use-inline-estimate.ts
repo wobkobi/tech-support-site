@@ -1,7 +1,6 @@
 "use client";
 // src/features/booking/hooks/use-inline-estimate.ts
-// Inline "get a rough estimate" state for the public booking form (new
-// bookings only): runs the quick estimate and tracks whether it is out of date.
+// Inline rough estimate for the public booking form (new bookings only).
 
 import {
   BOOKING_FIELD_LIMITS,
@@ -142,9 +141,7 @@ export function useInlineEstimate(inputs: InlineEstimateInputs): InlineEstimateS
   }
 
   /**
-   * Runs the inline rough estimate from the current description + meeting +
-   * address, shows the range, and captures the logged estimate id so the
-   * booking snapshots the quote the customer saw.
+   * Runs the rough estimate and captures its id so the booking snapshots the quote shown.
    * @returns Resolves when the estimate completes.
    */
   async function runInlineEstimate(): Promise<void> {
@@ -160,8 +157,7 @@ export function useInlineEstimate(inputs: InlineEstimateInputs): InlineEstimateS
     setEstimating(true);
     setQuoteError(null);
     try {
-      // Quote the drive at the picked slot so the estimate matches what the
-      // booking snapshots at submit.
+      // Quote the drive at the picked slot, as the booking will.
       const slotEnd = slotStart
         ? new Date(slotStart.getTime() + durations[duration] * 60_000)
         : null;

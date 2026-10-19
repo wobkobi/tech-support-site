@@ -1,10 +1,7 @@
 // src/features/mailing/lib/send.ts
-// Sends mailing-list emails. A run claims the campaign with one atomic status flip, writes
-// a CampaignSend row per recipient, then sends the pending rows in batches of 100. Rows
-// are the record of truth: a resumed run only sends what is still pending, a retry only
-// what failed, and Resend idempotency keys cover a crash between sending and recording.
-// Quiet hours hold every list send: the cron waits for morning, and a manual send or
-// retry inside them is refused unless the operator chose to send anyway.
+// Sends mailing-list emails: an atomic claim, one CampaignSend row per recipient (the record
+// of truth for resume and retry), then batches of 100 with Resend idempotency keys.
+// Quiet hours hold every list send unless the operator chose to send anyway.
 
 import { audienceOf } from "@/features/mailing/lib/audience";
 import {
@@ -77,8 +74,7 @@ function contentOf(campaign: Campaign): CampaignContent {
 }
 
 /**
- * Puts a claimed campaign back to draft when a send can't go ahead, so it
- * reappears in Drafts for the operator to fix rather than sitting in "sending".
+ * Puts a claimed campaign back to draft when a send can't go ahead.
  * @param id - Campaign id.
  */
 async function releaseToDraft(id: string): Promise<void> {
@@ -159,8 +155,7 @@ async function deliverPending(campaign: Campaign, parts: SharedRenderParts): Pro
         subject: email.subject,
         html: email.html,
         text: email.text,
-        // One-click unsubscribe (RFC 8058): Gmail and Apple Mail show their own
-        // Unsubscribe button, and bulk-sender rules expect it.
+        // One-click unsubscribe (RFC 8058), expected by bulk-sender rules.
         headers: {
           "List-Unsubscribe": `<${oneClickUnsubscribeUrl(token)}>`,
           "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
@@ -168,8 +163,7 @@ async function deliverPending(campaign: Campaign, parts: SharedRenderParts): Pro
       };
     });
 
-    // Same rows + same attempt = same key, so a resumed run that re-sends a batch
-    // Resend already accepted gets the original answer back instead of a second send.
+    // Same rows + same attempt = same key, so a resumed run never double-sends a batch.
     const key = `campaign-${campaign.id}-${campaign.sendAttempt}-${rows[0]!.id}-${rows.length}`;
     let outcomes: Awaited<ReturnType<typeof sendBatch>>;
     try {
@@ -196,8 +190,7 @@ async function deliverPending(campaign: Campaign, parts: SharedRenderParts): Pro
 }
 
 /**
- * Totals the rows and closes the run: "sent" when anything went out, otherwise
- * "failed".
+ * Totals the rows and closes the run: "sent" when anything went out, else "failed".
  * @param campaign - The claimed campaign.
  * @returns Sent and failed counts.
  */
@@ -220,8 +213,8 @@ async function finishRun(campaign: Campaign): Promise<{ sent: number; failed: nu
 }
 
 /**
- * Sends a draft or scheduled campaign now. The atomic claim is what stops a
- * double-click, or the cron racing a manual send, from sending it twice.
+ * Sends a draft or scheduled campaign now; the atomic claim stops a double-click or the
+ * cron from sending it twice.
  * @param id - Campaign id.
  * @param excludedIds - Contacts unticked in the send dialog; omitted to keep the stored list.
  * @param sendDuringQuietHours - The operator chose "Send now anyway" inside quiet hours.
@@ -335,12 +328,8 @@ export async function retryFailedSends(id: string): Promise<SendResult> {
 }
 
 /**
- * Cron: sends scheduled campaigns that are due, then resumes any run that died
- * part-way. Does nothing inside quiet hours: the schedule route already keeps new times
- * out of them, so this catches a window changed after scheduling and a stalled run that
- * would otherwise resume overnight. Both go on the first run after quiet hours end.
- * A stalled run whose linked promo has since ended is closed, not resumed, so nobody
- * gets an email with the promo wording blanked out.
+ * Cron: sends due scheduled campaigns, then resumes stalled runs. Does nothing inside
+ * quiet hours; a stalled run whose promo has ended is closed, not resumed.
  * @returns When quiet hours end (null outside them), and one line per campaign touched.
  */
 export async function runScheduledSends(): Promise<{
@@ -379,8 +368,7 @@ export async function runScheduledSends(): Promise<{
       await ensureSendRows(campaign);
       await deliverPending(campaign, parts);
     } else {
-      // Part of the list may already have it, so close the run rather than release to
-      // draft: the rest fail with a reason, and Retry stays blocked while the promo is off.
+      // Part of the list may already have it, so close the run; the rest fail with a reason.
       await prisma.campaignSend.updateMany({
         where: { campaignId: campaign.id, status: "pending" },
         data: { status: "failed", error: "The promo ended before this went out." },
@@ -393,9 +381,8 @@ export async function runScheduledSends(): Promise<{
 }
 
 /**
- * Sends one copy to the operator's own inbox, filled in as if it were for them, with a
- * sample review for {reviewText}. Not recorded anywhere, and its unsubscribe link goes
- * to a page that explains it came from a test.
+ * Sends one unrecorded copy to the operator's inbox, filled in for them with a sample
+ * {reviewText}; its unsubscribe link goes to a test explainer page.
  * @param content - Subject, preheader and body to test.
  * @param promoId - Linked promo id, or null.
  * @returns Success, or the reason it didn't send.

@@ -1,7 +1,6 @@
 // scripts/check-time-parse.ts
-// How the job calculator reads times. The description's ranges become the billed
-// session, and the parse reply's start/end/duration become the window the tasks are
-// fitted to, so a misread here changes what an invoice charges for labour.
+// How the job calculator reads times: description ranges become the billed session,
+// and the parse reply's times become the task window.
 // Run with: npm test -- time-parse
 
 import type { JobPromo } from "@/features/business/lib/business";
@@ -45,8 +44,7 @@ function reply(fields: Partial<ParseJobResponse>): ParseJobResponse {
 }
 
 /**
- * Re-parses a booked invoice whose description adds $5 parking and never mentions the
- * drive, and reads back the travel line.
+ * Re-parses a booked invoice that adds $5 parking but never mentions the drive.
  * @param line - The invoice's existing travel line description.
  * @param lineTotal - That line's total.
  * @returns The new "Round-trip travel" line total, if any.
@@ -91,8 +89,7 @@ function parsedHour(unsuccessful: boolean): ParseJobResponse["tasks"][number] {
 }
 
 /**
- * Re-parses a two-hour unbooked job into two pinned $80/hr hours, the second not fixed,
- * and reads back both discounts.
+ * Re-parses a two-hour unbooked job into two $80/hr hours, the second not fixed.
  * @param factor - Share of an unsuccessful line still charged.
  * @param promo - The invoice's promo terms, or null.
  * @param uplift - Weekend or holiday labour uplift for the job date.

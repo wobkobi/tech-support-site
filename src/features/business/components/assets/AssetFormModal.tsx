@@ -1,9 +1,7 @@
 "use client";
 // src/features/business/components/assets/AssetFormModal.tsx
-// Add or edit one asset in a dialog. Holds the form state, lays out the name, origin,
-// class and disposal sections, and saves through the assets API (POST for a new asset,
-// PUT for a saved one); a refusal shows the API's message inline. Mounted fresh per
-// target (AssetsView keys it), so the starting values always match what was opened.
+// Add or edit one asset in a dialog, saving through the assets API. AssetsView keys it
+// per target, so it mounts fresh each time.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -82,8 +80,7 @@ export function AssetFormModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
-  // The alert sits at the foot of a scrolling body, so a save from higher up the form
-  // (a phone's usual view) would leave the refusal off screen.
+  // The alert sits at the foot of a scrolling body, so scroll it into view.
   useEffect(() => {
     if (error) errorRef.current?.scrollIntoView({ block: "nearest" });
   }, [error]);

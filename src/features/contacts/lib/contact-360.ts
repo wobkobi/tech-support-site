@@ -1,8 +1,6 @@
 // src/features/contacts/lib/contact-360.ts
-// One loader for everything a contact touches, so every caller shares ONE set of matching
-// rules. Mirrors the sync matchers in maintenance.ts exactly: email primary (lowercased,
-// alts included), phone fallback (normaliseContactPhone, mobile keys only - a shared
-// landline may be a household). Income is reached through the invoices.
+// Loads everything a contact touches, matching exactly as maintenance.ts does: email first,
+// then mobile-only phone keys (a shared landline may be a household).
 
 import { isNZMobileKey, normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -59,16 +57,13 @@ export interface Contact360 {
   };
 }
 
-// Bounded scan for the phone-only fallback: the stored booking phone is un-normalised, so
-// it can't be queried by match key and has to be filtered in JS. Only reached when a
-// contact has no email, and capped so a growing bookings table can't turn one page view
-// into a full scan - denormalise the link if volume climbs past this.
+// Cap on the phone-only fallback's JS-filtered scan (booking phones are un-normalised);
+// denormalise the link if volume outgrows it.
 const PHONE_FALLBACK_SCAN_CAP = 1000;
 
 /**
- * Loads every record linked to a contact, matched by the same rules the
- * contact-sync uses, for the customer-360 detail page. Returns null when the
- * contact is missing or soft-deleted (every reader excludes `deletedAt`).
+ * Loads every record linked to a contact for the customer-360 page; null when the
+ * contact is missing or soft-deleted.
  * @param contactId - The contact's id.
  * @returns The contact plus its linked bookings, invoices, income, and reviews, or null.
  */
@@ -78,8 +73,7 @@ export async function loadContact360(contactId: string): Promise<Contact360 | nu
   });
   if (!contact) return null;
 
-  // Match keys, built exactly as maintenance.ts does: lowercased email (primary +
-  // alts), and mobile-only normalised phone keys (primary + alts).
+  // Match keys as maintenance.ts builds them: lowercased emails, mobile-only phone keys.
   const emailKeys = new Set<string>();
   if (contact.email) emailKeys.add(contact.email.toLowerCase());
   for (const alt of contact.altEmails) emailKeys.add(alt.toLowerCase());
@@ -127,9 +121,8 @@ export async function loadContact360(contactId: string): Promise<Contact360 | nu
 }
 
 /**
- * Bookings matched to a contact. Email is the primary key; a bounded phone
- * fallback runs only for a contact with no email, mirroring the sync's
- * email-first/phone-second `findContact`.
+ * Bookings matched to a contact by email, with a bounded phone fallback only
+ * when the contact has no email.
  * @param emailKeys - Lowercased email + altEmails.
  * @param mobileKeys - Normalised mobile keys from phone + altPhones.
  * @returns Matched bookings, most recent first.
@@ -183,8 +176,7 @@ async function loadBookings(
 }
 
 /**
- * Invoices linked to a contact by its id, plus any pre-link rows that still carry
- * a matching client email (invoices predate the contactId backfill).
+ * Invoices linked by contactId, plus unlinked rows with a matching client email.
  * @param contactId - The contact's id.
  * @param emailKeys - Lowercased email + altEmails.
  * @returns Matched invoices, most recent first.

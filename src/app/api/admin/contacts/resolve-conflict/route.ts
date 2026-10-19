@@ -1,6 +1,5 @@
 // src/app/api/admin/contacts/resolve-conflict/route.ts
-// Resolves a contact conflict by applying a chosen value to both the contact and the
-// source record (Booking or Review).
+// Resolves a contact conflict by writing the chosen value to the contact and its source record.
 
 import { splitName } from "@/features/contacts/lib/split-name";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -24,10 +23,7 @@ interface ResolveBody {
 
 /**
  * POST /api/admin/contacts/resolve-conflict
- * Applies the chosen value for each conflicting field to both the local Contact
- * and the originating source record. This keeps both sides in sync regardless of
- * which value was chosen.
- * Requires an admin session (cookie or X-Admin-Secret header).
+ * Applies each chosen value to both the Contact and its source record.
  * @param request - Incoming request.
  * @returns JSON { ok: true } on success or an error response.
  */
@@ -46,8 +42,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Missing required fields.", 400);
   }
   if (source !== "Booking" && source !== "Review") {
-    // Guard the union: an unknown source would update the Contact but silently
-    // skip the source-record write-back this route exists to keep in sync.
+    // An unknown source would skip the source write-back.
     return errorResponse("source must be 'Booking' or 'Review'.", 400);
   }
 
@@ -59,8 +54,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (phone !== undefined) contactUpdate.phone = normalisedPhone;
 
   try {
-    // Contact + source must move together so a partial failure can't leave the
-    // two sides disagreeing about the value the admin just chose.
+    // Contact and source move together.
     const writes: Prisma.PrismaPromise<unknown>[] = [
       prisma.contact.update({ where: { id: contactId }, data: contactUpdate }),
     ];

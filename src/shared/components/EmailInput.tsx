@@ -1,10 +1,7 @@
 "use client";
 // src/shared/components/EmailInput.tsx
-// Shared email input with consistent validation and inline error display, keeping
-// validation and typo-suggestion behaviour identical across every email field even when
-// wording differs. Input is lowercased as it is typed - addresses are case-insensitive
-// everywhere the site sends or matches them, and normaliseEmail is what the server
-// stores.
+// Shared email input with identical validation and typo suggestions everywhere. Lowercases as
+// typed, since addresses are case-insensitive across the site.
 
 import { validateEmail } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
@@ -21,19 +18,11 @@ interface EmailInputProps {
   maxLength?: number;
   placeholder?: string;
   autoComplete?: string;
-  /**
-   * Externally-controlled error. When the prop is supplied (including null),
-   * it overrides the component's own blur error. Pass `undefined` (the default)
-   * to let the component manage its blur error internally.
-   */
+  /** Externally-controlled error; when supplied (even null) it overrides the blur error. */
   error?: string | null;
   /** Wording overrides for blur errors. */
   errorMessages?: { invalid?: string; tooLong?: string };
-  /**
-   * Input classes that REPLACE the default styles (the default focus ring would
-   * otherwise switch off a caller's outline-based focus style). The error border
-   * is still applied on top.
-   */
+  /** Input classes that REPLACE the defaults, so a caller's outline focus style survives; the error border still applies. */
   className?: string;
   /** Skip rendering the inline error <p>. */
   hideError?: boolean;
@@ -105,9 +94,8 @@ export function EmailInput({
   const describedBy = activeError ? (errorId ?? `${id}-error`) : undefined;
 
   /**
-   * Maps a validateEmail verdict to the message for this field, or null when
-   * the address is fine. Blank is never an error here - a missing required
-   * field is the submit path's call, not this input's.
+   * Maps a validateEmail verdict to this field's message. Blank is never an error here; the
+   * submit path handles required.
    * @param candidate - Address to check.
    * @returns Error message, or null.
    */
@@ -119,9 +107,8 @@ export function EmailInput({
   }
 
   /**
-   * Validates on blur, marks the field touched so later keystrokes validate
-   * live, then forwards the event to the caller's onBlur if provided. Also
-   * computes a "did you mean…?" suggestion when the address is well-formed.
+   * Validates on blur, marks the field touched for live checks, suggests "did you mean...?"
+   * and forwards to the caller's onBlur.
    * @param e - Blur event.
    */
   function handleBlur(e: React.FocusEvent<HTMLInputElement>): void {
@@ -132,9 +119,8 @@ export function EmailInput({
   }
 
   /**
-   * Lowercases the keystroke, re-checks it once the field has been blurred at
-   * least once, and forwards the normalised value to the caller. Trailing
-   * whitespace from a paste goes too - no valid address contains a space.
+   * Lowercases and trims the value (no valid address has a space), re-checks once touched,
+   * and forwards it.
    * @param next - New input value.
    */
   function handleChange(next: string): void {
@@ -144,10 +130,7 @@ export function EmailInput({
     onChange(normalised);
   }
 
-  /**
-   * Apply the suggested correction. Surfaces the change through onChange so
-   * the parent's controlled state updates, then clears the suggestion.
-   */
+  /** Applies the suggested correction through onChange, then clears the suggestion. */
   function acceptSuggestion(): void {
     if (!suggestion) return;
     onChange(normaliseEmail(suggestion));

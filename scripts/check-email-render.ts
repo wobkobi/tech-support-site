@@ -1,18 +1,7 @@
 // scripts/check-email-render.ts
-// Renders outbound emails through their real send functions and asserts the HTML and the
-// derived text/plain part both survive. fetch is stubbed at the Resend transport, so
-// nothing is delivered and no quota is spent, and the fixtures carry hostile input (tags,
-// entities, a URL) so escaping and the anchor rewrite are exercised, not assumed.
-//
-// Only sends that do NOT read settings run here: getSettings wraps its query in
-// unstable_cache, which needs a Next request context, so the eleven settings-dependent
-// sends throw "incrementalCache missing" outside the server. The preview routes cover
-// those (/api/admin/preview-review-email, /api/business/invoices/[id]/preview-email).
-//
-// --conditions is required, not optional: email-booking.ts reaches pricing-policy.server.ts,
-// which imports `server-only` - a package that throws on the default condition and is
-// empty under `react-server`, the condition Next builds with.
-// Run with: npm test -- email-render
+// Render emails through their real send functions (Resend stubbed) with hostile input and
+// assert both HTML and text parts. Settings-reading sends need a request; previews cover them.
+// Needs --conditions=react-server for the `server-only` import. Run: npm test -- email-render
 
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
 import { sendOwnerBookingNotification } from "@/features/reviews/lib/email-booking";
@@ -21,9 +10,7 @@ import {
   type BusinessEnquiryData,
 } from "@/features/reviews/lib/email-enquiry";
 
-// Read inside the send functions rather than at module load, so setting them
-// here still takes effect despite import hoisting. A fake key is a second line
-// of defence behind the fetch stub: a real send would 401 rather than deliver.
+// Read per send, so this survives import hoisting; a fake key 401s if the stub ever misses
 process.env.RESEND_API_KEY ??= "re_fixture_key";
 process.env.EMAIL_FROM ??= "fixture@example.test";
 process.env.ADMIN_EMAIL ??= "admin@example.test";
@@ -37,14 +24,11 @@ interface Sent {
 
 const sent: Sent[] = [];
 
-// Intercept the Resend transport. Everything else falls through to real fetch;
-// Prisma talks to Mongo over its own driver, not this.
+// Intercept the Resend transport; everything else falls through to real fetch
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-  // Match on the host, not a substring: "resend.com" appearing anywhere in a
-  // path would otherwise stub an unrelated request and let the run pass on a
-  // send that never happened.
+  // Match the host, not a substring, so an unrelated URL can't fake a send
   let host = "";
   try {
     host = new URL(url).hostname.toLowerCase();
@@ -60,9 +44,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   });
 }) as typeof fetch;
 
-// Hostile-ish customer input: a tag, an entity, repeated "<head" and a bare URL.
-// The tag must survive into the text part as literal characters and must never
-// reach the HTML unescaped.
+// Hostile input: the tag must reach the text part literally and the HTML only escaped
 const PAYLOAD = "<script>alert(1)</script> & <head><head><head> see https://example.test/x";
 
 const inHour = new Date(Date.now() + 60 * 60 * 1000);
@@ -158,8 +140,7 @@ async function renderCase(name: string, send: () => Promise<unknown>): Promise<v
     check(!re.test(text), `undecoded entity in text: ${re}`);
   }
 
-  // Anchors must carry their destination: a text reader cannot follow a link it
-  // cannot see.
+  // Links must keep their URL in the text part
   if (/<a\s+href="https?:/i.test(html)) {
     check(/\(https?:\/\//.test(text), "html had links but text kept no URL");
   }

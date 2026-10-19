@@ -1,9 +1,7 @@
 "use client";
 // src/features/admin/components/settings/TaxTab.tsx
-// Editor for the tax group: the ACC and KiwiSaver rates (stored as fractions), the
-// income-tax bands, the IETC, the thresholds, the vehicle fuel type and the per-category
-// business-use shares. The Tax, Assets and Trips pages and the overview's tax card read
-// these live; nothing overrides them.
+// Editor for the tax group: ACC/KiwiSaver rates, income-tax bands, IETC, thresholds,
+// vehicle fuel and per-category business use. Read live by the tax, assets and trips pages.
 
 import {
   FieldShell,
@@ -61,8 +59,8 @@ export function TaxTab({ initial, defaults }: Props): React.ReactElement {
   };
 
   /**
-   * Sets one category's business-use percent. 100 removes the entry, because a missing
-   * category already counts in full, so the stored object holds only the exceptions.
+   * Sets one category's business-use percent. 100 removes the entry, since a missing
+   * category counts in full.
    * @param category - Expense category.
    * @param pct - Business share, 0-100.
    */

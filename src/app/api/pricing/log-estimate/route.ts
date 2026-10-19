@@ -1,8 +1,6 @@
 // src/app/api/pricing/log-estimate/route.ts
-// Public, rate-limited endpoint that logs what the price estimator showed a user (raw
-// description, AI interpretation, final range). POST sanitises the untrusted LogBody,
-// cleans the task list via cleanTasks, persists a PriceEstimateLog, and returns its id so
-// the booking flow can snapshot which quote the customer saw.
+// Public, rate-limited log of what the price estimator showed a user; returns the
+// PriceEstimateLog id so the booking can snapshot the quote seen.
 
 import { errorResponse } from "@/shared/lib/api-response";
 import { prisma } from "@/shared/lib/prisma";
@@ -33,8 +31,7 @@ interface CleanTask {
 }
 
 /**
- * Parses the AI tasks array from an untrusted body. Drops malformed entries
- * and caps to 10 to keep log rows bounded.
+ * Parse untrusted AI tasks, dropping malformed entries and capping at 10.
  * @param raw - Whatever the client posted under `aiTasks`.
  * @returns Cleaned task array (may be empty).
  */
@@ -52,9 +49,7 @@ function cleanTasks(raw: unknown): CleanTask[] {
 }
 
 /**
- * POST /api/pricing/log-estimate - Records what the public price estimator
- * showed to a user (raw description, AI interpretation, final range).
- * Fire-and-forget from the client; failures should not break the UX.
+ * POST /api/pricing/log-estimate - fire-and-forget log of an estimate shown.
  * @param request - Incoming request carrying the LogBody payload.
  * @returns Empty 200 JSON on success, 400 on bad input.
  */
@@ -65,14 +60,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const body = (await request.json().catch(() => null)) as LogBody | null;
   if (!body) return errorResponse("invalid body", 400);
 
-  // Sanitise the payload fields
   const description =
     typeof body.description === "string" ? body.description.trim().slice(0, 500) : "";
   if (!description) return errorResponse("description required", 400);
 
   const aiEstimatedMins = Math.max(0, Math.round(Number(body.aiEstimatedMins) || 0));
-  // There is no "complex" tier, so every estimate logs as standard. The enum +
-  // column stay so older rows still read.
+  // No "complex" tier exists; the enum stays so older rows still read.
   const aiCategory: AiEstimateCategory = AiEstimateCategory.standard;
   const aiExplanation =
     typeof body.aiExplanation === "string" ? body.aiExplanation.trim().slice(0, 400) : "";
@@ -102,12 +95,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ? body.promoLabel.trim().slice(0, 200)
       : null;
 
-  // NODE_ENV is "production" on Vercel (both prod and preview deploys run
-  // Next.js in production mode) and "development" under `npm run dev`
-  // locally. The admin page uses this to hide local test submissions.
+  // "development" only locally (previews run as production); admin hides local test rows.
   const environment = process.env.NODE_ENV ?? "production";
 
-  // Persist the log entry
   try {
     const created = await prisma.priceEstimateLog.create({
       data: {
@@ -128,8 +118,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         environment,
       },
     });
-    // Return the id so the wizard can carry it to /booking and the booking can
-    // snapshot which quote the customer saw.
     return NextResponse.json({ ok: true, id: created.id });
   } catch (err) {
     console.error("[log-estimate] failed:", err);

@@ -1,8 +1,6 @@
 // src/app/api/business/income/[id]/route.ts
-// Admin endpoint for a single income entry. PUT updates the entry and writes the change
-// through to its Cashbook sheet row (by Sync ID); DELETE removes the entry and its sheet
-// row. Sheet failures are logged and swallowed so DB changes are never blocked - the sync
-// cron reconciles any drift.
+// Admin single income entry: PUT/DELETE write through to the Cashbook row by Sync ID.
+// Sheet failures are logged and surfaced as a warning, never blocking the DB change.
 
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import {
@@ -40,8 +38,7 @@ export async function PUT(
   if (!date || !customer || !description || amount === undefined || !method) {
     return errorResponse("Missing required fields", 400);
   }
-  // Same gate as the create path: an edit must not be able to set a method the
-  // Cashbook's validation list will reject.
+  // The Cashbook's validation list rejects any other method.
   if (!(INCOME_METHODS as readonly string[]).includes(method)) {
     return errorResponse("Invalid payment method", 400);
   }
@@ -72,18 +69,15 @@ export async function PUT(
     },
   });
 
-  // Write through to the sheet. If the edited date moved the entry into a
-  // different FY workbook, append to the new sheet BEFORE deleting the old row
-  // so a failure can't strand the entry off-sheet; otherwise update in place.
+  // A date move into another FY workbook appends BEFORE deleting the old row, so a
+  // failure can't strand the entry off-sheet.
   let sheetRowKey = existing.sheetRowKey;
   let sheetSyncWarning = false;
   try {
     const newSheetId = await resolveSheetIdForDate(updated.date);
     const oldSheetId = await resolveSheetIdForDate(existing.date);
     if (sheetRowKey && oldSheetId && newSheetId && newSheetId !== oldSheetId) {
-      // Cross-FY move: create the new row and persist its key first, then remove the old
-      // one best-effort. A failed append leaves the old row intact (outer catch); a failed
-      // delete leaves a logged stray rather than a lost entry.
+      // A failed delete leaves a logged stray rather than a lost entry.
       const oldKey = sheetRowKey;
       sheetRowKey = await appendRowWithSyncId(newSheetId, "Cashbook", buildCashbookCells(updated));
       await prisma.incomeEntry.update({ where: { id }, data: { sheetRowKey } });
@@ -115,9 +109,7 @@ export async function PUT(
   } catch (err) {
     console.error(`[income] Failed to update sheet row for entry ${id}:`, err);
     sheetRowKey = existing.sheetRowKey;
-    // Signal the write-through failure so the admin knows the sheet (source of
-    // truth) still holds the old values; the sheet-wins cron would otherwise
-    // revert this DB edit on its next run with no visible warning.
+    // The sheet-wins cron would revert this edit, so warn the caller.
     sheetSyncWarning = true;
   }
 
@@ -147,9 +139,7 @@ export async function DELETE(
 
   await prisma.incomeEntry.delete({ where: { id } });
 
-  // Remove the matching sheet row so the import can't resurrect the entry. A
-  // failed delete leaves the row behind (the cron would re-import it), so
-  // surface a warning the caller can toast.
+  // A sheet row left behind would be re-imported, so a failure warns the caller.
   let sheetSyncWarning = false;
   if (existing.sheetRowKey) {
     try {
@@ -157,9 +147,7 @@ export async function DELETE(
       if (spreadsheetId) {
         await deleteRowBySyncId(spreadsheetId, "Cashbook", existing.sheetRowKey);
       } else {
-        // No sheet resolved (missing or renamed FY folder). The row survives and
-        // the next import re-creates the entry from it, silently undoing this
-        // delete - so this is a warning, not a clean success.
+        // No sheet resolved (missing or renamed FY folder); the row survives.
         console.error(`[income] No sheet resolved for entry ${id}; sheet row left in place`);
         sheetSyncWarning = true;
       }

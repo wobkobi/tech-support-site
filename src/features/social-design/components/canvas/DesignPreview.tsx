@@ -1,8 +1,7 @@
 "use client";
 // src/features/social-design/components/canvas/DesignPreview.tsx
-// A still drawing of one size of a design, with nothing to click: small for the size
-// tabs, and at full size off screen for the exported pictures. Same renderers as the
-// canvas, so a picture matches what the editor showed.
+// Still drawing of one size: small for the size tabs, full size off screen for export.
+// Shares the canvas renderers so a picture matches the editor.
 
 import { LayerVisual, layerTransform } from "@/features/social-design/components/canvas/LayerNode";
 import type { BoundValues, DesignDoc } from "@/features/social-design/lib/doc";
@@ -19,7 +18,7 @@ import { Group, Layer as KLayer, Rect, Stage } from "react-konva";
  * @param props.bound - Live values for contact and promo layers.
  * @param props.family - Exo's font-family list.
  * @param props.height - Height in screen pixels; the width follows the size's shape.
- * @param props.transparent - Leave out the white ground, for a PNG with see-through gaps.
+ * @param props.transparent - Leave out the white ground, for a see-through PNG.
  * @param props.stageRef - Receives the Konva stage, for exporting.
  * @returns Preview element.
  */

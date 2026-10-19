@@ -1,8 +1,7 @@
 "use client";
 // src/features/mailing/components/blocks/DesignPicker.tsx
-// "Use a design" for the mail Picture block: the post maker designs that have pictures,
-// each size as a button. The pictures are already stored, so this works with uploads
-// switched off too. Links to Post maker open a new tab, so the email being written stays put.
+// "Use a design" for the mail Picture block: post maker designs' stored pictures, one button
+// per size. Works with uploads off; Post maker links open a new tab.
 
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { callApi } from "@/features/mailing/lib/api-client";

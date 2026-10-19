@@ -1,10 +1,7 @@
 "use client";
 // src/features/business/components/calculator/TravelSection.tsx
-// Travel address input + per-entry cost list. Lookup populates one auto entry; operators
-// can add manual entries (parking, ferry), all lumped into a single "Round-trip travel"
-// invoice line, and store runs (client > store > back mid-job), each billed on its own
-// line. Looked-up entries show a step-by-step breakdownTravelCharge (there/back > raw >
-// rounded > final). A Drove / Walked toggle says whether saving the invoice logs a trip.
+// Travel address input + cost list: one auto entry, manual extras lumped into one line,
+// store runs billed separately, and a Drove / Walked toggle for trip logging.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
@@ -48,12 +45,8 @@ interface Props {
 }
 
 /**
- * Travel address input + per-entry travel cost list. Lookup populates a single
- * auto entry; operators can add manual entries (parking, ferry), which lump into
- * one "Round-trip travel" invoice line, and store runs, which bill on their own
- * lines. Looked-up entries also show a step-by-step breakdown (destination >
- * there/back > raw > rounded > final) so the operator can see exactly how the
- * figure was derived.
+ * Travel address input + per-entry cost list. Looked-up entries show a breakdown
+ * (there/back > raw > rounded > final).
  * @param props - Component props.
  * @param props.jobAddress - Current address text.
  * @param props.onJobAddressChange - Address change handler.
@@ -122,9 +115,8 @@ export function TravelSection({
       toast(result.error, { tone: "error", duration: 8000 });
       return;
     }
-    // Apply to the latest entries, not this render's snapshot: the operator may have
-    // edited, added or removed rows during the lookup. Drop the result if this row no
-    // longer holds the store that was looked up.
+    // Apply to the latest entries (rows may change mid-lookup); drop the result if this
+    // row no longer holds the looked-up store.
     const looked = entry.label;
     onTravelEntriesChange((current) =>
       current[index]?.kind === "storeRun" && current[index].label === looked
@@ -302,9 +294,7 @@ export function TravelSection({
                       step="0.01"
                       value={entry.cost || ""}
                       onPaste={(e) => {
-                        // Only intercept clipboard text carrying "$", commas
-                        // or other junk; a plain numeric paste falls through to
-                        // the native number input so decimal entry is unaffected.
+                        // Intercept only pastes with "$", commas or other junk.
                         const text = e.clipboardData.getData("text");
                         if (!/[^\d.]/.test(text)) return;
                         const value = parseMoney(text);
@@ -347,8 +337,7 @@ export function TravelSection({
                       {entry.distanceKmOneWay !== undefined && ` (${entry.distanceKmOneWay} km)`}
                     </li>
                     <li>
-                      {/* Return leg quoted at its own departure time; km shown only on
-                          There - the back-leg distance is not returned by the lookup. */}
+                      {/* Return leg at its own departure time; the lookup gives no back-leg km. */}
                       <span className="text-admin-muted">
                         {isRun ? "Back to the client:" : "Back:"}
                       </span>{" "}

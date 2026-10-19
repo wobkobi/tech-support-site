@@ -1,11 +1,7 @@
 "use client";
 // src/features/mailing/components/CampaignEditor.tsx
-// Write, preview and send one mailing-list email. Drafts and presets autosave; the
-// preview is rendered by the same server code that builds the real email, so what
-// shows here is exactly what lands. Once an email is scheduled or sent the content
-// locks and the page shows who it went to instead. Drafts get a template dropdown
-// beside the preview that swaps presets while keeping any field already edited, and
-// the body has an Add menu for placeholders, links, buttons and contact details.
+// Write, preview and send one mailing-list email. Drafts and presets autosave; the preview uses
+// the same server renderer as the real email. Content locks once scheduled or sent.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -87,7 +83,7 @@ const SNIPPETS: { label: string; title: string; before: string; after: string; l
  * @param props.promoTitle - Title of the linked promo, if any.
  * @param props.adminEmail - Inbox test sends go to.
  * @param props.templates - Templates for the dropdown; empty when the email isn't a draft.
- * @param props.promo - Wording of the email's promo (its linked one, or whichever is running), for the promo card block.
+ * @param props.promo - Wording of the linked or running promo, for the promo card block.
  * @param props.linkTargets - Pages the block editor's buttons and pictures can link to.
  * @param props.canDraft - Whether "Draft with AI" is available (OpenAI is set up).
  * @returns Editor element.
@@ -254,8 +250,7 @@ export function CampaignEditor({
    * Inserts text at the cursor in the body, wrapping any selected text.
    * @param before - Text before the selection.
    * @param after - Text after the selection.
-   * @param line - Give it a line of its own. A button only renders as one when nothing
-   * else shares its line, so text after the cursor moves down too.
+   * @param line - Give it a line of its own (a button only renders alone on its line).
    */
   function insert(before: string, after = "", line = false): void {
     const el = bodyRef.current;
@@ -276,8 +271,7 @@ export function CampaignEditor({
   }
 
   /**
-   * Takes an AI draft's subject and preview text, keeping the current one where the
-   * draft left it blank.
+   * Takes an AI draft's subject and preview text, keeping current values the draft left blank.
    * @param subject - Drafted subject.
    * @param preheader - Drafted preview text.
    */
@@ -329,8 +323,7 @@ export function CampaignEditor({
   }
 
   /**
-   * Saves who the email goes to straight away, like the promo link, rather than through
-   * the text autosave.
+   * Saves the audience straight away, outside the text autosave.
    * @param next - The picked audience.
    */
   async function changeAudience(next: CampaignAudience): Promise<void> {

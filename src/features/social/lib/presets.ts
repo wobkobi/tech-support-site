@@ -1,7 +1,5 @@
 // src/features/social/lib/presets.ts
-// Starter presets for social posts. They are seeded into the database once, the first
-// time the Social page opens, and from then on they're ordinary records the operator
-// edits or deletes; nothing here is read again after seeding.
+// Starter social presets, seeded once on first Social page open; afterwards ordinary records.
 
 import { defaultTargets } from "@/features/social/lib/targets";
 import { prisma } from "@/shared/lib/prisma";
@@ -22,9 +20,7 @@ export interface StarterPostPreset {
 }
 
 /**
- * The starter set. Dates inside them are examples for the operator to overwrite.
- * Posts are plain text: no bold or headings, since Facebook and Instagram show the
- * markers as typed.
+ * The starter set; dates are examples. Plain text only, since apps show markdown as typed.
  * @param siteUrl - Site origin for the booking links.
  * @returns The presets in display order.
  */
@@ -96,11 +92,7 @@ export function starterPostPresets(siteUrl: string): StarterPostPreset[] {
   ];
 }
 
-/**
- * Seeds the starter presets the first time it runs, and never again. Creating
- * the marker row first doubles as a lock: its unique key makes a second
- * concurrent page load fail the create and skip the seeding.
- */
+/** Seeds the starter presets once; the marker row's unique key locks out a concurrent load. */
 export async function ensureStarterPostPresets(): Promise<void> {
   const seeded = await prisma.setting.findUnique({ where: { key: SEEDED_KEY } });
   if (seeded) return;

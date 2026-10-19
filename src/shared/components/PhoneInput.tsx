@@ -1,9 +1,7 @@
 "use client";
 // src/shared/components/PhoneInput.tsx
-// Shared NZ phone input. On blur, formats the value with formatNZPhone and runs
-// validatePhone so every form on the site behaves identically. Per-form wording can be
-// customised via errorMessages. Public forms pass nzOnly, which refuses numbers from
-// other countries.
+// Shared NZ phone input: formats with formatNZPhone and runs validatePhone on blur. Public forms
+// pass nzOnly to refuse overseas numbers.
 
 import { cn } from "@/shared/lib/cn";
 import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
@@ -18,19 +16,11 @@ interface PhoneInputProps {
   maxLength?: number;
   placeholder?: string;
   autoComplete?: string;
-  /**
-   * Externally-controlled error. When supplied (including null), overrides the
-   * internal blur error. Pass `undefined` (the default) to let the component
-   * own its blur error.
-   */
+  /** Externally-controlled error; when supplied (even null) it overrides the blur error. */
   error?: string | null;
   /** Wording override for blur errors. */
   errorMessages?: { invalid?: string };
-  /**
-   * Input classes that REPLACE the default styles (the default focus ring would
-   * otherwise switch off a caller's outline-based focus style). The error border
-   * is still applied on top.
-   */
+  /** Input classes that REPLACE the defaults, so a caller's outline focus style survives; the error border still applies. */
   className?: string;
   /** Skip rendering the inline error <p>. */
   hideError?: boolean;
@@ -94,8 +84,7 @@ export function PhoneInput({
   const describedBy = activeError ? (errorId ?? `${id}-error`) : undefined;
 
   /**
-   * On blur: format the value via formatNZPhone (so the user sees the NZ
-   * spacing) then run validatePhone and stash the result in internal state.
+   * On blur: format via formatNZPhone, then run validatePhone into internal state.
    * @param e - Blur event.
    */
   function handleBlur(e: React.FocusEvent<HTMLInputElement>): void {

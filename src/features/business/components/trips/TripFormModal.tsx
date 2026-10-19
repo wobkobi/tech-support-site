@@ -1,11 +1,7 @@
 "use client";
 // src/features/business/components/trips/TripFormModal.tsx
-// Add or edit one trip: who it was to, where (the address is saved with the trip), date,
-// round-trip km, purpose and notes. Picking a saved contact fills the address from their
-// contact and looks up the km from Google Maps (round trip from the base address); an
-// address can also be typed or picked from Places. Saves through the trips API and hands
-// the stored row back. The parent mounts it per trip (keyed), so the form starts from that
-// trip's values without an effect.
+// Add or edit one trip. Picking a saved contact fills the address and looks up round-trip
+// km from Google Maps. The parent keys it per trip, so the form starts from that trip's values.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -121,9 +117,8 @@ export function TripFormModal({
   }
 
   /**
-   * Picks a contact: links it, fills the address from their contact, starts the purpose
-   * when it is blank, and looks the km up straight away. A contact with no saved address
-   * keeps whatever address is already typed.
+   * Picks a contact: links it, fills the address (keeping a typed one if they have none),
+   * starts a blank purpose, and looks the km up.
    * @param picked - The contact chosen in the "Who" box.
    */
   function pickContact(picked: GoogleContact): void {
@@ -150,8 +145,7 @@ export function TripFormModal({
   }
 
   /**
-   * Tracks the "Who" box. Typing away from the picked contact's name unlinks it, so a
-   * trip is never tied to someone it no longer names.
+   * Tracks the "Who" box. Typing away from the picked contact's name unlinks it.
    * @param text - Box text as typed.
    */
   function changeWho(text: string): void {
@@ -197,8 +191,7 @@ export function TripFormModal({
   }
 
   /**
-   * Saves the trip: PUT for an edit, POST for a new one. The API re-validates and its
-   * message is shown in the dialog on a refusal.
+   * Saves the trip: PUT for an edit, POST for a new one. A refusal shows the API's message.
    * @param e - Form submit event.
    */
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>): Promise<void> {

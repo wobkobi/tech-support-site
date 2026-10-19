@@ -1,8 +1,6 @@
 // src/app/api/cron/record-subscriptions/route.ts
-// Cron endpoint (Bearer-authorised) that records every active subscription due today or
-// earlier in NZ time. GET creates an ExpenseEntry per subscription, advances nextDue with
-// a CAS guard so concurrent runs stay idempotent, and appends each row to the Expenses
-// Google Sheet. Run daily at 8am NZ time via cron-job.org.
+// Cron (daily 8am NZ) that records every active subscription due today or earlier. A CAS
+// on nextDue keeps concurrent runs idempotent.
 
 import { recordSubscriptionPayment } from "@/features/business/lib/subscription-recording";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -14,7 +12,6 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * GET /api/cron/record-subscriptions
  * Records all active subscriptions due today or earlier (NZ time).
- * Run daily at 8am NZ time via cron-job.org.
  * @param request - Incoming cron request.
  * @returns JSON with count of recorded subscriptions and any errors.
  */
@@ -23,11 +20,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
 
-  // nextDue is stored as UTC midnight (admin form + advanceNextDue), so UTC
-  // midnight of today's NZ date is the correct ceiling for `nextDue <=`.
+  // nextDue is stored as UTC midnight, so UTC midnight of today's NZ date is the ceiling.
   const todayNZ = new Date(`${nzTodayKey()}T00:00:00.000Z`);
 
-  // Find subscriptions due today
   const due = await prisma.subscription.findMany({
     where: { isActive: true, nextDue: { lte: todayNZ } },
   });

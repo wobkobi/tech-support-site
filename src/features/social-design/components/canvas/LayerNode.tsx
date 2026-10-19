@@ -1,10 +1,7 @@
 "use client";
 // src/features/social-design/components/canvas/LayerNode.tsx
-// Draws one layer on the canvas. Every layer is a Konva Group centred on its box
-// (offset by half its size), so rotation and flips turn about the middle as the
-// handles show. Children draw in the box's own 0..w, 0..h space. A see-through
-// "hit-box" rect fills the box so thin shapes and gaps between words still pick up
-// clicks, and the Transformer sizes its frame from it.
+// Draws one layer as a Konva Group centred on its box, so rotation and flips turn about the
+// middle. A see-through hit-box rect catches clicks on thin shapes and sizes the Transformer.
 
 import { iconDataUri } from "@/features/social-design/components/canvas/icon-art";
 import { useQrImageUrl } from "@/features/social-design/components/canvas/qr-art";
@@ -65,8 +62,7 @@ function shadowOf(on: boolean, unit: number): Konva.ShapeConfig {
 }
 
 /**
- * Part of a photo to draw so it covers (or fits inside) a box, honouring the focus
- * point and zoom.
+ * Photo crop that covers (or fits) a box, honouring focus point and zoom.
  * @param nw - Photo width.
  * @param nh - Photo height.
  * @param w - Box width.
@@ -114,8 +110,7 @@ function photoPlacement(
 }
 
 /**
- * Konva image node that re-caches itself when its filters change, since Konva only
- * runs filters on a cached node.
+ * Image node that re-caches when its filters change; Konva only filters cached nodes.
  * @param props - Component props.
  * @param props.image - Loaded image.
  * @param props.filters - Filters to run, empty for none.
@@ -148,8 +143,7 @@ function FilteredImage({
 }
 
 /**
- * A photo frame with no photo yet, as templates start: a pale panel with a camera and
- * "Add a photo", clipped to the frame's shape.
+ * Empty photo frame placeholder: pale panel, camera and "Add a photo", clipped to the frame.
  * @param props - Component props.
  * @param props.w - Box width.
  * @param props.h - Box height.
@@ -192,8 +186,7 @@ function EmptyPhoto({
 }
 
 /**
- * A photo layer: cropped into its frame, with rounded corners or a circle mask. A
- * frame with no photo yet draws the "Add a photo" placeholder.
+ * A photo layer cropped into its frame with rounded or circle mask, or the placeholder.
  * @param props - Component props.
  * @param props.layer - Image layer.
  * @param props.w - Box width.
@@ -269,8 +262,7 @@ function Photo({
 }
 
 /**
- * A backdrop layer: the brand's pre-blurred backdrop, a blurred photo, a flat colour
- * or a two-colour gradient, with an optional light wash over it.
+ * A backdrop layer: brand backdrop, blurred photo, flat colour or gradient, plus optional wash.
  * @param props - Component props.
  * @param props.layer - Backdrop layer.
  * @param props.w - Box width.
@@ -371,11 +363,10 @@ function Logo({ src, w, h, shadow }: DrawProps & { src: string }): React.ReactEl
 }
 
 /**
- * Placement of a layer's Group: centred on its box and offset by half its size, so
- * turns and flips happen about the middle.
+ * Group placement centred on the box, offset by half its size, so turns and flips use the middle.
  * @param layer - The layer.
  * @param g - Its geometry on the size drawn.
- * @param paidAd - The design's paid-ad switch, which leaves contact details off.
+ * @param paidAd - Paid-ad switch, which leaves contact details off.
  * @returns Konva Group attributes.
  */
 export function layerTransform(
@@ -414,7 +405,7 @@ export function layerTransform(
  * @param props.bound - Live values for contact and promo layers.
  * @param props.family - Font-family list.
  * @param props.unit - The picture's shorter side over 1080.
- * @param props.editing - Whether its words are open in the text box, so they hide here.
+ * @param props.editing - Words open in the text box, so hidden here.
  * @returns Konva nodes.
  */
 export function LayerVisual({

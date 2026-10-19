@@ -1,7 +1,6 @@
 // src/features/mailing/lib/ai-draft.ts
-// The AI draft for a mailing email: what kinds of email it can write, the shape the
-// route returns, and how a draft fills the block list. Pure and client-safe, so the
-// editor and the checks share it.
+// AI draft for a mailing email: draft kinds, the route's reply shape, and how a draft fills
+// the block list. Pure and client-safe.
 
 import { emptyBlock, type Block } from "@/features/mailing/lib/blocks";
 
@@ -60,18 +59,13 @@ export interface AiDraft {
   paragraphs: string[];
   bullets: string[];
   buttonText: string;
-  /**
-   * Where a button with no link yet should go: one of the editor's link choices, or ""
-   * to leave the link for the operator. Ignored when the button already has a link.
-   */
+  /** Link for a button that has none yet (one of the editor's choices), or "". */
   buttonUrl: string;
 }
 
 /**
- * Straightens the typography the prompt bans but the model still slips in now and
- * then: curly quotes become straight ones, and an en or em dash becomes a spaced
- * hyphen (an unspaced one between digits, so a range reads "9-5"). Only punctuation
- * changes; the words stay as written.
+ * Straightens curly quotes and turns en/em dashes into a spaced hyphen, or an unspaced
+ * one between digits so a range reads "9-5".
  * @param value - Model text.
  * @returns The text with plain punctuation.
  */
@@ -84,8 +78,7 @@ export function plainPunctuation(value: string): string {
 }
 
 /**
- * A trimmed string field with plain punctuation, or "" when missing or not a string,
- * cut to a length.
+ * A trimmed, length-capped string with plain punctuation, or "" when not a string.
  * @param value - Raw value.
  * @param max - Longest allowed.
  * @returns The string.
@@ -110,10 +103,8 @@ function list(value: unknown, count: number, max: number): string[] {
 }
 
 /**
- * Reads the model's JSON into a draft, dropping anything the wrong shape and capping
- * lengths so a runaway reply can't flood the editor. Beyond straightening quotes and
- * dashes the wording is left as written: the operator reads every draft before it
- * goes anywhere.
+ * Reads the model's JSON into a draft, dropping wrong-shaped fields and capping lengths
+ * so a runaway reply can't flood the editor.
  * @param raw - Parsed JSON from the model.
  * @returns The draft, or null when it has nothing to fill in.
  */
@@ -145,18 +136,9 @@ function isGreeting(block: Block): boolean {
 }
 
 /**
- * Fills a block list from a draft, by position, so a template's layout keeps its shape:
- * - the heading goes in the first Heading block,
- * - the paragraphs replace the run of Text blocks that starts at the first one after the
- *   greeting (all of them up to the next other block), so drafting into an email that
- *   already has words, or drafting twice, swaps them rather than piling up,
- * - the bullets replace the first Bullet list's points,
- * - the button words replace the first Button's words, keeping its link; a button with
- *   no link yet takes the draft's link.
- * A part with no block to go in is added: a heading under the greeting, the paragraphs
- * under that, a list under the paragraphs and a button at the end.
- * A missing greeting is added at the top. Pictures, quotes, the promo card and every
- * other block stay as they were.
+ * Fills a block list from a draft by position, so a template keeps its shape: each part
+ * replaces the first matching block (paragraphs swap the Text run after the greeting, so
+ * drafting twice doesn't pile up), else is added. Other blocks are left alone.
  * @param blocks - The current blocks.
  * @param draft - The draft.
  * @returns The new blocks.
@@ -181,8 +163,7 @@ export function fillBlocks(blocks: readonly Block[], draft: AiDraft): Block[] {
     }
   }
 
-  // Paragraphs: swap out the run of Text blocks from the first one after the greeting.
-  // With none to replace, they start under the heading (or the greeting).
+  // Paragraphs: swap the Text run after the greeting, else go under the heading or greeting.
   let lastParagraph = Math.max(greeting, heading);
   if (draft.paragraphs.length > 0) {
     const first = out.findIndex((b, i) => i > greeting && b.type === "text");

@@ -1,8 +1,6 @@
 // scripts/check-assets.ts
-// Asset register helpers: request-body validation for the assets API, the schedule wiring
-// (low-value grouping across the whole register, filed closing values carried forward),
-// the expense prefill and link list, the view shape the Assets page hands the browser, the
-// asset form's round trip through parseAssetBody and its cost label's GST side.
+// Asset register helpers: body validation, schedule wiring, expense prefill and links,
+// page view shape, and the form's round trip through parseAssetBody.
 // Run with: npm test -- assets
 
 import {

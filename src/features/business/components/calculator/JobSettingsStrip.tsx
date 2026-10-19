@@ -1,8 +1,7 @@
 "use client";
 // src/features/business/components/calculator/JobSettingsStrip.tsx
-// Top strip of the calculator: job date, promo code entry, the form tools (clear, a link
-// to the rate editor in Settings), the date surcharge chip, and the resolved promo with its
-// per-job skip toggle.
+// Top strip of the calculator: job date, promo code, form tools, surcharge chip and the
+// resolved promo with its skip toggle.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
@@ -28,9 +27,7 @@ interface Props {
 }
 
 /**
- * Job settings strip: the date, the promo code and the form tools share one
- * box, so the first screen reaches the event picker and the job description.
- * The date drives the surcharge (public holiday or weekend) and promo lookup.
+ * Job settings strip in one compact box. The date drives the surcharge and promo lookup.
  * @param props - Component props.
  * @param props.jobDate - Selected job date (YYYY-MM-DD).
  * @param props.onJobDateChange - Called with the picked date, or "" when the input is cleared.
@@ -75,10 +72,7 @@ export function JobSettingsStrip({
           />
         </div>
 
-        {/* Code entry for a job taken over the phone. It renders whether or
-            not a promo resolved - without it there would be nowhere to type a
-            code when no automatic promo is running, which is exactly when a
-            code matters. */}
+        {/* Code entry, shown even when no automatic promo resolved. */}
         <div className="flex items-center gap-2">
           <label
             htmlFor="calc-promo-code"
@@ -111,10 +105,7 @@ export function JobSettingsStrip({
           </AdminButton>
         </div>
 
-        {/* The full clear lives up here rather than under the save buttons: it
-            is the "start over" action, reached mid-form far more often than at
-            the end, and destructive styling keeps it from reading as a fifth
-            way to save. */}
+        {/* Full "start over" clear, up here since it's used mid-form. */}
         <div className="ml-auto flex gap-2">
           <AdminButton variant="danger" size="xs" onClick={onClearForm}>
             Clear form
@@ -134,8 +125,7 @@ export function JobSettingsStrip({
         )}
       </div>
 
-      {/* The verdict comes from the job-date lookup, not a live check: a
-          code can be valid today and not on the day the job was done. */}
+      {/* Verdict is for the job date: a code valid today may not have been then. */}
       {promoCode !== "" && activePromo?.code !== promoCode && (
         <p className="text-sm font-medium text-red-700">
           {promoCode} isn&apos;t valid on {jobDate} - pricing uses whatever promo applied that day.

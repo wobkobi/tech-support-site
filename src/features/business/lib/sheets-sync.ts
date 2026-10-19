@@ -1,8 +1,6 @@
 // src/features/business/lib/sheets-sync.ts
-// Site > Google Sheet write-back primitives. Hidden Sync ID at column Z carries a UUID so
-// appends, in-place updates, deletes, and the import's reconciliation can all locate
-// rows. Cell builders keep the Cashbook/Expenses column order in one place. Failures are
-// non-fatal.
+// Site > Google Sheet write-back primitives. A hidden column-Z Sync ID locates rows for every
+// write and the import; cell builders own the Cashbook/Expenses column order.
 
 import { getFinancialYear } from "@/features/business/lib/financial-year";
 import { getDriveClient } from "@/features/business/lib/google-drive";
@@ -69,10 +67,8 @@ export async function getFySheetIdForDate(date: Date): Promise<string | null> {
 }
 
 /**
- * Resolves the spreadsheet an entry dated `date` should live in: the per-FY
- * sheet when `GOOGLE_BUSINESS_SHEETS_FOLDER_ID` is set, otherwise the single
- * `GOOGLE_SHEET_ID` workbook. Returns null when neither resolves - callers
- * skip the sheet write and the cron self-heal appends the row later.
+ * Resolves the spreadsheet for `date`: the per-FY sheet when a folder is set, else
+ * `GOOGLE_SHEET_ID`. Null skips the write; the cron self-heal appends it later.
  * @param date - Entry date used to pick the FY workbook.
  * @returns Spreadsheet file ID, or null when no destination exists.
  */
@@ -83,11 +79,8 @@ export async function resolveSheetIdForDate(date: Date): Promise<string | null> 
 }
 
 /**
- * Looks up the numeric sheet ID (gid) of a tab by name; needed for batchUpdate.
- * Matching is trimmed and case-insensitive to mirror how the values API
- * resolves range names - the workbooks title their tabs "CASHBOOK"/"EXPENSES"
- * while the code addresses them as "Cashbook"/"Expenses", so an exact match
- * reads rows fine but broke every metadata lookup (Sync-ID backfill).
+ * Looks up a tab's numeric sheet ID (gid) for batchUpdate. Case-insensitive like the values
+ * API, since the workbooks title tabs "CASHBOOK"/"EXPENSES".
  * @param spreadsheetId - The spreadsheet file ID.
  * @param tabName - Human-readable tab name (e.g. "Cashbook").
  * @returns The numeric sheetId, or null if the tab is missing.
@@ -186,8 +179,7 @@ async function ensureSyncIdSetup(spreadsheetId: string, tabName: string): Promis
                   endColumnIndex: SYNC_ID_COLUMN_INDEX + 1,
                 },
                 description: "Sync ID column - managed by To the Point app",
-                // Warning-only so owner-authed row deletes and updates are never
-                // blocked; strict protection would 403 deleteDimension calls.
+                // Warning-only: strict protection would 403 deleteDimension calls.
                 warningOnly: true,
               },
             },
@@ -202,17 +194,12 @@ async function ensureSyncIdSetup(spreadsheetId: string, tabName: string): Promis
 }
 
 /**
- * Writes a row (with its Sync ID at column Z) into the first empty-date row,
- * padding to 25 columns. NOT a values.append - see {@link firstEmptyRow}.
- * With a caller-supplied deterministic Sync ID (an entry's Mongo id) the write
- * is idempotent: a row already carrying that id is returned WITHOUT writing a
- * duplicate. The read-then-write is not atomic - live routes don't hold the
- * sync lock - so the import's content-gated dedup and the cron self-heal
- * backstop a concurrent collision.
+ * Writes a row with its column-Z Sync ID into the first empty-date row ({@link firstEmptyRow}).
+ * A deterministic `syncId` already present is reused, not duplicated (read-then-write, not atomic).
  * @param spreadsheetId - Spreadsheet file ID.
  * @param tabName - Tab to write to (e.g. "Cashbook").
- * @param cells - Values for columns A..Y; sheet-managed columns pass null to keep their formulas; right-padded with empty strings.
- * @param syncId - Optional caller-supplied deterministic Sync ID; a fresh random one is minted when omitted.
+ * @param cells - Values for columns A..Y; null keeps a sheet formula.
+ * @param syncId - Optional deterministic Sync ID; a random one is minted when omitted.
  * @returns The Sync ID written into (or already present in) column Z.
  */
 export async function appendRowWithSyncId(
@@ -223,8 +210,7 @@ export async function appendRowWithSyncId(
 ): Promise<string> {
   await ensureSyncIdSetup(spreadsheetId, tabName);
   const id = syncId ?? randomUUID();
-  // Append-if-absent for deterministic ids: reuse an existing row instead of
-  // doubling it. Random ids can't collide, so skip the extra read for them.
+  // Append-if-absent for deterministic ids; random ids can't collide.
   if (syncId) {
     const existing = await readSyncIdColumn(spreadsheetId, tabName);
     if (existing.has(syncId)) return syncId;
@@ -233,10 +219,8 @@ export async function appendRowWithSyncId(
   while (padded.length < SYNC_ID_COLUMN_INDEX) padded.push("");
   padded.push(id);
 
-  // Write into the first empty row, not values.append: the tabs are 1000-row templates
-  // with formula columns pre-filled, and append lands after the last populated cell in
-  // ANY column, stranding new rows near row 1000. Nulls in `padded` are skipped by update
-  // so sheet formulas survive; a rare collision orphans a sheetRowKey the cron re-appends.
+  // Not values.append: the 1000-row templates have pre-filled formula columns, so append
+  // lands near row 1000. Nulls are skipped by update, keeping formulas.
   const targetRow = await firstEmptyRow(spreadsheetId, tabName);
   const sheets = getSheetsClient();
   await withRetry(
@@ -254,11 +238,8 @@ export async function appendRowWithSyncId(
 }
 
 /**
- * Finds the first data row whose date column (A) is empty - the contiguous
- * insert point for a new entry (values.get trims trailing empties, so a
- * fully-packed block returns its next row). Column A holds only real entry
- * dates - never a fill-down formula - so it pinpoints the insert row; rows
- * stranded low by the old append bug sit AFTER a gap and are skipped.
+ * Finds the first data row whose date column (A) is empty. Column A holds only real dates,
+ * never a formula, so it pinpoints the insert row.
  * @param spreadsheetId - Spreadsheet file ID.
  * @param tabName - Tab to scan (e.g. "Cashbook").
  * @returns 1-based row number of the first empty-date row (>= 2).
@@ -311,9 +292,8 @@ export interface ExpenseRowInput {
 }
 
 /**
- * Builds the Cashbook cells A..H for an income entry. Columns F (Cash Deposit
- * Ref) and G (Tax Put-Aside) are sheet-managed: null means "skip" in a
- * values.update, so in-place edits never clobber operator-entered values there.
+ * Builds the Cashbook cells A..H for an income entry. F and G are sheet-managed, so null
+ * skips them in a values.update.
  * @param e - Income entry fields.
  * @returns Cell values for columns A..H.
  */
@@ -331,11 +311,8 @@ export function buildCashbookCells(e: CashbookRowInput): (string | number | null
 }
 
 /**
- * Builds the Expenses cells A..K for an expense entry. The GST rate (column H)
- * is written as a percent string (e.g. "15%") to match the importer's parser.
- * Columns I/J are sheet-managed formulas: null means "skip", so the app never
- * overwrites them (hard values on top of them broke the sheet); the importer
- * recomputes I/J on read anyway. Mirrors {@link buildCashbookCells}.
+ * Builds the Expenses cells A..K for an expense entry, GST rate (H) as "15%". I/J are
+ * sheet formulas, so null skips them, as in {@link buildCashbookCells}.
  * @param e - Expense entry fields.
  * @returns Cell values for columns A..K (I/J null so the sheet formulas stand).
  */
@@ -357,9 +334,8 @@ export function buildExpenseCells(e: ExpenseRowInput): (string | number | null)[
 }
 
 /**
- * Reads the Sync ID column of a tab into a syncId > 1-based row number map.
- * One API call; use for bulk reconciliation instead of per-row lookups.
- * Row indices are only valid until the next row insert/delete on the tab.
+ * Reads a tab's Sync ID column into a syncId > 1-based row map, valid until the next
+ * row insert or delete.
  * @param spreadsheetId - Spreadsheet file ID.
  * @param tabName - Tab to read (e.g. "Cashbook").
  * @returns Map of Sync ID to 1-based row number.
@@ -405,11 +381,8 @@ async function findRowIndexBySyncId(
 }
 
 /**
- * Updates the sheet row carrying `syncId` in place (columns A..Y only, so the
- * Sync ID at Z is preserved; null cells are skipped, not cleared). When the row
- * has vanished (operator deleted it), falls back to appending a fresh row so
- * the entry is never lost - the caller must persist the returned key when it
- * differs from the one passed in.
+ * Updates the row carrying `syncId` in place (A..Y; null cells skipped). A vanished row is
+ * re-appended; the caller persists the returned key if it differs.
  * @param spreadsheetId - Spreadsheet file ID.
  * @param tabName - Tab holding the row.
  * @param syncId - Sync ID of the row to update.
@@ -424,9 +397,7 @@ export async function updateRowBySyncId(
 ): Promise<{ updated: boolean; syncId: string }> {
   const rowIndex = await findRowIndexBySyncId(spreadsheetId, tabName, syncId);
   if (rowIndex === null) {
-    // Row vanished (sheet-side delete): re-append under the SAME Sync ID, not a fresh
-    // random one, so the caller's persisted sheetRowKey stays valid and the import's
-    // id-fallback can re-link an orphan left by a failed re-persist.
+    // Re-append under the SAME Sync ID so the persisted sheetRowKey stays valid.
     const newSyncId = await appendRowWithSyncId(spreadsheetId, tabName, cells, syncId);
     return { updated: false, syncId: newSyncId };
   }
@@ -446,8 +417,7 @@ export async function updateRowBySyncId(
 }
 
 /**
- * Deletes the whole sheet row carrying `syncId`. deleteDimension shifts the
- * rows below up, so any cached row indices are stale after this call.
+ * Deletes the row carrying `syncId`; cached row indices go stale after.
  * @param spreadsheetId - Spreadsheet file ID.
  * @param tabName - Tab holding the row.
  * @param syncId - Sync ID of the row to delete.
@@ -492,9 +462,8 @@ export async function deleteRowBySyncId(
 }
 
 /**
- * Writes Sync IDs into column Z for existing sheet rows in one batched call.
- * Used by the import to backfill manually-typed rows. Runs {@link ensureSyncIdSetup}
- * first so the header/hidden/protected state exists.
+ * Backfills column-Z Sync IDs for existing rows in one batched call, after
+ * {@link ensureSyncIdSetup}.
  * @param spreadsheetId - Spreadsheet file ID.
  * @param tabName - Tab to write to.
  * @param backfills - Row numbers (1-based) and the Sync IDs to write.

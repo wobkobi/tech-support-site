@@ -1,7 +1,6 @@
 // src/app/api/cron/send-review-asks/route.ts
-// Daily cron sending the Google review ask a few days after each invoice goes out, and
-// stamping why when it doesn't. Idempotent: every invoice is decided once, and a send
-// carries a per-invoice idempotency key. See docs/CRON.md.
+// Daily cron sending the Google review ask a few days after each invoice, stamping why
+// when it doesn't. Each invoice is decided once. See docs/CRON.md.
 
 import { runReviewAsks } from "@/features/reviews/lib/review-ask-run.server";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -10,8 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/cron/send-review-asks
- * Optional `?invoiceId=` limits the run to one invoice, for testing against a database
- * full of real invoices.
+ * Optional `?invoiceId=` limits the run to one invoice, for testing.
  * @param request - Incoming cron request.
  * @returns JSON `{ ok, sent, skipped, failed, waiting, errors }`.
  */

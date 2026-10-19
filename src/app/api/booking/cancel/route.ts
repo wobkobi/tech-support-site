@@ -1,8 +1,6 @@
 // src/app/api/booking/cancel/route.ts
-// Cancel a booking by cancel token. GET returns startAt + status so the cancel page can
-// render the fee banner before firing. POST cancels, stamps cancellation flags from the
-// server clock, and auto-drafts a DRAFT invoice when the cancel lands inside the fee
-// window.
+// Cancel a booking by cancel token. GET feeds the cancel page's fee banner; POST cancels
+// and drafts a cancellation invoice when inside the fee window.
 
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 import { assessCancellation } from "@/features/business/lib/pricing-policy";
@@ -47,8 +45,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Booking not found.", 404);
   }
 
-  // Hand the live cancellation policy to the client so the fee banner quotes
-  // the figures actually charged, not the bundled defaults.
+  // Live policy, so the fee banner quotes the figures actually charged.
   const { CANCELLATION } = await getPolicy();
   return NextResponse.json({
     ok: true,
@@ -64,8 +61,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 /**
  * POST /api/booking/cancel
- * Cancels the booking, removes its Google Calendar event, stamps the
- * cancellation flags, and fires the auto-draft invoice when inside the fee window.
+ * Cancel the booking, remove its calendar event and draft a fee invoice when late.
  * @param request - The incoming cancel request.
  * @returns JSON response indicating success or failure.
  */
@@ -74,10 +70,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (limited) return limited;
 
   try {
-    // Parse and validate body
     const body = (await request.json()) as CancelPayload;
-    // parseString, not a bare destructure: the payload type is a compile-time
-    // claim only, and a filter object here would match somebody else's booking.
+    // A filter object here would match somebody else's booking.
     const cancelToken = parseString(body.cancelToken);
 
     if (!cancelToken) {
@@ -108,8 +102,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Server clock decides the fee flags so a skewed client can't move the boundary.
-    // In-person and remote have their own windows and fees, so the policy reads
-    // the booking rather than one set of windows being applied to both.
+    // In-person and remote have their own windows and fees.
     const now = new Date();
     const { CANCELLATION } = await getPolicy();
     const charge = assessCancellation(booking.startAt, now, {
@@ -133,23 +126,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // The promo was never used, so its booking-time redemption stops counting
-    // against the cap and the customer's own limit. Swallows its own errors.
+    // Unused promo stops counting against its caps. Both helpers never throw.
     await releaseBookingRedemptions(booking.id);
     // A reminder held overnight would otherwise still land in the morning.
-    // Also never throws.
     await cancelHeldBookingEmails(booking.id);
 
-    // Awaited, not detached: Vercel freezes the instance once the response is sent, so a
-    // `void` call would usually never run and the fee would go unbilled and unlogged. The
-    // failure is still swallowed - the cancellation has committed and must report as done.
+    // Awaited: Vercel freezes the instance after the response, so a detached call never runs.
+    // Failure is swallowed - the cancellation has committed.
     if (lateCancellation) {
       try {
         await createDraftCancellationInvoice(updated, {
           cancelledAt: now,
           reason: "late-cancellation",
-          // Auto-send only on this customer self-cancel path; no-show / operator
-          // cancels stay drafts for review (see admin/bookings/[id]/route.ts).
+          // Auto-send only on customer self-cancel; operator cancels stay drafts.
           autoSend: CANCELLATION.autoSendCancellationInvoice,
         });
       } catch (err) {
@@ -157,11 +146,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // This route notified nobody at all, so a cancellation stayed invisible
-    // until someone happened to look at the calendar. Wrapped like the invoice
-    // above: the helpers swallow their own errors, but the settings read does
-    // not, and the cancellation has committed - a throw here would report a
-    // successful cancel as failed and invite the customer to try again.
+    // Wrapped because the settings read can throw, and the cancel has committed -
+    // a throw would report success as failure and invite a retry.
     try {
       await sendOwnerBookingCancellation(
         {

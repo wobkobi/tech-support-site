@@ -1,9 +1,7 @@
 "use client";
 // src/features/admin/components/DayAgendaView.tsx
-// Mobile-friendly single-day schedule view: one NZ day as a vertical agenda with
-// prev/today/next navigation, swipe gestures, and the same booking/block/travel data as
-// the desktop week grid. The sticky header band and the timed-events list render from
-// DayAgendaHeader and DayAgendaList; this file owns the state and gestures.
+// Mobile single-day schedule: one NZ day as a vertical agenda with swipe navigation.
+// Owns the state and gestures; DayAgendaHeader and DayAgendaList render it.
 
 import { BlockDayButton } from "@/features/admin/components/BlockDayButton";
 import { DayAgendaHeader } from "@/features/admin/components/DayAgendaHeader";
@@ -56,9 +54,8 @@ const SWIPE_MIN_DX = 60;
 const SWIPE_MAX_MS = 500;
 
 /**
- * Mobile single-day agenda view. Holds the selected day in client state so
- * day-stepping within the fetched week is instant (no server round-trip);
- * crossing the week boundary calls router.push to refetch the next week.
+ * Mobile single-day agenda. Stepping within the fetched window is client-side;
+ * leaving it calls router.push to refetch.
  * @param props - Component props.
  * @param props.initialDayKey - NZ YYYY-MM-DD for the day to show on mount.
  * @param props.todayKey - NZ YYYY-MM-DD for "today".
@@ -86,22 +83,18 @@ export function DayAgendaView({
   const [actionSheetEvent, setActionSheetEvent] = useState<WeekEvent | null>(null);
   // Stable "now" for the past-event lock (avoids an impure call during render).
   const [renderedAt] = useState(() => Date.now());
-  // Separate ticking clock for the current-time marker. Kept apart from
-  // renderedAt deliberately: that one must stay frozen or the past-edit lock
-  // would shift under the operator mid-session.
+  // Ticking clock for the now marker; renderedAt stays frozen so the lock doesn't shift.
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
-  // useTransition keeps the current view interactive while the next week
-  // is being fetched, so crossing the week boundary doesn't blank the UI.
+  // Keeps the current view up while the next week fetches.
   const [isPending, startTransition] = useTransition();
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const swipeStart = useRef<{ x: number; y: number; t: number } | null>(null);
-  // Long-press infrastructure: timer + start position + "fired" flag so the
-  // subsequent click doesn't also trigger the tap-to-expand toggle.
+  // Long-press state; the "fired" flag stops the following click toggling expand.
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressStart = useRef<{ x: number; y: number } | null>(null);
   const longPressFired = useRef<boolean>(false);
@@ -128,9 +121,7 @@ export function DayAgendaView({
     };
   }, [yy, mm, dd, selectedDayKey]);
 
-  // Filter the week down to the selected day. All-day events are start-inclusive /
-  // end-exclusive so multi-day Busy blocks show on every overlapping day key; timed events
-  // sort by start instant, then interleave with "free" gap markers.
+  // All-day events are end-exclusive so multi-day Busy blocks show on every day they cover.
   const { agendaItems, timedEvents, allDayEvents } = useMemo(() => {
     const timed: WeekEvent[] = [];
     const allDay: WeekEvent[] = [];
@@ -144,12 +135,10 @@ export function DayAgendaView({
         if (key === selectedDayKey) timed.push(ev);
       }
     }
-    // Compare parsed timestamps - lexical sort breaks when mixing Google's
-    // `+12:00`-offset strings with travel blocks' UTC `Z` ISO output.
+    // Parse first: lexical sort breaks mixing Google's `+12:00` strings with UTC `Z` ones.
     timed.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 
-    // Only booking>booking gaps get a free-time label - travel and personal events
-    // already imply unavailability, and labelling around them muddies the free-slot view.
+    // Only booking>booking gaps get a free-time label.
     const items: AgendaItem[] = [];
     for (let i = 0; i < timed.length; i++) {
       const cur = timed[i]!;
@@ -162,9 +151,7 @@ export function DayAgendaView({
       if (gapMin >= MIN_GAP_MINUTES) items.push({ type: "gap", minutes: gapMin });
     }
 
-    // Mark where the day has got to, before the first event still to come - an event
-    // already under way started before now, so the marker lands after its card rather than
-    // splitting it. Skipped on an empty day, where the "no events" message says more.
+    // Now marker goes before the first event still to come; skipped on an empty day.
     if (timed.length > 0 && selectedDayKey === nzDateKey(new Date(nowMs))) {
       const next = items.findIndex(
         (it) => it.type === "event" && new Date(it.ev.startAt).getTime() > nowMs,
@@ -178,9 +165,8 @@ export function DayAgendaView({
   }, [events, selectedDayKey, nowMs]);
 
   const holidayName = holidaysByDateKey[selectedDayKey] ?? null;
-  // Optimistic override for a just-clicked day: true = blocked, false = free, undefined =
-  // use the real calendar. `busyEvent` excludes the placeholder (it carries the unblock
-  // id); the displayed list shows or hides the block to match the click instantly.
+  // Optimistic override: true = blocked, false = free, undefined = real calendar.
+  // `busyEvent` excludes the placeholder since it carries the unblock id.
   const override = optimisticBlock.get(selectedDayKey);
   const realBusy = allDayEvents.find((e) => e.kind === "booking");
   const effectiveBlocked = override ?? realBusy != null;
@@ -195,9 +181,7 @@ export function DayAgendaView({
   const hasBookings = timedEvents.some((e) => e.kind === "booking");
   const bookingCount = timedEvents.filter((e) => e.kind === "booking").length;
 
-  // 7-day strip data: the Monday-to-Sunday week containing the selected day,
-  // with a booking count per day. Booking count drives the dot indicators
-  // and is also a useful aggregate for the at-a-glance read.
+  // Week strip: Monday-to-Sunday around the selected day, with a booking count per day.
   const weekDays = useMemo(() => {
     const mondayKey = mondayOf(selectedDayKey);
     return Array.from({ length: 7 }, (_, i) => {
@@ -212,7 +196,6 @@ export function DayAgendaView({
         timeZone: NZ_TZ,
         day: "numeric",
       }).format(noon);
-      // Count timed bookings whose NZ start-day matches this strip cell.
       let count = 0;
       for (const ev of events) {
         if (ev.kind !== "booking" || ev.isAllDay) continue;
@@ -223,10 +206,7 @@ export function DayAgendaView({
   }, [selectedDayKey, events]);
 
   /**
-   * Navigates to a new day. Stays client-side when the day is inside the
-   * buffered 21-day window (instant + URL mirrored); falls back to
-   * router.push when the target is outside the buffer so the server can
-   * rebuild it around the new day.
+   * Navigates to a day: client-side inside the 21-day buffer, else router.push.
    * @param newDayKey - NZ YYYY-MM-DD to navigate to.
    */
   function goToDay(newDayKey: string): void {
@@ -242,9 +222,7 @@ export function DayAgendaView({
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       url.searchParams.set("day", newDayKey);
-      // weekStart is server-derived from `day` when both are present, so drop
-      // it from the URL to avoid drift when stepping across the visible-week
-      // boundary inside the buffer.
+      // The server derives weekStart from `day`; drop it so the two can't drift.
       url.searchParams.delete("weekStart");
       window.history.replaceState(null, "", url.toString());
     }
@@ -297,9 +275,7 @@ export function DayAgendaView({
   }
 
   /**
-   * Swipe-end handler. Steps day forward/back when the gesture clears the
-   * directional + velocity thresholds; ignored when starting inside a
-   * `data-no-swipe` element so taps and links aren't intercepted.
+   * Swipe-end handler: steps a day when the gesture is fast and horizontal enough.
    * @param e - Pointer event.
    */
   function onPointerUp(e: React.PointerEvent<HTMLDivElement>): void {
@@ -317,8 +293,7 @@ export function DayAgendaView({
   }
 
   /**
-   * Starts the long-press timer on a booking card. Clears any prior timer so
-   * a rapid second touch doesn't double-fire.
+   * Starts the long-press timer on a booking card, clearing any prior one.
    * @param e - Pointer event from the card.
    * @param ev - The week-event the card represents.
    */
@@ -333,8 +308,7 @@ export function DayAgendaView({
   }
 
   /**
-   * Cancels the long-press if the finger drifts more than the threshold -
-   * keeps swipes from accidentally triggering the action sheet.
+   * Cancels the long-press when the finger drifts, so swipes don't open the sheet.
    * @param e - Pointer event.
    */
   function onCardPointerMove(e: React.PointerEvent<HTMLDivElement>): void {
@@ -358,9 +332,7 @@ export function DayAgendaView({
   }
 
   /**
-   * Toggles the inline expanded view for a booking card. Skipped when the
-   * preceding pointer interaction fired a long-press so the action sheet
-   * doesn't get immediately closed by the tap-to-expand toggle.
+   * Toggles a booking card's expanded view, unless a long-press just fired.
    * @param eventId - WeekEvent.id.
    */
   function handleCardClick(eventId: string): void {
@@ -372,8 +344,7 @@ export function DayAgendaView({
   }
 
   /**
-   * Computes a sensible default start time for the manual-booking modal: the
-   * next half-hour when the day is today, or 9am NZ otherwise.
+   * Opens the booking modal at the next half-hour today, or 9am NZ otherwise.
    */
   function handleAddBooking(): void {
     if (isToday) {
@@ -401,12 +372,7 @@ export function DayAgendaView({
     <div
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
-      className={cn(
-        "touch-pan-y transition-opacity",
-        // Subtle dim while the next week is loading so the user gets feedback
-        // without the layout shifting or going blank.
-        isPending && "opacity-60",
-      )}
+      className={cn("touch-pan-y transition-opacity", isPending && "opacity-60")}
     >
       <DayAgendaHeader
         weekDays={weekDays}
@@ -425,8 +391,7 @@ export function DayAgendaView({
       />
 
       {holidayName && (
-        // Amber to match the week grid's holiday label; Notice has no amber tone, so the
-        // border, fill and text are set here.
+        // Amber matches the week grid; Notice has no amber tone.
         <Notice className="mb-3 border-amber-500 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
           Public holiday: {holidayName}
         </Notice>

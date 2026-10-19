@@ -1,7 +1,6 @@
 // src/app/api/admin/social/[id]/route.ts
-// One social post. PATCH is a sparse update (only fields present in the body are
-// written) and only touches drafts and presets: what was posted stays as it was posted.
-// DELETE can take the post down from its platforms first.
+// One social post. PATCH is a sparse update of drafts and presets only; DELETE can take the
+// post down from its platforms first.
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import { deleteUnusedPictures } from "@/features/social-design/lib/picture-store";
@@ -57,8 +56,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx): Promise<Next
     const current = await prisma.socialPost.findFirst({ where: editable });
     if (current) targets = mergeTargets(current.targets, parsed.targets);
   }
-  // The status guard sits in the write itself, so an edit racing a publish can't
-  // change a post that has already started going out.
+  // Status guard in the write itself, so an edit can't race a publish.
   const updated = await prisma.socialPost.updateMany({
     where: editable,
     data: { ...parsed.patch, ...(targets ? { targets } : {}) },
@@ -73,17 +71,12 @@ export async function PATCH(request: NextRequest, { params }: Ctx): Promise<Next
   return okResponse({ post: toPostRow(post) });
 }
 
-// Statuses where nothing of the post is up on any platform, so the record can go
-// without leaving something online that can no longer be taken down from here.
+// Statuses where nothing is up on any platform, so the record can safely go.
 const NOTHING_UP = ["draft", "scheduled", "failed", "removed"] as const;
 
 /**
- * DELETE /api/admin/social/[id] - removes a post from this list. By default it's
- * taken down from every platform it's up on first, and kept here if any platform
- * refuses, so nothing is left online without a record of it. The server decides this
- * from the stored post, not the list the browser loaded, since a scheduled post may
- * have gone out since. `?keepOnline=1` (the operator unticked the box) deletes only
- * the record. Refused while it is posting or being taken down.
+ * DELETE /api/admin/social/[id] - takes the post down everywhere first (kept if any platform
+ * refuses), or with `?keepOnline=1` deletes only the record. Refused mid-post or mid-take-down.
  * @param request - Incoming request.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the post id.
@@ -125,8 +118,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
         where: { id },
         select: { imageUrl: true, targets: { select: { imageUrl: true } } },
       });
-  // The status guard is in the delete itself: a post that went out between the
-  // take-down check and here is still up, so it stays.
+  // Status guard in the delete itself, so a post that just went out stays.
   const deleted = await prisma.socialPost.deleteMany({
     where: keepOnline
       ? { id, status: { notIn: ["posting", "removing"] } }

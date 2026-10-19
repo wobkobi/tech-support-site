@@ -1,7 +1,6 @@
 // src/app/api/booking/manage-lookup/route.ts
-// Find-my-booking: emails someone the change/cancel links for their upcoming
-// appointments. The response is deliberately identical whether or not the address
-// matched, so this can't be used to test which email addresses have booked.
+// Find-my-booking: emails change/cancel links for upcoming appointments. The response
+// is identical whether or not the address matched, so it can't enumerate bookers.
 
 import { sendBookingManageLinksEmail } from "@/features/reviews/lib/email-booking";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -22,15 +21,13 @@ const UNIFORM_MESSAGE =
  * @returns The same acknowledgement regardless of whether a booking matched.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  // Tighter than the booking form: this one sends mail on a bare email address,
-  // so it is the more attractive thing to hammer.
+  // Tighter than the booking form: this sends mail on a bare email address.
   const limited = rateLimitOrReject(request, "manage-lookup", 3, 60_000);
   if (limited) return limited;
 
   const body = (await request.json().catch(() => ({}))) as { email?: unknown };
   const email = typeof body.email === "string" ? normaliseEmail(body.email) : "";
-  // A malformed address is the one case worth reporting - it's the user's own
-  // typo, and saying so leaks nothing about who has booked.
+  // A malformed address leaks nothing about who has booked, so report it.
   if (!email || !email.includes("@") || email.length > 200) {
     return errorResponse("Enter a valid email address.", 400);
   }
@@ -44,8 +41,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
       orderBy: { startAt: "asc" },
       select: { startAt: true, cancelToken: true },
-      // A generous cap: nobody legitimately has more upcoming than this, and it
-      // bounds the email size.
+      // Bounds the email size.
       take: 10,
     });
 
@@ -53,8 +49,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       await sendBookingManageLinksEmail(email, bookings);
     }
   } catch (error) {
-    // Swallow: reporting a lookup/send failure differently would reintroduce
-    // the enumeration signal this endpoint exists to avoid.
+    // Swallow: a distinct failure response would be an enumeration signal.
     console.error("[booking/manage-lookup] Lookup or send failed:", error);
   }
 

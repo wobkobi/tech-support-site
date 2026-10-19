@@ -16,10 +16,8 @@ interface TaskTimeWarningProps {
 }
 
 /**
- * Inline banner shown above the tasks panel when hourly task minutes don't
- * match the listed job window, or when a short job sits below the minimum
- * billable time; {@link taskWindowMismatch} decides which. Stays hidden when everything
- * lines up so the panel doesn't carry a permanent strip of UI in the steady state.
+ * Banner above the tasks panel when hourly task minutes miss the job window or fall
+ * below the minimum; {@link taskWindowMismatch} decides which.
  * @param props - Component props.
  * @param props.tasks - Current task lines (hourly + flat).
  * @param props.windowMin - Job window in minutes (`durationMins`).
@@ -39,8 +37,7 @@ export function TaskTimeWarning({
   if (!mismatch) return null;
   const taskMin = hourlyTaskMinutes(tasks);
 
-  // Sub-minimum job: whole-job labour sits under the billable floor, so offer to bill at
-  // the minimum (Fix floors the tasks).
+  // Sub-minimum job: Fix floors the tasks to the billable minimum.
   if (mismatch === "floor") {
     return (
       <div
@@ -75,8 +72,7 @@ export function TaskTimeWarning({
       <span>
         Tasks total {Math.round(taskMin)} min - listed window is {windowMin} min.
       </span>
-      {/* Short of the window bills less than the job ran, since the end time is the
-          actual finish, so Fix grows the tasks to fill it. */}
+      {/* The end time is the actual finish, so Fix grows the tasks to fill the window. */}
       <button
         type="button"
         onClick={onFix}

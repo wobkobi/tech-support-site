@@ -1,9 +1,6 @@
 // src/features/admin/components/ui/AdminButton.tsx
-// Compact back-office button. Same colours as the shared public Button (coquelicot
-// primary, violet outline) at admin density: h-8/h-10 instead of the public h-12.
-// Polymorphic: renders a Next.js Link when `href` is set, otherwise a native button. A
-// `busy` button shows a spinner and is disabled. The variant and size classes come from
-// adminButtonClass in button-classes.ts, which non-button elements can share.
+// Compact back-office button in the public Button's colours at admin density. Renders a
+// Link when `href` is set; classes come from adminButtonClass so other elements can share them.
 
 "use client";
 

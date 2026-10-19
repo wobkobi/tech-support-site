@@ -1,12 +1,7 @@
 "use client";
 // src/features/admin/components/ScheduleFindTimes.tsx
-// Inline "next open times" bar for the admin schedule. Shows a few genuinely-bookable
-// start times (one per hour, spread across days) for a short or long job so the operator
-// can read them out on the phone; tapping a time opens the manual-booking form prefilled.
-// Entering the customer's address - typed or picked from a contact - gates the times by
-// the real drive to/from the surrounding jobs. Data comes from
-// /api/admin/schedule/suggest-times, which reuses the public availability engine so slots
-// match what customers can actually book.
+// "Next open times" bar: a few bookable starts to read out on the phone, optionally gated
+// by the drive from a customer address. Uses the public availability engine via the API.
 
 import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
@@ -196,8 +191,7 @@ export function ScheduleFindTimes(): React.ReactElement {
           )}
         </div>
 
-        {/* Full row on a phone, so the times start at the left edge instead of
-            wrapping into whatever space the address input leaves. */}
+        {/* Full row on a phone so the times start at the left edge. */}
         <div className="flex basis-full flex-wrap items-center gap-1.5 sm:flex-1 sm:basis-auto">
           {loading && <span className="text-sm text-admin-muted">Finding...</span>}
           {!loading && error && <span className="text-sm text-red-600">{error}</span>}

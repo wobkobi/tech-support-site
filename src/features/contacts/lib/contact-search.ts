@@ -1,16 +1,11 @@
 // src/features/contacts/lib/contact-search.ts
 // Token-scored contact search shared by the picker modal and inline autocomplete.
-// scoreContactToken ranks a token per field (name > email > company > phone; exact >
-// prefix > substring) and filterContacts requires every token to match some field, sorted
-// best-first.
 
 import type { GoogleContact } from "@/features/business/types/business";
 
 /**
- * Ranks a contact against a single search token. Lower scores rank first.
- * Returns Infinity when no field matches (caller filters those out). Name
- * matches outrank email > company > phone; exact > prefix > substring within
- * each field.
+ * Ranks a contact against one token, lower first: name > email > company > phone,
+ * then exact > prefix > substring. Infinity when nothing matches.
  * @param c - Contact to rank.
  * @param token - Lowercased search token.
  * @returns Numeric score (lower = better match) or Infinity.
@@ -33,14 +28,10 @@ function scoreContactToken(c: GoogleContact, token: string): number {
 }
 
 /**
- * Token-split + scored filter shared by the contact picker modal and inline
- * autocomplete. Every space-separated token must match SOME field on the
- * contact (name/email/company/phone). Results sort by best total score so
- * exact-name + prefix matches surface first.
+ * Every space-separated token must match some field; results sort by total score.
  * @param contacts - Full contact list.
  * @param query - Raw search input.
- * @returns Filtered + ranked contacts. With an empty query, returns the full
- * list sorted alphabetically by name/email.
+ * @returns Filtered, ranked contacts; the full list A-Z for an empty query.
  */
 export function filterContacts(contacts: GoogleContact[], query: string): GoogleContact[] {
   const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -67,10 +58,8 @@ export function filterContacts(contacts: GoogleContact[], query: string): Google
 }
 
 /**
- * Whether a search found this contact through their company alone ("68" finding Michael
- * Smith at 68 Ltd): every token matches the company, and the tokens don't all match the
- * name or email. The calculator addresses such a pick to the company, since that is who
- * the operator was looking for.
+ * Whether only the company explains the match ("68" finding Michael Smith at 68 Ltd),
+ * so the calculator addresses the pick to the company.
  * @param c - The picked contact.
  * @param query - Raw search input at the moment of the pick.
  * @returns True when only the company explains the match.

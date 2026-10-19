@@ -1,7 +1,6 @@
 // scripts/check-service-pages.ts
-// Guards the service detail page content. Every page must belong to a real service
-// category, link only to pages that exist, and pin review ids Prisma can query - a
-// malformed ObjectId throws at render and 500s the whole page.
+// Guards service page content: real categories, existing links, and valid review
+// ObjectIds (a malformed one 500s the page).
 // Run with: npm test -- service-pages
 
 import { SERVICE_AREAS } from "@/shared/lib/service-areas";

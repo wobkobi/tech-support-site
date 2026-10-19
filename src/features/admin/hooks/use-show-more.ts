@@ -18,12 +18,8 @@ export interface UseShowMore<T> {
 }
 
 /**
- * Shows the first `step` items, then `step` more on each call to `showMore`.
- *
- * The limit is stored against the `resetKey` it was grown under, and a
- * different key reads as the first batch again. So a new search, filter or
- * sort starts from the top of the list without an effect or a setState during
- * render.
+ * Shows the first `step` items, then `step` more per `showMore`. The limit is keyed to
+ * `resetKey`, so a new filter or sort restarts at the first batch without an effect.
  * @param items - The full (already filtered and sorted) list.
  * @param step - Rows per batch.
  * @param resetKey - Anything that changes when the list is re-filtered or re-sorted.

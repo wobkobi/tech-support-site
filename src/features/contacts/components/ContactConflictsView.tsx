@@ -1,8 +1,7 @@
 "use client";
 // src/features/contacts/components/ContactConflictsView.tsx
-// Lists pending Google Contacts sync conflicts and lets the admin pick a winner per row.
-// POSTs to /api/admin/contacts/conflicts/[id], which writes the chosen value to the site
-// DB and triggers a fresh push to Google. A resolved row drops out of the list.
+// Pending Google Contacts sync conflicts; the admin picks a winner per row, which is
+// saved and pushed back to Google.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
@@ -21,8 +20,7 @@ export interface ConflictRow {
   contactId: string;
   contactName: string;
   contactEmail: string | null;
-  // Known fields plus an open set; `string & {}` keeps the literal hints
-  // without them collapsing into plain string.
+  // `string & {}` keeps the literal hints from collapsing into plain string.
   field: "name" | "email" | "address" | (string & {});
   siteValue: string | null;
   googleValue: string | null;
@@ -35,9 +33,7 @@ interface ContactConflictsViewProps {
 }
 
 /**
- * Conflicts review UI. One card per row with "Use site value" / "Use Google
- * value". Resolution is optimistic: the row drops out as soon as the API call
- * succeeds, with a toast either way.
+ * Conflicts review UI: one card per row; a row drops out once its resolve succeeds.
  * @param props - Component props.
  * @param props.initial - Server-loaded conflicts.
  * @returns Conflicts view element.
@@ -93,8 +89,7 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
     );
   }
 
-  // Headed like the address list above it: the breadcrumb already leads back to
-  // Contacts, and a bare back link here read as the start of a new page.
+  // Headed like the address list above; the breadcrumb already links back.
   return (
     <section className="flex flex-col gap-3">
       <div>

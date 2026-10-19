@@ -1,7 +1,6 @@
 // src/app/api/business/promos/route.ts
-// Admin promo collection endpoint. GET lists every promo newest start first; POST
-// validates a PromoBody via validatePromo (per-type discount fields, kind/code pairing,
-// startAt before endAt), creates the promo, and revalidates the active-promo cache tag.
+// Admin promo collection endpoint: GET lists promos, POST validates and creates one and
+// revalidates the active-promo cache tag.
 
 import {
   resolveDiscountType,
@@ -58,17 +57,14 @@ interface PromoBody {
 function validatePromo(body: PromoBody): string | null {
   if (!body.title || typeof body.title !== "string") return "title is required";
   if (!body.startAt || !body.endAt) return "startAt and endAt are required";
-  // Parse before comparing: an unparseable date compares false against
-  // everything, so `start >= end` would pass it through to Prisma, which
-  // rejects an Invalid Date and 500s the create.
+  // Parse first: an Invalid Date passes `start >= end` and 500s the Prisma create.
   const startAt = parseDate(body.startAt);
   const endAt = parseDate(body.endAt);
   if (!startAt || !endAt) return "startAt and endAt must be valid dates";
   if (startAt >= endAt) {
     return "startAt must be before endAt";
   }
-  // Shared with the edit route: two copies of this drifted once already, which
-  // is how editing a fixed-amount promo came to be rejected outright.
+  // Shared with the edit route so the two can't drift.
   const discountError = validateDiscount(body);
   if (discountError) return discountError;
   const kindError = validateKind({ kind: body.kind, code: normalisePromoCode(body.code) });
@@ -79,8 +75,7 @@ function validatePromo(body: PromoBody): string | null {
   if (windowError) return windowError;
   const tierError = validateTiers(resolveDiscountType(body), body.minSpend, body.tiers);
   if (tierError) return tierError;
-  // Reject rather than coerce: a fractional priority would order unpredictably
-  // against the integer column and read as accepted.
+  // A fractional priority would order unpredictably against the integer column.
   if (body.priority !== undefined && !Number.isInteger(body.priority)) {
     return "priority must be a whole number";
   }
@@ -139,8 +134,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       activeFromMinute: body.activeFromMinute ?? null,
       activeToMinute: body.activeToMinute ?? null,
       minSpend: body.minSpend ?? null,
-      // Stored as given; resolution reduces rather than sorts, and validation
-      // has already rejected duplicate floors.
+      // Stored unsorted; resolution reduces, and duplicate floors are already rejected.
       tiers: (body.tiers ?? []).map((t) => ({
         minSpend: t.minSpend!,
         flatHourlyRate: t.flatHourlyRate ?? null,

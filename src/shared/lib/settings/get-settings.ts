@@ -1,13 +1,7 @@
 // src/shared/lib/settings/get-settings.ts
-// Server-only accessor that resolves the full, typed settings:
-// code defaults with DB overrides merged on top, with the booking window
-// (maxAdvanceDays) defensively clamped so a hand-edited bad row can't push it
-// out of range on the public booking/pricing pages. Cached
-// via unstable_cache with a tag: hot reads hit the data cache, and
-// `saveSettingsGroup` busts the tag so edits go live immediately. No time-based
-// revalidate: the root layout reads this, and an unstable_cache timer becomes the
-// ISR interval of every public page (each regeneration is ~100 billed ISR write
-// units). A row edited straight in the DB needs a settings save to go live.
+// Server-only typed settings: defaults plus DB overrides, maxAdvanceDays clamped. Cached by tag,
+// busted on save. No time-based revalidate: the root layout reads this, so a timer would become
+// every public page's ISR interval. A row edited straight in the DB needs a settings save.
 
 import { prisma } from "@/shared/lib/prisma";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
@@ -23,9 +17,8 @@ export const SETTINGS_KEY_PREFIX = "settings:";
 const GROUPS = Object.keys(DEFAULT_SETTINGS) as SettingsGroup[];
 
 /**
- * Overlays an override onto a base value. Plain objects merge recursively;
- * arrays and scalars (including an explicit `null`, used for "off") replace.
- * Override keys not present in the base shape are preserved as-is.
+ * Overlays an override onto a base: plain objects merge recursively; arrays, scalars and an
+ * explicit `null` ("off") replace. Extra override keys are kept.
  * @param base - Default value for this branch.
  * @param override - Stored override (may be partial or undefined).
  * @returns Merged value of the base's type.
@@ -55,8 +48,7 @@ function clamp(n: number, min: number, max: number, fallback: number): number {
 }
 
 /**
- * Read-side guards that keep an out-of-range stored value from breaking the
- * public site. Heavier coherence checks live in the write-path validator.
+ * Read-side clamps so a bad stored value can't break the public site.
  * @param s - Freshly merged settings (mutated in place).
  * @returns The same settings, clamped.
  */
@@ -71,8 +63,7 @@ function sanitiseSettings(s: Settings): Settings {
 }
 
 /**
- * Pure resolver: merges a map of per-group overrides over the defaults. Shared
- * by the DB loader and unit tests (no Prisma, no cache).
+ * Pure resolver merging per-group overrides over the defaults; shared by the loader and tests.
  * @param overrides - Parsed override JSON keyed by group (missing groups use defaults).
  * @returns Fully-resolved, clamped settings.
  */
@@ -87,8 +78,7 @@ export function resolveSettings(overrides: Partial<Record<SettingsGroup, unknown
 }
 
 /**
- * Loads + merges the `settings:*` rows from MongoDB. Bad JSON in any row is
- * ignored so one corrupt row falls back to that group's default.
+ * Loads and merges `settings:*` rows; a row with bad JSON falls back to its group default.
  * @returns Resolved settings.
  */
 async function loadSettings(): Promise<Settings> {
@@ -108,8 +98,7 @@ async function loadSettings(): Promise<Settings> {
 }
 
 /**
- * Cached accessor for the full settings object; the tag is busted on every
- * settings write so edits go live immediately.
+ * Cached settings accessor; every settings write busts the tag.
  * @returns Resolved settings (defaults + DB overrides).
  */
 export const getSettings = unstable_cache(loadSettings, ["settings"], {

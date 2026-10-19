@@ -48,7 +48,6 @@ export function createReviewsHandlers(prisma = prismaClient): {
         return NextResponse.json({ reviews: [] }, { status: 500 });
       }
     },
-    // ...existing POST handler will be moved below
   };
 }
 
@@ -56,12 +55,9 @@ export function createReviewsHandlers(prisma = prismaClient): {
 export const GET = createReviewsHandlers().GET;
 
 /**
- * POST /api/reviews
- * Submits a new review. Optionally verifies the reviewer against a booking
- * (bookingId + reviewToken) or against a contact-level manual link
- * (contactId + reviewToken).
- * @param request - Incoming Next.js request containing review text, optional name fields, and optional verification fields.
- * @returns JSON response with ok flag and review id on success (201), or an error message on failure.
+ * POST /api/reviews - submit a review, optionally verified by a booking or contact token.
+ * @param request - Review text, optional names, and optional verification fields.
+ * @returns `{ ok, id, verified, status }` (201), or an error.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const limited = rateLimitOrReject(request, "reviews-post", 5, 60_000);
@@ -69,7 +65,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const prisma = prismaClient;
   try {
-    // Parse and validate body
     const body = (await request.json()) as {
       text?: string;
       firstName?: string;
@@ -102,10 +97,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let customerRef = null;
     let autoContactId: string | null = null;
 
-    // Validate the verification inputs before any of them reaches a `where`.
-    // These are the secrets that prove who the reviewer is, and Prisma reads a
-    // filter object in place of a scalar - so an unchecked value lets a caller
-    // match a booking or contact they hold no token for and post as verified.
+    // Validate before any reaches a `where`: Prisma accepts a filter object in place of
+    // a scalar, which would let a caller match a booking without its token.
     const claimedToken = parseString(body.reviewToken);
     const claimedBookingId = parseObjectId(body.bookingId);
     const claimedContactId = parseObjectId(body.contactId);
@@ -117,8 +110,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
 
       if (booking) {
-        // One review per booking: a used link is an edit flow (PATCH), so a
-        // second POST for the same booking is a duplicate - refuse it.
+        // One review per booking; edits go through PATCH.
         const existing = await prisma.review.findFirst({
           where: { bookingId: booking.id },
           select: { id: true },
@@ -132,10 +124,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         verified = true;
         bookingId = booking.id;
         customerRef = booking.reviewToken;
-        // Auto-link to Contact by booking email - best effort, never fails the
-        // submission. Case-insensitive and skips soft-deleted contacts; when no
-        // live contact is found the review keeps its bookingId + customerRef so
-        // matchReviewsToContacts can link it later.
+        // Best-effort link to a live Contact by email; unmatched reviews are linked
+        // later by matchReviewsToContacts.
         try {
           const bookingEmail = booking.email.toLowerCase();
           const contact = await prisma.contact.findFirst({
@@ -157,8 +147,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           data: { reviewSubmittedAt: new Date() },
         });
       } else {
-        // Token supplied but the booking is gone - keep the token so the review
-        // is still identifiable, and log rather than silently dropping it.
+        // Booking gone: keep the token so the review stays identifiable.
         customerRef = claimedToken;
         console.warn(
           `[reviews] booking-token submission matched no booking (bookingId=${claimedBookingId}); review kept with customerRef.`,
@@ -166,9 +155,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Verify against a contact-level manual review link. The token may be the
-    // contact's primary reviewToken or one inherited from a merged-away
-    // contact (altReviewTokens) - both prove the same person.
+    // Contact-level link: the token may be primary or inherited from a merge (altReviewTokens).
     if (!verified && claimedContactId && claimedToken) {
       const contact = await prisma.contact.findFirst({
         where: {
@@ -179,8 +166,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
 
       if (contact && !contact.deletedAt) {
-        // One review per contact: a used link is an edit flow (PATCH), so a
-        // second POST for the same person is a duplicate - refuse it.
+        // One review per contact; edits go through PATCH.
         const existing = await prisma.review.findFirst({
           where: { contactId: contact.id },
           select: { id: true },
@@ -195,8 +181,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         customerRef = claimedToken;
         autoContactId = contact.id;
 
-        // Fill blanks on the Contact from any details the customer typed,
-        // never overwriting an existing value.
+        // Fill blank Contact fields only; never overwrite.
         const submittedEmail = normaliseEmailOrNull(body.contactEmail);
         const submittedPhone = normaliseContactPhone(body.contactPhone);
         const contactUpdate: { email?: string; phone?: string; reviewLinkSubmittedAt: Date } = {
@@ -206,9 +191,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (!contact.phone && submittedPhone) contactUpdate.phone = submittedPhone;
         await prisma.contact.update({ where: { id: contact.id }, data: contactUpdate });
       } else if (contact) {
-        // The token is valid but the contact was soft-deleted/merged away. Keep
-        // the token (so the review re-links if the contact returns) but don't
-        // mark it verified or link it to a dead row.
+        // Contact soft-deleted: keep the token for re-linking, but not verified.
         customerRef = claimedToken;
         console.warn(
           `[reviews] contact-token submission matched a soft-deleted contact (contactId=${claimedContactId}); review kept with customerRef for later re-link.`,
@@ -216,12 +199,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Token-verified reviews auto-approve only when the operator opts in;
-    // otherwise everything starts pending for manual approval.
+    // Verified reviews auto-approve only when the operator opts in.
     const { reviews: reviewSettings, comms } = await getSettings();
     const status = verified && reviewSettings.autoApproveVerified ? "approved" : "pending";
 
-    // Create the review
     const review = await prisma.review.create({
       data: {
         text,
@@ -236,15 +217,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // Trigger on-demand revalidation of every review surface. The home-page
-    // marquee is one of them, so this has to go through the shared helper - the
-    // inline version this replaced omitted "/" and left the marquee stale.
+    // Shared helper covers every review surface, including the home-page marquee.
     revalidateReviewPaths();
 
-    // Awaited, not detached: Vercel freezes the instance once the response is
-    // sent, so a `void` call here would usually never reach Resend and the
-    // review would sit unapproved with no notification and no log line.
-    // sendOwnerReviewNotification swallows its own errors.
+    // Awaited: Vercel freezes the instance after the response. Swallows its own errors.
     await sendOwnerReviewNotification(review);
 
     if (comms.pushOnReview) {
@@ -259,8 +235,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
     }
 
-    // `status` goes back so the thank-you screen can say whether the review is
-    // already live or waiting on approval, instead of guessing.
+    // `status` tells the thank-you screen whether the review is live yet.
     return NextResponse.json({ ok: true, id: review.id, verified, status }, { status: 201 });
   } catch (error) {
     console.error("[reviews] POST error:", error);

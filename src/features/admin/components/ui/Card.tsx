@@ -1,7 +1,6 @@
 // src/features/admin/components/ui/Card.tsx
-// Canonical admin surface: a bordered 8px panel with no shadow, matching the public
-// site's panels, plus an optional CardHeader: a title row ruled off across the card's
-// full width. Server-safe.
+// Canonical admin surface (bordered, no shadow) plus an optional full-width CardHeader.
+// Server-safe.
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -16,8 +15,7 @@ interface CardProps {
   /** Inner padding: "none" (self-managed), "sm", or "md" (default). */
   padding?: CardPadding;
   /**
-   * Drop the surface below `sm`. For a card that wraps a list of cards: on a
-   * phone the extra border and padding only narrow the cards inside it.
+   * Drop the surface below `sm`, for a card wrapping a list of cards.
    */
   flushOnPhone?: boolean;
 }
@@ -27,9 +25,8 @@ export const FLUSH_ON_PHONE =
   "max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:[--card-pad-x:0px] max-sm:[--card-pad:0px]";
 
 /**
- * Padding for the given preset. The padding is also published as --card-pad (and the
- * header's side inset as --card-pad-x), so a CardHeader can pull itself out to the
- * card's edges whatever the preset; a "none" card still gives its header a side inset.
+ * Padding for the given preset, also published as --card-pad / --card-pad-x so a
+ * CardHeader can pull out to the card's edges.
  * @param padding - Padding preset.
  * @returns Class string.
  */
@@ -85,9 +82,8 @@ interface CardHeaderProps {
 }
 
 /**
- * Title / description / actions row for the top of a {@link Card}. As the card's first
- * child it runs edge to edge with a rule under it (negative margins cancel the card's
- * padding); anywhere else it keeps the rule and loses the pull-out.
+ * Title / description / actions row for a {@link Card}. As the first child it runs edge
+ * to edge via negative margins; elsewhere it just keeps the rule.
  * @param props - Component props.
  * @param props.title - Header title.
  * @param props.description - Optional supporting description.

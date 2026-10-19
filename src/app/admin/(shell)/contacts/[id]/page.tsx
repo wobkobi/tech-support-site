@@ -1,8 +1,6 @@
 // src/app/admin/(shell)/contacts/[id]/page.tsx
-// Customer-360 contact detail. Loads everything the contact touches through the shared
-// loadContact360 matcher - bookings, invoices, income, reviews - summarises it as
-// StatCards, and merges the lot into one interaction timeline. The right rail carries the
-// contact fields, sync state and review-ask state.
+// Customer-360 contact detail: everything loadContact360 matches, as stat cards and one
+// timeline, with contact, sync and review-ask state in the rail.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";

@@ -1,8 +1,6 @@
 "use client";
 // src/features/admin/components/ManualBookingModal.tsx
-// Modal for adding a booking from the admin schedule view, for one taken over the phone
-// or by email - prefills date/time from the clicked slot, checks the customer fields
-// inline, and POSTs to the admin booking-create endpoint.
+// Modal for adding a phone/email booking from the admin schedule, prefilled from the clicked slot.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
@@ -71,15 +69,12 @@ export function ManualBookingModal({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  // Unit kept separate from the street address, same as the public booking form:
-  // Google Places autocomplete predicts the street but rarely the apartment/unit,
-  // so without its own box the unit gets lost.
+  // Own unit box: Places autocomplete rarely predicts the unit, so it'd get lost.
   const [unit, setUnit] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [durationMinutes, setDurationMinutes] = useState<60 | 120>(initialDurationMinutes);
-  // Auto-size from the job notes: an estimate over an hour bumps the duration to
-  // 2 hours, unless the operator has set it by hand.
+  // A notes estimate over an hour bumps to 2 hours, unless set by hand.
   const [durationManuallySet, setDurationManuallySet] = useState(false);
   const [estimating, setEstimating] = useState(false);
   const [estimateHint, setEstimateHint] = useState<string | null>(null);
@@ -95,10 +90,8 @@ export function ManualBookingModal({
   const [nameListOpen, setNameListOpen] = useState(false);
 
   /**
-   * Estimates job duration from the notes via the pricing estimator and bumps the
-   * duration to 2 hours when it runs over an hour. Skips when the operator set the
-   * duration by hand, the notes are too short, or they're unchanged since the last
-   * estimate; a rate-limit or failure just leaves the current duration in place.
+   * Estimates duration from the notes, bumping to 2 hours past an hour. Skips a
+   * hand-set duration and short or unchanged notes; failures leave it alone.
    */
   async function estimateFromNotes(): Promise<void> {
     if (durationManuallySet) return;
@@ -133,8 +126,7 @@ export function ManualBookingModal({
 
   useEffect(() => {
     /**
-     * Loads existing contacts so the customer-name field can autofill from them.
-     * Failure is non-fatal > the form still works without suggestions.
+     * Loads contacts for name autofill; failure just means no suggestions.
      */
     async function loadContacts(): Promise<void> {
       try {
@@ -150,9 +142,7 @@ export function ManualBookingModal({
   }, []);
 
   /**
-   * Submits the manual booking. Validates locally then POSTs to the admin
-   * create endpoint. On success refreshes the schedule page so the new booking
-   * appears in the grid; on failure surfaces the error message inline.
+   * Validates and POSTs the booking, refreshing the schedule on success.
    * @param e - Submit event from the form.
    * @returns Promise that resolves once the request settles.
    */
@@ -203,22 +193,20 @@ export function ManualBookingModal({
   }
 
   /**
-   * Clears one field's error as it's edited, so a fix is acknowledged as it's typed.
+   * Clears one field's error as it's edited.
    * @param key - The field being edited.
    */
   function clearFieldError(key: ContactField): void {
     setFieldErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
   }
 
-  // A booking taken over the phone is typed while talking, so a stray backdrop
-  // tap or Escape must not wipe it. The prefilled start and duration don't count.
+  // Typed mid-call, so a stray Escape mustn't wipe it; prefilled fields don't count.
   const dirty = [name, phone, email, unit, address, notes].some((v) => v.trim() !== "");
 
   return (
     <Modal
       open
-      // Block Escape/backdrop dismissal while the create POST is in flight -
-      // the booking would still save invisibly behind a closed modal.
+      // No dismissal mid-POST, or the booking saves invisibly behind a closed modal.
       onClose={submitting ? () => undefined : onClose}
       dirty={dirty && !submitting}
       title="New booking"
@@ -228,8 +216,7 @@ export function ManualBookingModal({
           <AdminButton variant="secondary" onClick={onClose} disabled={submitting}>
             Cancel
           </AdminButton>
-          {/* The footer sits outside the form, so submit through the form itself -
-              requestSubmit keeps the browser's required-field validation. */}
+          {/* Footer is outside the form; requestSubmit keeps native validation. */}
           <AdminButton
             variant="primary"
             busy={submitting}
@@ -326,8 +313,7 @@ export function ManualBookingModal({
                           setName(c.name);
                           setEmail(c.email ?? "");
                           setPhone(c.phone ? formatNZPhone(c.phone) : "");
-                          // Split the stored address back into unit + street so the
-                          // dedicated unit box stays populated on edit.
+                          // Split back into unit + street for the unit box.
                           {
                             const split = splitUnitFromAddress(c.address ?? "");
                             setUnit(split.unit);
@@ -383,9 +369,7 @@ export function ManualBookingModal({
           </AdminField>
         </div>
 
-        {/* Stack below sm: the unit input + address autocomplete can't both
-              shrink to fit three tracks on a narrow phone, and this modal is
-              fixed-position so the page-level overflow clip doesn't contain it. */}
+        {/* Stack below sm: unit + autocomplete can't fit three tracks on a phone. */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <AdminField label="Apt / Unit" htmlFor="mb-unit" optional>
             <AdminInput

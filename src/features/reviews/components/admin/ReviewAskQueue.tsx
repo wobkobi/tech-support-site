@@ -1,8 +1,7 @@
 "use client";
 // src/features/reviews/components/admin/ReviewAskQueue.tsx
-// The "Review asks" card on the admin reviews page: invoices whose automatic review ask
-// is still to come (with a warning when it's going to be skipped), and what happened to
-// the asks decided in the last two weeks. Skip and Send now act on one invoice.
+// The "Review asks" card on the admin reviews page: upcoming automatic asks (with skip
+// warnings) and the last two weeks' outcomes, with per-invoice Skip and Send now.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ADMIN_META_LABEL_CLS } from "@/features/admin/components/ui/field-classes";

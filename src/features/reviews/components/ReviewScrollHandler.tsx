@@ -1,39 +1,32 @@
 "use client";
 // src/features/reviews/components/ReviewScrollHandler.tsx
-// Centres a hash-targeted review card with a smooth scroll from the top, then plays a
-// soft outer-glow halo on arrival. Uses the Web Animations API so the flash survives the
-// global prefers-reduced-motion CSS. Re-runs on hashchange; renders nothing.
+// Centres a hash-targeted review card with a smooth scroll from the top, then flashes a
+// halo. Re-runs on hashchange; renders nothing.
 
 import { useEffect } from "react";
 
 const COQ = "243, 66, 19";
 
 /**
- * Centers a hash-targeted review card in the viewport with a smooth scroll
- * starting from the top of the page, then plays a soft outer-glow halo on
- * arrival. Uses the Web Animations API so the flash isn't suppressed by the
- * global `prefers-reduced-motion` CSS override.
+ * Scrolls to and flashes the hash-targeted review. The Web Animations API keeps the
+ * flash alive under the global `prefers-reduced-motion` CSS override.
  * @returns Null (this component only runs side effects).
  */
 export function ReviewScrollHandler(): null {
   useEffect(() => {
-    // The retry chain can still be pending up to two seconds after unmount (it
-    // only retries while the target is absent). A late retry re-reads the current
-    // hash and would scroll whatever page the reader moved to back to the top.
+    // A retry can fire up to 2s after unmount and would scroll the next page to the top.
     let cancelled = false;
 
     /**
-     * Locates the targeted review, jumps to top, smooth-scrolls to center it,
-     * then triggers the halo flash. Retries briefly if DOM isn't ready.
+     * Finds the targeted review, scrolls to it and flashes it; retries while it isn't in
+     * the DOM yet.
      * @param attempt - Current retry count.
      */
     function flashTarget(attempt = 0): void {
       if (cancelled) return;
       const rawHash = window.location.hash;
       const matches = rawHash.match(/review-[a-zA-Z0-9_-]+/g);
-      // No hash target: undo any stale scroll-restoration and stay at the top.
-      // Without this, clicking "Reviews" in the navbar after previously
-      // targeting a review would scroll back to the old anchor.
+      // No hash target: undo stale scroll restoration so the navbar link lands at the top.
       if (!matches || matches.length === 0) {
         window.scrollTo({ top: 0, behavior: "instant" });
         return;
@@ -50,12 +43,10 @@ export function ReviewScrollHandler(): null {
         return;
       }
 
-      // Always start the journey from the top
       window.scrollTo({ top: 0, behavior: "instant" });
 
-      // Brief beat so the user sees "we're at the top", then glide to target
+      // Brief beat at the top, then glide to the target.
       const target: HTMLElement = el;
-      // Respect reduced-motion: jump instead of gliding when the OS asks for it.
       const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       setTimeout(() => {
         target.scrollIntoView({
@@ -78,8 +69,7 @@ export function ReviewScrollHandler(): null {
           );
         }
 
-        // Fire halo when smooth scroll finishes; fall back to a fixed delay
-        // for browsers without `scrollend` support (older Safari).
+        // Fire on scrollend, with a fixed-delay fallback for older Safari.
         let fired = false;
         /**
          * Triggers the halo exactly once when the smooth scroll has settled.
@@ -95,7 +85,7 @@ export function ReviewScrollHandler(): null {
       }, 200);
     }
 
-    // Slight initial delay so the page has finished laying out
+    // Slight delay so the page has finished laying out.
     const t = setTimeout(() => flashTarget(0), 150);
     /**
      * Re-runs the flash sequence when the URL hash changes within the page.

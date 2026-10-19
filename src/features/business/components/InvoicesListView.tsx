@@ -1,11 +1,7 @@
 "use client";
 // src/features/business/components/InvoicesListView.tsx
-// Lists every invoice with client-side search, status/date filtering, sortable columns,
-// and clickable summary cards. Status is shown as a derived badge (SENT-past-due surfaces
-// as OVERDUE) - there is no inline status dropdown; a payment is recorded through
-// PaymentDialog (POST /pay), and voiding lives on the invoice detail page so a client
-// notification can be sent. Filters, sort and page live in the URL (?status=overdue),
-// so Back from an invoice and the dashboard's deep links land on the same view.
+// Lists every invoice with search, filters, sorting and summary cards. Filters, sort and
+// page live in the URL so Back and dashboard deep links land on the same view.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
@@ -58,8 +54,7 @@ async function fetchInvoices(): Promise<Invoice[]> {
 }
 
 /**
- * Client component listing all invoices with search, filters, sortable columns,
- * summary cards, and a payment-recording action.
+ * Client component listing all invoices, with a payment-recording action.
  * @param props - Component props.
  * @param props.query - The page's searchParams, the starting filters.
  * @returns The invoices list element.
@@ -110,9 +105,7 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
   }, []);
 
   /**
-   * Reloads the full invoice list from the server. A failure keeps the rows
-   * already on screen and raises the banner, so an outage never reads as an
-   * empty ledger.
+   * Reloads the invoice list; a failure keeps the current rows and raises the banner.
    */
   async function reload(): Promise<void> {
     setRetrying(true);
@@ -198,8 +191,7 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
   }
 
   /**
-   * Applies a sort: toggles direction on the active column, else switches column
-   * (dates + totals default to descending, text to ascending).
+   * Applies a sort: toggles the active column, else switches (dates/totals start descending).
    * @param key - Column to sort by.
    */
   function toggleSort(key: SortKey): void {
@@ -221,9 +213,8 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
     setStatusFilter((s) => (s === key ? "all" : key));
   }
 
-  // Summary across ALL invoices, not the filtered view. Legacy PAID rows with no paidAt
-  // are excluded from "paid this month" (unknown pay date), and quotes are not money owed,
-  // so they get their own counter and stay out of every dollar stat.
+  // Summary across ALL invoices. PAID rows without paidAt skip "paid this month"; quotes
+  // get their own counter and stay out of dollar stats.
   const summary = useMemo<InvoicesSummary>(() => {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     let outstanding = 0;
@@ -276,8 +267,7 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return invoices.filter((inv) => {
-      // The linked contact's name and company count too, so "michael" finds the
-      // invoices addressed to 68 Ltd and "68" finds the ones addressed to him.
+      // The linked contact's name and company match too.
       const haystack = [inv.number, inv.clientName, inv.contactName, inv.contactCompany];
       if (q && !haystack.some((field) => field?.toLowerCase().includes(q))) {
         return false;
@@ -287,13 +277,10 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
       } else if (statusFilter === "QUOTE") {
         if (!inv.isQuote) return false;
       } else if (statusFilter !== "all" && (inv.status !== statusFilter || inv.isQuote)) {
-        // Stored-status buckets are invoice-only: a quote is DRAFT/SENT under
-        // the hood but must not surface under those filters.
+        // Stored-status buckets are invoice-only; quotes stay out.
         return false;
       }
-      // Compare NZ calendar days as strings. Parsing an input's YYYY-MM-DD as a
-      // Date gives UTC midnight, midday in NZ, which cuts the morning off the
-      // first day.
+      // Compare NZ days as strings; parsing YYYY-MM-DD gives UTC midnight (midday NZ).
       const issued = nzDateKey(new Date(inv.issueDate));
       if (fromDate && issued < fromDate) return false;
       if (toDate && issued > toDate) return false;
@@ -327,9 +314,7 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
   const anyFilterActive =
     search !== "" || statusFilter !== "all" || fromDate !== "" || toDate !== "";
 
-  // Pagination. currentPage clamps defensively so a filter change that shrinks
-  // the result set can never leave us slicing past the end (page state may lag
-  // one render behind the filter handlers that reset it).
+  // Clamp the page, which may lag a render behind a filter that shrank the results.
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paged = useMemo(

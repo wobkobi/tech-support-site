@@ -1,8 +1,6 @@
 // src/app/api/admin/blocked-days/[eventId]/route.ts
-// Admin endpoint to unblock a day. A multi-day block is ONE all-day "Busy" event spanning
-// the range, so unblocking a single day must trim or split that event: an edge day
-// shortens it, a middle day splits it, the last remaining day deletes it. Without `?date`
-// the whole event is deleted.
+// Admin endpoint to unblock a day by trimming or splitting the block's single all-day
+// event. Without `?date` the whole event is deleted.
 
 import {
   deleteBookingEvent,
@@ -27,9 +25,8 @@ interface Segment {
 }
 
 /**
- * Splits an all-day block [startKey, endKey) (end exclusive) around a removed
- * day, returning the surviving segments (caller guards that `removedDay` is in
- * the span): the only day > [], an edge day > 1 segment, a middle day > 2.
+ * Splits an all-day block [startKey, endKey) around a removed day (caller checks it is
+ * inside): only day > [], edge day > 1 segment, middle day > 2.
  * @param startKey - Block start (inclusive, YYYY-MM-DD).
  * @param endKey - Block end (exclusive, YYYY-MM-DD).
  * @param removedDay - The day being unblocked (YYYY-MM-DD).
@@ -45,8 +42,7 @@ function splitBlockedRange(startKey: string, endKey: string, removedDay: string)
 
 /**
  * DELETE /api/admin/blocked-days/[eventId]?date=YYYY-MM-DD
- * Unblocks a day: trims or splits the underlying all-day event so only that day
- * is freed; without `date`, deletes the whole event.
+ * Unblocks one day, or deletes the whole event without `date`.
  * @param request - Incoming admin request.
  * @param root0 - Route params.
  * @param root0.params - Route params with eventId.
@@ -77,9 +73,7 @@ export async function DELETE(
     );
   }
 
-  // Refuse to touch a real booking's calendar event from the blocked-day route: it would
-  // strip the appointment off the calendar while the Booking row stays confirmed with a
-  // dangling calendarEventId. No Booking ever references a blocked-day event.
+  // Never touch a real booking's event here; no Booking references a blocked-day event.
   const bookingUsingEvent = await prisma.booking.findFirst({
     where: { calendarEventId: eventId },
     select: { id: true },
@@ -89,8 +83,7 @@ export async function DELETE(
   }
 
   try {
-    // No specific day, or the event isn't a readable all-day block, or the day
-    // sits outside the block: delete the whole event.
+    // No usable day, or the day is outside the block: delete the whole event.
     const range = removedDay ? await getBlockedDayRange(eventId) : null;
     if (
       !removedDay ||
@@ -133,8 +126,7 @@ export async function DELETE(
     revalidateTag(SCHEDULE_CALENDAR_TAG, {});
     return NextResponse.json({ ok: true, action });
   } catch (err) {
-    // The event is already gone (a prior action / merge deleted it) - the day is
-    // effectively unblocked, so treat 404/410 as success rather than a 500.
+    // Already gone (404/410) means already unblocked.
     const code =
       (err as { code?: number; status?: number })?.code ?? (err as { status?: number })?.status;
     if (code === 404 || code === 410) {

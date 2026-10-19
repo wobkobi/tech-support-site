@@ -1,12 +1,7 @@
 "use client";
 // src/features/booking/components/admin/BookingAdminList.tsx
-// Admin bookings list: summary StatCards, status pills, free-text search (name / email /
-// phone), a start-date range filter, and sortable columns. Editing and the full action
-// set (cancel, no-show, delete) live on the booking detail page now; the list keeps only
-// the two common quick actions - mark completed and send / resend review - each behind a
-// ConfirmDialog and routed through useBookingActions. Each row links to its detail page.
-// The status, search and date range live in the URL (?status=held&q=...), so Back from
-// a booking and the dashboard's deep links land on the same view.
+// Admin bookings list with stats, filters (synced to the URL), sorting, and two quick
+// actions (complete, review); everything else is on the detail page.
 
 import {
   ROW_CLS,
@@ -69,8 +64,7 @@ type SortDir = "asc" | "desc";
 const BATCH = 25;
 
 /**
- * Natural date order for a status bucket: work still ahead (confirmed, held)
- * reads soonest first, history reads newest first.
+ * Natural date order for a status bucket: upcoming soonest first, history newest first.
  * @param filter - The status bucket.
  * @returns Sort direction for the start date.
  */
@@ -95,8 +89,7 @@ interface PendingAction {
 }
 
 /**
- * Admin booking list with StatCards, filters, sortable columns, and per-row
- * quick actions (mark completed, send review).
+ * Admin booking list with StatCards, filters, sorting and per-row quick actions.
  * @param props - Component props.
  * @param props.bookings - Initial booking rows from the server.
  * @param props.query - The page's searchParams, the starting filters.
@@ -111,8 +104,7 @@ export function BookingAdminList({
 }): React.ReactElement {
   const actions = useBookingActions();
   const [bookings, setBookings] = useState<AdminBookingRow[]>(initial);
-  // With no status in the URL: confirmed work, or everything when nothing is
-  // confirmed, so the page never lands on an empty list.
+  // Default to confirmed, or everything when nothing is confirmed.
   const [defaultFilter] = useState<StatusFilter>(() =>
     initial.some((b) => b.status === "confirmed") ? "confirmed" : "all",
   );
@@ -193,8 +185,7 @@ export function BookingAdminList({
   }, [bookings, filter, query, dateFrom, dateTo, sortKey, sortDir]);
 
   /**
-   * Toggles the sort direction when re-selecting the active column, else switches
-   * to the new column with a sensible default direction.
+   * Toggles direction on the active column, else switches column.
    * @param key - Column to sort by.
    */
   function toggleSort(key: SortKey): void {
@@ -207,8 +198,7 @@ export function BookingAdminList({
   }
 
   /**
-   * Switches the status bucket. A date sort follows the bucket's natural order;
-   * a name or status sort the operator picked is left alone.
+   * Switches the status bucket; a date sort follows the bucket's natural order.
    * @param f - Status bucket to show.
    */
   function selectFilter(f: StatusFilter): void {
@@ -278,8 +268,7 @@ export function BookingAdminList({
   }
 
   /**
-   * Flags a live booking whose calendar event is gone: reminder and review
-   * emails are paused for it.
+   * Flags a live booking whose calendar event is gone (its emails are paused).
    * @param b - The booking row.
    * @returns The flag, or null when the event is there or the booking is cancelled.
    */
@@ -296,8 +285,7 @@ export function BookingAdminList({
   }
 
   /**
-   * Runs the pending quick action (mark completed / send review), applies the
-   * optimistic local update on success, and closes the dialog.
+   * Runs the pending quick action with an optimistic update, then closes the dialog.
    */
   async function runPending(): Promise<void> {
     if (!pending) return;
@@ -378,8 +366,7 @@ export function BookingAdminList({
         }
         filters={
           <>
-            {/* One unit, so "to" can't wrap away from the dates it joins. On a
-                phone the pair shares the row; from sm up each keeps its width. */}
+            {/* One unit, so "to" can't wrap away from its dates. */}
             <div className="flex w-full items-center gap-2 sm:w-auto">
               <AdminInput
                 type="date"

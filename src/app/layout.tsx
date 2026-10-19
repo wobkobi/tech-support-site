@@ -34,10 +34,8 @@ const exo = Exo({
 
 const siteUrl = getSiteUrl();
 
-// Runs during HTML parse, before paint, so browsers too old for the Tailwind v4 / Next 16
-// app get the static fallback instead. color-mix() is the probe because its support line
-// is exactly Tailwind v4's (Safari 16.4+, Chrome 111+, Firefox 113+). Deliberately
-// ES5-safe; "?full=1" or a stored flag lets a visitor override.
+// Before paint, send browsers too old for Tailwind v4 to the static fallback. color-mix()
+// matches Tailwind v4's support line. ES5-safe; "?full=1" or a stored flag overrides.
 const legacyRedirectScript = `(function(){try{var allow=false;try{if(window.localStorage&&localStorage.getItem("ttp-allow-modern")==="1")allow=true;}catch(e){}if(window.location&&window.location.search.indexOf("full=1")!==-1){allow=true;try{localStorage.setItem("ttp-allow-modern","1");}catch(e){}}if(allow)return;var ok=window.CSS&&typeof CSS.supports==="function"&&CSS.supports("color","color-mix(in srgb, #000, #fff)");if(!ok){window.location.replace("/legacy.html");}}catch(e){}})();`;
 
 export const metadata: Metadata = {
@@ -59,8 +57,7 @@ export const metadata: Metadata = {
     description:
       "Friendly computer and IT support across Auckland. On-site and remote help, transparent pricing, no jargon.",
   },
-  // Card type only: no page overrides `twitter`, so a title/description/image here
-  // would repeat the home page's on every page. X falls back to each page's og:* tags.
+  // Card type only; X falls back to each page's og:* tags.
   twitter: { card: "summary_large_image" },
   robots: {
     index: true,
@@ -74,9 +71,7 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    // SVG handles dark mode itself; the PNG entries cover browsers without
-    // SVG-favicon support. favicon.ico is intentionally omitted - Chrome would
-    // pick it over the SVG. Bots probing /favicon.ico still find the file.
+    // PNGs cover browsers without SVG favicons. favicon.ico is omitted, or Chrome picks it over the SVG.
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml", sizes: "any" },
       {
@@ -131,18 +126,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>): Promise<React.ReactElement> {
-  // Live identity + weekly hours + rates so the JSON-LD never drifts from the
-  // settings or the rate config.
+  // Live settings and rates so the JSON-LD never drifts.
   const [{ availability, identity }, pricing] = await Promise.all([
     getSettings(),
     getPublicPricing(),
   ]);
-  // schema.org telephone, derived from the editable tel: link (strip the scheme).
   const telephone = identity.phoneTel.replace(/^tel:/, "");
-  // Which days appear still tracks the real schedule; only the times are
-  // overridable, so the advertised listing can be narrower than the hours the
-  // booking form offers (later slots stay bookable, just not advertised).
-  // Listed Monday-first, which is how the hours read to a customer.
+  // Days track the real schedule; only the advertised times can be narrower. Monday-first.
   const published = identity.publishedHours;
   const advertisedOrder: readonly Weekday[] = [1, 2, 3, 4, 5, 6, 0];
   const openingHoursSpecification = advertisedOrder
@@ -178,9 +168,8 @@ export default async function RootLayout({
     slogan: "Clear explanations, no jargon, solutions that actually work.",
     telephone,
     email: identity.email,
-    // Same @id as the Person entity on /about. The name and url stay inline
-    // because this block renders on every page and Google won't resolve an
-    // @id defined on another page.
+    // Same @id as /about's Person; name and url stay inline since Google won't resolve
+    // an @id defined on another page.
     founder: {
       "@type": "Person",
       "@id": `${siteUrl}/about#person`,
@@ -207,8 +196,7 @@ export default async function RootLayout({
         containedInPlace: { "@type": "AdministrativeArea", name: identity.homeRegion },
       })),
     ],
-    // No `serviceArea`: schema.org superseded it with `areaServed`, which already
-    // carries the same GeoCircle above.
+    // No `serviceArea`: superseded by `areaServed`.
     openingHoursSpecification,
     contactPoint: [
       {

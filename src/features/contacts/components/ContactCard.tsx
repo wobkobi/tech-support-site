@@ -1,8 +1,7 @@
 "use client";
 // src/features/contacts/components/ContactCard.tsx
-// One contact row in the admin contacts list: view mode, inline edit with multiple
-// emails/phones and Places-backed addresses, and its source/target role in a merge.
-// Phones show it as the row; the desktop table opens its editor in an expanding row.
+// One contact in the admin list: view mode, inline edit and its merge role.
+// Phones show it as the row; the desktop table renders it in an expanding row.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -70,11 +69,7 @@ export interface EditFormState {
   cancel: () => void;
 }
 
-/**
- * A card's role in an in-progress merge: "idle" (no merge running), "source"
- * (this card is the one being merged away), or "target" (a candidate to merge
- * the source into and keep).
- */
+/** Merge role: "idle", "source" (being merged away) or "target" (could be kept). */
 export type MergeRole = "idle" | "source" | "target";
 
 export interface ContactCardProps {
@@ -102,9 +97,8 @@ export interface ContactCardProps {
   onMergeHere: () => void;
   onCancelMerge: () => void;
   /**
-   * Prefix for the edit inputs' DOM ids. The phone card and the desktop table's
-   * expanding row both mount while editing, so the table passes its own prefix to keep
-   * every label pointing at its own input. Defaults to "edit".
+   * Prefix for the edit inputs' DOM ids (default "edit"). The phone card and table
+   * row both mount while editing, so the table passes its own to keep ids unique.
    */
   fieldIdPrefix?: string;
 }

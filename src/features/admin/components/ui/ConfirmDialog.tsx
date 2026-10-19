@@ -1,6 +1,5 @@
 // src/features/admin/components/ui/ConfirmDialog.tsx
-// Styled confirmation dialog built on Modal, replacing `window.confirm`. A "danger" tone
-// renders the confirm button in coquelicot; `busy` shows a spinner and blocks dismissal
+// Styled confirmation dialog on Modal, replacing `window.confirm`. `busy` blocks dismissal
 // while the action runs.
 
 "use client";

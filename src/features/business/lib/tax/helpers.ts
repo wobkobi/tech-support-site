@@ -17,8 +17,7 @@ export function roundKm(km: number): number {
 }
 
 /**
- * Turns a 0-100 percentage into a 0-1 fraction, clamped. A non-finite value
- * counts as 100 so a bad stored figure never silently zeroes a deduction.
+ * Turns a 0-100 percentage into a clamped 0-1 fraction; non-finite counts as 100.
  * @param pct - Percentage, normally 0-100.
  * @returns Fraction between 0 and 1.
  */
@@ -28,9 +27,7 @@ export function pctFraction(pct: number): number {
 }
 
 /**
- * Puts a date on the ledger scale: UTC midnight of its NZ calendar day. A stored
- * ledger date comes back unchanged; a real instant (11:30pm NZ, say) lands on
- * the NZ day it happened.
+ * Puts a date on the ledger scale: UTC midnight of its NZ calendar day (ledger dates pass unchanged).
  * @param date - ISO string or Date.
  * @returns UTC midnight of the NZ day.
  */
@@ -39,9 +36,7 @@ export function ledgerDay(date: string | Date): Date {
 }
 
 /**
- * Half-open FY window test on ISO strings, matching the business page's
- * filterByScope. The date is normalised through Date first so a bare
- * "2026-04-01" compares as "2026-04-01T00:00:00.000Z".
+ * Half-open FY window test on normalised ISO strings, matching filterByScope.
  * @param date - ISO string or Date.
  * @param fy - The financial year (only its bounds are read).
  * @returns True when start <= date < end.

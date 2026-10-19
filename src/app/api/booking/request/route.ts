@@ -66,19 +66,13 @@ interface BookingRequestPayload {
   /** Honeypot field - real users never fill this; bots usually do. */
   website?: string;
   /**
-   * Client-generated UUID; one per form mount. Logged for traceability so a
-   * retried request after a flaky network can be correlated with the original.
-   * The DB unique constraint on `activeSlotKey` is what actually prevents a
-   * double-booking; this is just observability + a hook for future replay-safe
-   * idempotency.
+   * Client UUID per form mount, logged to correlate retries. The `activeSlotKey`
+   * unique constraint is what prevents double-booking.
    */
   idempotencyKey?: string;
   /** Id of the PriceEstimateLog the customer saw before booking, if any. */
   estimateId?: string;
-  /**
-   * Promo code the customer entered, if any. Never trusted: the route
-   * re-resolves it and prices from the result.
-   */
+  /** Promo code the customer entered. Never trusted - re-resolved server-side. */
   promoCode?: string;
 }
 
@@ -116,8 +110,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.log(`[booking/request] idempotencyKey=${idempotencyKey}`);
     }
 
-    // Normalise + validate phone up front so a malformed number (letters,
-    // wrong length) is rejected before any of the calendar / DB work runs.
+    // Reject a malformed phone before any calendar / DB work runs.
     const phoneValidation = validatePhone(phone ?? "", { nzOnly: true });
     if (phoneValidation.result === "invalid") {
       return NextResponse.json(
@@ -127,9 +120,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     const phoneE164 = phoneValidation.e164 || null;
 
-    // Honeypot trip: silently report success without creating a booking so the
-    // bot moves on. Real users never fill this field (it's visually hidden
-    // and tab-skipped on the form).
+    // Honeypot trip: fake success so the bot moves on.
     if (typeof website === "string" && website.trim().length > 0) {
       console.warn("[booking/request] Honeypot tripped; faking success.", {
         ip: request.headers.get("x-forwarded-for") ?? "unknown",
@@ -164,9 +155,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // normaliseAddress only formats an UNAMBIGUOUS match (null on 0 or >1 candidates), so
-    // it never guesses between streets - real ambiguity was resolved by the customer's
-    // pick on the client. Falls back to the typed value so a new address still books.
+    // normaliseAddress only formats an UNAMBIGUOUS match; fall back to the typed value
+    // so a new address still books.
     const cleanName = normaliseName(name) || name.trim();
     const normalisedEmail = normaliseEmail(email);
     const canonicalAddress =
@@ -175,9 +165,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         : (address?.trim() ?? null);
 
     const now = new Date();
-    // Settings are read once, here, before anything is created. A failed read
-    // after the calendar invite or the booking row would 500 a booking that
-    // actually went through, and the customer would book it again.
+    // Read settings before creating anything, or a failed read would 500 a booking
+    // that went through and the customer would book again.
     const [{ config, acceptingBookings }, settings] = await Promise.all([
       getAvailabilityConfig(),
       getSettings(),
@@ -192,9 +181,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const existingForValidation = await loadBlockingBookings(now);
 
-    // Fail closed: the live calendar read is authoritative for real events, so
-    // if it errors we cannot rule out a collision - refuse the booking rather
-    // than risk a double-book against a manual calendar entry.
+    // Fail closed: without the calendar read a collision can't be ruled out.
     let calendarEvents: Array<{ id: string; start: string; end: string }>;
     try {
       const rawEvents = await fetchAllCalendarEvents(now, maxDate);
@@ -215,7 +202,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Validate with duration
     const validation = validateBookingRequest(
       dateKey,
       timeOfDay,
@@ -238,7 +224,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     const durationMinutes = duration === "short" ? config.durations.short : config.durations.long;
 
-    // Calculate start/end times
     const [year, month, day] = dateKeyParts(dateKey);
 
     const startAt = nzWallClockUtc(year, month, day, startHour, startMinute);
@@ -247,9 +232,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const cancelToken = randomUUID();
     const reviewToken = randomUUID();
 
-    // Snapshot the quote the customer saw, before the notes/calendar are built so it
-    // lands in both. Best effort, and every field is copied rather than referenced so it
-    // survives the estimate-log retention purge. priceLow/priceHigh are the all-in total.
+    // Snapshot the quote the customer saw; fields are copied so they survive the
+    // estimate-log purge. priceLow/priceHigh are the all-in total.
     let priceEstimateIdAtBooking: string | null = null;
     let quotedLowAtBooking: number | null = null;
     let quotedHighAtBooking: number | null = null;
@@ -276,7 +260,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const cleanAccessNotes = typeof accessNotes === "string" ? accessNotes.trim() || null : null;
 
-    // Build notes
     let bookingNotes = `${notes.trim()}\n\n`;
     const timeLabel =
       startMinute === 0
@@ -289,14 +272,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bookingNotes += `Address: ${canonicalAddress}\n`;
     }
     if (quotedLowAtBooking !== null && quotedHighAtBooking !== null) {
-      // Same helper the admin price-snapshot card uses, so the notes line and
-      // the card can never disagree on the labour/travel split.
+      // Same helper as the admin price-snapshot card, so the two always agree.
       bookingNotes += `Quoted: ${formatQuotedRange(quotedLowAtBooking, quotedHighAtBooking, quotedTravelAtBooking)}\n`;
     }
 
-    // The notes blob above is the internal record parseBookingNotes reads back. The
-    // customer is an attendee on the event, so the invite gets the customer-facing
-    // description instead - it must never carry the quoted price or the metadata.
+    // The customer is an attendee, so the invite must never carry the internal notes
+    // (quoted price, metadata).
     const identity = await getIdentity();
     const siteUrl = getSiteUrl();
     const calendarDescription = buildAppointmentDescription({
@@ -310,7 +291,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       cancelUrl: `${siteUrl}/booking/cancel?token=${encodeURIComponent(cancelToken)}`,
     });
 
-    // Create calendar event
     let calendarEventId: string | null = null;
     try {
       const cleanDurationLabel = `${duration === "short" ? "Standard" : "Extended"} ${durationMinutes} min`;
@@ -339,19 +319,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Snapshot rates + active promo + one-way travel so the quoted price survives later
-    // rate edits and promo expiry. Read by the late-cancellation invoice helper.
-    // Best-effort: failures degrade to null rather than blocking the booking.
-    //
-    // The submitted code is re-resolved here rather than believed. A client can
-    // post any string; resolvePromo decides what it actually unlocks, and an
-    // unrecognised code silently falls back to the automatic promo. The promo's
-    // dates are judged at booking time (booking during a promo locks the rate
-    // in, as the confirmation email says) and its weekday and time-of-day
-    // restriction at startAt, the appointment itself.
-    //
-    // The email goes with it so per-customer and new-customer limits bind a
-    // public booking, which has no Contact row yet.
+    // Snapshot rates + promo so the quote survives later edits; failures degrade to null.
+    // Promo dates are judged at booking time, weekday/time-of-day at startAt; the email
+    // lets per-customer limits bind before a Contact exists.
     const [rates, activePromo] = await Promise.all([
       prisma.rateConfig.findMany().catch((err) => {
         console.warn("[booking/request] RateConfig snapshot fetch failed:", err);
@@ -366,13 +336,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const snapshotPromo = activePromo && activePromo.tiers.length === 0 ? activePromo : null;
     const baseRow = rates.find((r) => r.ratePerHour !== null && r.isDefault) ?? null;
     const baseRateAtBooking = baseRow?.ratePerHour ?? null;
-    // Travel rate is a pricing setting; snapshot it so later settings edits
-    // can't reprice an already-quoted booking.
+    // Snapshot so later settings edits can't reprice a quoted booking.
     const travelRatePerHourAtBooking = settings.pricing.travelRatePerHour;
 
-    // Drive-time snapshot for in-person bookings: outbound quoted at the start, return at
-    // the end, so both are real traffic predictions for the actual drives. Lets the
-    // late-cancel handler bill travel without a re-lookup. Non-blocking on failure.
+    // Drive-time snapshot (outbound at start, return at end) so a late cancel bills
+    // travel without a re-lookup.
     let travelMinsAtBooking: number | null = null;
     let travelMinsBackAtBooking: number | null = null;
     if (meetingType === "in-person" && canonicalAddress) {
@@ -387,15 +355,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Stamp the public holiday name when the booking date is a stat day so
-    // disputes can quote the exact holiday that drove the uplift.
+    // Stamp the holiday name so disputes can quote what drove the uplift.
     const holiday = await lookupPublicHoliday(startAt).catch((err) => {
       console.warn("[booking/request] public-holiday lookup failed:", err);
       return null;
     });
     const publicHolidayName = holiday?.name ?? null;
 
-    // Create booking
     try {
       const booking = await prisma.booking.create({
         data: {
@@ -413,27 +379,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           activeSlotKey: startAt.toISOString(), // Unique constraint for double-booking prevention
           bufferBeforeMin: 0,
           bufferAfterMin: config.bookingBufferAfterMin,
-          // Notes text above stays dual-written for regex-parsing admin code.
-          // Split unit off the address so apartment numbers can be filtered
-          // without re-parsing.
+          // Notes stay dual-written for regex-parsing admin code.
           address: canonicalAddress ? splitUnitFromAddress(canonicalAddress).rest : null,
           unit: canonicalAddress ? splitUnitFromAddress(canonicalAddress).unit || null : null,
           meetingType: meetingType === "in-person" ? "in_person" : "remote",
           duration,
           travelMinsAtBooking,
           travelMinsBackAtBooking,
-          // Rate snapshot locks in the quoted price against later admin edits.
-          // complexRateAtBooking is not written (there is no Complex tier); the
-          // column stays for older bookings that carry it.
+          // complexRateAtBooking is not written; there is no Complex tier.
           baseRateAtBooking,
           travelRatePerHourAtBooking,
           // Promo snapshot denormalised - survives Promo deletion before service.
           promoIdAtBooking: activePromo?.id ?? null,
           promoTitleAtBooking: activePromo?.title ?? null,
-          // Null for a tiered promo on purpose: the band is not decided until
-          // the job is priced, so these columns hold values the engine ignores.
-          // promoIdAtBooking is what carries the promo forward, and the
-          // calculator resolves the band against the real subtotal.
+          // Null for a tiered promo: its band is resolved against the real subtotal.
           promoFlatHourlyRateAtBooking: snapshotPromo?.flatHourlyRate ?? null,
           promoPercentDiscountAtBooking: snapshotPromo?.percentDiscount ?? null,
           // The full terms, which is what the invoice actually prices from.
@@ -441,8 +400,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             ? (activePromo as unknown as Prisma.InputJsonValue)
             : undefined,
           publicHolidayName,
-          // Snapshot of the public quote the customer saw before booking, plus
-          // what they typed to get it and how the AI read it.
+          // The public quote the customer saw and how the AI read their request.
           priceEstimateIdAtBooking,
           quotedLowAtBooking,
           quotedHighAtBooking,
@@ -456,10 +414,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       console.log(`[booking/request] Created ${duration} booking: ${booking.id}`);
 
-      // Upsert contact record - best effort, never fail the booking on write error.
-      // The id is kept beyond the try because the redemption below needs it: a
-      // redemption with no contact cannot be counted, and a per-customer promo
-      // limit would then never bind.
+      // Best-effort contact upsert. The id feeds the redemption below, or a
+      // per-customer promo limit would never bind.
       let redeemedByContactId: string | undefined;
       try {
         const { contact } = await findOrCreateContactByEmail(normalisedEmail, {
@@ -468,15 +424,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           address: canonicalAddress,
         });
         redeemedByContactId = contact.id;
-        // Best-effort sync to Google Contacts - never fail the booking if it errors.
         await syncContactToGoogle(contact.id);
       } catch (contactError) {
         console.error("[booking/request] Failed to upsert contact:", contactError);
       }
 
-      // Awaited, not detached: Vercel freezes the instance once the response is
-      // sent. The helper swallows its own errors - a booking must not fail
-      // because analytics bookkeeping did.
+      // Awaited: Vercel freezes the instance after the response. Never throws.
       if (booking.promoIdAtBooking) {
         await recordPromoRedemption({
           promoId: booking.promoIdAtBooking,
@@ -487,9 +440,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         });
       }
 
-      // Send before returning, or Vercel kills the function mid-request; both helpers
-      // swallow their own errors and never throw. The owner alert always fires, the
-      // customer confirmation honours the notifyConfirmation setting.
+      // Send before returning, or Vercel kills the function; helpers never throw.
       const { comms } = settings;
       await Promise.all([
         sendOwnerBookingNotification({
@@ -541,16 +492,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         cancelToken: booking.cancelToken,
       });
     } catch (error) {
-      // Handle unique constraint violation (concurrent booking for same slot)
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         console.warn("[booking/request] Concurrent booking conflict", {
           activeSlotKey: startAt.toISOString(),
           email: normalisedEmail,
           timestamp: new Date().toISOString(),
         });
-        // The booking lost the slot race, so the calendar event created above
-        // is an orphan that already emailed the customer an invite. Best-effort
-        // delete it so no ghost event/invite lingers at the taken time.
+        // Lost the slot race; delete the orphaned event so no ghost invite lingers.
         if (calendarEventId) {
           await deleteBookingEvent({ eventId: calendarEventId }).catch((err) =>
             console.error("[booking/request] Failed to delete orphaned calendar event:", err),
@@ -561,7 +509,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           { status: 409 },
         );
       }
-      // Re-throw other errors to be caught by outer handler
       throw error;
     }
   } catch (error) {

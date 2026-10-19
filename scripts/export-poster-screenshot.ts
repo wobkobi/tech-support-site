@@ -1,8 +1,6 @@
 // scripts/export-poster-screenshot.ts
-// Exports the /poster page as a print-ready A5 PDF by screenshotting it via Puppeteer and
-// embedding the result into a pdf-lib document. The capture, PDF assembly and crop marks
-// live in scripts/lib/print-export.ts, shared with the business card exporter; this file
-// owns the poster's page sizes and CLI.
+// Exports /poster as a print-ready A5 (or A4) PDF. Capture, assembly and crop marks live
+// in scripts/lib/print-export.ts.
 // Run with: npx tsx scripts/export-poster-screenshot.ts [--url=<url>] [--variant=<v>] [--output-dir=<dir>] [--format=a5|a4]
 
 import { logSummary, renderVariants, type PageConfig } from "./lib/print-export.js";
@@ -110,9 +108,7 @@ const PROD_URL = "https://www.tothepoint.co.nz/poster";
 const LOCAL_URL = "http://localhost:3000/poster";
 
 /**
- * Parses CLI flags from `process.argv`.
- *
- * Flags:
+ * Parses CLI flags from `process.argv`:
  * - `--local`              Use the local dev server instead of production.
  * - `--url=<value>`        Override the target URL entirely.
  * - `--variant=<value>`    Export variant: "digital", "print", or "both" (default: "both").

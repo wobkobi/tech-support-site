@@ -1,18 +1,14 @@
 "use client";
 // src/features/admin/components/BlockDayButton.tsx
-// Toggles an all-day "Busy" event on the booking calendar for a given NZ date. Two visual
-// variants: a compact icon used in the week-grid day header, and a full-width labelled
-// button used by the mobile day-agenda view.
+// Toggles an all-day "Busy" event on the booking calendar for a given NZ date.
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { FaBan, FaCircleCheck } from "react-icons/fa6";
 
-// Serialise block/unblock writes across ALL day buttons: the routes read the current
-// blocks then patch/delete to merge or trim, so two in flight race that read-modify-write
-// and drop blocks (rapid Wed-Sun left Wed + Thu unblocked). Only the network write
-// queues - the optimistic UI still updates instantly per click.
+// Serialise block/unblock writes across ALL day buttons: the routes read-modify-write the
+// blocks, so two in flight drop blocks. Only the network write queues, not the UI.
 let blockWriteQueue: Promise<unknown> = Promise.resolve();
 
 /**
@@ -33,11 +29,7 @@ function enqueueBlockWrite<T>(task: () => Promise<T>): Promise<T> {
 interface BlockDayButtonProps {
   dateKey: string;
   busyEventId: string | null;
-  /**
-   * Effective blocked state from the parent (override-aware). Lets a just-clicked
-   * day show blocked/free instantly even before the real event syncs. Falls back
-   * to `busyEventId != null` when omitted.
-   */
+  /** Override-aware blocked state from the parent; falls back to `busyEventId != null`. */
   blocked?: boolean;
   hasBookings: boolean;
   /** Day is >18h in the past - block/unblock is locked (server enforces it too). */
@@ -48,11 +40,8 @@ interface BlockDayButtonProps {
   onPending: (dateKey: string, pending: boolean) => void;
   onChanged: () => void;
   /**
-   * Optimistic state change, fired the moment the operator confirms - BEFORE the
-   * Google call - so the UI flips immediately (the booking calendar is eventually
-   * consistent and the round-trip takes a second or two). The parent applies it;
-   * this button reverts by re-firing the old value if the request fails. `blocked`
-   * is the intended new state (true = now blocked, false = now free).
+   * Optimistic new state, fired before the slow Google call; re-fired with the old
+   * value to revert on failure.
    */
   onOptimisticChange?: (dateKey: string, blocked: boolean) => void;
   /** "icon" = compact 24px button for grid headers, "full" = labelled button. */
@@ -60,9 +49,8 @@ interface BlockDayButtonProps {
 }
 
 /**
- * Block/unblock-day toggle. Renders nothing for a day that can't be toggled:
- * more than 18h in the past, or a free day that already has a booking (a full-day
- * Busy would bury the appointment).
+ * Block/unblock-day toggle. Renders nothing for a day >18h past, or a free day
+ * with a booking (a full-day Busy would bury it).
  * @param props - Component props.
  * @param props.dateKey - NZ YYYY-MM-DD for the target day.
  * @param props.busyEventId - Existing all-day event id, or null.
@@ -91,34 +79,24 @@ export function BlockDayButton({
   // Above the early return below - hooks must run on every render.
   const { toast } = useToast();
   const isBlocked = blocked ?? busyEventId != null;
-  // Hide the toggle entirely for a day that can't be blocked: more than 18h in
-  // the past (locked), or a free day that already has a booking (a full-day Busy
-  // would bury the appointment). The routes enforce the same rules server-side.
+  // The routes enforce the same rules server-side.
   if (locked || (hasBookings && !isBlocked)) return null;
-  // Disable only while THIS day's own request is in flight (other days stay live).
-  // An optimistic-only block (shown blocked, no real event id yet - e.g. lost to a
-  // merge) stays clickable; onClick clears it locally.
+  // Disable only while THIS day's request is in flight; other days stay live.
   const disabled = pending;
   const label = isBlocked ? "Unblock day" : "Block day with a Busy event";
 
   /** Sends the block/unblock request and refreshes the parent on success. */
   async function onClick(): Promise<void> {
     if (disabled) return;
-    // Optimistic-only block (shows blocked but no real event synced - e.g. a block
-    // that was lost to a merge): nothing on the server to unblock, so just clear
-    // the local override. The next refresh reconciles.
+    // Optimistic-only block (no real event synced): just clear the local override.
     if (isBlocked && busyEventId == null) {
       onOptimisticChange?.(dateKey, false);
       return;
     }
-    // No confirm dialog: blocking is instant and reversible, so the operator can toggle
-    // several days quickly. Flip the UI before the slow Google round-trip, then reconcile
-    // via onChanged on success or revert on failure.
+    // No confirm dialog: blocking is reversible, so several days toggle quickly.
     onOptimisticChange?.(dateKey, !isBlocked);
     onPending(dateKey, true);
     try {
-      // Queue the write so it runs only after earlier block/unblock requests
-      // commit - prevents concurrent merges/trims from racing and losing blocks.
       const res = await enqueueBlockWrite(() =>
         isBlocked
           ? // Pass the clicked day so a multi-day block is trimmed/split, not wiped.

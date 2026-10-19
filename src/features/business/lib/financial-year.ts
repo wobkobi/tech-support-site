@@ -1,7 +1,6 @@
 // src/features/business/lib/financial-year.ts
-// NZ financial year (1 April - 31 March) bucketing for the business dashboard. The FY
-// containing a date is named after the START year; e.g. dates in Apr 2025 - Mar 2026
-// belong to "FY 2025-26".
+// NZ financial year (1 April - 31 March) bucketing, named by start year: Apr 2025 - Mar 2026
+// is "FY 2025-26".
 
 import { nzDayStartUtc } from "@/shared/lib/timezone-utils";
 
@@ -11,16 +10,12 @@ export const APRIL = 3;
 /** One day in ms, for stepping across a ledger date or an FY's exclusive end. */
 export const DAY_MS = 86_400_000;
 
-/**
- * Code default for the business start date; the live value comes from
- * `identity.startDateIso`, threaded in by the server-side callers.
- */
+/** Fallback business start; the live value is `identity.startDateIso` from the callers. */
 const DEFAULT_START_DATE = new Date("2025-10-01T00:00:00Z");
 
 /**
- * Computes the start year of the NZ financial year that contains `date`.
- * Reads UTC parts: every date reaching here has been through
- * {@link nzDayStartUtc}, so its UTC calendar day IS its NZ calendar day.
+ * Start year of the NZ FY containing `date`. Reads UTC parts after {@link nzDayStartUtc},
+ * whose UTC day is the NZ day.
  * @param date - Any date.
  * @returns Start year (e.g. 2025 for any date in Apr 2025 - Mar 2026).
  */
@@ -31,10 +26,7 @@ function fyStartYear(date: Date): number {
   return m >= APRIL ? y : y - 1;
 }
 
-/**
- * One NZ financial year, with display label and the dates needed to bucket
- * income/expense entries.
- */
+/** One NZ financial year: display label and bucketing bounds. */
 export interface FinancialYear {
   /** Display label, e.g. "FY 2025-26" or "FY 2025-26 (partial)". */
   label: string;
@@ -74,8 +66,7 @@ export function getFinancialYear(
 }
 
 /**
- * Lists every FY from the business start date through the current FY,
- * most-recent first.
+ * Lists every FY from the business start through the current FY, most recent first.
  * @param now - "Today"; defaults to the current time.
  * @param startDate - Business start date (the first FY listed).
  * @returns Ordered list of FYs.
@@ -94,9 +85,7 @@ export function listFinancialYears(
 }
 
 /**
- * Extracts the `YYYY-YY` key from a financial-year label ("FY 2025-26").
- * The ledger filters store the key, while {@link FinancialYear} carries the
- * display label, so the two need converting at the boundary.
+ * Extracts the `YYYY-YY` key the ledger filters store from a {@link FinancialYear} label ("FY 2025-26").
  * @param label - The FY label.
  * @returns The key, or the label unchanged when it doesn't match.
  */
@@ -105,13 +94,8 @@ export function fyKeyOf(label: string): string {
 }
 
 /**
- * The NZ financial-year code an invoice or quote number carries, e.g. "202627"
- * for the year beginning 1 April 2026.
- *
- * Reads the NZ calendar month rather than the runtime's. The server clock is
- * UTC on Vercel, which is 12-13 hours behind NZ, so for the first half of each
- * NZ 1 April a local-time read still says March - and a number minted then
- * would be filed under the financial year that had just ended.
+ * The NZ FY code an invoice or quote number carries, e.g. "202627" for the year from 1 April 2026.
+ * Reads the NZ month: Vercel runs on UTC, which still says March for half of NZ 1 April.
  * @param now - Reference instant (defaults to the current time).
  * @returns Six-digit financial-year code.
  */

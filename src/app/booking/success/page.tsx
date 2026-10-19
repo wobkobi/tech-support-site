@@ -29,17 +29,14 @@ import {
 } from "react-icons/fa6";
 import { BookingConversion } from "./BookingConversion";
 
-// Post-booking confirmation, only reachable after submitting the form: keep
-// it out of search results.
+// Only reachable after submitting the form: keep it out of search results.
 export const metadata: Metadata = {
   title: "Booking request received",
   robots: { index: false, follow: false },
 };
 
 /**
- * Human-readable appointment length, derived from the booked window rather than
- * the optional `duration` enum so legacy rows (which never set it) still read
- * correctly.
+ * Appointment length from the booked window (legacy rows lack the `duration` enum).
  * @param startAt - Appointment start.
  * @param endAt - Appointment end.
  * @returns Length such as "45 minutes", "1 hour", "1 hour 30 minutes".
@@ -92,9 +89,7 @@ export default async function BookingSuccessPage({
   // Edit-mode submits land here too; they must not count as new leads.
   const edited = params.edited === "1";
 
-  // Restate the appointment itself (the details card below) plus the
-  // snapshotted promo title, so customers see the rate is locked even if the
-  // offer expires before service. Degrades to the generic page without a token.
+  // Restate the appointment and the snapshotted promo (rate locked); generic page without a token.
   const booking = cancelToken
     ? await prisma.booking
         .findFirst({
@@ -114,15 +109,12 @@ export default async function BookingSuccessPage({
         .catch(() => null)
     : null;
   const promoTitle = booking?.promoTitleAtBooking ?? null;
-  // Only restate an appointment that is still live - revisiting this URL after
-  // cancelling must not present the old slot as if it were still booked.
+  // Never present a cancelled slot as still booked.
   const appointment = booking && booking.status !== "cancelled" ? booking : null;
   const [{ CANCELLATION }, identity] = await Promise.all([getPolicy(), getIdentity()]);
 
-  // Add-to-calendar targets. Google Calendar already invites the customer's
-  // email address; these cover everyone whose calendar isn't that address.
-  // Rejoined in the stored NZ form ("12/160 Kepa Road"); a comma between unit
-  // and street reads as a different address to a map lookup.
+  // Add-to-calendar for calendars other than the invited address. NZ form ("12/160 Kepa
+  // Road"): a comma between unit and street misleads map lookups.
   const calendarLocation =
     appointment && appointment.meetingType !== "remote"
       ? combineUnitAndAddress(appointment.unit ?? "", appointment.address ?? "")
@@ -151,9 +143,7 @@ export default async function BookingSuccessPage({
   return (
     <main id="main" className="relative min-h-dvh overflow-hidden">
       <BookingConversion bookingRef={cancelToken ?? null} edited={edited} />
-      {/* Backdrop. Fixed, not absolute: an absolute layer stretches to the full
-          page height, so once the content scrolls past one viewport the image
-          gets scaled over that taller box instead of staying put. */}
+      {/* Backdrop. Fixed, so the image doesn't scale over the full page height. */}
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <picture>
           <source type="image/avif" srcSet="/source/backdrop-blur.avif" />
@@ -227,8 +217,7 @@ export default async function BookingSuccessPage({
                       {appointment.meetingType === "in_person" ? "In person" : "Remote (online)"}
                     </DetailRow>
                   )}
-                  {/* Remote jobs have no address; older rows may carry one without
-                      a meetingType, so show it whenever it exists and isn't remote. */}
+                  {/* Older rows may have an address without a meetingType. */}
                   {appointment.address && appointment.meetingType !== "remote" && (
                     <DetailRow label="Where">
                       {combineUnitAndAddress(appointment.unit ?? "", appointment.address ?? "")}

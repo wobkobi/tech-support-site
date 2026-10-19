@@ -1,7 +1,5 @@
 // src/shared/components/PhoneLink.tsx
-// Inline tap-to-call link for "call or text me" copy. A plain <a href="tel:"> on purpose:
-// GoogleTag delegates the phone_call_click event from any tel: anchor, so every use is
-// tracked without wiring.
+// Inline tap-to-call link. A plain tel: anchor so GoogleTag tracks every use without wiring.
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";

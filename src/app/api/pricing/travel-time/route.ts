@@ -1,7 +1,5 @@
 // src/app/api/pricing/travel-time/route.ts
-// Public, rate-limited travel-time endpoint. POST looks up both drive legs via
-// lookupDriveRoundTrip, each traffic-aware at its own departure. Returns zero durations
-// for no match, 503 on misconfig, 502 on upstream errors. Each request costs two Google
+// Public travel-time endpoint: both drive legs, traffic-aware. Each request costs two
 // Distance Matrix elements; the 5/min rate limit keeps that within quota.
 
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
@@ -23,18 +21,15 @@ function parseIsoField(value: unknown): Date | undefined {
 }
 
 /**
- * The next weekday at `hour` NZ time. Used when the caller has no chosen slot,
- * so travel is quoted against a realistic visit rather than live traffic at
- * page-load (an estimate opened at 11pm would otherwise price an empty motorway).
- * @param hour - NZ-local hour to price against (live scheduling.travelQuoteHour).
+ * The next weekday at `hour` NZ time, so a slot-less quote uses realistic traffic.
+ * @param hour - NZ-local hour to price against.
  * @param now - Reference time (defaults to now).
  * @returns A UTC Date for that NZ-local moment.
  */
 function representativeDepartureTime(hour: number, now: Date = new Date()): Date {
   const [y, m, d] = nzDateParts(now);
 
-  // Weekday maths on a UTC-midnight cursor built from the NZ calendar date, so
-  // the day-of-week is the NZ one rather than the server's.
+  // UTC-midnight cursor from the NZ date, so day-of-week is NZ's, not the server's.
   const cursor = new Date(Date.UTC(y, m - 1, d));
   cursor.setUTCDate(cursor.getUTCDate() + 1);
   while (cursor.getUTCDay() === 0 || cursor.getUTCDay() === 6) {
@@ -49,16 +44,11 @@ function representativeDepartureTime(hour: number, now: Date = new Date()): Date
 }
 
 /**
- * POST /api/pricing/travel-time - both drive legs between the base address
- * and a destination. Optional `departureTimeIso` / `returnDepartureTimeIso`
- * pin each leg's traffic prediction; missing/malformed ones quote against
- * {@link representativeDepartureTime} (return 60 min later) so a late-night
- * estimate doesn't price an empty motorway for a mid-afternoon job.
+ * POST /api/pricing/travel-time - missing departure times fall back to
+ * {@link representativeDepartureTime} (return 60 min later).
  * @param request - Body: `{ destination: string, departureTimeIso?: string, returnDepartureTimeIso?: string }`.
- * @returns `{ ok: true, durationMinsThere, durationMinsBack, distanceKm }` on
- *   success (distanceKm is the outbound leg), zero durations when
- *   unresolvable, and `{ ok: false, error }` with 503 on misconfig / 502 on
- *   upstream errors so the operator notices.
+ * @returns Leg durations and outbound distanceKm; zero durations when unresolvable,
+ *   503 on misconfig, 502 on upstream errors.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const limited = rateLimitOrReject(request, "travel-time", 5, 60_000);
@@ -75,9 +65,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("destination is required", 400);
   }
 
-  // With no slot chosen (the /pricing wizard), live traffic would price an empty motorway
-  // for an estimate opened at 11pm on a job that happens mid-afternoon. Fall back to a
-  // representative bookable time instead of "now".
   const { scheduling } = await getSettings();
   const departureTime =
     parseIsoField(body?.departureTimeIso) ??

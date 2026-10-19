@@ -1,7 +1,6 @@
 // src/features/social-design/lib/ai-draft.ts
-// The AI draft for a post maker design: the kinds of post it writes, what room a design
-// has for words, reading the model's reply, and filling a draft into the layers by role.
-// Pure and client-safe, so the editor, the route and the checks share it.
+// AI draft for a post maker design: post kinds, room for words, reply parsing and filling layers
+// by role. Pure and client-safe.
 
 import { plainPunctuation } from "@/features/mailing/lib/ai-draft";
 import type { DesignKind } from "@/features/social-design/lib/design-row";
@@ -106,9 +105,8 @@ function textWithRole(doc: DesignDoc, role: LayerRole): Layer | undefined {
 }
 
 /**
- * What words a design has room for, read from its layers' roles. A design with no
- * word layers at all (a blank one) gets a headline and a short line, which the editor
- * adds; any other design gets only what it already has, so a template keeps its shape.
+ * What words a design has room for, from its layers' roles. A blank design gets a headline
+ * and short line; otherwise only what exists, so templates keep their shape.
  * @param doc - Design.
  * @returns The room.
  */
@@ -184,10 +182,8 @@ function wordsOf(value: string): string[] {
 }
 
 /**
- * Whether a quote or name is drawn from the brief. The prompt only lets the model cut a
- * customer's words, never add any; this backs that up, so a made-up review can't reach
- * the picture. A tenth of the words may differ, for the odd changed capital or "it is"
- * written as "it's".
+ * Whether a quote or name is drawn from the brief, so a made-up review can't reach the picture.
+ * Up to a tenth of the words may differ (a changed capital, "it is" vs "it's").
  * @param value - The quote or name.
  * @param brief - The operator's brief.
  * @returns True when nearly every word is in the brief.
@@ -201,10 +197,8 @@ export function fromBrief(value: string, brief: string): boolean {
 }
 
 /**
- * Reads the model's JSON into a draft. Words the design has no room for are dropped, as
- * are a quote or name that isn't in the brief; lengths are capped so a runaway reply
- * can't flood the picture. Beyond straightening quotes and dashes the wording is left
- * as written: the operator reads every draft before it's posted.
+ * Reads the model's JSON into a draft, dropping words with no room and quotes or names not in
+ * the brief, and capping lengths. Wording is otherwise left for the operator to review.
  * @param raw - Parsed JSON from the model.
  * @param room - What the design has room for.
  * @param brief - The brief, for checking a quote and name.
@@ -239,11 +233,8 @@ export function readDesignDraft(raw: unknown, room: DraftRoom, brief: string): D
 export type MissingWords = ("headline" | "support")[];
 
 /**
- * Fills a draft into a design: each part goes into the first layer with its role (the
- * ticked points into the first bullet list), and the post words into the caption. An
- * empty part leaves its layer as it was, so a review's "Paste the review here" stays
- * when the brief had no review words. Layout, styling and every other layer are left
- * alone.
+ * Fills each draft part into the first layer with its role (points into the first bullet list,
+ * post words into the caption). An empty part leaves its layer as it was.
  * @param doc - Design.
  * @param draft - The draft.
  * @returns The filled design, and the headline or short line that had no layer to go in.

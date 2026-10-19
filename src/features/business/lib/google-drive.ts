@@ -1,7 +1,6 @@
 // src/features/business/lib/google-drive.ts
-// Google Drive v3 helpers for invoice storage. Finds or creates the "Invoices > {year}"
-// folder tree (cached per yearCode), uploads/lists invoice PDFs, and reads spreadsheets
-// for the sheets importer.
+// Google Drive v3 helpers: the "Invoices > {year}" folder tree, invoice PDF upload/listing,
+// and spreadsheet listing for the sheets importer.
 
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { drive as googleDrive, type drive_v3 } from "@googleapis/drive";
@@ -64,11 +63,8 @@ async function getOrCreateInvoiceFolder(yearCode: string): Promise<string> {
 }
 
 /**
- * Adds an "anyone with the link can view" permission to a Drive file so the
- * link embedded in invoice emails works without the recipient having to sign
- * into Google. Idempotent: Drive accepts repeat calls without duplicating the
- * permission, and failures are logged but never thrown so this can never break
- * the surrounding upload flow.
+ * Shares a Drive file as "anyone with the link can view" so emailed links work without a
+ * Google sign-in. Idempotent; failures are logged, never thrown.
  * @param fileId - Drive file ID to share.
  */
 async function ensureAnyoneWithLinkReader(fileId: string): Promise<void> {
@@ -77,8 +73,7 @@ async function ensureAnyoneWithLinkReader(fileId: string): Promise<void> {
     await drive.permissions.create({
       fileId,
       requestBody: { type: "anyone", role: "reader" },
-      // Suppress the "X shared a file with you" notification email - the
-      // client gets the invoice via Resend; they don't need a Google nudge.
+      // The client already gets the invoice via Resend.
       sendNotificationEmail: false,
     });
   } catch (err) {
@@ -87,9 +82,8 @@ async function ensureAnyoneWithLinkReader(fileId: string): Promise<void> {
 }
 
 /**
- * Uploads (or replaces in-place) an invoice PDF in the correct year folder.
- * Replace keeps the existing file ID/URL stable; a missing/deleted file
- * triggers a fresh create. Shares as "anyone with the link can view".
+ * Uploads an invoice PDF to its year folder, replacing in place to keep the URL stable
+ * (a deleted file is recreated), shared as anyone-with-the-link.
  * @param buffer - PDF content as a Buffer.
  * @param invoiceNumber - Filename (e.g. "TTP-2627-0042").
  * @param yearCode - Fiscal year code used to resolve the destination folder.
@@ -114,9 +108,7 @@ export async function uploadInvoicePdf(
       await ensureAnyoneWithLinkReader(res.data.id!);
       return { fileId: res.data.id!, webUrl: res.data.webViewLink! };
     } catch (err) {
-      // Only fall through to a fresh create when the target is genuinely gone (404/410).
-      // A transient 5xx/429/timeout may have applied, or would on retry, so rethrow rather
-      // than orphaning the existing PDF behind a duplicate the emailed link misses.
+      // Recreate only on 404/410; a transient error rethrows rather than orphan the emailed PDF.
       const e = err as { code?: unknown; response?: { status?: unknown } };
       const status =
         typeof e.response?.status === "number"
@@ -159,9 +151,7 @@ export async function searchAllInvoicePdfs(): Promise<
 > {
   const drive = getDriveClient();
   const results: { name: string; fileId: string; webUrl: string }[] = [];
-  // Paged like listSpreadsheetsInFolder below: Drive treats pageSize as a maximum and
-  // returns a continuation token on broad queries, so a single page silently truncates.
-  // nextPageToken must be requested in `fields` - omit it and the token never comes back.
+  // Paged, since one page silently truncates; nextPageToken must be listed in `fields`.
   let pageToken: string | undefined;
   do {
     const res = await drive.files.list({
@@ -180,15 +170,10 @@ export async function searchAllInvoicePdfs(): Promise<
 }
 
 /**
- * Lists every Google Sheets spreadsheet inside a Drive folder, recursing into
- * any subfolders so per-year subfolder structures (e.g. `Business/2025-26/...`)
- * are walked end-to-end. Sheet display names are prefixed with the folder
- * breadcrumb so they're identifiable in the per-sheet import breakdown.
- * `modifiedTime` lets a caller skip a workbook it has already imported: the
- * hourly ledger sync reads every row of every workbook otherwise, and that cost
- * grows with each financial year added to the folder.
+ * Lists every spreadsheet in a Drive folder, recursing into subfolders. Names carry the
+ * folder breadcrumb; `modifiedTime` lets the import skip unchanged workbooks.
  * @param folderId - The Drive folder ID to scan.
- * @returns Array of `{ name, fileId, modifiedTime }` for every spreadsheet found, sorted by name.
+ * @returns `{ name, fileId, modifiedTime }` for every spreadsheet, sorted by name.
  */
 export async function listSpreadsheetsInFolder(
   folderId: string,
@@ -244,9 +229,8 @@ export async function downloadDriveFile(fileId: string): Promise<Buffer> {
 const INVOICE_FILE_RE = /^Invoice\s+([A-Z]+-[\d-]+\d)\.pdf$/i;
 
 /**
- * Extracts the invoice number from a Drive PDF filename, as the DB candidates to try: the
- * number as written, plus the 4-digit-year form when it carries a 6-digit year code
- * ("TTP-202627-0006" > "TTP-2627-0006").
+ * Invoice-number candidates from a Drive PDF filename: as written, plus the 4-digit-year
+ * form ("TTP-202627-0006" > "TTP-2627-0006").
  * @param filename - Drive file name, e.g. "Invoice TTP-202627-0006.pdf".
  * @returns Candidate invoice numbers; empty when the name isn't an invoice PDF.
  */

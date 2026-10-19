@@ -1,10 +1,7 @@
 "use client";
 // src/features/business/components/trips/TripsView.tsx
-// Trips page body for one financial year: km claim cards, the jobs still waiting for a
-// trip, and the trip log with add, edit and delete. Totals recompute from the rows on
-// screen with the year's IRD tier rates, so they move as soon as a trip is saved. Only
-// trips dated inside a km-rate vehicle's service period count, the same split the Tax
-// page's computeTaxYear makes, so both pages show one claim.
+// Trips page body for one FY: km claim cards, jobs waiting for a trip, and the trip log.
+// Totals recompute from the rows on screen with the same km-rate split as computeTaxYear.
 
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
@@ -73,8 +70,8 @@ interface TripsViewProps {
   /** The FY's IRD km rates for the configured fuel type. */
   rates: { tier1: number; tier2: number };
   /**
-   * Every km the car travelled in the FY (business and private) from the Tax page, or
-   * null when not entered. Over {@link KM_TIER1_LIMIT} it scales Tier 1 down to the business share.
+   * Every km the car travelled in the FY, or null when not entered. Over
+   * {@link KM_TIER1_LIMIT} it scales Tier 1 down to the business share.
    */
   totalVehicleKm: number | null;
   /** Service periods of every km-rate vehicle on the asset register. */
@@ -141,8 +138,7 @@ export function TripsView({
   const claim = kmClaim(split.claimableKm, rates, totalVehicleKm);
   // Without the car's total km, the first KM_TIER1_LIMIT business km stand in for Tier 1.
   const needsTotalKm = totalVehicleKm === null && claim.businessKm > 0;
-  // Unclaimed trips before the first km-rate car were in a car never on the register (a
-  // shared or borrowed one), which is expected; a gap after it needs the vehicle added.
+  // Unclaimed before the first km-rate car is expected; a gap after it needs the vehicle added.
   const unclaimed = new Map<string, UnclaimedReason>();
   let beforeVehicleKm = 0;
   let noVehicleKm = 0;
@@ -181,8 +177,7 @@ export function TripsView({
   }
 
   /**
-   * Puts a saved trip into the log. A trip re-dated outside this FY leaves the list and
-   * the toast says where it went.
+   * Puts a saved trip into the log; one re-dated outside this FY leaves it with a toast.
    * @param saved - The stored trip.
    */
   function handleSaved(saved: TripRow): void {
@@ -211,8 +206,7 @@ export function TripsView({
   }
 
   /**
-   * Fills one job's km from Google Maps: the round trip from the base address to the
-   * job's address (the booking's, else the contact's).
+   * Fills one job's round-trip km from Google Maps.
    * @param s - The job.
    */
   async function handleLookUp(s: TripSuggestion): Promise<void> {
@@ -257,9 +251,8 @@ export function TripsView({
   }
 
   /**
-   * Reloads the trip log and the jobs list after a 409: the job's trip was logged
-   * somewhere else (another tab), so this page is missing it. Km already typed for
-   * other jobs is kept.
+   * Reloads the trip log and jobs list after a 409 (trip logged in another tab), keeping
+   * typed km.
    * @returns True when both lists were reloaded.
    */
   async function refreshAfterConflict(): Promise<boolean> {
@@ -279,8 +272,7 @@ export function TripsView({
   }
 
   /**
-   * Toast text for a km input that didn't parse: blank asks for the km, anything else
-   * states the allowed range.
+   * Toast text for a km input that didn't parse.
    * @param s - The job.
    * @returns The warning text.
    */
@@ -292,9 +284,8 @@ export function TripsView({
   }
 
   /**
-   * Posts one job's trip and updates both lists. A 409 means the job already has a
-   * trip (logged in another tab), so the job leaves the list here and the caller
-   * refreshes both lists rather than erroring.
+   * Posts one job's trip and updates both lists. A 409 (trip already logged elsewhere)
+   * drops the job and the caller refreshes.
    * @param s - The job.
    * @param km - Validated round-trip km.
    * @returns What happened.
@@ -331,8 +322,7 @@ export function TripsView({
   }
 
   /**
-   * Adds one job's trip from its km input. Its Add button stays disabled until the
-   * request, and any refresh after a 409, has finished.
+   * Adds one job's trip from its km input; Add stays disabled until any 409 refresh ends.
    * @param s - The job.
    */
   async function handleAdd(s: TripSuggestion): Promise<void> {
@@ -357,9 +347,8 @@ export function TripsView({
   }
 
   /**
-   * Adds a trip for every job with km filled in, one request at a time so each
-   * success leaves the list as it lands. Jobs without km stay for later. Every Add
-   * stays disabled until the run, and one refresh if any job hit a 409, has finished.
+   * Adds a trip for every job with km filled in, one request at a time. Every Add stays
+   * disabled until the run and any 409 refresh finish.
    */
   async function handleAddAll(): Promise<void> {
     const ready = suggestions.flatMap((s) => {
@@ -494,17 +483,15 @@ export function TripsView({
         figures for the days the car is on km rates, and only trips on those days earn the rate.
       </Notice>
 
-      {/* Adding from the jobs list has no dialog, so warn here when this FY is filed. A
-          one-day span on the FY's first day keys it to this year alone, so it shows even
-          when the jobs list is empty. */}
+      {/* Jobs-list adds have no dialog, so warn here. A one-day span on the FY's first day
+          keys it to this year alone. */}
       <FiledYearWarning
         filedYears={filedYears}
         spans={[{ from: startISO, to: startISO }]}
         variant="page"
         className={filedClaim === null ? "mb-6" : "mb-2"}
       />
-      {/* The figures above stay live so late edits show; the filed claim is what the Tax
-          page and the CSV carry. */}
+      {/* Figures above stay live; the Tax page and CSV carry the filed claim. */}
       {filedClaim !== null && (
         <p className="mb-6 text-sm text-admin-text-secondary">
           Filed: the Tax page shows the saved claim of {formatNZD(filedClaim)}.

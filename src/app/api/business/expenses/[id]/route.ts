@@ -1,8 +1,6 @@
 // src/app/api/business/expenses/[id]/route.ts
-// Admin endpoint for a single expense entry. PUT updates the entry (recomputing the GST
-// split server-side) and writes the change through to its Expenses sheet row (by Sync
-// ID); DELETE removes the entry and its sheet row. Sheet failures are logged and
-// swallowed so DB changes are never blocked - the sync cron reconciles any drift.
+// Admin single expense: PUT/DELETE write through to the Expenses sheet row by Sync ID.
+// Sheet failures are logged and surfaced as a warning, never blocking the DB change.
 
 import { splitGstInclusive } from "@/features/business/lib/business";
 import { GST_RATE } from "@/features/business/lib/pricing-policy";
@@ -20,8 +18,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * PUT /api/business/expenses/[id] - Updates an expense entry and its sheet row,
- * recomputing GST and the excl-GST amount server-side.
+ * PUT /api/business/expenses/[id] - Updates an expense entry and its sheet row.
  * @param request - Incoming Next.js request with updated expense data in body
  * @param root0 - Route context
  * @param root0.params - Route params containing the expense entry ID
@@ -62,8 +59,7 @@ export async function PUT(
     return errorResponse("Expense entry not found", 404);
   }
 
-  // No rate sent: keep the split the row already has rather than assuming 15%, so an edit
-  // never adds GST to a row recorded without it (or strips it from one recorded with it).
+  // No rate sent: keep the row's existing GST/no-GST split rather than assuming 15%.
   const rate = parsedRate ?? (existing.gstAmount > 0 ? GST_RATE : 0);
   const { gstAmount, amountExcl } = splitGstInclusive(inclNum, rate);
 
@@ -83,18 +79,15 @@ export async function PUT(
     },
   });
 
-  // Write through to the sheet. If the edited date moved the entry into a
-  // different FY workbook, append to the new sheet BEFORE deleting the old row
-  // so a failure can't strand the entry off-sheet; otherwise update in place.
+  // A date move into another FY workbook appends BEFORE deleting the old row, so a
+  // failure can't strand the entry off-sheet.
   let sheetRowKey = existing.sheetRowKey;
   let sheetSyncWarning = false;
   try {
     const newSheetId = await resolveSheetIdForDate(updated.date);
     const oldSheetId = await resolveSheetIdForDate(existing.date);
     if (sheetRowKey && oldSheetId && newSheetId && newSheetId !== oldSheetId) {
-      // Cross-FY move: create the new row and persist its key first, then remove the old
-      // one best-effort. A failed append leaves the old row intact (outer catch); a failed
-      // delete leaves a logged stray rather than a lost entry.
+      // A failed delete leaves a logged stray rather than a lost entry.
       const oldKey = sheetRowKey;
       sheetRowKey = await appendRowWithSyncId(newSheetId, "Expenses", buildExpenseCells(updated));
       await prisma.expenseEntry.update({ where: { id }, data: { sheetRowKey } });
@@ -122,8 +115,7 @@ export async function PUT(
   } catch (err) {
     console.error(`[expenses] Failed to update sheet row for entry ${id}:`, err);
     sheetRowKey = existing.sheetRowKey;
-    // The sheet still holds the old values; the sheet-wins cron would revert
-    // this edit at the next pass. Surface it so the caller can toast.
+    // The sheet-wins cron would revert this edit, so warn the caller.
     sheetSyncWarning = true;
   }
 
@@ -153,9 +145,7 @@ export async function DELETE(
 
   await prisma.expenseEntry.delete({ where: { id } });
 
-  // Remove the matching sheet row so the import can't resurrect the entry. A
-  // failed delete leaves the row behind (the cron would re-import it), so
-  // surface a warning the caller can toast.
+  // A sheet row left behind would be re-imported, so a failure warns the caller.
   let sheetSyncWarning = false;
   if (existing.sheetRowKey) {
     try {
@@ -163,9 +153,7 @@ export async function DELETE(
       if (spreadsheetId) {
         await deleteRowBySyncId(spreadsheetId, "Expenses", existing.sheetRowKey);
       } else {
-        // No sheet resolved (missing or renamed FY folder). The row survives and
-        // the next import re-creates the entry from it, silently undoing this
-        // delete - so this is a warning, not a clean success.
+        // No sheet resolved (missing or renamed FY folder); the row survives.
         console.error(`[expenses] No sheet resolved for entry ${id}; sheet row left in place`);
         sheetSyncWarning = true;
       }

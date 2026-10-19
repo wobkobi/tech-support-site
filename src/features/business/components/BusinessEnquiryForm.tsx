@@ -1,7 +1,6 @@
 // src/features/business/components/BusinessEnquiryForm.tsx
-// Public business enquiry form for the /business page. Posts to /api/enquiry/business; on
-// success the form swaps for a confirmation card. Follows the public BookingForm field
-// conventions (text-base sizing, shared EmailInput/PhoneInput, hidden honeypot).
+// Public business enquiry form for /business; posts to /api/enquiry/business and follows
+// the BookingForm field conventions.
 
 "use client";
 
@@ -32,8 +31,7 @@ const URGENCY_OPTIONS = ["This week", "This month", "Just exploring"] as const;
  * @returns Enquiry form element.
  */
 export function BusinessEnquiryForm(): React.ReactElement {
-  // Who the help is for: a business (company required) or the person
-  // themselves (company hidden - sole traders and personal jobs both fit).
+  // A business (company required) or the person themselves (company hidden).
   const [enquiryFor, setEnquiryFor] = useState<"business" | "personal">("business");
   const [company, setCompany] = useState("");
   const [name, setName] = useState("");

@@ -1,8 +1,6 @@
 // src/shared/lib/api-client.ts
-// Client-side wrapper for the site's own JSON API. Collapses the `res.ok` / `body.ok` /
-// `body.error` branching every call site was repeating, and mirrors the `{ ok, ... }`
-// contract that `api-response.ts` writes on the server so a caller branches once instead
-// of guessing which layer failed.
+// Client wrapper for the site's JSON API, mirroring api-response.ts's `{ ok, ... }` contract so
+// callers branch once.
 
 /** Outcome of an {@link apiFetch} call. */
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; status: number };
@@ -29,13 +27,8 @@ function fallbackMessage(status: number): string {
 }
 
 /**
- * Calls one of the site's JSON API routes and normalises the outcome.
- *
- * A call fails when the HTTP status is not ok OR the body carries `ok: false`,
- * so a route that returns 200 with `{ ok: false }` is still treated as a
- * failure. On success `data` is the whole parsed body, so existing readers of
- * extra fields (`entry`, `status`, `sheetSyncWarning`) keep working unchanged.
- * A thrown network error becomes `status: 0` rather than propagating.
+ * Calls a site JSON API route. Fails on a non-ok status OR `ok: false`; success returns the
+ * whole body as `data`. Network errors become `status: 0`.
  * @param url - Same-origin API path.
  * @param init - Standard fetch init, plus `json` to send a JSON body.
  * @returns The parsed body on success, or an error message and status.

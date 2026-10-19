@@ -1,15 +1,7 @@
 // scripts/calibrate-benchmarks.ts
-// Read-only report of what jobs ACTUALLY took, from real invoices, so the public
-// estimator's benchmarks can be judged against reality. No AI, no API calls, no writes.
-// Run: npm run calibrate
-//
-// It reports; it does NOT conclude. Two limits are deliberate and load-bearing:
-//   1. Task tags are coarse - "Laptop setup" covers a 15-min account fix AND a 90-min
-//      new-laptop build - so a tag's median is NOT a benchmark's truth. Benchmarks print
-//      alongside for pairing BY EYE; auto-pairing them produced confident nonsense.
-//   2. LineItem stores qty with no unit, so a part (qty=1) looks identical to an hour of
-//      labour. A line counts as labour only when its unitPrice matches a live hourly rate;
-//      everything else is excluded and listed, so exclusions stay visible.
+// Read-only report of real billed job times to judge estimator benchmarks against, by eye
+// (task tags are too coarse to auto-pair). Run: npm run calibrate
+// Labour = lines whose unitPrice matches a live hourly rate; LineItem has no unit field.
 
 import { prisma } from "@/shared/lib/prisma";
 import { loadLiveContext, type LiveContext } from "./eval-ai/context";
@@ -36,10 +28,8 @@ function median(xs: number[]): number {
 }
 
 /**
- * The task key of a composed invoice description: the "<Device> <action>" head
- * before the " - <details>" tail (see composeDescription in business.ts).
- * Case-folded, because the live data holds case-drifted duplicates ("External
- * storage" vs "External Storage") that would otherwise split one group in two.
+ * The "<Device> <action>" head of a composed description, case-folded so drifted
+ * duplicates ("External Storage") group together.
  * @param description - Raw invoice line description.
  * @returns The task head, trimmed and case-folded for grouping.
  */
@@ -49,9 +39,7 @@ function taskKey(description: string): string {
 }
 
 /**
- * Every hourly price a labour line could plausibly carry: each base rate, plus
- * each base combined with one modifier delta. Used to tell labour from parts,
- * since the line records no unit of its own.
+ * Every plausible labour price: each base rate, alone and plus one modifier delta.
  * @param ctx - Live context carrying the rate rows.
  * @returns Sorted list of plausible hourly unit prices.
  */
@@ -70,8 +58,7 @@ async function main(): Promise<void> {
   const ctx = await loadLiveContext();
   const rates = plausibleHourlyRates(ctx);
   /**
-   * Whether a line's unit price matches a live hourly rate (so it is labour,
-   * not a part). Parts and labour are otherwise indistinguishable on a LineItem.
+   * Whether a line's unit price matches a live hourly rate (labour, not a part).
    * @param unitPrice - The line's unit price.
    * @returns True when the price matches a plausible hourly rate.
    */

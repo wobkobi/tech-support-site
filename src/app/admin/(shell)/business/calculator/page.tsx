@@ -1,14 +1,6 @@
 // src/app/admin/(shell)/business/calculator/page.tsx
-// Job calculator page. Resolves business identity, pricing policy, rate configs, task
-// templates, and the active promo server-side in one parallel pass, then hands them to
-// CalculatorView for AI job parsing and time-tracked quoting - only the slow Google
-// Contacts picker list is left to a client fetch. `?eventId=` (the schedule's "Bill in
-// calculator" action) prefills the job from that calendar event's corrected times plus
-// its booking's client details, and links the saved invoice back to both.
-// `?eventIds=a,b,c` bills several of the day's events as one job, each event keeping its
-// own time slot so the gaps between them go unbilled. `?reissue=<invoiceId>` rebuilds a
-// voided invoice: its events prefill as above, and its client, lines and notes seed the
-// form, so the promo is priced again rather than copied.
+// Job calculator page: loads pricing context server-side for CalculatorView. `?eventId=` /
+// `?eventIds=` prefill from calendar events (gaps unbilled); `?reissue=` rebuilds a voided invoice.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { CalculatorView } from "@/features/business/components/CalculatorView";
@@ -36,9 +28,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Parses the event deep-link params into a de-duplicated id list. `eventIds`
- * (comma-separated) carries a merged job; `eventId` is the schedule's
- * single-event action and stays supported on its own.
+ * Parses the event deep-link params into a de-duplicated id list.
  * @param params - Resolved search params.
  * @param params.eventId - Single event id from the schedule action.
  * @param params.eventIds - Comma-separated ids from the calculator's merge picker.
@@ -50,8 +40,7 @@ function parseEventIds(params: { eventId?: string; eventIds?: string }): string[
 }
 
 /**
- * Loads a voided invoice to re-issue. Anything else (a live invoice, a quote, a bad id)
- * gives null, and the calculator loads as normal.
+ * Loads a voided invoice to re-issue; anything else gives null.
  * @param id - The `reissue` param.
  * @returns The prefill plus the invoice's billed events, or null.
  */
@@ -85,8 +74,7 @@ export default async function CalculatorPage({
   const [identity, policy, rateRows, templateRows, promo, eventPrefill] = await Promise.all([
     getIdentity(),
     getPolicy(),
-    // Full rows (ids included) - tasks pick modifiers by id, so the trimmed
-    // public cache from getRateRows is not enough here.
+    // Full rows with ids: tasks pick modifiers by id.
     prisma.rateConfig.findMany({ orderBy: { label: "asc" } }),
     prisma.taskTemplate.findMany({ orderBy: [{ usageCount: "desc" }, { description: "asc" }] }),
     getActivePromo(),
@@ -107,8 +95,7 @@ export default async function CalculatorPage({
     },
   };
 
-  // Flatten Dates to the ISO strings the client types expect (the same shape
-  // the JSON API routes return).
+  // Flatten Dates to ISO strings for the client types.
   const initialRates: RateConfig[] = rateRows.map((r) => ({
     id: r.id,
     label: r.label,
@@ -142,9 +129,7 @@ export default async function CalculatorPage({
         }
       />
       <Suspense>
-        {/* Keyed by the event set so the in-page picker's client-side
-            navigation remounts the view - the prefill lands via useState
-            initialisers, which never re-run on a prop change alone. */}
+        {/* Keyed by the event set to remount, since the prefill uses useState initialisers. */}
         <CalculatorView
           key={
             reissue

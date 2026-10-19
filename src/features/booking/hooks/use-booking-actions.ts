@@ -1,12 +1,7 @@
 "use client";
 // src/features/booking/hooks/use-booking-actions.ts
-// Shared booking mutation wrappers around the admin bookings API - PATCH edits,
-// mark-completed, cancel (operator / on-behalf), no-show, delete, resend-review, and time
-// edits - each bundled with success/error toasts. The bookings list, the booking detail
-// page, and the schedule's EventActionSheet all mutate bookings through this hook so the
-// endpoints, wording, and error handling live in one place. Every wrapper resolves to a
-// BookingActionResult; the caller owns busy state and any optimistic update or router
-// refresh.
+// Shared booking mutation wrappers with toasts. Callers own busy state, optimistic
+// updates and refreshes.
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { apiFetch } from "@/shared/lib/api-client";
@@ -22,11 +17,7 @@ interface BookingActionResult {
 
 /** Outcome of a time edit - {@link BookingActionResult} plus its own failure mode. */
 interface BookingTimesResult extends BookingActionResult {
-  /**
-   * Set when the new window overlaps another booking or calendar event. The
-   * caller is expected to show it and offer to save anyway; no toast is raised
-   * for this case, unlike every other failure.
-   */
+  /** Overlap with another booking or event; no toast, the caller offers to save anyway. */
   conflict?: string;
 }
 
@@ -41,26 +32,17 @@ export interface UseBookingActions {
     body: Record<string, unknown>,
     successMsg?: string,
   ) => Promise<BookingActionResult>;
-  /**
-   * Marks the booking completed. No review email goes with it: the review ask
-   * rides on the invoice email instead.
-   */
+  /** Marks the booking completed; the review ask rides on the invoice email. */
   completeBooking: (id: string) => Promise<BookingActionResult>;
   /** Cancels the booking; operator = no fee, on-behalf = customer fee rules. */
   cancelBooking: (id: string, mode: CancelMode) => Promise<BookingActionResult>;
-  /**
-   * Flags a no-show; drafts the late-cancellation invoice (callout + travel).
-   * `draftInvoice` false (default true) records the fee without raising one.
-   */
+  /** Flags a no-show; `draftInvoice` false records the fee without drafting the invoice. */
   markNoShow: (id: string, draftInvoice?: boolean) => Promise<BookingActionResult>;
   /** Permanently deletes the booking and its calendar event. */
   deleteBooking: (id: string) => Promise<BookingActionResult>;
   /** Sends (or re-sends) the review-request email; `alreadySent` tunes the toast. */
   resendReview: (id: string, alreadySent?: boolean) => Promise<BookingActionResult>;
-  /**
-   * Moves a booking's start/end; `force` saves through an overlap warning and
-   * `notifyCustomer` false mutes the reschedule emails.
-   */
+  /** Moves a booking; `force` overrides overlaps, `notifyCustomer` false mutes emails. */
   updateBookingTimes: (
     id: string,
     times: { startAt: string; endAt: string; force?: boolean; notifyCustomer?: boolean },
@@ -68,8 +50,7 @@ export interface UseBookingActions {
 }
 
 /**
- * Booking mutation wrappers with built-in toasts. Consumed by the bookings list,
- * the booking detail page, and the schedule action sheet.
+ * Booking mutation wrappers with built-in toasts.
  * @returns The {@link UseBookingActions} wrappers (stable across renders).
  */
 export function useBookingActions(): UseBookingActions {
@@ -150,8 +131,7 @@ export function useBookingActions(): UseBookingActions {
         { method: "PATCH", json: times },
       );
       if (!res.ok) {
-        // 409 on an unforced save is the overlap warning, which belongs in the
-        // caller's confirm dialog rather than a toast that dismisses itself.
+        // 409 on an unforced save is the overlap warning for the caller's dialog.
         if (res.status === 409 && !times.force) {
           return { ok: false, error: res.error, conflict: res.error };
         }

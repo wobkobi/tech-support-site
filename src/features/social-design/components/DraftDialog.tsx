@@ -1,8 +1,7 @@
 "use client";
 // src/features/social-design/components/DraftDialog.tsx
-// "Draft with AI" in the post maker: a one-line brief and the kind of post in, words for
-// the picture and the post out. The editor fills them into the layers as one undo step;
-// nothing is saved or posted here.
+// "Draft with AI" in the post maker: a brief and post kind in, picture and post words out.
+// Nothing is saved or posted here.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";

@@ -1,7 +1,6 @@
 // src/features/business/lib/tax/types.ts
-// Shared shapes for the NZ sole-trader tax maths: inputs the server loader builds from
-// Prisma and settings, and the per-FY result the Tax, Assets and overview pages render.
-// Every money figure is NZD rounded to cents; every rate is a fraction (0.5 = 50%).
+// Shared shapes for the NZ sole-trader tax maths: loader inputs and the per-FY result.
+// Money is NZD rounded to cents; rates are fractions (0.5 = 50%).
 
 /** Diminishing value or straight line (IR260). */
 export type DepreciationMethod = "DV" | "SL";
@@ -149,16 +148,9 @@ export interface TaxYearRecordInput {
   sqmRate: number;
   kmTier1: number;
   kmTier2: number;
-  /**
-   * Every km the km-rate vehicle travelled in the FY, business and private (from
-   * odometer readings). Over 14,000, it scales the Tier 1 km down to the business
-   * share; missing, the first 14,000 business km are Tier 1.
-   */
+  /** Total km (business and private) the km-rate vehicle travelled; over 14,000 it scales Tier 1 down. */
   totalVehicleKm?: number | null;
-  /**
-   * The year's ACC levy rate as a fraction. The levy changes each April, so a past year
-   * keeps its own rate; missing or null uses `settings.acc`.
-   */
+  /** The year's own ACC levy rate (changes each April); null uses `settings.acc`. */
   accRate?: number | null;
   /** Mortgage interest or rent for the year (whole house). */
   mortgageInterestOrRent: number | null;
@@ -236,10 +228,7 @@ export interface KmClaim {
   amount: number;
 }
 
-/**
- * One stretch of days a km-rate vehicle is on the register, as ISO ledger dates
- * (UTC midnight of the NZ day). Half-open: `from` is covered, `to` is not.
- */
+/** Half-open stretch [from, to) a km-rate vehicle is on the register, as ISO ledger dates. */
 export interface KmVehiclePeriod {
   /** First day in service. */
   from: string;

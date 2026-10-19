@@ -1,8 +1,7 @@
 "use client";
 // src/features/social-design/components/SizeTabs.tsx
-// The post maker's size tabs: a live thumbnail of every size the design makes, a
-// "Side by side" tab showing them all at once, and a "Sizes" menu to add or remove sizes, with the less
-// common ones (covers, banners, profile picture) listed under "More sizes".
+// The post maker's size tabs: a live thumbnail per size, a "Side by side" tab, and a
+// "Sizes" menu to add or remove sizes.
 
 import { DesignPreview } from "@/features/social-design/components/canvas/DesignPreview";
 import type { BoundValues, DesignDoc } from "@/features/social-design/lib/doc";

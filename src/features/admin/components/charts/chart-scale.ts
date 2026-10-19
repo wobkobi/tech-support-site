@@ -1,6 +1,5 @@
 // src/features/admin/components/charts/chart-scale.ts
-// Y-axis maths for the admin charts: a rounded top value and evenly spaced ticks, so the
-// axis reads 0 / 1,000 / 2,000 rather than 0 / 1,037 / 2,074.
+// Y-axis maths for the admin charts: ticks of 0 / 1,000 / 2,000, not 0 / 1,037 / 2,074.
 
 /** A value axis: its top, the tick step and every tick from 0 up. */
 export interface ChartScale {
@@ -13,11 +12,8 @@ export interface ChartScale {
 const STEP_FACTORS = [1, 2, 2.5, 5, 10] as const;
 
 /**
- * Picks a clean axis for values from 0 to `max`. The step is the smallest 1/2/2.5/5 x
- * 10^n that keeps the axis to `maxTicks` ticks, and the top is the first step at or
- * above `max`. The step is always a whole number of cents (at least one), so a cents-sized
- * axis can't round two ticks to the same label or draw a gridline off its tick. A max of 0
- * or less returns a 0-1 axis so callers never divide by zero.
+ * Picks a clean axis for 0 to `max`: the smallest 1/2/2.5/5 x 10^n step within `maxTicks`,
+ * always whole cents so ticks can't round together. A max <= 0 returns a 0-1 axis.
  * @param max - The largest value plotted.
  * @param maxTicks - The most ticks wanted, 0 included (default 6).
  * @returns The scale.

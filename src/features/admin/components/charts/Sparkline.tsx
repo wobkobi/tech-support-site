@@ -1,7 +1,5 @@
 // src/features/admin/components/charts/Sparkline.tsx
-// Small trend line for a stat card: the series in de-emphasis grey with the latest point
-// as an accent dot. Decorative (aria-hidden) - the same values sit in a full chart with a
-// table view elsewhere on the page. Server-safe.
+// Decorative stat-card trend line (aria-hidden; a full chart holds the values). Server-safe.
 
 import {
   SPARKLINE_DOT_CLASS,
@@ -25,11 +23,8 @@ interface SparklineProps {
 }
 
 /**
- * Renders the sparkline, or nothing with fewer than two points.
- *
- * The SVG stretches non-uniformly to fill the card (`preserveAspectRatio="none"`), so
- * the line uses a non-scaling stroke to stay 2px and the end dot is an HTML span placed
- * by percentage; an SVG circle would squash into an ellipse.
+ * Renders the sparkline, or nothing with fewer than two points. The SVG stretches
+ * non-uniformly, so the end dot is an HTML span; an SVG circle would squash.
  * @param props - Component props.
  * @param props.values - Values oldest first.
  * @param props.className - Extra classes on the wrapper.

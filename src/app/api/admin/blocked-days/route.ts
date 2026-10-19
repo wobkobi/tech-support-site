@@ -1,7 +1,5 @@
 // src/app/api/admin/blocked-days/route.ts
-// Admin endpoint to create an all-day "Busy" block on the booking calendar. Refuses the
-// request when a confirmed/held booking already exists on the chosen NZ day -
-// personal-calendar events on the day are ignored.
+// Admin endpoint to create an all-day "Busy" block; refused when a live booking is on that NZ day.
 
 import {
   createBlockedDayEvent,
@@ -31,8 +29,7 @@ interface BlockedDayPayload {
 
 /**
  * POST /api/admin/blocked-days
- * Creates a "Busy" all-day event on the booking calendar for the given NZ date,
- * provided no held or confirmed bookings already occupy that day.
+ * Creates a "Busy" all-day event for the NZ date if no live bookings occupy it.
  * @param request - Incoming admin request with x-admin-secret header.
  * @returns JSON with the new event id or an error.
  */
@@ -62,8 +59,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const [y, m, d] = dateKeyParts(dateKey);
   const offset = getPacificAucklandOffset(y, m, d);
   const dayStart = nzMidnightUtc(y, m, d);
-  // The end boundary keeps day d's offset on purpose: it is "24 hours of NZ
-  // day d", not "NZ midnight of day d+1", which differ across a DST change.
+  // End keeps day d's offset: "24 hours of NZ day d", which differs from d+1 midnight across DST.
   const dayEnd = new Date(Date.UTC(y, m - 1, d + 1, -offset, 0, 0));
 
   const conflicting = await prisma.booking.findFirst({
@@ -85,9 +81,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const nextKey = addDaysToDateKey(dateKey, 1);
 
   try {
-    // Merge with any contiguous block so adjacent days collapse into one span instead of
-    // piling up one-day "Busy" events. `before` ends exactly at D (last covered day D-1);
-    // `after` starts at D+1. A failed adjacency lookup falls through to a plain create.
+    // Merge with adjacent blocks (`before` ends at D, `after` starts at D+1); a failed
+    // lookup falls back to a plain create.
     let before: Awaited<ReturnType<typeof listBlockedDayRanges>>[number] | null = null;
     let after: Awaited<ReturnType<typeof listBlockedDayRanges>>[number] | null = null;
     try {

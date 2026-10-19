@@ -1,7 +1,6 @@
 // src/app/pricing/page.tsx
-// Pricing page. Rates come from RateConfig (shared with the calculator and wizard);
-// accordion copy comes from pricing-policy.ts so the page, booking emails, and FAQ stay
-// aligned.
+// Pricing page. Live rates; accordion copy from pricing-policy.ts so it matches the
+// booking emails and FAQ.
 
 import { GetEstimateButton } from "@/features/business/components/GetEstimateButton";
 import { PricingWizard } from "@/features/business/components/PricingWizard";
@@ -51,10 +50,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
 
-// ISR with tag-based purge: admin rate / promo edits bust the rate-config /
-// active-promo tags, which invalidates this page immediately, and the publish cron
-// busts active-promo within ~5 minutes of a promo starting or ending. The daily
-// timer is only a fallback.
+// Rate/promo edits purge via cache tags, and the publish cron busts active-promo within
+// ~5 min of a promo starting or ending. The daily timer is a fallback.
 export const revalidate = 86400;
 
 /**
@@ -63,8 +60,7 @@ export const revalidate = 86400;
  */
 export async function generateMetadata(): Promise<Metadata> {
   const [promo, pricing] = await Promise.all([getActivePromo(), getPublicPricing()]);
-  // Fixed end date: search results and share cards outlive the week a relative
-  // "this Friday" was written in.
+  // Fixed end date: search results outlive a relative "this Friday".
   const promoSummary = promo ? summariseForBanner(promo, { fixedDate: true }) : null;
   const rateBlurb = promoSummary
     ? `Limited offer: ${promoSummary}.`
@@ -88,8 +84,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Pricing page; fetches live rates + the active promo server-side so a single
- * rate change in the admin UI propagates without a deploy.
+ * Pricing page with live rates and the active promo.
  * @returns Pricing page element.
  */
 export default async function PricingPage(): Promise<React.ReactElement> {
@@ -102,25 +97,16 @@ export default async function PricingPage(): Promise<React.ReactElement> {
     hasActivePromoCode().catch(() => true),
   ]);
   const baseRate = pricing.baseRate;
-  // Words and numbers part company here. `promo` still announces the offer and
-  // names its restriction; `pricedPromo` is null for a promo whose weekday or
-  // time-of-day restriction or spend floor this page cannot check, because
-  // nobody has picked an appointment or priced a job yet. Quoting a Tuesday
-  // discount to someone who has not chosen a day, or a $100-minimum discount
-  // as an hourly rate, promises a price the invoice will not honour.
+  // `promo` announces the offer; `pricedPromo` is null when a weekday/time restriction or
+  // spend floor can't be checked here (no slot or job yet), so figures stay undiscounted.
   const pricedPromo = promoForRateCard(promo);
-  // Named wherever the promo is announced, since the figures on this page stay
-  // undiscounted for it.
   const promoRestriction = promo ? describeRecurringWindow(promo) : null;
-  // Crossed-out pairs for the promo block. Null when the promo does not touch
-  // that figure, so nothing is struck out to show the same number back.
+  // Crossed-out pairs; null when the promo doesn't touch that figure.
   const ratePair = pricedPromo ? promoRateBeforeAfter(baseRate, pricedPromo) : null;
   const travelPair = pricedPromo
     ? promoTravelBeforeAfter(pricing.travelRatePerHour, pricedPromo)
     : null;
-  // Every other price on the page quotes these rather than the raw settings, so
-  // a live promo is not announced in the hero and then contradicted further
-  // down by the standard rates.
+  // Every other price quotes these, so the page never contradicts the promo.
   const displayRate = promoDisplayRate(baseRate, pricedPromo);
   const travelFactor = promoTravelFactor(pricedPromo);
   const displayTravelRate = roundCents(pricing.travelRatePerHour * travelFactor);
@@ -142,19 +128,15 @@ export default async function PricingPage(): Promise<React.ReactElement> {
       />
 
       <Section aria-labelledby="home-rates-heading">
-        {/* Qualified rather than just "Rates": an unqualified heading reads as
-            universal, so a business visitor takes the home rate as theirs and
-            never reaches the business page. */}
+        {/* "Home", so business visitors don't take this rate as theirs. */}
         <SectionHeading id="home-rates-heading" title="Home rates" />
 
         <div className="max-w-180">
           {promo ? (
             <>
               <div className="rounded-lg border-2 border-mustard-300 bg-mustard-50 p-6">
-                {/* Every promo that saves money on labour moves this number,
-                    including a fixed amount - see promoRateBeforeAfter for
-                    what that figure means. A travel promo leaves it alone and
-                    crosses out the travel charge below instead. */}
+                {/* Labour promos (fixed amounts too, see promoRateBeforeAfter) move this;
+                    travel promos cross out the travel charge instead. */}
                 {ratePair && (
                   <p className="mb-1 text-lg text-seasalt-700 line-through sm:text-xl">
                     {formatMoneyCompact(ratePair.before)}/hr
@@ -183,17 +165,11 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                   ⚡ Limited offer: {promo.title}
                   {promo.description ? ` - ${promo.description}` : ""}
                 </p>
-                {/* Always: the crossed-out pair shows the result, not the
-                    terms. "$65 to $55.25" does not tell anyone it is 15% off,
-                    and for a fixed amount the pair is only a one-hour
-                    illustration. */}
+                {/* The pair shows the result, not the terms ("$65 to $55.25" isn't "15% off"). */}
                 <p className="mt-1 text-base font-semibold sm:text-lg">
                   {describePromoOffer(promo)}
                 </p>
-                {/* Without this a restricted promo reads as a discount that
-                    applies now, beside a headline rate that has not moved.
-                    The rates above are deliberately undiscounted, because no
-                    appointment exists here to check the restriction against. */}
+                {/* Explains why the rate above hasn't moved for a restricted promo. */}
                 {promoRestriction && (
                   <p className="mt-1 text-base font-semibold sm:text-lg">{promoRestriction} only</p>
                 )}
@@ -214,9 +190,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             </div>
           )}
 
-          {/* Sits with the rate rather than in the caveat list below: a business
-              visitor forms their price impression here, and a fourth checkmark
-              among the home-job caveats reads as fine print they can skip. */}
+          {/* Beside the rate, not in the caveats, where it reads as skippable fine print. */}
           <Notice className="mt-5">
             <strong>Running a business?</strong> Check out the business rates and monthly retainers
             on the{" "}

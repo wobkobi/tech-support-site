@@ -1,9 +1,6 @@
 // src/features/business/lib/tax/snapshot.ts
-// Filed-year snapshots. Marking a year filed stores a TaxYearSnapshot on TaxYear.snapshot:
-// the computed figures plus the register and trip details behind them, so the Tax page and
-// the CSV keep showing what was filed. Also compares a snapshot with a fresh calculation,
-// reads back the closing asset values the next year starts from, and finds which filed
-// years an asset or trip edit reaches. Pure: no Prisma, no React.
+// Filed-year snapshots (TaxYear.snapshot): frozen figures, register and trips, plus diffing,
+// closing values carried forward and filed-year edit checks. Pure: no Prisma, no React.
 
 import { assetClassByKey } from "@/features/business/lib/tax/asset-classes";
 import type {
@@ -46,10 +43,7 @@ export interface SnapshotTrip {
   purpose: string;
 }
 
-/**
- * The rates and home office inputs the year's car and home office figures were worked
- * from, so a filed CSV shows how they were reached even after the rates table changes.
- */
+/** Rates and home office inputs the year was worked from, frozen against later rate changes. */
 export type SnapshotYearInputs = Pick<
   TaxYearRecordInput,
   "kmTier1" | "kmTier2" | "sqmRate" | "officeSqm" | "houseSqm" | "mortgageInterestOrRent" | "rates"
@@ -65,10 +59,7 @@ export interface TaxYearSnapshot {
   assets: SnapshotAsset[];
   /** Trips dated inside this year, oldest first. */
   trips: SnapshotTrip[];
-  /**
-   * Every km the km-rate car travelled in the year (TaxYear.totalVehicleKm), which sets the
-   * Tier 1 split; null when it wasn't entered.
-   */
+  /** TaxYear.totalVehicleKm, which sets the Tier 1 split; null when not entered. */
   totalVehicleKm: number | null;
   /** Km tier rates, square-metre rate, floor areas and house costs used for the year. */
   yearInputs: SnapshotYearInputs;
@@ -151,8 +142,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Reads a number from a result by dotted path ("deductions.total"). A missing or
- * non-numeric value reads as 0, so a snapshot saved before a field existed still compares.
+ * Reads a number from a result by dotted path ("deductions.total"); missing or non-numeric reads as 0.
  * @param result - Computed year.
  * @param path - Dotted property path.
  * @returns The number at that path, or 0.
@@ -166,8 +156,7 @@ export function readFigure(result: TaxYearResult, path: string): number {
 }
 
 /**
- * Freezes one register entry, resolving the class label now so a later edit to the
- * class table doesn't change a filed export.
+ * Freezes one register entry, resolving the class label now so class table edits don't reach it.
  * @param asset - Register entry.
  * @returns The frozen copy.
  */
@@ -191,8 +180,7 @@ function toSnapshotAsset(asset: AssetInput): SnapshotAsset {
 }
 
 /**
- * Assembles a snapshot from a computed year. Only assets with a schedule row in that
- * year are kept, so the register section lists exactly the assets the figures cover.
+ * Assembles a snapshot from a computed year, keeping only assets with a schedule row in it.
  * @param args - Snapshot parts.
  * @param args.result - Computed figures for the year.
  * @param args.assets - Every asset on the register.
@@ -385,8 +373,7 @@ function isAssetYearRow(value: unknown): boolean {
 }
 
 /**
- * Checks a stored result deeply enough that the Tax page and the CSV can read every
- * figure, line and schedule row without hitting a missing object or a non-number.
+ * Checks a stored result deeply enough that every figure, line and row the page and CSV read is safe.
  * @param value - Anything.
  * @returns True for a usable result.
  */
@@ -447,8 +434,7 @@ function isStoredTrip(value: unknown): boolean {
 }
 
 /**
- * Checks the stored rates and home office inputs: the rates must be numbers, the areas
- * and house costs a number or null (not entered).
+ * Checks the stored year inputs: rates must be numbers, areas and house costs a number or null.
  * @param value - Anything.
  * @returns True for a usable {@link SnapshotYearInputs}.
  */
@@ -464,11 +450,8 @@ function isStoredYearInputs(value: unknown): boolean {
 }
 
 /**
- * Reads a stored snapshot back. Returns null for anything that isn't a current-version
- * snapshot, so a corrupt or foreign value never reaches the maths as a filed year. The
- * check goes down to every field the Tax page and the CSV read (numbers finite, dates
- * parseable, nested objects present), so anything that parses is safe to render and
- * export; it never throws. A missing total km reads as null (not entered).
+ * Reads a stored snapshot back, validating every field the page and CSV read; never throws.
+ * Null for anything that isn't a valid current-version snapshot; missing total km reads as null.
  * @param json - The TaxYear.snapshot value.
  * @returns The snapshot, or null.
  */
@@ -502,8 +485,7 @@ export function closingAtvFromSnapshot(snapshot: TaxYearSnapshot): Map<string, n
 }
 
 /**
- * The `filedClosingAtv` input for the tax maths: closing values by FY key, then asset id,
- * from every filed TaxYear row. Unfiled rows and unreadable snapshots are skipped.
+ * Closing values by FY key then asset id from filed rows (the `filedClosingAtv` input).
  * @param rows - TaxYear rows with fyKey, filedAt and snapshot.
  * @returns FY key > (asset id > closing value).
  */
@@ -520,9 +502,7 @@ export function filedClosingAtvByFy(
 }
 
 /**
- * Compares the car's total km for the year. It isn't part of the result, but it sets the
- * Tier 1 split, so entering, changing or clearing it after filing is listed. Null (not
- * entered) shows as 0 with a label that says which side was missing.
+ * Compares the car's total km, which sets the Tier 1 split. A null side shows as 0 with a label saying so.
  * @param filed - Total km in the saved snapshot.
  * @param live - Total km now.
  * @returns The change, or null when both match (or both are unset).
@@ -544,10 +524,8 @@ function totalKmChange(filed: number | null, live: number | null): SnapshotChang
 }
 
 /**
- * Lists every figure where a fresh calculation differs from the filed snapshot: what an
- * amended return would change. The car's total km and the asset closing values are
- * compared too: the km sets the Tier 1 split, and the closing values carry into the next
- * year's opening values.
+ * Lists every figure a fresh calculation changes from the filed snapshot, including total km
+ * and asset closing values (they carry into the next year).
  * @param filed - The saved snapshot.
  * @param live - The same year computed now.
  * @returns Changes in display order; empty when nothing moved by half a cent or more.
@@ -600,9 +578,7 @@ export function diffSnapshots(filed: TaxYearSnapshot, live: TaxYearSnapshot): Sn
 }
 
 /**
- * Normalises a form or stored date to an ISO instant on the ledger scale. A bare
- * "YYYY-MM-DD" from a date input is UTC midnight of that NZ day, the same scale the
- * FY bounds use, so plain string comparison works.
+ * Normalises a date to an ISO ledger instant; bare "YYYY-MM-DD" becomes UTC midnight, matching FY bounds.
  * @param value - "YYYY-MM-DD", a full ISO string, or "".
  * @returns ISO string, or null when empty or unparseable.
  */
@@ -615,8 +591,7 @@ function toLedgerIso(value: string): string | null {
 }
 
 /**
- * Whether a span reaches a filed year. The FY window is half-open [start, end), so the
- * span reaches it when it starts before the FY ends and hasn't ended before the FY starts.
+ * Whether a span overlaps a filed year's half-open [start, end) window.
  * @param span - Dates the record covers.
  * @param fy - A filed year.
  * @returns True when the record's figures fall in that year.
@@ -629,8 +604,7 @@ function spanTouches(span: DateSpan, fy: FiledYearRef): boolean {
 }
 
 /**
- * Filed years an asset or trip edit reaches. Pass both the record's saved dates and the
- * edited ones, so moving a record out of a filed year still warns.
+ * Filed years an edit reaches. Pass saved and edited dates so moving out of a filed year still warns.
  * @param spans - Date spans of the record (saved and edited).
  * @param filed - Filed years, oldest first.
  * @returns The filed years reached, in the order given.

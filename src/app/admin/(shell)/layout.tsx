@@ -1,12 +1,6 @@
 // src/app/admin/(shell)/layout.tsx
-// Admin shell layout - renders AdminShell (sidebar, top bar and the padded content
-// column), the toast provider and the phone + button once for every page in the (shell)
-// group. The route group is transparent in the URL, so paths stay `/admin/...` unchanged.
-//
-// Auth stays PER-PAGE (`await requireAdminAuth(...)` as the first line of each page), NOT
-// in this layout: layouts do not re-run on client-side navigation between sibling pages,
-// so a layout-level gate would be a hole. The request-level gate is `src/proxy.ts`; the
-// per-page checks are defence-in-depth.
+// Admin shell layout: AdminShell, toasts and the phone + button for every (shell) page.
+// Auth stays per-page: layouts don't re-run on client navigation (src/proxy.ts gates requests).
 
 import { AdminShell } from "@/features/admin/components/AdminShell";
 import { MobileQuickActions } from "@/features/admin/components/MobileQuickActions";
@@ -17,16 +11,14 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import type React from "react";
 
-// Installing from the admin should produce a home-screen icon that opens the
-// admin, not the public homepage the root manifest's start_url points at.
+// Installing from the admin should open the admin, not the public homepage.
 export const metadata: Metadata = {
   manifest: "/admin.webmanifest",
 };
 
 /**
- * Renders the admin chrome and the toast provider around every page in the
- * group. The desktop sidebar's collapsed state comes from the {@link SIDEBAR_COOKIE}
- * cookie (set by {@link AdminShell}), so the first paint already has the saved width.
+ * Renders the admin chrome around every page; the {@link SIDEBAR_COOKIE} cookie (set by
+ * {@link AdminShell}) gives the first paint the saved sidebar width.
  * @param props - Layout props.
  * @param props.children - The active admin page.
  * @returns The admin shell element.

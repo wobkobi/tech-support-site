@@ -19,10 +19,7 @@ interface ButtonAsLink {
   prefetch?: boolean;
   scroll?: boolean;
   replace?: boolean;
-  /**
-   * When set, renders as a plain <a> with the download attribute instead of a Next.js Link.
-   * Use for file downloads so the browser handles them directly without the router.
-   */
+  /** Renders a plain <a download> instead of a Link, so the browser handles the file directly. */
   download?: string;
   /** Link target, e.g. "_blank" for an external destination. Passthrough links only. */
   target?: string;
@@ -31,10 +28,7 @@ interface ButtonAsLink {
   variant?: ButtonVariant;
   size?: ButtonSize;
   fullWidth?: boolean;
-  /**
-   * Visual styling only - Link will still navigate when clicked.
-   * For truly disabled links, use conditional rendering instead.
-   */
+  /** Visual only - a Link still navigates; render conditionally for truly disabled links. */
   disabled?: boolean;
   className?: string;
   children: React.ReactNode;
@@ -132,10 +126,7 @@ function getSizeClasses(size: ButtonSize): string {
 }
 
 /**
- * Polymorphic Button component
- *
- * Renders as Next.js Link when `href` is provided, otherwise as a native button.
- * Supports 7 variants (primary, secondary, tertiary, ghost, outline, white, outline-white) and 3 sizes (sm, md, lg).
+ * Polymorphic button: a Next.js Link when `href` is set, else a native button.
  * @param props - Button props (discriminated by presence of href)
  * @returns Button or Link element
  */

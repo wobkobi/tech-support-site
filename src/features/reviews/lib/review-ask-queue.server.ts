@@ -1,10 +1,6 @@
 // src/features/reviews/lib/review-ask-queue.server.ts
-// Gathers every invoice whose review ask is still undecided, with the contact, opt-out
-// and last-ask state the rules need, and runs decideReviewAsk on each. Read-only on
-// purpose: the admin reviews page calls this on every render, and minting a review token
-// writes the Contact, which re-pushes it to Google on the next sync. The job mints the
-// token only after it has claimed an invoice. Also forecasts one invoice's ask for the
-// send modal, with the same rules.
+// Runs decideReviewAsk on every undecided invoice, plus the send-modal forecast. Read-only:
+// the admin page calls it every render, and minting a token would re-sync the Contact.
 
 import { findInvoiceContact } from "@/features/business/lib/contact-review-token";
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
@@ -67,9 +63,7 @@ const CONTACT_SELECT = {
 } as const;
 
 /**
- * Case-insensitive equality filters for a set of addresses. Contact emails and invoice
- * client emails written before normalisation can carry capitals, so a plain `in` would
- * miss them.
+ * Case-insensitive equality filters for a set of addresses; older rows can carry capitals.
  * @param field - The string field to match.
  * @param addresses - Normalised addresses.
  * @returns One filter per address, for an OR.
@@ -93,8 +87,8 @@ function insensitiveAny<F extends string>(
  * @param now - Current instant.
  * @param timing - Delay and gap from settings.
  * @param opts - Options.
- * @param opts.onlyInvoiceId - Restrict to one invoice (local testing, Send now). A
- *   failed ask is then included whatever its attempt count, so Send now can retry it.
+ * @param opts.onlyInvoiceId - Restrict to one invoice; includes a failed ask whatever its
+ *   attempt count, so Send now can retry it.
  * @returns Candidates with their decisions.
  */
 export async function loadReviewAskCandidates(
@@ -285,10 +279,8 @@ export async function loadReviewAskCandidates(
 }
 
 /**
- * What an invoice's automatic review ask will do if the invoice is sent now, for the send
- * modal. Judges the same rules the job does at the due date, and also counts asks still
- * queued on the person's other invoices: of several invoices sent close together, only
- * the first ask goes out and the gap skips the rest.
+ * Send-modal forecast of an invoice's review ask, with the job's rules plus asks queued
+ * on the person's other invoices (only the first of a close group goes out).
  * @param invoice - The invoice being sent.
  * @param invoice.id - Invoice id, left out of the queued asks.
  * @param invoice.contactId - Optional Contact id.
@@ -339,9 +331,8 @@ export async function forecastInvoiceReviewAsk(
     }),
   ]);
 
-  // Play the queued asks forward in due order: each one that clears the gap goes out
-  // and becomes the latest ask. An overdue one goes out on the next run, so it counts
-  // from now.
+  // Play queued asks forward in due order; each that clears the gap becomes the latest.
+  // An overdue one counts from now (it goes out next run).
   let lastAsk = state.lastAskedAt;
   let lastAskQueued = false;
   if (timing.gapDays > 0) {
@@ -401,8 +392,7 @@ export interface ReviewAskOutcomeRow {
 }
 
 /**
- * Review asks decided in the last `days` days, newest first. Skips stamped by the
- * launch backfill are left out - they say nothing about recent jobs.
+ * Review asks decided in the last `days` days, newest first, minus launch-backfill skips.
  * @param now - Current instant.
  * @param days - How far back to look.
  * @returns Decided rows.
@@ -429,8 +419,7 @@ export async function loadRecentReviewAskOutcomes(
       reviewAskAttempts: true,
     },
   });
-  // The before_auto filter runs here, not in the query: on Mongo a NOT on a field also
-  // drops every row where that field is unset, which is most of them.
+  // Filter before_auto here: a Mongo NOT also drops rows where the field is unset.
   return rows.flatMap((r) =>
     r.reviewAskOutcome && r.reviewAskDecidedAt && r.reviewAskNote !== "before_auto"
       ? [

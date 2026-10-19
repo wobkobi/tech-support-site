@@ -1,14 +1,7 @@
 // src/app/card/page.tsx
-// Business card artwork - 90x55mm at 300 DPI (1063x650px), the standard NZ card size.
-// Pass ?side=back for the contact face (default is the brand face), and ?mode=print to
-// add a 3mm bleed on all edges (viewport 1134x721px). Contact details come from the live
-// identity settings so the card cannot drift from the site, invoices and emails.
-//
-// Deliberately plain: a flat white ground, no backdrop photo and no frosted panel. At
-// 90mm the site's blurred backdrop reads as muddy tone rather than imagery, and white
-// keeps the small type crisp on uncoated stock. Grouping is done with spacing rather than
-// rules - the wordmark already carries a vertical coquelicot rule, and a second one
-// anywhere on the card reads as a stray piece of the logo.
+// Business card artwork, 90x55mm at 300 DPI (1063x650px). ?side=back for the contact face,
+// ?mode=print adds 3mm bleed (1134x721px). Plain white: the backdrop reads as mud at 90mm,
+// and no extra rules, which would read as a stray piece of the logo.
 
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
@@ -29,25 +22,17 @@ const TAGLINE = "Computer and tech support";
 /** Service area, set below the contact triad rather than beside a pin icon. */
 const SERVICE_AREA = "On-site across Auckland, or remote";
 
-/**
- * QR edge length in CSS pixels at 300 DPI: 260px prints at 22mm, over the 2cm
- * floor printers quote for a scannable code, and puts each of the 29 modules
- * at about 0.76mm.
- */
+/** QR edge in px at 300 DPI: 260px prints at 22mm (over the 2cm floor), ~0.76mm per module. */
 const QR_SIZE = 260;
 
 /**
- * Quiet zone above and below the QR, in CSS pixels at 300 DPI: four modules,
- * as the QR spec asks. The generated SVG carries only a 10px margin on a
- * 2000px canvas, so the clear space has to come from the layout. Sideways it
- * is already there: the row's 40px gap on the left, the 50px safe margin on
- * the right.
+ * Four-module quiet zone above and below the QR; the SVG has almost no margin.
+ * Sideways the row gap and safe margin already cover it.
  */
 const QR_QUIET_ZONE = 36;
 
 /**
- * One contact line: brand-navy icon, then the value at a size that stays
- * readable for the site's older customers.
+ * One contact line, sized to stay readable for older customers.
  * @param props - Component props.
  * @param props.icon - Icon component to render ahead of the value.
  * @param props.value - Contact value (phone, email or website).
@@ -99,8 +84,7 @@ function CardFront({ identity }: { identity: IdentitySettings }): React.ReactEle
 }
 
 /**
- * Contact face: the three ways to reach Harrison, the service area, and a QR to
- * the booking page.
+ * Contact face: phone, email, website, service area and a booking QR.
  * @param props - Component props.
  * @param props.identity - Live business identity settings.
  * @returns The back face element.
@@ -139,8 +123,7 @@ function CardBack({ identity }: { identity: IdentitySettings }): React.ReactElem
 /**
  * Business card page for PDF export.
  * @param props - Page props.
- * @param props.searchParams - Next.js search params promise: `side` picks the
- *   face ("front" default, "back" for contact details), `mode=print` adds bleed.
+ * @param props.searchParams - `side` ("front" or "back") and `mode=print` for bleed.
  * @returns Business card page element.
  */
 export default async function CardPage({

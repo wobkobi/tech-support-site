@@ -1,8 +1,6 @@
 // src/app/api/review-asks/stop/[token]/route.ts
-// Public "stop asking me for reviews" endpoint. Mail apps hit it directly through the
-// review-ask email's List-Unsubscribe header (RFC 8058 one-click: a form POST), and the
-// /review-asks/stop page posts JSON `{ action }` to it. POST only: link scanners fetch
-// every URL in an email with GET, and that must never opt anyone out.
+// Public "stop asking me for reviews" endpoint for RFC 8058 one-click and the stop page.
+// POST only: link scanners GET every URL in an email.
 
 import { verifyReviewAskStopToken } from "@/features/mailing/lib/unsubscribe-token";
 import { allowReviewAsks, optOutOfReviewAsks } from "@/features/reviews/lib/review-ask-opt-out";
@@ -13,8 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 const PREVIEW_TOKEN = "preview";
 
 /**
- * Works out what the caller wants. A JSON body is the page; anything else is a mail
- * app's one-click POST, which always means stop.
+ * Read the action: JSON is the page; anything else is a one-click POST, meaning stop.
  * @param request - Incoming request.
  * @returns The requested action, or null for an unknown JSON action.
  */

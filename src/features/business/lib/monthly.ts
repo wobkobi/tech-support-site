@@ -1,7 +1,6 @@
 // src/features/business/lib/monthly.ts
-// NZ calendar-month bucketing for the admin charts. A row lands in the NZ month of its
-// date, read through nzDateParts, which agrees with the `>= nzMidnightUtc(y, m, 1)` month
-// filters the dashboard and business pages already use, for real instants and ledger dates.
+// NZ calendar-month bucketing for the admin charts, via nzDateParts (agrees with the
+// `>= nzMidnightUtc(y, m, 1)` month filters the pages use).
 
 import { roundCents } from "@/shared/lib/money";
 import { nzDateParts } from "@/shared/lib/timezone-utils";
@@ -32,8 +31,7 @@ const MONTH_NAMES = [
 ] as const;
 
 /**
- * Builds the month for a year and month, wrapping overflow (month 13 > January of the
- * next year, month 0 > December of the year before).
+ * Builds a month, wrapping overflow (month 13 > next January, month 0 > previous December).
  * @param year - Full year.
  * @param month - Month, 1-12 or overflowing either way.
  * @returns The normalised month.
@@ -46,9 +44,8 @@ export function nzMonth(year: number, month: number): NzMonth {
 }
 
 /**
- * The NZ calendar month containing an instant or a ledger date. Ledger dates are stored
- * as UTC midnight of their NZ day, which is midday or 1pm that same day in NZ, so they
- * never slip into the neighbouring month.
+ * The NZ calendar month containing an instant or ledger date (UTC midnight is midday or 1pm
+ * NZ, so ledger dates never slip a month).
  * @param date - A Date or an ISO string.
  * @returns The month it falls in.
  */
@@ -82,8 +79,7 @@ export function nzMonthSpan(first: NzMonth, last: NzMonth): NzMonth[] {
 type KeysOfType<T, V> = { [K in keyof T]-?: T[K] extends V ? K : never }[keyof T];
 
 /**
- * Sums each row's amount into its NZ month. Rows outside `months` are ignored. Totals
- * are rounded to cents, so float noise (0.1 + 0.2) never reaches a label or a table.
+ * Sums each row's amount into its NZ month, ignoring rows outside `months`; totals rounded to cents.
  * @param rows - Rows to bucket.
  * @param fields - Which row fields to read.
  * @param fields.date - Field holding the row's date (a Date or an ISO string).

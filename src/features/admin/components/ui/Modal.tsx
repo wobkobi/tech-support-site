@@ -1,11 +1,6 @@
 // src/features/admin/components/ui/Modal.tsx
-// Shared admin dialog shell: backdrop-click and Escape close it, focus moves into the
-// dialog on open and Tab stays inside it, body scroll locks while open, and the whole
-// overlay is `print:hidden`.
-// A `dirty` dialog asks before a backdrop tap, Escape or the close button throws away
-// what was typed. It appears without motion; a fade added later must use
-// `transition-[opacity]` (Tailwind v4 compiles translate/scale to separate longhand
-// props, so a transform-based transition would silently no-op).
+// Shared admin dialog: focus trap, scroll lock, Escape/backdrop close, discard prompt when dirty.
+// A future fade must use `transition-[opacity]`; Tailwind v4 transforms are longhand props.
 
 "use client";
 
@@ -37,11 +32,7 @@ interface ModalProps {
   size?: ModalSize;
   /** Unsaved input: a backdrop tap, Escape or the close button asks before discarding. */
   dirty?: boolean;
-  /**
-   * "sheet" pins the dialog to the bottom edge below sm, within thumb reach; "top" pins it
-   * to the top below sm, so a typing dialog stays above the phone keyboard (defaults to
-   * "centre").
-   */
+  /** Below sm: "sheet" pins to the bottom, "top" keeps it above the keyboard (default "centre"). */
   placement?: ModalPlacement;
   children: React.ReactNode;
 }
@@ -91,11 +82,9 @@ export function Modal({
   const descId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const discardBarRef = useRef<HTMLDivElement>(null);
-  // Set when a dismiss is attempted with unsaved input; the footer then asks
-  // before anything is thrown away.
+  // Set when a dismiss is attempted with unsaved input.
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
-  // A question left open when the parent closes the dialog must not greet the
-  // next open.
+  // Clear a leftover discard question when the parent closes the dialog.
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
@@ -114,15 +103,10 @@ export function Modal({
     else requestClose();
   });
 
-  // Keyed on `open` alone: a re-render (a fresh onClose arrow from the parent,
-  // `dirty` flipping on the first keystroke) must not re-run this and yank
-  // focus out of the field in use.
+  // Keyed on `open` alone so a re-render can't yank focus out of the field in use.
   useEffect(() => {
     if (!open) return;
-    // While open: lock page scroll and move focus into the dialog (restored to
-    // the trigger on close). The lock goes on <html>, the page's scroller: body
-    // overflow does not reach the viewport while html has overflow-x set, so a
-    // hidden body only clips its own box instead of stopping the scroll.
+    // Lock scroll on <html>: body overflow doesn't reach the viewport while html sets overflow-x.
     const root = document.documentElement;
     const prevFocus = document.activeElement as HTMLElement | null;
     const prevOverflow = root.style.overflow;
@@ -177,8 +161,7 @@ export function Modal({
               </p>
             )}
           </div>
-          {/* Full 44px target, pulled into the header padding so the header
-              doesn't grow. */}
+          {/* 44px target, pulled into the header padding. */}
           <button
             type="button"
             onClick={requestClose}

@@ -1,7 +1,5 @@
 // src/features/business/types/business.ts
-// Shared type definitions for the business feature - rate config, line items, invoices
-// and their status, plus the ledger and job-calculation shapes consumed by the
-// calculator, invoice, and importer code.
+// Shared business types: rates, line items, invoices, ledger rows and job-calculation shapes.
 
 import type { CancelMeetingType } from "@/features/business/lib/pricing-policy";
 
@@ -10,7 +8,7 @@ export interface RateConfig {
   label: string;
   /** Set on base hourly rates (e.g. Standard $65/hr). Null on modifiers and flat rates. */
   ratePerHour: number | null;
-  /** Set on flat per-unit rates (e.g. legacy Travel $1.20/km row before the time-based switch). Null on hourly bases and modifiers. */
+  /** Set on flat per-unit rates. Null on hourly bases and modifiers. */
   flatRate: number | null;
   /** Set on modifier rates (signed $/hr delta, e.g. -10 for At home). Null on bases and flat rates. */
   hourlyDelta: number | null;
@@ -27,13 +25,8 @@ export interface LineItem {
   unitPrice: number;
   lineTotal: number;
   /**
-   * Whole billed minutes, authoritative for hourly labour lines: `qty` is those
-   * minutes in hours and cannot hold a 5-minute grid exactly (10 min = 0.1667h),
-   * so renderers show this as h:mm and money is derived from it. Absent on
-   * flat rows (travel, parts, surcharges) and on invoices issued before the
-   * switch, which keep rendering their decimal `qty`. Null as well as undefined
-   * because Prisma reads a missing optional composite field back as null;
-   * readers must treat the two the same.
+   * Whole billed minutes, authoritative on hourly lines (`qty` can't hold 10 min = 0.1667h
+   * exactly). Absent on flat rows; Prisma reads a missing field as null, so treat both alike.
    */
   minutes?: number | null;
 }
@@ -48,7 +41,7 @@ export interface Invoice {
   issueDate: string;
   dueDate: string;
   lineItems: LineItem[];
-  /** @deprecated Legacy boolean kept for storage shape. The engine derives GST mode from GST_REGISTERED in pricing-policy.ts; renderers gate on `gstAmount > 0`. */
+  /** @deprecated Storage shape only; GST mode comes from pricing-policy.ts, renderers gate on `gstAmount > 0`. */
   gst: boolean;
   subtotal: number;
   gstAmount: number;
@@ -57,7 +50,7 @@ export interface Invoice {
   promoTitle?: string | null;
   /** Dollar discount applied to the labour subtotal at creation time. */
   promoDiscount?: number | null;
-  /** Operator ticked the unsuccessful-work checkbox: labour discounted by the unsuccessful-work factor (parts + travel unaffected). */
+  /** Unsuccessful work: labour discounted by the policy factor (parts and travel unaffected). */
   unsuccessful?: boolean;
   /** Computed labour-half discount, persisted for audit + PDF rendering. */
   unsuccessfulDiscount?: number | null;
@@ -146,10 +139,10 @@ export interface TaskLine {
   rateConfigId: string | null;
   /** For hourly tasks - points to the base RateConfig (with ratePerHour set). Null on flat tasks. */
   baseRateId?: string | null;
-  /** For hourly tasks - applied modifier RateConfig IDs (each with hourlyDelta set). Effective $/hr = base + sum(deltas). */
+  /** For hourly tasks - modifier RateConfig IDs; effective $/hr = base + sum(deltas). */
   modifierIds?: string[];
   description: string;
-  /** Decimal hours, derived from {@link TaskLine.minutes} on hourly tasks. Carried unrounded so `qty * unitPrice` stays exact. */
+  /** Decimal hours from {@link TaskLine.minutes}, unrounded so `qty * unitPrice` stays exact. */
   qty: number;
   unitPrice: number;
   lineTotal: number;
@@ -161,15 +154,15 @@ export interface TaskLine {
   action?: string | null;
   /** Optional free-text qualifier appended to the composed description (e.g. "corrupted", "Windows OS"). */
   details?: string | null;
-  /** AI-flagged "short" task ("quickly", "briefly", one-shot actions). Pinned at 15 min by the rebalance helper so non-short tasks absorb the correction. */
+  /** AI-flagged "short" task; the rebalance pins it at 15 min. */
   isShort?: boolean;
-  /** AI-flagged task with an operator-stated explicit duration. Pinned at the parser-emitted qty by the rebalance helper, so only floating tasks absorb any window mismatch. */
+  /** AI-flagged task with an operator-stated duration; the rebalance leaves its qty alone. */
   isExplicit?: boolean;
-  /** Operator-set: this task wasn't finished, so calcJobTotal discounts its line per the unsuccessful-work policy. Ignored on flat-rate rows and when the whole-job `unsuccessful` flag is set (which already covers it). */
+  /** Task not finished: its labour is discounted, unless flat-rate or the whole job is flagged. */
   unsuccessful?: boolean;
-  /** A flat charge with no rate row behind it (a cancellation fee): never labour, so no minimum-billable padding, window fitting, surcharge or promo. */
+  /** Flat charge with no rate row (a cancellation fee): no padding, window fitting, surcharge or promo. */
   isFlatFee?: boolean;
-  /** Operator typed this row's $/hr, so restoring a draft keeps it instead of re-pricing from the live rate. Cleared when the base or a modifier changes. */
+  /** Operator typed this row's $/hr, so a restored draft keeps it; cleared on a rate change. */
   priceOverridden?: boolean;
 }
 
@@ -179,25 +172,19 @@ export interface PartLine {
 }
 
 /**
- * One travel charge in the calculator. Every entry except a store run lumps into a
- * single "Round-trip travel" invoice line, and each store run gets a line of its own.
- * The per-entry label only appears in the calculator UI to help the operator track
- * what each amount represents.
+ * One travel charge in the calculator. All but store runs lump into one "Round-trip
+ * travel" invoice line; each store run gets its own.
  */
 export interface TravelEntry {
-  /** Operator-facing label (e.g. "Parking", "76 Riversdale Rd"); the store on a store run. Not shown on the invoice. */
+  /** Calculator-only label (e.g. "Parking"); the store on a store run. */
   label: string;
-  /**
-   * "storeRun" marks a mid-job drive from the client's place to a store and back. It
-   * bills on its own invoice line with no minimum travel charge, and a free-travel
-   * promo doesn't cover it. Absent on every other entry.
-   */
+  /** Mid-job client > store > client drive: own line, no minimum, not free-travel promo. */
   kind?: "storeRun";
   /** Cost in NZD. */
   cost: number;
   /** True when this entry was created by the address lookup; lets re-lookup replace it. */
   isAuto?: boolean;
-  /** True when this entry came from the AI parse's travelCosts (parking, tolls); a reparse replaces it, a manual address re-lookup leaves it alone. */
+  /** From the AI parse's travelCosts; a reparse replaces it, an address re-lookup doesn't. */
   isParsedCost?: boolean;
   /** Destination text shown in the operator-side breakdown (auto entries only). */
   destination?: string;
@@ -210,19 +197,14 @@ export interface TravelEntry {
 }
 
 export interface JobCalculation {
-  /** Total billable minutes (time-slot sum + out-of-session follow-up); informational - labour bills through the hourly task lines. */
+  /** Total billable minutes, informational; labour bills through the hourly task lines. */
   durationMins: number;
   tasks: TaskLine[];
   parts: PartLine[];
   /** Every travel charge for this job; see {@link TravelEntry} for how they reach the invoice. */
   travelEntries: TravelEntry[];
   notes: string;
-  /**
-   * Operator-set flag: when true, calcJobTotal discounts the labour portion
-   * (time charge + hourly tasks) per the published unsuccessful-work
-   * policy. Travel and parts are not discounted. Auditable on the saved
-   * invoice via Invoice.unsuccessful + Invoice.unsuccessfulDiscount.
-   */
+  /** Unsuccessful job: calcJobTotal discounts labour only, per the published policy. */
   unsuccessful?: boolean;
   clientName: string;
   clientEmail: string;
@@ -236,7 +218,7 @@ export interface ParseJobQuestion {
 
 export interface ParseJobResponse {
   durationMins: number | null;
-  /** Minutes of explicitly-stated work done OUTSIDE the stated session ranges (e.g. a call after the visit); included in durationMins and exempt from the wall-clock cap. */
+  /** Stated work outside the session ranges (a call after); in durationMins, exempt from the cap. */
   outOfSessionMins?: number;
   startTime: string | null;
   endTime: string | null;
@@ -298,42 +280,26 @@ export interface EventPrefillSlot {
 }
 
 /**
- * Job prefill built server-side from one or more booking-calendar events
- * (whose times the operator corrects to actual on-site time) plus their
- * Booking rows. Wins over any saved draft - billing a specific event is a
- * fresh task.
+ * Job prefill built server-side from one or more calendar events (times are actual on-site)
+ * and their Booking rows. Wins over any saved draft.
  */
 export interface EventPrefill {
-  /**
-   * Earliest merged event's id; stored on the saved invoice. Invoice.
-   * calendarEventId is singular, so a merged job links back through its first
-   * event only - the rest are recoverable from {@link EventPrefill.slots}.
-   */
+  /** Earliest event's id, saved on the invoice; the rest live in {@link EventPrefill.slots}. */
   calendarEventId: string;
   /** Matching Booking row id, or null for manual calendar events. */
   bookingId: string | null;
   /** NZ-local YYYY-MM-DD of the earliest event's start. */
   jobDate: string;
-  /**
-   * One entry per merged event, in start order; a single-event prefill has
-   * exactly one. Each becomes its own time slot, so the gaps between merged
-   * events never reach the billable total.
-   */
+  /** One per event in start order; each is its own slot, so gaps between never bill. */
   slots: EventPrefillSlot[];
   clientName: string;
   clientEmail: string;
   jobAddress: string;
-  /**
-   * How the booking was to be met. Cancel mode bills no round trip on a remote
-   * session. Null when no Booking row backs the event, in which case the
-   * calculator infers it from whether there is an address or a drive.
-   */
+  /** How the booking was met (cancel mode bills no trip for remote); null with no Booking row. */
   meetingType: CancelMeetingType | null;
   /**
-   * Drive prediction made for the events' actual windows, from the frozen
-   * TravelBlock (raw minutes, no scheduling buffer) or the booking snapshot.
-   * One round trip for the whole job: out to the first event, home from the
-   * last. Null when neither exists - the operator looks up manually.
+   * One round trip for the whole job, from the frozen TravelBlock (raw minutes) or the
+   * booking snapshot; null when neither exists.
    */
   travelMinsThere: number | null;
   travelMinsBack: number | null;
@@ -359,9 +325,9 @@ interface ParsedTaskLine {
   details?: string | null;
   /** True when the AI placed this task in the SHORT set (one-shot, quickly, briefly, etc.). */
   isShort?: boolean;
-  /** True when the AI pinned this task to an operator-stated explicit duration. Pinned tasks are skipped by the post-parse safety-net rebalance. */
+  /** True when the AI pinned this task to a stated duration; the rebalance skips it. */
   isExplicit?: boolean;
-  /** True when the AI read the task's problem as not resolved ("couldn't fix it"); the calculator discounts that line's labour per the unsuccessful-work policy. */
+  /** True when the AI read the problem as unresolved; the calculator discounts that line. */
   unsuccessful?: boolean;
 }
 

@@ -1,7 +1,5 @@
 // src/app/api/admin/social/designs/photos/route.ts
-// Recent photos for the post maker's photo picker: every photo already used in a
-// design or template (photo layers and photo backdrops), newest design first, so the
-// same photo can go into another design without uploading it again.
+// Recent photos for the post maker picker: every photo used in a design or template, newest first.
 
 import { errorResponse, noStore, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -21,8 +19,7 @@ interface RecentPhoto {
 }
 
 /**
- * Photos in one stored document. Read loosely: a document that fails the full check
- * can still offer its photos, and only addresses on the site's Blob store come back.
+ * Photos in one stored document, read loosely; only site Blob store URLs come back.
  * @param doc - Stored document JSON.
  * @returns Photos in stack order, top layer first.
  */

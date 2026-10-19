@@ -1,11 +1,6 @@
 // src/features/booking/components/admin/BookingTimeline.tsx
-// Vertical lifecycle timeline for a booking: Created > Reminder sent > Completed /
-// Cancelled > Review sent > Review submitted. A cancelled booking branches to a Cancelled
-// step that spells out who cancelled and which fee flags fired (late cancellation, travel
-// charge, no-show). Steps render only once the booking has reached them; a reached step
-// whose timestamp is null (legacy rows, or the completed marker which has no dedicated
-// stamp) degrades to a muted note rather than vanishing. Server component - no client
-// hooks.
+// Booking lifecycle timeline: Created > Reminder > Completed/Cancelled > Review sent >
+// Review submitted. Server component.
 
 import { dotClass, type StepTone } from "@/features/admin/components/ui/timeline-tone";
 import { cn } from "@/shared/lib/cn";
@@ -44,10 +39,7 @@ interface Step {
   date: Date | string | null;
   /** Extra muted context (e.g. cancellation flags). */
   detail?: string | null;
-  /**
-   * When true, a null date degrades to "date not recorded". When false, the step
-   * has no dedicated timestamp field (the completed marker) so no date is shown.
-   */
+  /** True: a null date reads "date not recorded"; false: the step has no timestamp field. */
   hasDate: boolean;
   tone: StepTone;
 }

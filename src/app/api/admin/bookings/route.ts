@@ -1,7 +1,5 @@
 // src/app/api/admin/bookings/route.ts
-// Admin endpoint to create a booking manually (phone/email bookings captured from the
-// /admin/schedule grid). Accepts arbitrary startAt + duration instead of the public slot
-// model.
+// Admin endpoint to create a manual booking at any startAt + duration.
 
 import {
   BOOKING_CONFIG,
@@ -45,8 +43,7 @@ interface AdminBookingPayload {
 
 /**
  * POST /api/admin/bookings
- * Creates a confirmed booking at the given start time. Skips the public form's
- * slot/min-notice constraints since admin is authoritative.
+ * Creates a confirmed booking, skipping the public slot and notice rules.
  * @param request - Incoming admin request with x-admin-secret header.
  * @returns JSON with the new booking id or an error.
  */
@@ -158,9 +155,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const cancelToken = randomUUID();
   const reviewToken = randomUUID();
 
-  // Internal notes blob, parsed back by parseBookingNotes. The customer is an attendee on
-  // the invite, so the event gets the customer-facing description built below instead -
-  // this one would show them the admin marker and the raw metadata.
+  // Internal notes for parseBookingNotes; the invite gets the customer-facing description below.
   let bookingNotes = notes ? `${notes}\n\n` : "";
   bookingNotes += `[Manual entry by admin - ${durationMinutes} min]\n`;
   bookingNotes += `Meeting type: ${address ? "In-person" : "Remote"}\n`;
@@ -209,13 +204,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         name,
         email,
         phone: phoneE164,
-        // Persist the address to its own column (not only inside the notes text)
-        // so the schedule agenda's "Open in Maps" link and the cancellation-invoice
-        // draft can read booking.address for manually-created bookings too.
+        // Address gets its own column too, for Maps links and cancellation invoices.
         address,
-        // Same structured columns the public flow writes. Without them a manual
-        // booking renders no meeting-type or duration chip, which left the operator
-        // reading those values out of the raw notes text instead.
+        // Same structured columns as the public flow, for the meeting-type and duration chips.
         meetingType: address ? "in_person" : "remote",
         duration: durationMinutes === 60 ? "short" : "long",
         notes: bookingNotes,
@@ -263,8 +254,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     revalidateTag(SCHEDULE_CALENDAR_TAG, {});
     return NextResponse.json({ ok: true, bookingId: booking.id });
   } catch (err) {
-    // Roll back the calendar event created before the insert so a failed insert
-    // (slot race or otherwise) doesn't leave an orphan event on the calendar.
+    // Roll back the calendar event so a failed insert leaves no orphan.
     if (calendarEventId) {
       try {
         await deleteBookingEvent({ eventId: calendarEventId });

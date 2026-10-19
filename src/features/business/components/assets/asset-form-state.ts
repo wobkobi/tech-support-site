@@ -1,9 +1,6 @@
 // src/features/business/components/assets/asset-form-state.ts
-// Field state for AssetFormModal: the string values the inputs bind to, how a form is
-// filled (blank, from a saved asset, from an expense) and how it becomes the JSON body
-// the assets API validates. Rates show as percentages here and travel as fractions.
-// Also the cost field's label and hint, which say whether to enter it with or without GST.
-// Pure: no React, so scripts/check-assets.ts can round-trip it through parseAssetBody.
+// Field state for AssetFormModal: filling the form and building the API body (rates show
+// as percentages, travel as fractions). No React, so scripts/check-assets.ts can use it.
 
 import {
   defaultRate,
@@ -97,8 +94,7 @@ export function classOptionLabel(c: AssetClass): string {
 }
 
 /**
- * Blank form for a new asset: brought in (the common case for the first entries), fully
- * business use, diminishing value.
+ * Blank form for a new asset: brought in, fully business use, diminishing value.
  * @returns The form.
  */
 export function emptyAssetForm(): AssetFormState {
@@ -219,8 +215,8 @@ export function withOrigin(f: AssetFormState, origin: AssetOrigin): AssetFormSta
 }
 
 /**
- * The JSON body for POST/PUT /api/business/assets. Fields the current origin, vehicle
- * option or disposal toggle hides are sent blank so a hidden value never saves.
+ * The JSON body for POST/PUT /api/business/assets. Hidden fields are sent blank so
+ * they never save.
  * @param f - The form.
  * @returns The request body.
  */
@@ -235,8 +231,7 @@ export function formToBody(f: AssetFormState): Record<string, unknown> {
     supplier: f.origin === "purchased" ? f.supplier : "",
     valuationNote: f.origin === "introduced" ? f.valuationNote : "",
     method: f.method,
-    // Sent as a string so an unreadable entry reaches the API as "NaN" and is refused,
-    // rather than serialising to null and quietly taking the class rate.
+    // A string, so an unreadable entry reaches the API as "NaN" and is refused, not null.
     rate: rate === "" ? "" : String(Number(rate) / 100),
     businessUsePct: f.businessUsePct,
     investmentBoost: f.origin === "purchased" && !f.kmVehicle && f.investmentBoost,
@@ -259,12 +254,8 @@ export interface CostFieldText {
 }
 
 /**
- * Label and hint for the cost input. The figure is entered on the GST basis for the
- * in-service date: GST-inclusive while not registered on that day (the GST is part of
- * the cost), exclusive from the registration date (the GST is claimed back). The maths
- * takes costBase as entered, so this label is the only place the GST decision is made.
- * A brought-in item's label carries no GST suffix; its hint says whether to take GST off.
- * A date that isn't a full YYYY-MM-DD yet (mid-typing, or cleared) reads as today.
+ * Label and hint for the cost input: GST-inclusive before registration on the in-service
+ * date, exclusive from it. The only place the GST decision is made; a partial date reads as today.
  * @param f - The form's origin and in-service date.
  * @param f.origin - Brought in (market value) or bought (cost).
  * @param f.inServiceDate - YYYY-MM-DD, possibly incomplete.
@@ -278,8 +269,7 @@ export function costFieldText(
   const day = parseDateKey(f.inServiceDate) ?? parseDateKey(todayISO()) ?? new Date();
   const gstInclusive = !isGstRegisteredOn(day, gst);
   if (f.origin === "introduced") {
-    // A second-hand market value has no GST line to strip, so the label stays plain and
-    // only the hint changes: GST comes off only when it is claimed back in a return.
+    // A market value has no GST line; only the hint says when to take GST off.
     return {
       label: "Market value on that date",
       hint: gstInclusive

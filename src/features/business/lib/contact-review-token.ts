@@ -1,21 +1,18 @@
 // src/features/business/lib/contact-review-token.ts
-// The per-contact review token behind a review ask's site-form link, and the read-only
-// "which contact is this invoice's customer?" lookup the send modal's forecast reads.
+// Per-contact review token for review-ask links, and the invoice > contact lookup.
 
 import { prisma } from "@/shared/lib/prisma";
 import { randomUUID } from "crypto";
 
 /**
- * Returns the contact's stable review token, creating + persisting one on first call.
- * Writes the Contact (which re-pushes it to Google), so only call it once an ask is
- * actually going out.
+ * Returns the contact's review token, creating one on first call. The write re-pushes the
+ * Contact to Google, so call it only when an ask is going out.
  * @param contactId - Contact ObjectId.
  * @returns Token string, or null if the contact doesn't exist or DB write failed.
  */
 export async function ensureContactReviewToken(contactId: string): Promise<string | null> {
   try {
-    // Soft-deleted contacts are excluded: an invoice keeps its contactId after the
-    // contact is deleted, so minting here would email someone who had been removed.
+    // Invoices keep contactId after a soft delete, so skip deleted contacts.
     const contact = await prisma.contact.findFirst({
       where: { id: contactId, deletedAt: null },
       select: { reviewToken: true },
@@ -36,8 +33,7 @@ export async function ensureContactReviewToken(contactId: string): Promise<strin
 }
 
 /**
- * The live contact an invoice belongs to, by its contactId or its client email. The
- * same match the review-ask job uses; without one the ask is skipped. Read-only.
+ * The live contact an invoice belongs to, by contactId or client email (the review-ask match).
  * @param args - Lookup inputs.
  * @param args.contactId - Optional Contact id from the invoice.
  * @param args.clientEmail - Invoice's clientEmail (case-insensitive match).

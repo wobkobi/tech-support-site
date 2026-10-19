@@ -1,8 +1,6 @@
 // src/features/social-design/lib/app-crops.ts
-// What each app does with a picture of one size when it goes up as a post: the part
-// Facebook and Google show when they cut it to their shape, and whether Instagram
-// refuses it. Built from the composer's own PICTURE_FIT rules, so the editor's
-// overlay and the composer's crop warnings always agree.
+// What each app shows or refuses of a size, built from the composer's PICTURE_FIT rules so the
+// editor overlay and the composer's crop warnings agree.
 
 import { FORMATS, type FormatKey } from "@/features/social-design/lib/formats";
 import {
@@ -22,8 +20,7 @@ export interface AppCrop {
 }
 
 /**
- * The visible part of each app's cut of a size. Apps cut from the middle, so each
- * box is centred; apps that cut to the same box share one, labelled with both names.
+ * Each app's centred visible cut of a size; apps cutting the same box share one label.
  * @param key - Size.
  * @returns Boxes for the apps that cut this size, and the apps that refuse it.
  */

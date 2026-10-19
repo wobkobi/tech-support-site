@@ -1,8 +1,6 @@
 // scripts/check-tax-load.ts
-// The pure mappers inside the tax loader: stored Asset rows > AssetInput, TaxYear rows >
-// the year record (blank rates filled from IRD for the year and fuel type), and
-// settings.tax > the rules the maths reads. load.ts is server-only, hence the
-// react-server condition; nothing here touches the database.
+// Pure mappers inside the tax loader (assets, tax years, settings.tax). Needs the
+// react-server condition because load.ts is server-only; no database.
 // Run with: npm test -- tax-load
 
 import {
