@@ -42,8 +42,11 @@ import {
   splitTripKm,
 } from "@/features/business/lib/tax/vehicle";
 
-/** The expense category a km-rate vehicle replaces (the rate already covers fuel). */
-const FUEL_CATEGORY: (typeof EXPENSE_CATEGORIES)[number] = "Fuel";
+/** Categories IRD's km rate already covers (parking and tolls aren't, so stay in Travel). */
+const KM_RATE_CATEGORIES: ReadonlySet<string> = new Set<(typeof EXPENSE_CATEGORIES)[number]>([
+  "Fuel",
+  "Vehicle",
+]);
 
 /**
  * The tax maths' view of a financial year.
@@ -114,7 +117,7 @@ export function computeTaxYear(input: TaxYearInput): TaxYearResult {
     const basis = expenseTaxBasis(row, input.gst);
     if (linkedExpenseIds.has(row.id)) {
       excludedAssetLinked += basis;
-    } else if (row.category === FUEL_CATEGORY && inKmVehiclePeriod(row.date, kmPeriods)) {
+    } else if (KM_RATE_CATEGORIES.has(row.category) && inKmVehiclePeriod(row.date, kmPeriods)) {
       excludedFuel += basis;
     } else {
       expenses += basis * pctFraction(settings.categoryBusinessUse[row.category] ?? 100);

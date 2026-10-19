@@ -1227,6 +1227,21 @@ function checkTaxYear(): void {
     [registered.deductions.expenses, registered.deductions.excludedFuel],
     [949, 100],
   );
+  // 20 Jun WOF predates the km car: 956.50 + 70 = 1,026.50. 1 Dec service joins the
+  // excluded fuel: 115 + 380 = 495.
+  const withVehicleCosts = computeTaxYear({
+    ...input,
+    expenses: [
+      ...input.expenses,
+      expense("wof", "2026-06-20", "Vehicle", 70, 60.87),
+      expense("service", "2026-12-01", "Vehicle", 380, 330.43),
+    ],
+  });
+  expectEqual(
+    "Vehicle costs are left out while the car is on km rates, deducted before it",
+    [withVehicleCosts.deductions.expenses, withVehicleCosts.deductions.excludedFuel],
+    [1026.5, 495],
+  );
   // Income from 1 Sep counts GST-exclusive too: only the 15 Feb 14,000 row is in the
   // registered period. 14,000 / 1.15 = 12,173.913 > 12,173.91 (3/23 of 14,000 = 1,826.09
   // comes off). Income 1,000 + 15,000 + 12,173.91 = 28,173.91. Deductions 4,833.84 - 956.50

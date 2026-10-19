@@ -276,7 +276,7 @@ export interface SetAsidePlan {
 export interface TaxDeductions {
   /** Expense rows on the GST basis x category business %, after exclusions. */
   expenses: number;
-  /** Fuel rows left out because a km-rate vehicle was in service on their date. */
+  /** Fuel and Vehicle rows dated while on km rates. Name kept so stored snapshots validate. */
   excludedFuel: number;
   /** Rows linked to an asset. */
   excludedAssetLinked: number;
