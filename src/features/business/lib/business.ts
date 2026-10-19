@@ -494,19 +494,34 @@ function jobPromoBreakdown(
     // Per line, never netted across the job. Without the Standard rate, a line
     // already under the flat rate stays as it is; netting its shortfall against
     // a line above would cancel the saving the pricing page promises there.
-    const byTask = shares((t, line) => {
-      if (cut == null) return Math.max(0, line - t.qty * flat);
+    const hourCuts = job.tasks.map((t) => {
+      if (!isDiscounted(t)) return 0;
+      if (cut == null) return Math.max(0, t.unitPrice - flat);
       // Floor the hour at the promo price for the line's tags (live rate less
       // the cut). A line typed or saved under the live rate only comes down to
       // that floor: at an old $75 Standard the full $35 cut would bill $40/hr,
       // under the $65 the promo promises.
       const live =
         rates && t.baseRateId ? effectiveHourlyRate(rates, t.baseRateId, t.modifierIds) : 0;
-      const hourCut =
-        live > 0 ? Math.min(cut, Math.max(0, t.unitPrice - Math.max(0, live - cut))) : cut;
-      return Math.min(line, t.qty * hourCut);
+      return live > 0 ? Math.min(cut, Math.max(0, t.unitPrice - Math.max(0, live - cut))) : cut;
     });
-    return { total: roundCents(byTask.reduce((s, d) => s + d, 0)), byTask };
+    const byTask = job.tasks.map((t, i) => Math.min(lineTotals[i]!, t.qty * hourCuts[i]!));
+    // The total is what the lines lose at the promo price, both sides rounded the way
+    // the invoice rounds its lines. 4h20m prints $433.33 at $100/hr and is $281.67 at
+    // $65/hr, so the promo takes $151.66; rounding the raw $35/hr cut ($151.667) on its
+    // own takes $151.67 and bills the hours a cent under the promo price.
+    const promoLineTotals = taskLineTotals(
+      job.tasks.map((t, i) =>
+        hourCuts[i]! > 0
+          ? { ...t, unitPrice: Math.max(0, roundCents(t.unitPrice - hourCuts[i]!)) }
+          : t,
+      ),
+    );
+    const total = roundCents(
+      lineTotals.reduce((s, line) => s + line, 0) -
+        promoLineTotals.reduce((s, line) => s + line, 0),
+    );
+    return { total, byTask };
   }
   if (promo.percentDiscount !== null) {
     const pct = Math.max(0, Math.min(1, promo.percentDiscount));

@@ -954,6 +954,19 @@ function main(): void {
   );
   expectEqual("so the labour bills at half the promo price", flatFailed.total, 48.75);
 
+  // 4h20m across thirds-of-a-cent lines: $433.33 at $100/hr, $281.67 at $65/hr. The
+  // raw $35/hr cut is $151.667; rounded on its own it billed $281.66.
+  const lockedRate = calcJobTotal(
+    failedJob(
+      [135, 25, 15, 25, 5, 20, 35].map((mins) => ({ qty: mins / 60, unitPrice: 100 })),
+      false,
+    ),
+    promo("flat_hourly", 65),
+    NO_FLOOR,
+  );
+  expectEqual("a flat promo's discount is the rounded gap", lockedRate.promoDiscount, 151.66);
+  expectEqual("so the hours bill at exactly the promo price", lockedRate.total, 281.67);
+
   expectEqual(
     "with no promo, a failed visit is half the full price",
     calcJobTotal(failedJob([{ qty: 1.5, unitPrice: 100 }], true), null, NO_FLOOR)
