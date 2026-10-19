@@ -48,6 +48,7 @@ import {
 import { FORMATS, type FormatKey } from "@/features/social-design/lib/formats";
 import { ICON_CHOICES } from "@/features/social-design/lib/icons";
 import type { AlignTo } from "@/features/social-design/lib/layout";
+import { TextArea } from "@/shared/components/TextArea";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useState } from "react";
@@ -492,7 +493,7 @@ function TypeFields({
     case "text":
       return (
         <Section title="Text">
-          <textarea
+          <TextArea
             aria-label="Words"
             rows={3}
             value={layer.text}
@@ -583,7 +584,7 @@ function TypeFields({
         <Section title="Bullet list">
           <label className="flex flex-col gap-0.5 text-sm text-admin-text-secondary">
             Points, one per line (up to 8)
-            <textarea
+            <TextArea
               rows={4}
               value={layer.items.join("\n")}
               onChange={(e) =>

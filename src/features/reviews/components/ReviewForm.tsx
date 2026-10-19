@@ -7,6 +7,7 @@ import { Button } from "@/shared/components/Button";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { PhoneLink } from "@/shared/components/PhoneLink";
+import { TextArea } from "@/shared/components/TextArea";
 import { cn } from "@/shared/lib/cn";
 import { focusAndReveal } from "@/shared/lib/focus-and-reveal";
 import { formatNZPhone, normalisePhone, validatePhone } from "@/shared/lib/normalise-phone";
@@ -557,7 +558,7 @@ export default function ReviewFormProtected({
           </span>
         </div>
 
-        <textarea
+        <TextArea
           id={textId}
           autoComplete="off"
           placeholder={`Share your experience (at least ${textMin} characters)...`}

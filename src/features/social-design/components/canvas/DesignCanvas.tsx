@@ -18,6 +18,7 @@ import {
 } from "@/features/social-design/lib/doc";
 import { unionBox, type Box } from "@/features/social-design/lib/editor-ops";
 import { FORMATS, safeRect, type FormatKey } from "@/features/social-design/lib/formats";
+import { TextArea } from "@/shared/components/TextArea";
 import type Konva from "konva";
 import type React from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -818,7 +819,7 @@ export function DesignCanvas({
       )}
 
       {editing && editStyle && (
-        <textarea
+        <TextArea
           ref={textRef}
           aria-label={editLayer?.type === "bullets" ? "Bullet points, one per line" : "Text"}
           value={draft}
