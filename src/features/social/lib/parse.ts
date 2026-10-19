@@ -10,14 +10,12 @@ import {
   type GooglePostCta,
   type GooglePostType,
 } from "@/features/social/lib/validate";
+import { BLOB_IMAGE_HOST_SUFFIX } from "@/shared/lib/blob-image";
 
 const MAX_NAME = 120;
 const MAX_BODY = 10_000;
 const MAX_ALT = 300;
 const MAX_URL = 2_000;
-// Meta fetches the picture by URL, so only images in this site's own Blob store are
-// accepted: they're public, stable, and already shrunk to JPEG by the composer.
-const IMAGE_HOST_SUFFIX = ".public.blob.vercel-storage.com";
 
 /** Editable post fields, apart from targets. */
 export interface PostPatch {
@@ -160,7 +158,7 @@ export function parsePostPatch(
   }
   const checks: [keyof PostPatch, string | null | { error: string } | number][] = [];
   if (body.imageUrl !== undefined) {
-    checks.push(["imageUrl", optionalUrl(body.imageUrl, "Picture", IMAGE_HOST_SUFFIX)]);
+    checks.push(["imageUrl", optionalUrl(body.imageUrl, "Picture", BLOB_IMAGE_HOST_SUFFIX)]);
   }
   if (body.imageAlt !== undefined) {
     checks.push(["imageAlt", optionalText(body.imageAlt, "Picture description", MAX_ALT)]);
@@ -234,7 +232,10 @@ export function parsePostPatch(
       }
       const pictureChecks: [keyof TargetEdit, string | null | number | { error: string }][] = [];
       if (t.imageUrl !== undefined) {
-        pictureChecks.push(["imageUrl", optionalUrl(t.imageUrl, "Picture", IMAGE_HOST_SUFFIX)]);
+        pictureChecks.push([
+          "imageUrl",
+          optionalUrl(t.imageUrl, "Picture", BLOB_IMAGE_HOST_SUFFIX),
+        ]);
       }
       if (t.imageAlt !== undefined) {
         pictureChecks.push(["imageAlt", optionalText(t.imageAlt, "Picture description", MAX_ALT)]);

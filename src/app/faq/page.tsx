@@ -29,6 +29,7 @@ import { PageShell } from "@/shared/components/PageLayout";
 import { PromoPrice } from "@/shared/components/PromoPrice";
 import { renderEmphasised } from "@/shared/components/renderEmphasised";
 import { Section, TEXT_LINK } from "@/shared/components/Section";
+import { roundCents } from "@/shared/lib/money";
 import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
@@ -47,8 +48,9 @@ export const metadata: Metadata = {
 };
 
 // ISR with tag-based purge: rate and settings edits bust their cache tags,
-// which invalidates this page immediately - no per-request render needed.
-export const revalidate = 300;
+// which invalidates this page immediately - no per-request render needed. The daily
+// timer is only a fallback.
+export const revalidate = 86400;
 
 interface FaqItem {
   question: string;
@@ -86,8 +88,8 @@ export default async function FaqPage(): Promise<React.ReactElement> {
   const pricedPromo = promoForRateCard(promo);
   const displayRate = promoDisplayRate(pricing.baseRate, pricedPromo);
   const travelFactor = promoTravelFactor(pricedPromo);
-  const displayTravelRate = Math.round(pricing.travelRatePerHour * travelFactor * 100) / 100;
-  const displayMinTravel = Math.round(policy.MIN_TRAVEL_CHARGE * travelFactor * 100) / 100;
+  const displayTravelRate = roundCents(pricing.travelRatePerHour * travelFactor);
+  const displayMinTravel = roundCents(policy.MIN_TRAVEL_CHARGE * travelFactor);
   const rateDiscounted = displayRate !== pricing.baseRate;
   const travelDiscounted = travelFactor < 1;
   const paymentTermsDays = settings.identity.paymentTermsDays;

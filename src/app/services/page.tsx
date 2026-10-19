@@ -23,8 +23,9 @@ import Link from "next/link";
 import type React from "react";
 import { Fragment } from "react";
 
-// ISR so rate edits propagate via the rate-config tag purge without a redeploy.
-export const revalidate = 3600;
+// ISR so rate edits propagate via the rate-config tag purge without a redeploy. The
+// daily timer is only a fallback: each regeneration costs ~100 billed ISR write units.
+export const revalidate = 86400;
 
 const TITLE = "Computer Repairs & Tech Help in Auckland";
 const DESCRIPTION =

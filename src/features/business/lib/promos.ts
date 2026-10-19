@@ -1,11 +1,14 @@
 // src/features/business/lib/promos.ts
-// Active-promo lookup + helpers. Cached 60s; admin writes revalidate.
+// Active-promo lookup + helpers. Cached until the tag is busted: admin writes bust it,
+// and the publish cron busts it when a promo starts or ends (refreshPromoCacheAtBoundary in
+// promos.server.ts, kept out of here because client components import this file).
 
 import { promoForSpend, type PromoTierValues } from "@/features/business/lib/promo-tiers";
+import { roundCents } from "@/shared/lib/money";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import { NZ_TZ, nzMinuteOfDay, nzWeekday } from "@/shared/lib/timezone-utils";
-import type { Promo } from "@prisma/client";
+import type { Prisma, Promo } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 
 /** Cache tag invalidated by the promo CRUD routes. */
@@ -75,6 +78,12 @@ export interface ActivePromo {
   activeFromMinute: number | null;
   /** End of the NZ time-of-day restriction, in minutes past midnight. */
   activeToMinute: number | null;
+  /**
+   * Whether the promo is new-customers-only or capped per customer, so it can
+   * only be priced once the customer is known. Absent on hand-built fixtures,
+   * which read as unlimited.
+   */
+  customerLimited?: boolean;
 }
 
 /** The parts of a priced job a promo can act on after the band is built. */
@@ -85,15 +94,6 @@ export interface QuoteParts {
   labourHigh: number;
   /** Round-trip travel charge, in dollars. */
   travel: number;
-}
-
-/**
- * Rounds a dollar figure to cents, keeping the arithmetic out of float drift.
- * @param value - Raw dollar amount.
- * @returns The amount rounded to two decimal places.
- */
-function toCents(value: number): number {
-  return Math.round(value * 100) / 100;
 }
 
 /**
@@ -113,7 +113,7 @@ export function applyPromoToQuote(parts: QuoteParts, promo: ActivePromo | null):
 
   if (promo.discountType === "free_travel" && promo.travelPercent !== null) {
     const factor = Math.min(1, Math.max(0, promo.travelPercent));
-    return { ...parts, travel: toCents(parts.travel * factor) };
+    return { ...parts, travel: roundCents(parts.travel * factor) };
   }
 
   if (promo.discountType === "fixed_amount" && promo.fixedAmount !== null) {
@@ -124,8 +124,8 @@ export function applyPromoToQuote(parts: QuoteParts, promo: ActivePromo | null):
     const off = Math.max(0, promo.fixedAmount);
     return {
       ...parts,
-      labourLow: toCents(Math.max(0, parts.labourLow - off)),
-      labourHigh: toCents(Math.max(0, parts.labourHigh - off)),
+      labourLow: roundCents(Math.max(0, parts.labourLow - off)),
+      labourHigh: roundCents(Math.max(0, parts.labourHigh - off)),
     };
   }
 
@@ -133,7 +133,7 @@ export function applyPromoToQuote(parts: QuoteParts, promo: ActivePromo | null):
 }
 
 /** Ordering for every promo lookup: highest priority wins, then newest. */
-const PROMO_ORDER = [{ priority: "desc" as const }, { createdAt: "desc" as const }];
+export const PROMO_ORDER = [{ priority: "desc" as const }, { createdAt: "desc" as const }];
 
 /**
  * Maps a database row to the plain shape the rest of the app passes around.
@@ -168,7 +168,18 @@ function toActivePromo(row: Promo): ActivePromo {
     activeWeekdays: row.activeWeekdays,
     activeFromMinute: row.activeFromMinute,
     activeToMinute: row.activeToMinute,
+    customerLimited: row.newCustomersOnly || row.perCustomerLimit != null,
   };
+}
+
+/**
+ * Promos of one kind that are switched on and inside their start and end dates.
+ * @param kind - Promo kind to match.
+ * @param now - The instant to test against.
+ * @returns Prisma where clause.
+ */
+export function inWindowWhere(kind: "automatic" | "code", now: Date): Prisma.PromoWhereInput {
+  return { isActive: true, kind, startAt: { lte: now }, endAt: { gt: now } };
 }
 
 /**
@@ -178,24 +189,22 @@ function toActivePromo(row: Promo): ActivePromo {
  * Automatic only, and deliberately so: every caller is a display surface, and
  * a code promo advertised on the banner or the pricing page would be offered to
  * people who never entered the code. Widening this filter re-opens that.
+ *
+ * No time-based revalidate: the root layout reads this for the banner, and an
+ * unstable_cache timer becomes every public page's ISR interval. A promo
+ * starting or ending is picked up by refreshPromoCacheAtBoundary in promos.server.ts.
  * @returns Active automatic promo or null.
  */
 export const getActivePromo = unstable_cache(
   async (): Promise<ActivePromo | null> => {
-    const now = new Date();
     const row = await prisma.promo.findFirst({
-      where: {
-        isActive: true,
-        kind: "automatic",
-        startAt: { lte: now },
-        endAt: { gt: now },
-      },
+      where: inWindowWhere("automatic", new Date()),
       orderBy: PROMO_ORDER,
     });
     return row ? toActivePromo(row) : null;
   },
   ["active-promo"],
-  { tags: [ACTIVE_PROMO_TAG], revalidate: 60 },
+  { tags: [ACTIVE_PROMO_TAG], revalidate: false },
 );
 
 /**
@@ -207,9 +216,8 @@ export const getActivePromo = unstable_cache(
  * @returns The promo, or null when it is missing, a code promo, off or outside its window.
  */
 export async function findAdvertisablePromo(id: string): Promise<ActivePromo | null> {
-  const now = new Date();
   const row = await prisma.promo.findFirst({
-    where: { id, isActive: true, kind: "automatic", startAt: { lte: now }, endAt: { gt: now } },
+    where: { id, ...inWindowWhere("automatic", new Date()) },
   });
   return row ? toActivePromo(row) : null;
 }
@@ -222,14 +230,11 @@ export async function findAdvertisablePromo(id: string): Promise<ActivePromo | n
  */
 export const hasActivePromoCode = unstable_cache(
   async (): Promise<boolean> => {
-    const now = new Date();
-    const count = await prisma.promo.count({
-      where: { isActive: true, kind: "code", startAt: { lte: now }, endAt: { gt: now } },
-    });
+    const count = await prisma.promo.count({ where: inWindowWhere("code", new Date()) });
     return count > 0;
   },
   ["has-active-promo-code"],
-  { tags: [ACTIVE_PROMO_TAG], revalidate: 60 },
+  { tags: [ACTIVE_PROMO_TAG], revalidate: false },
 );
 
 /** The recurring restriction a promo can carry inside its outer window. */
@@ -295,15 +300,24 @@ export function hasRecurringWindow(window: RecurringWindow): boolean {
  * discount to someone who has not picked a day promises a price the invoice
  * will not honour, which is the same failure as quoting a business customer a
  * home-rate promo.
+ *
+ * A new-customers-only or once-per-customer promo is held back the same way
+ * until the server has judged it against this customer: a returning customer
+ * quoted the new-customer rate is promised a price the booking takes away.
  * @param promo - The resolved promo, or null.
  * @param at - The appointment instant, or null when none has been chosen.
+ * @param options - What the server already judged.
+ * @param options.customerChecked - True when the promo was resolved against the
+ *   customer's email, so its per-customer limits are already settled.
  * @returns The promo to price with, or null.
  */
 export function promoForAppointment(
   promo: ActivePromo | null,
   at: Date | null,
+  { customerChecked = false }: { customerChecked?: boolean } = {},
 ): ActivePromo | null {
   if (!promo) return null;
+  if (promo.customerLimited && !customerChecked) return null;
   if (!hasRecurringWindow(promo)) return promo;
   if (!at) return null;
   return matchesRecurringWindow(promo, at) ? promo : null;
@@ -313,10 +327,11 @@ export function promoForAppointment(
  * The promo a page may price its published rates with, where there is neither
  * an appointment nor a job total to check against.
  *
- * On top of {@link promoForAppointment}, a promo with a spend floor or tiers is
- * named in words but not priced: a crossed-out $/hr beside a $100 minimum
- * promises a one-hour job a discount it never earns. Surfaces that do have a
- * total gate it with promoForSpend instead.
+ * Customer-limited promos drop out through {@link promoForAppointment}, since a
+ * page has no visitor to judge them against. On top of that, a promo with a
+ * spend floor or tiers is named in words but not priced: a crossed-out $/hr
+ * beside a $100 minimum promises a one-hour job a discount it never earns.
+ * Surfaces that do have a total gate it with promoForSpend instead.
  * @param promo - The resolved promo, or null.
  * @returns The promo to price the rate card with, or null.
  */
@@ -487,12 +502,14 @@ async function passesLimits(
   }
 
   if (promo.newCustomersOnly && customer.emails.length > 0) {
-    // Completed only. A held or cancelled booking is not someone who has been
-    // served, and counting one would deny a first-timer their own offer.
+    // Confirmed or completed. A confirmed booking is the customer's first job already
+    // on the books, so a second booking before it is done is not a new customer's
+    // either. A held or cancelled one is not, and counting it would deny a first-timer
+    // their own offer.
     const prior = await prisma.booking.count({
       where: {
         email: { in: customer.emails },
-        status: "completed",
+        status: { in: ["confirmed", "completed"] },
         ...(bookingId ? { id: { not: bookingId } } : {}),
       },
     });
@@ -608,15 +625,44 @@ export async function resolvePromo(context: PromoContext): Promise<ActivePromo |
  * already made. Its weekday and time-of-day restriction is still judged at the
  * appointment, so a Tuesday promo does not follow a job moved to Thursday, and
  * the spend floor and tiers stay with the caller, which knows the real total.
+ *
+ * The terms are the ones saved with the booking, so editing the promo's rate
+ * afterwards changes what new bookings get, not this one. Bookings made before
+ * the terms were saved fall back to the promo row as it stands.
  * @param promoId - The booking's `promoIdAtBooking`.
- * @param at - The appointment instant.
- * @returns The promo, or null when it has been deleted or the appointment falls
- *   outside its restriction.
+ * @param at - The appointment instant, or null to skip the restriction (an
+ *   invoice that already carries the promo was judged when it was raised).
+ * @param snapshot - The booking's `promoTermsAtBooking`, when it has one.
+ * @returns The promo, or null when it has been deleted (with no saved terms) or
+ *   the appointment falls outside its restriction.
  */
-export async function lockedInPromo(promoId: string, at: Date): Promise<ActivePromo | null> {
-  const row = await prisma.promo.findUnique({ where: { id: promoId } }).catch(() => null);
-  if (!row || !matchesRecurringWindow(row, at)) return null;
-  return toActivePromo(row);
+export async function lockedInPromo(
+  promoId: string,
+  at: Date | null,
+  snapshot?: unknown,
+): Promise<ActivePromo | null> {
+  const saved = isSavedPromoTerms(snapshot, promoId) ? snapshot : null;
+  const terms =
+    saved ??
+    (await prisma.promo
+      .findUnique({ where: { id: promoId } })
+      .then((row) => (row ? toActivePromo(row) : null))
+      .catch(() => null));
+  if (!terms || (at && !matchesRecurringWindow(terms, at))) return null;
+  return terms;
+}
+
+/**
+ * Whether a booking's saved promo terms are usable: the same promo, with the
+ * arrays the pricing helpers walk. Anything else falls back to the live row.
+ * @param value - The stored JSON.
+ * @param promoId - The promo id the booking names.
+ * @returns True when the value can stand in for the promo.
+ */
+function isSavedPromoTerms(value: unknown, promoId: string): value is ActivePromo {
+  if (!value || typeof value !== "object") return false;
+  const terms = value as Partial<ActivePromo>;
+  return terms.id === promoId && Array.isArray(terms.tiers) && Array.isArray(terms.activeWeekdays);
 }
 
 /**
@@ -666,13 +712,24 @@ export function applyPromoToHourlyRate(
     // Never raise the price - a promo above the base rate is a misconfig, so
     // the cut floors at zero, and so does the discounted rate.
     const cut = Math.max(0, baseRate - promo.flatHourlyRate);
-    return Math.round(Math.max(0, rate - cut) * 100) / 100;
+    return roundCents(Math.max(0, rate - cut));
   }
   if (promo.percentDiscount !== null) {
     const factor = Math.max(0, 1 - promo.percentDiscount);
-    return Math.round(rate * factor * 100) / 100;
+    return roundCents(rate * factor);
   }
   return rate;
+}
+
+/**
+ * The last instant a promo applies. `endAt` is exclusive: a promo ending Sat 31 Oct is
+ * stored as NZ midnight starting Sun 1 Nov, so formatting `endAt` itself names a day the
+ * promo does not run. Format this instead whenever the end is shown to anyone.
+ * @param endIso - Promo `endAt` ISO timestamp.
+ * @returns One millisecond before `endAt`.
+ */
+export function promoLastDay(endIso: string): Date {
+  return new Date(Date.parse(endIso) - 1);
 }
 
 /**
@@ -680,10 +737,10 @@ export function applyPromoToHourlyRate(
  * @param endIso - Promo `endAt` ISO timestamp.
  * @param now - Reference time (injected for tests).
  * @param fixedDate - Always give the date, never "this Saturday".
- * @returns Short date phrase.
+ * @returns Short date phrase naming the promo's last day.
  */
 export function formatPromoEnd(endIso: string, now: Date = new Date(), fixedDate = false): string {
-  const end = new Date(endIso);
+  const end = promoLastDay(endIso);
   const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
   // Within a week: anchor on weekday ("I have until Friday"). Pin to NZ time so
@@ -764,7 +821,7 @@ export function promoModifierRate(
   }
   if (kind === "delta") return promoDisplayRate(modifierRate, promo);
   const discountPerHour = baseRate - promoDisplayRate(baseRate, promo);
-  return Math.round((modifierRate - discountPerHour) * 100) / 100;
+  return roundCents(modifierRate - discountPerHour);
 }
 
 /** A crossed-out "before" figure and the one a promo leaves in its place. */
@@ -792,7 +849,7 @@ export function promoRateBeforeAfter(
 ): PromoBeforeAfter | null {
   if (promo.discountType === "free_travel") return null;
   if (promo.discountType === "fixed_amount" && promo.fixedAmount !== null) {
-    const after = Math.max(0, Math.round((baseRate - promo.fixedAmount) * 100) / 100);
+    const after = Math.max(0, roundCents(baseRate - promo.fixedAmount));
     return after < baseRate ? { before: baseRate, after } : null;
   }
   const after = applyPromoToHourlyRate(baseRate, promo);
@@ -813,7 +870,7 @@ export function promoTravelBeforeAfter(
 ): PromoBeforeAfter | null {
   if (promo.discountType !== "free_travel" || promo.travelPercent === null) return null;
   const factor = Math.min(1, Math.max(0, promo.travelPercent));
-  const after = Math.round(minTravelCharge * factor * 100) / 100;
+  const after = roundCents(minTravelCharge * factor);
   return after < minTravelCharge ? { before: minTravelCharge, after } : null;
 }
 

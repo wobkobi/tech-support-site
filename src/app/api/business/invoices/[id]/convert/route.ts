@@ -6,10 +6,12 @@
 
 import { completeBilledBookings } from "@/features/booking/lib/complete-billed-bookings.server";
 import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";
+import { calcInvoiceTotals } from "@/features/business/lib/invoice-maths";
 import {
   getNextInvoiceNumber,
   writeBackInvoiceCounter,
 } from "@/features/business/lib/invoice-numbering";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import {
   releaseBookingRedemptions,
   settlePromoRedemption,
@@ -55,6 +57,14 @@ export async function POST(
 
   const previousNumber = existing.number;
   const identity = await getIdentity();
+  // A tax invoice states GST as it stands at conversion, not as it stood when the quote
+  // was written: a quote saved before GST registration would otherwise convert with none.
+  const { GST_REGISTERED } = await getPolicy();
+  const totals = calcInvoiceTotals(
+    existing.lineItems,
+    (existing.promoDiscount ?? 0) + (existing.unsuccessfulDiscount ?? 0),
+    GST_REGISTERED,
+  );
   const now = new Date();
   const dueDate = new Date(now.getTime() + identity.paymentTermsDays * 24 * 60 * 60 * 1000);
 
@@ -78,6 +88,10 @@ export async function POST(
           // original quote date - restamp both dates from today.
           issueDate: now,
           dueDate,
+          gst: totals.gstAmount > 0,
+          subtotal: totals.subtotal,
+          gstAmount: totals.gstAmount,
+          total: totals.total,
           // Back to DRAFT regardless of whether the quote was emailed: the
           // operator reviews and sends the real invoice as its own step.
           status: "DRAFT",

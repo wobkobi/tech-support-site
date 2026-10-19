@@ -37,26 +37,7 @@ import {
 } from "@/features/business/lib/tax";
 import { formatDollars, formatRatePct } from "@/features/business/lib/tax/workings";
 import { parseDateKey } from "@/shared/lib/date-format";
-
-let failures = 0;
-
-/**
- * Compares a value against its expectation, recording rather than throwing so
- * every fixture runs even after one fails.
- * @param label - Human-readable case name.
- * @param actual - What the call produced.
- * @param expected - What it should have produced.
- */
-function expectEqual(label: string, actual: unknown, expected: unknown): void {
-  const a = JSON.stringify(actual);
-  const e = JSON.stringify(expected);
-  if (a === e) {
-    console.log(`  PASS  ${label} > ${a}`);
-  } else {
-    console.error(`  FAIL  ${label} > expected ${e}, got ${a}`);
-    failures++;
-  }
-}
+import { expectEqual, finish } from "./lib/harness.js";
 
 /**
  * The error a parse produced, or "ok", so a case compares as one string.
@@ -676,8 +657,7 @@ function main(): void {
     "Cost (incl. GST)",
   );
 
-  console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
-  process.exit(failures === 0 ? 0 : 1);
+  finish();
 }
 
 main();

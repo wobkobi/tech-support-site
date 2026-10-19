@@ -23,8 +23,8 @@ import type React from "react";
 import { FaPhone } from "react-icons/fa6";
 
 // ISR so rate edits propagate via the rate-config tag purge instead of
-// requiring a redeploy.
-export const revalidate = 3600;
+// requiring a redeploy. The daily timer is only a fallback.
+export const revalidate = 86400;
 
 const TITLE = "Small Business IT Support in Auckland";
 const DESCRIPTION =

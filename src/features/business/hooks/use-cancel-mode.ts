@@ -137,10 +137,10 @@ export function useCancelMode({
   });
 
   /**
-   * The cancellation fee as a single flat task. baseRateId stays null so
-   * business.ts treats it as flat: bills qty * unitPrice, contributes no
-   * labour minutes, and collapseToWindow ignores it. No RateConfig needed -
-   * rateConfigId only links flat rate rows like Travel.
+   * The cancellation fee as a single flat task. isFlatFee keeps it out of labour
+   * (isHourlyTask): it bills qty * unitPrice, is never padded to the minimum billable
+   * time, and window fitting ignores it. No RateConfig needed - rateConfigId only
+   * links flat rate rows like Travel.
    * @param reason - Which fee is being billed.
    * @param date - The cancelled booking's date (YYYY-MM-DD).
    * @param fee - Fee amount in NZD.
@@ -154,6 +154,7 @@ export function useCancelMode({
       qty: 1,
       unitPrice: fee,
       lineTotal: fee,
+      isFlatFee: true,
     };
   }
 

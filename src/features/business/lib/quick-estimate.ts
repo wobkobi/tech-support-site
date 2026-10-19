@@ -96,20 +96,22 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
           .trim();
 
   const code = normalisePromoCode(input.promoCode);
+  const email = input.email?.trim() || null;
+  const startAt = input.departureTimeIso ?? null;
 
   const [ratesRes, promoRes, codeRes, travelRes, estimateRes] = await Promise.allSettled([
     fetch("/api/pricing/rates").then((r) => r.json() as Promise<{ rates?: PublicRate[] }>),
-    fetch("/api/promos/active").then((r) => r.json() as Promise<{ promo?: ActivePromo | null }>),
+    fetch("/api/promos/active", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ startAt, email }),
+    }).then((r) => r.json() as Promise<{ promo?: ActivePromo | null }>),
     // Both promos are asked for at once, so an entered code costs no latency.
     code
       ? fetch("/api/promos/validate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            code,
-            startAt: input.departureTimeIso ?? null,
-            email: input.email?.trim() || null,
-          }),
+          body: JSON.stringify({ code, startAt, email }),
         }).then((r) => r.json() as Promise<{ valid?: boolean; promo?: ActivePromo | null }>)
       : Promise.resolve({ valid: false, promo: null }),
     dest
@@ -156,11 +158,11 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
   // A promo restricted to certain days is priced in only once a slot is picked,
   // because that is the appointment it has to be checked against. Before then it
   // is advertised but not applied, so the estimate never promises a discount the
-  // booking will not honour.
-  const dateGated = promoForAppointment(
-    resolved,
-    input.departureTimeIso ? new Date(input.departureTimeIso) : null,
-  );
+  // booking will not honour. A customer-limited one waits on the email the same
+  // way - both endpoints judged it against the email when there was one.
+  const dateGated = promoForAppointment(resolved, startAt ? new Date(startAt) : null, {
+    customerChecked: email != null,
+  });
   // Both legs quoted at "now"-ish traffic (no job time exists here; the
   // server defaults the return to +60 min, matching the fallback duration).
   const travelMins =

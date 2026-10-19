@@ -6,37 +6,18 @@
 // Run with: npm test -- contact-emails
 
 import { mergeEmails } from "@/features/contacts/lib/merge-emails";
-
-let failures = 0;
-
-/**
- * Compares a merged list against its expectation, recording rather than
- * throwing so every fixture runs even after one fails.
- * @param label - Human-readable case name.
- * @param actual - List produced by the code under test.
- * @param expected - List the case should produce.
- */
-function expectList(label: string, actual: string[], expected: string[]): void {
-  const a = JSON.stringify(actual);
-  const e = JSON.stringify(expected);
-  if (a === e) {
-    console.log(`  PASS  ${label} > ${a}`);
-  } else {
-    console.error(`  FAIL  ${label} > expected ${e}, got ${a}`);
-    failures++;
-  }
-}
+import { expectEqual, finish } from "./lib/harness.js";
 
 /** Runs every fixture case and exits non-zero if any failed. */
 function main(): void {
   console.log("contact email merge fixtures\n");
 
-  expectList("nothing anywhere", mergeEmails([], [], null), []);
+  expectEqual("nothing anywhere", mergeEmails([], [], null), []);
 
-  expectList("primary only", mergeEmails(["a@x.co.nz"], [], "a@x.co.nz"), ["a@x.co.nz"]);
+  expectEqual("primary only", mergeEmails(["a@x.co.nz"], [], "a@x.co.nz"), ["a@x.co.nz"]);
 
   // Google holds both addresses, the site imported only one.
-  expectList(
+  expectEqual(
     "google's extra address is kept",
     mergeEmails(
       ["pat.lee@example.com"],
@@ -48,13 +29,13 @@ function main(): void {
 
   // The push direction: an address the site knows must not be dropped from
   // Google just because Google has not seen it yet.
-  expectList(
+  expectEqual(
     "site-only address survives",
     mergeEmails(["a@x.co.nz", "b@x.co.nz"], ["a@x.co.nz"], "a@x.co.nz"),
     ["a@x.co.nz", "b@x.co.nz"],
   );
 
-  expectList(
+  expectEqual(
     "primary leads even when Google lists it second",
     mergeEmails(["b@x.co.nz"], ["a@x.co.nz", "b@x.co.nz"], "b@x.co.nz"),
     ["b@x.co.nz", "a@x.co.nz"],
@@ -62,26 +43,26 @@ function main(): void {
 
   // Stored lowercased, and a case-only difference is the same address - the
   // sync already compares emails lowercased for exactly this reason.
-  expectList(
+  expectEqual(
     "case-only duplicates collapse",
     mergeEmails(["A@X.co.nz"], ["a@x.CO.NZ"], "A@X.co.nz"),
     ["a@x.co.nz"],
   );
 
-  expectList(
+  expectEqual(
     "blanks and nulls are dropped",
     mergeEmails([null, "  ", "a@x.co.nz"], ["", "b@x.co.nz"], "a@x.co.nz"),
     ["a@x.co.nz", "b@x.co.nz"],
   );
 
   // No primary yet (a contact with alts but no primary email set).
-  expectList("no primary keeps Google's order", mergeEmails([], ["a@x.co.nz", "b@x.co.nz"], null), [
-    "a@x.co.nz",
-    "b@x.co.nz",
-  ]);
+  expectEqual(
+    "no primary keeps Google's order",
+    mergeEmails([], ["a@x.co.nz", "b@x.co.nz"], null),
+    ["a@x.co.nz", "b@x.co.nz"],
+  );
 
-  console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
-  process.exit(failures === 0 ? 0 : 1);
+  finish();
 }
 
 main();

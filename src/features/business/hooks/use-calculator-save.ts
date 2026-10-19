@@ -29,6 +29,7 @@ import type {
   TaskLine,
   TaskTemplate,
 } from "@/features/business/types/business";
+import { roundCents } from "@/shared/lib/money";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
@@ -396,6 +397,7 @@ export function useCalculatorSave({
           bookingId: eventPrefill?.bookingId ?? null,
           calendarEventId: eventPrefill?.calendarEventId ?? null,
           calendarEventIds: eventPrefill?.slots.map((slot) => slot.calendarEventId) ?? [],
+          jobDate,
           // Quote mode: server allocates a Q- number + 30-day validity.
           isQuote: quote || undefined,
           // Part payment: the invoice asks for the balance and the server records this
@@ -528,7 +530,7 @@ export function useCalculatorSave({
     const rows: { key: string; method: string; amount: number }[] = split
       ? [
           { key: "part", method: alreadyPaid.method, amount: prepaid },
-          { key: "rest", method: bank, amount: Math.round((totals.total - prepaid) * 100) / 100 },
+          { key: "rest", method: bank, amount: roundCents(totals.total - prepaid) },
         ]
       : [
           {

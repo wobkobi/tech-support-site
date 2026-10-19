@@ -4,6 +4,7 @@
 // fitted to, so a misread here changes what an invoice charges for labour.
 // Run with: npm test -- time-parse
 
+import type { JobPromo } from "@/features/business/lib/business";
 import { restatesTaskLine } from "@/features/business/lib/business-format";
 import {
   buildParseInput,
@@ -16,26 +17,7 @@ import {
   statesTimeRange,
 } from "@/features/business/lib/time-parse";
 import type { ParseJobResponse } from "@/features/business/types/business";
-
-let failures = 0;
-
-/**
- * Compares a value against its expectation, recording rather than throwing so
- * every fixture runs even after one fails.
- * @param label - Human-readable case name.
- * @param actual - What the call produced.
- * @param expected - What it should have produced.
- */
-function expectEqual(label: string, actual: unknown, expected: unknown): void {
-  const a = JSON.stringify(actual);
-  const e = JSON.stringify(expected);
-  if (a === e) {
-    console.log(`  PASS  ${label} > ${a}`);
-  } else {
-    console.error(`  FAIL  ${label} > expected ${e}, got ${a}`);
-    failures++;
-  }
-}
+import { expectEqual, finish } from "./lib/harness.js";
 
 /**
  * Reads a description's ranges as "HH:MM-HH:MM (minutes)" strings for compact fixtures.
@@ -110,13 +92,18 @@ function parsedHour(unsuccessful: boolean): ParseJobResponse["tasks"][number] {
 
 /**
  * Re-parses a two-hour unbooked job into two pinned $80/hr hours, the second not fixed,
- * and reads back the unsuccessful-work discount.
+ * and reads back both discounts.
  * @param factor - Share of an unsuccessful line still charged.
- * @param promoDiscount - The promo discount the invoice keeps.
- * @returns The discount for the new lines.
+ * @param promo - The invoice's promo terms, or null.
+ * @param uplift - Weekend or holiday labour uplift for the job date.
+ * @returns The promo and unsuccessful-work discounts for the new lines.
  */
-function unsuccessfulCut(factor: number, promoDiscount: number): number {
-  return parsedJobToLineItems(
+function repriced(
+  factor: number,
+  promo: JobPromo | null,
+  uplift = 0,
+): { promoDiscount: number; unsuccessfulDiscount: number } {
+  const { promoDiscount, unsuccessfulDiscount } = parsedJobToLineItems(
     reply({ durationMins: 120, tasks: [parsedHour(false), parsedHour(true)] }),
     [],
     "18:00",
@@ -124,12 +111,23 @@ function unsuccessfulCut(factor: number, promoDiscount: number): number {
       minBillableMins: 60,
       travelRatePerHour: 60,
       minTravelCharge: 10,
-      surcharge: null,
+      surcharge: uplift > 0 ? { label: "Weekend surcharge", uplift } : null,
       unsuccessfulFactor: factor,
+      standardRate: 80,
     },
     { line: null, destination: null },
-    promoDiscount,
-  ).unsuccessfulDiscount;
+    promo,
+  );
+  return { promoDiscount, unsuccessfulDiscount };
+}
+
+/**
+ * Promo terms for the fixtures.
+ * @param terms - The discount fields that differ from none.
+ * @returns A promo with only those terms set.
+ */
+function terms(terms: Partial<JobPromo>): JobPromo {
+  return { flatHourlyRate: null, percentDiscount: null, ...terms };
 }
 
 /** Runs every fixture and exits non-zero on any failure. */
@@ -365,10 +363,29 @@ function main(): void {
     5,
   );
 
-  console.log("\nUnsuccessful-work discount on a re-parsed invoice");
-  expectEqual("half price on the unfixed hour", unsuccessfulCut(0.5, 0), 40);
-  expectEqual("follows the live factor", unsuccessfulCut(0.75, 0), 20);
-  expectEqual("cut after the hour's share of a $32 promo", unsuccessfulCut(0.5, 32), 32);
+  console.log("\nDiscounts on a re-parsed invoice");
+  expectEqual("half price on the unfixed hour", repriced(0.5, null).unsuccessfulDiscount, 40);
+  expectEqual("follows the live factor", repriced(0.75, null).unsuccessfulDiscount, 20);
+  expectEqual(
+    "a kept $32 spreads over the labour, then the unfixed hour is halved",
+    repriced(0.5, terms({ discountType: "fixed_amount", fixedAmount: 32 })),
+    { promoDiscount: 32, unsuccessfulDiscount: 32 },
+  );
+  expectEqual(
+    "a $65 flat rate re-prices per hour, then the unfixed hour is halved",
+    repriced(0.5, terms({ discountType: "flat_hourly", flatHourlyRate: 65 })),
+    { promoDiscount: 30, unsuccessfulDiscount: 32.5 },
+  );
+  expectEqual(
+    "free travel takes no share of the labour",
+    repriced(0.5, terms({ discountType: "free_travel", travelPercent: 0 })).unsuccessfulDiscount,
+    40,
+  );
+  expectEqual(
+    "a +25% day's surcharge on the unfixed hour is halved too",
+    repriced(0.5, null, 0.25).unsuccessfulDiscount,
+    50,
+  );
 
   console.log("\nDetails that only repeat the line");
   expectEqual(
@@ -408,8 +425,7 @@ function main(): void {
     true,
   );
 
-  console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
-  process.exit(failures === 0 ? 0 : 1);
+  finish();
 }
 
 main();

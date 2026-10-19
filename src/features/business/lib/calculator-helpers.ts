@@ -5,7 +5,9 @@
 
 import { effectiveHourlyRate, isChannelModifier, todayISO } from "@/features/business/lib/business";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
+import { isHourlyTask } from "@/features/business/lib/task-timing";
 import type { RateConfig, TaskLine, TravelEntry } from "@/features/business/types/business";
+import { roundCents } from "@/shared/lib/money";
 import { addDaysToDateKey, nextNzWallClockOnWeekday, timeParts } from "@/shared/lib/timezone-utils";
 
 /**
@@ -97,7 +99,7 @@ export function updateTaskField(
   // incoming qty is already whole minutes: snap it, and carry qty unrounded.
   if (field === "qty") {
     const mins = Math.round(Number(val) * 60);
-    if (item.baseRateId != null) {
+    if (isHourlyTask(item)) {
       item.minutes = mins;
       item.qty = mins / 60;
       // A typed time is the operator's own measurement, no longer the parser's
@@ -115,11 +117,13 @@ export function updateTaskField(
     if (rate) {
       item.description = rate.label;
       item.unitPrice = rate.flatRate ?? rate.ratePerHour ?? 0;
-      item.lineTotal = Math.round(item.qty * item.unitPrice * 100) / 100;
+      item.lineTotal = roundCents(item.qty * item.unitPrice);
     }
   }
+  // A typed $/hr is deliberate, so a draft restore must not re-price it from the rate.
+  if (field === "unitPrice") item.priceOverridden = true;
   if (field === "qty" || field === "unitPrice") {
-    item.lineTotal = Math.round(Number(item.qty) * Number(item.unitPrice) * 100) / 100;
+    item.lineTotal = roundCents(Number(item.qty) * Number(item.unitPrice));
   }
   t[idx] = item;
   return t;
@@ -161,7 +165,8 @@ export function toggleTaskModifierLine(
     ...target,
     modifierIds: next,
     unitPrice: newPrice,
-    lineTotal: Math.round(target.qty * newPrice * 100) / 100,
+    lineTotal: roundCents(target.qty * newPrice),
+    priceOverridden: false,
   };
   return arr;
 }
@@ -188,7 +193,8 @@ export function setTaskBaseLine(
     ...target,
     baseRateId: baseId,
     unitPrice: newPrice,
-    lineTotal: Math.round(target.qty * newPrice * 100) / 100,
+    lineTotal: roundCents(target.qty * newPrice),
+    priceOverridden: false,
   };
   return arr;
 }
@@ -197,16 +203,17 @@ export function setTaskBaseLine(
  * Re-prices every hourly line from the live rates for its base and modifiers.
  * A restored draft keeps the prices it was saved with, so a rate change since
  * would otherwise bill the old rate, and a flat promo would then cut the full
- * (Standard - flat) from it.
+ * (Standard - flat) from it. A $/hr the operator typed is left alone.
  * @param tasks - Task lines, e.g. from a saved draft.
  * @param rates - Live rate configs.
  * @returns The lines with hourly prices brought up to date; flat and untagged lines unchanged.
  */
 export function repriceHourlyTasks(tasks: TaskLine[], rates: RateConfig[]): TaskLine[] {
   return tasks.map((t) => {
+    if (t.priceOverridden) return t;
     const live = effectiveHourlyRate(rates, t.baseRateId, t.modifierIds);
     if (live <= 0 || live === t.unitPrice) return t;
-    return { ...t, unitPrice: live, lineTotal: Math.round(t.qty * live * 100) / 100 };
+    return { ...t, unitPrice: live, lineTotal: roundCents(t.qty * live) };
   });
 }
 

@@ -14,6 +14,7 @@ import {
   type ActivePromo,
 } from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";
+import { roundCents } from "@/shared/lib/money";
 import type React from "react";
 
 /** The live rates a promo preview prices against. Plain data for the server > client boundary. */
@@ -109,17 +110,13 @@ export function PromoPricePreview({
       label: "Travel",
       now: rates.travelRatePerHour,
       suffix: "/hr",
-      after: promos.map(
-        (p) => Math.round(rates.travelRatePerHour * promoTravelFactor(p) * 100) / 100,
-      ),
+      after: promos.map((p) => roundCents(rates.travelRatePerHour * promoTravelFactor(p))),
     },
     {
       label: "Minimum travel",
       now: rates.minTravelCharge,
       suffix: "",
-      after: promos.map(
-        (p) => Math.round(rates.minTravelCharge * promoTravelFactor(p) * 100) / 100,
-      ),
+      after: promos.map((p) => roundCents(rates.minTravelCharge * promoTravelFactor(p))),
     },
   ];
 

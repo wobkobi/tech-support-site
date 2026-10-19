@@ -30,8 +30,8 @@ interface EditInvoiceViewProps {
   /** Initial form values (dates already ISO YYYY-MM-DD). */
   initial: InvoiceFormData;
   /**
-   * Discounts from creation, shown in totals and the preview. The promo is kept as is; the
-   * unsuccessful-work discount changes only when the AI box rebuilds the lines.
+   * Discounts from creation, shown in totals and the preview. Both change only when the
+   * AI box rebuilds the lines and re-prices them.
    */
   preservedDiscounts: PreservedDiscounts;
   /** Live business identity for the preview. */
@@ -73,9 +73,17 @@ export function EditInvoiceView({
   // Mirror of the form data so the preview updates as the operator types.
   const [preview, setPreview] = useState<InvoiceFormData>(initial);
   const [discounts, setDiscounts] = useState<PreservedDiscounts>(preservedDiscounts);
-  // Only sent when the AI box re-priced it, so a hand edit never rewrites the stored one.
+  // The lines the discounts were last worked out on: the saved ones, then each AI rebuild.
+  const [pricedLines, setPricedLines] = useState(initial.lineItems);
+  // Only sent when the AI box re-priced them, so a hand edit never rewrites the stored ones.
   const unsuccessfulChanged =
     (discounts.unsuccessfulDiscount ?? 0) !== (preservedDiscounts.unsuccessfulDiscount ?? 0);
+  const promoChanged = (discounts.promoDiscount ?? 0) !== (preservedDiscounts.promoDiscount ?? 0);
+  // Saved lines carry no rate tags, so a hand edit cannot re-price the discounts. Say so
+  // rather than let a promo worked out on 2 hours quietly ride on 4.
+  const discountsStale =
+    ((discounts.promoDiscount ?? 0) > 0 || (discounts.unsuccessfulDiscount ?? 0) > 0) &&
+    JSON.stringify(preview.lineItems) !== JSON.stringify(pricedLines);
 
   /**
    * PATCHes the full-update branch, then routes back to the detail page.
@@ -98,6 +106,7 @@ export function EditInvoiceView({
           alreadyPaid: alreadyPaidAmount(data.alreadyPaid) || null,
           alreadyPaidMethod: data.alreadyPaid.method,
           ...(unsuccessfulChanged && { unsuccessfulDiscount: discounts.unsuccessfulDiscount ?? 0 }),
+          ...(promoChanged && { promoDiscount: discounts.promoDiscount ?? 0 }),
         }),
       });
       const d = await res.json();
@@ -127,6 +136,11 @@ export function EditInvoiceView({
         <InvoiceForm
           initial={initial}
           preservedDiscounts={discounts}
+          discountNote={
+            discountsStale
+              ? "The discounts were worked out on the lines before your edits. Describe the job above to re-price them."
+              : null
+          }
           gstRegistered={gstRegistered}
           paymentTermsDays={paymentTermsDays}
           submitLabel="Save changes"
@@ -140,8 +154,9 @@ export function EditInvoiceView({
               disabled={busy}
               // Parsed notes only fill an empty field, so a hand-written note survives. A
               // stated cash amount ("paid $47 in cash") fills Already paid.
-              onApply={(lineItems, notes, cashPaid, unsuccessfulDiscount) => {
-                setDiscounts((d) => ({ ...d, unsuccessfulDiscount }));
+              onApply={(lineItems, notes, cashPaid, repriced) => {
+                setDiscounts((d) => ({ ...d, ...repriced }));
+                setPricedLines(lineItems);
                 apply({
                   lineItems,
                   ...(notes && !form.notes.trim() && { notes }),
@@ -163,7 +178,7 @@ export function EditInvoiceView({
           lineItems={preview.lineItems}
           notes={preview.notes}
           promoTitle={preservedDiscounts.promoTitle ?? null}
-          promoDiscount={preservedDiscounts.promoDiscount ?? 0}
+          promoDiscount={discounts.promoDiscount ?? 0}
           unsuccessfulDiscount={discounts.unsuccessfulDiscount ?? 0}
           gstRegistered={gstRegistered}
           alreadyPaid={alreadyPaidAmount(preview.alreadyPaid)}

@@ -14,6 +14,7 @@ import {
 } from "@/features/social-design/lib/brand";
 import { FORMATS, isFormatKey, type FormatKey } from "@/features/social-design/lib/formats";
 import { isIconName } from "@/features/social-design/lib/icons";
+import { isBlobImageUrl } from "@/shared/lib/blob-image";
 
 export const DOC_VERSION = 1;
 
@@ -30,9 +31,6 @@ const MAX_ITEM = 200;
 const MAX_ID = 40;
 // Twice the largest format side, so a layer can hang off any edge.
 const MAX_COORD = 6_000;
-// Pictures carry their own photos only from this site's Blob store: public, stable,
-// and served with CORS so the canvas can export them.
-const IMAGE_HOST_SUFFIX = ".public.blob.vercel-storage.com";
 
 /** Where a layer sits on one size. x and y are the top-left corner before rotation. */
 export interface Geometry {
@@ -334,22 +332,8 @@ function colourOrNull(v: unknown, path: string): ColourKey | null {
  */
 function blobUrl(v: unknown, path: string): string {
   const url = str(v, path, MAX_URL);
-  if (!isAllowedImageUrl(url)) throw new DocError(`${path} must be an uploaded picture.`);
+  if (!isBlobImageUrl(url)) throw new DocError(`${path} must be an uploaded picture.`);
   return url;
-}
-
-/**
- * Whether an image URL points at the site's own public Blob store over https.
- * @param url - Image URL.
- * @returns True when the canvas may load and export it.
- */
-export function isAllowedImageUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "https:" && parsed.hostname.endsWith(IMAGE_HOST_SUFFIX);
-  } catch {
-    return false;
-  }
 }
 
 /**

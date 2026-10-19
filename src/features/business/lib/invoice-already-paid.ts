@@ -13,6 +13,7 @@ import {
   updateRowBySyncId,
 } from "@/features/business/lib/sheets-sync";
 import { parseAmount } from "@/features/business/lib/validation";
+import { roundCents } from "@/shared/lib/money";
 import { prisma } from "@/shared/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
@@ -31,7 +32,7 @@ export function parseAlreadyPaid(amount: unknown, method: unknown): AlreadyPaidI
   if (amount == null || amount === "") return { ok: true, amount: null, method: null };
   const parsed = parseAmount(amount);
   if (parsed === null) return { ok: false, error: "Invalid already-paid amount" };
-  const cents = Math.round(parsed * 100) / 100;
+  const cents = roundCents(parsed);
   if (cents === 0) return { ok: true, amount: null, method: null };
   if (typeof method !== "string" || !(INCOME_METHODS as readonly string[]).includes(method)) {
     return { ok: false, error: "Choose how the already-paid money came in" };

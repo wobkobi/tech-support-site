@@ -39,27 +39,11 @@ import {
 } from "@/features/mailing/lib/unsubscribe-token";
 import { nextSendTime, type QuietHours } from "@/shared/lib/quiet-hours";
 import { nzWallClockUtc } from "@/shared/lib/timezone-utils";
+import { expect, finish } from "./lib/harness.js";
 
 // The token helpers read the secret on each call, so setting it here still takes
 // effect despite import hoisting.
 process.env.UNSUBSCRIBE_SECRET = "check-mailing-fixture-secret";
-
-let failures = 0;
-
-/**
- * Records one assertion, so every case runs even after one fails.
- * @param label - Human-readable case name.
- * @param ok - Whether the case passed.
- * @param detail - Extra output shown on failure.
- */
-function expect(label: string, ok: boolean, detail = ""): void {
-  if (ok) {
-    console.log(`  PASS  ${label}`);
-  } else {
-    console.error(`  FAIL  ${label}${detail ? `\n        ${detail}` : ""}`);
-    failures++;
-  }
-}
 
 const BLOB_IMAGE = "https://abc123.public.blob.vercel-storage.com/mailing/image-x1.jpg";
 const VALUES = {
@@ -1210,8 +1194,7 @@ function main(): void {
   checkTemplates();
   checkInsertables();
   checkQuietHours();
-  console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
-  process.exit(failures === 0 ? 0 : 1);
+  finish();
 }
 
 main();

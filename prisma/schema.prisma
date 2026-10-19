@@ -180,6 +180,10 @@ model Booking {
   promoTitleAtBooking           String?
   promoFlatHourlyRateAtBooking  Float?
   promoPercentDiscountAtBooking Float?
+  // The promo's whole terms (ActivePromo shape, tiers and weekday window
+  // included) as they stood at booking, so an admin editing the promo later
+  // does not reprice bookings already made under it.
+  promoTermsAtBooking           Json?
   baseRateAtBooking             Float?
   complexRateAtBooking          Float?
   travelRatePerHourAtBooking    Float?
@@ -492,6 +496,9 @@ model Invoice {
   clientEmail          String
   issueDate            DateTime
   dueDate              DateTime
+  // NZ date the work was done (YYYY-MM-DD), from the calculator. Editing a draft
+  // judges the weekend or holiday surcharge on it rather than on the issue date.
+  jobDate              String?
   lineItems            LineItem[]
   gst                  Boolean           @default(false)
   subtotal             Float

@@ -54,7 +54,8 @@ export function ScheduleAutoRefresh({
 
   /** Fetches the current fingerprint and refreshes only if it moved. */
   const check = useCallback(async (): Promise<void> => {
-    const query = `from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`;
+    // The seen token lets the endpoint bust the schedule cache only on a real change.
+    const query = new URLSearchParams({ from: fromIso, to: toIso, token: seenToken.current });
     try {
       const res = await fetch(`/api/admin/schedule/version?${query}`, { cache: "no-store" });
       if (!res.ok) return;

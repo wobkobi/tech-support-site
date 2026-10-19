@@ -70,6 +70,8 @@ interface InvoiceFormProps {
   initial: InvoiceFormData;
   /** Discounts carried from creation - displayed in totals, not editable here. */
   preservedDiscounts?: PreservedDiscounts;
+  /** Warning under the discount rows, e.g. when edits have outdated them. */
+  discountNote?: string | null;
   /** Live GST-registration flag (drives the "Includes GST" total line). */
   gstRegistered: boolean;
   /** Payment terms in days - changing the issue date re-derives the due date. */
@@ -115,6 +117,7 @@ function addDaysISO(iso: string, days: number): string {
  * @param props - Component props.
  * @param props.initial - Initial field values.
  * @param props.preservedDiscounts - Read-only discount snapshot for totals.
+ * @param props.discountNote - Warning shown under the discount rows.
  * @param props.gstRegistered - Live GST-registration flag.
  * @param props.paymentTermsDays - Net terms; re-derives due date on issue change.
  * @param props.submitLabel - Submit button label.
@@ -127,6 +130,7 @@ function addDaysISO(iso: string, days: number): string {
 export function InvoiceForm({
   initial,
   preservedDiscounts,
+  discountNote,
   gstRegistered,
   paymentTermsDays,
   submitLabel,
@@ -335,6 +339,7 @@ export function InvoiceForm({
             <span>-{formatNZD(unsuccessfulDiscount)}</span>
           </div>
         )}
+        {discountNote && <p className="text-sm text-amber-700">{discountNote}</p>}
         {totals.gstAmount > 0 && (
           <div className="flex justify-between gap-3">
             <span className="text-admin-muted">Includes GST</span>

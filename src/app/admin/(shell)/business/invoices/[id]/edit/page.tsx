@@ -13,9 +13,12 @@ import {
   EMPTY_ALREADY_PAID,
   toAlreadyPaidMethod,
 } from "@/features/business/lib/already-paid-input";
+import type { JobPromo } from "@/features/business/lib/business";
 import { buildEventPrefill } from "@/features/business/lib/event-prefill.server";
 import { dateSurcharge } from "@/features/business/lib/pricing-policy";
 import { getPolicy, lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
+import { lockedInPromo } from "@/features/business/lib/promos";
+import type { RateConfig } from "@/features/business/types/business";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
@@ -57,13 +60,54 @@ export default async function EditInvoicePage({
       : invoice.calendarEventId
         ? [invoice.calendarEventId]
         : [];
-  const [identity, policy, prefill] = await Promise.all([
+  const promoId = (invoice.promoDiscount ?? 0) > 0 ? invoice.promoId : null;
+  const [identity, policy, prefill, rateRows, booking] = await Promise.all([
     getIdentity(),
     getPolicy(),
     // A deleted or unreachable event just leaves the box without a booked window.
     eventIds.length > 0 ? buildEventPrefill(eventIds).catch(() => null) : Promise.resolve(null),
+    prisma.rateConfig.findMany().catch(() => []),
+    promoId && invoice.bookingId
+      ? prisma.booking
+          .findUnique({
+            where: { id: invoice.bookingId },
+            select: { promoTermsAtBooking: true },
+          })
+          .catch(() => null)
+      : Promise.resolve(null),
   ]);
-  const jobDate = prefill?.jobDate ?? nzDateKey(invoice.issueDate);
+  // Dates flattened to the ISO strings the client rate type expects.
+  const rates: RateConfig[] = rateRows.map((r) => ({
+    id: r.id,
+    label: r.label,
+    ratePerHour: r.ratePerHour,
+    flatRate: r.flatRate,
+    hourlyDelta: r.hourlyDelta,
+    percentDelta: r.percentDelta,
+    unit: r.unit,
+    isDefault: r.isDefault,
+    createdAt: r.createdAt.toISOString(),
+  }));
+  // The promo the invoice was raised with, re-applied when the AI box rebuilds the lines.
+  // The window is not judged again: the invoice carrying it means it already applied.
+  // One that can no longer be found (deleted, with no terms saved on a booking) comes
+  // off as the stored dollar figure, spread over the labour.
+  const promoTerms = promoId
+    ? await lockedInPromo(promoId, null, booking?.promoTermsAtBooking)
+    : null;
+  const promo: JobPromo | null =
+    promoTerms ??
+    ((invoice.promoDiscount ?? 0) > 0
+      ? {
+          discountType: "fixed_amount",
+          fixedAmount: invoice.promoDiscount,
+          flatHourlyRate: null,
+          percentDiscount: null,
+        }
+      : null);
+  // The issue date is only the last resort: a job invoiced the Monday after a
+  // Saturday visit would otherwise lose its weekend surcharge on edit.
+  const jobDate = prefill?.jobDate ?? invoice.jobDate ?? nzDateKey(invoice.issueDate);
   // UTC midnight is midday in NZ, so the key's own NZ date is the one looked up.
   const jobDay = new Date(`${jobDate}T00:00:00Z`);
   const holiday = await lookupPublicHoliday(jobDay).catch(() => null);
@@ -86,8 +130,17 @@ export default async function EditInvoicePage({
         weekendUplift: policy.WEEKEND_UPLIFT,
       }),
       unsuccessfulFactor: policy.UNSUCCESSFUL_WORK_FACTOR,
+      // Picked the same way the calculator picks them, so a rebuilt draft and a fresh
+      // calculator job price a promo identically.
+      businessModifierId:
+        rates.find((r) => r.label === "Business" && r.unit === "modifier")?.id ?? null,
+      standardRate:
+        rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
+        rates.find((r) => r.ratePerHour !== null && r.unit === "hour")?.ratePerHour ??
+        null,
+      rates,
     },
-    promoDiscount: invoice.promoDiscount ?? 0,
+    promo,
   };
 
   const initial: InvoiceFormData = {

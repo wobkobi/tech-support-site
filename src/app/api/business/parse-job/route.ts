@@ -28,6 +28,7 @@ import { aiRateLimitResponse } from "@/shared/lib/ai-rate-limit";
 import { isAiRateLimitError, jsonCompletion } from "@/shared/lib/ai/json-completion";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { roundCents } from "@/shared/lib/money";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NZ_TZ, nextNzWallClockOnWeekday, timeParts } from "@/shared/lib/timezone-utils";
@@ -229,7 +230,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // the 2026-07-24 eval showed mini obeying an injected negative-duration
     // correction (parse-injection-negative) that 4.1 correctly ignores. The SDK
     // defaults (10-minute timeout, 2 retries with retry-after sleeps) can outlive
-    // the 60s function ceiling and swallow a 429 the catch below hands back as
+    // the 300s function ceiling and swallow a 429 the catch below hands back as
     // retryable, so one attempt, leaving room for the travel lookups that follow.
     const { text, model, usage } = await jsonCompletion({
       feature: "parse-job",
@@ -287,7 +288,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     parsed.paidCash = parsed.paidCash === true;
     const cash = Number(parsed.cashPaid);
     parsed.cashPaid =
-      parsed.paidCash && Number.isFinite(cash) && cash > 0 ? Math.round(cash * 100) / 100 : null;
+      parsed.paidCash && Number.isFinite(cash) && cash > 0 ? roundCents(cash) : null;
     const storeRuns: string[] = [];
     for (const raw of Array.isArray(parsed.storeRuns) ? parsed.storeRuns : []) {
       const store = typeof raw === "string" ? raw.trim().slice(0, 80) : "";

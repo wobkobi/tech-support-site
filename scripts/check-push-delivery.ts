@@ -5,26 +5,7 @@
 // Run with: npm test -- push-delivery
 
 import { buildPushPayload, isGoneStatus } from "@/features/notifications/lib/push";
-
-let failures = 0;
-
-/**
- * Compares a value against its expectation, recording rather than throwing so
- * every fixture runs even after one fails.
- * @param label - Human-readable case name.
- * @param actual - Value produced by the code under test.
- * @param expected - Value the case should produce.
- */
-function expectEqual(label: string, actual: unknown, expected: unknown): void {
-  const a = JSON.stringify(actual);
-  const e = JSON.stringify(expected);
-  if (a === e) {
-    console.log(`  PASS  ${label} > ${a}`);
-  } else {
-    console.error(`  FAIL  ${label} > expected ${e}, got ${a}`);
-    failures++;
-  }
-}
+import { expectEqual, finish } from "./lib/harness.js";
 
 /** Runs every fixture case and exits non-zero if any failed. */
 function main(): void {
@@ -75,8 +56,7 @@ function main(): void {
     "/admin/reviews",
   );
 
-  console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
-  process.exit(failures === 0 ? 0 : 1);
+  finish();
 }
 
 main();

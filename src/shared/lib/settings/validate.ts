@@ -60,11 +60,12 @@ function nonNeg(n: unknown): n is number {
 export const MAX_TAX_BANDS = 10;
 
 /**
- * True for a plain `{}` object (not null, not an array).
+ * True for a plain `{}` object (not null, not an array). Also tells get-settings.ts's
+ * deep merge which branches it can merge into.
  * @param v - Candidate value.
  * @returns Whether `v` is a plain object.
  */
-function isPlainObject(v: unknown): boolean {
+export function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
@@ -293,6 +294,19 @@ function validatePricing(p: PricingSettings): FieldError[] {
     errors.push({
       field: "cancellation.fullCallOutFee",
       message: "Must be at least the cancellation fee, or cancelling later would cost less.",
+    });
+  // The travel-charge window sits inside the free-notice window: free beyond freeNotice,
+  // the flat fee between the two, the full call-out plus travel inside travelCharge.
+  // Wider than freeNotice, a cancel between the two is free while the copy promises the
+  // full call-out, and the flat-fee tier can never be reached.
+  if (
+    nonNeg(p.cancellation?.freeNoticeHours) &&
+    nonNeg(p.cancellation?.travelChargeHours) &&
+    (p.cancellation?.travelChargeHours ?? 0) > (p.cancellation?.freeNoticeHours ?? 0)
+  )
+    errors.push({
+      field: "cancellation.travelChargeHours",
+      message: "Must be no more than the free-notice hours, or that window can never apply.",
     });
   if (typeof p.cancellation?.autoSendCancellationInvoice !== "boolean")
     errors.push({

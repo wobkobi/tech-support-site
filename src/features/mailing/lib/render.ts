@@ -4,23 +4,17 @@
 // always match. Pure: everything it needs from the database arrives in the context.
 
 import type { CampaignAudience } from "@/features/mailing/lib/audience";
-import { parseBlocks } from "@/features/mailing/lib/blocks";
+import { type Block, parseBlocks } from "@/features/mailing/lib/blocks";
 import {
   BOX_LINE_RE,
   BUTTON_LINE_RE,
   BUTTON_PLACEHOLDER_RE,
   DIRECTIVE_RE,
-  DIVIDER_RE,
   IMAGE_LINE_RE,
   INLINE_LINK_RE,
   isDirective,
-  isListLine,
   LINKED_IMAGE_LINE_RE,
   PICTURE_PLACEHOLDER_RE,
-  QUOTE_LINE_RE,
-  QUOTE_NAME_RE,
-  QUOTE_STARS_RE,
-  readBox,
 } from "@/features/mailing/lib/body-syntax";
 import {
   escapeHtml,
@@ -28,6 +22,7 @@ import {
   linkifyEscaped,
   renderNotificationEmail,
 } from "@/features/reviews/lib/email-core";
+import { isBlobImageUrl } from "@/shared/lib/blob-image";
 import {
   FACEBOOK_PAGE_URL,
   GOOGLE_BUSINESS_PROFILE_URL,
@@ -115,13 +110,6 @@ const PLACEHOLDER_RE = /\{(\w+)\}/g;
  */
 const LINK_SHAPED_LINE_RE = /^\[?!?\[[^\]\n]*\]\([^)\n]*\)(?:\]\([^)\n]*\))?$/;
 
-/**
- * Hosts an image may come from. Only the site's own Blob store: an image the
- * operator hotlinks from elsewhere can vanish or change after the email is
- * sent, and a third-party host sees every open.
- */
-const IMAGE_HOST_SUFFIX = ".public.blob.vercel-storage.com";
-
 // Inline styles: email clients ignore stylesheets. 16px body text because most
 // recipients are older and read on a phone.
 const P_STYLE = "margin:0 0 14px;color:#333;font-size:16px;line-height:1.6";
@@ -175,20 +163,6 @@ const SPACER_HTML = '<div style="height:20px;line-height:20px;font-size:1px">&nb
 // Text links, not icons: many email apps block images by default, and words
 // read better for older recipients than small logos.
 const SOCIAL_HTML = `<p style="${P_STYLE};text-align:center">Find us on <a href="${GOOGLE_BUSINESS_PROFILE_URL}" style="${LINK_STYLE}">Google</a> · <a href="${FACEBOOK_PAGE_URL}" style="${LINK_STYLE}">Facebook</a> · <a href="${INSTAGRAM_URL}" style="${LINK_STYLE}">Instagram</a></p>`;
-
-/**
- * Whether an image URL points at the site's own Blob store.
- * @param url - Image URL from an `![alt](url)` line.
- * @returns True when the host is allowed.
- */
-export function isAllowedImageUrl(url: string): boolean {
-  try {
-    const { protocol, hostname } = new URL(url);
-    return protocol === "https:" && hostname.endsWith(IMAGE_HOST_SUFFIX);
-  } catch {
-    return false;
-  }
-}
 
 /**
  * First word of a stored name, or null when there is none.
@@ -263,7 +237,7 @@ function renderInline(escaped: string): string {
  * @returns The picture's HTML, or null.
  */
 function pictureHtml(alt: string, url: string, small: boolean, link: string | null): string | null {
-  if (!isAllowedImageUrl(url)) return null;
+  if (!isBlobImageUrl(url)) return null;
   const img = small
     ? `<img src="${escapeHtml(url)}" alt="${alt}" width="248" style="${SMALL_IMAGE_STYLE}" />`
     : `<img src="${escapeHtml(url)}" alt="${alt}" width="496" style="${IMAGE_STYLE}" />`;
@@ -272,30 +246,26 @@ function pictureHtml(alt: string, url: string, small: boolean, link: string | nu
 }
 
 /**
- * HTML for a big box from its `>> ` lines (escaped, placeholders still tokens), or
- * an empty string when it has no headline. A photo off the site's Blob store is
- * dropped for the plain colour, and a button still waiting for its link is left out;
- * {@link listProblems} names both.
- * @param lines - The box's line texts.
+ * HTML for a big box block (placeholders still tokens), or an empty string when it
+ * has no headline. A photo off the site's Blob store is dropped for the plain colour,
+ * and a button still waiting for its link is left out; {@link listProblems} names both.
+ * @param box - The box block.
  * @returns The box's HTML.
  */
-function boxHtml(lines: string[]): string {
-  const box = readBox(lines);
+function boxHtml(box: Extract<Block, { type: "box" }>): string {
   if (!box.headline) return "";
-  // Lines arrive escaped, so the photo URL is undone before the host check.
-  const photo = box.photo.replace(/&amp;/g, "&");
-  const background = photo && isAllowedImageUrl(photo) ? box.photo : "";
+  const background = box.photo && isBlobImageUrl(box.photo) ? escapeHtml(box.photo) : "";
   const cellAttrs = background
     ? `background="${background}" bgcolor="${BUTTON_BG}" style="${BOX_CELL_STYLE};background-image:url('${background}')"`
     : `bgcolor="${BUTTON_BG}" style="${BOX_CELL_STYLE}"`;
-  const smaller = box.lines
-    .map((l) => `<p style="${BOX_LINE_STYLE}">${renderInline(l)}</p>`)
+  const smaller = (box.line ? box.line.split("\n") : [])
+    .map((l) => `<p style="${BOX_LINE_STYLE}">${renderInline(escapeHtml(l))}</p>`)
     .join("");
   const button =
     box.label && /^https?:\/\//i.test(box.url)
-      ? `${BOX_BUTTON_TABLE}<a href="${box.url}" style="${BOX_BUTTON_STYLE}">${box.label}</a></td></tr></table>`
+      ? `${BOX_BUTTON_TABLE}<a href="${escapeHtml(box.url)}" style="${BOX_BUTTON_STYLE}">${escapeHtml(box.label)}</a></td></tr></table>`
       : "";
-  return `${BOX_TABLE}<tr><td ${cellAttrs}><h2 style="${BOX_HEADLINE_STYLE}">${renderInline(box.headline)}</h2>${smaller}${button}</td></tr></table>`;
+  return `${BOX_TABLE}<tr><td ${cellAttrs}><h2 style="${BOX_HEADLINE_STYLE}">${renderInline(escapeHtml(box.headline))}</h2>${smaller}${button}</td></tr></table>`;
 }
 
 /**
@@ -349,148 +319,81 @@ export function renderBody(
     );
   }
 
-  const blocks: string[] = [];
-  let paragraph: string[] = [];
-  let list: string[] = [];
-  let quote: string[] = [];
-  let box: string[] = [];
+  // The editor's parser groups the lines, so the editor and the email can never
+  // disagree about where one block ends and the next begins.
+  const html = parseBlocks(tokenised)
+    .map((block) => blockHtml(block, promo, fill))
+    .filter(Boolean);
+  return fill(html.join("\n"));
+}
 
-  /** Closes the paragraph being collected. */
-  function flushParagraph(): void {
-    if (paragraph.length === 0) return;
-    blocks.push(`<p style="${P_STYLE}">${paragraph.map(renderInline).join("<br>")}</p>`);
-    paragraph = [];
+/**
+ * HTML for one parsed block, or an empty string when it renders nothing: a button or
+ * picture still waiting for its link, a picture or box photo off the site's Blob
+ * store, a box with no headline, a quote that comes out blank for this recipient, and
+ * an unknown `::word` (which the editor keeps as a Text block so it isn't lost).
+ * @param block - The block, with placeholders still as sentinel tokens.
+ * @param promo - Promo wording for the promo card, or null when none applies.
+ * @param fill - Swaps sentinel tokens for their values, to test whether a quote is blank.
+ * @returns The block's HTML.
+ */
+function blockHtml(
+  block: Block,
+  promo: PromoWording | null,
+  fill: (text: string) => string,
+): string {
+  switch (block.type) {
+    case "text": {
+      // parseBlocks only makes a lone `::word` line from a directive it doesn't know.
+      const unknownDirective = block.text.match(DIRECTIVE_RE);
+      if (unknownDirective) return directiveHtml(unknownDirective[1]!, promo);
+      const lines = block.text.split("\n").map((l) => renderInline(escapeHtml(l)));
+      return `<p style="${P_STYLE}">${lines.join("<br>")}</p>`;
+    }
+    case "list": {
+      const items = block.items.map((item) => `<li>${renderInline(escapeHtml(item))}</li>`);
+      return `<ul style="${UL_STYLE}">${items.join("")}</ul>`;
+    }
+    case "heading": {
+      const text = renderInline(escapeHtml(block.text));
+      return block.size === "big"
+        ? `<h2 style="${H1_STYLE}">${text}</h2>`
+        : `<h3 style="${H2_STYLE}">${text}</h3>`;
+    }
+    case "button":
+      if (!block.url) return "";
+      return `${BUTTON_TABLE}<a href="${escapeHtml(block.url)}" style="${BUTTON_STYLE}">${escapeHtml(block.label)}</a></td></tr></table>`;
+    case "picture":
+      if (!block.url) return "";
+      return pictureHtml(escapeHtml(block.alt), block.url, block.small, block.link || null) ?? "";
+    case "box":
+      return boxHtml(block);
+    case "quote": {
+      // A quote whose text comes out blank for this recipient (an empty
+      // {reviewText}) is left out entirely rather than sent as an empty box.
+      const text = block.text
+        .split("\n")
+        .map((l) => renderInline(escapeHtml(l)))
+        .join("<br>");
+      if (!fill(text).trim()) return "";
+      const stars = "★".repeat(block.stars);
+      const starsHtml = stars
+        ? `<p style="${STARS_STYLE}" role="img" aria-label="${block.stars} out of 5 stars">${stars}</p>`
+        : "";
+      const nameHtml = block.name
+        ? `<p style="${QUOTE_NAME_STYLE}">- ${renderInline(escapeHtml(block.name))}</p>`
+        : "";
+      return `${BOX_TABLE}<tr><td style="${QUOTE_CELL_STYLE}">${starsHtml}<p style="${QUOTE_TEXT_STYLE}">${text}</p>${nameHtml}</td></tr></table>`;
+    }
+    case "divider":
+      return DIVIDER_HTML;
+    case "promo":
+      return directiveHtml("promo", promo);
+    case "spacer":
+      return directiveHtml("space", promo);
+    case "social":
+      return directiveHtml("social", promo);
   }
-  /** Closes the big box being collected. */
-  function flushBox(): void {
-    if (box.length === 0) return;
-    const html = boxHtml(box.filter(Boolean));
-    box = [];
-    if (html) blocks.push(html);
-  }
-  /** Closes the bullet list being collected. */
-  function flushList(): void {
-    if (list.length === 0) return;
-    blocks.push(
-      `<ul style="${UL_STYLE}">${list.map((item) => `<li>${renderInline(item)}</li>`).join("")}</ul>`,
-    );
-    list = [];
-  }
-  /**
-   * Closes the review quote being collected. A first line of only stars is the
-   * rating and a last `- Name` line is who said it. A quote whose text comes
-   * out blank for this recipient (an empty {reviewText}) is left out entirely
-   * rather than sent as an empty box.
-   */
-  function flushQuote(): void {
-    if (quote.length === 0) return;
-    const lines = quote.filter(Boolean);
-    quote = [];
-    const stars = lines[0]?.match(QUOTE_STARS_RE)?.[1] ?? "";
-    if (stars) lines.shift();
-    const name = lines.length > 1 ? (lines.at(-1)?.match(QUOTE_NAME_RE)?.[1] ?? "") : "";
-    if (name) lines.pop();
-    const text = lines.map((l) => renderInline(escapeHtml(l))).join("<br>");
-    if (!fill(text).trim()) return;
-    const starsHtml = stars
-      ? `<p style="${STARS_STYLE}" role="img" aria-label="${stars.length} out of 5 stars">${stars}</p>`
-      : "";
-    const nameHtml = name
-      ? `<p style="${QUOTE_NAME_STYLE}">- ${renderInline(escapeHtml(name))}</p>`
-      : "";
-    blocks.push(
-      `${BOX_TABLE}<tr><td style="${QUOTE_CELL_STYLE}">${starsHtml}<p style="${QUOTE_TEXT_STYLE}">${text}</p>${nameHtml}</td></tr></table>`,
-    );
-  }
-
-  for (const rawLine of tokenised.replace(/\r\n?/g, "\n").split("\n")) {
-    const line = rawLine.trim();
-    if (!line) {
-      flushParagraph();
-      flushList();
-      flushQuote();
-      flushBox();
-      continue;
-    }
-    const boxed = line.match(BOX_LINE_RE);
-    if (boxed) {
-      flushParagraph();
-      flushList();
-      flushQuote();
-      box.push(escapeHtml(boxed[1]!.trim()));
-      continue;
-    }
-    flushBox();
-    const quoted = line.match(QUOTE_LINE_RE);
-    if (quoted) {
-      flushParagraph();
-      flushList();
-      quote.push(quoted[1]!.trim());
-      continue;
-    }
-    flushQuote();
-    if (isListLine(line)) {
-      flushParagraph();
-      list.push(escapeHtml(line.slice(2).trim()));
-      continue;
-    }
-    flushList();
-
-    if (DIVIDER_RE.test(line)) {
-      flushParagraph();
-      blocks.push(DIVIDER_HTML);
-      continue;
-    }
-    const directive = line.match(DIRECTIVE_RE);
-    if (directive) {
-      flushParagraph();
-      const html = directiveHtml(directive[1]!, promo);
-      if (html) blocks.push(html);
-      continue;
-    }
-    if (PICTURE_PLACEHOLDER_RE.test(line) || BUTTON_PLACEHOLDER_RE.test(line)) {
-      flushParagraph();
-      continue;
-    }
-    const linked = line.match(LINKED_IMAGE_LINE_RE);
-    const image = linked ?? line.match(IMAGE_LINE_RE);
-    if (image) {
-      flushParagraph();
-      const html = pictureHtml(
-        escapeHtml(image[1]!),
-        image[2]!,
-        Boolean(image[3]),
-        linked ? linked[4]! : null,
-      );
-      if (html) blocks.push(html);
-      continue;
-    }
-    const button = line.match(BUTTON_LINE_RE);
-    if (button) {
-      flushParagraph();
-      blocks.push(
-        `${BUTTON_TABLE}<a href="${escapeHtml(button[2]!)}" style="${BUTTON_STYLE}">${escapeHtml(button[1]!)}</a></td></tr></table>`,
-      );
-      continue;
-    }
-    if (line.startsWith("## ")) {
-      flushParagraph();
-      blocks.push(`<h3 style="${H2_STYLE}">${renderInline(escapeHtml(line.slice(3).trim()))}</h3>`);
-      continue;
-    }
-    if (line.startsWith("# ")) {
-      flushParagraph();
-      blocks.push(`<h2 style="${H1_STYLE}">${renderInline(escapeHtml(line.slice(2).trim()))}</h2>`);
-      continue;
-    }
-    paragraph.push(escapeHtml(line));
-  }
-  flushParagraph();
-  flushList();
-  flushQuote();
-  flushBox();
-
-  return fill(blocks.join("\n"));
 }
 
 /**
@@ -583,7 +486,7 @@ export function listProblems(
     if (boxed && PICTURE_PLACEHOLDER_RE.test(line)) continue;
     const boxPhoto = boxed ? line.match(IMAGE_LINE_RE) : null;
     if (boxPhoto) {
-      if (!isAllowedImageUrl(boxPhoto[2]!)) {
+      if (!isBlobImageUrl(boxPhoto[2]!)) {
         lineProblems.add(
           "The big box's photo wasn't added with its photo buttons, so the box shows plain colour. Pick the photo again.",
         );
@@ -618,7 +521,7 @@ export function listProblems(
     const linked = line.match(LINKED_IMAGE_LINE_RE);
     const image = linked ?? line.match(IMAGE_LINE_RE);
     const button = image ? null : line.match(BUTTON_LINE_RE);
-    if (image && !isAllowedImageUrl(image[2]!)) {
+    if (image && !isBlobImageUrl(image[2]!)) {
       lineProblems.add(
         "An image wasn't added with the Picture button, so it's left out. Add it with the Picture button instead.",
       );

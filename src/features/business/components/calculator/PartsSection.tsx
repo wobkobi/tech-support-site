@@ -13,7 +13,7 @@ import {
 } from "@/features/business/components/calculator/calculator-classes";
 import type { PartLine } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
-import { parseMoney } from "@/shared/lib/parse-money";
+import { parseMoney } from "@/shared/lib/money";
 import type React from "react";
 
 interface Props {

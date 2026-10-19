@@ -25,6 +25,7 @@ import {
   hasActivePromoCode,
   promoDisplayRate,
   promoForRateCard,
+  promoLastDay,
   promoModifierRate,
   promoRateBeforeAfter,
   promoTravelBeforeAfter,
@@ -43,6 +44,7 @@ import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section"
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { renderEmphasised } from "@/shared/components/renderEmphasised";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { roundCents } from "@/shared/lib/money";
 import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
@@ -50,9 +52,10 @@ import Link from "next/link";
 import type React from "react";
 
 // ISR with tag-based purge: admin rate / promo edits bust the rate-config /
-// active-promo tags, which invalidates this page immediately; the 5-minute
-// window only limits how long a purely time-expired promo can linger.
-export const revalidate = 300;
+// active-promo tags, which invalidates this page immediately, and the publish cron
+// busts active-promo within ~5 minutes of a promo starting or ending. The daily
+// timer is only a fallback.
+export const revalidate = 86400;
 
 /**
  * Builds page metadata; reflects the active promo and live base/complex rates.
@@ -120,8 +123,8 @@ export default async function PricingPage(): Promise<React.ReactElement> {
   // down by the standard rates.
   const displayRate = promoDisplayRate(baseRate, pricedPromo);
   const travelFactor = promoTravelFactor(pricedPromo);
-  const displayTravelRate = Math.round(pricing.travelRatePerHour * travelFactor * 100) / 100;
-  const displayMinTravel = Math.round(policy.MIN_TRAVEL_CHARGE * travelFactor * 100) / 100;
+  const displayTravelRate = roundCents(pricing.travelRatePerHour * travelFactor);
+  const displayMinTravel = roundCents(policy.MIN_TRAVEL_CHARGE * travelFactor);
   const rateDiscounted = displayRate !== baseRate;
   const travelDiscounted = travelFactor < 1;
   const { identity } = settings;
@@ -195,7 +198,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                   <p className="mt-1 text-base font-semibold sm:text-lg">{promoRestriction} only</p>
                 )}
                 <p className="mt-1 text-base text-russian-violet-900 sm:text-lg">
-                  Until {formatDateShort(promo.endAt)}.
+                  Until {formatDateShort(promoLastDay(promo.endAt))}.
                 </p>
               </div>
             </>

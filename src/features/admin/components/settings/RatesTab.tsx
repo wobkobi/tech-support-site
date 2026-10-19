@@ -14,6 +14,7 @@ import { useToast } from "@/features/admin/components/ui/Toast";
 import { DEFAULT_RATE_ROWS } from "@/features/business/lib/pricing-policy";
 import type { RateConfig } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
+import { roundCents } from "@/shared/lib/money";
 import type React from "react";
 import { useState } from "react";
 
@@ -152,7 +153,7 @@ function effectiveLabel(kind: RateKind, amount: string, base: number | null): st
   const n = Number(amount);
   if (base === null || amount.trim() === "" || !Number.isFinite(n)) return "";
   if (kind === "delta") return `= ${money(base + n)}/hr`;
-  if (kind === "percent") return `= ${money(Math.round(base * (1 + n / 100) * 100) / 100)}/hr`;
+  if (kind === "percent") return `= ${money(roundCents(base * (1 + n / 100)))}/hr`;
   return "";
 }
 

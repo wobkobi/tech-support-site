@@ -3,9 +3,9 @@
 // design or template (photo layers and photo backdrops), newest design first, so the
 // same photo can go into another design without uploading it again.
 
-import { isAllowedImageUrl } from "@/features/social-design/lib/doc";
 import { errorResponse, noStore, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { isBlobImageUrl } from "@/shared/lib/blob-image";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -32,7 +32,7 @@ function photosIn(doc: unknown): RecentPhoto[] {
   const out: RecentPhoto[] = [];
   for (const raw of [...layers].reverse()) {
     const l = raw as Record<string, unknown> | null;
-    if (!l || typeof l.src !== "string" || !isAllowedImageUrl(l.src)) continue;
+    if (!l || typeof l.src !== "string" || !isBlobImageUrl(l.src)) continue;
     if (l.type === "image") {
       out.push({
         url: l.src,

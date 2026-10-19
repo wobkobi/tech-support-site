@@ -6,7 +6,7 @@
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import type { AlreadyPaidState } from "@/features/business/lib/already-paid-input";
-import { timeDiffMins, type JobPricing } from "@/features/business/lib/business";
+import { isTripDrive, timeDiffMins, type JobPricing } from "@/features/business/lib/business";
 import {
   buildParseInput,
   describeFit,
@@ -205,16 +205,17 @@ export function useJobParse({
     if (freshAuto) {
       setTravelEntries((prev) => {
         // Google's live predictions drift between calls (minutes, and even the
-        // route), so a reparse of the same destination keeps the existing auto
-        // entry rather than silently moving the price. "Look up" is the refresh.
-        const existingAuto = prev.find((e) => e.isAuto);
+        // route), so a reparse of the same destination keeps the existing trip
+        // rather than silently moving the price - including a price the operator
+        // typed over. "Look up" is the refresh. Either way there is one trip.
+        const existingTrip = prev.find(isTripDrive);
         const sameDestination =
-          existingAuto?.destination?.trim().toLowerCase() ===
+          existingTrip?.destination?.trim().toLowerCase() ===
           freshAuto.destination?.trim().toLowerCase();
         return [
-          existingAuto && sameDestination ? existingAuto : freshAuto,
+          existingTrip && sameDestination ? existingTrip : freshAuto,
           ...parsedCosts,
-          ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
+          ...prev.filter((e) => !isTripDrive(e) && !e.isParsedCost),
         ];
       });
     } else {
@@ -228,9 +229,9 @@ export function useJobParse({
       // parser being told the trip was on foot or on the house, not an omission.
       const keepSeededTravel = eventPrefill !== null && !result.noTravelCharge;
       setTravelEntries((prev) => [
-        ...(keepSeededTravel ? prev.filter((e) => e.isAuto) : []),
+        ...(keepSeededTravel ? prev.filter(isTripDrive) : []),
         ...parsedCosts,
-        ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
+        ...prev.filter((e) => !isTripDrive(e) && !e.isParsedCost),
       ]);
     }
 

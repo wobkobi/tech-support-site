@@ -54,6 +54,7 @@ import {
   useGoogleContacts,
 } from "@/features/contacts/components/ContactNameInput";
 import { cn } from "@/shared/lib/cn";
+import { roundCents } from "@/shared/lib/money";
 import { nzNowTime } from "@/shared/lib/timezone-utils";
 import Link from "next/link";
 import type React from "react";
@@ -110,7 +111,7 @@ interface IncomeRow {
  */
 function parseDollars(raw: string): number {
   const n = Number(raw.replace(/[$,\s]/g, ""));
-  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+  return Number.isFinite(n) ? roundCents(n) : 0;
 }
 
 interface Props {
@@ -204,7 +205,7 @@ export function QuickPriceView({
             description: "Labour",
             qty: billedMins / 60,
             unitPrice: hourlyRate,
-            lineTotal: Math.round((billedMins / 60) * hourlyRate * 100) / 100,
+            lineTotal: roundCents((billedMins / 60) * hourlyRate),
             minutes: billedMins,
             unsuccessful: unfixed,
           },
@@ -259,10 +260,10 @@ export function QuickPriceView({
   }
 
   const receivedAmount = received === null ? totals.total : parseDollars(received);
-  const receivedDiff = Math.round((receivedAmount - totals.total) * 100) / 100;
+  const receivedDiff = roundCents(receivedAmount - totals.total);
   const partAmount = alreadyPaidAmount(part);
   const restMethod: AlreadyPaidMethod = part.method === "Cash" ? "Bank" : "Cash";
-  const restAmount = Math.round((receivedAmount - partAmount) * 100) / 100;
+  const restAmount = roundCents(receivedAmount - partAmount);
   const isSplit = paidBy === "Split";
   const rows: IncomeRow[] = isSplit
     ? [

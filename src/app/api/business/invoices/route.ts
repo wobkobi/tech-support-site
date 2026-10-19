@@ -119,6 +119,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     alreadyPaid,
     alreadyPaidMethod,
     alreadyPaidDate,
+    // NZ day the job was done, kept so a draft edit prices the surcharge for that day.
+    jobDate,
     // Sent by the calculator when you drove to the job, travel charged or not: the job
     // address and NZ day, so the job's trip is logged at Google's round-trip km.
     trip,
@@ -143,6 +145,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     alreadyPaid?: number | null;
     alreadyPaidMethod?: string | null;
     alreadyPaidDate?: string | null;
+    jobDate?: string | null;
     trip?: { address?: unknown; date?: unknown } | null;
   };
 
@@ -252,6 +255,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           clientEmail: normaliseEmail(clientEmail),
           issueDate: issueDateValue,
           dueDate: dueDateValue,
+          jobDate:
+            typeof jobDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(jobDate) ? jobDate : null,
           lineItems: lines,
           gst: gstAmount > 0,
           subtotal,

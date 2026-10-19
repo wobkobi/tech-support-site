@@ -6,6 +6,7 @@
 import { formatNZD } from "@/features/business/lib/business-format";
 import type { SnapshotChange } from "@/features/business/lib/tax/snapshot";
 import { Notice } from "@/shared/components/Notice";
+import { roundCents } from "@/shared/lib/money";
 import type React from "react";
 
 /**
@@ -26,7 +27,7 @@ function formatValue(value: number, unit: SnapshotChange["unit"]): string {
  * @returns The formatted difference.
  */
 function formatDifference(change: SnapshotChange): string {
-  const diff = Math.round((change.live - change.filed) * 100) / 100;
+  const diff = roundCents(change.live - change.filed);
   return `${diff > 0 ? "+" : ""}${formatValue(diff, change.unit)}`;
 }
 

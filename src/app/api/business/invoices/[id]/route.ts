@@ -16,6 +16,7 @@ import {
 } from "@/features/business/lib/invoice-already-paid";
 import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { releaseInvoiceRedemptions } from "@/features/business/lib/promo-redemption";
 import { parseAmount, parseDate, parseObjectId } from "@/features/business/lib/validation";
 import type { LineItem } from "@/features/business/types/business";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -140,6 +141,7 @@ export async function PATCH(
     select: {
       status: true,
       promoDiscount: true,
+      promoId: true,
       unsuccessfulDiscount: true,
       sentAt: true,
       paidAt: true,
@@ -213,14 +215,24 @@ export async function PATCH(
           : parseAlreadyPaid(body.alreadyPaid, body.alreadyPaidMethod)
         : undefined;
     if (prepaid && !prepaid.ok) return errorResponse(prepaid.error, 400);
-    // The editor's AI box re-prices unsuccessful tasks along with the lines it rebuilds, so
-    // a new figure only rides with replacement line items. Absent keeps the stored one.
+    // The editor's AI box re-prices the promo and unsuccessful tasks along with the lines it
+    // rebuilds, so a new figure only rides with replacement line items. Absent keeps the
+    // stored one.
     const repricesUnsuccessful = lineItems !== undefined && body.unsuccessfulDiscount !== undefined;
     let unsuccessfulDiscount = current.unsuccessfulDiscount ?? 0;
     if (repricesUnsuccessful) {
       const parsed = parseAmount(body.unsuccessfulDiscount ?? 0);
       if (parsed === null) return errorResponse("Invalid unsuccessful-work discount", 400);
       unsuccessfulDiscount = parsed;
+    }
+    // Only an invoice raised with a promo can have it re-priced; this never adds one.
+    const repricesPromo =
+      lineItems !== undefined && body.promoDiscount !== undefined && current.promoId != null;
+    let promoDiscount = current.promoDiscount ?? 0;
+    if (repricesPromo) {
+      const parsed = parseAmount(body.promoDiscount ?? 0);
+      if (parsed === null) return errorResponse("Invalid promo discount", 400);
+      promoDiscount = parsed;
     }
     if (status !== undefined) {
       if (!isInvoiceStatus(status)) return errorResponse("Invalid status", 400);
@@ -231,13 +243,11 @@ export async function PATCH(
     // request body does not carry gst. gstAmount is non-zero once that flag
     // is on, stays 0 today.
     const { GST_REGISTERED } = await getPolicy();
-    // Preserve the invoice's stored discounts when recomputing on a line-item
-    // edit; recomputing with 0 would silently strip the promo / unsuccessful
-    // discount from the total charged.
-    const preservedDiscount = (current.promoDiscount ?? 0) + unsuccessfulDiscount;
+    // Keep the stored discounts (or the AI box's re-priced ones) when recomputing on a
+    // line-item edit; recomputing with 0 would silently strip them from the total charged.
     const { subtotal, gstAmount, total } = calcInvoiceTotals(
       lines ?? [],
-      preservedDiscount,
+      promoDiscount + unsuccessfulDiscount,
       GST_REGISTERED,
     );
     const statusPatch = isInvoiceStatus(status) ? statusDataFor(status, current) : {};
@@ -259,11 +269,22 @@ export async function PATCH(
           unsuccessful: unsuccessfulDiscount > 0,
           unsuccessfulDiscount: unsuccessfulDiscount > 0 ? unsuccessfulDiscount : null,
         }),
+        // promoTitle and promoId stay, so the redemption still settles against the promo.
+        ...(repricesPromo && { promoDiscount: promoDiscount > 0 ? promoDiscount : null }),
         ...(notes !== undefined && { notes: notes || null }),
         ...(prepaid && { alreadyPaid: prepaid.amount, alreadyPaidMethod: prepaid.method }),
         ...statusPatch,
       },
     });
+    // The redemption this invoice settled records what the promo was worth, so it follows
+    // a re-priced discount. Bookkeeping, so a failure is logged.
+    if (repricesPromo && !current.isQuote && promoDiscount !== (current.promoDiscount ?? 0)) {
+      await prisma.promoRedemption
+        .updateMany({ where: { invoiceId: id }, data: { discountValue: promoDiscount } })
+        .catch((err: unknown) => {
+          console.error("[invoice-patch] Failed to update promo redemption value:", err);
+        });
+    }
     const incomeSheetWarning = prepaid ? (await syncAlreadyPaidIncome(id)).sheetSyncWarning : false;
     // Any field change should be reflected in the Drive archive copy.
     await syncInvoicePdfToDriveById(id, "[invoice-patch]");
@@ -354,6 +375,9 @@ export async function DELETE(
     await prisma.invoice.update({ where: { id }, data: { alreadyPaid: null } });
     incomeSheetWarning = (await syncAlreadyPaidIncome(id)).sheetSyncWarning;
   }
+  // The same goes for its promo redemption: left settled, the re-raised invoice reads as
+  // the customer's second use and a once-per-customer promo refuses it.
+  await releaseInvoiceRedemptions(id);
   await prisma.invoice.delete({ where: { id } });
   return NextResponse.json({ ok: true, incomeSheetWarning });
 }

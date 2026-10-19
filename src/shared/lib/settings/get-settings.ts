@@ -4,12 +4,15 @@
 // (maxAdvanceDays) defensively clamped so a hand-edited bad row can't push it
 // out of range on the public booking/pricing pages. Cached
 // via unstable_cache with a tag: hot reads hit the data cache, and
-// `saveSettingsGroup` busts the tag so edits go live immediately. The 60s
-// revalidate is only a cross-instance safety net.
+// `saveSettingsGroup` busts the tag so edits go live immediately. No time-based
+// revalidate: the root layout reads this, and an unstable_cache timer becomes the
+// ISR interval of every public page (each regeneration is ~100 billed ISR write
+// units). A row edited straight in the DB needs a settings save to go live.
 
 import { prisma } from "@/shared/lib/prisma";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 import type { Settings, SettingsGroup } from "@/shared/lib/settings/types";
+import { isPlainObject } from "@/shared/lib/settings/validate";
 import { unstable_cache } from "next/cache";
 
 /** Cache tag invalidated by `saveSettingsGroup` on every write. */
@@ -18,15 +21,6 @@ export const SETTINGS_TAG = "settings";
 export const SETTINGS_KEY_PREFIX = "settings:";
 
 const GROUPS = Object.keys(DEFAULT_SETTINGS) as SettingsGroup[];
-
-/**
- * True for a non-null, non-array object literal (a mergeable branch).
- * @param value - Candidate value.
- * @returns Whether `value` is a plain object.
- */
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /**
  * Overlays an override onto a base value. Plain objects merge recursively;
@@ -120,5 +114,5 @@ async function loadSettings(): Promise<Settings> {
  */
 export const getSettings = unstable_cache(loadSettings, ["settings"], {
   tags: [SETTINGS_TAG],
-  revalidate: 60,
+  revalidate: false,
 });
