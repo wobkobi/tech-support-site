@@ -167,7 +167,7 @@ async function generateEstimate(
   incrementMins: number,
   maxJobMins: number,
 ): Promise<EstimateResult> {
-  // Keep the whole call under the 60s function ceiling, so a hung upstream
+  // Keep the whole call well under the 300s function ceiling, so a hung upstream
   // lands in the route's 422 shape instead of a 504. Per-attempt timeouts alone
   // can't: the SDK sleeps for a 429's retry-after (up to 60s) before its one
   // retry, so the signal caps attempts and that sleep together.

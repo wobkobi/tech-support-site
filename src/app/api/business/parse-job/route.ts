@@ -230,7 +230,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // the 2026-07-24 eval showed mini obeying an injected negative-duration
     // correction (parse-injection-negative) that 4.1 correctly ignores. The SDK
     // defaults (10-minute timeout, 2 retries with retry-after sleeps) can outlive
-    // the 60s function ceiling and swallow a 429 the catch below hands back as
+    // the 300s function ceiling and swallow a 429 the catch below hands back as
     // retryable, so one attempt, leaving room for the travel lookups that follow.
     const { text, model, usage } = await jsonCompletion({
       feature: "parse-job",
