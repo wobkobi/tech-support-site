@@ -273,6 +273,7 @@ function buildPriceRange(
       ? {
           originalLow: original.low,
           originalHigh: original.high,
+          originalTravel: original.travel,
           promoLabel: promo ? summariseForBanner(promo) : undefined,
         }
       : {}),
@@ -645,11 +646,15 @@ export function PricingWizard({
   }
 
   // An offer the estimate could not price in, because it only runs on certain
-  // days and no appointment has been chosen yet. Named rather than dropped: a
-  // customer who would book a Tuesday should know a Tuesday is worth picking.
+  // days and no appointment has been chosen yet, or depends on who the customer
+  // is. Named rather than dropped: a customer who would book a Tuesday should
+  // know a Tuesday is worth picking.
   const restrictedOffer = (() => {
     const resolved = codePromo ?? activePromo;
     if (!resolved || promoForAppointment(resolved, null)) return null;
+    if (resolved.customerLimited) {
+      return `${describePromoDiscount(resolved)} may also apply. It depends on your past bookings with us, so it is worked out when you book.`;
+    }
     const when = describeRecurringWindow(resolved);
     if (!when) return null;
     return `${describePromoDiscount(resolved)} is available ${when}. Pick one of those times when you book and it comes off this estimate.`;
@@ -668,9 +673,12 @@ export function PricingWizard({
   const spendNudge = (() => {
     const resolved = promoForAppointment(codePromo ?? activePromo, null);
     if (!resolved || !result) return null;
-    // No promo applied means nothing was discounted, so the figures on screen
-    // are already the pre-discount ones; when one did, originalLow is.
-    const total = (result.originalLow ?? result.low) + (result.travelCharge ?? 0);
+    // Judged on the same pre-discount total buildPriceRange judged the promo on. No
+    // promo applied means the figures on screen already are; when one did, the
+    // original* pair is - travel included, or a free-travel promo the estimate
+    // already earned reads as one still to earn.
+    const total =
+      (result.originalLow ?? result.low) + (result.originalTravel ?? result.travelCharge ?? 0);
     const next = [
       ...resolved.tiers.map((t) => t.minSpend),
       ...(resolved.minSpend != null ? [resolved.minSpend] : []),

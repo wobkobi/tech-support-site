@@ -2,7 +2,7 @@
 // src/features/business/components/invoice/InvoiceAiBox.tsx
 // "Describe the job" box for the draft-invoice editor. Sends the description through the
 // same parse-job route and parse helpers as the calculator, then hands back replacement
-// line items and the unsuccessful-work discount for them. The promo discount is kept.
+// line items with the promo and unsuccessful-work discounts re-priced for them.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -16,7 +16,7 @@ import {
   JOB_DESCRIPTION_HINT,
   JOB_DESCRIPTION_PLACEHOLDER,
 } from "@/features/business/lib/ai-input-copy";
-import { formatNZD } from "@/features/business/lib/business";
+import { formatNZD, type JobPromo } from "@/features/business/lib/business";
 import {
   buildParseInput,
   describeFit,
@@ -42,8 +42,17 @@ export interface InvoiceAiContext {
   /** Job address to quote travel from when the description names none. */
   fallbackDestination: string | null;
   pricing: ParsedJobPricing;
-  /** The promo discount the invoice keeps; unsuccessful lines are cut after their share. */
+  /**
+   * The invoice's promo terms, re-applied to the rebuilt lines; null when it has no
+   * promo.
+   */
+  promo: JobPromo | null;
+}
+
+/** The discounts re-priced for a rebuilt set of lines. */
+export interface RepricedDiscounts {
   promoDiscount: number;
+  unsuccessfulDiscount: number;
 }
 
 /** Props for {@link InvoiceAiBox}. */
@@ -55,13 +64,13 @@ interface InvoiceAiBoxProps {
   disabled?: boolean;
   /**
    * Receives the parsed line items, any parsed notes, any cash amount already paid and
-   * the unsuccessful-work discount for the new lines.
+   * the promo and unsuccessful-work discounts for the new lines.
    */
   onApply: (
     lineItems: LineItem[],
     notes: string | null,
     cashPaid: number | null,
-    unsuccessfulDiscount: number,
+    discounts: RepricedDiscounts,
   ) => void;
 }
 
@@ -73,7 +82,7 @@ const PARSE_ERROR = "Couldn't parse that - try being more specific, or edit the 
  * @param props.context - Booking and pricing context for the parse.
  * @param props.currentItems - The form's current line items.
  * @param props.disabled - Whether the parent form is saving.
- * @param props.onApply - Receives the parsed line items, notes, cash paid and discount.
+ * @param props.onApply - Receives the parsed line items, notes, cash paid and discounts.
  * @returns The AI box element.
  */
 export function InvoiceAiBox({
@@ -120,20 +129,24 @@ export function InvoiceAiBox({
         const parsed = d.result as ParseJobResponse;
         const existingTravel =
           currentItems.find((li) => li.description.startsWith("Round-trip travel")) ?? null;
-        const { lineItems, fit, windowMins, unsuccessfulDiscount } = parsedJobToLineItems(
-          parsed,
-          context.slots,
-          nzNowTime(),
-          context.pricing,
-          { line: existingTravel, destination: context.fallbackDestination },
-          context.promoDiscount,
-        );
+        const { lineItems, fit, windowMins, promoDiscount, unsuccessfulDiscount } =
+          parsedJobToLineItems(
+            parsed,
+            context.slots,
+            nzNowTime(),
+            context.pricing,
+            { line: existingTravel, destination: context.fallbackDestination },
+            context.promo,
+          );
         if (lineItems.length === 0) {
           setError(PARSE_ERROR);
         } else {
           setResult(parsed);
           setAnswers({});
-          onApply(lineItems, parsed.notes || null, parsed.cashPaid ?? null, unsuccessfulDiscount);
+          onApply(lineItems, parsed.notes || null, parsed.cashPaid ?? null, {
+            promoDiscount,
+            unsuccessfulDiscount,
+          });
           const fitNote = describeFit(fit, windowMins);
           if (fitNote) toast(fitNote, { tone: "info" });
           if (unsuccessfulDiscount > 0) {

@@ -167,6 +167,10 @@ export interface TaskLine {
   isExplicit?: boolean;
   /** Operator-set: this task wasn't finished, so calcJobTotal discounts its line per the unsuccessful-work policy. Ignored on flat-rate rows and when the whole-job `unsuccessful` flag is set (which already covers it). */
   unsuccessful?: boolean;
+  /** A flat charge with no rate row behind it (a cancellation fee): never labour, so no minimum-billable padding, window fitting, surcharge or promo. */
+  isFlatFee?: boolean;
+  /** Operator typed this row's $/hr, so restoring a draft keeps it instead of re-pricing from the live rate. Cleared when the base or a modifier changes. */
+  priceOverridden?: boolean;
 }
 
 export interface PartLine {

@@ -74,7 +74,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     ? await prisma.booking
         .findUnique({
           where: { id: bookingId },
-          select: { promoIdAtBooking: true, createdAt: true },
+          select: { promoIdAtBooking: true, promoTermsAtBooking: true, createdAt: true },
         })
         .catch(() => null)
     : null;
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // live instead would lose a booked code, and an automatic promo would settle a
   // second redemption for the same job.
   const locked = booking?.promoIdAtBooking
-    ? await lockedInPromo(booking.promoIdAtBooking, at)
+    ? await lockedInPromo(booking.promoIdAtBooking, at, booking.promoTermsAtBooking)
     : null;
 
   const [settings, holiday, resolved] = await Promise.all([

@@ -35,6 +35,8 @@ export interface PriceRange {
   /** Pre-promo range, populated only when an active promo discounted the headline. */
   originalLow?: number;
   originalHigh?: number;
+  /** Pre-promo travel charge, set alongside originalLow; a free-travel promo zeroes travelCharge but not this. */
+  originalTravel?: number;
   /** Customer-facing label of the active promo, when applied. */
   promoLabel?: string;
 }

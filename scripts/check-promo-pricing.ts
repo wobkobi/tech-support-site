@@ -229,6 +229,21 @@ function main(): void {
   );
   expectEqual("null in, null out", promoForAppointment(null, null), null);
 
+  // A new-customers-only or once-per-customer promo waits on the server having judged
+  // the customer: a returning customer quoted the new-customer rate loses it at booking.
+  const newCustomers: ActivePromo = { ...promo("percent", 0.2), customerLimited: true };
+  expectEqual(
+    "a customer-limited promo does not price an anonymous quote",
+    promoForAppointment(newCustomers, null)?.id ?? null,
+    null,
+  );
+  expectEqual(
+    "it does once the server judged it against the email",
+    promoForAppointment(newCustomers, null, { customerChecked: true })?.id ?? null,
+    "p1",
+  );
+  expectEqual("and never prices a rate card", promoForRateCard(newCustomers)?.id ?? null, null);
+
   // The banner is what adds the qualifier, so the phrase itself stays reusable.
   expectEqual(
     "the banner names the restriction",
@@ -239,6 +254,23 @@ function main(): void {
     }).endsWith(", Tuesdays 9am to 5pm only"),
     true,
   );
+
+  // endAt is exclusive: the admin form saves a promo's last day as NZ midnight starting
+  // the next day, so the banner must name the day before endAt. One summer date (NZDT,
+  // +13) and one winter date (NZST, +12) so the offset can't hide an off-by-one.
+  const lastDayCases: [string, string][] = [
+    ["2026-10-31T11:00:00.000Z", "31 Oct"],
+    ["2026-07-31T12:00:00.000Z", "31 Jul"],
+  ];
+  for (const [endAt, lastDay] of lastDayCases) {
+    expectEqual(
+      `a promo stored to end ${endAt} is shown ending ${lastDay}`,
+      summariseForBanner({ ...promo("percent", 0.2), endAt }, { fixedDate: true }).includes(
+        lastDay,
+      ),
+      true,
+    );
+  }
 
   // ---- Spend thresholds and tiers ----
   //
@@ -1005,6 +1037,56 @@ function main(): void {
       .unsuccessfulDiscount,
     135,
   );
+
+  expectEqual(
+    "a +25% day's surcharge is halved with the labour: 2h at $65 takes $81.25 off",
+    calcJobTotal(failedJob([{ qty: 2, unitPrice: 65 }], true), null, {
+      ...NO_FLOOR,
+      surchargeUplift: 0.25,
+    }).unsuccessfulDiscount,
+    81.25,
+  );
+
+  /**
+   * One $100 hour beside a second row, under 20% off.
+   * @param row - The second row's rate tags and flags.
+   * @returns The promo discount.
+   */
+  const percentBeside = (row: Record<string, unknown>): number =>
+    calcJobTotal(
+      {
+        ...failedJob([{ qty: 1, unitPrice: 100 }], false),
+        tasks: [
+          ...failedJob([{ qty: 1, unitPrice: 100 }], false).tasks,
+          { description: "Row", qty: 1, unitPrice: 50, lineTotal: 50, ...row },
+        ],
+      } as Parameters<typeof calcJobTotal>[0],
+      promo("percent", 0.2),
+      NO_FLOOR,
+    ).promoDiscount;
+  expectEqual(
+    "a cancellation fee is not labour, so no promo comes off it",
+    percentBeside({ rateConfigId: null, baseRateId: null, isFlatFee: true }),
+    20,
+  );
+  expectEqual(
+    "a 'No base' hourly row is labour, so the promo does",
+    percentBeside({ rateConfigId: null, baseRateId: null }),
+    30,
+  );
+
+  const freeTravel = calcJobTotal(
+    {
+      ...failedJob([{ qty: 1, unitPrice: 100 }], false),
+      travelEntries: [
+        { label: "Travel", cost: 30, isAuto: true, durationMinsOneWay: 15 },
+        { label: "Parking", cost: 5, isParsedCost: true },
+      ],
+    },
+    promo("free_travel", 0),
+    NO_FLOOR,
+  );
+  expectEqual("free travel covers the drive, not the parking", freeTravel.promoDiscount, 30);
 
   // Timed lines at one rate share their cents: rounded alone, 35 + 35 + 20 min at
   // $100/hr printed $58.33 + $58.33 + $33.33 = $149.99 for 90 minutes worth $150.

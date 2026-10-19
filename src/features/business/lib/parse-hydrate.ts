@@ -4,19 +4,19 @@
 
 import {
   billableMins,
+  calcJobTotal,
   collapseToWindow,
   composeDescription,
   enforceMinBillable,
   jobToLineItems,
   TASK_TIMING_FALLBACK,
-  taskLineTotals,
   timeDiffMins,
+  type JobPromo,
   type LabourSurcharge,
   type TaskTimingConfig,
 } from "@/features/business/lib/business";
 import { storeRunEntry } from "@/features/business/lib/calculator-helpers";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
-import { isHourlyTask } from "@/features/business/lib/task-timing";
 import {
   extractRanges,
   statedRangeWeekdays,
@@ -24,9 +24,11 @@ import {
 } from "@/features/business/lib/time-parse";
 import type {
   EventPrefillSlot,
+  JobCalculation,
   LineItem,
   ParsedRange,
   ParseJobResponse,
+  RateConfig,
   TaskLine,
   TravelEntry,
 } from "@/features/business/types/business";
@@ -243,9 +245,10 @@ export function hydrateParsedTasks(result: ParseJobResponse): TaskLine[] {
     // The server already composes the description; composing locally keeps it right if
     // an older route shape sneaks through.
     const description = composeDescription(device, action, details) || t.description || "";
-    // A baseRateId marks an hourly task, so a stray AI rateConfigId is dropped to keep
-    // the promo maths classifying it correctly.
-    const isHourly = t.baseRateId != null;
+    // Same rule as isHourlyTask: a baseRateId, or no rateConfigId at all, is labour. A
+    // stray AI rateConfigId beside a baseRateId is dropped to keep the promo maths
+    // classifying it correctly.
+    const isHourly = t.baseRateId != null || t.rateConfigId == null;
     // Hourly tasks arrive snapped to the billing grid in whole minutes; carry those as
     // the billed unit with qty unrounded so line quantities sum to the session.
     const minutes = isHourly ? (t.minutes ?? Math.round(t.qty * 60)) : undefined;
@@ -398,6 +401,12 @@ export interface ParsedJobPricing {
   surcharge: LabourSurcharge | null;
   /** Share of an unsuccessful line still charged (0.5 = half price). */
   unsuccessfulFactor?: number;
+  /** RateConfig id of the "Business" modifier, whose labour a promo skips. */
+  businessModifierId?: string | null;
+  /** The undiscounted Standard $/hr a flat promo cuts from. */
+  standardRate?: number | null;
+  /** Live rate list, for a flat promo's per-line floor. */
+  rates?: RateConfig[];
 }
 
 /** The invoice's current travel, for {@link parsedJobToLineItems} to keep when it should. */
@@ -449,18 +458,18 @@ function sameAddressKey(address: string | null | undefined): string {
  * it parses to the booked address again (Google's live quote drifts between calls, so a
  * re-parse must not silently move the price). noTravelCharge still drops it.
  *
- * The unsuccessful-work discount is worked out the way the calculator does it: each
- * unsuccessful hourly line is cut after its promo share comes off, so half price is half
- * of what the customer was due. The invoice keeps only a promo total, not its per-line
- * split, so that total is spread over the labour lines in proportion to their size.
+ * Both discounts come from {@link calcJobTotal}, the calculator's own totals, so a
+ * rebuilt draft prices exactly as a fresh calculator job would: the promo re-applied to
+ * the new lines (a free-travel promo cuts no labour, a flat-rate one cuts per hour), and
+ * each unsuccessful line halved after its promo share, surcharge included.
  * @param result - The parse response.
  * @param slots - Booked event slots; empty for an unbooked job.
  * @param now - Current NZ wall-clock HH:MM.
  * @param pricing - Live pricing inputs.
  * @param existing - The invoice's current travel line and booked address.
- * @param promoDiscount - The promo discount the invoice keeps, for the unsuccessful cut.
- * @returns Line items, the window fit (for a rebalance toast) and the unsuccessful-work
- * discount for the new lines (0 when no hourly task was unsuccessful).
+ * @param promo - The invoice's promo terms, or null when it has none.
+ * @returns Line items, the window fit (for a rebalance toast), and the promo and
+ * unsuccessful-work discounts for the new lines.
  */
 export function parsedJobToLineItems(
   result: ParseJobResponse,
@@ -468,11 +477,12 @@ export function parsedJobToLineItems(
   now: string,
   pricing: ParsedJobPricing,
   existing: ExistingInvoiceTravel,
-  promoDiscount = 0,
+  promo: JobPromo | null = null,
 ): {
   lineItems: LineItem[];
   fit: FittedTasks;
   windowMins: number;
+  promoDiscount: number;
   unsuccessfulDiscount: number;
 } {
   const { windowMins } = parsedWindow(result, slots, now);
@@ -498,34 +508,31 @@ export function parsedJobToLineItems(
       : null;
   if (kept) travelEntries.unshift(kept);
   else if (auto) travelEntries.unshift(auto);
+  const job: JobCalculation = {
+    durationMins: windowMins,
+    tasks: fit.tasks,
+    parts: result.parts.map((p) => ({ description: p.description, cost: p.cost })),
+    travelEntries,
+    notes: result.notes,
+    clientName: "",
+    clientEmail: "",
+  };
   const lineItems = jobToLineItems(
-    {
-      durationMins: windowMins,
-      tasks: fit.tasks,
-      parts: result.parts.map((p) => ({ description: p.description, cost: p.cost })),
-      travelEntries,
-      notes: result.notes,
-      clientName: "",
-      clientEmail: "",
-    },
+    job,
     pricing.surcharge,
     pricing.minTravelCharge,
     pricing.minBillableMins,
   );
-  // Same floor and cent split jobToLineItems applied, so these line totals are the ones
-  // just built (a lone per-line round could differ from the shared split by a cent).
-  const floored = enforceMinBillable(fit.tasks, pricing.minBillableMins);
-  const totals = taskLineTotals(floored);
-  let labour = 0;
-  let failed = 0;
-  for (const [i, t] of floored.entries()) {
-    if (!isHourlyTask(t)) continue;
-    labour += totals[i]!;
-    if (t.unsuccessful) failed += totals[i]!;
-  }
-  const promoShare =
-    labour > 0 ? (Math.min(Math.max(0, promoDiscount), labour) * failed) / labour : 0;
-  const cut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
-  const unsuccessfulDiscount = Math.max(0, roundCents((failed - promoShare) * cut));
-  return { lineItems, fit, windowMins, unsuccessfulDiscount };
+  const { promoDiscount, unsuccessfulDiscount } = calcJobTotal(job, promo, {
+    // Only the discounts are read, and neither depends on GST.
+    gstRegistered: false,
+    minTravelCharge: pricing.minTravelCharge,
+    minBillableMins: pricing.minBillableMins,
+    surchargeUplift: pricing.surcharge?.uplift ?? 0,
+    unsuccessfulFactor: pricing.unsuccessfulFactor,
+    businessModifierId: pricing.businessModifierId,
+    standardRate: pricing.standardRate,
+    rates: pricing.rates,
+  });
+  return { lineItems, fit, windowMins, promoDiscount, unsuccessfulDiscount };
 }

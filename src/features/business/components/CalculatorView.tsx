@@ -37,6 +37,7 @@ import {
 } from "@/features/business/lib/already-paid-input";
 import {
   calcJobTotal,
+  isTripDrive,
   jobToLineItems,
   timeDiffMins,
   todayISO,
@@ -446,12 +447,12 @@ export function CalculatorView({
 
   /**
    * Applies a picked Places suggestion: keep the full formatted address and
-   * drop the stale auto travel entry (manual entries survive).
+   * drop the stale trip, edited or not (manual entries survive).
    * @param formattedAddress - The selected address.
    */
   function handleAddressSelected(formattedAddress: string): void {
     changeJobAddress(formattedAddress);
-    setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
+    setTravelEntries((prev) => prev.filter((e) => !isTripDrive(e)));
   }
 
   // Mount seeding + contacts fetch. The "now" times must seed in an effect - nzNowTime() at
@@ -780,16 +781,16 @@ export function CalculatorView({
   }
 
   /**
-   * Looks up the drive to the job address and replaces the single auto travel
-   * entry (manual entries survive). See {@link lookupAutoTravel} for how each
-   * leg's departure is chosen.
+   * Looks up the drive to the job address and replaces the trip entry, even one whose
+   * price was typed over (manual entries survive). See {@link lookupAutoTravel} for how
+   * each leg's departure is chosen.
    */
   async function handleTravelLookup(): Promise<void> {
     if (!jobAddress.trim()) return;
     setLookingUpTravel(true);
     // Drop any stale auto entry up-front so the chip disappears while the
     // lookup is in flight; manual entries survive.
-    setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
+    setTravelEntries((prev) => prev.filter((e) => !isTripDrive(e)));
     try {
       const entry = await lookupAutoTravel({
         jobAddress,
@@ -801,7 +802,7 @@ export function CalculatorView({
         minTravelCharge: pricing.minTravelCharge,
       });
       if (entry) {
-        setTravelEntries((prev) => [entry, ...prev.filter((e) => !e.isAuto)]);
+        setTravelEntries((prev) => [entry, ...prev.filter((e) => !isTripDrive(e))]);
       }
     } catch {
       // silently ignore - travel is optional

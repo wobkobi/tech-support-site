@@ -13,7 +13,7 @@ import { roundCents } from "@/shared/lib/money";
  * @returns Sum of hourly task minutes (`qty * 60`).
  */
 export function hourlyTaskMinutes(tasks: TaskLine[]): number {
-  return tasks.filter((t) => t.baseRateId != null).reduce((sum, t) => sum + t.qty * 60, 0);
+  return tasks.filter(isHourlyTask).reduce((sum, t) => sum + t.qty * 60, 0);
 }
 
 /**
@@ -29,7 +29,7 @@ export function explicitRoundingAllowanceMins(
   tasks: TaskLine[],
   snapMins: number = TASK_TIMING_FALLBACK.snapMins,
 ): number {
-  return tasks.filter((t) => t.baseRateId != null && t.isExplicit).length * snapMins;
+  return tasks.filter((t) => isHourlyTask(t) && t.isExplicit).length * snapMins;
 }
 
 /** What the calculator's task-time banner flags, from {@link taskWindowMismatch}. */
@@ -71,7 +71,7 @@ export function taskWindowMismatch(
   if (Math.abs(gap) < 2) return null;
   // Billing at the minimum floor legitimately exceeds a shorter window.
   if (gap > 0 && taskMin <= minBillableMins) return null;
-  const canAbsorb = tasks.some((t) => t.baseRateId != null && !t.isExplicit && !t.isShort);
+  const canAbsorb = tasks.some((t) => isHourlyTask(t) && !t.isExplicit && !t.isShort);
   if (gap > 0 && !canAbsorb && gap <= explicitRoundingAllowanceMins(tasks, snap)) return null;
   return gap > 0 ? "over" : "under";
 }
@@ -124,8 +124,8 @@ export function collapseToWindow(
   timing: TaskTimingConfig = TASK_TIMING_FALLBACK,
 ): { tasks: TaskLine[]; dropped: number; rescaled: boolean } {
   if (windowMin <= 0) return { tasks, dropped: 0, rescaled: false };
-  const hourlyIn = tasks.filter((t) => t.baseRateId != null);
-  const flat = tasks.filter((t) => t.baseRateId == null);
+  const hourlyIn = tasks.filter(isHourlyTask);
+  const flat = tasks.filter((t) => !isHourlyTask(t));
   if (hourlyIn.length === 0) return { tasks, dropped: 0, rescaled: false };
 
   // The classification below splits tasks into short / explicit / floating groups, so the
@@ -398,12 +398,17 @@ export function enforceMinBillable(
 }
 
 /**
- * Whether a task line counts as labour. Hourly tasks (an explicit base rate, or
- * no rate config at all) are labour; flat-rate rows like Travel never are, so
- * they're excluded from the unsuccessful-work discount.
+ * Whether a task line counts as labour - the one classifier every pricing and timing
+ * path uses. Hourly tasks (an explicit base rate, or no rate config at all, which is a
+ * "No base" row priced by hand per hour) are labour; flat-rate rows like Travel and flat
+ * fees never are, so they're excluded from the minimum floor, window fitting, the
+ * surcharge, promos and the unsuccessful-work discount.
  * @param task - Task line to classify.
  * @returns True when the line is hourly labour.
  */
-export function isHourlyTask(task: TaskLine): boolean {
+export function isHourlyTask(
+  task: Pick<TaskLine, "baseRateId" | "rateConfigId" | "isFlatFee">,
+): boolean {
+  if (task.isFlatFee) return false;
   return task.baseRateId != null || task.rateConfigId == null;
 }

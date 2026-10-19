@@ -295,6 +295,19 @@ function validatePricing(p: PricingSettings): FieldError[] {
       field: "cancellation.fullCallOutFee",
       message: "Must be at least the cancellation fee, or cancelling later would cost less.",
     });
+  // The travel-charge window sits inside the free-notice window: free beyond freeNotice,
+  // the flat fee between the two, the full call-out plus travel inside travelCharge.
+  // Wider than freeNotice, a cancel between the two is free while the copy promises the
+  // full call-out, and the flat-fee tier can never be reached.
+  if (
+    nonNeg(p.cancellation?.freeNoticeHours) &&
+    nonNeg(p.cancellation?.travelChargeHours) &&
+    (p.cancellation?.travelChargeHours ?? 0) > (p.cancellation?.freeNoticeHours ?? 0)
+  )
+    errors.push({
+      field: "cancellation.travelChargeHours",
+      message: "Must be no more than the free-notice hours, or that window can never apply.",
+    });
   if (typeof p.cancellation?.autoSendCancellationInvoice !== "boolean")
     errors.push({
       field: "cancellation.autoSendCancellationInvoice",

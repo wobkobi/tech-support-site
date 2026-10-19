@@ -3,7 +3,7 @@
 // preset, duplicating, or "save as preset"), from a promo via "Post this promo", or from
 // a mailing-list email via "Share to social".
 
-import { findAdvertisablePromo } from "@/features/business/lib/promos";
+import { findAdvertisablePromo, promoLastDay } from "@/features/business/lib/promos";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { postFromEmail } from "@/features/social/lib/from-email";
 import { toPostRow } from "@/features/social/lib/post-row";
@@ -121,10 +121,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         (await prisma.socialPost.findFirst({
           where: { isPreset: true, presetKey: PROMO_POST_PRESET_KEY },
         })) ?? starterPostPresets(getSiteUrl()).find((p) => p.presetKey === PROMO_POST_PRESET_KEY)!;
-      // Google shows it as an offer card over the promo's own NZ calendar days. endAt
-      // is midnight starting the day after the last day (exclusive), so the last day
-      // is read 1ms before it.
-      const lastDay = new Date(Date.parse(promo.endAt) - 1);
+      // Google shows it as an offer card over the promo's own NZ calendar days.
+      const lastDay = promoLastDay(promo.endAt);
       const created = await prisma.socialPost.create({
         data: {
           name: `Promo: ${promo.title}`,

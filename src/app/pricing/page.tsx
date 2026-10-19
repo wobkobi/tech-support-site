@@ -25,6 +25,7 @@ import {
   hasActivePromoCode,
   promoDisplayRate,
   promoForRateCard,
+  promoLastDay,
   promoModifierRate,
   promoRateBeforeAfter,
   promoTravelBeforeAfter,
@@ -197,7 +198,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                   <p className="mt-1 text-base font-semibold sm:text-lg">{promoRestriction} only</p>
                 )}
                 <p className="mt-1 text-base text-russian-violet-900 sm:text-lg">
-                  Until {formatDateShort(promo.endAt)}.
+                  Until {formatDateShort(promoLastDay(promo.endAt))}.
                 </p>
               </div>
             </>

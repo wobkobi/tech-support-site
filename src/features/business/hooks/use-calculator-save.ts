@@ -397,6 +397,7 @@ export function useCalculatorSave({
           bookingId: eventPrefill?.bookingId ?? null,
           calendarEventId: eventPrefill?.calendarEventId ?? null,
           calendarEventIds: eventPrefill?.slots.map((slot) => slot.calendarEventId) ?? [],
+          jobDate,
           // Quote mode: server allocates a Q- number + 30-day validity.
           isQuote: quote || undefined,
           // Part payment: the invoice asks for the balance and the server records this

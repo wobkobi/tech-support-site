@@ -436,6 +436,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           // calculator resolves the band against the real subtotal.
           promoFlatHourlyRateAtBooking: snapshotPromo?.flatHourlyRate ?? null,
           promoPercentDiscountAtBooking: snapshotPromo?.percentDiscount ?? null,
+          // The full terms, which is what the invoice actually prices from.
+          promoTermsAtBooking: activePromo
+            ? (activePromo as unknown as Prisma.InputJsonValue)
+            : undefined,
           publicHolidayName,
           // Snapshot of the public quote the customer saw before booking, plus
           // what they typed to get it and how the AI read it.

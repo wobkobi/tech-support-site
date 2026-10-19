@@ -127,10 +127,28 @@ export function travelEntriesTotal(entries: TravelEntry[]): number {
   return roundCents(entries.reduce((s, e) => s + (e.cost || 0), 0));
 }
 
+/**
+ * Whether a travel entry is the drive to the client: the entry the address lookup made,
+ * including after the operator edits its price (which clears isAuto but keeps the drive
+ * time). Re-parse and Look up replace this entry rather than adding a second one beside
+ * it, and a free-travel promo covers it; typed and parsed entries without a drive time
+ * are disbursements like parking.
+ * @param entry - Travel entry to classify.
+ * @returns True for the client drive; false for store runs and disbursements.
+ */
+export function isTripDrive(entry: TravelEntry): boolean {
+  return entry.kind !== "storeRun" && (entry.isAuto === true || entry.durationMinsOneWay != null);
+}
+
 /** A job's travel split the way the invoice bills it. */
 export interface TravelSplit {
   /** The trip to the client plus disbursements (parking, tolls), after the minimum charge. */
   tripTotal: number;
+  /**
+   * The drive part of tripTotal: looked-up drives plus any minimum-charge lift, without
+   * disbursements. What a free-travel promo covers - it waives the drive, not parking.
+   */
+  driveTotal: number;
   /** Store runs with a cost, each billed on its own line. */
   storeRuns: TravelEntry[];
   /** tripTotal plus every store run. */
@@ -153,8 +171,10 @@ export function splitTravel(entries: TravelEntry[], minTravelCharge: number): Tr
   const hasAutoEntry = trip.some((e) => e.isAuto && e.cost > 0);
   const tripTotal =
     hasAutoEntry && rawTrip > 0 && rawTrip < minTravelCharge ? minTravelCharge : rawTrip;
+  const drives = trip.filter(isTripDrive);
+  const driveTotal = roundCents(travelEntriesTotal(drives) + (tripTotal - rawTrip));
   const total = roundCents(tripTotal + travelEntriesTotal(storeRuns));
-  return { tripTotal, storeRuns, total };
+  return { tripTotal, driveTotal, storeRuns, total };
 }
 
 /**
@@ -283,10 +303,10 @@ export function jobToLineItems(
 
   const { tripTotal, storeRuns } = splitTravel(job.travelEntries, minTravelCharge);
   if (tripTotal > 0) {
-    // Drive minutes across auto entries (back leg falls back to outbound on
+    // Drive minutes across the trip entries (back leg falls back to outbound on
     // legacy drafts) so the line reads "Round-trip travel (46 min drive)".
     const driveMins = job.travelEntries.reduce((sum, e) => {
-      if (!e.isAuto || !e.durationMinsOneWay) return sum;
+      if (!isTripDrive(e) || !e.durationMinsOneWay) return sum;
       return sum + e.durationMinsOneWay + (e.durationMinsBack ?? e.durationMinsOneWay);
     }, 0);
     items.push({
@@ -458,16 +478,14 @@ function jobPromoBreakdown(
   }
 
   /**
-   * Whether the promo discounts a task. A task is hourly if either: it has a
-   * baseRateId set (new rate model), OR no flat rateConfigId. The double check
-   * survives stale AI output that forgets to clear rateConfigId. Business labour
-   * is out of scope for a promo, checked per task rather than per job so a mixed
-   * job discounts only its home-rate lines.
+   * Whether the promo discounts a task: hourly labour ({@link isHourlyTask}) that isn't
+   * business labour, which is out of scope for a promo. Checked per task rather than
+   * per job so a mixed job discounts only its home-rate lines.
    * @param t - The task line to classify.
    * @returns True when the promo applies to the line.
    */
   const isDiscounted = (t: (typeof job.tasks)[number]): boolean =>
-    (t.baseRateId != null || t.rateConfigId == null) && !isBusinessTask(t);
+    isHourlyTask(t) && !isBusinessTask(t);
   // Line totals in the cents jobToLineItems and calcJobTotal print. A raw sum discounts a
   // base the invoice never shows, landing the promo a cent off.
   const lineTotals = taskLineTotals(job.tasks);
@@ -501,9 +519,13 @@ function jobPromoBreakdown(
       // the cut). A line typed or saved under the live rate only comes down to
       // that floor: at an old $75 Standard the full $35 cut would bill $40/hr,
       // under the $65 the promo promises.
+      // A "No base" row has no live rate to measure from, so its floor is the promo
+      // price itself: a $40/hr row under a $50 promo stays at $40, as a Standard row
+      // typed at $40 does.
       const live =
         rates && t.baseRateId ? effectiveHourlyRate(rates, t.baseRateId, t.modifierIds) : 0;
-      return live > 0 ? Math.min(cut, Math.max(0, t.unitPrice - Math.max(0, live - cut))) : cut;
+      if (live > 0) return Math.min(cut, Math.max(0, t.unitPrice - Math.max(0, live - cut)));
+      return t.baseRateId == null ? Math.min(cut, Math.max(0, t.unitPrice - flat)) : cut;
     });
     const byTask = job.tasks.map((t, i) => Math.min(lineTotals[i]!, t.qty * hourCuts[i]!));
     // The total is what the lines lose at the promo price, both sides rounded the way
@@ -589,7 +611,10 @@ export function calcJobTotal(
   const lineTotals = taskLineTotals(job.tasks);
   const tasksTotal = lineTotals.reduce((s, line) => s + line, 0);
   const partsTotal = job.parts.reduce((s, p) => s + p.cost, 0);
-  const { tripTotal, total: travelTotal } = splitTravel(job.travelEntries, pricing.minTravelCharge);
+  const { driveTotal, total: travelTotal } = splitTravel(
+    job.travelEntries,
+    pricing.minTravelCharge,
+  );
   // The date surcharge (public holiday or weekend) uplifts labour only (hourly task
   // lines), never travel or parts. 0 when neither applies.
   const surchargeUplift = pricing.surchargeUplift ?? 0;
@@ -605,8 +630,9 @@ export function calcJobTotal(
   const { total: promoDiscount, byTask: promoByTask } = jobPromoBreakdown(
     job,
     promo,
-    // A free-travel promo covers getting to the client, not a store run.
-    tripTotal,
+    // A free-travel promo covers the drive to the client: not a store run, and not
+    // parking or tolls paid on the way.
+    driveTotal,
     pricing.businessModifierId,
     // The subtotal above is exactly the pre-discount total a spend threshold and
     // a tier band are judged against.
@@ -621,11 +647,14 @@ export function calcJobTotal(
   // stack them: a 35%-off promo plus half price would bill 15% of the labour, not
   // 32.5%. The whole-job flag covers every hourly task and subsumes per-task flags,
   // so a task can't be discounted twice; lines are rounded the same way in both
-  // cases, so flagging every task matches the whole-job flag to the cent.
+  // cases, so flagging every task matches the whole-job flag to the cent. A weekend
+  // or holiday surcharge is part of what the labour costs that day, so the line's
+  // share of it is halved along with it: 2h on a +25% holiday bills $81.25, half of
+  // $162.50, not $65 of labour plus the full $32.50 surcharge.
   const unsuccessfulBase = job.tasks.reduce(
     (s, t, i) =>
       isHourlyTask(t) && (job.unsuccessful || t.unsuccessful)
-        ? s + lineTotals[i]! - (promoByTask[i] ?? 0)
+        ? s + lineTotals[i]! * (1 + surchargeUplift) - (promoByTask[i] ?? 0)
         : s,
     0,
   );
