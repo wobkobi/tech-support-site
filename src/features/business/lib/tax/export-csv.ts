@@ -249,9 +249,9 @@ export function buildTaxCsv(
   lines.push(line(csvText("Total deductions"), csvMoney(result.deductions.total), csvText("")));
   lines.push(
     line(
-      csvText("Not deducted: Fuel"),
+      csvText("Not deducted: Fuel and car costs"),
       csvMoney(result.deductions.excludedFuel),
-      csvText("Dated while a vehicle was on km rates, which cover fuel"),
+      csvText("Dated while a vehicle was on km rates, which cover fuel and running costs"),
     ),
   );
   lines.push(

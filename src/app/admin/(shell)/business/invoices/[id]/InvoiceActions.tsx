@@ -12,9 +12,9 @@
 // SendInvoiceModal.tsx and VoidInvoiceModal.tsx.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { adminButtonClass } from "@/features/admin/components/ui/button-classes";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
-import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import {
@@ -462,13 +462,12 @@ export function InvoiceActions({
           </>
         }
       >
-        <textarea
+        <AdminTextarea
           rows={5}
           value={notesDraft}
           onChange={(e) => setNotesDraft(e.target.value)}
           disabled={notesSaving}
           placeholder="Optional note shown on the invoice."
-          className={cn(ADMIN_INPUT_CLS, "resize-y")}
         />
       </Modal>
 

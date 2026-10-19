@@ -85,8 +85,8 @@ export function DeductionsBreakdown({
           <ul className="divide-y divide-admin-border">
             {excludedFuel > 0 && (
               <WorkingRow
-                label="Fuel"
-                note="Bought while the car was claimed on IRD kilometre rates, which already cover fuel."
+                label="Fuel and car costs"
+                note="Paid while the car was claimed on IRD kilometre rates, which already cover fuel and running costs."
                 value={formatNZD(excludedFuel)}
                 tone="muted"
               />

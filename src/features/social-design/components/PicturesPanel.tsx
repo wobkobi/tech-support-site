@@ -14,6 +14,7 @@ import type { Pictures } from "@/features/social-design/components/use-pictures"
 import type { DesignDoc } from "@/features/social-design/lib/doc";
 import { FORMATS, type FormatKey } from "@/features/social-design/lib/formats";
 import { autoAltText, pictureFileName } from "@/features/social-design/lib/pictures";
+import { TextArea } from "@/shared/components/TextArea";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useId, useState } from "react";
@@ -302,7 +303,7 @@ export function PicturesPanel({
           </h3>
           <label className="flex flex-col gap-1 text-sm text-admin-text">
             Post words
-            <textarea
+            <TextArea
               value={doc.caption}
               maxLength={2200}
               rows={4}
@@ -315,7 +316,7 @@ export function PicturesPanel({
           </label>
           <label className="flex flex-col gap-1 text-sm text-admin-text">
             Picture description
-            <textarea
+            <TextArea
               value={doc.altText}
               maxLength={300}
               rows={2}

@@ -15,7 +15,11 @@ export const VALID_FREQUENCIES = [
 // select and the sheet read the same list top to bottom.
 export const EXPENSE_CATEGORIES = [
   "Fuel",
+  // Rego, WOF, servicing, tyres, car insurance. Not deducted while on km rates.
+  "Vehicle",
   "Tools",
+  // Parts billed on to a client.
+  "Parts for clients",
   "Software",
   "Marketing",
   "Phone/Internet",
@@ -29,6 +33,8 @@ export const EXPENSE_CATEGORIES = [
   "Office supplies",
   "Insurance",
   "Accounting",
+  // Courses, books, certifications.
+  "Training",
   "Other",
 ] as const;
 

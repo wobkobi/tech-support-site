@@ -16,6 +16,7 @@ import {
 import { Button } from "@/shared/components/Button";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
+import { TextArea } from "@/shared/components/TextArea";
 import { cn } from "@/shared/lib/cn";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type React from "react";
@@ -241,7 +242,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
         <label htmlFor="enquiry-needs" className={FIELD_LABEL}>
           What do you need help with? <span className="text-error">*</span>
         </label>
-        <textarea
+        <TextArea
           id="enquiry-needs"
           required
           aria-required

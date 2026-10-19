@@ -8,6 +8,7 @@ import {
   DESCRIPTION_NO_WORDS_MESSAGE,
 } from "@/features/booking/lib/booking";
 import { NOTES_WARN_GAP } from "@/features/booking/lib/booking-form";
+import { TextArea } from "@/shared/components/TextArea";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -58,7 +59,7 @@ export function BookingNotesField({
       <label htmlFor="booking-notes" className="text-base font-semibold text-rich-black">
         What do you need help with? <span className="text-error">*</span>
       </label>
-      <textarea
+      <TextArea
         id="booking-notes"
         name="booking-notes-no-autofill"
         autoComplete="new-password"
@@ -175,7 +176,7 @@ export function BookingAccessNotesField({
       <p id="booking-access-notes-hint" className="text-base text-rich-black/70">
         Parking, directions, gate or door codes, pets, or the best way in.
       </p>
-      <textarea
+      <TextArea
         id="booking-access-notes"
         name="booking-access-notes-no-autofill"
         autoComplete="off"

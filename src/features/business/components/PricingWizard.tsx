@@ -22,6 +22,7 @@ import {
 } from "@/features/business/lib/promos";
 import type { PriceRange, PublicRate } from "@/features/business/types/pricing";
 import { Button } from "@/shared/components/Button";
+import { TextArea } from "@/shared/components/TextArea";
 import { cn } from "@/shared/lib/cn";
 import type { EstimateConfidence, EstimatorRange } from "@/shared/lib/settings/types";
 import type React from "react";
@@ -733,7 +734,7 @@ export function PricingWizard({
           <p className={STEP_HELP}>
             Describe the issue or job - the more detail, the better the estimate.
           </p>
-          <textarea
+          <TextArea
             rows={4}
             value={issueDescription}
             onChange={(e) => setIssueDescription(e.target.value)}

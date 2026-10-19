@@ -1,9 +1,10 @@
 // src/features/admin/components/ui/AdminTextarea.tsx
 // Native textarea in the admin field style, resizable vertically only. Every native prop
 // (and `ref`, a plain prop in React 19) passes straight through; `className` merges over
-// the defaults. Server-safe.
+// the defaults. Built on TextArea, so Grammarly fixes stick.
 
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { TextArea } from "@/shared/components/TextArea";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
@@ -17,5 +18,5 @@ export function AdminTextarea({
   className,
   ...rest
 }: React.ComponentProps<"textarea">): React.ReactElement {
-  return <textarea {...rest} className={cn(ADMIN_INPUT_CLS, "resize-y", className)} />;
+  return <TextArea {...rest} className={cn(ADMIN_INPUT_CLS, "resize-y", className)} />;
 }
