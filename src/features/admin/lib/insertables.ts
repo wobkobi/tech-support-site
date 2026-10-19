@@ -1,7 +1,5 @@
 // src/features/admin/lib/insertables.ts
-// Add menu sections both the social composer and the email editor offer: promo
-// wording, contact details and symbols. Contact details come from the settings and
-// site address, so they follow any change made there.
+// Add-menu sections shared by the social composer and email editor (promo, contact, symbols).
 
 import type { InsertGroup } from "@/features/admin/components/ui/InsertMenu";
 import type { PromoWording } from "@/features/mailing/lib/render";
@@ -29,8 +27,7 @@ export function insertDetailsOf(
 }
 
 /**
- * Promo placeholders, each showing what it would fill with today, or saying none is
- * running (the post or email can still go out later, once one is).
+ * Promo placeholders, each previewing today's fill or saying none is running.
  * @param promo - The running promo's wording, or null.
  * @returns The Promo section.
  */

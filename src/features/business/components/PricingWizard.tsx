@@ -1,8 +1,6 @@
 "use client";
 // src/features/business/components/PricingWizard.tsx
-// Public multi-step price-estimate wizard. Gathers a job description, location, and
-// meeting type, uses the AI duration estimator to predict job length, and shows a price
-// range with travel and after-hours.
+// Public multi-step price-estimate wizard: AI-estimated job length to a price range.
 
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { BOOKING_FIELD_LIMITS } from "@/features/booking/lib/booking";
@@ -103,16 +101,9 @@ interface QuoteSettings {
 }
 
 /**
- * Builds the displayed price range from a fixed set of estimate inputs and one
- * promo.
- *
- * Split out of the estimate flow so applying a promo code reprices from what
- * was already fetched. Re-running the whole flow would spend another AI call
- * and could return a different duration, which reads as the code having changed
- * the length of the job.
- * A spend threshold or a tier band is judged here rather than by the caller,
- * because the figure it needs - the undiscounted total - only exists inside
- * this function.
+ * Builds the displayed price range from fixed estimate inputs and one promo, so a promo
+ * code reprices without another AI call. Spend thresholds are judged here, on the
+ * undiscounted total.
  * @param inputs - The estimate inputs, independent of any promo.
  * @param settings - Live pricing settings.
  * @param resolvedPromo - The promo resolution returned, before spend is known.
@@ -123,14 +114,11 @@ function buildPriceRange(
   settings: QuoteSettings,
   resolvedPromo: ActivePromo | null,
 ): { range: PriceRange; promoRate: number; promo: ActivePromo | null } {
-  // Floor short jobs to the published billable minimum. The range width is
-  // confidence-scaled (see priceRangeFor) - wider, with a lower low end, when
-  // the description is vague.
+  // Floor to the billable minimum; the range widens with a vaguer description.
   const effectiveMins = Math.max(settings.minBillableMins, inputs.estimatedMins);
 
   /**
-   * Confidence-scaled price band for one slice, via the shared helper so the
-   * pricing page and the inline booking estimate use identical math.
+   * Confidence-scaled price band for one slice, shared with the inline booking estimate.
    * @param mins - Minutes for this slice.
    * @param rate - Effective $/hr.
    * @returns Whole-dollar low/high range.
@@ -144,9 +132,7 @@ function buildPriceRange(
       settings.lowEndFloorFactor,
     );
 
-  // Travel uses the dedicated Travel rate (never promo-discounted, never
-  // labour-rate). Routes through calcTravelCharge so the floor + leg
-  // summing match the calculator and invoice exactly.
+  // Travel rate (never discounted) via calcTravelCharge, matching the calculator and invoice.
   const travel = calcTravelCharge(
     inputs.travelMins,
     inputs.travelMinsBack,
@@ -155,30 +141,23 @@ function buildPriceRange(
   );
 
   /**
-   * Labour-only band (floor applied), with the drive-time charge alongside it
-   * for the separate travel line - not folded into low/high.
+   * Labour-only band (floor applied), with the travel charge alongside for its own line.
    * @param rate - Effective $/hr for labour.
    * @returns Labour low/high plus the (rate-invariant) drive-time charge.
    */
   const buildVisitRange = (rate: number): { low: number; high: number; travel: number } => {
     const { low, high } = rangeFor(effectiveMins, rate);
-    // Labour-only band; travel is surfaced on its own line (matching the
-    // booking form) rather than folded into the headline. The logged total
-    // below stays all-in so the booking snapshot is unchanged.
+    // Travel shows on its own line; the logged total below stays all-in.
     return { low, high, travel };
   };
 
-  // Priced undiscounted first, because that total is what a spend threshold and
-  // a tier band are judged against. It doubles as the crossed-out "before"
-  // figure below, so nothing is priced twice.
+  // Undiscounted first: spend thresholds judge it, and it doubles as the "before" figure.
   const undiscounted = buildVisitRange(inputs.fullRate);
   const promo = promoForSpend(resolvedPromo, undiscounted.low + undiscounted.travel);
   const promoRate = applyPromoToHourlyRate(inputs.fullRate, promo, inputs.baseRate);
   const promoApplied = promoRate < inputs.fullRate;
 
-  // Quote-level promo types (fixed amount, free travel) act here, after the
-  // band and travel are priced. The rate-based types already applied to
-  // promoRate above and are a no-op at this stage.
+  // Quote-level promos (fixed amount, free travel) apply here; rate-based ones already did.
   const pricedRange = buildVisitRange(promoRate);
   const discounted = applyPromoToQuote(
     { labourLow: pricedRange.low, labourHigh: pricedRange.high, travel: pricedRange.travel },
@@ -189,10 +168,7 @@ function buildPriceRange(
     high: discounted.labourHigh,
     travel: discounted.travel,
   };
-  // The crossed-out "before" figure is deliberately undiscounted at both
-  // stages. A quote-level promo moves travel without touching the band, so
-  // the comparison has to include travel or a free-travel offer would show
-  // no saving at all.
+  // The "before" figure includes travel, or a free-travel offer would show no saving.
   const anyDiscount =
     promoApplied ||
     promoRange.low !== pricedRange.low ||
@@ -207,16 +183,12 @@ function buildPriceRange(
       ? rawOriginal
       : null;
 
-  // Allocate the visit range proportionally to each task's share of total mins. A
-  // per-line rangeFor would re-apply the $20 minimum spread and inflate past the visit
-  // total; the proportional split keeps the sum honest, with drift snapping to the
-  // largest line.
+  // Split the visit range by each task's share of minutes (rounding drift to the largest
+  // line); a per-line rangeFor would re-apply the $20 spread and inflate the total.
   const taskLines = (() => {
     const visitJob = rangeFor(effectiveMins, promoRate);
     if (inputs.tasks.length <= 1) {
-      // Use the AI's own label ("Wi-Fi troubleshooting") rather than a generic
-      // one - the multi-task branch below already does. "Tech support" stays
-      // as the fallback for a parse that returned no tasks at all.
+      // The AI's own label, falling back to "Tech support" when no tasks came back.
       return [
         {
           label: inputs.tasks[0]?.label || "Tech support",
@@ -299,8 +271,7 @@ interface Props {
 }
 
 /**
- * Multi-step wizard that gathers a job description, location, and meeting type,
- * uses the AI duration estimator to predict job length, and shows a price range.
+ * Multi-step wizard from job description, meeting type and location to a price range.
  * @param props - Component props.
  * @param props.minBillableMins - Minimum billable minutes used to floor the estimate.
  * @param props.minTravelCharge - Travel floor for the travel estimate.
@@ -323,24 +294,20 @@ export function PricingWizard({
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<Step>("issue");
   const [issueDescription, setIssueDescription] = useState("");
-  // Null until the customer explicitly picks - no silent on-site default, so a
-  // remote customer can't skip past and get a travel-inclusive quote by accident.
+  // Null until picked, so nobody gets a travel-inclusive quote by accident.
   const [meeting, setMeeting] = useState<MeetingMode | null>(null);
   const [address, setAddress] = useState("");
   const [addressNotFound, setAddressNotFound] = useState(false);
   const [aiExplanation, setAiExplanation] = useState("");
   const [aiEstimatedMins, setAiEstimatedMins] = useState(0);
   const [aiConfidence, setAiConfidence] = useState<EstimateConfidence>("medium");
-  // True when the AI estimate failed and the quote rests on the fallback
-  // duration, which must not be presented as a reading of the description.
+  // True when the quote rests on the fallback duration after an AI failure.
   const [aiFailed, setAiFailed] = useState(false);
   const [result, setResult] = useState<PriceRange | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
-  // Id of the logged estimate, carried to /booking so the booking snapshots
-  // which quote the customer actually saw.
+  // Logged estimate id, carried to /booking to snapshot the quote seen.
   const [estimateId, setEstimateId] = useState<string | null>(null);
-  // The estimate behind the current quote, kept so applying a promo code
-  // reprices it instead of asking the AI again.
+  // The estimate behind the quote, so a promo code reprices without the AI.
   const [quoteInputs, setQuoteInputs] = useState<QuoteInputs | null>(null);
   const [promoCode, setPromoCode] = useState("");
   const [codePromo, setCodePromo] = useState<ActivePromo | null>(null);
@@ -376,8 +343,7 @@ export function PricingWizard({
 
   /** Calls both APIs in parallel then computes a price range from the AI's time estimate. */
   async function getEstimate(): Promise<void> {
-    // Reachable only after the meeting step, which requires an explicit pick;
-    // guard anyway so `meeting` narrows to a concrete mode below.
+    // Guard so `meeting` narrows below.
     if (!meeting) return;
     setIsCalculating(true);
     setAddressNotFound(false);
@@ -420,9 +386,7 @@ export function PricingWizard({
       ),
     ]);
 
-    // Both legs at "now"-ish traffic - no job time exists yet, and the server
-    // defaults the return to +60 min, matching the fallback duration below.
-    // Forced to 0 for remote even if an address was typed before backing up.
+    // Both legs at "now" traffic (no job time yet); 0 for remote even with a typed address.
     const travelMins =
       meeting === "remote"
         ? 0
@@ -436,23 +400,19 @@ export function PricingWizard({
           ? (travelRes.value.durationMinsBack ?? travelMins)
           : 0;
 
-    // Disclaim when an address was typed but geocoding returned durationMins: 0.
-    // Without this the wizard silently quotes $0 travel.
+    // Disclaim a typed address that geocoded to 0 minutes, not silently quote $0 travel.
     if (meeting === "on-site" && dest && travelMins === 0) {
       setAddressNotFound(true);
     }
 
-    // Resolve the live base + remote delta regardless of the AI call's outcome,
-    // so a failed/timed-out estimate still prices against the operator's current
-    // rate instead of the hardcoded fallback (mirrors quick-estimate.ts).
+    // Live rates even when the AI call fails (mirrors quick-estimate.ts).
     const baseStandard =
       rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
       rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
       FALLBACK_BASE_RATE;
     const fullRate = baseStandard + remoteRateDelta(rates, meeting);
 
-    // Fallback defaults when the AI estimate fails. The results copy calls this
-    // "a typical one-hour job", so keep the two in step.
+    // Fallback when the AI fails; must match the "typical one-hour job" copy.
     let estimatedMins = 60;
     let explanation = "";
     let confidence: EstimateConfidence = "medium";
@@ -488,9 +448,7 @@ export function PricingWizard({
     };
     // Held so applying a promo code later reprices from the same estimate.
     setQuoteInputs(inputs);
-    // No appointment exists at this point in the wizard, so a promo restricted
-    // to certain days cannot be checked and is deliberately not priced in. It is
-    // still named below, under the estimate.
+    // No appointment yet, so a day-restricted promo isn't priced in (it is named below).
     const promo = promoForAppointment(codePromo ?? activePromo, null);
     const built = buildPriceRange(inputs, settings, promo);
     const { range, promoRate } = built;
@@ -499,9 +457,7 @@ export function PricingWizard({
     setIsCalculating(false);
     setStep("results");
 
-    // Reaching a quote is the strongest intent signal short of booking: the
-    // customer has described a real problem and seen a price. Report it so the
-    // funnel shows where estimates stall instead of turning into bookings.
+    // Report the quote so the funnel shows where estimates stall before booking.
     if (typeof window.gtag === "function") {
       window.gtag("event", "price_estimate");
     }
@@ -510,8 +466,7 @@ export function PricingWizard({
   }
 
   /**
-   * Records the quote the customer actually saw and keeps its id for the
-   * booking link. Fire-and-forget: a failed log must not break the quote.
+   * Logs the quote seen and keeps its id for the booking link. Fire-and-forget.
    * @param inputs - The estimate behind the quote.
    * @param range - The range as displayed.
    * @param promoRate - Effective $/hr the range was built at.
@@ -537,8 +492,7 @@ export function PricingWizard({
         travelMinsBack: inputs.travelMinsBack,
         meetingType: inputs.meeting === "on-site" ? "in_person" : "remote",
         hourlyRate: promoRate,
-        // Logged total stays all-in (labour + travel) so the booking snapshot
-        // and legacy consumers keep the full price; the headline shows labour only.
+        // Logged total stays all-in; the headline shows labour only.
         priceLow: range.low + travel,
         priceHigh: range.high + travel,
         travelCharge: travel,
@@ -556,19 +510,14 @@ export function PricingWizard({
   }
 
   /**
-   * Reprices the quote on screen after a promo code is applied or cleared.
-   *
-   * Rebuilt from the stored estimate rather than re-run: another AI call could
-   * return a different duration, which would read as the code having changed
-   * how long the job takes. Re-logged because the customer is now looking at a
-   * different quote, and the booking snapshots whichever one they saw.
+   * Reprices from the stored estimate after a promo code is applied or cleared, and
+   * re-logs it since the booking snapshots the quote seen.
    * @param promo - The promo the code unlocked, or null when it was cleared or rejected.
    */
   function repriceForCode(promo: ActivePromo | null): void {
     setCodePromo(promo);
     if (!quoteInputs) return;
-    // A rejected code leaves the automatic promo in place - it never costs the
-    // customer a discount they already had.
+    // A rejected code leaves the automatic promo in place.
     const effective = promoForAppointment(promo ?? activePromo, null);
     const built = buildPriceRange(quoteInputs, settings, effective);
     setResult(built.range);
@@ -576,9 +525,7 @@ export function PricingWizard({
   }
 
   /**
-   * Advances to the next step. Remote sessions skip the address step (there's
-   * no travel to look up); the address step is the trigger for the estimate
-   * on-site, the meeting step is the trigger for remote.
+   * Advances a step; remote skips the address step, so the estimate runs from whichever is last.
    */
   async function nextStep(): Promise<void> {
     if (step === "issue") {
@@ -633,8 +580,7 @@ export function PricingWizard({
     return true;
   }
 
-  // Step progression: on-site has 3 steps (issue > meeting > address), remote
-  // has 2 (issue > meeting). stepIndex / totalSteps drive the progress bar.
+  // On-site: issue > meeting > address; remote: issue > meeting.
   const totalSteps = meeting === "remote" ? 2 : 3;
   const stepIndex = step === "issue" ? 0 : step === "meeting" ? 1 : 2;
 
@@ -646,10 +592,8 @@ export function PricingWizard({
     );
   }
 
-  // An offer the estimate could not price in, because it only runs on certain
-  // days and no appointment has been chosen yet, or depends on who the customer
-  // is. Named rather than dropped: a customer who would book a Tuesday should
-  // know a Tuesday is worth picking.
+  // An offer the estimate couldn't price in (day- or customer-restricted), named so the
+  // customer knows to pick that day.
   const restrictedOffer = (() => {
     const resolved = codePromo ?? activePromo;
     if (!resolved || promoForAppointment(resolved, null)) return null;
@@ -667,17 +611,12 @@ export function PricingWizard({
     ? priceRangeText(result.low + travelCharge, result.high + travelCharge)
     : "";
 
-  // The next spend threshold this estimate has not reached. Naming it is the
-  // whole point of a tiered offer - without it the customer cannot know that
-  // a slightly larger job earns more, which is exactly what the promo is for.
-  // Shown whether or not a lower band already applied.
+  // The next spend threshold not yet reached, shown even when a lower band applied.
   const spendNudge = (() => {
     const resolved = promoForAppointment(codePromo ?? activePromo, null);
     if (!resolved || !result) return null;
-    // Judged on the same pre-discount total buildPriceRange judged the promo on. No
-    // promo applied means the figures on screen already are; when one did, the
-    // original* pair is - travel included, or a free-travel promo the estimate
-    // already earned reads as one still to earn.
+    // Judge on the pre-discount total incl. travel (the original* pair when a promo
+    // applied), or an already-earned free-travel promo reads as one still to earn.
     const total =
       (result.originalLow ?? result.low) + (result.originalTravel ?? result.travelCharge ?? 0);
     const next = [
@@ -689,13 +628,11 @@ export function PricingWizard({
     if (next === undefined) return null;
     const earned = promoForSpend(resolved, next);
     if (!earned) return null;
-    // Tiers stripped so the phrase names the one band that threshold unlocks
-    // rather than listing every band again.
+    // Tiers stripped so the phrase names only the band this threshold unlocks.
     return `Jobs over $${next} get ${describePromoDiscount({ ...earned, tiers: [] })}.`;
   })();
 
-  // An applied code travels to /booking so the customer does not re-enter it;
-  // the booking route re-resolves it there rather than trusting the link.
+  // An applied code travels to /booking, which re-resolves it.
   const bookingHref = (() => {
     const params = new URLSearchParams();
     if (estimateId) params.set("estimate", estimateId);
@@ -866,9 +803,7 @@ export function PricingWizard({
               {meeting === "remote"
                 ? "Remote session - no travel charge. "
                 : result.includesTravel
-                  ? // Only mention the minimum when the minimum is what's being
-                    // charged - saying "$10 minimum" beside a $40 drive reads as
-                    // if the customer is being quoted the floor.
+                  ? // Mention the minimum only when the minimum is what's charged.
                     (result.travelCharge ?? 0) <= minTravelCharge
                     ? `Round-trip drive time is charged at the Travel rate, ${formatPriceRound(minTravelCharge)} minimum. `
                     : "Round-trip drive time is charged at the Travel rate. "

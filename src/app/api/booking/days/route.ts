@@ -18,7 +18,6 @@ async function fetchCalendarEventsSafe(
   maxDate: Date,
 ): Promise<Array<{ id: string; start: string; end: string }>> {
   try {
-    // Try to import the calendar module
     const { fetchAllCalendarEvents } = await import("@/features/calendar/lib/google-calendar");
     const rawEvents = await fetchAllCalendarEvents(now, maxDate);
     const events = rawEvents.map((e) => ({
@@ -29,7 +28,6 @@ async function fetchCalendarEventsSafe(
     console.log(`[booking/days] ✅ Blocking ${events.length} calendar events`);
     return events;
   } catch (error) {
-    // Log the actual error
     console.error("[booking/days] ❌ Calendar error:", error);
     console.error(
       "[booking/days] Error details:",
@@ -41,8 +39,7 @@ async function fetchCalendarEventsSafe(
 
 /**
  * GET /api/booking/days
- * Returns available booking days, blocking both calendar events and database bookings.
- * Rate-limited per IP because each call hits the DB plus the Google Calendar API.
+ * Available booking days. Rate-limited because each call hits the DB and Google Calendar.
  * @param request - Incoming request used for IP-based rate limiting.
  * @returns JSON response with available days
  */
@@ -71,7 +68,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     console.log(`[booking/days] Found ${existingForSlots.length} database bookings`);
 
-    // Fetch calendar events (safe - returns empty array if not available)
     const calendarEvents = await fetchCalendarEventsSafe(now, maxDate);
 
     const { days, sameDayClosed } = buildAvailableDays(

@@ -1,7 +1,5 @@
 // src/features/business/types/pricing.ts
-// Type definitions for the public pricing estimator - rate and service shapes plus the
-// price-range breakdown (low/high, travel, after-hours, and promo) rendered by the
-// pricing wizard.
+// Types for the public pricing estimator: rates and the price-range breakdown.
 
 export interface PublicRate {
   label: string;
@@ -25,17 +23,13 @@ export interface PriceRange {
   high: number;
   breakdown: BreakdownLine[];
   includesTravel: boolean;
-  /**
-   * The round-trip drive charge actually applied ($). Lets the UI tell a
-   * floored charge from a real one, so the "minimum" note only shows when the
-   * minimum is what's being billed.
-   */
+  /** Round-trip drive charge applied ($), so the "minimum" note shows only when floored. */
   travelCharge?: number;
   includesAfterHours: boolean;
   /** Pre-promo range, populated only when an active promo discounted the headline. */
   originalLow?: number;
   originalHigh?: number;
-  /** Pre-promo travel charge, set alongside originalLow; a free-travel promo zeroes travelCharge but not this. */
+  /** Pre-promo travel charge; a free-travel promo zeroes travelCharge but not this. */
   originalTravel?: number;
   /** Customer-facing label of the active promo, when applied. */
   promoLabel?: string;

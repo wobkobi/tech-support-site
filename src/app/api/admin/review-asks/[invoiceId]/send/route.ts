@@ -1,7 +1,6 @@
 // src/app/api/admin/review-asks/[invoiceId]/send/route.ts
-// Admin "Send now" on an upcoming or failed review ask. Uses the daily job's own
-// claim-send-stamp path, minus the delay and the gap between asks, so the two can't both
-// email the person. Opt-outs still apply, and works even with automatic asks off.
+// Admin "Send now" for a review ask, via the daily job's claim-send-stamp path (no delay or
+// gap) so both can't send. Opt-outs still apply.
 
 import { reviewAskNoteLabel } from "@/features/reviews/lib/review-ask-rules";
 import { runReviewAsks } from "@/features/reviews/lib/review-ask-run.server";

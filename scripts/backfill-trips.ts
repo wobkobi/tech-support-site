@@ -1,13 +1,7 @@
 // scripts/backfill-trips.ts
-// One-off backfill of the trips log from past invoices, for jobs billed before an invoice
-// save logged its own trip. Two passes:
-//   plan:  reads every non-voided, non-quote invoice, works out where and when you drove
-//          (booking address, then the calendar event's location, then the contact's
-//          address; the event or booking day, else the issue date), guesses remote jobs
-//          from the booking and the line wording, looks up Google's round-trip km, prints
-//          one line per invoice and saves the plan as JSON. Writes nothing to the DB.
-//   write: reads that plan and logs a trip for each "log" row, minus any --skip numbers,
-//          plus any --include numbers (e.g. a job wrongly guessed as remote).
+// One-off backfill of the trips log from past invoices. `plan` works out address, date,
+// remote guess and round-trip km per invoice into a JSON plan (no DB writes); `write` logs
+// each "log" row, minus --skip, plus --include (e.g. a job wrongly guessed remote).
 // Run with:
 //   npx dotenv -e .env.local -- tsx --conditions=react-server scripts/backfill-trips.ts plan <plan.json>
 //   npx dotenv -e .env.local -- tsx --conditions=react-server scripts/backfill-trips.ts write <plan.json> [--skip=TTP-1,TTP-2] [--include=TTP-3]
@@ -42,8 +36,8 @@ interface PlanRow {
 const REMOTE_WORDING = /\bremote\b|\bby (text|phone|email)\b|over the phone|phone call/i;
 
 /**
- * The travel origin: the base address saved in Settings, else HOME_ADDRESS. Read from the
- * settings row directly, since getSettings needs a request (it is cached per request).
+ * The travel origin: Settings base address, else HOME_ADDRESS. Reads the row directly
+ * since getSettings needs a request.
  * @returns Origin address, or null when neither is set.
  */
 async function baseAddress(): Promise<string | null> {
@@ -82,9 +76,8 @@ async function legKm(origin: string, destination: string, key: string): Promise<
 }
 
 /**
- * Round-trip km from the base address, matching the app's lookup: the destination gets
- * ", New Zealand" and is capped at 100 characters, a missing return leg mirrors the way
- * there, and a trip over the log's limit counts as no route.
+ * Round-trip km matching the app's lookup: missing return leg mirrors the way there; over
+ * the log's limit counts as no route.
  * @param origin - Base address.
  * @param address - Job address.
  * @param key - Google Maps server key.
@@ -100,8 +93,7 @@ async function roundTripKm(origin: string, address: string, key: string): Promis
 }
 
 /**
- * Flattens a multi-line calendar location or a booking's unit and address to one line,
- * the same way the calculator's event prefill does.
+ * Flattens a multi-line address to one line, as the calculator's event prefill does.
  * @param raw - Address text, possibly multi-line.
  * @returns Single-line address.
  */
@@ -119,8 +111,7 @@ async function buildPlan(): Promise<PlanRow[]> {
   if (!origin || !mapsKey) throw new Error("Base address or GOOGLE_MAPS_SERVER_KEY is not set");
   const [invoices, trips] = await Promise.all([
     prisma.invoice.findMany({
-      // Quotes are dropped below, not here: on MongoDB `isQuote: { not: true }` also
-      // skips the older invoices that have no isQuote field at all.
+      // Quotes filtered below: on MongoDB `isQuote: { not: true }` skips rows missing the field
       where: { status: { not: "VOIDED" } },
       orderBy: { issueDate: "asc" },
       select: {

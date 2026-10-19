@@ -1,8 +1,6 @@
 // src/features/admin/components/ui/AdminCheckbox.tsx
-// Single-line admin checkbox with its label. Used for the "do this too?" opt-outs an
-// action carries with it - the review email on completing a booking, the reschedule email
-// on a time edit, the draft invoice on a no-show - inside confirm-dialog bodies and admin
-// forms alike.
+// Single-line admin checkbox with its label, mostly for the "do this too?" opt-outs inside
+// confirm dialogs and admin forms.
 
 "use client";
 

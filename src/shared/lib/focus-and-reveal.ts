@@ -11,9 +11,8 @@ export function scrollBehaviour(): ScrollBehavior {
 }
 
 /**
- * Focuses an element and brings it to the middle of the viewport. Focus goes
- * first with preventScroll, because the browser's own focus-scroll jumps and
- * can leave the element under the fixed nav or a sticky submit band.
+ * Focuses an element (preventScroll) then centres it, since the browser's focus-scroll can
+ * leave it under the fixed nav.
  * @param el - Element to focus.
  */
 export function focusAndReveal(el: HTMLElement): void {

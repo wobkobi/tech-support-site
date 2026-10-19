@@ -1,29 +1,25 @@
 // src/features/mailing/lib/body-syntax.ts
-// The line patterns of a mailing email body. The renderer, the block editor's parser and
-// "Share to social" all read the body with these, so the three can't disagree about what
-// a line means.
+// Line patterns of a mailing email body, shared by the renderer, the block editor's parser
+// and "Share to social" so they agree on what a line means.
 
 /** A line that is only `[Text](https://...)`: rendered as a button. */
 export const BUTTON_LINE_RE = /^\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)$/i;
 
 /**
- * A line that is only `![alt](https://...)`: rendered as a picture. An optional
- * `"small"` title (`![alt](url "small")`) makes it half width and centred.
+ * A line that is only `![alt](https://...)`: a picture; `![alt](url "small")` is half width.
  * Groups: 1 alt, 2 image URL, 3 `small` when present.
  */
 export const IMAGE_LINE_RE = /^!\[([^\]\n]*)\]\((https:\/\/[^)\s]+)(?:\s+"(small)")?\)$/i;
 
 /**
- * A button still waiting for its link, `[Text]()`: a new Button block, or one a draft
- * added. Left out of the email (and listed as a problem) until it has one.
- * Group 1 is the button text.
+ * A button still waiting for its link, `[Text]()`; left out and listed as a problem until
+ * it has one. Group 1 is the button text.
  */
 export const BUTTON_PLACEHOLDER_RE = /^\[([^\]\n]+)\]\(\)$/;
 
 /**
- * A picture still to be chosen, `![alt]()`: a template's header picture before
- * one is uploaded. Left out of the email (and listed as a problem) until it has one.
- * Group 1 is the alt text.
+ * A picture still to be chosen, `![alt]()`; left out and listed as a problem until it has
+ * one. Group 1 is the alt text.
  */
 export const PICTURE_PLACEHOLDER_RE = /^!\[([^\]\n]*)\]\(\)$/;
 
@@ -77,9 +73,8 @@ export function isListLine(line: string): boolean {
 }
 
 /**
- * A `>> ` line: part of a big box, a coloured panel with a large headline. Checked
- * before {@link QUOTE_LINE_RE}, which would otherwise read it as a quote line starting
- * with `>`. Group 1 is the text after the marker.
+ * A `>> ` line: part of a big box (coloured panel, large headline). Check it before
+ * {@link QUOTE_LINE_RE}, which also matches. Group 1 is the text after the marker.
  */
 export const BOX_LINE_RE = /^>>[ \t]?(.*)$/;
 
@@ -98,10 +93,8 @@ export interface BoxParts {
 }
 
 /**
- * Reads a big box from the text of its `>> ` lines (markers already stripped):
- * - the first picture line is the background photo,
- * - the first button line (or `[Text]()` waiting for a link) is the button,
- * - the first other line is the headline and the rest are the smaller lines.
+ * Reads a big box from its `>> ` lines (markers stripped): first picture is the photo,
+ * first button the button, first other line the headline, the rest smaller lines.
  * @param lines - Trimmed line texts, blank ones already dropped.
  * @returns The box's parts.
  */

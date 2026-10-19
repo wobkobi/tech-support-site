@@ -1,17 +1,11 @@
 // src/shared/lib/jpeg-size.ts
-// Reads a JPEG's pixel size from its header: for a picture carried over from an email
-// into a post, and for a post maker export, so the server stores what the file really
-// is rather than what the browser says. The editors always upload JPEG, so this avoids
-// bundling an image library into the function for one lookup.
+// Reads a JPEG's pixel size from its header so the server stores the file's real size, without
+// bundling an image library.
 
 /**
- * Finds the width and height in a JPEG's start-of-frame segment.
- *
- * A JPEG is a run of segments, each `FF xx` then a 2-byte big-endian length that
- * counts itself. Restart (D0-D7) and TEM (01) markers stand alone with no length.
- * The size lives in the first SOF segment (C0-CF, apart from C4 Huffman tables, C8
- * reserved and CC arithmetic coding): 1 byte precision, then 2 bytes height, then
- * 2 bytes width.
+ * Finds width and height in a JPEG's first SOF segment (C0-CF except C4, C8, CC). Segments are
+ * `FF xx` plus a self-counting 2-byte length; D0-D7 and 01 stand alone. SOF holds precision (1),
+ * height (2), width (2).
  * @param bytes - The file's bytes.
  * @returns Width and height, or null when it isn't a readable JPEG.
  */

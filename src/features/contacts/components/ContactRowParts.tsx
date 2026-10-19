@@ -1,9 +1,7 @@
 "use client";
 // src/features/contacts/components/ContactRowParts.tsx
-// Pieces of one contact row shared by the phone card (ContactCard) and the desktop table
-// (ContactTable): sync status and its confirm panel, the merge-aware row actions, the
-// delete confirm panel, and the linked-reviews toggle and list. Every handler comes in as
-// a prop; the list owns all state.
+// Contact row pieces shared by ContactCard and ContactTable: sync, actions, delete
+// confirm and linked reviews. The list owns all state.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
@@ -15,18 +13,14 @@ import { cn } from "@/shared/lib/cn";
 import { formatNZPhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 
-/**
- * Compact row-action button: h-9, between the kit's xs and sm, with tighter padding. No
- * kit size matches, so it stays an override on the default size.
- */
+/** Compact row-action button: h-9, between the kit's xs and sm sizes. */
 const ROW_ACTION_CLS = "h-9 px-2";
 
 /** Tighter side padding on the xs size, for the desktop table's narrow actions column. */
 const TABLE_ACTION_CLS = "px-1.5";
 
 /**
- * Sync state for a contact: the "Synced" pill, "Syncing…" while a push runs, or the
- * button that opens the sync confirm.
+ * Sync state: the "Synced" pill, "Syncing…", or the button that opens the confirm.
  * @param props - Component props.
  * @param props.c - Contact row.
  * @param props.isSyncing - True while this contact is mid-sync.
@@ -95,9 +89,8 @@ export function ContactSyncConfirm({
 }
 
 /**
- * Row actions, which depend on the contact's part in a merge: "Keep this one" on every
- * other contact while a merge is picking its survivor, "Merging - cancel" on the contact
- * being merged away, otherwise Edit, Merge and Delete.
+ * Row actions by merge role: "Keep this one", "Merging - cancel", or Edit, Merge
+ * and Delete.
  * @param props - Component props.
  * @param props.compact - Use the table's tighter buttons so the actions column stays narrow.
  * @param props.mergeRole - This contact's role in an in-progress merge.
@@ -259,8 +252,7 @@ export function ContactReviewsToggle({
 }
 
 /**
- * A contact's linked reviews: reviewer, a link to the review page when the review has a
- * token, and the text cut to 80 characters.
+ * A contact's linked reviews, with a link when there is a token and text cut to 80 chars.
  * @param props - Component props.
  * @param props.reviews - Linked reviews.
  * @returns The review list element.

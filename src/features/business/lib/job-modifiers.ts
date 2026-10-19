@@ -27,8 +27,7 @@ export interface JobModifierResult {
 }
 
 /**
- * Tests whether a rate row (or an AI-emitted label) is the Business modifier. Matched on
- * the default label, like the /business page's rate.
+ * Tests whether a rate row (or AI-emitted label) is the Business modifier, by its default label.
  * @param rate - Rate row or anything carrying its label.
  * @param rate.label - Label to match, compared trimmed and case-insensitively.
  * @returns True for the Business modifier.
@@ -38,12 +37,8 @@ export function isBusinessModifier(rate: { label: string }): boolean {
 }
 
 /**
- * Adds the job-wide modifiers to one hourly task's modifier ids.
- *
- * Remote only fills a gap: a task the description already put on a channel (a phone
- * call, at home) keeps it, since a remote booking can still end in a call. Business goes
- * on every task and stacks with the channel, the same as ticking its chip. A missing or
- * renamed row adds nothing, so a deleted modifier is never billed.
+ * Adds the job-wide modifiers to one hourly task. Remote only fills a missing channel;
+ * Business stacks on every task. A missing or renamed row adds nothing.
  * @param modifierIds - The task's resolved modifier ids.
  * @param rates - Live rate rows.
  * @param facts - What the parse knows about the job.

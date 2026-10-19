@@ -1,8 +1,6 @@
 "use client";
 // src/features/admin/components/LoginForm.tsx
-// Client-side form for the admin login page. POSTs the secret to /api/admin/login and
-// navigates back to the requested `next` path on success. Generic error on failure so a
-// wrong password can't be distinguished from a rate-limited one (defence-in-depth).
+// Admin login form: POSTs the secret to /api/admin/login, then goes to `next`.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -17,9 +15,8 @@ interface LoginFormProps {
 }
 
 /**
- * Single-field login form. Shows a generic error on any failure (wrong
- * password, rate-limited, network) so the operator can't read failure-mode
- * details off the UI.
+ * Single-field login form. One generic error for every failure, so a wrong password
+ * can't be told apart from a rate limit.
  * @param props - Component props.
  * @param props.nextPath - Where to send the operator after a successful login.
  * @returns Login form element.
@@ -32,15 +29,12 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
   const secretRef = useRef<HTMLInputElement>(null);
 
   /**
-   * Submits the secret. On 2xx response, navigates to nextPath. On any other
-   * response (4xx, 5xx, network) shows a generic error.
+   * Submits the secret and navigates to nextPath on success.
    * @param e - Form submit event.
    */
   async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
-    // Read the live DOM value, not React state: a password-manager autofill
-    // can populate the field without firing an input event, leaving state
-    // empty while the input visibly holds the secret.
+    // Read the DOM value: password-manager autofill can skip the input event.
     const value = secretRef.current?.value ?? secret;
     if (!value) return;
     setError(null);
@@ -57,8 +51,7 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
         setBusy(false);
         return;
       }
-      // router.push + refresh so the cookie set in the response is visible to
-      // server components on the next render.
+      // Refresh so server components see the new cookie.
       router.push(nextPath);
       router.refresh();
     } catch {
@@ -69,10 +62,8 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      {/* Visually-hidden username: password managers key saved logins on a
-          username field, so a password-only form saves with a blank username
-          and autofill gets flaky. Off-screen (not display:none) so managers
-          still see it. */}
+      {/* Off-screen username so password managers save and autofill reliably;
+          not display:none, or they'd ignore it. */}
       <input
         type="text"
         name="username"

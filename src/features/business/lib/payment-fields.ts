@@ -1,14 +1,13 @@
 // src/features/business/lib/payment-fields.ts
-// Bank transfer fields for the invoice's payment call-out. NZ internet banking gives the payer
-// three boxes - Particulars, Code, Reference - each capped at 12 characters, so a full invoice
-// number (TTP-2627-0042, 13 characters) is silently truncated when pasted into one of them.
+// Bank transfer fields for the invoice's payment call-out. NZ banks cap Particulars, Code and
+// Reference at 12 characters, so TTP-2627-0042 (13) would be truncated.
 
 /** Character cap on each of the payer's Particulars, Code and Reference fields. */
 export const BANK_FIELD_MAX = 12;
 
 /**
  * Trims a value to what a bank field accepts: letters, digits, spaces and hyphens, capped at
- * {@link BANK_FIELD_MAX}. Banks reject or strip anything else, so drop it before the payer sees it.
+ * {@link BANK_FIELD_MAX}.
  * @param value - Raw value to clean.
  * @returns The cleaned value, 12 characters or fewer.
  */
@@ -21,8 +20,8 @@ function toBankField(value: string): string {
 }
 
 /**
- * Marks a client name as a business rather than a person. A business's last word is its legal
- * suffix or a generic trade word ("Acme Plumbing Ltd"), so it's named from the front instead.
+ * Marks a client name as a business, whose last word is a suffix or trade word, so it's named
+ * from the front.
  */
 const BUSINESS_NAME =
   /&|\b(ltd|limited|inc|incorporated|co|company|trust|group|holdings|services|solutions|nz)\b/i;
@@ -37,9 +36,8 @@ export function looksLikeBusinessName(name: string): boolean {
 }
 
 /**
- * Fits a business name into a bank field as whole words from the front: "68 Ltd" stays whole,
- * "Acme Plumbing Ltd" becomes "Acme". A bare first word can name nobody on the statement ("68"),
- * so words keep being added while they fit. A first word longer than the cap is truncated.
+ * Fits as many whole words from the front as fit: "68 Ltd" stays whole, "Acme Plumbing Ltd"
+ * becomes "Acme". An over-long first word is truncated.
  * @param parts - The name's words, leading article already dropped.
  * @returns Bank-field value, 12 characters or fewer.
  */
@@ -55,9 +53,8 @@ function businessBankField(parts: string[]): string {
 }
 
 /**
- * Picks the Particulars value that names the payer on the statement, since the statement itself
- * shows only an account number: a person's surname, or as much of a business's name as fits.
- * Falls back to the single name given, and to "Payment" when nothing usable is left.
+ * Particulars naming the payer on the statement: a person's surname or as much of a business
+ * name as fits, else the single name, else "Payment".
  * @param clientName - Client name as it appears on the invoice.
  * @returns Particulars value, 12 characters or fewer.
  */
@@ -73,8 +70,7 @@ export function bankParticulars(clientName: string): string {
 }
 
 /**
- * Builds the Code value from an invoice number by dropping the prefix every payment to the
- * business shares (TTP-2627-0042 > 2627-0042), which is what brings it under the field cap.
+ * Code value: the invoice number without its shared prefix (TTP-2627-0042 > 2627-0042).
  * @param invoiceNumber - Invoice or quote number, e.g. "TTP-2627-0042".
  * @returns Code value, 12 characters or fewer.
  */

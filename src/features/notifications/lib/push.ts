@@ -1,7 +1,6 @@
 // src/features/notifications/lib/push.ts
-// Web Push delivery to the operator's own devices. Mirrors the owner-email
-// helpers: swallows every error and never throws, so a failed notification can
-// never fail the customer action that triggered it.
+// Web Push delivery to the operator's own devices. Never throws, so a failed notification
+// can't fail the customer action behind it.
 
 import { prisma } from "@/shared/lib/prisma";
 import webpush from "web-push";
@@ -19,9 +18,8 @@ export interface OwnerPushInput {
 }
 
 /**
- * Reports whether a push-service status means the endpoint is permanently
- * gone. Only 404 and 410 qualify: a 500 or a rate limit is transient, and
- * retiring a device on those would unsubscribe a browser that still works.
+ * Whether a push-service status means the endpoint is gone for good: only 404 and 410,
+ * since a 500 or rate limit is transient.
  * @param statusCode - HTTP status from the push service, if any.
  * @returns True when the device row should be deleted.
  */
@@ -61,9 +59,8 @@ function configureVapid(): boolean {
 }
 
 /**
- * Sends a notification to every registered operator device. Never throws:
- * callers await this only so it actually runs before Vercel freezes the
- * instance, never so its result can block them.
+ * Sends a notification to every registered operator device. Never throws; callers await
+ * it only so it runs before Vercel freezes the instance.
  * @param input - Notification content.
  * @returns Promise that resolves once delivery has been attempted.
  */
@@ -93,8 +90,7 @@ export async function sendOwnerPush(input: OwnerPushInput): Promise<void> {
         } catch (err) {
           const statusCode = (err as { statusCode?: number }).statusCode;
           if (isGoneStatus(statusCode)) {
-            // The browser is gone for good - drop the row so it stops being
-            // retried on every future booking.
+            // Gone for good - drop the row so it isn't retried on every booking.
             await prisma.pushDevice.delete({ where: { id: device.id } }).catch(() => null);
             return;
           }

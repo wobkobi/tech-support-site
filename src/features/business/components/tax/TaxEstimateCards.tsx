@@ -1,8 +1,6 @@
 // src/features/business/components/tax/TaxEstimateCards.tsx
-// Headline figures for one FY on the Tax page. TaxEstimateCards is the summary strip
-// (income, deductions, profit, tax to set aside); SetAsideCard is the side card with the
-// total and the weekly and monthly amounts that keep pace with 31 March for the weeks
-// actually left (a past FY shows "Year ended" instead of targets). Server-safe.
+// Headline figures for one FY on the Tax page: the summary strip, and the set-aside card
+// with weekly and monthly amounts to reach the total by 31 March. Server-safe.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
@@ -85,8 +83,7 @@ export function TaxEstimateCards({ result, fyLabel }: TaxEstimateCardsProps): Re
 }
 
 /**
- * Renders the set-aside card: the year's total, then what to put away each week and month
- * to reach it by 31 March.
+ * Renders the set-aside card: the year's total and the weekly and monthly pace to 31 March.
  * @param props - Component props.
  * @param props.result - computeTaxYear output for the FY.
  * @param props.targets - Set-aside targets for the weeks and months left.

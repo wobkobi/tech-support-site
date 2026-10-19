@@ -1,7 +1,6 @@
 "use client";
 // src/features/business/components/PromoListRows.tsx
-// The admin promo list: a table from sm, stacked cards on phones. Markup only; the list
-// state and every row action handler live in PromosView.
+// Admin promo list markup: table from sm, cards on phones. State and handlers live in PromosView.
 
 import type { PromoRow } from "@/app/admin/(shell)/promos/page";
 import {
@@ -41,12 +40,8 @@ interface PromoStatsBlockProps {
 }
 
 /**
- * Usage detail for one promo: how often it was redeemed, what it gave away, and
- * how much of its cap is left.
- *
- * Deliberately answers only what the redemption rows can support. Whether the
- * promo caused the bookings is not knowable from this data, and a number
- * implying it were would be worse than no number.
+ * Usage detail for one promo: redemptions, amount given away, cap left. No
+ * "bookings caused" figure, since the redemption rows can't support one.
  * @param props - Component props.
  * @param props.promo - The promo being reported on.
  * @param props.stats - Its redemption totals.
@@ -67,8 +62,7 @@ function PromoStatsBlock({ promo, stats }: PromoStatsBlockProps): React.ReactEle
     rows.push(["Per customer", `${promo.perCustomerLimit} max`]);
   }
 
-  // Unvalued rows are called out rather than counted as zero: a redemption
-  // recorded before the value was tracked is not a discount of nothing.
+  // Unvalued rows predate value tracking, so they're called out, not counted as zero.
   if (used > 0) {
     const valued = used - (stats?.unvaluedRedemptions ?? 0);
     rows.push([
@@ -101,11 +95,8 @@ interface PromoChipsProps {
 }
 
 /**
- * Marks everything that narrows a promo below "applies to everyone, always".
- *
- * Without these a restricted promo reads as broken in the list: it says Active
- * while the banner stays silent or the discount only lands on some jobs, which
- * is correct but looks like a bug.
+ * Marks everything that narrows a promo below "applies to everyone, always", so
+ * an Active but restricted promo doesn't look broken.
  * @param props - Component props.
  * @param props.promo - The promo the chips describe.
  * @returns The chip row, or null when nothing narrows the promo.
@@ -113,8 +104,7 @@ interface PromoChipsProps {
 function PromoChips({ promo }: PromoChipsProps): React.ReactElement | null {
   const chips: string[] = [];
   if (promo.kind === "code" && promo.code) chips.push(`Code only: ${promo.code}`);
-  // Shared with the customer-facing banner so the operator reads the same
-  // wording the customer will.
+  // Same wording as the customer-facing banner.
   const window = describeRecurringWindow(promo);
   if (window) chips.push(window);
   if (promo.tiers.length > 0) chips.push(`${promo.tiers.length} spend tiers`);
@@ -259,8 +249,7 @@ export function PromoListRows({
                   </td>
                   <td className={cn(TD_CLS, "align-top")}>
                     <div className="flex flex-wrap justify-end gap-1.5">
-                      {/* Code promos are never advertised, so only a running
-                          automatic one can be emailed or posted. */}
+                      {/* Code promos are never advertised; only running automatic ones. */}
                       {p.kind === "automatic" && status === "active" && (
                         <AdminButton
                           variant="outline"

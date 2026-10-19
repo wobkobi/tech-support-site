@@ -1,6 +1,5 @@
 // src/features/business/components/invoices-list-options.ts
-// Filter buckets, sortable columns and the row-level pay rule shared by InvoicesListView
-// and the toolbar, phone cards and desktop table it renders.
+// Filter buckets, sortable columns and the row pay rule shared by the invoices list.
 
 import type { Invoice } from "@/features/business/types/business";
 
@@ -33,10 +32,8 @@ export const FILTER_OPTIONS: { value: FilterKey; label: string }[] = [
 ];
 
 /**
- * Whether a payment can be recorded from the list: SENT only. A DRAFT row
- * offers "Send invoice" instead (send comes before payment; recording payment
- * on an unsent draft stays possible from the detail page), and PAID is already
- * settled, VOIDED can't be paid.
+ * Whether a payment can be recorded from the list: SENT only. A DRAFT offers
+ * "Send invoice" instead (the detail page can still record payment).
  * @param inv - The invoice.
  * @returns True when the Record-payment action should show.
  */

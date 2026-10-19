@@ -1,10 +1,6 @@
 // scripts/check-trips.ts
-// Fixtures for the trips log helpers in src/features/business/lib/trips.ts: request-body
-// parsing (km rounding and limits, real calendar dates, address cap, ObjectId guards), the half-open FY
-// window, km totals against the tier split, the add-form default date, and which bookings
-// become "jobs without a trip" (status, remote, already linked, NZ-day FY boundary, one
-// round trip per job, the contact's address when the booking has none, km reused from an
-// earlier trip to the same address).
+// Trips log helper fixtures: body parsing, the half-open FY window, km totals, the add-form
+// default date, and which bookings become "jobs without a trip".
 // Run with: npm test -- trips
 
 import { listFinancialYears } from "@/features/business/lib/financial-year";
@@ -236,9 +232,8 @@ function main(): void {
   expectEqual("tier 1 km stops at 14,000", claim.tier1Km, 14000);
   expectEqual("tier 2 km is the rest", claim.tier2Km, 10);
   expectEqual("claim at 2025-26 petrol rates", claim.amount, 16803.7);
-  // The page's claim rule (splitTripKm, shared with the Tax page): a trip before the
-  // km-rate car's in-service day earns nothing. 40.5 x 1.20 = 48.60. The page passes the
-  // FY's total vehicle km as the third argument, null while it is unset.
+  // splitTripKm: a trip before the km-rate car's in-service day earns nothing.
+  // 40.5 x 1.20 = 48.60. Third argument is the FY's total vehicle km, or null.
   const split = splitTripKm(
     [
       { ...trip("early", "2026-07-15T00:00:00.000Z"), km: 25 },

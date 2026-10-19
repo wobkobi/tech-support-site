@@ -1,8 +1,6 @@
 // src/features/social-design/templates/stack.ts
-// Layout engine for the starter templates: content described as nested columns and
-// rows, sized from its parts, then centred in a size's safe area inside a frosted card
-// sized to fit, as build-ads lays out its cards. Text boxes are estimated from explicit
-// line counts; the editor re-measures every text height when the design opens.
+// Starter template layout engine: nested columns and rows centred in the safe area inside a
+// fitted frosted card. Text heights are estimates; the editor re-measures on open.
 
 import type { FormatLayout, Geometry } from "@/features/social-design/lib/doc";
 import { FORMATS, safeRect, type FormatKey } from "@/features/social-design/lib/formats";
@@ -102,8 +100,7 @@ export function textBox(
 }
 
 /**
- * Bullet list box, matching the canvas bullet layout: rows 1.3 lines tall with a gap
- * of 0.45 of the font size between them, one line per item.
+ * Bullet list box matching the canvas layout: rows 1.3 lines tall, gaps 0.45 of the font size.
  * @param id - Layer id.
  * @param items - Number of items.
  * @param fontSize - Font size in pixels.
@@ -180,8 +177,7 @@ function place(node: Node, x: number, y: number, out: FormatLayout): void {
 }
 
 /**
- * Lays a template out on one size: the backdrop full-bleed, the content centred in the
- * safe area and the frosted card around it with the frame's padding.
+ * Lays a template out on one size: backdrop full-bleed, content centred in the safe area, card around it.
  * @param frame - Size's frame.
  * @param ids - Backdrop and card layer ids.
  * @param ids.backdrop - Backdrop layer.

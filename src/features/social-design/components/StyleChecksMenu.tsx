@@ -1,8 +1,6 @@
 "use client";
 // src/features/social-design/components/StyleChecksMenu.tsx
-// The editor's "Checks" dropdown: what may stop the picture reading well in a feed,
-// with a Show button that opens the size and picks the layer. Warnings only; nothing
-// here stops a picture being made or used.
+// The editor's "Checks" dropdown of feed-readability warnings; warnings never block a picture.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import type { FormatKey } from "@/features/social-design/lib/formats";

@@ -1,8 +1,7 @@
 "use client";
 // src/features/mailing/components/blocks/useBodyMode.ts
-// Which tab the email body opens on, Blocks or Plain text, remembered in this browser.
-// Read through useSyncExternalStore so the server render and hydration both use Blocks
-// and the stored choice applies straight after, with no mismatch warning.
+// The email body's remembered tab (Blocks or Plain text). useSyncExternalStore renders
+// Blocks on the server and hydration, then the stored choice, with no mismatch.
 
 import { useSyncExternalStore } from "react";
 

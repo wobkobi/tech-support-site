@@ -1,7 +1,5 @@
 // src/app/api/business/assets/route.ts
-// Admin asset register collection. GET lists every asset, newest in-service date first;
-// POST validates the body with parseAssetBody, checks any expense link, then creates the
-// asset. Site-only: nothing is written to the Google Sheet.
+// Admin asset register: GET lists, POST creates. Site-only - nothing goes to the Sheet.
 
 import { expenseLinkProblem } from "@/features/business/lib/asset-links.server";
 import { parseAssetBody } from "@/features/business/lib/assets";

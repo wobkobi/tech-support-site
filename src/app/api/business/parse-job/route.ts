@@ -1,8 +1,6 @@
 // src/app/api/business/parse-job/route.ts
-// Admin endpoint that turns a plain-English job description into a structured quote:
-// prompts the model, resolves task templates and rates, attaches round-trip travel and
-// any mid-job store runs, caps durationMins to the wall-clock span, and rebalances task
-// quantities. May return clarification questions instead.
+// Turns a plain-English job description into a structured quote (or clarifying
+// questions), then sanitises the model output: travel, rates, duration caps, task fit.
 
 import {
   composeDescription,
@@ -38,11 +36,8 @@ import { NextRequest, NextResponse } from "next/server";
 const CLARIFY_IDS = new Set(["location", "duration", "tasks"]);
 
 /**
- * Converts an operator-stated HH:MM (NZ wall clock) to a Date for the
- * traffic-aware travel lookup, anchored to the next occurrence of the job
- * date's WEEKDAY. Google only quotes future departures, so a past job is
- * priced at the same weekday + time as a proxy for that day's actual traffic.
- * Mirrors the calculator's client-side jobStartIsoFromTime.
+ * NZ HH:MM on the next occurrence of the job date's WEEKDAY, for the traffic lookup.
+ * Google only quotes future departures, so the same weekday + time stands in.
  * @param hhmm - HH:MM (24h) NZ wall-clock string, or null.
  * @param anchorDate - NZ-local YYYY-MM-DD whose weekday to match (the job date); malformed/missing falls back to today.
  * @returns Date, or undefined when the input isn't a valid HH:MM.
@@ -77,11 +72,8 @@ function findTemplateByTags<T extends { device: string | null; action: string | 
 }
 
 /**
- * POST /api/business/parse-job - Parses a plain-English job description using gpt-4.1.
- * Pre-computes session total from time ranges and attaches travel info from the AI-extracted
- * destination, falling back to the caller-supplied `fallbackDestination` when the text names none.
- * A remote booking (`meetingType`) and a company bill-to (`billedToCompany`) add Remote and
- * Business to the parsed tasks.
+ * POST /api/business/parse-job - Parses a plain-English job description.
+ * `fallbackDestination` is used when the text names no address.
  * @param request - Incoming Next.js request with input string in body
  * @returns JSON with structured ParseJobResponse or a 422 error
  */
@@ -90,9 +82,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
 
-  // Parse and validate body. `.catch(() => null)` like the sibling routes: the
-  // try below starts well after this line, so a malformed body threw straight
-  // out of the handler as a bare 500 instead of the 400 the validation returns.
+  // Outside the try below, so a malformed body must 400 here rather than 500.
   const body = await request.json().catch(() => null);
   if (body === null || typeof body !== "object") {
     return errorResponse("Invalid request body", 400);
@@ -105,16 +95,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     meetingType?: unknown;
     billedToCompany?: unknown;
   };
-  // Facts the calculator knows that the description may not say: how the booking was to
-  // be met, and whether the invoice is addressed to the contact's company.
+  // Facts the calculator knows that the description may not say.
   const remoteBooked = meetingType === "remote";
   const companyBill = billedToCompany === true;
   // Job date (NZ-local YYYY-MM-DD) anchors travel quotes to the job's weekday.
   const jobDateAnchor =
     typeof jobDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(jobDate) ? jobDate : undefined;
-  // Calculator-supplied address (booked-job prefill or the Travel card) used
-  // only when the AI extracts no destination from the text. Never enters the
-  // prompt - it feeds the Distance Matrix lookup alone.
+  // Used only when the AI finds no destination. Never enters the prompt.
   const fallbackDest =
     typeof fallbackDestination === "string"
       ? fallbackDestination.trim().slice(0, 200) || undefined
@@ -127,18 +114,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("input must be 1000 characters or fewer", 400);
   }
 
-  // Whitelist clarification answer keys to the IDs the model may ask about (see
-  // CLARIFICATION MODE in the system prompt). Anything else is dropped, so a crafted
-  // payload can't smuggle synthetic "[User clarifications: ...]" into the trusted segment.
+  // Whitelist answer keys so a crafted payload can't smuggle text into the trusted segment.
   const ALLOWED_ANSWER_KEYS = new Set(["location", "duration", "tasks"]);
   const safeAnswers: Record<string, string> = {};
   if (answers && typeof answers === "object") {
     for (const [k, v] of Object.entries(answers)) {
       if (!ALLOWED_ANSWER_KEYS.has(k)) continue;
       if (typeof v !== "string") continue;
-      // Strip newlines and square brackets so an answer value cannot close the
-      // USER DATA sentinel and forge a trusted "[...]" annotation in the region
-      // the system prompt declares server-appended and trustworthy.
+      // Strip newlines and brackets so an answer can't forge a trusted "[...]" annotation.
       const clean = v
         .trim()
         .replace(/[\r\n[\]]/g, " ")
@@ -148,7 +131,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    // Load rates, templates and settings
     const [rates, templates, settings] = await Promise.all([
       prisma.rateConfig.findMany({ orderBy: { label: "asc" } }),
       prisma.taskTemplate.findMany({ orderBy: [{ usageCount: "desc" }, { description: "asc" }] }),
@@ -170,8 +152,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       hour12: false,
     }).format(new Date());
 
-    // System prompt is static (cacheable) - all per-call data is appended to
-    // the user message via buildParseJobContext.
+    // Static system prompt (cacheable); per-call data goes in the user message.
     const systemPrompt = buildParseJobPrompt();
     const context = buildParseJobContext(
       rateDtos,
@@ -189,21 +170,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Live ceiling on one job's billable time; clamps the model's minutes below.
     const maxJobMins = settings.pricing.maxJobMins;
 
-    // Parse the stated time ranges once - reused below to attach parsed.ranges and to
-    // warn when overlapping ranges cost the job billable minutes.
+    // Parsed once; reused for parsed.ranges and the overlap warning.
     const rangeStats = extractRangeStats(input);
     const extractedRanges = rangeStats.ranges;
     const precomputed =
       extractedRanges.length > 0
         ? extractedRanges.reduce((sum, r) => sum + r.durationMins, 0)
         : null;
-    // Close the untrusted USER DATA block before any server-supplied trusted
-    // annotations so the model knows where operator-controlled text ends.
+    // Close the untrusted USER DATA block before any trusted annotations.
     let userContent = `${context}${input.trim()}\n--- END USER DATA ---`;
-    // The model miscounts a mid-sentence range ("1:46 pm to 2:05 pm" pinned as 15 or 5
-    // min) and, told of it separately, bills it again as outside work. So the total itself
-    // names the minutes it already holds. Server-formatted times only: this note sits
-    // outside the untrusted block, so the operator's own wording never goes in it.
+    // Name the task-line ranges the total already holds, or the model bills them again.
+    // Server-formatted times only - this sits outside the untrusted block.
     const taskLineNote =
       rangeStats.taskLineRanges.length > 0
         ? ` (already includes, from ranges written on a task's own line - see SECOND-VISIT RANGE: ${rangeStats.taskLineRanges
@@ -226,12 +203,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       userContent += `\n\n[Invoice: billed to the client's company]`;
     }
 
-    // Call the model and parse the response. gpt-4.1 (not -mini) is deliberate:
-    // the 2026-07-24 eval showed mini obeying an injected negative-duration
-    // correction (parse-injection-negative) that 4.1 correctly ignores. The SDK
-    // defaults (10-minute timeout, 2 retries with retry-after sleeps) can outlive
-    // the 300s function ceiling and swallow a 429 the catch below hands back as
-    // retryable, so one attempt, leaving room for the travel lookups that follow.
+    // gpt-4.1, not -mini: mini obeys an injected negative-duration correction. One attempt,
+    // since SDK retry defaults can outlive the 300s ceiling and swallow a retryable 429.
     const { text, model, usage } = await jsonCompletion({
       feature: "parse-job",
       openAiModel: "gpt-4.1",
@@ -243,9 +216,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       maxRetries: 0,
     });
 
-    // Prompt-cache visibility. The system prompt is ~13.9k static tokens sent on
-    // every call, so whether it is served from cache decides most of the cost.
-    // The cached count is the only ground truth for that.
+    // The ~13.9k-token system prompt's cache hit decides most of the cost.
     console.log(
       `[parse-job] ${model} prompt ${usage.input} tokens, ${usage.cached} cached, completion ${usage.output}`,
     );
@@ -254,8 +225,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (!parsed || typeof parsed !== "object") throw new Error("Invalid response shape");
 
-    // Clarify only on well-formed questions the form knows how to ask. An empty or
-    // garbled list would leave the operator with no questions and no result.
+    // Only well-formed questions the form can ask; a garbled list would leave nothing.
     if ("clarify" in parsed && Array.isArray(parsed.clarify)) {
       const questions = parsed.clarify
         .filter(
@@ -276,15 +246,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (!Array.isArray(parsed.tasks)) throw new Error("Clarify reply with no usable questions");
     }
 
-    // Structural shape only: a reply missing the task list or carrying a non-number
-    // duration is read as no tasks / no duration rather than crashing the clamps below.
+    // Coerce a bad shape to no tasks / no duration rather than crash the clamps below.
     if (!Array.isArray(parsed.tasks)) parsed.tasks = [];
     if (typeof parsed.durationMins !== "number" || !Number.isFinite(parsed.durationMins)) {
       parsed.durationMins = null;
     }
 
-    // Store runs and the cash fields are untrusted model output: short distinct store
-    // names only, a strict boolean, and a positive amount rounded to cents.
+    // Untrusted model output: short distinct stores, strict boolean, positive cents.
     parsed.paidCash = parsed.paidCash === true;
     const cash = Number(parsed.cashPaid);
     parsed.cashPaid =
@@ -297,9 +265,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
     parsed.storeRuns = storeRuns.slice(0, 3);
-    // A store run is extra to the trip to the client. A model that also made the store
-    // the destination would bill the round trip to the store instead, so drop it there
-    // and let the client's address stand in.
+    // A store as the destination would bill the round trip to the store; drop it.
     if (
       parsed.destination &&
       parsed.storeRuns.some((s) => s.toLowerCase() === parsed.destination?.trim().toLowerCase())
@@ -307,9 +273,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       parsed.destination = null;
     }
 
-    // Booked-job descriptions rarely restate the address, so fall back to the calculator's
-    // when the AI found no destination. From here every branch treats it exactly like an
-    // operator-typed address; an explicit no-travel parse still wins.
+    // Booked-job descriptions rarely restate the address; an explicit no-travel still wins.
     if (!parsed.destination && !parsed.noTravelCharge && fallbackDest) {
       parsed.destination = fallbackDest;
     }
@@ -319,9 +283,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         ? parsed.statedDistanceKm
         : null;
     if (statedKm !== null && !parsed.destination) {
-      // Travel bills on drive time, so stated km with nowhere to route prices nothing.
-      // Keep the one-way km for display and tell the operator, rather than letting a
-      // real trip vanish from the invoice. With a destination, the lookup below bills it.
+      // Travel bills on drive time, so km with no address prices nothing - warn instead.
       parsed.travel = {
         distanceKmOneWay: Math.round((statedKm / 2) * 10) / 10,
         durationMins: 0,
@@ -332,9 +294,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         `A ${statedKm} km trip was mentioned but there's no address to time the drive, so no travel was charged. Add the address or a travel line by hand.`,
       ];
     } else if (!parsed.noTravelCharge && parsed.destination) {
-      // Both drive legs at their own departure: outbound at the parsed start, return at
-      // the parsed end (or start + duration). Direct helper call, not a self-fetch - works
-      // without NEXT_PUBLIC_BASE_URL and doesn't burn the public route's rate limit.
+      // Outbound at the parsed start, return at the parsed end (or start + duration).
       const parsedRanges = parsed.ranges ?? [];
       const departAt = nzTimeToDate(parsed.startTime ?? parsedRanges[0]?.startTime, jobDateAnchor);
       let returnAt = nzTimeToDate(
@@ -342,9 +302,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         jobDateAnchor,
       );
       if (departAt && returnAt && returnAt <= departAt) {
-        // Independent roll-forward can invert the pair (start already past
-        // rolls to tomorrow while a future end stays today) - keep the
-        // return after the outbound leg.
+        // Independent roll-forward can put the start tomorrow and the end today.
         returnAt = new Date(returnAt.getTime() + 24 * 60 * 60 * 1000);
       }
       if (departAt && !returnAt && parsed.durationMins && parsed.durationMins > 0) {
@@ -399,7 +357,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Resolve task templates and rates
     if (parsed.tasks?.length > 0) {
       const ratesForLookup = rateDtos as unknown as RateConfig[];
       /**
@@ -412,19 +369,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const target = label.trim().toLowerCase();
         return ratesForLookup.find((r) => r.label.toLowerCase() === target) ?? null;
       };
-      // Modifier labels the AI emitted that match no live rate (stale name, a
-      // since-renamed modifier, or a hallucinated label). Collected so the
-      // operator gets a warning instead of the modifier silently vanishing.
+      // Labels matching no live rate, warned about rather than silently dropped.
       const unresolvedModifierLabels = new Set<string>();
-      // Known-tag maps (lowercased > canonical casing) for canonicaliseTag, so
-      // emitted case-variants land on the taxonomy's existing spelling. Where the
-      // stored rows disagree the busiest casing wins, so a stray "Pc" on one row
-      // can't pull every later parse off the "PC" the rest of the table uses.
+      // Lowercased > canonical casing; the busiest casing wins, so one stray "Pc" can't
+      // displace "PC".
       const knownDevices = canonicalTagMap(templates, "device");
       const knownActions = canonicalTagMap(templates, "action");
-      // Job-wide modifiers. Remote fills in on a remote booking unless the parse found a
-      // trip to the client. Business is all or nothing: a company bill-to, or the model
-      // putting it on any one task, bills every task at it.
+      // Remote fills in on a remote booking with no trip. Business is all or nothing.
       const jobFacts = {
         remoteBooking: remoteBooked && !parsed.destination,
         business:
@@ -437,9 +388,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       };
       let remoteAdded = 0;
       let businessAdded = 0;
-      // Tags the model coined that aren't in the taxonomy. Surfaced as a
-      // warning so a genuinely new tag is a visible operator decision and a
-      // drifted synonym gets corrected before it splits the price history.
+      // Coined tags are warned about so a drifted synonym can't split the price history.
       const newTags = new Set<string>();
       const strippedSpeedHints = new Set<string>();
       const strippedRestatements = new Set<string>();
@@ -452,20 +401,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           modifierLabels?: string[];
           isShort?: boolean;
         };
-        // Canonicalise BEFORE the template snap so a case-drifted tag still
-        // finds its template and its remembered price.
+        // Canonicalise BEFORE the template snap so a case-drifted tag still matches.
         const device = canonicaliseTag(t.device, knownDevices);
         const action = canonicaliseTag(t.action, knownActions);
         if (device && !knownDevices.has(device.toLowerCase())) newTags.add(device);
         if (action && !knownActions.has(action.toLowerCase())) newTags.add(action);
         const snap = findTemplateByTags(device, action, templates);
-        // Billing signals must not print on the invoice line. The prompt forbids them, but
-        // the model still echoes speed hints back out of inputs like "(quick)" as their own
-        // details item. Only a comma item that is ENTIRELY a speed hint is dropped: matching
-        // the word anywhere would eat product names the operator really typed - "Quick Assist"
-        // is Microsoft's remote-support tool, "Quick Look" is a macOS feature. An emptied
-        // details is null. Every drop is reported as a warning rather than rewritten silently,
-        // so a recurring one here means the prompt rule has stopped binding.
+        // Drop speed hints the model echoes into details, but only whole comma items -
+        // "Quick Assist" is a real product. Each drop warns, flagging prompt drift.
         const rawDetails = t.details?.trim() ? t.details.trim() : null;
         let details: string | null = null;
         if (rawDetails) {
@@ -499,10 +442,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return rate;
           })
           .filter((r): r is RateConfig => r !== null && r.hourlyDelta !== null);
-        // Delivery channels are mutually exclusive; the prompt says so, but enforce it so
-        // a model stacking them can't compound the discounts. Highest effective rate
-        // wins, ties keep the first. Shares isChannelModifier with the calculator chips,
-        // so the AI output and a hand-edited task obey one rule.
+        // Delivery channels are mutually exclusive so discounts can't compound; the highest
+        // rate wins, ties keep the first.
         const channels = modifierRates.filter(isChannelModifier);
         const keptChannel = channels.reduce<RateConfig | null>(
           (best, r) => (best === null || (r.hourlyDelta ?? 0) > (best.hourlyDelta ?? 0) ? r : best),
@@ -534,9 +475,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         return {
           ...t,
-          // All AI-parsed tasks are hourly work per the prompt. Force null so
-          // downstream "is this hourly" checks always agree, regardless of
-          // what the AI emitted (omitted, null, stale ID).
+          // AI-parsed tasks are always hourly, whatever the model emitted.
           rateConfigId: null,
           device,
           action,
@@ -595,9 +534,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Out-of-pocket travel disbursements (parking, tolls, ferry) pass through
-    // at the stated cost. Sanitise the untrusted model output: finite positive
-    // amounts only, short labels, capped count.
+    // Parking/tolls/ferry pass through at cost; sanitise the untrusted output.
     parsed.travelCosts = Array.isArray(parsed.travelCosts)
       ? parsed.travelCosts
           .slice(0, 5)
@@ -610,9 +547,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           )
       : [];
 
-    // Parts land on the invoice at face value, so the same untrusted output gets the
-    // same bar: a named part at a positive, plausible price. A dropped part is warned
-    // about rather than silently lost.
+    // Parts bill at face value: named, positive, plausible. Drops are warned about.
     const rawParts: unknown[] = Array.isArray(parsed.parts) ? parsed.parts : [];
     parsed.parts = rawParts
       .slice(0, 20)
@@ -634,9 +569,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ];
     }
 
-    // Attach the operator-stated ranges so the calculator can render one row
-    // per detected segment. Strip the internal durationMins - the calc derives
-    // it from start/end on its own (extractedRanges was parsed once, above).
+    // One calculator row per stated range; the calc derives durations itself.
     if (extractedRanges.length > 0) {
       parsed.ranges = extractedRanges.map(({ startTime, endTime }) => ({ startTime, endTime }));
     } else if (parsed.startTime && parsed.endTime) {
@@ -645,10 +578,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       parsed.ranges = [];
     }
 
-    // An overlap silently shrinks the billable window, and the reconciliation check below
-    // cannot catch it - tasks are sized against the already-merged total, so both sides
-    // agree on the smaller number. On a multi-day job the cause is usually a missing date
-    // header, which only the operator can confirm.
+    // An overlap silently shrinks the window and the reconciliation below can't see it.
+    // On a multi-day job it's usually a missing date header.
     if (rangeStats.discardedMins > 0) {
       parsed.warnings = [
         ...(parsed.warnings ?? []),
@@ -656,10 +587,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ];
     }
 
-    // Sanitise the model's out-of-session minutes (work explicitly stated to
-    // have happened outside the session ranges, e.g. a call after the visit).
-    // With no stated session there is nothing to be outside of: a phone-only job's
-    // minutes reported here would leave the calculator a zero-length session.
+    // Out-of-session minutes need a session; on a phone-only job they'd leave a
+    // zero-length session.
     const hasSession = precomputed !== null || (!!parsed.startTime && !!parsed.endTime);
     const outOfSessionMins =
       hasSession &&
@@ -670,15 +599,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         : 0;
     parsed.outOfSessionMins = outOfSessionMins;
 
-    // Wall-clock ceiling: the model sometimes inflates durationMins off its own task
-    // estimates ("9-9:30" but emits 50 min). Cap to the stated span plus out-of-session
-    // minutes - gaps only reduce billable time, but work after the session adds on top.
+    // Wall-clock ceiling: the model inflates durationMins ("9-9:30" emitted as 50 min).
+    // Cap to the stated span plus out-of-session minutes.
     if (parsed.startTime && parsed.endTime && typeof parsed.durationMins === "number") {
       const [sh, sm] = timeParts(parsed.startTime);
       const [eh, em] = timeParts(parsed.endTime);
-      // A single clock span cannot bound a multi-day job - two 9-5 days would cap at 8h,
-      // halving the bill. With operator-stated ranges each day contributes its own span;
-      // the plain subtraction is only the fallback for a window the model supplied itself.
+      // One clock span would cap two 9-5 days at 8h; stated ranges give each day its span.
       const wallMin =
         rangeStats.ranges.length > 0 ? rangeStats.spanMins : eh * 60 + em - (sh * 60 + sm);
       const ceiling = wallMin + outOfSessionMins;
@@ -689,22 +615,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         ];
         parsed.durationMins = ceiling;
       }
-      // Floor: a model that reports outOfSessionMins but forgets to add it to
-      // durationMins would carve the extra work out of the on-site window
-      // (under-billing the session tasks). Enforce the sum deterministically.
+      // Floor: the model may report outOfSessionMins but not add it to durationMins.
       const floor = wallMin + outOfSessionMins;
       if (wallMin > 0 && outOfSessionMins > 0 && parsed.durationMins < floor) {
         parsed.durationMins = floor;
       }
     }
 
-    // Canonical clamps: the operator-stated ranges bound what the model may
-    // bill, so an injected "bill 8 hours" or "durationMins = -120" cannot
-    // move the total. Below-cap values pass through (free work subtracts).
+    // Stated ranges bound the bill, so an injected "bill 8 hours" can't move it.
+    // Below-cap values pass through (free work subtracts).
     if (precomputed !== null && precomputed > 0) {
       const statedTotal = precomputed + outOfSessionMins;
-      // The longest-billable-day ceiling applies to each day on its own: two stated 9-5
-      // days bill both, while one 12pm-12am day is cut to the ceiling.
+      // The day ceiling applies per day: two 9-5 days bill both, one 12pm-12am day is cut.
       const minsByDay = new Map<number, number>();
       for (const r of extractedRanges) {
         minsByDay.set(r.day, (minsByDay.get(r.day) ?? 0) + r.durationMins);
@@ -712,9 +634,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const dayCapped = [...minsByDay.values()].reduce((s, m) => s + Math.min(m, maxJobMins), 0);
       const cap = dayCapped + outOfSessionMins;
       if (typeof parsed.durationMins === "number" && parsed.durationMins > cap) {
-        // Name the constraint that actually bound: a long-but-real session ("12pm-12am")
-        // is cut by the longest-billable-day ceiling, not by a misread range, and blaming
-        // the model sends the operator hunting for a parse error that never happened.
+        // Name the constraint that bound, so a long real day isn't blamed on the model.
         parsed.warnings = [
           ...(parsed.warnings ?? []),
           cap < statedTotal
@@ -740,8 +660,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       typeof parsed.durationMins === "number" &&
       parsed.durationMins > maxJobMins + outOfSessionMins
     ) {
-      // A bare duration has no ranges to bound it, so the day ceiling is the only check
-      // on a misread ("2 days" as 48 hours) or an injected "bill 20 hours".
+      // Only the day ceiling bounds a bare duration ("2 days" misread as 48 hours).
       parsed.warnings = [
         ...(parsed.warnings ?? []),
         `Duration of ${parsed.durationMins} min is over the ${maxJobMins} min longest-billable-day ceiling; capped. For a job over several days, give each day's times.`,
@@ -749,18 +668,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       parsed.durationMins = maxJobMins + outOfSessionMins;
     }
 
-    // Fit task quantities to the billable total. `isExplicit` (operator-stated, so
-    // exact) and `isShort` (a one-shot task can't absorb a long session's leftovers) are
-    // pinned; only the floating set moves, and it snaps to the billing grid - a bare
-    // proportional multiplier yields quantities like 0.85h that nobody worked.
+    // Fit task quantities to the billable total. `isExplicit` and `isShort` tasks are
+    // pinned; the floating set snaps to the billing grid (no 0.85h nobody worked).
     if (
       parsed.tasks?.length > 0 &&
       typeof parsed.durationMins === "number" &&
       parsed.durationMins > 0
     ) {
-      // Match the calculator's billable rule exactly (round to the live billing
-      // increment, floor at the minimum) so the safety net, AI, and invoice agree
-      // on the target. incHours is one increment expressed in hours.
+      // Same billable rule as the calculator, so AI and invoice agree on the target.
       const incMins = settings.pricing.billingIncrementMins;
       const incHours = incMins / 60;
       const targetMins = clampBillableMins(
@@ -769,16 +684,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         incMins,
       );
       const targetHours = Math.round((targetMins / 60) * 100) / 100;
-      // Minutes are the billed unit: snap each task onto the grid up front and carry qty
-      // as minutes-in-hours, unrounded. The model's 2 dp qty can't hold a 5-minute step
-      // (10 min arrives as 0.17h = 10.2 min), and that drift is what stopped a 140-minute
-      // job ever billing 140.
+      // Snap to whole minutes up front: a 2 dp qty can't hold a 5-min step (0.17h = 10.2 min).
       /**
-       * A model-emitted quantity read back as whole minutes on the billing grid,
-       * floored at one increment so no task lands at zero. An operator-stated duration
-       * rounds UP, as the prompt's billing rule does, so "took 12 mins" never bills 10
-       * when the model emits the raw 0.2h. The epsilon stops float noise (0.25h * 60 =
-       * 15.000000000000002) ceiling an on-grid figure to the next increment.
+       * Model qty as grid minutes, at least one increment. Stated durations round UP
+       * ("took 12 mins" never bills 10); the epsilon stops 0.25h * 60 = 15.000000000000002
+       * ceiling to the next step.
        * @param qty - Task quantity in decimal hours, as the model emitted it.
        * @param explicit - Whether the operator stated this task's duration.
        * @returns Billed minutes, a multiple of the billing increment.
@@ -798,8 +708,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const diff = Math.round((targetHours - sumQty) * 100) / 100;
       if (sumQty > 0 && Math.abs(diff) >= incHours) {
         /**
-         * Whether a task's quantity is fixed and must not be scaled - an
-         * operator-stated duration, or a quick one-shot task.
+         * Whether a task's quantity is fixed (stated duration or quick one-shot).
          * @param t - Task to classify.
          * @param t.isExplicit - Set when the operator stated this task's duration.
          * @param t.isShort - Set when the task is a quick one-shot job.
@@ -811,14 +720,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const floatingIdx = parsed.tasks.map((t, i) => ({ t, i })).filter(({ t }) => !isPinned(t));
         const floatingSumMins = floatingIdx.reduce((s, { t }) => s + (t.minutes ?? 0), 0);
         const floatingTargetMins = targetMins - pinnedMins;
-        // Every floating task keeps at least one increment, so the floating set
-        // needs that much room before it can be fitted at all.
+        // Each floating task keeps at least one increment.
         const canScaleFloating =
           floatingSumMins > 0 && floatingTargetMins >= floatingIdx.length * incMins;
         if (canScaleFloating) {
-          // Proportional share floored onto the increment grid (one increment minimum),
-          // then the remainder goes to the largest shares first. Mirrors the prompt's
-          // subBase + subLeftover split so the model and the server apportion identically.
+          // Floor proportional shares to the grid, then hand the remainder to the largest
+          // first - the prompt's subBase + subLeftover split.
           const multiplier = floatingTargetMins / floatingSumMins;
           const shares = floatingIdx.map(({ t, i }) => {
             const rawMins = (t.minutes ?? 0) * multiplier;
@@ -830,8 +737,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             share.mins += incMins;
             leftover -= incMins;
           }
-          // Any sub-increment leftover goes to the largest share, so the minutes
-          // land exactly on the window rather than a step short of it.
+          // Sub-increment leftover goes to the largest share so the window is exact.
           if (leftover > 0 && shares.length > 0) {
             shares.reduce((max, cur) => (cur.mins > max.mins ? cur : max)).mins += leftover;
           }
@@ -843,15 +749,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             `Rebalanced floating task quantities to match the ${targetHours}h total (stated and quick-task durations untouched).`,
           ];
         } else {
-          // Nothing floating left to absorb the gap. Pinned qtys round UP on the step
-          // grid, so overshoot of up to one step per pinned task is expected; warn only
-          // outside that. A residual nothing can absorb usually means the window itself
-          // is wrong (a break, overlapping ranges), not that the tasks were too small.
+          // Nothing floating to absorb the gap. Up to one step of overshoot per pinned task
+          // is expected (they round UP); beyond that the window itself is usually wrong.
           const pinnedCount = parsed.tasks.filter(isPinned).length;
           const overshoot = Math.round((sumQty - parsed.durationMins / 60) * 100) / 100;
-          // A job under the minimum billable time always has tasks summing below
-          // the floored target - enforceMinBillable tops the invoice up on its
-          // own, so that gap is the floor doing its job, not a window problem.
+          // Under the minimum, the gap is the floor doing its job, not a window problem.
           const flooredByMinimum = parsed.durationMins < settings.pricing.minBillableMins;
           if ((sumQty < targetHours && !flooredByMinimum) || overshoot > pinnedCount * incHours) {
             parsed.warnings = [
@@ -866,8 +768,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, result: parsed });
   } catch (err) {
     console.error("[parse-job] failed:", err);
-    // Upstream 429s are transient: mark them retryable so callers can
-    // back off and retry instead of reading a rate limit as a parse failure.
+    // Upstream 429s are transient, so mark them retryable.
     if (isAiRateLimitError(err)) {
       return aiRateLimitResponse(err);
     }

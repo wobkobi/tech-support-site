@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/AdminTopBar.tsx
-// Sticky bar above every admin page: the drawer button (below lg) or the sidebar collapse
-// toggle (lg+), the GlobalSearch trigger, and at lg+ the Quick actions menu and Sign out.
+// Sticky bar above every admin page: menu/collapse toggle, search, quick actions, sign out.
 
 import {
   GlobalSearch,
@@ -50,8 +49,7 @@ interface AdminTopBarProps {
 }
 
 /**
- * Admin top bar. Sticks to the top of the content column at every width; the
- * drawer backdrop and drawer (z-30/z-40), modals and toasts all sit above it.
+ * Admin top bar, sticky at every width; the drawer (z-30/z-40), modals and toasts sit above it.
  * @param props - Component props.
  * @param props.collapsed - Whether the desktop sidebar is collapsed.
  * @param props.onToggleCollapsed - Collapse toggle handler.
@@ -71,8 +69,7 @@ export function AdminTopBar({
   const [searchOpen, setSearchOpen] = useState(false);
   useGlobalSearchShortcut(() => setSearchOpen(true));
 
-  // Server snapshot is "not Apple", so the first client render matches the HTML and
-  // the hint switches to the Cmd glyph straight after hydration.
+  // Server snapshot is "not Apple" so hydration matches; the Cmd glyph swaps in after.
   const isApple = useSyncExternalStore(subscribeNever, isApplePlatform, () => false);
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -115,9 +112,8 @@ export function AdminTopBar({
   }, [menuOpen]);
 
   /**
-   * Menu keyboard: Escape closes and refocuses the button, ArrowUp/ArrowDown
-   * (wrapping) and Home/End move between items, Tab closes and moves on, and
-   * ArrowDown on the closed button opens the menu.
+   * Menu keyboard: Escape/Tab close, arrows (wrapping) and Home/End move, and
+   * ArrowDown on the closed button opens it.
    * @param e - The key event, from the button or an item.
    */
   function onMenuKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
@@ -199,7 +195,7 @@ export function AdminTopBar({
         {/* Phones get the same shortcuts from the + button instead. */}
         <div className="ml-auto hidden shrink-0 items-center gap-2 lg:flex">
           <div ref={menuWrapRef} className="relative" onKeyDown={onMenuKeyDown}>
-            {/* AdminButton's primary look on a native button, since AdminButton has no way to take the menu-button ARIA or a ref. */}
+            {/* Native button: AdminButton can't take the menu-button ARIA or a ref. */}
             <button
               ref={quickButtonRef}
               id={quickButtonId}

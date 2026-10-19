@@ -1,7 +1,5 @@
 // src/app/api/business/invoices/preview-pdf/route.ts
-// Admin endpoint that renders the customer-facing PDF for an UNSAVED invoice. POST takes
-// the builder's form state, forces status to DRAFT (so the VOID watermark stays off), and
-// returns the same PDF bytes the customer would receive as an attachment download.
+// Renders the customer-facing PDF for an UNSAVED invoice from the builder's form state.
 
 import { generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import { parseDate } from "@/features/business/lib/validation";
@@ -27,10 +25,7 @@ interface PreviewPayload {
 
 /**
  * POST /api/business/invoices/preview-pdf
- * Generates the actual customer-facing PDF for an UNSAVED invoice (used by
- * the builder's "Save PDF" button so the operator gets the same bytes the
- * customer would receive, instead of the browser's window.print() screenshot
- * of the HTML preview).
+ * The real PDF bytes for the builder's "Save PDF" button, not a print of the preview.
  * @param request - Next.js request, admin-auth gated, body is the form state.
  * @returns The rendered PDF as application/pdf with a download header.
  */
@@ -43,16 +38,14 @@ export async function POST(request: NextRequest): Promise<Response> {
   if (!body.number || !body.clientName) {
     return errorResponse("number and clientName are required", 400);
   }
-  // serialiseInvoice calls toISOString on both dates, which throws a RangeError
-  // on an Invalid Date - the shape a cleared date input on the edit form sends.
+  // A cleared date input would make toISOString throw a RangeError.
   const issueDate = parseDate(body.issueDate);
   const dueDate = parseDate(body.dueDate);
   if (!issueDate || !dueDate) {
     return errorResponse("Enter a valid issue date and due date", 400);
   }
 
-  // Build the minimum Invoice shape generateInvoicePdf needs. Status is
-  // forced to DRAFT so the watermark stays off for in-progress previews.
+  // DRAFT keeps the watermark off.
   const invoice: Invoice = {
     id: "preview",
     number: body.number,

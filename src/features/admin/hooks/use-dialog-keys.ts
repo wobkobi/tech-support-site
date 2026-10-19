@@ -1,15 +1,10 @@
 "use client";
 // src/features/admin/hooks/use-dialog-keys.ts
-// Keyboard handling shared by the admin dialogs (Modal and the phone sidebar drawer):
-// Escape dismisses, and Tab stays inside the dialog instead of wandering onto the page
-// behind the backdrop.
+// Admin dialog keys: Escape dismisses and Tab stays inside the dialog.
 
 import { type RefObject, useEffect, useRef } from "react";
 
-/**
- * Open dialogs, oldest first. A confirm opened over another dialog would
- * otherwise have both answer the same Escape or Tab; only the top one does.
- */
+/** Open dialogs, oldest first; only the top one answers Escape and Tab. */
 const openStack: symbol[] = [];
 
 /** Everything Tab can land on. */
@@ -17,9 +12,8 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * While `open`, Escape calls `onEscape` and Tab wraps between the first and
- * last control inside `ref`. `onEscape` is read fresh on each key press, so an
- * inline arrow is fine and never re-subscribes the listener.
+ * While `open`, Escape calls `onEscape` and Tab wraps inside `ref`. `onEscape` is read
+ * fresh per key press, so an inline arrow never re-subscribes.
  * @param ref - The dialog panel.
  * @param open - Whether the dialog is showing.
  * @param onEscape - Dismiss handler for the Escape key.

@@ -1,9 +1,7 @@
 "use client";
 // src/features/social-design/components/SimpleEditor.tsx
-// The post maker on a phone: a preview of each size, the words in plain boxes, and a
-// button per photo to swap it. Nothing moves or resizes here, since dragging handles
-// on a small touch screen goes wrong more often than right; the full editor is a tap
-// away for when it's needed.
+// The post maker on a phone: size previews, words in plain boxes and photo swaps. No
+// moving or resizing - handles are unreliable on small touch screens.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -17,8 +15,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { FaCamera, FaUpDownLeftRight } from "react-icons/fa6";
 
 /**
- * Layers in reading order on a size: top to bottom, then left to right. A layer hidden
- * there still lists, so its words can be changed for the sizes that show it.
+ * Layers in reading order on a size; hidden ones still list so other sizes can be edited.
  * @param doc - Design.
  * @param format - Size.
  * @param keep - Which layers to list.
@@ -34,9 +31,8 @@ function inReadingOrder(doc: DesignDoc, format: FormatKey, keep: (l: Layer) => b
 }
 
 /**
- * Box for a ticked list, one point per line. It holds what's typed itself, so a new
- * line just started (still empty) stays in the box while the list leaves blanks out;
- * an undo that changes the points from outside replaces it.
+ * Box for a ticked list, one point per line. Holds its own text so a just-started empty
+ * line survives; outside changes (undo) replace it.
  * @param props - Component props.
  * @param props.id - Textarea id.
  * @param props.items - The list's points.
@@ -55,8 +51,7 @@ function PointsBox({
   const outside = items.join("\n");
   const [text, setText] = useState(outside);
   const [seen, setSeen] = useState(outside);
-  // Points changed from outside the box (undo, redo, an AI draft): show those, unless
-  // they're just what was typed with the blank lines left out.
+  // Show outside changes (undo, AI draft) unless they're just the typed text minus blanks.
   if (outside !== seen) {
     setSeen(outside);
     const typed = text

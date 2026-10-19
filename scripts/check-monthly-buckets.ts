@@ -1,8 +1,6 @@
 // scripts/check-monthly-buckets.ts
-// NZ month bucketing behind the admin charts, and the chart axis maths. The point of the
-// bucketing cases: a row must land in the same month the dashboard's and business page's
-// `>= nzMidnightUtc(y, m, 1)` filters put it in, either side of NZDT and NZST month ends,
-// for real instants and for ledger dates (stored as UTC midnight of the NZ day).
+// NZ month bucketing and chart axis maths. A row must land in the same month the
+// `>= nzMidnightUtc(y, m, 1)` filters put it in, across NZDT/NZST month ends.
 // Run with: npm test -- monthly-buckets
 
 import { formatAxisDollars, niceScale } from "@/features/admin/components/charts/chart-scale";
@@ -25,8 +23,7 @@ import { nzMidnightUtc } from "@/shared/lib/timezone-utils";
 import { expectEqual, finish } from "./lib/harness.js";
 
 /**
- * Month key a dashboard-style filter puts an instant in: the month whose
- * [nzMidnightUtc(1st), nzMidnightUtc(next 1st)) window contains it.
+ * Month key whose [nzMidnightUtc(1st), nzMidnightUtc(next 1st)) window holds the instant.
  * @param date - The instant.
  * @param candidates - Months to try.
  * @returns The matching key, or null.

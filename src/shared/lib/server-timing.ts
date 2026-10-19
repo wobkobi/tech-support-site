@@ -1,8 +1,5 @@
 // src/shared/lib/server-timing.ts
-// Lightweight Server-Timing collector for locating slow server work. Route handlers emit
-// spans as a `Server-Timing` response header via ServerTimer.toHeader; server components
-// (no response headers) call ServerTimer.log instead. Durations use the `performance`
-// clock.
+// Server-Timing collector: routes emit a header via toHeader; server components log instead.
 
 /** One recorded span: a token-safe name and its duration in milliseconds. */
 interface TimingSpan {
@@ -13,8 +10,7 @@ interface TimingSpan {
 }
 
 /**
- * Replaces characters that are not valid in a Server-Timing metric name with
- * underscores, so an arbitrary label can never produce a malformed header.
+ * Replaces characters invalid in a Server-Timing metric name, so labels can't break the header.
  * @param name - Raw span label.
  * @returns Token-safe name.
  */
@@ -22,10 +18,7 @@ function toToken(name: string): string {
   return name.replace(/[^A-Za-z0-9_-]/g, "_");
 }
 
-/**
- * Collects named durations for one request or render. Create one per request -
- * it is not a singleton, so spans never bleed across concurrent invocations.
- */
+/** Collects durations for one request; create one per request so spans never bleed across. */
 export class ServerTimer {
   private readonly spans: TimingSpan[] = [];
 
@@ -39,8 +32,7 @@ export class ServerTimer {
   }
 
   /**
-   * Times an async operation, records it as a span, and returns its result. The
-   * span is recorded even when the operation throws.
+   * Times an async operation as a span, recorded even when it throws.
    * @param name - Span label.
    * @param fn - The async operation to measure.
    * @returns Whatever the operation resolves to.
@@ -63,8 +55,7 @@ export class ServerTimer {
   }
 
   /**
-   * Prints the collected spans to the server logs - for server components,
-   * which cannot attach a response header. No-op when nothing was recorded.
+   * Logs the spans, for server components that can't set headers. No-op when empty.
    * @param label - Prefix identifying the page/handler in the log line.
    */
   log(label = "server-timing"): void {

@@ -1,7 +1,5 @@
 // src/shared/lib/served-suburbs.ts
-// Parses the admin "Served suburbs" list. One suburb per line; a line ending in a
-// colon ("North Shore:") starts a region that the suburbs below it belong to. The
-// Services page renders the groups, the JSON-LD areaServed uses the flat list.
+// Parses the "Served suburbs" setting: one suburb per line, and a line ending in ":" starts a region.
 
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
@@ -13,9 +11,7 @@ export interface SuburbGroup {
 }
 
 /**
- * Groups raw lines under their region headings. Blank lines are ignored, a
- * suburb repeated anywhere in the list is kept only at its first mention
- * (case-insensitive), and a heading with no suburbs under it is dropped.
+ * Groups lines under region headings, keeping each suburb's first mention and dropping empty headings.
  * @param lines - Raw textarea lines as stored in settings.
  * @returns Non-empty groups in list order.
  */
@@ -41,9 +37,7 @@ export function groupServedSuburbs(lines: readonly string[]): SuburbGroup[] {
 }
 
 /**
- * Live suburb groups for an identity, falling back to the default list when the
- * stored one holds no suburbs (an identity row seeded before servedSuburbs
- * existed stores [], which would otherwise blank every consumer).
+ * Live suburb groups, falling back to the defaults when the stored list is empty.
  * @param identity - Resolved identity settings.
  * @returns Non-empty suburb groups.
  */

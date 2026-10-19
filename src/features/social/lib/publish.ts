@@ -1,9 +1,6 @@
 // src/features/social/lib/publish.ts
-// Publishing a social post to every enabled platform, and taking it down again. Same
-// claim-then-work shape as the mailing send: an atomic status flip stops a double-click
-// or the cron racing a manual publish from posting twice, and each platform's outcome is
-// recorded on its target so a retry or a resumed run only touches the platforms still
-// pending.
+// Publishes a social post to every enabled platform and takes it down. An atomic status claim
+// stops double posts; per-target outcomes let retries touch only pending platforms.
 
 import { promoWording } from "@/features/mailing/lib/context";
 import type { PromoWording } from "@/features/mailing/lib/render";
@@ -68,8 +65,7 @@ function missingSetup(post: Pick<SocialPost, "targets">): string[] {
 }
 
 /**
- * Checks a post can go out right now: platforms set up, linked promo still live, and
- * no validator errors.
+ * Checks a post can go out now: platforms set up, promo live, no validator errors.
  * @param post - The post.
  * @returns The promo wording to fill with, or the reason it can't go.
  */
@@ -94,8 +90,7 @@ export async function readiness(
 }
 
 /**
- * What stops a post being scheduled. A promo can start after the schedule is set,
- * so promo placeholders and a linked promo are only checked when it goes out.
+ * What stops scheduling. Promo checks wait for send time, since a promo may start later.
  * @param post - The post.
  * @returns Problems with their HTTP status, or null when it can be scheduled.
  */
@@ -107,8 +102,7 @@ export function scheduleProblems(post: SocialPost): { error: string; status: num
 }
 
 /**
- * Puts a claimed post back to draft when it can't go ahead, so it reappears in
- * Drafts for the operator to fix rather than sitting in "posting".
+ * Puts a claimed post back to draft so it shows in Drafts instead of stuck in "posting".
  * @param id - Post id.
  */
 async function releaseToDraft(id: string): Promise<void> {
@@ -119,8 +113,7 @@ async function releaseToDraft(id: string): Promise<void> {
 }
 
 /**
- * Publishes every enabled target still pending, all platforms at once, then records
- * each outcome and the status they add up to.
+ * Publishes every pending enabled target in parallel, then records outcomes and status.
  * @param post - The claimed post.
  * @param targets - Targets to run from (pending ones get published).
  * @param promo - Promo wording for the placeholders.
@@ -226,11 +219,8 @@ export async function retryFailed(id: string): Promise<PublishOutcome> {
 }
 
 /**
- * Deletes a post from every platform it's up on. Claimed with a status flip to
- * "removing", like a publish, so a double-click can't run two take-downs and a retry
- * can't post while one runs. A take-down that died part-way stays "removing" until
- * {@link STUCK_AFTER_MS} passes, then pressing Take down again claims it; a platform it
- * already reached comes back as already deleted, which counts as done.
+ * Deletes a post everywhere, claimed by a flip to "removing". A stalled take-down can be
+ * reclaimed after {@link STUCK_AFTER_MS}; platforms already reached report already deleted.
  * @param id - Post id.
  * @returns The outcome per platform, or the reason it didn't run.
  */
@@ -300,9 +290,8 @@ export async function takeDownPost(id: string): Promise<PublishOutcome> {
 }
 
 /**
- * Cron: publishes scheduled posts that are due, then resumes any run that died
- * part-way or is waiting on Instagram's processing. Runs inside quiet hours too:
- * a post wakes nobody, so the time the operator picked is the time it goes.
+ * Cron: publishes due scheduled posts and resumes stalled or processing runs. Ignores quiet
+ * hours, since a post wakes nobody.
  * @returns One line per post touched.
  */
 export async function runScheduledSocialPosts(): Promise<

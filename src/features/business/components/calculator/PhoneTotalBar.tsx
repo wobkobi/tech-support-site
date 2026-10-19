@@ -14,10 +14,8 @@ interface Props {
 }
 
 /**
- * Phone total bar. Below lg the invoice preview, and the total in it, sits
- * under every section, so the running figure stays pinned here while the job
- * is built. It stays hidden until the job has a total, so an empty calculator
- * isn't topped by a $0.00 bar.
+ * Phone total bar, pinned below lg where the preview sits under every section.
+ * Hidden until the job has a total.
  * @param props - Component props.
  * @param props.show - Whether the bar is pinned (hidden otherwise).
  * @param props.total - Job total after discounts.

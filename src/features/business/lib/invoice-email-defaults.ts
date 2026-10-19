@@ -1,7 +1,5 @@
 // src/features/business/lib/invoice-email-defaults.ts
-// Default copy for the invoice email's editable body. Lives in its own file so both the
-// server (`buildInvoiceEmail`) and the client (the Send modal in SendInvoiceModal.tsx) can
-// import it without dragging server-only dependencies into the client bundle.
+// Default invoice email bodies, kept free of server-only imports so the client can use them.
 
 /** Default text rendered between the greeting and the auto-generated invoice details block. */
 export const DEFAULT_INVOICE_EMAIL_BODY =
@@ -11,12 +9,7 @@ export const DEFAULT_INVOICE_EMAIL_BODY =
 export const DEFAULT_QUOTE_EMAIL_BODY =
   "Thanks for getting in touch - your quote is attached. If you're happy with it, just reply to this email or give me a ring and I'll get it booked in.";
 
-/**
- * Default body for the "your invoice has been voided" notification email.
- * Sent atomically when the operator voids a SENT or PAID invoice and ticks the
- * notify checkbox; the attached PDF carries the diagonal VOID stamp so the
- * client sees the cancellation visually as well.
- */
+/** Default body for the "your invoice has been voided" email (PDF attached with a VOID stamp). */
 export const DEFAULT_VOID_EMAIL_BODY =
   "I'm writing to let you know that the invoice I sent you has been voided and should be disregarded. " +
   "Please ignore the previous PDF and email. If you've already paid, please reply so I can sort out a refund. " +

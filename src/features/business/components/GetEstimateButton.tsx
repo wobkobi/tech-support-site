@@ -1,8 +1,6 @@
 "use client";
 // src/features/business/components/GetEstimateButton.tsx
-// The "Get a rough estimate" CTA on the pricing page. Smooth-scrolls to the estimator
-// section instead of a hard anchor jump, which would land the heading under the sticky
-// navbar (the `scroll-mt-*` on the target keeps it clear of the navbar).
+// "Get a rough estimate" CTA on the pricing page; smooth-scrolls to the estimator.
 
 import { Button } from "@/shared/components/Button";
 import type React from "react";

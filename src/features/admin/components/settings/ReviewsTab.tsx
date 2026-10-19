@@ -1,8 +1,7 @@
 "use client";
 // src/features/admin/components/settings/ReviewsTab.tsx
-// Editor for the reviews & reputation group: how many reviews feature on the home page,
-// whether verified reviews auto-approve, the Google review link, and the automatic
-// review ask's timing. Saves through the shared settings form hook.
+// Editor for the reviews & reputation group: featured count, auto-approve, Google review
+// link and the automatic review ask's timing.
 
 import {
   NumberField,

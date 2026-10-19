@@ -14,7 +14,6 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * GET /api/admin/contacts
  * Returns all contacts ordered by newest first.
- * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns JSON with contacts array.
  */
@@ -41,9 +40,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 /**
  * POST /api/admin/contacts
- * Find-or-creates a Contact by email. A contact already linked to
- * `googleContactId` gets the email attached rather than a duplicate row. On
- * create or attach, fires a best-effort sync to Google Contacts.
+ * Find-or-creates a Contact by email (attaching it to a `googleContactId` match), then
+ * best-effort syncs to Google.
  * @param request - Incoming request with { name, email, phone?, address?, company?, googleContactId? }.
  * @returns JSON { ok, created, emailAttached, contact }.
  */
@@ -72,9 +70,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const phoneE164 = body.phone ? toE164NZ(body.phone) || null : null;
 
-  // Google-canonicalise a typed address (unambiguous matches only - see
-  // resolveAddress), keeping the typed value when there's no single confident
-  // match and flagging it so it shows in the address review queue.
+  // Canonicalise a typed address; an unconfident match keeps the text and flags it for review.
   const rawAddress = body.address?.trim() || null;
   const resolution = rawAddress ? await resolveAddress(rawAddress) : null;
   const address = resolution?.status === "resolved" ? resolution.address : rawAddress;
@@ -96,10 +92,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, created: false, contact });
   }
 
-  // Push to Google Contacts so it appears on the operator's phone - a new row, or
-  // an existing one that just gained an email.
-  // Awaited, not detached: Vercel freezes the instance once the response
-  // is sent. Still best-effort - a Google hiccup must not fail the create.
+  // Push to Google; awaited because Vercel freezes after the response, but best-effort.
   try {
     await syncContactToGoogle(contact.id);
   } catch (err) {

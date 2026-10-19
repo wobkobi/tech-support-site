@@ -1,7 +1,6 @@
 // src/features/social-design/lib/brand.ts
-// The house style the post maker is limited to: brand colour swatches, text presets
-// and the logo and backdrop files. Hexes match the @theme tokens in globals.css; keys
-// are stored in designs so a design never carries an off-brand colour.
+// The post maker's house style: swatches, text presets, logo and backdrop files. Hexes match the
+// globals.css @theme tokens; designs store keys so colours stay on-brand.
 
 /** One colour the operator can pick. */
 export interface Swatch {
@@ -54,9 +53,8 @@ export function hexOf(key: ColourKey): string {
 export type TextPreset = "headline" | "support" | "small" | "accent";
 
 /**
- * Starting values for each preset at a 1080px-wide picture. Headline matches the
- * build-ads h1 (Exo 800, tight tracking); support text sits at 75-78% opacity there,
- * so it is seasalt 600 here rather than a translucent violet.
+ * Preset values at 1080px wide. Headline matches the build-ads h1 (Exo 800); support text is
+ * seasalt 600 to match its 75-78% opacity there.
  */
 export const TEXT_PRESETS: Record<
   TextPreset,
@@ -116,17 +114,11 @@ export const LOGOS = {
 /** Logo variant key. */
 export type LogoVariant = keyof typeof LOGOS;
 
-/**
- * The brand backdrop, pre-blurred by build-icons (BACKDROP_VARIANTS) so the canvas
- * never runs a live blur over a 1080x1920 picture.
- */
+/** Brand backdrop, pre-blurred by build-icons so the canvas never blurs 1080x1920 live. */
 export const BACKDROP_BLURRED_SRC = "/source/backdrop-blur.webp";
 export const BACKDROP_SRC = "/source/backdrop.jpg";
 
-/**
- * Frosted card, matching FrostedSection and the build-ads card: white at 60%, a 2px
- * seasalt-200 border at 40%, a navy-tinted shadow.
- */
+/** Frosted card matching FrostedSection: white 60%, 2px seasalt-200 border at 40%, navy shadow. */
 export const FROSTED = {
   fill: "rgba(252,252,252,0.6)",
   stroke: "rgba(191,198,205,0.4)",

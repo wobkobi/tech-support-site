@@ -1,7 +1,6 @@
 // src/app/api/business/tax/export/route.ts
-// Accountant CSV for one financial year (`?fy=2025-26`): the saved snapshot when the year
-// is filed, otherwise live figures. A filed year whose snapshot can't be read exports the
-// live figures rather than failing. Admin only, never cached.
+// Accountant CSV for one FY (`?fy=2025-26`): the filed snapshot, else (or if unreadable)
+// live figures. Admin only, never cached.
 
 import { buildTaxCsv } from "@/features/business/lib/tax/export-csv";
 import { loadTaxYearView, resolveFinancialYear } from "@/features/business/lib/tax/view.server";
@@ -24,8 +23,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const fy = await resolveFinancialYear(fyKey, now);
   if (!fy) return noStore(errorResponse("Unknown financial year", 404));
 
-  // `shown` is the live figures when the filed snapshot can't be read, so this can't throw
-  // on it; the filing date still goes in the status line so the CSV doesn't read as unfiled.
+  // An unreadable snapshot falls back to live figures; still note the filing date.
   const view = await loadTaxYearView(fy, now);
   const csv = buildTaxCsv(view.shown, {
     fyLabel: fy.label,

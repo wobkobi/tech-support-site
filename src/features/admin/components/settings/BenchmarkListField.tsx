@@ -1,9 +1,7 @@
 "use client";
 // src/features/admin/components/settings/BenchmarkListField.tsx
-// Repeatable-row editor for the estimator's task-duration benchmarks. Each row is a label
-// + a minutes input with a remove button, plus an "Add benchmark" button. Row-level
-// validation errors are keyed `benchmarks.<index>.label` / `benchmarks.<index>.mins` to
-// match the validator.
+// Repeatable-row editor for the estimator's task-duration benchmarks. Row errors are keyed
+// `benchmarks.<index>.label` / `.mins` to match the validator.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";

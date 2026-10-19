@@ -1,8 +1,6 @@
 "use client";
 // src/features/admin/components/AdminShell.tsx
-// Client frame around every admin page: owns the phone drawer and the desktop sidebar's
-// collapsed state, and lays out AdminSidebar beside the AdminTopBar + #main column, with
-// the phone AdminTabBar and its QuickActionsSheet.
+// Client frame around every admin page: owns the phone drawer and the sidebar's collapsed state.
 
 import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
 import { AdminTabBar } from "@/features/admin/components/AdminTabBar";
@@ -25,11 +23,8 @@ interface AdminShellProps {
 }
 
 /**
- * Admin chrome: sidebar (drawer below lg), sticky top bar and the padded main
- * column. The drawer closes on navigation, on Escape, and when the window widens
- * to lg (where the sidebar is always shown). Opening it focuses its close button;
- * dismissing it returns focus to whichever button opened it (the phone bar's Menu, or
- * the top bar's menu button on pages with their own action bar).
+ * Admin chrome: sidebar (drawer below lg), sticky top bar and main column. The drawer
+ * closes on navigation, Escape or widening to lg, and returns focus to its opener.
  * @param props - Component props.
  * @param props.initialCollapsed - Saved collapsed state from the {@link SIDEBAR_COOKIE} cookie.
  * @param props.children - The active admin page.
@@ -37,8 +32,7 @@ interface AdminShellProps {
  */
 export function AdminShell({ initialCollapsed, children }: AdminShellProps): React.ReactElement {
   const pathname = usePathname();
-  // Pairing the drawer state with the pathname auto-closes it on navigation
-  // without a setState-in-effect (which the React lint rule rejects).
+  // Pairing with the pathname auto-closes on navigation without a setState-in-effect.
   const [drawer, setDrawer] = useState<{ open: boolean; pathname: string }>({
     open: false,
     pathname,
@@ -85,8 +79,7 @@ export function AdminShell({ initialCollapsed, children }: AdminShellProps): Rea
     if (drawerOpen) closeButtonRef.current?.focus({ preventScroll: true });
   }, [drawerOpen]);
 
-  // Widening to lg leaves no drawer to close, and its Tab trap would otherwise
-  // hold focus in the sidebar.
+  // Close on widening to lg, or the drawer's Tab trap holds focus in the sidebar.
   useEffect(() => {
     const desktop = window.matchMedia("(width >= 64rem)");
     /**
@@ -109,9 +102,8 @@ export function AdminShell({ initialCollapsed, children }: AdminShellProps): Rea
         collapsed={collapsed}
         closeButtonRef={closeButtonRef}
       />
-      {/* Sidebar is fixed-position; reserve its width on lg+ only (phones use the
-          drawer). min-w-0 stops wide content blowing out the flex column. Print
-          drops the chrome. */}
+      {/* Reserve the fixed sidebar's width on lg+ only; min-w-0 stops wide content
+          blowing out the column. */}
       <div
         className={cn(
           "min-w-0 flex-1 bg-admin-bg transition-[margin-left] duration-200 ease-out print:ml-0 print:bg-white",
@@ -125,9 +117,7 @@ export function AdminShell({ initialCollapsed, children }: AdminShellProps): Rea
           onOpenDrawer={openDrawer}
           menuButtonRef={menuButtonRef}
         />
-        {/* The root layout's skip link targets #main. Below lg, pb-28 keeps the end
-            of every page clear of the bottom bar. Pages sit in a centred column so
-            wide screens don't stretch tables and panels edge to edge. */}
+        {/* Skip link targets #main; pb-28 clears the phone bottom bar. */}
         <main id="main" className="px-4 pt-5 pb-28 sm:px-6 lg:pt-8 lg:pb-10 print:p-0">
           <div className="mx-auto w-full max-w-328 print:max-w-none">{children}</div>
         </main>

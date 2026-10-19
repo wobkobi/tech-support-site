@@ -1,7 +1,6 @@
 // src/features/social-design/lib/pictures.ts
-// The exported pictures of a design: whether they still match it, what a paid ad
-// leaves off, the picture description written for the post when none is typed, and
-// download file names. Pure, so the editor, the composer and the server agree.
+// A design's exported pictures: staleness, paid-ad omissions, default description and file names.
+// Pure, so editor, composer and server agree.
 
 import type { RenderRow } from "@/features/social-design/lib/design-row";
 import {
@@ -23,8 +22,7 @@ export interface PictureState {
 }
 
 /**
- * Whether a layer is left off the pictures of a paid ad. Paid ads carry no contact
- * details: Meta's own button does that job.
+ * Whether a layer is left off a paid ad's pictures; Meta's button replaces contact details.
  * @param layer - Layer.
  * @param paidAd - The design's paid-ad switch.
  * @returns True when the layer is left off.
@@ -52,8 +50,7 @@ export function pictureState(
 }
 
 /**
- * Picture description for a post when the operator hasn't typed one: the headline and
- * the supporting line, read as sentences.
+ * Default picture description: the headline and supporting line read as sentences.
  * @param doc - Design.
  * @returns Description, or "" when the design has no headline or supporting words.
  */

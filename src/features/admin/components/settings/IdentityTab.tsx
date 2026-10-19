@@ -1,9 +1,7 @@
 "use client";
 // src/features/admin/components/settings/IdentityTab.tsx
-// Editor for the business identity group: contact details, the unified base address
-// (which also drives the travel origin + SEO), payment terms, GST number, bank account,
-// home region, and the SEO service area (radius + served suburbs). Sensitive fields (GST
-// number, bank account) are masked with a reveal toggle.
+// Editor for the business identity group: contact, base address (travel origin + SEO),
+// invoicing, service area and published hours. GST number and bank account are masked.
 
 import {
   closeLabel,

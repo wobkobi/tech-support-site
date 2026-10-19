@@ -1,8 +1,6 @@
 // src/features/business/lib/invoice-already-paid.ts
-// Money a client hands over before the invoice goes out ("paid $47 in cash"): request
-// validation for the amount and method, and the income entry that records it. The entry
-// is linked to the invoice like the balance payment's, and told apart from it by
-// Invoice.alreadyPaidIncomeId.
+// Money paid before the invoice goes out ("paid $47 in cash"): validation and its income
+// entry, told apart from the balance payment by Invoice.alreadyPaidIncomeId.
 
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import { recordIncome } from "@/features/business/lib/income-recording";
@@ -58,16 +56,9 @@ export function balanceIncomeWhere(invoice: {
 }
 
 /**
- * Brings the already-paid income entry in line with the invoice: creates it when the
- * invoice gains a part payment, updates the amount and method when they change, and
- * deletes it (with its Cashbook row) when the part payment is cleared or the invoice is
- * a quote. The Cashbook sheet is the source of truth on the next import, so a sheet
- * failure is not reconciled for you: an update that misses the sheet gets put back to the
- * sheet's amount, and the warning tells the operator to fix the row by hand.
- *
- * A removal deletes the sheet row first and only then the entry. If the sheet delete
- * fails, the entry is kept but unlinked from the invoice, so it keeps mirroring the row
- * still in the sheet instead of the import re-adding that row as a second income entry.
+ * Creates, updates or deletes the already-paid income entry (and its Cashbook row) to match
+ * the invoice. The sheet wins on the next import, so a sheet failure warns for a hand fix.
+ * If the sheet row delete fails, the entry is unlinked instead so the import can't duplicate it.
  * @param invoiceId - The invoice to reconcile.
  * @param date - Date for a newly created entry; defaults to the invoice's issue date.
  * @returns Whether the Cashbook sheet write was skipped or failed.
@@ -135,8 +126,7 @@ export async function syncAlreadyPaidIncome(
   if (existing.amount === amount && existing.method === method) {
     return { sheetSyncWarning: false };
   }
-  // Only the amount and method follow the invoice; a date or note the operator
-  // changed in the ledger stays.
+  // Only amount and method follow the invoice; ledger edits to date or note stay.
   const updated = await prisma.incomeEntry.update({
     where: { id: existing.id },
     data: { amount, method },

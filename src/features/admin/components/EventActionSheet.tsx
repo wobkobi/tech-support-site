@@ -1,11 +1,6 @@
 "use client";
 // src/features/admin/components/EventActionSheet.tsx
-// Bottom-sheet of quick mutations for a booking event, opened by a long-press on a
-// booking card in DayAgendaView: view details, complete, cancel, no-show, reschedule,
-// bill in calculator, resend review email, delete (test bookings only). Mutations route
-// through the shared useBookingActions hook, with toasts from the global admin toaster.
-// Built on the kit Modal in its sheet placement: pinned to the bottom edge on phones,
-// centred from sm.
+// Bottom sheet of quick booking mutations, opened by a long-press on a DayAgendaView card.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
@@ -43,25 +38,15 @@ interface PendingAction {
 /** Full-width sheet action height: a 44px finger target on every screen. */
 const SHEET_BUTTON_CLS = "h-11 w-full";
 
-/**
- * Amber warning tint laid over the secondary variant for Mark no-show, so it stands apart
- * from the neutral cancel when the sheet is used one-handed on a job.
- */
+/** Amber tint for Mark no-show, so it stands apart from the neutral cancel. */
 const SHEET_NO_SHOW_CLS =
   "border-amber-300 bg-amber-100 text-amber-900 hover:border-amber-500 hover:bg-amber-200";
 
-/**
- * Plain links styled as the secondary AdminButton at sheet size. They stay native anchors
- * because Reschedule opens a new tab and the others do a full page load, which the
- * AdminButton link form (a client-side Next Link) would change.
- */
+/** Native anchors styled as AdminButton: they need a new tab or full page load, not Next Link. */
 const SHEET_LINK_CLS = cn(adminButtonClass({ variant: "secondary" }), SHEET_BUTTON_CLS);
 
 interface EventActionSheetProps {
-  /**
-   * The booking event being acted on. Caller is responsible for only
-   * opening the sheet when `ev.kind === "booking"` and `ev.booking` exists.
-   */
+  /** The booking event; open only when `ev.booking` exists. */
   event: WeekEvent & { booking: WeekEventBooking };
   /** Live past-edit lock window (hours) - scheduling.pastEditLockHours. */
   lockHours: number;
@@ -72,9 +57,7 @@ interface EventActionSheetProps {
 }
 
 /**
- * Renders the action sheet and runs its mutations through
- * {@link useBookingActions} (the same wrappers the bookings list and detail
- * page use) so the schedule view stays behaviourally identical to them.
+ * Renders the action sheet; mutations go through {@link useBookingActions} like the bookings pages.
  * @param props - Component props.
  * @param props.event - Event with attached booking data.
  * @param props.lockHours - Live past-edit lock window (hours).
@@ -90,8 +73,7 @@ export function EventActionSheet({
 }: EventActionSheetProps): React.ReactElement {
   const actions = useBookingActions();
   const [busy, setBusy] = useState(false);
-  // Stable "now" so the past/future booking checks don't get flagged for
-  // calling an impure function during render.
+  // Stable "now" avoids an impure call during render.
   const [renderedAt] = useState(() => Date.now());
   const [pending, setPending] = useState<PendingAction | null>(null);
   // Ticked by default: a no-show is normally chased for the call-out fee.
@@ -103,20 +85,15 @@ export function EventActionSheet({
   const isCancelled = status === "cancelled";
   const isCompleted = status === "completed";
   const isConfirmed = status === "confirmed";
-  // A completed job already happened, so cancelling it would only send the
-  // customer a Google "cancelled" email for a visit they had.
+  // Cancelling a completed job would only send a Google "cancelled" email.
   const isOpen = !isCancelled && !isCompleted;
   const isTestBooking = booking.name.toLowerCase().includes("test");
-  // Cancel / no-show lock 18h after the booking ends, mirroring the server
-  // guard, so the operator sees it up front rather than via a rejection toast.
-  // Completing stays available at any age - it is the expected terminal state
-  // and moves no money, so locking it would only leave the booking unfinishable.
-  // Billing, review resend, reschedule (future-only) and delete stay available.
+  // Cancel / no-show lock after the booking ends, mirroring the server guard.
+  // Completing stays open: it moves no money, and locking it strands the booking.
   const isEditLocked = isPastEditWindow(new Date(event.endAt).getTime(), renderedAt, lockHours);
 
   /**
-   * Runs a mutation, then closes + refreshes on success. Toasts (including
-   * errors) come from {@link useBookingActions}.
+   * Runs a mutation, then closes and refreshes on success; {@link useBookingActions} toasts.
    * @param run - The action wrapper to invoke.
    */
   async function act(run: () => Promise<{ ok: boolean }>): Promise<void> {
@@ -184,8 +161,7 @@ export function EventActionSheet({
     });
   }
 
-  // Rendered from live state rather than stored on `pending`, so a stored
-  // element can't freeze the tick.
+  // Rendered from live state so a stored element can't freeze the tick.
   const confirmBody =
     pending?.target.kind === "complete" ? (
       "This only changes the status. The review request goes out with the invoice."
@@ -201,8 +177,7 @@ export function EventActionSheet({
         />
       </div>
     ) : pending?.target.kind === "cancel" ? (
-      // Every booking on the schedule has its Google event, and deleting it is
-      // the only notice the customer gets - the site sends none of its own.
+      // Deleting the Google event is the only cancellation notice the customer gets.
       <div className="flex flex-col gap-2">
         <p>{pending.body}</p>
         <p className="font-medium text-admin-text">
@@ -293,8 +268,7 @@ export function EventActionSheet({
 
         {(isConfirmed || isCompleted) && (
           <>
-            {/* Deep-link into the calculator with the event's (operator-corrected)
-                times, client, and address pre-filled - see calculator/page.tsx. */}
+            {/* Calculator pre-fills the event's corrected times, client and address. */}
             <a
               href={`/admin/business/calculator?eventId=${encodeURIComponent(event.id)}`}
               className={SHEET_LINK_CLS}
@@ -324,8 +298,7 @@ export function EventActionSheet({
         )}
       </div>
 
-      {/* Sits inside the Modal panel, whose click handler stops propagation, so
-          dialog clicks don't bubble to the sheet backdrop and close it mid-confirm. */}
+      {/* Inside the Modal panel so clicks don't reach the backdrop mid-confirm. */}
       <ConfirmDialog
         open={pending !== null}
         title={pending?.title ?? ""}

@@ -1,6 +1,5 @@
 // src/features/admin/lib/dashboard-data.ts
-// Data behind the admin dashboard: one batch of parallel Prisma queries for booking, review,
-// contact, invoice and ledger stats, plus the values the dashboard sections derive from them.
+// Admin dashboard data: one batch of parallel Prisma queries plus the derived values.
 
 import "server-only";
 
@@ -108,10 +107,7 @@ export interface DashboardData {
   calendarLastRefreshMs: number | null;
   /** Income vs expenses for the last 12 NZ months, oldest first. */
   incomeExpenseGroups: BarGroup[];
-  /**
-   * Income received per month (GST-inclusive, like {@link DashboardData.monthRevenue}) for
-   * the same 12 months, for the revenue sparkline.
-   */
+  /** Income per month for the sparkline (GST-inclusive, like {@link DashboardData.monthRevenue}). */
   revenueTrend: number[];
   /** GST registered; the chart's series read "(excl. GST)" only when true. */
   gstRegistered: boolean;
@@ -119,14 +115,11 @@ export interface DashboardData {
 
 /**
  * Runs the dashboard's queries and derives every value its sections show.
- * @param now - Request instant; every "today", "this month" and "upcoming" bound is built
- * from it so one render reads one consistent clock.
+ * @param now - Request instant; every date bound is built from it.
  * @returns The dashboard data.
  */
 export async function loadDashboardData(now: Date): Promise<DashboardData> {
-  // Build "today"/"this month" boundaries on NZ midnight, not the server's UTC
-  // midnight (Vercel runs in UTC, 12-13h behind NZ), so counts match the
-  // operator's calendar day rather than sliding a booking into the wrong day.
+  // Bounds on NZ midnight; Vercel runs in UTC, 12-13h behind.
   const [nzYear, nzMonth, nzDay] = nzDateParts(now);
   const todayStart = nzMidnightUtc(nzYear, nzMonth, nzDay);
   const todayEnd = nzMidnightUtc(nzYear, nzMonth, nzDay + 1);
@@ -169,9 +162,7 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     prisma.booking.count({ where: { status: "held" } }),
     prisma.booking.count({ where: { status: "confirmed" } }),
     prisma.contact.count({ where: { deletedAt: null } }),
-    // MongoDB gotcha: contacts created before googleContactId existed in the
-    // schema have no field at all, so `null` alone misses them. `isSet: false`
-    // covers that case so the unsynced count is accurate.
+    // `isSet: false` catches rows created before the field existed; `null` alone misses them.
     prisma.contact.count({
       where: {
         OR: [{ googleContactId: null }, { googleContactId: { isSet: false } }],
@@ -223,9 +214,7 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
       where: { reviewLinkSentAt: { not: null }, deletedAt: null },
       select: { email: true, phone: true },
     }),
-    // Suggestion candidates: only contacts never stamped as sent. Excluding the rest
-    // DB-side (they were filtered below anyway) keeps the scan proportional to real
-    // candidates. isSet covers pre-field rows.
+    // Suggestion candidates: contacts never stamped as sent (isSet covers pre-field rows).
     prisma.contact.findMany({
       where: {
         deletedAt: null,
@@ -244,14 +233,12 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
       orderBy: { startAt: "asc" },
       select: { id: true, name: true, startAt: true, endAt: true },
     }),
-    // This-month income (server-side sum). Bounded at month end so a future-dated entry
-    // can't lift the card above the sparkline's last point and the business page's figure.
+    // This-month income, bounded at month end so a future-dated entry can't lift the card.
     prisma.incomeEntry.aggregate({
       where: { date: { gte: monthStart, lt: monthEnd } },
       _sum: { amount: true },
     }),
-    // Outstanding (DRAFT or SENT). Overdue flagged separately on the card.
-    // Quotes ride on DRAFT/SENT but aren't money owed - excluded.
+    // Outstanding (DRAFT or SENT), quotes excluded.
     prisma.invoice.findMany({
       where: { status: { in: ["DRAFT", "SENT"] }, ...NOT_A_QUOTE_FILTER },
       orderBy: { dueDate: "asc" },
@@ -284,8 +271,7 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
       orderBy: { fetchedAt: "desc" },
       select: { fetchedAt: true },
     }),
-    // Retainer clients - feeds the "Retainers due" panel. isSet guards rows
-    // created before the field existed (MongoDB gotcha, as above).
+    // Retainer clients; isSet guards pre-field rows.
     prisma.contact.findMany({
       where: { deletedAt: null, retainerTier: { isSet: true, not: null } },
       orderBy: { name: "asc" },
@@ -301,8 +287,7 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
       prisma.reviewAskOptOut.findMany({ select: { email: true, contactId: true } }),
       prisma.emailOptOut.findMany({ select: { email: true, contactId: true } }),
     ]).then(([a, b]) => [...a, ...b]),
-    // The chart's two series: every income and expense row in its 12 months, bucketed
-    // per NZ month below. The this-month aggregate above stays the revenue card's source.
+    // Chart series: income and expense rows for its 12 months, bucketed per NZ month below.
     prisma.incomeEntry.findMany({
       where: { date: { gte: chartStart } },
       select: { date: true, amount: true },
@@ -316,9 +301,8 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
   ]);
 
   // --- Retainers due this month ---
-  // Invoiced = an invoice linked by contactId, issued this month, with a line item
-  // mentioning "retainer". The text match runs in JS: lineItems is an embedded composite
-  // type and the Mongo connector can't regex-filter composite string content.
+  // Invoiced = a "retainer" line on an invoice issued this month. Matched in JS: the Mongo
+  // connector can't regex-filter composite lineItems.
   let retainersDue: typeof retainerContacts = [];
   if (retainerContacts.length > 0) {
     const monthInvoices = await prisma.invoice.findMany({
@@ -354,9 +338,7 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     ...contactsWithReviewSent.flatMap((c) => (c.phone ? [toE164NZ(c.phone)] : [])),
     ...bookingsWithReviewSent.flatMap((b) => (b.phone ? [toE164NZ(b.phone)] : [])),
   ]);
-  // The set diff still matters for cross-record coverage: an unsent contact
-  // sharing an email/phone with a sent contact, booking or invoice is already
-  // covered, and opted-out addresses ride in the same sets.
+  // An unsent contact sharing an email/phone with any sent record is already covered.
   const contactsWithoutReviewLinks = unsentContacts.filter((c) => {
     if (skipIds.has(c.id)) return false;
     if (c.email && sentEmails.has(c.email.toLowerCase())) return false;
@@ -422,8 +404,7 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     : null;
 
   // --- Income vs expenses chart ---
-  // Both series on the GST basis, so the bars read as profit; the sparkline stays money
-  // received, matching the "Revenue this month" card it sits on.
+  // Bars on the GST basis; the sparkline stays money received, like its card.
   const incomeExpenseGroups = ledgerMonthGroups(
     { income: basisIncomeRows(chartIncome, gst), expenses: basisExpenseRows(chartExpenses, gst) },
     months,

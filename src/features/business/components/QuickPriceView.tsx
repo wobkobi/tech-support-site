@@ -1,11 +1,7 @@
 "use client";
 // src/features/business/components/QuickPriceView.tsx
-// On-site quick price: an address and a start/end time priced as one Standard labour line
-// plus auto travel. Runs through calcJobTotal and lookupAutoTravel, the same pair the job
-// calculator uses, so the figure quoted at the door matches what a later invoice would say.
-// Travel can be dropped from the total, and the money taken can be recorded straight to
-// income: the amount received (which can differ from the total) by Bank, Cash, or split
-// across both as two rows, the same way an invoice's already-paid part and its balance are.
+// On-site quick price: one Standard labour line plus auto travel via the job calculator's
+// helpers, with the money taken recordable straight to income as Bank, Cash or a split.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
@@ -396,8 +392,7 @@ export function QuickPriceView({
 
           <div className="grid grid-cols-2 gap-3">
             <AdminField label="Start" htmlFor="quick-start">
-              {/* min-w-0 + appearance-none: iOS Safari gives time inputs an intrinsic
-                  width wider than a phone's half column, so they spill out of the card. */}
+              {/* min-w-0 + appearance-none: iOS Safari time inputs otherwise overflow a half column. */}
               <AdminInput
                 id="quick-start"
                 type="time"

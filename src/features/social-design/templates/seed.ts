@@ -1,9 +1,6 @@
 // src/features/social-design/templates/seed.ts
-// Seeds the starter templates once, the first time the Post maker page opens. Each
-// template key gets its own Setting marker, written before the row: the unique key makes
-// it the lock against two page loads seeding at once, and it stays after the template is
-// deleted so a deleted template stays deleted. A reworked template carries a new key and
-// so seeds as a new row beside any copy the operator edited.
+// Seeds starter templates on first Post maker open. Each key's Setting marker is the seed lock and
+// outlives the template, so deletions stick; a reworked template gets a new key.
 
 import { starterTemplates } from "@/features/social-design/templates/starters";
 import { prisma } from "@/shared/lib/prisma";

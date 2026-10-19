@@ -11,9 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/admin/preview-review-email
- * Returns the review ask's HTML so the admin can preview it. The stop link uses the
- * "preview" token, which the stop page and route treat as a no-op.
- * Requires an admin session (cookie or X-Admin-Secret header).
+ * Returns the review ask's HTML; the stop link uses the no-op "preview" token.
  * @param request - The incoming request.
  * @returns JSON response with `{ html, subject }`.
  */

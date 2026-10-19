@@ -8,10 +8,8 @@ import type { DesignRender, SocialDesign } from "@prisma/client";
 import { del } from "@vercel/blob";
 
 /**
- * Changes a design's exports or post link while keeping its updatedAt. The editor's
- * saves are guarded on updatedAt, so moving it here would turn the next autosave into a
- * false "changed in another tab". Written conditionally on the updatedAt just read, and
- * re-read if an autosave landed in between.
+ * Changes a design's exports or post link without bumping updatedAt, which would make the next
+ * autosave a false "changed in another tab". Written conditionally, re-read on a race.
  * @param id - Design id.
  * @param change - Given the stored design, the fields to write.
  * @returns The design as it was before the write, or null when it doesn't exist.
@@ -33,12 +31,8 @@ export async function writeKeepingUpdatedAt(
 }
 
 /**
- * Deletes exported pictures from Blob once nothing points at them. A picture a post or
- * one of its apps uses stays up, since a published post keeps its picture forever, and so
- * does one any design still lists or any email or email preset has in its words (the mail
- * Picture block's "Use a design"; a sent email keeps its picture forever too). Uploaded
- * photos are never touched. Failures are logged, never thrown: a leftover file costs
- * nothing but storage.
+ * Deletes exported pictures from Blob once nothing points at them: no post, design, email or
+ * email preset. Uploaded photos are never touched. Failures are logged, never thrown.
  * @param urls - Addresses that may have fallen out of use.
  */
 export async function deleteUnusedPictures(urls: (string | null | undefined)[]): Promise<void> {

@@ -1,8 +1,6 @@
 // src/features/business/lib/expense-recording.ts
-// Shared expense-entry writer, the counterpart to `income-recording.ts`: creates the
-// ExpenseEntry, mirrors it to the per-FY Expenses sheet keyed by the entry's own id (a
-// deterministic Sync ID, so a retried append reuses the row instead of doubling it), and
-// persists the returned sheetRowKey.
+// Shared expense-entry writer: creates the ExpenseEntry and mirrors it to the per-FY Expenses
+// sheet, keyed by the entry id so a retried append reuses the row.
 
 import { splitGstInclusive } from "@/features/business/lib/business";
 import { GST_RATE } from "@/features/business/lib/pricing-policy";
@@ -28,10 +26,7 @@ export interface RecordExpenseInput {
   category: string;
   /** GST-inclusive amount (already parsed/validated). */
   amountIncl: number;
-  /**
-   * GST rate as a decimal (e.g. 0.15); the split is derived from it. Omitted = the rate
-   * on the entry date: 0 while not GST registered (nothing to claim), else {@link GST_RATE}.
-   */
+  /** GST rate as a decimal (0.15); omitted = 0 while unregistered, else {@link GST_RATE}. */
   gstRate?: number;
   /** Payment method (a PAYMENT_METHODS value). */
   method: string;
@@ -52,11 +47,8 @@ export interface RecordExpenseResult {
 }
 
 /**
- * Creates an expense entry and best-effort mirrors it to the Expenses sheet.
- * The DB write always succeeds independently of the sheet; a sheet failure sets
- * `sheetSyncWarning` and leaves `sheetRowKey` null (the cron self-heal appends
- * it later). Mirrors recordIncome's contract, including the deterministic Sync
- * ID that makes a retried append idempotent.
+ * Creates an expense entry and best-effort mirrors it to the Expenses sheet, as recordIncome
+ * does. A sheet failure sets `sheetSyncWarning`; the cron self-heal appends it later.
  * @param data - Validated expense data.
  * @returns The created entry, its sheet row key, and a sync-warning flag.
  */
@@ -79,9 +71,7 @@ export async function recordExpense(data: RecordExpenseInput): Promise<RecordExp
     },
   });
 
-  // Synchronous append so the row lands before the response - Vercel can terminate the
-  // function before a fire-and-forget promise resolves. Failures are swallowed (the DB
-  // entry stands, the cron self-heal re-appends) but surfaced via sheetSyncWarning.
+  // Await the append: Vercel can kill the function before a fire-and-forget resolves.
   let sheetRowKey: string | null = null;
   let sheetSyncWarning = false;
   try {

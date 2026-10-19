@@ -1,6 +1,5 @@
 // src/app/api/admin/contacts/export/route.ts
-// Exports all contacts as a Google Contacts-compatible CSV file. Column layout matches
-// the format produced by Google Contacts own export tool.
+// Exports all contacts as a Google Contacts-compatible CSV.
 
 import { splitName } from "@/features/contacts/lib/split-name";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -9,16 +8,13 @@ import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Escapes a value for CSV: guards against formula injection, wraps in double
- * quotes, and escapes inner quotes.
+ * Escapes a value for CSV, guarding against formula injection.
  * @param value - The string to escape.
  * @returns CSV-safe string.
  */
 function csvCell(value: string | null | undefined): string {
   let str = value ?? "";
-  // Formula-injection guard: a leading =, +, -, or @ makes a spreadsheet app run
-  // the cell as a formula, and contact names/addresses originate from the public
-  // booking form. Prefix with a single quote so the value stays plain text.
+  // A leading =, +, - or @ runs as a formula; prefix a quote (values come from the public form).
   if (/^[=+\-@]/.test(str)) {
     str = `'${str}`;
   }
@@ -28,8 +24,6 @@ function csvCell(value: string | null | undefined): string {
 /**
  * GET /api/admin/contacts/export
  * Returns all contacts as a CSV file compatible with Google Contacts import.
- * Column layout mirrors the format Google Contacts produces when exporting.
- * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns CSV file response.
  */
@@ -52,9 +46,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     },
   });
 
-  // Flatten each contact's primary + alt values so the merged multi-email /
-  // multi-phone data survives an export/import round-trip. Google's CSV format
-  // carries alternates as repeated "E-mail N" / "Phone N" columns.
+  // Alternates go in repeated "E-mail N" / "Phone N" columns so they survive a round trip.
   const emailLists = contacts.map((c) =>
     [c.email, ...c.altEmails].filter((v): v is string => Boolean(v)),
   );
@@ -64,8 +56,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const maxEmails = Math.max(1, ...emailLists.map((l) => l.length));
   const maxPhones = Math.max(1, ...phoneLists.map((l) => l.length));
 
-  // Build the header row - email/phone column counts grow to fit the contact
-  // with the most values.
+  // Email/phone column counts fit the contact with the most values.
   const emailHeaders: string[] = [];
   for (let i = 1; i <= maxEmails; i++) {
     emailHeaders.push(`E-mail ${i} - Label`, `E-mail ${i} - Value`);
@@ -111,8 +102,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const emails = emailLists[idx];
     const phones = phoneLists[idx];
 
-    // Emit a Label/Value pair per email slot; only the first (primary) carries
-    // the "* " primary marker, alternates get a blank label.
+    // Only the primary email gets the "* " label.
     const emailCells: string[] = [];
     for (let i = 0; i < maxEmails; i++) {
       const value = emails?.[i] ?? "";

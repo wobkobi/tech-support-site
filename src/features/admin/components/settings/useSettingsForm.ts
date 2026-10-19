@@ -1,9 +1,7 @@
 "use client";
 // src/features/admin/components/settings/useSettingsForm.ts
-// Shared client state for one settings tab: holds the draft, tracks dirty state, and
-// saves to `/api/admin/settings/[group]`, mapping the route's responses (400 field
-// errors, 409 warnings, 422 blocks) into UI state. Reused by every settings tab so the
-// save/validation flow stays consistent.
+// Shared client state for one settings tab: draft, dirty state, and saves to
+// `/api/admin/settings/[group]` (400 field errors, 409 warnings, 422 blocks).
 
 import { useUnsavedChangesWarning } from "@/features/admin/hooks/use-unsaved-changes-warning";
 import type { Settings, SettingsGroup } from "@/shared/lib/settings/types";
@@ -12,16 +10,14 @@ import type React from "react";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 /**
- * Full resolved settings, provided by SettingsView so each tab's form can run
- * the cross-setting guardrails live (against the other groups + its own draft).
- * Null when no provider is present - the live banner just stays empty then.
+ * Full resolved settings from SettingsView, so each tab can run the cross-setting
+ * guardrails live. Null without a provider, leaving the live banner empty.
  */
 export const SettingsAllContext = createContext<Settings | null>(null);
 
 /**
- * Collects the dotted paths at which two settings values differ. Recurses only
- * into plain objects; an array or primitive that differs reports as its own
- * path rather than being walked, so a list editor reads as one changed field.
+ * Collects the dotted paths at which two settings values differ. Recurses only into plain
+ * objects, so a changed array reads as one changed field.
  * @param next - The draft value.
  * @param prev - The value to compare against.
  * @param prefix - Path accumulated so far (empty at the root).
@@ -81,9 +77,7 @@ export function useSettingsForm<G extends SettingsGroup>(
   defaults: Settings[G],
 ): SettingsFormApi<G> {
   const [draft, setDraft] = useState<Settings[G]>(initial);
-  // Dirty baseline. Starts at the server value and advances to the just-saved
-  // draft after each successful save, so the save bar clears and the "Saved"
-  // confirmation can show instead of staying permanently dirty.
+  // Dirty baseline: advances to the saved draft after each save so the bar clears.
   const [baseline, setBaseline] = useState<Settings[G]>(initial);
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -91,9 +85,7 @@ export function useSettingsForm<G extends SettingsGroup>(
   const [serverWarns, setServerWarns] = useState<string[]>([]);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
-  // Live cross-setting guardrails: run the same pure check the save route uses,
-  // against the current draft over the other groups, so BLOCK/WARN issues show
-  // as the operator types instead of only after a rejected save.
+  // Live cross-setting guardrails: the save route's own check, run as the operator types.
   const all = useContext(SettingsAllContext);
   const live = useMemo(() => {
     if (!all) return { blocks: [] as string[], warns: [] as string[] };
@@ -117,14 +109,12 @@ export function useSettingsForm<G extends SettingsGroup>(
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
 
-  // Dotted paths of fields edited since the last save, keyed like field ids so a row can
-  // recognise itself without a threaded prop. Arrays report as one path (`morningGuards`)
-  // rather than per index, matching the single anchor those composite editors render.
+  // Dotted paths edited since the last save, keyed like field ids. Arrays report as one
+  // path (`morningGuards`), matching the single anchor composite editors render.
   const changedPaths = useMemo(() => new Set(diffPaths(draft, baseline)), [draft, baseline]);
 
-  // Warn before a full-page unload (reload / close / external nav) with unsaved
-  // edits. This does not cover in-app settings tab switches: SettingsView renders
-  // only the active tab, so switching tabs unmounts the current draft.
+  // Warn before a full-page unload with unsaved edits. In-app tab switches aren't
+  // covered: they unmount the draft.
   useUnsavedChangesWarning(dirty);
 
   const save = useCallback(

@@ -1,8 +1,6 @@
 // src/app/api/business/expenses/route.ts
-// Admin expense-ledger endpoint. GET lists every expense entry (newest first); POST
-// creates one, computing GST and the excl-GST amount server-side from the GST-inclusive
-// amount and rate. With no rate sent, the rate for the entry date applies: 0 while not
-// GST registered.
+// Admin expense ledger: GET lists, POST creates with GST split server-side. With no rate
+// sent, the entry date's rate applies (0 while not GST registered).
 
 import { recordExpense } from "@/features/business/lib/expense-recording";
 import { parseAmount, parseDate, parseRate } from "@/features/business/lib/validation";

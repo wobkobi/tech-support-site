@@ -1,6 +1,5 @@
 // src/features/admin/lib/global-search.ts
-// Server-side lookup behind the admin search dialog: matches one free-text query against
-// contacts, bookings, invoices and reviews and returns a few ready-to-render hits per group.
+// Admin search: matches a query against contacts, bookings, invoices and reviews.
 
 import "server-only";
 
@@ -44,10 +43,7 @@ export const MAX_QUERY_LENGTH = 100;
 /** Most hits returned per group. */
 export const HITS_PER_GROUP = 5;
 
-/**
- * A query made only of phone punctuation and digits. Letters rule it out, so an
- * invoice number such as "INV-0042" never runs the phone pass.
- */
+/** Digits and phone punctuation only, so "INV-0042" never runs the phone pass. */
 const PHONE_LIKE = /^[\d\s+\-()]+$/;
 
 /** A phone-shaped query in both of the forms stored numbers are compared against. */
@@ -59,8 +55,7 @@ interface PhoneQuery {
 }
 
 /**
- * Reads a query as a phone number when it looks like one: only digits, spaces,
- * "+", "-" and parentheses, with at least 3 digits.
+ * Reads a phone-shaped query (phone characters only, at least 3 digits).
  * @param q - Trimmed search query.
  * @returns The phone forms to match on, or null when the query is not phone-shaped.
  */
@@ -72,10 +67,8 @@ function toPhoneQuery(q: string): PhoneQuery | null {
 }
 
 /**
- * Whether a stored phone matches a phone query. Prisma cannot normalise stored
- * values, so this runs in memory: the normalised keys catch "021 123" against a
- * stored "+64211234567", and the raw-digit check catches a fragment typed without
- * its prefix against a number stored as typed.
+ * Whether a stored phone matches, in memory since Prisma can't normalise. Normalised keys
+ * match "021 123" to "+64211234567"; raw digits catch unprefixed fragments.
  * @param stored - Stored phone value (any format).
  * @param query - The phone query from {@link toPhoneQuery}.
  * @returns True when the stored number contains the query.
@@ -88,8 +81,7 @@ function phoneMatches(stored: string | null | undefined, query: PhoneQuery): boo
 }
 
 /**
- * Unions two result sets by id (first occurrence wins), sorts them and keeps the
- * top {@link HITS_PER_GROUP}.
+ * Unions two result sets by id (first wins), sorts and keeps {@link HITS_PER_GROUP}.
  * @param a - Primary rows (text matches).
  * @param b - Extra rows (phone matches).
  * @param compare - Sort order for the merged list.
@@ -102,8 +94,7 @@ function mergeRows<T extends { id: string }>(a: T[], b: T[], compare: (x: T, y: 
 }
 
 /**
- * Sentence-cases a stored enum value for display ("confirmed" > "Confirmed",
- * "OVERDUE" > "Overdue").
+ * Sentence-cases a stored enum value ("OVERDUE" > "Overdue").
  * @param value - Raw status value.
  * @returns The display label.
  */
@@ -112,9 +103,7 @@ function statusLabel(value: string): string {
 }
 
 /**
- * Contacts whose name, email, address or company contains the query, plus (for a
- * phone-shaped query) those whose primary or alternate phone contains it. Deleted
- * contacts never match.
+ * Non-deleted contacts matching on name, email, address, company or (phone query) phone.
  * @param q - Trimmed search query.
  * @param phone - Phone forms of the query, or null when it is not phone-shaped.
  * @returns Up to {@link HITS_PER_GROUP} contact hits, sorted by name.
@@ -184,8 +173,7 @@ async function searchContacts(q: string, phone: PhoneQuery | null): Promise<Sear
 }
 
 /**
- * Bookings whose name or email contains the query, plus (for a phone-shaped
- * query) those whose phone contains it.
+ * Bookings matching on name, email or (phone query) phone.
  * @param q - Trimmed search query.
  * @param phone - Phone forms of the query, or null when it is not phone-shaped.
  * @returns Up to {@link HITS_PER_GROUP} booking hits, latest start first.
@@ -242,9 +230,7 @@ async function searchBookings(q: string, phone: PhoneQuery | null): Promise<Sear
 }
 
 /**
- * Invoices and quotes whose number or client name contains the query. The status
- * shown is the display status, so a SENT invoice past due reads "Overdue" as it
- * does on the invoice list.
+ * Invoices and quotes matching on number or client name, with the display status.
  * @param q - Trimmed search query.
  * @returns Up to {@link HITS_PER_GROUP} invoice hits, newest first.
  */
@@ -276,9 +262,7 @@ async function searchInvoices(q: string): Promise<SearchHit[]> {
 }
 
 /**
- * Reviews whose first or last name contains the query. A two-word query also
- * matches first name against the first word AND last name against the second, so
- * "jane smi" finds Jane Smith.
+ * Reviews matching on first or last name; "jane smi" also matches first AND last name.
  * @param q - Trimmed search query.
  * @returns Up to {@link HITS_PER_GROUP} review hits, newest first.
  */
@@ -320,8 +304,8 @@ async function searchReviews(q: string): Promise<SearchHit[]> {
 }
 
 /**
- * Runs the admin search across all four record kinds in parallel. Callers enforce
- * {@link MIN_QUERY_LENGTH} and {@link MAX_QUERY_LENGTH}; this trims but does not cut.
+ * Searches all four record kinds in parallel. Callers enforce {@link MIN_QUERY_LENGTH}
+ * and {@link MAX_QUERY_LENGTH}.
  * @param q - Search query.
  * @returns Hits grouped by kind, each group capped at {@link HITS_PER_GROUP}.
  */

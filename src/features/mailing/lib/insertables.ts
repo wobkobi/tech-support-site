@@ -1,7 +1,6 @@
 // src/features/mailing/lib/insertables.ts
-// What the email editor's "Add" menu offers. Add an entry here and it shows up in the
-// menu. Formatting that wraps selected text (bold, headings) stays in the editor's
-// button strip instead, since a menu pick can only insert.
+// What the email editor's "Add" menu offers. Formatting that wraps selected text stays in
+// the editor's button strip, since a menu pick can only insert.
 
 import type { InsertGroup } from "@/features/admin/components/ui/InsertMenu";
 import {
@@ -13,8 +12,7 @@ import {
 import { PLACEHOLDERS, type PromoWording } from "@/features/mailing/lib/render";
 import { GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
 
-// Pages the menu links to: [menu label, link text, path]. The link text is lower case
-// because it sits inside a sentence ("Have a look at our prices page").
+// [menu label, link text, path]. Link text is lower case to sit mid-sentence.
 const PAGES: [string, string, string][] = [
   ["Booking page", "booking page", "/booking"],
   ["Prices page", "prices page", "/pricing"],
@@ -22,8 +20,7 @@ const PAGES: [string, string, string][] = [
   ["Contact page", "contact page", "/contact"],
 ];
 
-// Big buttons: [button text, path]. Each goes on a line of its own, which is what makes
-// the renderer draw a button rather than a link.
+// Big buttons: [button text, path]. Each needs its own line to render as a button.
 const BUTTONS: [string, string][] = [
   ["Book a time", "/booking"],
   ["See our prices", "/pricing"],
@@ -38,9 +35,8 @@ export interface LinkTarget {
 }
 
 /**
- * The block editor's link choices: the site's main pages, the Google "write a review"
- * link (opens the review box straight away) and the Google profile, where people read
- * the reviews.
+ * The block editor's link choices: main site pages, the Google review-box link and the
+ * Google profile.
  * @param siteUrl - Site origin.
  * @param googleReviewUrl - The review-box link from Settings > Reviews; left out when blank.
  * @returns Choices in menu order.
@@ -56,10 +52,9 @@ export function emailLinkTargets(siteUrl: string, googleReviewUrl: string): Link
 }
 
 /**
- * The menu's sections. Links and buttons use the `[text](url)` form the renderer
- * understands, so they show as words in the email rather than a bare address.
+ * The menu's sections. Links and buttons use the renderer's `[text](url)` form.
  * @param details - Site address and contact details.
- * @param promo - Wording of the email's promo (its linked one, or whichever is running), or null.
+ * @param promo - Wording of the email's linked or running promo, or null.
  * @param googleReviewUrl - The review-box link from Settings > Reviews; no button when blank.
  * @returns Groups in menu order.
  */

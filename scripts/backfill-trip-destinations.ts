@@ -1,12 +1,6 @@
 // scripts/backfill-trip-destinations.ts
-// One-off fill of Trip.destination and Trip.contactId for trips logged before the trip
-// log saved where it went. Each trip is traced to its invoice (the number in its notes,
-// else a matching booking or calendar event), then the address is found the same way
-// backfill-trips.ts did when it logged them: the booking's address, then the calendar
-// event's location, then the contact's saved address. The contact is the invoice's own,
-// else the live contact whose email matches the invoice's (an invoice can still point at
-// a contact a merge removed). Only empty fields are written. Prints one line per trip and
-// writes nothing without --write.
+// One-off fill of empty Trip.destination and Trip.contactId via each trip's invoice
+// (address: booking > event location > contact). Writes nothing without --write.
 // Run with:
 //   npx dotenv -e .env.local -- tsx --conditions=react-server scripts/backfill-trip-destinations.ts [--write]
 
@@ -21,10 +15,8 @@ import { prisma } from "@/shared/lib/prisma";
 const INVOICE_IN_NOTES = /Logged from invoice ([A-Z0-9-]+)/i;
 
 /**
- * Flattens a multi-line calendar location or a booking's unit and address to one line,
- * the same way the calculator's event prefill does, then drops a part that only repeats
- * the end of the one before it ("...Auckland 0600 New Zealand" then "New Zealand" on the
- * next line).
+ * Flattens an address to one line, dropping a part that repeats the end of the one before
+ * ("...Auckland 0600 New Zealand, New Zealand").
  * @param raw - Address text, possibly multi-line.
  * @returns Single-line address.
  */
@@ -44,8 +36,7 @@ function oneLine(raw: string): string {
 }
 
 /**
- * The live contact an invoice is for: its own contact when that still exists, else the
- * one whose primary or alternate email is the invoice's.
+ * The invoice's live contact, else the one matching its email (merges can orphan the link).
  * @param contactId - The invoice's contact link, or null.
  * @param clientEmail - The invoice's client email.
  * @returns The contact's id and address, or null when none matches.

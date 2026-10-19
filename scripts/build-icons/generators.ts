@@ -38,9 +38,6 @@ const canvas = createRequire(import.meta.url)("canvas") as typeof import("canvas
 
 /**
  * Render a single favicon variant from an SVG logo buffer.
- *
- * - `opaque: false` > resize logo to fill the canvas (transparent passthrough).
- * - `opaque: true` > composite logo onto a coloured background at `logoScale`.
  * @param logoSvg - SVG source buffer (light or dark colour variant).
  * @param size - Output square size in pixels.
  * @param opaque - Whether to render on an opaque background.
@@ -69,11 +66,8 @@ async function renderFavicon(
 }
 
 /**
- * Build all favicon variations and the multi-resolution favicon.ico.
- *
- * Each spec produces a light PNG. Specs flagged `hasDarkVariant` also produce
- * a `-dark.png`. Maskable specs use a smaller logo scale (80%) so the safe
- * zone survives Android's circle/squircle/rounded-square crop.
+ * Build all favicon variations and the multi-resolution favicon.ico. Maskable specs use
+ * an 80% logo scale so the safe zone survives Android's crop.
  * @returns Promise that resolves when all favicons are generated.
  */
 export async function buildFavicons(): Promise<void> {
@@ -112,12 +106,8 @@ export async function buildFavicons(): Promise<void> {
 /* ---------- SVG Favicon ---------- */
 
 /**
- * Build favicon.svg with embedded prefers-color-scheme styling.
- *
- * The injected CSS overrides the source SVG's inline `fill` attributes
- * because in SVG, `fill="..."` is a presentation attribute and any matching
- * CSS rule wins (no `!important` needed). Modern browsers prefer SVG
- * favicons over PNGs and handle dark mode natively in a single file.
+ * Build favicon.svg with embedded prefers-color-scheme styling. CSS beats the inline
+ * `fill` presentation attributes without `!important`.
  * @returns Promise that resolves when favicon.svg is written.
  */
 export async function buildFaviconSvg(): Promise<void> {
@@ -212,8 +202,7 @@ export async function buildSocialImages(): Promise<void> {
 /* ---------- Backdrop Variant Generation ---------- */
 
 /**
- * Build optimised backdrop variants for site use (e.g. blurred page background).
- * Each variant is resized and compressed according to its spec in {@link BACKDROP_VARIANTS}.
+ * Build the optimised backdrop variants listed in {@link BACKDROP_VARIANTS}.
  * @returns Promise that resolves when all backdrop variants are generated.
  */
 export async function buildBackdropVariants(): Promise<void> {
@@ -469,12 +458,8 @@ export async function buildQRCodes(): Promise<void> {
 /* ---------- Manifest File ---------- */
 
 /**
- * Build the web manifest (site.webmanifest) for PWA / Add to Home Screen.
- *
- * Lists every transparent android-chrome size so the OS picks the sharpest
- * fit per device, plus a dedicated maskable icon (separate file with safe-zone
- * padding) so Android does not clip the logo edges when cropping to a
- * circle/squircle.
+ * Build site.webmanifest: every android-chrome size plus a padded maskable icon so
+ * Android's crop doesn't clip the logo.
  * @returns Promise that resolves when the manifest is written.
  */
 export async function buildManifest(): Promise<void> {

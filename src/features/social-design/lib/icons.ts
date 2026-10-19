@@ -1,8 +1,6 @@
 // src/features/social-design/lib/icons.ts
-// Icons the post maker offers: a short hand-picked set from react-icons' Font Awesome 6
-// pack, by component name. Names only, so the document checker can reject unknown
-// icons without loading the artwork; components/canvas/icon-art.tsx maps each name to
-// its component.
+// The post maker's hand-picked Font Awesome 6 icon names; names only, so the checker can reject
+// unknown icons without loading artwork (icon-art.tsx maps them to components).
 
 /** One icon on offer. */
 export interface IconChoice {

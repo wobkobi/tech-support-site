@@ -1,6 +1,5 @@
 // src/features/admin/lib/sign-out.ts
-// Admin sign-out shared by the sidebar footer and the top bar. Client-only: it calls
-// fetch and drives the App Router.
+// Admin sign-out. Client-only.
 
 /** The two router methods sign-out needs (a subset of useRouter()'s instance). */
 interface SignOutRouter {
@@ -9,9 +8,7 @@ interface SignOutRouter {
 }
 
 /**
- * Signs the operator out by clearing the session cookie on the server, then
- * navigates to /admin/login. Errors are swallowed - the cookie either clears or
- * the redirect itself ends the session client-side.
+ * Clears the session cookie, then navigates to /admin/login. Errors are swallowed.
  * @param router - The App Router instance from useRouter().
  */
 export async function signOut(router: SignOutRouter): Promise<void> {

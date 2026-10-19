@@ -1,11 +1,6 @@
 // src/shared/lib/settings/validate.ts
-// Write-path validation for the settings panel. Two layers:
-//   1. validateGroup - per-field shape + bounds for one group (rejects garbage
-//      before it is stored).
-//   2. checkGuardrails - cross-setting coherence on the full proposed settings,
-//      classified BLOCK (would make bookings/invoices impossible) vs WARN (unusual
-//      but allowed). The same function powers the live-preview banner later.
-// Hand-rolled to match the repo's existing manual-validation convention (no zod).
+// Settings write-path validation: validateGroup checks one group's fields; checkGuardrails checks
+// cross-setting coherence as BLOCK or WARN. Hand-rolled, no zod.
 
 import type { IetcConfig, TaxBracket } from "@/features/business/lib/tax/types";
 import { parseDateKey } from "@/shared/lib/date-format";
@@ -60,8 +55,7 @@ function nonNeg(n: unknown): n is number {
 export const MAX_TAX_BANDS = 10;
 
 /**
- * True for a plain `{}` object (not null, not an array). Also tells get-settings.ts's
- * deep merge which branches it can merge into.
+ * True for a plain `{}` object; also tells get-settings.ts's deep merge what it can merge into.
  * @param v - Candidate value.
  * @returns Whether `v` is a plain object.
  */
@@ -295,10 +289,8 @@ function validatePricing(p: PricingSettings): FieldError[] {
       field: "cancellation.fullCallOutFee",
       message: "Must be at least the cancellation fee, or cancelling later would cost less.",
     });
-  // The travel-charge window sits inside the free-notice window: free beyond freeNotice,
-  // the flat fee between the two, the full call-out plus travel inside travelCharge.
-  // Wider than freeNotice, a cancel between the two is free while the copy promises the
-  // full call-out, and the flat-fee tier can never be reached.
+  // travelCharge must sit inside freeNotice, or the flat-fee tier between them can
+  // never be reached.
   if (
     nonNeg(p.cancellation?.freeNoticeHours) &&
     nonNeg(p.cancellation?.travelChargeHours) &&
@@ -327,8 +319,7 @@ function validatePricing(p: PricingSettings): FieldError[] {
 const MAX_BENCHMARKS = 40;
 
 /**
- * Validates the estimator group: a list of task-duration benchmarks, each a
- * non-empty unique label plus a sane minute count.
+ * Validates estimator benchmarks: unique non-empty labels with sane minute counts.
  * @param e - Proposed estimator settings.
  * @returns List of field errors (empty when valid).
  */
@@ -474,10 +465,7 @@ function validateReviews(r: ReviewsSettings): FieldError[] {
   return errors;
 }
 
-/**
- * Placeholders the email signature accepts. Kept in step with
- * `signaturePlaceholders` in the email layer, which is what actually expands them.
- */
+/** Placeholders the email signature accepts; keep in step with `signaturePlaceholders` in the email layer. */
 const SIGNATURE_PLACEHOLDERS = ["name", "company", "phone", "email", "website", "location"];
 
 /**
@@ -527,8 +515,7 @@ function validateIdentity(i: IdentitySettings): FieldError[] {
 }
 
 /**
- * Validates the tax group's shape + bounds. Rates are fractions
- * (0.0175 = 1.75%).
+ * Validates the tax group; rates are fractions (0.0175 = 1.75%).
  * @param t - Proposed tax settings.
  * @returns List of field errors (empty when valid).
  */
@@ -562,8 +549,7 @@ function validateTax(t: TaxSettings): FieldError[] {
 }
 
 /**
- * Validates the scheduling group's shape + bounds. All are non-negative
- * minute/hour buffers; 0 disables the rule each one gates.
+ * Validates the scheduling group: non-negative buffers, 0 disabling each rule.
  * @param s - Proposed scheduling settings.
  * @returns List of field errors (empty when valid).
  */
@@ -588,9 +574,7 @@ function validateScheduling(s: SchedulingSettings): FieldError[] {
 }
 
 /**
- * Validates one settings group's payload. Groups without a dedicated validator
- * yet fall through as valid (read-side clamping still guards them); the
- * highest-blast-radius groups are validated in full.
+ * Validates one group's payload; groups without a validator pass (read-side clamping guards them).
  * @param group - Which group is being saved.
  * @param value - Proposed value for that group.
  * @returns Field errors (empty when valid).
@@ -619,9 +603,7 @@ export function validateGroup<G extends SettingsGroup>(group: G, value: Settings
 }
 
 /**
- * Cross-setting coherence checks on the full proposed settings. BLOCK issues
- * must stop the save; WARN issues should prompt a confirm. Named so the message
- * tells the operator exactly what would break.
+ * Cross-setting coherence checks: BLOCK stops the save, WARN prompts a confirm.
  * @param s - The full settings with the edited group already applied.
  * @returns Guardrail issues (empty when fully coherent).
  */

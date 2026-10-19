@@ -1,8 +1,7 @@
 "use client";
 // src/features/social/components/PostPreviewPanel.tsx
-// The composer's preview column: a look-alike Facebook, Instagram or Google card for each
-// enabled platform, its fix-first and note lines, and a switch between platforms. From xl
-// it pins beside the form, clearing the admin top bar and, on drafts, the pinned action bar.
+// The composer's preview column: a look-alike card per enabled platform with its notes. From xl
+// it pins beside the form, below the top bar and any pinned action bar.
 
 import {
   FacebookPreview,

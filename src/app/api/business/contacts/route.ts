@@ -1,7 +1,5 @@
 // src/app/api/business/contacts/route.ts
-// Admin endpoint for the contact picker. GET fetches the operator's Google Contacts via
-// the People API and returns a sanitised list (name, email, phone, company), dropping any
-// entry with no id or no name/email.
+// Admin contact picker: the operator's Google Contacts via the People API, sanitised.
 
 import type { GoogleContact } from "@/features/business/types/business";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
@@ -24,8 +22,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const auth = getOAuth2Client();
     const people = googlePeople({ version: "v1", auth });
 
-    // Page through every connection - a single 100-row page silently drops the
-    // operator's remaining contacts from the picker once they pass 100.
+    // Page through every connection; one page silently drops the rest.
     const connections: people_v1.Schema$Person[] = [];
     let pageToken: string | undefined;
     do {

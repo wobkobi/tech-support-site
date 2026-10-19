@@ -14,11 +14,8 @@ import { useSyncExternalStore } from "react";
 const noSubscribe = (): (() => void) => () => {};
 
 /**
- * Current pathname in a code chip, or "this address" until it is known. The 404 page
- * is prerendered once at build time, when there is no real address (usePathname would
- * give a placeholder and the hydrated text would not match), so the path is read from
- * the browser only: the null server snapshot covers the build and the first client
- * render, then React re-renders with the real path.
+ * Current pathname in a code chip, or "this address" until known. Read from the browser
+ * only, since the 404 page is prerendered with no real address.
  * @returns The requested path, or fallback text.
  */
 export function RequestedPath(): React.ReactElement {

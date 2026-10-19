@@ -1,11 +1,6 @@
 // src/app/admin/(shell)/business/tax/page.tsx
-// Tax page for one NZ financial year, picked by `?fy=` (defaults to the current FY). The
-// server loads the year's ledger, assets, trips and TaxYear record, runs computeTaxYear,
-// and renders the summary strip, then deductions, income tax workings and the home office
-// and car form beside the set-aside targets, the filed status and the questions to raise
-// with the accountant, then the accountant summary with CSV export. A filed year renders
-// its saved snapshot, with a Filed pill, the differences a fresh calculation shows and a
-// locked home office and car form.
+// Tax page for one FY (`?fy=`): computes the year live, or shows a filed year's snapshot
+// with its differences from a fresh calculation.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminTabs } from "@/features/admin/components/ui/AdminTabs";
@@ -53,8 +48,7 @@ function tabHref(fyKey: string): string {
 }
 
 /**
- * The FY tabs, most recent first, with a "Current" badge on the running FY when another
- * tab is open.
+ * The FY tabs, most recent first, badging the running FY when another tab is open.
  * @param props - Component props.
  * @param props.fys - Every FY, most recent first.
  * @param props.active - Active tab key.
@@ -81,8 +75,7 @@ function FyTabs(props: { fys: FinancialYear[]; active: string }): React.ReactEle
 }
 
 /**
- * Tax page. An unfiled year is computed live from the ledger, the asset register, the trip
- * log, the FY's TaxYear record and the tax settings; a filed year shows its saved snapshot.
+ * Tax page: an unfiled year computed live, a filed year from its snapshot.
  * @param root0 - Page props.
  * @param root0.searchParams - URL search params (`?fy=` FY key).
  * @returns Tax page element.
@@ -96,8 +89,7 @@ export default async function TaxPage({
   const { fy: fyParam } = await searchParams;
   const now = new Date();
 
-  // Most recent first, like the overview's tabs. An unknown or missing key falls back
-  // to the current FY.
+  // Most recent first; an unknown key falls back to the current FY.
   const fys = [...(await loadAllFys(now))].sort((a, b) => b.start.getTime() - a.start.getTime());
   const selected = pickFy(fys, fyParam) ?? pickFy(fys, undefined);
 
@@ -131,15 +123,12 @@ export default async function TaxPage({
   }
 
   const fyKey = fyKeyOf(selected.label);
-  // While the year is filed every figure on the page comes from the saved snapshot; the
-  // live recompute only feeds the list of differences. `record` still feeds the home office
-  // form, whose fields the PUT refuses to change while filed.
+  // A filed year's figures come from the snapshot; the live recompute only feeds the differences.
   const view = await loadTaxYearView(selected, now);
   const { input, record } = view;
   const result = view.shown.result;
   const filed = view.filedAtIso !== null;
-  // The threshold in Settings may have moved since the year was filed, so a filed year
-  // names it without the live figure.
+  // A filed year names the threshold without the live figure, which may have moved.
   const provisionalOver = filed
     ? "the provisional tax threshold"
     : formatNZD(input.settings.provisionalThreshold);
@@ -170,8 +159,7 @@ export default async function TaxPage({
 
       <TaxEstimateCards result={result} fyLabel={selected.label} />
 
-      {/* Phone: the set-aside card straight after the strip, as it answers the question
-          most visits are for. Desktop shows the same card at the top of the side column. */}
+      {/* Phone: set-aside card right after the strip (desktop shows it in the side column). */}
       <SetAsideCard
         result={result}
         targets={targets}

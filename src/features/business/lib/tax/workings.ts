@@ -1,8 +1,6 @@
 // src/features/business/lib/tax/workings.ts
-// Display maths for the Tax page and the overview's tax card: the per-bracket split of
-// income tax, rate and dollar labels, the all-FY sum shown for "All time", and the GST
-// roll-up for a registered business. Pure; the tax maths itself lives in income-tax.ts
-// and tax-year.ts.
+// Pure display maths for the Tax page and overview tax card: bracket split, labels,
+// all-FY sum and GST roll-up. The tax maths itself is in income-tax.ts and tax-year.ts.
 
 import { formatNZD } from "@/features/business/lib/business-format";
 import { GST_RATE } from "@/features/business/lib/pricing-policy";
@@ -71,10 +69,8 @@ function byUpperBound(a: TaxBracket, b: TaxBracket): number {
 }
 
 /**
- * Splits a taxable profit across the progressive brackets. Every bracket gets a row,
- * including ones the profit doesn't reach (taxedAmount 0), so callers choose what to
- * hide. Each band's tax is rounded on its own, so the sum can differ from
- * incomeTaxOnBrackets by a cent or two; show the result's `incomeTax` as the total.
+ * Splits a taxable profit across the brackets, one row each (unreached ones at 0). Bands
+ * round on their own, so their sum can be a cent or two off; show `incomeTax` as the total.
  * @param taxable - Taxable profit (0 or more).
  * @param brackets - Brackets from settings, in any order.
  * @returns One row per bracket, lowest first.
@@ -110,8 +106,8 @@ export function formatRatePct(rate: number): string {
 }
 
 /**
- * Rate label for a filed year, worked back from the saved amounts so it can't drift
- * from them when the rate in Settings changes later: 1.67% from acc / taxable.
+ * Rate label for a filed year, worked back from saved amounts (acc / taxable) so a later
+ * Settings change can't drift it.
  * @param amount - Saved levy or contribution (ACC, KiwiSaver).
  * @param taxable - Saved taxable profit.
  * @returns Percent label, or null when there is no taxable profit to divide by.
@@ -122,9 +118,8 @@ export function filedRateLabel(amount: number, taxable: number): string | null {
 }
 
 /**
- * Whether the brackets in Settings still give a filed year's saved income tax, to the
- * cent. Compares against incomeTaxOnBrackets rather than the summed band rows, because
- * {@link bandBreakdown} rounds each band on its own and can sit a cent or two off by design.
+ * Whether today's brackets still give a filed year's saved income tax to the cent. Uses
+ * incomeTaxOnBrackets, since {@link bandBreakdown} rows can sit a cent or two off.
  * @param result - Saved result of the filed year.
  * @param brackets - Brackets in Settings now.
  * @returns True when the band rows can be shown beside the saved total.
@@ -149,8 +144,8 @@ export function formatWholeDollars(amount: number): string {
 }
 
 /**
- * Dollars that drop only a ".00": 1000 > "$1,000", 999.5 > "$999.50". For a figure such
- * as the write-off limit, where rounding would misstate the rule the maths applies.
+ * Dollars that drop only a ".00": 1000 > "$1,000", 999.5 > "$999.50". For limits where
+ * rounding would misstate the rule.
  * @param amount - Dollar amount.
  * @returns Formatted amount.
  */
@@ -182,9 +177,8 @@ export function fuelLabel(fuel: VehicleFuel): string {
 }
 
 /**
- * Adds up FY results for the overview. Each FY is computed on its own first (brackets,
- * the IETC and ACC apply per year), so this sums finished figures and never re-taxes a
- * combined profit.
+ * Adds up finished FY results for the overview; never re-taxes a combined profit, since
+ * brackets, IETC and ACC apply per year.
  * @param results - One result per FY in scope.
  * @returns Summed figures, rounded to cents.
  */
@@ -223,10 +217,8 @@ export function sumTaxEstimates(results: readonly TaxYearResult[]): TaxEstimateS
 }
 
 /**
- * GST owed for the rows dated on or after registration took effect: the GST share
- * ({@link GST_RATE}, 3/23 at 15%) of GST-inclusive income, less the GST recorded on
- * expenses. Rows before the "registered from" date, or every row while unregistered,
- * count for nothing.
+ * GST owed on rows dated from registration: the GST share ({@link GST_RATE}, 3/23 at 15%)
+ * of inclusive income less recorded expense GST. Earlier rows count for nothing.
  * @param income - Income rows (ISO ledger dates, GST-inclusive amounts).
  * @param expenses - Expense rows with their recorded GST.
  * @param gst - Registration status and start date.

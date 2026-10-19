@@ -1,15 +1,7 @@
 // src/app/api/business/task-templates/actions/[name]/route.ts
-// Admin endpoint to rename or retire a task-template action tag. PATCH renames it across
-// every row (merging collisions) and is the safe way to fix a drifted or misspelt tag.
-// DELETE clears the action (sets it to null, case-insensitive match) on every matching
-// TaskTemplate.
-//
-// Clearing an action is effectively PERMANENT - nothing re-tags the rows later. parse-job
-// may only reuse tags from the live vocabulary, and that vocabulary is built from this
-// very field, so a retired tag is never offered to the model again; `findTemplateByTags`
-// also needs BOTH device and action, so a null-action row can never match. The rows
-// survive but go inert. Retire a tag only when that work is genuinely gone - otherwise
-// PATCH it to the canonical spelling.
+// Admin endpoint to rename (PATCH) or retire (DELETE) a task-template action tag.
+// Clearing is effectively permanent: the tag leaves parse-job's vocabulary and null-action
+// rows never match. To fix a misspelt tag, PATCH it instead.
 
 import { renameTaxonomyTag } from "@/features/business/lib/task-taxonomy.server";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -41,8 +33,7 @@ export async function PATCH(
 
   if (!from) return errorResponse("name is required", 400);
   if (!to) return errorResponse("to is required", 400);
-  // A case-only rename is allowed - it is the fix for a tag stored under two
-  // spellings - so only an exact repeat is rejected.
+  // Case-only renames are allowed (they fix split spellings).
   if (from === to) return errorResponse("to must differ from the current name", 400);
 
   const result = await renameTaxonomyTag("action", from, to);
@@ -51,9 +42,7 @@ export async function PATCH(
 
 /**
  * DELETE /api/business/task-templates/actions/[name]
- * Removes the action tag from every TaskTemplate currently labelled with
- * `name` (sets `action: null`). The rows survive but go inert - nothing re-tags
- * them automatically (see the file header); PATCH instead to fix a spelling.
+ * Sets `action: null` on every TaskTemplate tagged `name`; the rows go inert.
  * @param request - Incoming Next.js request.
  * @param root0 - Route context.
  * @param root0.params - Promise resolving to the route param object.

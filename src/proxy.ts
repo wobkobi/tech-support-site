@@ -1,8 +1,6 @@
 // src/proxy.ts
-// Edge chokepoint for admin/business routes (Next.js 16 proxy, formerly `middleware.ts`).
-// Accepts EITHER a signed session cookie (browser path, set on /admin/login) OR the
-// `x-admin-secret` header (scripts + cron). Per-route checks via `isAdminRequest` /
-// `requireAdminAuth` still run as belt-and-braces.
+// Edge gate for admin/business routes: a signed session cookie or the `x-admin-secret` header.
+// Per-route checks still run as well.
 
 import { ADMIN_SESSION_COOKIE, verifySessionCookieValue } from "@/shared/lib/admin-session";
 import { NextRequest, NextResponse } from "next/server";
@@ -15,9 +13,8 @@ const PROTECTED_PAGE_PREFIX = "/admin";
 const PUBLIC_EXCEPTIONS = ["/admin/login", "/api/admin/login", "/api/admin/logout"];
 
 /**
- * Edge-safe constant-time-ish string compare against `ADMIN_SECRET`. Edge
- * runtime has no `timingSafeEqual`; the per-route Node handlers re-check with
- * the real constant-time path.
+ * Edge-safe near-constant-time compare against `ADMIN_SECRET` (no `timingSafeEqual` on Edge;
+ * Node handlers re-check properly).
  * @param provided - Secret value pulled from a header.
  * @returns True when the value matches `process.env.ADMIN_SECRET`.
  */
@@ -29,8 +26,7 @@ function hasValidHeaderSecret(provided: string | null): boolean {
 }
 
 /**
- * True when the incoming request carries a valid admin session cookie OR a
- * valid `x-admin-secret` header. Cookie wins because it's the browser path.
+ * Whether the request has a valid admin session cookie or `x-admin-secret` header.
  * @param request - Incoming Next.js request.
  * @returns Whether the request should be allowed through.
  */
@@ -41,9 +37,8 @@ async function hasAdminAccess(request: NextRequest): Promise<boolean> {
 }
 
 /**
- * Gates `/api/admin/*` and `/api/business/*` (401 on missing/invalid auth)
- * and `/admin/*` (redirect to /admin/login on missing/invalid auth). Public
- * exceptions are listed in {@link PUBLIC_EXCEPTIONS}.
+ * Gates `/api/admin/*` and `/api/business/*` (401) and `/admin/*` (login redirect), except
+ * {@link PUBLIC_EXCEPTIONS}.
  * @param request - Incoming Next.js request.
  * @returns A 401 / redirect / next response depending on auth state.
  */

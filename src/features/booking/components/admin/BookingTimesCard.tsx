@@ -1,12 +1,7 @@
 "use client";
 // src/features/booking/components/admin/BookingTimesCard.tsx
-// Editable start/finish times on the booking detail page. One control, two meanings:
-// moving a job that has already run to another past time is the operator recording what
-// actually happened, and stays silent; anything else is a reschedule, which emails the
-// customer unless that box is unticked. Which of the two a save will do follows the times
-// as they're typed. Overlaps on the reschedule path come back as a 409 and are re-offered
-// through a ConfirmDialog rather than blocked. Between them these are why the Google
-// event no longer has to be corrected by hand.
+// Editable booking times. Past-to-past moves silently record what happened; anything
+// else is a reschedule that emails the customer. Overlaps (409) re-offer via a confirm.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
@@ -63,28 +58,20 @@ export function BookingTimesCard({
     start: toNzInputValue(startAt),
     end: toNzInputValue(endAt),
   });
-  // Ticked by default: a customer whose booking moved normally needs telling.
-  // Only offered on the reschedule branch - the past-correction branch is silent
-  // whatever this says.
+  // Ticked by default; only used on the reschedule branch.
   const [notifyCustomer, setNotifyCustomer] = useState(true);
-  // Stable "now" so the branch copy doesn't trip react-hooks/purity. The lock
-  // is read here rather than on the server for the same reason - it's only the
-  // edit affordance, and the PATCH route re-checks it before writing anyway.
+  // Stable "now" for react-hooks/purity; the PATCH route re-checks the lock.
   const [renderedAt] = useState(() => Date.now());
   const locked = isPastEditWindow(new Date(endAt).getTime(), renderedAt, lockHours);
 
-  // Mirrors the server's rule: silence needs both the stored and the typed
-  // start to be past, so correcting a stale row onto a future date still warns
-  // that the customer will be emailed. Re-read as the field is typed.
+  // Mirrors the server: silence needs both the stored and typed starts in the past.
   const typedStart = form.start ? fromNzInputValue(form.start).getTime() : 0;
   const alreadyRun = new Date(startAt).getTime() <= renderedAt && typedStart <= renderedAt;
   const willNotify = !alreadyRun && status !== "cancelled";
   const spanMins = Math.round((new Date(endAt).getTime() - new Date(startAt).getTime()) / 60_000);
   const editable = !locked && status !== "cancelled";
 
-  /**
-   * Resets the fields to the current props and leaves edit mode.
-   */
+  /** Resets the fields to the current props and leaves edit mode. */
   function cancel(): void {
     setForm({ start: toNzInputValue(startAt), end: toNzInputValue(endAt) });
     setNotifyCustomer(true);
@@ -92,9 +79,7 @@ export function BookingTimesCard({
   }
 
   /**
-   * Saves the typed times, converting them from NZ wall clock to instants.
-   * A first save without `force` may come back with an overlap, which opens the
-   * confirm dialog instead of failing outright.
+   * Saves the typed NZ times; an overlap without `force` opens the confirm dialog.
    * @param force - Save through an overlap warning.
    */
   async function save(force = false): Promise<void> {

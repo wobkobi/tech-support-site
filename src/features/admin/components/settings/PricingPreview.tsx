@@ -1,8 +1,7 @@
 "use client";
 // src/features/admin/components/settings/PricingPreview.tsx
-// Live worked-example for the pricing tab - renders the draft cancellation policy,
-// billing rounding, surcharge, and GST status as the plain-English lines a customer or
-// invoice would reflect, so the abstract numbers have a concrete meaning before saving.
+// Live worked example for the pricing tab: the draft policy, rounding, surcharges and GST
+// as plain-English lines.
 
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
@@ -23,8 +22,7 @@ export function PricingPreview({ config }: Props): React.ReactElement {
   const { cancellation: c, reschedule: r } = config;
   const lines: string[] = [];
 
-  // In person and remote are priced separately, so the preview shows both -
-  // reading only one line would hide half the policy from the operator.
+  // In person and remote are priced separately, so show both.
   lines.push(
     c.travelChargeHours > 0
       ? `In person: free more than ${c.freeNoticeHours}h out. Inside that, a $${c.callOutFee} fee. Within ${c.travelChargeHours}h, or a no-show, the full $${c.fullCallOutFee} call-out plus round-trip travel.`

@@ -1,21 +1,6 @@
 // src/features/calendar/lib/reconcile-booking-times.ts
-// Pulls booking times back from Google Calendar.
-//
-// The operator corrects event times in Calendar - usually on a phone, after the job - and
-// the billing path already reads those live. The Booking row doesn't follow, so reminder
-// timing and the cancellation-fee windows go on working off a stale start.
-// This walks the bookings that own an event, compares the row against the live event, and
-// reports or applies the difference. The calendar wins: it is where the correction was
-// made.
-//
-// It also carries the other half of that drift: an event deleted in Calendar because the
-// job was called off, on a row nobody cancelled. Those get calendarEventMissingAt stamped
-// so the reminder cron stops emailing about a job that isn't happening.
-//
-// Correcting a time is not enough on its own. emailReminderSentAt is a one-way stamp, so
-// a row moved to a new date still carries the mark of a reminder sent for the old one,
-// and the reminder cron skips it forever. A correction clears a stamp its move
-// invalidated.
+// Pulls operator-corrected times from Google Calendar back onto Booking rows (the calendar
+// wins), flags rows whose event was deleted, and clears reminder stamps a move invalidated.
 
 import { lookupBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { prisma } from "@/shared/lib/prisma";
@@ -28,11 +13,8 @@ const FETCH_CONCURRENCY = 10;
 const DEFAULT_SINCE_DAYS = 60;
 
 /**
- * Widest gap the settings validator allows between a reminder and the start it
- * was sent for: `reminderLeadHours` is capped at 168. A stamp older than that
- * relative to the current start cannot have been sent for these times, whatever
- * the setting happens to be, so the check needs no settings read - which also
- * keeps this callable from the CLI script, outside any Next request context.
+ * Max `reminderLeadHours` (168). A stamp older than this before the start was sent
+ * for other times; using the cap avoids a settings read, so the CLI can call this.
  */
 const MAX_REMINDER_LEAD_MS = 168 * 3_600_000;
 
@@ -89,14 +71,8 @@ export interface ReconcileResult {
 }
 
 /**
- * Send stamps on a booking that cannot belong to the times it is about to hold.
- *
- * Judged against the times themselves rather than against "did this pass move
- * it", because a row corrected by an earlier run, or by either edit route, has
- * matching times and stale stamps - and a drift-only check would never repair
- * it. The test is one-directional and conservative: it only fires on a job that
- * is still ahead, where a reminder already sent was necessarily about times the
- * booking no longer has.
+ * Send stamps that cannot belong to the booking's times. Judged against the
+ * times, not this pass's drift, so rows corrected earlier get repaired too.
  * @param booking - The row's current stamps.
  * @param booking.emailReminderSentAt - When the 24h reminder went out.
  * @param startAt - The start the row holds after this pass.
@@ -110,9 +86,7 @@ function staleSendStamps(
 ): RearmedStamp[] {
   const stale: RearmedStamp[] = [];
 
-  // A legitimate reminder goes out inside the lead window before the start.
-  // One sent further back than the widest permitted window was sent for an
-  // earlier date, and the job it now names has not been reminded at all.
+  // A reminder older than the widest lead window was for an earlier date.
   if (
     booking.emailReminderSentAt &&
     startAt > now &&
@@ -129,7 +103,7 @@ function staleSendStamps(
  * times, re-arming the send stamps a correction invalidates, and flagging rows
  * whose event has been deleted.
  * @param options - Pass options.
- * @param options.apply - Write the calendar's times back to the row, clear the re-armed stamps, and stamp/clear the missing-event flag. False only reports.
+ * @param options.apply - Write times, stamp clears and missing-event flags; false only reports.
  * @param options.sinceDays - How far back to look, in days (defaults to 60).
  * @returns What was checked, what disagreed, what was re-armed, and whose event is gone.
  */
@@ -140,8 +114,7 @@ export async function reconcileBookingTimes(options: {
   const now = new Date();
   const since = new Date(now.getTime() - (options.sinceDays ?? DEFAULT_SINCE_DAYS) * 86_400_000);
 
-  // Cancelled bookings are excluded: their event is already deleted, so there
-  // is nothing to compare against and nothing that still reads their times.
+  // Cancelled bookings have no event left to compare against.
   const bookings = await prisma.booking.findMany({
     where: {
       calendarEventId: { not: null },
@@ -180,9 +153,8 @@ export async function reconcileBookingTimes(options: {
     for (const [index, booking] of batch.entries()) {
       const lookup = lookups[index]!;
 
-      // Event deleted in Calendar: flag the orphaned row so the email crons
-      // leave it alone, and leave its times as they are - there is nothing
-      // authoritative left to copy from.
+      // Event deleted in Calendar: flag the row so the email crons skip it;
+      // times stay as they are.
       if (lookup.state === "gone") {
         result.missing.push({
           bookingId: booking.id,
@@ -204,8 +176,7 @@ export async function reconcileBookingTimes(options: {
       }
       result.checked++;
 
-      // The event reads back, so an earlier flag was a deletion since undone or
-      // a lookup that had been failing. Either way, let the emails resume.
+      // Event reads back again, so clear the flag and let emails resume.
       if (booking.calendarEventMissingAt) {
         result.restored++;
         if (options.apply) {
@@ -219,11 +190,8 @@ export async function reconcileBookingTimes(options: {
       const startAt = new Date(lookup.event.start);
       const endAt = new Date(lookup.event.end);
 
-      // The reminder stamp is one-way, so a booking whose times moved carries a stamp for
-      // a date it no longer has and is skipped by the reminder cron forever. Checked
-      // against the times, not against whether this pass moved anything - a row an earlier
-      // run already corrected has matching times and a stale stamp, which a drift gate
-      // would miss.
+      // A moved booking keeps its one-way reminder stamp and would never be reminded
+      // again. Checked against the times, so earlier-corrected rows are caught too.
       const stamps = staleSendStamps(booking, startAt, now);
       const clearStamps = stamps.includes("reminder") ? { emailReminderSentAt: null } : {};
 
@@ -271,9 +239,8 @@ export async function reconcileBookingTimes(options: {
           });
         } catch (error) {
           if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-            // Another live booking already holds that start. Leaving the row
-            // stale is the lesser evil - the alternative is two bookings
-            // claiming one slot - but it needs a human, so it's reported.
+            // Another live booking holds that start; leave the row stale
+            // and report it for a human.
             drift.skipped = "another booking already starts at that time";
             wrote = false;
           } else {
@@ -282,8 +249,7 @@ export async function reconcileBookingTimes(options: {
         }
       }
 
-      // Reported alongside the drift, but only when the write that carried the
-      // clears actually landed.
+      // Report only when the write carrying the clears landed.
       if (stamps.length > 0 && wrote) {
         result.rearmed.push({ bookingId: booking.id, name: booking.name, startAt, stamps });
       }

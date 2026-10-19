@@ -1,11 +1,6 @@
 // scripts/check-tax-page.ts
-// Display maths behind the Tax page and the overview's tax card: the per-bracket split of
-// income tax, the rate and dollar labels, the all-FY sum for "All time", the GST roll-up
-// gated by the "registered from" date, and the invariants the page relies on in a
-// computeTaxYear result (counted deduction lines add up to the total, the bands add up to
-// the income tax, the set-aside total is residual tax plus ACC), and the labels a filed
-// year shows once Settings have changed (rates from the saved amounts, band rows only while
-// the brackets still give the saved income tax).
+// Display maths behind the Tax page and tax card: bracket split, labels, "All time" sum,
+// GST roll-up, computeTaxYear invariants, and filed-year labels after Settings change.
 // Run with: npm test -- tax-page
 
 import {

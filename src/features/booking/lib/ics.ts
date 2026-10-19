@@ -50,9 +50,7 @@ function formatUtc(date: Date): string {
 }
 
 /**
- * Folds a content line to the 75-octet limit, continuing with CRLF + a single
- * space. Measured in UTF-8 bytes, not characters, so a multi-byte character is
- * never split across a fold boundary.
+ * Folds a content line to 75 UTF-8 octets (CRLF + space), never splitting a multi-byte character.
  * @param line - One unfolded content line.
  * @returns The folded line.
  */
@@ -83,9 +81,8 @@ function foldLine(line: string): string {
 }
 
 /**
- * Serialises one event as a complete `.ics` document. METHOD:PUBLISH (not
- * REQUEST) because this is an add-to-my-calendar file, not an invitation that
- * expects an RSVP - Google Calendar already invites the attendee separately.
+ * Serialises one event as a complete `.ics` document. METHOD:PUBLISH because it is an
+ * add-to-calendar file, not an RSVP invitation.
  * @param event - The event to serialise.
  * @returns The `.ics` file contents, CRLF-delimited.
  */
@@ -115,14 +112,12 @@ export function buildIcs(event: IcsEvent): string {
 
   lines.push("STATUS:CONFIRMED", "END:VEVENT", "END:VCALENDAR");
 
-  // Trailing CRLF: the spec expects every content line, including the last, to
-  // be terminated.
+  // The spec terminates every content line, including the last.
   return `${lines.map(foldLine).join("\r\n")}\r\n`;
 }
 
 /**
- * Builds a Google Calendar "add event" URL - the no-download path for people
- * who live in Google Calendar and would be confused by an `.ics` file.
+ * Builds a Google Calendar "add event" URL, the no-download alternative to the `.ics` file.
  * @param event - The timing and text fields; identity fields are not used.
  * @returns An absolute google.com/calendar render URL.
  */

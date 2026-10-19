@@ -1,19 +1,14 @@
 // src/features/business/lib/prompts/parse-job.ts
-// Prompt builders for the AI job parser. buildParseJobPrompt is the static,
-// cache-friendly system prompt (rules, structure, output schema); buildParseJobContext
-// appends live per-call data to the user message.
+// Prompt builders for the AI job parser: a static cache-friendly system prompt, plus live
+// per-call context for the user message.
 
 import { collectTaxonomyTags } from "@/features/business/lib/task-taxonomy";
 import type { RateConfig, TaskTemplate } from "@/features/business/types/business";
 
 /**
- * Builds the static system prompt - rules, structure, examples, output schema.
- * Takes no per-call parameters so the system message is byte-identical across
- * calls and the provider's prompt cache can hit (OpenAI caches automatically,
- * Claude through the breakpoint jsonCompletion sets). Per-call data is appended
- * to the user message via {@link buildParseJobContext} instead, keeping this
- * prefix cache-friendly. The rules are written as explicit YES/NO steps because
- * gpt-4.1 skips softer guidance and Claude runs any literal test it is given.
+ * Builds the static system prompt, byte-identical across calls so the prompt cache hits
+ * (per-call data goes in {@link buildParseJobContext}). Rules are explicit YES/NO steps
+ * because gpt-4.1 skips softer guidance.
  * @returns Static system prompt string.
  */
 export function buildParseJobPrompt(): string {
@@ -423,13 +418,8 @@ Return this exact JSON shape (when not asking for clarification):
 }
 
 /**
- * Builds the per-call context block prepended to the user message: current
- * rate config, live device/action tag vocabulary, modifier labels, recent
- * (device, action) templates, the billing step, current NZ time, then the
- * "--- BEGIN USER DATA ---" sentinel. Lives in the user message so the system
- * prompt stays byte-identical and the prompt cache can hit; everything is
- * derived from live data so the static prompt never hardcodes a tag, label, or
- * rounding grid.
+ * Builds the per-call context prepended to the user message (rates, tags, modifiers,
+ * templates, billing step, NZ time, then the user-data sentinel), all from live data.
  * @param rates - Current rate configurations.
  * @param templates - Previously used task templates.
  * @param currentTime - Current NZ local time as HH:MM, used for open-ended session end times.
@@ -458,12 +448,8 @@ export function buildParseJobContext(
     workmanshipWindowDays: number;
   },
 ): string {
-  // Live tag vocabulary, collapsed the same way the taxonomy endpoint collapses
-  // it: one entry per case-insensitive tag. Offering both "PC" and "Pc" under a
-  // "reuse verbatim" instruction is what splits the taxonomy in the first place -
-  // the model picks either, and the next row is written with whichever it picked.
-  // Sent as flat lists so TAG SELECTION can demand verbatim reuse without the
-  // model re-deriving the sets from the pairs.
+  // One entry per case-insensitive tag: offering both "PC" and "Pc" for verbatim reuse
+  // would split the taxonomy. Flat lists so TAG SELECTION needn't derive them from pairs.
   const deviceTags = collectTaxonomyTags(templates, "device").map((tag) => tag.name);
   const actionTags = collectTaxonomyTags(templates, "action").map((tag) => tag.name);
   const taxonomyBlock =
@@ -474,9 +460,7 @@ export function buildParseJobContext(
           actionTags,
         )}\n\n`
       : "";
-  // The pair list is capped: callers order templates by usageCount desc, so the top slice
-  // keeps the pairings that recur while bounding the prompt as the table grows. The tag
-  // vocabulary above still derives from ALL templates, so TAG SELECTION sees everything.
+  // Cap the pairs (templates arrive busiest first); the tag lists above still use them all.
   const TEMPLATE_PAIR_CAP = 50;
   const templateBlock =
     templates.length > 0
@@ -492,9 +476,7 @@ export function buildParseJobContext(
   const identityBlock = identity
     ? `Business: ${identity.company}, sole trader ${identity.name}, based in ${identity.location}.\n\n`
     : "";
-  // Only modifiers the server can actually apply (a signed hourlyDelta) are offered.
-  // Percentage-only ones like Public Holiday are applied downstream by booking date, so
-  // listing them would only invite the model to emit a label the route drops.
+  // Offer only hourlyDelta modifiers; percentage ones (Public Holiday) apply by booking date.
   const modifierLabels = rates
     .filter((r) => r.unit === "modifier" && r.hourlyDelta !== null)
     .map((r) => r.label);
@@ -519,9 +501,7 @@ export function buildParseJobContext(
           : "Workmanship window (workmanshipDays) is 0 - fallout from earlier work bills in full."
       }\n\n`
     : "";
-  // Token diet: the model picks rates by label and the server resolves labels
-  // back to rows, so ids and timestamps are dead weight. Send only the fields
-  // the prompt rules read, omit null price fields, and compact-print.
+  // Token diet: rates are picked by label, so send only the fields the rules read.
   const leanRates = rates.map((r) => ({
     label: r.label,
     unit: r.unit,

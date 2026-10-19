@@ -1,9 +1,7 @@
 "use client";
 // src/features/business/components/calculator/TasksSection.tsx
-// Tasks list - the core of the job calculator. Each row is either a flat-rate line
-// (Travel etc.) or a device + action task whose pricing is looked up from a saved
-// TaskTemplate. Modifier chips nudge the effective hourly rate; TaskTotalsRow renders the
-// shared qty/price/total strip.
+// Tasks list for the job calculator: flat-rate lines or device + action tasks priced from
+// saved templates, with modifier chips on the hourly rate.
 
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
@@ -45,10 +43,8 @@ interface Props {
 }
 
 /**
- * Sorted suggestions for a Combobox axis (device or action), extracted from the
- * current template snapshot. One entry per case-insensitive tag: offering both
- * "PC" and "Pc" would let the operator pick either and keep the split alive,
- * and the two are one tag to every consumer downstream.
+ * Sorted suggestions for a Combobox axis, one per case-insensitive tag so "PC" and
+ * "Pc" don't both appear.
  * @param templates - All saved templates.
  * @param key - Which axis to extract.
  * @returns Sorted canonical tag values.
@@ -58,11 +54,8 @@ function tagSuggestions(templates: TaskTemplate[], key: "device" | "action"): st
 }
 
 /**
- * Tasks list - the core of the job calculator. Each row is either a flat-rate
- * line (Travel etc.) with a rate dropdown + qty/price/total, or a regular task
- * with device + action comboboxes that auto-look up a saved template for
- * pricing. Modifier chips (Business, Remote, etc.) toggle on each row to nudge
- * the effective hourly rate.
+ * Tasks list: flat-rate rows with a rate dropdown, or device + action rows priced
+ * from saved templates with modifier chips.
  * @param props - Component props.
  * @param props.tasks - The current task list.
  * @param props.onTasksChange - Functional setter; used by the Combobox onChange logic that does template-aware pricing.
@@ -111,8 +104,7 @@ export function TasksSection({
         }
       />
       {tasks.map((task, idx) => {
-        // Flat-rate rows (e.g. Travel) keep their old single-line look;
-        // task rows use the device + action combobox layout.
+        // Flat-rate rows are single-line; task rows use the combobox layout.
         const isFlatRate = task.rateConfigId != null;
         const composed = composeDescription(
           task.device ?? null,
@@ -350,20 +342,15 @@ function hoursFromHM(h: number, m: number): number {
 }
 
 /**
- * Compact qty + unit-price + total + delete row shared by both flat-rate and
- * device/action task rows. Stacks on mobile; at sm+ it becomes an inline strip -
- * compact for flat-rate rows, or full width when `spread` is set so the line
- * total lines up under the effective-rate readout above. Task rows (`spread`)
- * edit time as separate hrs + mins inputs; flat-rate rows keep a single unit-count
- * input. Either way `task.qty` stays decimal hours/units - the pricing maths is
- * unchanged.
+ * Qty + unit price + total + delete strip for every row. `spread` (task rows) fills
+ * the row and edits hrs + mins; `task.qty` always stays decimal.
  * @param props - Component props.
  * @param props.task - The task line to render controls for.
  * @param props.lineTotal - The line's total as the invoice prints it.
  * @param props.onQty - Called with the new decimal qty when hrs/mins/qty change.
  * @param props.onPrice - Called when the operator edits the $/unit input.
  * @param props.onDelete - Called when the × button is pressed.
- * @param props.spread - When true (task rows) the strip fills the row, right-aligns the total, and splits time into hrs + mins; flat-rate rows leave it false to stay compact with a single unit-count input.
+ * @param props.spread - True for task rows: fill the row and split time into hrs + mins.
  * @returns Totals strip element.
  */
 function TaskTotalsRow({
@@ -381,8 +368,7 @@ function TaskTotalsRow({
   onDelete: () => void;
   spread?: boolean;
 }): React.ReactElement {
-  // Task rows edit time as hrs + mins; task.qty stays decimal hours. Decompose
-  // for display (round-trips cleanly through 2dp qty, e.g. 50 min > 0.83 > 50).
+  // Decompose decimal qty for display; round-trips through 2dp (50 min > 0.83 > 50).
   const totalMins = Math.round(task.qty * 60);
   const hrs = Math.floor(totalMins / 60);
   const mins = totalMins % 60;

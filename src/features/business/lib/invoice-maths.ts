@@ -1,6 +1,6 @@
 // src/features/business/lib/invoice-maths.ts
-// GST extraction, invoice totals and line-item validation, invoice numbering, subscription
-// due dates and ledger income descriptions. Re-exported through business.ts.
+// GST, invoice totals, line-item validation, numbering and subscription due dates.
+// Re-exported through business.ts.
 
 import { minsToHoursLabel } from "@/features/business/lib/business-format";
 import { GST_RATE, GST_REGISTERED } from "@/features/business/lib/pricing-policy";
@@ -22,25 +22,17 @@ export function calcGstFromInclusive(amountIncl: number, gstRate: number): numbe
 export interface LineAmountInput {
   qty: number;
   unitPrice: number;
-  /** Billed minutes on a timed (hourly) line; absent or null on flat, part and travel lines. */
+  /** Billed minutes on a timed (hourly) line; null on flat, part and travel lines. */
   minutes?: number | null;
 }
 
 /**
  * Line totals in dollars, rounded so each rate's timed lines add up to that rate's whole
- * time billed at once. Rounding every line on its own drifts on splits like thirds: 35,
- * 35 and 20 min at $100/hr print $58.33, $58.33 and $33.33, which is $149.99 for 90
- * minutes that cost $150.00.
+ * time billed at once (35+35+20 min at $100/hr = $58.34 + $58.33 + $33.33 = $150.00).
  *
- * Lines carrying `minutes` group by unit price. A group's total is its summed minutes at
- * that rate, rounded once; each line takes its floored cents, then the leftover cents go
- * one apiece to the lines that lost the largest fraction. On a tie the bigger line takes
- * the cent (then the earlier one), where it reads as rounding: 5 min + 3:05 at $100/hr
- * prints $8.33 + $308.34, not an $8.34 nobody could check. The split above prints
- * $58.34, $58.33 and $33.33. A timed line is always priced from its minutes, the time
- * the invoice prints, so a line alone at its rate matches one in a group. Lines without
- * minutes round qty x unitPrice on their own. Worked out from qty, unitPrice and minutes
- * only, so a saved invoice re-totals to the cents it was printed with.
+ * Timed lines group by unit price: each takes its floored cents, then leftover cents go to
+ * the largest fractions, ties to the bigger then earlier line. Untimed lines round
+ * qty x unitPrice alone. Uses only qty, unitPrice and minutes, so saved invoices re-total.
  * @param lines - Line items or task lines, in display order.
  * @returns Each line's total in dollars, in the same order.
  */
@@ -58,9 +50,8 @@ export function splitLineTotals(lines: readonly LineAmountInput[]): number[] {
     // The epsilon keeps float noise (5833.9999999) from flooring a whole cent away.
     const floors = exact.map((x) => Math.floor(x + 1e-9));
     let leftover = target - floors.reduce((s, x) => s + x, 0);
-    // Fractions within float noise of each other are a tie (a third of a cent computes
-    // as .33333333333348 on one line and .333333333333 on another), so the tie-break
-    // decides rather than whichever the noise favours: bigger line, then earlier.
+    // Fractions within float noise are a tie (.33333333333348 vs .333333333333), so the
+    // tie-break decides: bigger line, then earlier.
     const fraction = exact.map((x, k) => x - floors[k]!);
     const order = idx
       .map((_, k) => k)
@@ -82,9 +73,8 @@ export function splitLineTotals(lines: readonly LineAmountInput[]): number[] {
 }
 
 /**
- * The same items with every `lineTotal` re-derived by {@link splitLineTotals}. Run on any
- * line items about to be stored or rendered, so the printed Total column always adds up to
- * the subtotal - whatever totals the sender worked out.
+ * The items with every `lineTotal` re-derived by {@link splitLineTotals}, so the Total
+ * column adds up to the subtotal. Run before storing or rendering.
  * @param items - Line items in display order.
  * @returns The items with their split line totals.
  */
@@ -96,9 +86,8 @@ export function withSplitLineTotals<T extends LineAmountInput>(
 }
 
 /**
- * Splits a GST-inclusive amount into its GST component and GST-exclusive base.
- * Both ledger writers and the subscription recorders need the pair, and deriving
- * `amountExcl` separately is where the two drifted apart.
+ * Splits a GST-inclusive amount into its GST component and GST-exclusive base, derived
+ * together so the pair can't drift apart.
  * @param amountIncl - Amount including GST.
  * @param gstRate - GST rate as a decimal (e.g. 0.15).
  * @returns GST component and exclusive base, each rounded to 2 decimal places.
@@ -112,12 +101,8 @@ export function splitGstInclusive(
 }
 
 /**
- * Invoice totals with an optional discount. GST mode is driven by
- * {@link GST_REGISTERED} in pricing-policy.ts. When false (today), gstAmount=0;
- * when true (future), gstAmount is back-calculated from the inclusive
- * total via {@link calcGstFromInclusive} and total stays equal to taxableAmount
- * (GST is already inside the displayed price). Discount is subtracted
- * before GST is computed, matching IRD's price-reduction treatment.
+ * Invoice totals with an optional discount. When {@link GST_REGISTERED}, GST is backed out of
+ * the inclusive total via {@link calcGstFromInclusive}; discount comes off before GST (IRD).
  * @param lineItems - Array of line items with qty and unit price.
  * @param promoDiscount - Optional dollar discount (e.g. from a promo snapshot).
  * @param gstRegistered - Live GST-registration flag (defaults to the constant).
@@ -128,8 +113,7 @@ export function calcInvoiceTotals(
   promoDiscount = 0,
   gstRegistered: boolean = GST_REGISTERED,
 ): { subtotal: number; gstAmount: number; total: number } {
-  // Sum the same per-line cents jobToLineItems stores and the PDF prints, so the Total
-  // column always adds up to the Subtotal under it.
+  // Sum the same per-line cents the PDF prints, so the Total column matches the Subtotal.
   const subtotal = roundCents(splitLineTotals(lineItems).reduce((sum, line) => sum + line, 0));
   const taxableAmount = Math.max(0, roundCents(subtotal - promoDiscount));
   const gstAmount = gstRegistered ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
@@ -141,9 +125,8 @@ export function calcInvoiceTotals(
 }
 
 /**
- * What the client still owes after money handed over on the day. The invoice total
- * stays the full price of the job; this is the figure the invoice asks for, the bank
- * details quote and a payment is matched against.
+ * What the client still owes after money paid on the day - the figure the invoice asks for
+ * and payments match against. The invoice total stays the full job price.
  * @param invoice - Invoice total and the amount already paid, if any.
  * @param invoice.total - Full invoice total.
  * @param invoice.alreadyPaid - Amount paid before the invoice went out, or null.
@@ -155,21 +138,15 @@ export function balanceDue(invoice: { total: number; alreadyPaid?: number | null
 }
 
 /**
- * Every key a persisted line item may carry. Must match the Prisma `LineItem`
- * composite type exactly: Prisma rejects a composite field it doesn't declare,
- * and an unguarded extra key turns that into a 500 on invoice create/update.
- * Rejecting here fails loudly as a 400 instead, and surfaces the mismatch in
- * local dev rather than in production.
+ * Every key a persisted line item may carry. Must match the Prisma `LineItem` composite
+ * exactly: an undeclared key makes Prisma 500, so reject it here as a 400.
  */
 const LINE_ITEM_FIELDS = new Set(["description", "qty", "unitPrice", "lineTotal", "minutes"]);
 
 /**
- * Validates one untrusted line-item payload before it reaches
- * {@link calcInvoiceTotals} or the database. Rejects non-object items, blank
- * descriptions, non-finite numerics (which would otherwise yield NaN totals or a
- * malformed persisted invoice), and any key outside {@link LINE_ITEM_FIELDS}.
+ * Validates one untrusted line item before {@link calcInvoiceTotals} or the database.
  * @param item - Candidate line item from a request body.
- * @returns True when the item carries only known fields, a non-empty description, finite qty, unit price and line total, and minutes either absent or finite.
+ * @returns True when it has only {@link LINE_ITEM_FIELDS}, a description and finite numbers.
  */
 export function isValidLineItem(item: unknown): item is LineItem {
   if (!item || typeof item !== "object") return false;
@@ -201,8 +178,7 @@ export function nextInvoiceNumber(
   prefix: string = "TTP",
 ): string {
   if (!lastNumber) return `${prefix}-${yearCode}-0001`;
-  // Match 4+ trailing digits so a 5-digit counter (10000+) still increments
-  // instead of silently restarting the sequence at 0001.
+  // 4+ digits so a 5-digit counter (10000+) still increments.
   const match = lastNumber.match(/-(\d{4,})$/);
   if (!match) return `${prefix}-${yearCode}-0001`;
   const next = parseInt(match[1] ?? "", 10) + 1;
@@ -210,11 +186,8 @@ export function nextInvoiceNumber(
 }
 
 /**
- * Advances a subscription's next due date by its frequency.
- * Uses UTC date methods to avoid DST issues. Month/year steps clamp to the last
- * day of the target month when the source day doesn't exist there (e.g. 31 Jan
- * monthly lands on 28/29 Feb, not 3 Mar), so a short target month can't roll the
- * due date into the following month.
+ * Advances a subscription's next due date by its frequency, in UTC to dodge DST. Month
+ * steps clamp to the month's last day (31 Jan monthly > 28/29 Feb, not 3 Mar).
  * @param current - Current nextDue date
  * @param frequency - Billing frequency
  * @returns New nextDue date
@@ -242,9 +215,7 @@ export function advanceNextDue(current: Date, frequency: string): Date {
 }
 
 /**
- * Adds whole months to a date in UTC, clamping the day to the last valid day of
- * the target month instead of letting {@link Date.setUTCMonth} overflow into the
- * next month. Mutates `d` in place.
+ * Adds whole months to `d` in UTC (mutating it), clamping the day to the target month's end.
  * @param d - Date to advance (mutated).
  * @param months - Whole months to add.
  */

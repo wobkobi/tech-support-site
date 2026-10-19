@@ -1,8 +1,6 @@
 // src/features/business/lib/trips.ts
-// Business trips log rules: request-body parsing, km and ledger-date checks, FY picking,
-// km totals, and which completed bookings become "jobs without a trip". Pure (no Prisma,
-// no React), so the page, the API routes, the client view and scripts/check-trips.ts all
-// share one copy.
+// Pure trips log rules: body parsing, km and date checks, FY picking, km totals and which
+// bookings become "jobs without a trip". Shared by the page, routes and check-trips.
 
 import { DAY_MS, fyKeyOf } from "@/features/business/lib/financial-year";
 import { inFy } from "@/features/business/lib/tax/helpers";
@@ -39,10 +37,7 @@ export interface TripRow {
   notes: string | null;
 }
 
-/**
- * A saved contact the trip form can pick, so its address fills the destination. Shaped
- * as a GoogleContact (blank strings, not nulls) so the shared contact search ranks it.
- */
+/** A contact the trip form can pick, shaped as a GoogleContact so the shared search ranks it. */
 export interface TripContact {
   id: string;
   name: string;
@@ -69,10 +64,7 @@ export interface TripSuggestion {
   contactId: string | null;
   /** Booked drive time there and back in minutes, or null when the booking stored none. */
   travelMins: number | null;
-  /**
-   * Round-trip km from the latest trip logged from a job at the same address, or null.
-   * Bookings store drive minutes only, never km, so this is the only stored km source.
-   */
+  /** Km from the latest trip to the same address, or null; bookings store no km. */
   suggestedKm: number | null;
   /** Purpose line the trip is logged with. */
   purpose: string;
@@ -109,11 +101,7 @@ export interface TripDistanceApiResponse {
   error?: string;
 }
 
-/**
- * What saving an invoice did about the job's trip: logged one (with its Google km), found
- * one already logged for the job, or could not log one (Google found no route, or the
- * lookup or write failed). Absent from the reply when no trip was asked for.
- */
+/** What saving an invoice did about the job's trip; absent when no trip was asked for. */
 export type AutoTripResult =
   | { status: "logged"; km: number }
   | { status: "exists" }
@@ -167,8 +155,7 @@ export interface SuggestContext {
 }
 
 /**
- * Parses a km figure: a finite number or numeric string, rounded to 0.1 km, above 0 and
- * at most {@link MAX_TRIP_KM}. A value that rounds to 0 is rejected.
+ * Parses a km figure rounded to 0.1, above 0 and at most {@link MAX_TRIP_KM}.
  * @param value - Raw value from a request body or an input.
  * @returns The km, or null when it isn't a usable distance.
  */
@@ -182,10 +169,8 @@ export function parseKm(value: unknown): number | null {
 }
 
 /**
- * Validates a trips API body. Checks run in field order (date, km, purpose, destination,
- * notes, contact, booking) and the first failure's message is returned for the form to
- * show. `contactId` and `bookingId` go through parseObjectId: an unchecked object there
- * would reach a Prisma `where` as an operator, and a malformed id would 500 the write.
+ * Validates a trips API body, returning the first failure. Ids go through parseObjectId so
+ * an object can't reach Prisma as an operator.
  * @param body - Parsed JSON body.
  * @returns The validated fields, or the first error.
  */
@@ -284,8 +269,7 @@ export function toTripRow(trip: {
 }
 
 /**
- * Half-open window check on ISO bounds, through the tax maths' {@link inFy} so the trips
- * page and the Tax page draw the FY edge in the same place.
+ * Half-open window check via {@link inFy}, so trips and tax agree on the FY edge.
  * @param iso - Date to test (ledger scale).
  * @param startISO - Inclusive start.
  * @param endISO - Exclusive end.
@@ -296,9 +280,8 @@ export function isInWindow(iso: string, startISO: string, endISO: string): boole
 }
 
 /**
- * Picks the FY a `?fy=` key names. A given key must match exactly (an unknown key yields
- * undefined, so an API can 404 and a page can fall back); no key means the current FY,
- * or the newest listed when none is current.
+ * Picks the FY a `?fy=` key names (unknown > undefined); no key means the current FY, else
+ * the newest.
  * @param fys - Financial years to choose from.
  * @param key - FY key such as "2026-27", or undefined.
  * @returns The matching FY, or undefined.
@@ -332,8 +315,7 @@ export function sortTrips(trips: readonly TripRow[]): TripRow[] {
 }
 
 /**
- * Date the add form starts on: today when it falls in the FY, the FY's last day for a
- * past FY, or its first day for one that hasn't started.
+ * Add form's start date: today if inside the FY, else the FY's nearest edge day.
  * @param startISO - FY start (inclusive ISO, ledger scale).
  * @param endISO - FY end (exclusive ISO, ledger scale).
  * @param todayKey - Today's NZ date as YYYY-MM-DD.
@@ -365,8 +347,7 @@ export function addressKey(address: string): string {
 }
 
 /**
- * Round-trip km per address from trips already logged, the latest trip per address
- * winning. Trips with no known address are skipped.
+ * Round-trip km per address from logged trips, latest per address winning.
  * @param trips - Logged trips with the address driven to and their ISO date.
  * @returns Km by {@link addressKey}.
  */
@@ -385,10 +366,8 @@ export function kmByAddressFrom(
 }
 
 /**
- * Whether a booking was a job driven to. Completed jobs count; a confirmed job counts
- * once it has ended, unless reconcile flagged its calendar event as gone (the job was
- * called off in Calendar); a no-show counts because the drive still happened. Remote
- * jobs and holds never do.
+ * Whether a booking was driven to: completed, ended confirmed (calendar event not gone), or
+ * a no-show. Remote jobs and holds never count.
  * @param b - The booking.
  * @param now - Reference time.
  * @returns True when the job needs a trip.
@@ -408,9 +387,8 @@ function isDrivenJob(b: TripCandidate, now: Date): boolean {
 }
 
 /**
- * Jobs in the FY that still need a trip, newest first. One suggestion per booking: travel
- * is one round trip per job. A booking's start is a real instant while the FY window is
- * on the ledger scale, so each job is placed on its NZ day before the window check.
+ * Jobs in the FY still needing a trip, one per booking, newest first. Each start is placed
+ * on its NZ day before the ledger-scale window check.
  * @param candidates - Bookings around the FY (the caller pads the query by a day).
  * @param ctx - Linked bookings, km by address, the FY window and now.
  * @returns The suggestions.
@@ -426,7 +404,6 @@ export function suggestTrips(
     if (!isInWindow(dayIso, ctx.startISO, ctx.endISO)) continue;
     const there = b.travelMinsAtBooking;
     const name = b.name.trim();
-    // A booking with no address of its own falls back to where its contact lives.
     const bookingAddress = b.address?.trim() || null;
     const contactAddress = b.contact?.address?.trim() || null;
     const address = bookingAddress ?? contactAddress;
@@ -450,9 +427,8 @@ export function suggestTrips(
 }
 
 /**
- * Km inputs for the suggestions list: what was already typed for a job survives a
- * refresh, a new job starts from its suggested km (or blank), and jobs no longer listed
- * drop out.
+ * Km inputs for the suggestions: typed drafts survive a refresh, new jobs start from their
+ * suggested km, unlisted jobs drop out.
  * @param suggestions - Current suggestions.
  * @param prev - Drafts typed so far, by booking id.
  * @returns Drafts by booking id.

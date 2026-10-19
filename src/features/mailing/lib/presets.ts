@@ -1,9 +1,6 @@
 // src/features/mailing/lib/presets.ts
-// Starter presets for the mailing list. They are seeded into the database the first time
-// the Mailing page opens, and from then on they're ordinary records the operator edits or
-// deletes. Presets added later (V2_PRESET_KEYS) are seeded once more on their own,
-// so an install that already had the first set gets the new ones without its deleted or
-// edited presets coming back.
+// Starter presets, seeded once when the Mailing page first opens, then ordinary records.
+// V2_PRESET_KEYS seed in their own step so deleted or edited first-set presets stay put.
 
 import {
   starterPresets,
@@ -20,8 +17,8 @@ const SEEDED_KEY = "mailing:presetsSeeded";
 const SEEDED_V2_KEY = "mailing:presetsSeeded:v2";
 
 /**
- * Claims a seeding step. Creating the marker row doubles as a lock: its unique key
- * makes a second concurrent page load fail the create and skip the step.
+ * Claims a seeding step. The marker row's unique key doubles as a lock against a
+ * concurrent page load.
  * @param key - The step's marker key.
  * @returns True when this call should do the seeding.
  */
@@ -45,10 +42,7 @@ function presetRows(presets: StarterPreset[]): Prisma.CampaignCreateManyInput[] 
   return presets.map((p) => ({ ...p, preheader: p.preheader || null, isPreset: true }));
 }
 
-/**
- * Seeds the starter presets that haven't been seeded yet, each set exactly once. A fresh
- * install gets everything in the first step and marks the later step done too.
- */
+/** Seeds each starter set exactly once; a fresh install gets everything in the first step. */
 export async function ensureStarterPresets(): Promise<void> {
   const all = starterPresets(getSiteUrl());
   if (await claim(SEEDED_KEY)) {

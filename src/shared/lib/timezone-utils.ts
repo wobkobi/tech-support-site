@@ -52,11 +52,7 @@ const nzInputFormat = new Intl.DateTimeFormat("en-CA", {
 });
 
 /**
- * The NZ weekday an instant falls on.
- *
- * Read in NZ time, never UTC: a UTC weekday check puts the boundary at 11am or
- * noon NZ depending on daylight saving, so a Tuesday-only rule would half-apply
- * on Monday.
+ * The NZ weekday of an instant. Never UTC: that moves the day boundary to 11am or noon NZ.
  * @param date - The instant to read.
  * @returns Weekday index, 0 = Sunday through 6 = Saturday.
  */
@@ -89,9 +85,7 @@ export function nzNowTime(): string {
 }
 
 /**
- * Formats an instant as its NZ (Pacific/Auckland) calendar date.
- * The server runs in UTC, so reading local Date parts would land 12-13 hours off
- * and attribute an evening booking to the wrong day.
+ * An instant's NZ calendar date; the server runs in UTC, which would shift evenings a day.
  * @param date - The instant to read.
  * @returns NZ calendar date as YYYY-MM-DD.
  */
@@ -108,13 +102,7 @@ export function nzTodayKey(): string {
 }
 
 /**
- * Splits a YYYY-MM-DD key into its numeric parts.
- *
- * Returns a fixed tuple so callers destructure three numbers rather than three
- * possibly-missing ones. A malformed key yields NaN parts, which is what the
- * arithmetic downstream already produced from a short split - callers that care
- * test with Number.isNaN, and the rest fall through to an Invalid Date exactly
- * as before.
+ * Splits a YYYY-MM-DD key into numbers; a malformed key gives NaN parts for Number.isNaN guards.
  * @param key - Date key, e.g. "2026-09-07".
  * @returns Tuple of [year, month (1-12), day].
  */
@@ -124,11 +112,7 @@ export function dateKeyParts(key: string): [number, number, number] {
 }
 
 /**
- * Splits an HH:MM time into its numeric parts.
- *
- * Fixed tuple for the same reason as {@link dateKeyParts}: a caller gets two
- * numbers, and a fragment with no colon yields NaN rather than undefined, so a
- * Number.isNaN guard actually catches it.
+ * Splits HH:MM into numbers; a fragment with no colon gives NaN, as in {@link dateKeyParts}.
  * @param hhmm - Time string, e.g. "09:30".
  * @returns Tuple of [hours, minutes].
  */
@@ -140,10 +124,7 @@ export function timeParts(hhmm: string): [number, number] {
 /** A weekday index as `getUTCDay()` numbers them: 0 = Sunday .. 6 = Saturday. */
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
-/**
- * Every weekday in `getUTCDay()` order. Iterate this rather than counting to 6,
- * so a {@link Weekday}-keyed map indexes without widening back to `number`.
- */
+/** Every weekday in `getUTCDay()` order, so {@link Weekday}-keyed maps index without widening to `number`. */
 export const WEEKDAYS: readonly Weekday[] = [0, 1, 2, 3, 4, 5, 6];
 
 /** Weekday names in `getUTCDay()` order, for labels and schema.org output. */
@@ -158,11 +139,7 @@ export const DAY_NAMES: Record<Weekday, string> = {
 };
 
 /**
- * Reads an instant's UTC weekday as a {@link Weekday}.
- *
- * `getUTCDay()` is specified to return 0-6, but TypeScript types it `number`,
- * so indexing a seven-key map with it fails. The assertion is sound and belongs
- * here once rather than at each call site.
+ * An instant's UTC weekday as a {@link Weekday}; `getUTCDay()` is typed `number`, so assert once here.
  * @param date - The instant to read.
  * @returns The weekday, 0 = Sunday .. 6 = Saturday.
  */
@@ -181,14 +158,8 @@ export function nzDateParts(date: Date): [number, number, number] {
 }
 
 /**
- * Collapses an instant to the UTC midnight of its NZ calendar day.
- *
- * This is the scale ledger entries are stored on: a "2026-04-01" date string
- * parses as 2026-04-01T00:00:00Z, so a stored date is UTC midnight of an NZ
- * day rather than a real NZ instant. Bucketing or comparing an instant against
- * those rows has to put both on this scale first. Distinct from
- * {@link nzMidnightUtc}, which returns the true instant of NZ midnight
- * (11:00/12:00Z the day before) and is for scheduling, not ledger dates.
+ * Collapses an instant to UTC midnight of its NZ day, the scale ledger dates are stored on
+ * ("2026-04-01" parses as UTC midnight). Unlike {@link nzMidnightUtc}, which is the real NZ midnight.
  * @param instant - The instant to collapse.
  * @returns UTC midnight of that instant's NZ calendar day.
  */
@@ -198,9 +169,8 @@ export function nzDayStartUtc(instant: Date): Date {
 }
 
 /**
- * Formats an instant as the NZ-local "YYYY-MM-DDTHH:mm" string an
- * `<input type="datetime-local">` expects. The browser would render its own
- * local time, which is only NZ time by luck, and the server runs in UTC.
+ * Formats an instant as NZ-local "YYYY-MM-DDTHH:mm" for datetime-local inputs, whatever the
+ * browser or server timezone.
  * @param input - The instant to format.
  * @returns NZ-local datetime string.
  */
@@ -211,10 +181,8 @@ export function toNzInputValue(input: Date | string): string {
 }
 
 /**
- * Parses a NZ-local "YYYY-MM-DDTHH:mm" datetime-local value back into a UTC
- * Date, applying the NZDT/NZST offset in force at that wall-clock time.
- * Callers must reject an empty input first - a cleared field has no parts to
- * read and cannot be given a sensible instant.
+ * Parses an NZ-local datetime-local value to UTC with the offset in force then. Reject empty
+ * input first.
  * @param local - Input value from a datetime-local field, read as NZ time.
  * @returns The equivalent UTC Date.
  */
@@ -231,10 +199,8 @@ export function fromNzInputValue(local: string): Date {
 }
 
 /**
- * NZ midnight for a calendar date, returned as the equivalent UTC instant.
- * Building day/month boundaries from local Date parts would land on UTC midnight
- * (12-13h off NZ) and miscount "today" / "this month". Handles NZDT and NZST via
- * {@link getPacificAucklandOffset}.
+ * NZ midnight of a date as a UTC instant (NZDT/NZST via {@link getPacificAucklandOffset}), not
+ * UTC midnight, which is 12-13h off.
  * @param year - Full year.
  * @param month - Month 1-12 (overflow wraps, e.g. month 13 > January next year).
  * @param day - Day of month (overflow wraps, e.g. day 32 > next month).
@@ -245,20 +211,10 @@ export function nzMidnightUtc(year: number, month: number, day: number): Date {
 }
 
 /**
- * An NZ wall-clock time on a calendar date, as the equivalent UTC instant:
- * "2pm on 3 March in Auckland" as a real moment. Every booking path needs this,
- * and assembling it inline is where the sign of the offset and the 0-indexed
- * month get fumbled.
- *
- * Two passes, because {@link getPacificAucklandOffset} reads the offset at NZ
- * midday. On the two changeover days the small hours sit on the other side of
- * the 2-3am switch, and a single pass put NZ midnight an hour out (23:00 the
- * night before in September, 01:00 in April). The first guess is re-checked
- * against the offset actually in force at that instant.
- *
- * A time the September switch skips (2:30am) comes out an hour later, as the
- * clock reads; the April hour that happens twice resolves to the second, NZST
- * pass. Appointments never run then.
+ * An NZ wall-clock time on a date as a UTC instant. Two passes, because
+ * {@link getPacificAucklandOffset} reads NZ midday: on changeover days a single pass put midnight
+ * an hour out. A skipped September time (2:30am) lands an hour later; April's repeated hour
+ * resolves to NZST.
  * @param year - Full year.
  * @param month - Month 1-12 (overflow wraps).
  * @param day - Day of month (overflow wraps).
@@ -304,9 +260,7 @@ function nzOffsetHoursAt(instant: Date): number {
 }
 
 /**
- * Adds `n` days to a YYYY-MM-DD key. Uses UTC noon so a DST transition can't roll
- * the date part backwards, then keeps just the date. Timezone-agnostic - operates
- * purely on the calendar-date string (as used for all-day event date keys).
+ * Adds `n` days to a YYYY-MM-DD key, via UTC noon so DST can't roll the date back.
  * @param dateKey - The base day (YYYY-MM-DD).
  * @param n - Days to add (may be negative).
  * @returns The shifted YYYY-MM-DD key.
@@ -317,16 +271,13 @@ export function addDaysToDateKey(dateKey: string, n: number): string {
 }
 
 /**
- * The next future instant at an NZ wall-clock time on the job date's weekday. Google
- * only quotes traffic for future departures, so a past job is priced at the same weekday
- * and time as a proxy for that day's traffic. The UTC offset is read on the target date
- * itself, so a trip landing across a daylight-saving change keeps its wall-clock hour.
+ * The next future instant at an NZ time on the job date's weekday, since Google only quotes
+ * traffic for future departures. The offset is read on the target date, so DST keeps the hour.
  * @param hour - NZ hour, 0-23.
  * @param minute - NZ minute, 0-59.
  * @param anchorDate - YYYY-MM-DD whose weekday to match; missing or malformed means today.
  * @param now - The current instant.
- * @returns The departure instant: today while the time is still ahead, else the next
- * matching day (tomorrow without an anchor, a week on with one).
+ * @returns Today while the time is ahead, else the next matching day (a week on with an anchor).
  */
 export function nextNzWallClockOnWeekday(
   hour: number,
@@ -365,8 +316,7 @@ export function nextNzWallClockOnWeekday(
 }
 
 /**
- * UTC offset (hours) for Pacific/Auckland on a given date.
- * Handles NZDT (UTC+13, Sep-Apr) and NZST (UTC+12, Apr-Sep) automatically.
+ * UTC offset for Pacific/Auckland on a date: 13 NZDT (Sep-Apr), 12 NZST (Apr-Sep).
  * @param year - Full year.
  * @param month - Month 1-12 (not 0-indexed).
  * @param day - Day of month.

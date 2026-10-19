@@ -1,9 +1,6 @@
 // src/app/api/business/tax-years/[fyKey]/route.ts
-// Admin per-FY tax record endpoint. PUT upserts the TaxYear row for one FY key: the home
-// office floor areas and whole-house costs, that year's IRD square-metre and kilometre
-// rates, the car's total km and the ACC levy rate for the year. A filed year is refused
-// so its figures stay frozen. POST `{ action: "file" | "unfile" }` saves the year's
-// figures as a snapshot or releases them.
+// Admin per-FY tax record endpoint. PUT upserts one FY's TaxYear row (refused once filed);
+// POST `{ action: "file" | "unfile" }` snapshots or releases the year's figures.
 
 import { fileTaxYear, unfileTaxYear } from "@/features/business/lib/tax/filing.server";
 import { resolveFinancialYear } from "@/features/business/lib/tax/view.server";
@@ -17,10 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 /** Shown for a malformed key, or one outside the business start to the current FY. */
 const UNKNOWN_FY_ERROR = "Unknown financial year";
 
-/**
- * TaxYear fields this route writes. Null clears a value (the km and m² rates then fall
- * back to IRD's, the ACC rate to the Settings one).
- */
+/** TaxYear fields this route writes. Null clears a value back to the IRD/Settings default. */
 const EDITABLE_FIELDS = [
   "officeSqm",
   "houseSqm",
@@ -51,10 +45,7 @@ const FIELD_LABELS: Record<EditableField, string> = {
 /** Shown for a zero, negative or non-numeric total km. */
 const TOTAL_KM_ERROR = "Enter the car's total km, or leave it blank";
 
-/**
- * Highest ACC rate (as a fraction) the route accepts. The levy has been under 2% for
- * years, so anything near this is a percent typed where the fraction belongs.
- */
+/** Highest ACC rate fraction accepted; the levy is under 2%, so more is a typed percent. */
 const MAX_ACC_RATE = 0.2;
 
 /**
@@ -73,8 +64,7 @@ export async function PUT(
   }
 
   const { fyKey } = await params;
-  // A malformed key, or one outside the business start to the current FY, has no year to
-  // record; POST answers it the same way.
+  // A malformed or out-of-range key has no year to record.
   if (!(await resolveFinancialYear(fyKey, new Date()))) {
     return noStore(errorResponse(UNKNOWN_FY_ERROR, 404));
   }
@@ -90,10 +80,8 @@ export async function PUT(
   }
   const raw = body as Record<string, unknown>;
 
-  // Sparse update: only fields present in the body get written; null or "" clears one.
-  // Booleans and objects are refused outright, since Number(true) would read as 1.
-  // Total km must be above 0: a 0 would hide the Trips page's "enter the total" hint
-  // and skew the Tier 1 split, so blank is the way to say "not known".
+  // Sparse update; null or "" clears a field. Booleans are refused (Number(true) is 1).
+  // Total km must be above 0 - blank means "not known", 0 would skew the Tier 1 split.
   const data: Partial<Record<EditableField, number | null>> = {};
   for (const field of EDITABLE_FIELDS) {
     if (!(field in raw)) continue;
@@ -126,8 +114,7 @@ export async function PUT(
     );
   }
 
-  // Check the areas as they will be after the save, so a one-field update can't
-  // leave the office bigger than the house.
+  // Check the post-save areas so a one-field update can't make office > house.
   const office = data.officeSqm !== undefined ? data.officeSqm : (existing?.officeSqm ?? null);
   const house = data.houseSqm !== undefined ? data.houseSqm : (existing?.houseSqm ?? null);
   if (office !== null && house !== null && office > house) {
@@ -144,8 +131,7 @@ export async function PUT(
   try {
     taxYear = await upsert();
   } catch (err) {
-    // Two first saves for one FY can both take the create path; the loser hits the
-    // fyKey unique index (P2002). Retry once: the row now exists, so it updates.
+    // Two first saves can both create; retry the P2002 loser once as an update.
     if (!isUniqueConflict(err)) throw err;
     taxYear = await upsert();
   }
@@ -154,8 +140,7 @@ export async function PUT(
 
 /**
  * POST /api/business/tax-years/[fyKey] - Marks a financial year filed or unfiled.
- * `{ action: "file" }` saves the year's live figures as TaxYear.snapshot and stamps
- * filedAt; `{ action: "unfile" }` clears both, so the year goes back to live figures.
+ * "file" saves TaxYear.snapshot and stamps filedAt; "unfile" clears both.
  * @param request - Incoming request with `{ action }` in the body.
  * @param root0 - Route context.
  * @param root0.params - Route params promise carrying the FY key ("2025-26").
@@ -168,7 +153,7 @@ export async function POST(
   if (!(await isAdminRequest(request))) return noStore(errorResponse("Unauthorized", 401));
 
   const { fyKey } = await params;
-  // Check the key before the body, as PUT does, so a bad key gets the same answer on both.
+  // Check the key before the body, matching PUT.
   if (!(await resolveFinancialYear(fyKey, new Date()))) {
     return noStore(errorResponse(UNKNOWN_FY_ERROR, 404));
   }

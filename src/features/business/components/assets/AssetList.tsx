@@ -1,8 +1,6 @@
 // src/features/business/components/assets/AssetList.tsx
-// The asset register: cards up to xl, a table from xl (below that, next to the sidebar,
-// the eight columns squeeze). Each asset shows its class, where it came from, value,
-// business share, rate, this year's depreciation claimed and tax value, with Schedule,
-// Edit and Delete actions. A disposal year's loss or recovery shows in the schedule.
+// The asset register: cards up to xl, an eight-column table from xl, with Schedule, Edit
+// and Delete actions.
 
 import {
   ROW_CLS,

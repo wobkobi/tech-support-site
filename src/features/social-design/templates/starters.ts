@@ -1,8 +1,6 @@
 // src/features/social-design/templates/starters.ts
-// The four starter templates in the house style (blurred brand backdrop, frosted card,
-// Exo headline, moonstone accents, logo), each laid out by hand for every core size.
-// Sample words are placeholders on purpose: the review template never carries a made-up
-// review. Line breaks are written in so each text box's line count is known.
+// The four starter templates in house style, laid out by hand per core size. Sample words are
+// placeholders so no review is made up; line breaks are explicit so line counts are known.
 
 import { LOGOS, TEXT_PRESETS, type TextPreset } from "@/features/social-design/lib/brand";
 import type { DesignKind } from "@/features/social-design/lib/design-row";
@@ -29,10 +27,7 @@ import {
 
 /** A starter template ready to seed. */
 export interface StarterTemplate {
-  /**
-   * Name plus version, like "review@1". A reworked template gets a new version and is
-   * seeded as a new row, so an edited copy of the old one is never overwritten.
-   */
+  /** Name plus version, like "review@1"; a new version seeds a new row, so edited copies are kept. */
   templateKey: string;
   name: string;
   kind: Exclude<DesignKind, "blank">;
@@ -74,8 +69,7 @@ function text(
 }
 
 /**
- * A font size scaled to a frame, never under the size that reads in a phone feed, so a
- * template passes its own style checks on every size.
+ * A font size scaled to a frame, floored at feed-readable so templates pass the style checks.
  * @param size - Size on a 1080px-wide portrait post.
  * @param frame - Size's frame.
  * @returns Font size in pixels.
@@ -150,8 +144,7 @@ const ACCENT_ON_CARD = { colour: "moonstone-700" } as const;
 const PRICE_ON_CARD = "coquelicot-600";
 
 /**
- * Announcement: a photo, a headline, a line or two and the wordmark. Wide sizes put the
- * photo beside the words, as the /intro wide layout does.
+ * Announcement: photo, headline, a line or two and the wordmark; wide sizes put the photo beside.
  * @returns Template.
  */
 function announcement(): StarterTemplate {
@@ -227,8 +220,7 @@ function review(): StarterTemplate {
 }
 
 /**
- * Tech tip: a lightbulb, a "TECH TIP" line, a headline and up to four ticked points.
- * The landscape size puts the points beside the headline.
+ * Tech tip: lightbulb, "TECH TIP", headline and up to four ticked points (beside on landscape).
  * @returns Template.
  */
 function tip(): StarterTemplate {
@@ -277,9 +269,7 @@ function tip(): StarterTemplate {
 }
 
 /**
- * Promo: the running promo's offer and end date as one line (read live), a headline, a
- * QR code to the booking page with a "Scan to book" line, and contact details. Three
- * pieces of text plus the contact small print, as the style checks ask.
+ * Promo: live offer and end date, headline, booking QR with "Scan to book", and contact details.
  * @param ctx - Live addresses.
  * @returns Template.
  */

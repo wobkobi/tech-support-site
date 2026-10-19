@@ -1,9 +1,7 @@
 "use client";
 // src/shared/components/MobileActionBar.tsx
-// Call + Book bar pinned to the bottom of the screen on phones. Long pages otherwise
-// offer those two actions only at the very top and the very bottom, several screens
-// apart. The Call button is a plain tel: anchor, so GoogleTag's delegated tel: listener
-// records it as a phone-call conversion with no wiring here.
+// Phone-only Call + Book bar pinned to the bottom. Call is a plain tel: anchor, so GoogleTag
+// records it as a conversion with no wiring here.
 
 import { isPrintRoute } from "@/shared/lib/print-routes";
 import Link from "next/link";
@@ -11,10 +9,7 @@ import { usePathname } from "next/navigation";
 import type React from "react";
 import { FaCalendarCheck, FaPhone } from "react-icons/fa6";
 
-/**
- * Path prefixes that hide the bar: admin has its own chrome, the booking pages
- * are where Book leads, and the review form needs the screen to itself.
- */
+/** Paths that hide the bar: admin, booking (where Book leads) and the review form. */
 const HIDDEN_PREFIXES: ReadonlyArray<string> = ["/admin", "/booking", "/review"];
 
 /**
@@ -28,12 +23,8 @@ function isHiddenOn(pathname: string): boolean {
 }
 
 /**
- * Phone-only Call and Book bar pinned to the bottom of the screen.
- *
- * Also renders an in-flow spacer the height of the bar, so the end of the page
- * (the footer links) can always scroll clear of it. The bar hides while the nav
- * drawer is open (NavBar flags `data-nav-open` on body) and while a form field
- * has focus, where it would otherwise ride up on the keyboard over the field.
+ * Phone-only Call and Book bar, plus an in-flow spacer so the footer scrolls clear. Hides
+ * while the nav drawer is open (`data-nav-open` on body) or a field has focus.
  * @param props - Component props.
  * @param props.phoneTel - tel: URI for the business phone.
  * @returns The bar and its spacer, or null on hidden paths.

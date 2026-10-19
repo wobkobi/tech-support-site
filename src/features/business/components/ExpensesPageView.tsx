@@ -1,11 +1,7 @@
 "use client";
 // src/features/business/components/ExpensesPageView.tsx
-// Thin client wrapper pairing ExpensesView with SubscriptionsView on the expenses page.
-// They are sibling components with separate self-loaded state, so a migrate in the
-// expenses view can't directly refresh the subscriptions list - this wrapper bumps a
-// `reloadKey` the subscriptions view watches, so a migrated subscription appears at once.
-// It also passes the server-read asset details (write-off threshold, linked expense ids)
-// through to the ledger's "Turn into an asset" action.
+// Pairs ExpensesView with SubscriptionsView; a migrate bumps the `reloadKey` the
+// subscriptions view watches, so the new subscription appears at once.
 
 import { ExpensesView } from "@/features/business/components/ExpensesView";
 import { SubscriptionsView } from "@/features/business/components/SubscriptionsView";

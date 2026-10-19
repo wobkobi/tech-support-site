@@ -1,9 +1,6 @@
 // src/app/admin/(shell)/reviews/page.tsx
-// Admin reviews page, built around asking for Google reviews. Loads reviews plus every
-// channel a review link goes out on - booking sends, manual contact sends, and the
-// automatic invoice review ask (soft-capped at 1000 each). The main column holds the
-// automatic asks, "Who you can ask" (every contact with their ask status), the send form
-// and the link history; reviews left on the site sit in the side column for approval.
+// Admin reviews page, built around asking for Google reviews: asks, "Who you can ask", the
+// send form and link history, with on-site reviews in the side column for approval.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
@@ -60,9 +57,7 @@ export default async function AdminReviewsPage({
   await requireAdminAuth();
   const { contactId } = await searchParams;
 
-  // Soft caps to prevent unbounded scans as data grows. The page joins these
-  // sets to build a unified link history; if the most recent 1000 ever stops
-  // being enough, swap in cursor pagination per section.
+  // Soft caps against unbounded scans; swap in cursor pagination if 1000 stops being enough.
   const now = new Date();
   const { reviews: reviewSettings } = await getSettings();
   const [reviews, sentBookings, sentInvoices, allContacts, optOuts, candidates, recentAsks] =
@@ -96,17 +91,14 @@ export default async function AdminReviewsPage({
           reviewToken: true,
         },
       }),
-      // Invoices whose email carried the review line. That send is stamped on the
-      // invoice and never on the contact, so a contact-only read cannot see it
-      // and these reviewers would drop into "Legacy".
+      // Invoices whose email carried the review line (stamped on the invoice only).
       prisma.invoice.findMany({
         where: { reviewLinkSentAt: { not: null } },
         orderBy: { reviewLinkSentAt: "desc" },
         take: 1000,
         select: { id: true, contactId: true, clientEmail: true, reviewLinkSentAt: true },
       }),
-      // One read of the contact book serves the picker, the suppression sets and
-      // the link history, so all three describe the same 1000 rows.
+      // One contact read serves the picker, suppression sets and link history.
       prisma.contact.findMany({
         where: { deletedAt: null },
         orderBy: { createdAt: "desc" },
@@ -125,8 +117,7 @@ export default async function AdminReviewsPage({
           reviewLinkSubmittedAt: true,
         },
       }),
-      // Anyone who has asked not to get review asks, or unsubscribed from email, shows
-      // in "Who you can ask" without a send button.
+      // Opted-out or unsubscribed contacts show without a send button.
       Promise.all([
         prisma.reviewAskOptOut.findMany({ select: { email: true, contactId: true } }),
         prisma.emailOptOut.findMany({ select: { email: true, contactId: true } }),
@@ -145,10 +136,8 @@ export default async function AdminReviewsPage({
   const contactMap = new Map(allContacts.map((c) => [c.id, c.name]));
   const contactById = new Map(allContacts.map((c) => [c.id, c]));
 
-  // Every token and address that still reaches a live contact, tokens inherited
-  // from a merged-away row included: a review stores whichever token was live
-  // when the customer clicked it, and a merge must not orphan the older one.
-  // Primaries are indexed first so one person's alt never shadows another's own.
+  // Every token and address reaching a live contact, merged-away tokens included.
+  // Primaries go first so one person's alt never shadows another's own.
   const contactByToken = new Map<string, ContactRow>();
   const contactByEmail = new Map<string, ContactRow>();
   for (const c of allContacts) {
@@ -167,8 +156,7 @@ export default async function AdminReviewsPage({
   }
 
   /**
-   * Resolves the live contact behind a review: the stored link first, then the
-   * magic-link token it was submitted under.
+   * Resolves the live contact behind a review: stored link first, then its magic-link token.
    * @param review - Review row to resolve.
    * @param review.contactId - Contact the review is already linked to, if any.
    * @param review.customerRef - Magic-link token the review was submitted under, if any.
@@ -209,15 +197,11 @@ export default async function AdminReviewsPage({
     reviewCount: reviewCountByContact.get(c.id) ?? 0,
   }));
 
-  // setDate over Date.now() arithmetic: react-hooks/purity rejects Date.now() in
-  // render and does not except server components, which only render once per
-  // request anyway. setDate also rolls months correctly on its own.
+  // setDate rather than Date.now(): react-hooks/purity rejects Date.now() in render.
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  // Everyone who has been asked, one entry per person rather than per send: a
-  // manual send and an invoice review line to the same contact are one ask at
-  // the later of the two dates, which is the one a cooldown cares about.
+  // Everyone asked, one entry per person at their latest ask date.
   const askByContact = new Map<string, { contact: ContactRow; sentAt: Date; source: LinkSource }>();
   for (const c of allContacts) {
     if (!c.reviewLinkSentAt) continue;
@@ -229,8 +213,7 @@ export default async function AdminReviewsPage({
   }
   for (const inv of sentInvoices) {
     if (!inv.reviewLinkSentAt) continue;
-    // Same resolution order the invoice email itself used: the stored link
-    // first, then the billing address matched against the contact book.
+    // Same order as the invoice email: stored link, then billing address.
     const c =
       (inv.contactId ? contactById.get(inv.contactId) : undefined) ??
       contactByEmail.get(inv.clientEmail.toLowerCase());
@@ -241,8 +224,7 @@ export default async function AdminReviewsPage({
   }
 
   /**
-   * True when a review is already on file for this contact - left through their
-   * own link, or linked to them by the operator.
+   * True when a review is already on file for this contact.
    * @param c - Contact to test.
    * @returns Whether they have already reviewed.
    */
@@ -250,9 +232,7 @@ export default async function AdminReviewsPage({
     return !!c.reviewLinkSubmittedAt || (reviewCountByContact.get(c.id) ?? 0) > 0;
   }
 
-  // "Who you can ask": every contact with their latest ask and whether they've reviewed.
-  // Reviews and booking sends match on email and phone as well as by id, so a duplicate
-  // pair that hasn't been merged yet still counts as the one person it is.
+  // "Who you can ask": matches on email and phone as well as id, so unmerged duplicates count once.
   const reviewedEmails = new Set<string>();
   const reviewedPhones = new Set<string>();
   const bookingAskByEmail = new Map<string, Date>();
@@ -331,9 +311,7 @@ export default async function AdminReviewsPage({
 
   const knownBookingIds = new Set(sentBookings.map((b) => b.id));
 
-  // Reviews that no tracked send accounts for. One that still resolves to a live
-  // contact is shown against that contact - the ask predates send-tracking, or the
-  // operator linked it by hand - so only a review with nobody behind it is legacy.
+  // Reviews no tracked send accounts for; only one with no live contact behind it is legacy.
   const looseReviews = reviews.filter((r) => {
     if (r.bookingId && knownBookingIds.has(r.bookingId)) return false;
     const c = contactForReview(r);
@@ -401,18 +379,14 @@ export default async function AdminReviewsPage({
     }),
   ].sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
 
-  // Computed over the same soft-capped sets above, so past 1000 rows these describe the
-  // most recent 1000, not all time. Linked and Legacy rows carry a review date rather
-  // than a send date and are reviewed by definition, so counting them as sends would
-  // flatter the conversion rate.
+  // Over the soft-capped sets. Linked and Legacy rows aren't sends, so they'd flatter conversion.
   const trackedSends = linkHistory.filter((e) => e.source !== "Legacy" && e.source !== "Linked");
   const sentLast30 = trackedSends.filter((e) => new Date(e.sentAt) >= thirtyDaysAgo);
   const reviewedLast30 = sentLast30.filter((e) => e.reviewed).length;
   const conversion =
     sentLast30.length > 0 ? Math.round((reviewedLast30 / sentLast30.length) * 100) : null;
 
-  // Arriving from a contact's "Send review link" - load that person to prefill
-  // the send form and open it. Soft-deleted or missing ids fall through to null.
+  // From a contact's "Send review link": prefill the send form (missing ids give null).
   // Review asks: what's coming and what happened lately
   const upcomingAsks: UpcomingReviewAsk[] = candidates.map((c) => {
     const d = c.decision;
@@ -429,8 +403,7 @@ export default async function AdminReviewsPage({
             : null,
     };
   });
-  // Invoices the rollout backfill marked as sent before automatic asks began are
-  // bookkeeping, not asks the job decided on, so they stay out of "Last 14 days".
+  // Rollout-backfilled invoices stay out of "Last 14 days".
   const recentAskRows: RecentReviewAsk[] = recentAsks
     .filter((r) => r.note !== "before_auto")
     .map((r) => ({

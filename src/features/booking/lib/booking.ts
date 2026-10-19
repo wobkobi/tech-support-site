@@ -13,28 +13,23 @@ import {
 } from "@/shared/lib/timezone-utils";
 
 /**
- * Splits a notes blob into the free text someone actually typed and the trailing
- * metadata block, so the parser and the admin edit form can never disagree on
- * where one ends and the other begins.
+ * Splits a notes blob into the typed free text and the trailing metadata block.
  * @param raw - Raw notes string from the DB.
  * @returns The free text and the metadata block, both trimmed.
  */
 function splitNotesBlob(raw: string | null): { userNotes: string; meta: string } {
   const trimmed = (raw ?? "").trim();
   if (!trimmed) return { userNotes: "", meta: "" };
-  // A metadata-only blob (operator-entered, customer typed nothing) opens straight onto
-  // "[...]", so there is no "\n\n[" separator. Without the startsWith check the whole
-  // internal block falls through as `userNotes` and is shown back to the customer.
+  // A metadata-only blob opens straight onto "[...]" with no "\n\n[" separator; without
+  // the startsWith check it would leak through as `userNotes`.
   const idx = trimmed.startsWith("[") ? 0 : trimmed.indexOf("\n\n[");
   if (idx === -1) return { userNotes: trimmed, meta: "" };
   return { userNotes: trimmed.slice(0, idx).trim(), meta: trimmed.slice(idx).trim() };
 }
 
 /**
- * Rewrites only the free-text part of a notes blob, leaving the metadata block
- * byte-identical. The admin edit form shows just the human note, so a save must
- * not disturb the "[...]" / "Address:" lines {@link parseBookingNotes} and the
- * contact backfill still read out of the text.
+ * Rewrites only the free text of a notes blob; the metadata block that
+ * {@link parseBookingNotes} reads stays byte-identical.
  * @param raw - Existing notes blob.
  * @param userNotes - Replacement free text.
  * @returns The rebuilt blob.
@@ -47,11 +42,8 @@ export function replaceUserNotes(raw: string | null, userNotes: string): string 
 }
 
 /**
- * Maps the meeting type stated in a notes blob onto the MeetingType column's
- * spelling. Bookings written before the column existed - and every manual one
- * created before the admin route started populating it - carry the value only
- * in the notes text, so the detail page's chip and the backfill both resolve it
- * through here rather than each spelling the mapping out.
+ * Maps the meeting type stated in a notes blob onto the MeetingType column's spelling,
+ * for legacy rows that carry it only in the notes.
  * @param raw - Raw notes string from the DB.
  * @returns The column value, or null when the notes state neither.
  */
@@ -63,8 +55,7 @@ export function meetingTypeFromNotes(raw: string | null): "in_person" | "remote"
 }
 
 /**
- * Google Maps search link for a visit address. On a phone it opens the Maps app,
- * where one more tap starts directions.
+ * Google Maps search link for a visit address.
  * @param address - Visit address as stored.
  * @returns The Maps URL.
  */
@@ -75,9 +66,7 @@ export function mapsSearchUrl(address: string): string {
 /**
  * Parses the structured booking notes blob back into its parts.
  * Format: `{userNotes}\n\n[{timeLabel} - {durationLabel}]\nMeeting type: ...\n[Address: ...]\n[Phone: ...]`
- * The structured columns (`address`, `meetingType`) are preferred now; this
- * stays because legacy rows carry the values only inside the notes text, and
- * `userNotes` - what the customer actually typed - has no column of its own.
+ * Columns are preferred; this serves legacy rows and `userNotes`, which has no column.
  * @param raw - Raw notes string from the DB.
  * @returns The customer's own text plus the parsed metadata fields.
  */
@@ -105,10 +94,8 @@ export function parseBookingNotes(raw: string | null): {
 }
 
 /**
- * Builds the customer-facing blurb that goes in a calendar entry (both the
- * `.ics` DESCRIPTION and the Google Calendar "details" field), so the two never
- * drift apart. Deliberately omits the time and address - a calendar entry
- * already shows those in its own fields.
+ * Builds the customer-facing calendar blurb for both the `.ics` and Google Calendar.
+ * Omits time and address, which have their own fields.
  * @param input - The pieces to assemble.
  * @param input.company - Business name.
  * @param input.phone - Contact phone.
@@ -146,9 +133,8 @@ export function buildAppointmentDescription(input: {
 }
 
 /**
- * Splits an NZ-style apartment-prefixed address ("12/160 Kepa Road Orakei")
- * into unit + street-and-rest. The unit prefix is 1-4 digits with an optional
- * letter suffix (e.g. "12", "12A") followed by "/". Returns unit="" otherwise.
+ * Splits "12/160 Kepa Road Orakei" into unit and rest. Unit is 1-4 digits plus an optional
+ * letter ("12A"), else "".
  * @param addr - Address string, possibly with a unit prefix.
  * @returns `unit` (may be empty) and `rest` (street + suburb).
  */
@@ -161,11 +147,8 @@ export function splitUnitFromAddress(addr: string): { unit: string; rest: string
 }
 
 /**
- * Combines a unit number and a street-and-rest back into the saved address
- * string ("12/160 Kepa Road Orakei"). Returns just the rest when no unit is
- * present, so non-apartment addresses are unchanged. Inverse of
- * {@link splitUnitFromAddress}; shared so every booking entry point (public form
- * + admin schedule modal) stores addresses identically.
+ * Joins unit and rest into the saved address ("12/160 Kepa Road Orakei"). Inverse of
+ * {@link splitUnitFromAddress}.
  * @param unit - Apartment / unit number, may be empty.
  * @param rest - Street address + suburb.
  * @returns Combined address string suitable for persistence.
@@ -177,10 +160,8 @@ export function combineUnitAndAddress(unit: string, rest: string): string {
 }
 
 /**
- * True when the entered unit duplicates the leading street number (e.g. unit
- * "500" against "500 Pt Chev Road") - warns customers in standalone houses who
- * put their street number in the Apt/Unit box. Same `1-4 digit + optional
- * letter` shape as {@link splitUnitFromAddress} so unit semantics stay consistent.
+ * True when the unit duplicates the leading street number (unit "500" on "500 Pt Chev
+ * Road"). Same unit shape as {@link splitUnitFromAddress}.
  * @param unit - Apartment / unit number as typed.
  * @param rest - Street address + suburb as typed.
  * @returns Whether the unit duplicates the leading street number.
@@ -193,18 +174,12 @@ export function unitMatchesStreetNumber(unit: string, rest: string): boolean {
 }
 
 /**
- * Prisma where-fragment matching bookings whose calendar event is still there.
- * Both email crons spread it in so neither chases a job that was called off in
- * Calendar without the row being cancelled.
- *
- * MUST be this OR shape: on the Mongo connector a bare `calendarEventMissingAt:
- * null` compiles to "exists AND is null" and silently skips every booking
- * written before the field existed, which is all of them. Spread it inside an
- * `AND` when the query already has an OR of its own.
+ * Prisma where-fragment for bookings whose calendar event still exists. MUST be this OR
+ * shape: on Mongo a bare `null` means "exists AND is null" and skips pre-field rows.
+ * Wrap in `AND` when the query has its own OR.
  */
 export const CALENDAR_EVENT_PRESENT_FILTER = {
-  // Plain mutable shape (no `as const`): Prisma's BookingWhereInput requires
-  // a mutable OR array.
+  // No `as const`: Prisma needs a mutable OR array.
   OR: [{ calendarEventMissingAt: null }, { calendarEventMissingAt: { isSet: false } }],
 };
 
@@ -263,16 +238,13 @@ export const TIME_OF_DAY_OPTIONS: ReadonlyArray<TimeOfDayOption> = [
   { value: "6pm", label: "6pm", startHour: 18, endHour: 19 },
 ] as const;
 
-// Slot values are hour labels ("10am" ... "8pm"), generated per day from the
-// operator's schedule, so the type is a plain string rather than a fixed enum.
+// Hour labels ("10am" ... "8pm") generated per day from the schedule.
 export type TimeOfDay = string;
 
 export type StartMinute = number;
 
 /**
- * Resolved config the slot engine runs on: the operator's editable availability
- * settings plus the structural timezone. Built by server callers from
- * `getSettings()` and {@link BOOKING_CONFIG}.timeZone.
+ * Slot-engine config: availability settings plus {@link BOOKING_CONFIG}.timeZone.
  */
 export type AvailabilityConfig = AvailabilitySettings & { timeZone: string };
 
@@ -302,9 +274,8 @@ export function parseHourLabel(label: string): number | null {
 }
 
 /**
- * Offered start hours for one weekday window: hourly from open up to the last
- * hour where the longest job still ends by close, skipping any start hour that
- * sits inside a midday break.
+ * Offered start hours for one weekday window: hourly while the longest job still ends by
+ * close, skipping hours inside a midday break.
  * @param window - The day's open/close/break window.
  * @param window.open - Earliest start hour (0-23).
  * @param window.close - Latest end hour (1-24).
@@ -350,8 +321,7 @@ export interface BookableDay {
   timeWindows: TimeWindow[];
   hasAnySlots: boolean; // True if any time slots are available
   /**
-   * Labour surcharge for the day (public holiday or weekend), attached on the server
-   * from the live pricing settings; null or absent when none applies.
+   * Labour surcharge for the day (public holiday or weekend); null or absent when none.
    */
   surcharge?: DateSurcharge | null;
 }
@@ -359,9 +329,7 @@ export interface BookableDay {
 export interface BuildAvailableDaysResult {
   days: BookableDay[];
   /**
-   * True when today was filtered out because the same-day cutoff or minimum
-   * notice window has elapsed. Surfaced to the UI so it can explain to the
-   * user why the list starts at tomorrow instead of silently shifting.
+   * True when today was dropped by the same-day cutoff or notice window, so the UI can say why.
    */
   sameDayClosed: boolean;
 }
@@ -399,9 +367,7 @@ function isSlotFree(
     }
   }
 
-  // Check calendar events.
-  // Travel blocks (synthetic entries) already represent padding, so no additional
-  // buffer is applied to them - only real calendar events get the bufferMin gap.
+  // Travel blocks are already padding; only real events get the bufferMin gap.
   for (const event of calendarEvents) {
     const isTravelBlock =
       event.id.startsWith("travel-before:") || event.id.startsWith("travel-after:");
@@ -418,11 +384,9 @@ function isSlotFree(
 }
 
 /**
- * Whether a slot falls under an active morning guard. A guard blocks slots on
- * its protectedDays before earliestHour once "now" has passed the most recent
- * triggerDay@triggerHour on or before the slot's date - so a weekend-morning
- * rule (Fri 18:00 > Sat/Sun before noon) only bites the imminent weekend, while
- * the same slots stay bookable if reserved earlier in the week.
+ * Whether an active morning guard blocks a slot: protectedDays before earliestHour, once
+ * "now" passes the latest triggerDay@triggerHour on or before the slot (Fri 18:00 >
+ * Sat/Sun before noon bites only the imminent weekend).
  * @param year - Slot's NZ calendar year.
  * @param month - Slot's NZ calendar month (1-12).
  * @param day - Slot's NZ calendar day.
@@ -445,8 +409,7 @@ function isSlotMorningGuarded(
     if (!g.enabled || slotHour >= g.earliestHour || !g.protectedDays.includes(dayOfWeek)) {
       continue;
     }
-    // The most recent triggerDay on or before the slot's date (UTC noon avoids
-    // any DST date-boundary shift when reading the trigger date's components).
+    // Latest triggerDay on or before the slot (UTC noon dodges DST boundaries).
     const daysBack = (dayOfWeek - g.triggerDay + 7) % 7;
     const trigger = new Date(Date.UTC(year, month - 1, day - daysBack, 12, 0, 0));
     const ty = trigger.getUTCFullYear();
@@ -476,22 +439,17 @@ export function buildAvailableDays(
   const days: BookableDay[] = [];
   let sameDayClosed = false;
 
-  // Use toLocaleString only for extracting NZ wall-clock hour/minute -
-  // getHours()/getMinutes() on the resulting Date give the correct NZ values
-  // regardless of whether the server is in UTC or NZ local time.
+  // toLocaleString gives NZ wall-clock hour/minute whatever the server's zone.
   const nzTime = new Date(now.toLocaleString("en-US", { timeZone: config.timeZone }));
   const currentHourNZ = nzTime.getHours();
   const currentMinuteNZ = nzTime.getMinutes();
 
-  // Derive today's NZ calendar date independently of server timezone.
-  // en-CA locale reliably produces YYYY-MM-DD on all Node.js platforms.
+  // Today's NZ date; en-CA reliably yields YYYY-MM-DD.
   const todayNZStr = now.toLocaleDateString("en-CA", { timeZone: config.timeZone });
   const [startY, startM, startD] = dateKeyParts(todayNZStr);
 
   for (let i = 0; days.length < config.maxAdvanceDays && i <= config.maxAdvanceDays; i++) {
-    // UTC noon for day i - using noon avoids any DST-induced date-boundary shift
-    // when extracting UTC date components. JavaScript's Date constructor handles
-    // month/day overflow automatically (e.g. day 32 wraps to the next month).
+    // UTC noon dodges DST boundaries; Date handles day overflow (32 > next month).
     const dayUTC = new Date(Date.UTC(startY, startM - 1, startD + i, 12, 0, 0));
     const dateKey = dayUTC.toISOString().split("T")[0]!;
     const dayOfWeek = weekdayOf(dayUTC);
@@ -549,8 +507,7 @@ export function buildAvailableDays(
       const breakEndMins = window.break ? window.break.end * 60 : null;
 
       /**
-       * True when a job [startMins, endMins) finishes by close and doesn't
-       * straddle the midday break (must sit entirely before or after it).
+       * True when a job [startMins, endMins) ends by close and doesn't straddle the break.
        * @param startMins - Job start, minutes from NZ midnight.
        * @param endMins - Job end, minutes from NZ midnight.
        * @returns Whether the job fits the day's window.
@@ -606,8 +563,7 @@ export function buildAvailableDays(
             }
           }
 
-          // Morning guards apply on every day, not just today (a weekend rule
-          // triggered on Friday evening blocks the coming Sat/Sun mornings).
+          // Morning guards apply on every day, not just today.
           if (
             isSlotMorningGuarded(year, month, day, dayOfWeek, slotHour, now, config.morningGuards)
           ) {
@@ -638,8 +594,7 @@ export function buildAvailableDays(
 
     const hasAnySlots = timeWindows.some((w) => w.availableShort || w.availableLong);
 
-    // Hide today when nothing is bookable (e.g. past same-day cutoff).
-    // Future fully-booked days stay in the array so they appear greyed out.
+    // Hide today when nothing is bookable; full future days stay, greyed out.
     if (isToday && !hasAnySlots) {
       sameDayClosed = true;
       continue;
@@ -687,8 +642,7 @@ export function validateBookingRequest(
     return { valid: false, error: "Invalid date format" };
   }
 
-  // Use UTC noon for both selected and today so comparisons are timezone-agnostic.
-  // "Today" is derived from the NZ wall-clock date (same logic as buildAvailableDays).
+  // UTC noon for both dates; "today" is the NZ wall-clock date.
   const selectedDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 
   const todayNZStr = now.toLocaleDateString("en-CA", { timeZone: config.timeZone });
@@ -717,17 +671,14 @@ export function validateBookingRequest(
     return { valid: false, error: "Invalid time slot" };
   }
 
-  // startMinute arrives raw from the JSON body; only accept an offset the
-  // operator actually offers so off-grid, fractional, or negative minutes
-  // can't slip past the window check below or land on a phantom slot key.
+  // startMinute is raw JSON; accept only an offered offset.
   if (!Number.isInteger(startMinute) || !config.subSlotMinutes.includes(startMinute)) {
     return { valid: false, error: "Invalid time slot" };
   }
 
   const durationMinutes = duration === "short" ? config.durations.short : config.durations.long;
 
-  // The job must start no earlier than open, finish by close, and not straddle
-  // a midday break.
+  // Within open/close and not straddling a midday break.
   const startMins = startHour * 60 + startMinute;
   const endMins = startMins + durationMinutes;
   const inBreak = window.break
@@ -744,8 +695,7 @@ export function validateBookingRequest(
     return { valid: false, error: "This time slot is in the past" };
   }
 
-  // Server-side enforce the client's min-notice window so direct API calls
-  // can't bypass it.
+  // Enforce min notice server-side too.
   const minNoticeMs = config.minHoursNotice * 60 * 60 * 1000;
   if (slotStart.getTime() - now.getTime() < minNoticeMs) {
     return {
@@ -754,8 +704,7 @@ export function validateBookingRequest(
     };
   }
 
-  // Authoritative morning-guard check (mirrors the day-grid filter) so a direct
-  // API call can't book an early slot the guard has closed for that day.
+  // Authoritative morning-guard check, mirroring the day grid.
   if (
     isSlotMorningGuarded(
       year,
@@ -777,9 +726,7 @@ export function validateBookingRequest(
     return { valid: false, error: "This time slot is no longer available" };
   }
 
-  // Enforce the daily caps server-side too: the day grid applies them when rendering, but
-  // a stale page or a direct API caller could book past the limit. Mirrors the cap logic
-  // in buildAvailableDays; on an edit the booking is already out of existingBookings.
+  // Enforce daily caps server-side (stale pages, direct calls), mirroring buildAvailableDays.
   const dayBookings = existingBookings.filter(
     (b) => b.startAt.toLocaleDateString("en-CA", { timeZone: config.timeZone }) === dateKey,
   );
@@ -796,8 +743,7 @@ export function validateBookingRequest(
 }
 
 /**
- * Shape of the booking-form fields validated at the API edge. Each field is
- * optional because the payload comes from JSON.parse of a request body.
+ * Booking-form fields validated at the API edge; all optional since they come from JSON.
  */
 export interface BookingPayloadFields {
   name?: string;
@@ -813,9 +759,7 @@ export interface BookingPayloadFields {
 }
 
 /**
- * Per-field max-length caps shared between the client form and the server
- * validator so both ends agree. Anything longer is rejected at the API edge
- * before hitting the database.
+ * Per-field max lengths shared by the client form and the server validator.
  */
 export const BOOKING_FIELD_LIMITS = {
   name: 100,
@@ -829,25 +773,18 @@ export const BOOKING_FIELD_LIMITS = {
 } as const;
 
 /**
- * Minimal email regex - rejects "a@", "@b", "a@b" (no TLD), whitespace-only
- * input. The domain is matched as one-or-more dot-separated dot-free segments
- * so dots only appear at explicit boundaries - this eliminates the backtrack
- * ambiguity that triggers the polynomial-ReDoS analyser.
- *
- * Module-internal only - all email validation goes through {@link validateEmail} below.
+ * Minimal email regex rejecting "a@", "@b" and "a@b". Domain segments are dot-free so
+ * there's no ReDoS backtracking. Use {@link validateEmail}.
  */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 
 /**
- * Discriminator returned by {@link validateEmail}. "empty" means the input is blank
- * (callers decide whether that's allowed based on whether the field is required).
+ * Result of {@link validateEmail}; callers decide whether "empty" is allowed.
  */
 export type EmailValidationResult = "empty" | "invalid" | "too-long" | "ok";
 
 /**
- * Single canonical email validator used by the shared EmailInput component and
- * by every submit handler / server route that accepts an email. Returns a
- * discriminator so callers can pick their own wording.
+ * The canonical email validator; returns a discriminator so callers pick their wording.
  * @param raw - Raw email input.
  * @returns Validation result.
  */
@@ -869,11 +806,8 @@ export type DescriptionCheckResult = "empty" | "too-short" | "no-words" | "ok";
 const DESCRIPTION_MIN_LETTERS = 4;
 
 /**
- * Whether a "what do you need help with" box describes a problem. Beyond the
- * length rule it needs a few letters, so digits and symbols alone fail, and it
- * must not be one short chunk typed over and over: with spaces removed,
- * `^(.{1,4})\1+$` matches "123123123123", "asdasdasd" and "aaaaaaaaaa", none of
- * which a real description ever is.
+ * Whether a description describes a problem: enough letters, and not a repeated chunk
+ * (`^(.{1,4})\1+$` without spaces catches "asdasdasd" and "aaaaaaaaaa").
  * @param raw - Raw description text.
  * @returns The check result.
  */
@@ -896,12 +830,10 @@ export const DESCRIPTION_NO_WORDS_MESSAGE =
   'Please describe the problem in a few words, like "printer won\'t connect to the wifi".';
 
 /**
- * Validates the user-supplied fields on a booking POST/edit payload. Returns
- * the same `{ valid, error }` shape as {@link validateBookingRequest} so call sites
- * can treat both checks uniformly.
+ * Validates a booking payload's user fields, in {@link validateBookingRequest}'s shape.
  * @param payload - Request body fields.
  * @param opts - Validation options.
- * @param opts.requireEmail - Whether the email field must be present (true for new bookings, false for edits where the email is fixed on the existing record).
+ * @param opts.requireEmail - Whether email is required (false for edits, where it is fixed).
  * @returns Validation result.
  */
 export function validateBookingPayloadFields(
@@ -963,9 +895,7 @@ export function validateBookingPayloadFields(
   if (payload.address && payload.address.length > BOOKING_FIELD_LIMITS.address) {
     return { valid: false, error: "Address is too long." };
   }
-  // A reachable phone is needed for in-person so the technician can contact the
-  // customer on arrival (gate codes, running late, etc.). Remote sessions don't
-  // need it because the calendar invite + email are sufficient.
+  // In-person visits need a phone for arrival contact; remote ones don't.
   if (payload.meetingType === "in-person" && !payload.phone?.trim()) {
     return {
       valid: false,

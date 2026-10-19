@@ -1,8 +1,6 @@
 // src/features/reviews/lib/review-ask-opt-out.ts
-// Records and reverses "stop asking me for reviews". Every address a contact uses is
-// opted out together, as with the mailing-list unsubscribe, so a merged contact's second
-// address can't keep getting asked. Separate from the mailing opt-out: someone can keep
-// the newsletter and drop review asks.
+// Records and reverses "stop asking me for reviews" across every address a contact uses.
+// Separate from the mailing opt-out, so someone can keep the newsletter.
 
 import { contactAddresses } from "@/features/reviews/lib/review-ask-rules";
 
@@ -71,9 +69,7 @@ export async function isReviewAskOptedOut(contactId: string): Promise<boolean> {
 }
 
 /**
- * Whether either opt-out blocks review asks to this contact: their own "stop asking me
- * for reviews", or a mailing-list unsubscribe (a review ask is outreach, not a
- * transactional email).
+ * Whether a review-ask opt-out or a mailing-list unsubscribe blocks review asks to this contact.
  * @param contactId - Contact id.
  * @returns Which opt-out applies, or null when asks may go out.
  */
@@ -96,10 +92,8 @@ export async function reviewAskBlockedBy(
 }
 
 /**
- * The writes that point a merged-away contact's opt-out rows (mailing and review asks)
- * at the surviving contact, for the merge's own transaction. Opt-out rows hold a bare
- * contactId, so without this a merge leaves them pointing at a deleted contact and the
- * by-id match stops protecting the person.
+ * Writes that repoint a merged-away contact's opt-out rows (mailing and review) at the
+ * survivor, for the merge transaction; rows hold a bare contactId.
  * @param fromId - Contact id being merged away.
  * @param toId - The surviving contact id.
  * @returns Prisma operations to include in a `$transaction`.

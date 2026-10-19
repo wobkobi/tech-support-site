@@ -1,8 +1,6 @@
 // scripts/eval-ai/assert.ts
-// Pure, network-free expectation maths and tolerance helpers for the eval harness.
-// Expected values come from the SAME canonical billing clamp the routes call
-// (clampBillableMins), so the auditor tracks the routes without mirroring their code.
-// Independent correctness is anchored by the hardcoded constants in the self-test.
+// Network-free expectation maths and tolerances for the eval harness. Expectations use the
+// routes' own clampBillableMins; the self-test's hardcoded constants anchor correctness.
 
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import type { AiDraft } from "@/features/mailing/lib/ai-draft";
@@ -26,9 +24,7 @@ export interface CheckResult {
 }
 
 /**
- * Expected estimatedMins for a single benchmarked task: the shared
- * {@link clampBillableMins} applied to the benchmark, so the expectation uses
- * the exact clamp the estimate-duration route now calls.
+ * Expected estimatedMins for one benchmarked task, via the route's own {@link clampBillableMins}.
  * @param benchmarkMins - Standalone benchmark minutes for the task.
  * @param minBillableMins - Live minimum billable floor.
  * @param incrementMins - Live rounding increment.
@@ -45,8 +41,7 @@ export function expectedEstimateMins(
 }
 
 /**
- * Absolute tolerance for a single-task estimate: one increment or 10% of the
- * expected value, whichever is larger. The model may round scope slightly.
+ * Tolerance for a single-task estimate: the larger of one increment or 10% of expected.
  * @param expected - Expected estimatedMins.
  * @param incrementMins - Live rounding increment.
  * @returns Tolerance in minutes.
@@ -77,10 +72,8 @@ export function spread(values: number[]): number {
 }
 
 /**
- * What a mailing draft got wrong. Hard problems break a rule the prompt states as an
- * INVARIANT (dashes, made-up figures, a greeting or sign-off the template already has,
- * missing paragraphs or button words); soft ones are style the operator fixes in a
- * second (curly quotes, a long subject or button).
+ * What a mailing draft got wrong. Hard problems break a prompt INVARIANT; soft ones are
+ * quick style fixes (curly quotes, a long subject or button).
  * @param draft - The draft the route returned.
  * @param brief - The brief it was written from.
  * @returns The hard and soft problems, empty when it's clean.
@@ -123,11 +116,8 @@ export function draftProblems(draft: AiDraft, brief: string): { hard: string[]; 
 const CONTACT_RE = /\b0\d[\d ]{6,}\d\b|@|\bwww\.|https?:\/\/|\.co\.nz\b/i;
 
 /**
- * What a post maker draft got wrong. Hard problems break a rule the prompt states as an
- * INVARIANT (dashes, picture figures not in the brief, contact details on the picture or
- * in a paid ad, a quote or name not taken from the brief, words for a slot the design
- * doesn't have, button-like words); soft ones are style (a headline over the target
- * length, curly quotes, hashtags).
+ * What a post maker draft got wrong. Hard problems break a prompt INVARIANT; soft ones
+ * are style (long headline, curly quotes, hashtags).
  * @param draft - The draft the route returned.
  * @param brief - The brief it was written from.
  * @param room - What the design had room for.

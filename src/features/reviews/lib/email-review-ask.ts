@@ -1,10 +1,6 @@
 // src/features/reviews/lib/email-review-ask.ts
-// The review ask: the one email every review request uses - the daily job, Send now,
-// and the admin's manual review-link and booking resend. Google is the main button; the
-// site's own form is the fallback for people without a Google account. Every recipient
-// gets the same email whatever their job was like, since Google bans asking only happy
-// customers, and nothing in it is an incentive. Carries a one-click "stop asking me"
-// link, because a review ask is outreach rather than a transactional email.
+// The one review-ask email every review request uses. Google is the main button, the site
+// form the fallback; identical for every recipient (Google bans asking only happy customers).
 
 import { signReviewAskStopToken } from "@/features/mailing/lib/unsubscribe-token";
 import {
@@ -50,14 +46,12 @@ export async function buildReviewAskEmail(
   firstName: string,
   links: ReviewAskLinks,
 ): Promise<ReviewAskEmail> {
-  // Contacts saved with only an email address have it as their name; "Hi there" reads
-  // better than greeting the address.
+  // Contacts saved with only an email have it as their name; greet "there" instead.
   const first = firstName.trim();
   const name = first && !first.includes("@") ? first : "there";
   const google = links.googleUrl.trim();
   const identity = await getIdentity();
-  // Say who's writing up front: someone from a one-off visit months ago may not
-  // place the email from the signature alone.
+  // Say who's writing up front; a one-off customer may not place the email otherwise.
   const sender = `${identity.name.split(" ")[0]} here from ${identity.company} Tech`;
   const mainButton = google
     ? `<a href="${escapeHtml(google)}" style="${BUTTON_STYLE}">Leave a review on Google</a>
@@ -106,12 +100,10 @@ export function reviewFormUrl(reviewToken: string): string {
 }
 
 /**
- * Sends a review ask. Goes through the quiet-hours path, and adds List-Unsubscribe
- * headers pointing at the one-click stop route so mail apps can offer their own
- * unsubscribe button. Never throws.
+ * Sends a review ask via the quiet-hours path, with List-Unsubscribe headers for the
+ * one-click stop route. Never throws.
  * @param recipient - Who it goes to.
- * @param idempotencyKey - Stable key for this ask, so a retried send after an
- *   interrupted run is a no-op on Resend's side instead of a second email.
+ * @param idempotencyKey - Stable key so a retried send is a no-op on Resend's side.
  * @returns "sent", "not_configured" (email env unset - nothing sent), or "failed".
  */
 export async function sendReviewAsk(

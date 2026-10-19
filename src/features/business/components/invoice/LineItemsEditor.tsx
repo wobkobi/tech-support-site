@@ -1,9 +1,7 @@
 "use client";
 // src/features/business/components/invoice/LineItemsEditor.tsx
-// Editable list of invoice line items: description, qty, unit price, with every row's
-// `lineTotal` re-derived through withSplitLineTotals as the operator types, adds or removes a
-// row. Purely controlled - the parent owns the array and validates it (mirroring
-// isValidLineItem) before persisting.
+// Controlled editor for invoice line items, re-deriving each `lineTotal` through
+// withSplitLineTotals on every change. The parent owns and validates the array.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { REMOVE_ROW_CLS } from "@/features/business/components/calculator/calculator-classes";
@@ -60,9 +58,7 @@ export function LineItemsEditor({
         items.map((item, i) => {
           if (i !== idx) return item;
           const merged = { ...item, ...patch };
-          // This editor works in decimal quantities. A hand-typed qty on a row
-          // that carried billed minutes has to rewrite them, or the stale minutes
-          // would keep printing the old h:mm while the total moved.
+          // A hand-typed decimal qty rewrites billed minutes, or the old h:mm would still print.
           const minutes =
             patch.qty !== undefined && merged.minutes != null
               ? Math.round(merged.qty * 60)
@@ -75,8 +71,7 @@ export function LineItemsEditor({
 
   return (
     <div className="space-y-2">
-      {/* Column headers (sm+ only; the phone rows carry their own labels). Keep the
-          columns in step with the row grid below. */}
+      {/* Column headers (sm+); keep in step with the row grid below. */}
       <div className="hidden gap-2 px-1 text-sm font-semibold text-admin-muted sm:grid sm:grid-cols-[1fr_5rem_7rem_6rem_2.75rem]">
         <span>Description</span>
         <span className="text-right">Qty</span>

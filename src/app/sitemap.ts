@@ -8,13 +8,8 @@ import type { MetadataRoute } from "next";
 const siteUrl = getSiteUrl();
 
 /**
- * Generate sitemap entries for all public, indexable routes.
- * Admin, API, and email-preview routes are intentionally excluded, as are the noindex
- * pages (Search Console flags a submitted URL that is marked noindex).
- *
- * URLs only. Google ignores `changefreq` and `priority`, and it trusts `lastmod` only
- * when it is verifiably accurate - a made-up date (build time, start of month) teaches
- * it to ignore lastmod for the whole site, so none is sent until a real one exists.
+ * Sitemap of public, indexable routes (noindex pages excluded). URLs only: a made-up
+ * `lastmod` teaches Google to ignore it site-wide.
  * @returns Sitemap entries.
  */
 export default function sitemap(): MetadataRoute.Sitemap {

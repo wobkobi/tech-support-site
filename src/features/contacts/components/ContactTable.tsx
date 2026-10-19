@@ -1,10 +1,7 @@
 "use client";
 // src/features/contacts/components/ContactTable.tsx
-// Desktop (lg and up) table for one section of the admin contacts list. Each row takes the
-// same props as a ContactCard. Editing swaps the row for the ContactCard editor across the
-// full width; the sync confirm, delete confirm and linked reviews open in an expanding
-// row under it. Merge buttons stay in the actions cell, which is pinned to the right edge
-// so the row actions stay in view when a narrow screen scrolls the table sideways.
+// Desktop (lg+) table for one contacts section; rows take ContactCard props and open
+// editors and panels in an expanding row. The actions cell is pinned right.
 
 import {
   PINNED_CELL_CLS,
@@ -48,10 +45,8 @@ const HEAD_CLS = cn(TH_CLS, "px-3");
 const NARROW_CELL_CLS = cn(TD_CLS, "px-2 align-top");
 
 /**
- * Content of a full-width row (editor or expanding panel). The table can be wider than its
- * scroll box, so the content sticks to the left edge and is sized to the visible width
- * (100cqw of the wrapper, less the cell's 0.75rem padding each side), keeping its buttons
- * on screen.
+ * Full-width row content, stuck left and sized to the visible width (100cqw less the
+ * cell's 0.75rem padding each side) so buttons stay on screen when the table scrolls.
  */
 const FULL_ROW_CONTENT_CLS = "sticky left-3 w-[calc(100cqw-1.5rem)]";
 
@@ -209,8 +204,7 @@ export function ContactTable({
   return (
     // @container: the full-width rows size themselves to this box with cqw units.
     <div className="@container hidden overflow-x-auto rounded-lg border border-admin-border lg:block">
-      {/* Fixed layout, so every section's table lines its columns up with the others.
-          Every column but Address is fixed, so Address takes all the spare width. */}
+      {/* Fixed layout lines sections up; Address takes the spare width. */}
       <table className={cn(TABLE_CLS, "min-w-232 table-fixed")}>
         <colgroup>
           <col className="w-36" />

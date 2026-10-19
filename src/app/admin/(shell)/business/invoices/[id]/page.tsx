@@ -1,9 +1,6 @@
 // src/app/admin/(shell)/business/invoices/[id]/page.tsx
-// Detail page for a single saved invoice. Two-column on lg+: the A4 preview (mirrors the
-// generated PDF) on the left, a context rail (timeline, payment, linked records) on the
-// right. Data loads in two batches so the preview paints from batch 1 while the rail
-// streams via Suspense from batch 2; both are Server-Timing instrumented to catch this
-// page's historically slow loads.
+// Invoice detail page: A4 preview (mirrors the PDF) left, context rail right. The preview
+// paints from batch 1 while the rail streams from batch 2.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { InfoRow } from "@/features/admin/components/ui/InfoRow";
@@ -71,9 +68,7 @@ function RailSkeleton(): React.ReactElement {
 }
 
 /**
- * Streamed context rail: loads the linked booking + contact (batch 2, keyed off
- * the invoice) and renders the timeline, payment, and linked-records cards. The
- * linked income entries come pre-loaded from batch 1.
+ * Streamed context rail: loads the linked booking and contact (batch 2) and renders the cards.
  * @param props - Component props.
  * @param props.invoice - The invoice (batch 1).
  * @param props.incomeEntries - Income entries linked to the invoice (batch 1).
@@ -250,9 +245,7 @@ async function InvoiceRail({
           )}
           <InfoRow label="Calendar">
             {invoice.calendarEventId ? (
-              // A merged job billed several events at once; calendarEventIds is
-              // empty on every single-event invoice, so the count only shows
-              // where it means something.
+              // calendarEventIds is only filled for merged jobs.
               invoice.calendarEventIds.length > 1 ? (
                 `Linked (${invoice.calendarEventIds.length} events billed together)`
               ) : (
@@ -302,9 +295,7 @@ export default async function InvoiceViewPage({
   await requireAdminAuth();
   const timer = new ServerTimer();
 
-  // Batch 1: the A4 preview + header need the invoice and identity; the void
-  // warning + payment card need the linked income. All keyed on the route id, so
-  // they run in parallel with no waterfall.
+  // Batch 1: invoice, identity and linked income, all keyed on the route id, in parallel.
   const [invoice, identity, incomeEntries] = await timer.measure("batch1", () =>
     Promise.all([
       prisma.invoice.findUnique({ where: { id } }),
@@ -324,9 +315,7 @@ export default async function InvoiceViewPage({
     total: incomeEntries.reduce((sum, e) => sum + e.amount, 0),
   };
 
-  // Money entered straight into the Cashbook sheet never reaches the invoice, so
-  // a SENT row can already be paid. Looked up only for SENT invoices, which is
-  // the one state where the answer changes what the operator should do.
+  // Cashbook sheet income never reaches the invoice, so a SENT row may already be paid.
   const recordedPayment =
     invoice.status === "SENT" && !invoice.isQuote ? await findRecordedPayment(invoice) : null;
 
@@ -445,9 +434,7 @@ export default async function InvoiceViewPage({
             </div>
           </div>
 
-          {/* Bill to (left) + dates (right) - mirrors PDF layout. A phone can't fit
-              both beside a long email, so the dates drop below instead of wrapping
-              a word per line. */}
+          {/* Bill to and dates, mirroring the PDF; dates drop below on phones. */}
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
             <div className="min-w-0">
               <p className="mb-1 text-xs font-bold tracking-wider text-slate-400 uppercase">

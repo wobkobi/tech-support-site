@@ -1,9 +1,7 @@
 // src/app/api/business/job-context/route.ts
 // GET /api/business/job-context?date=YYYY-MM-DD[&time=HH:MM][&code=CODE][&email=][&bookingId=]
-// - admin-only. Given when a job was actually done, returns the date surcharge that applied
-// (an NZ public holiday or a weekend, with the live labour uplift) and which promo applies,
-// so the calculator prices a past job by what applied then, not today. A booked job keeps
-// the promo it locked in.
+// - admin-only. The date surcharge and promo that applied when a job was done, so a past
+// job prices by what applied then. A booked job keeps its locked-in promo.
 
 import { dateSurcharge, type DateSurcharge } from "@/features/business/lib/pricing-policy";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
@@ -26,22 +24,14 @@ interface JobContextResponse {
   holidayName: string | null;
   /** Labour surcharge for the date (holiday first, else weekend), or null when neither applies. */
   surcharge: DateSurcharge | null;
-  /**
-   * Promo that applies to the job, or null. A code that resolves is returned
-   * in place of the booking's locked-in or automatic promo; one that does not
-   * falls back to them, so the caller compares `promo.code` to know whether
-   * the code took.
-   */
+  /** Promo for the job, or null. Compare `promo.code` to see whether a sent code took. */
   promo: ActivePromo | null;
 }
 
 /**
  * Resolves the holiday + promo context for a job date.
- * @param request - Incoming request with a `date` query param (YYYY-MM-DD), an
- * optional `time` (HH:MM, the job's NZ start) so a time-of-day promo judges the
- * real start, an optional `code` for a job taken over the phone, an optional
- * `email` so per-customer limits bind an operator-priced job too, and an
- * optional `bookingId` when billing a booked job.
+ * @param request - Query: `date` (YYYY-MM-DD), optional `time` (HH:MM NZ start), `code`,
+ * `email` (for per-customer limits) and `bookingId`.
  * @returns JSON { holidayName, surcharge, promo }.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -55,18 +45,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return errorResponse("date (YYYY-MM-DD) is required", 400);
   }
 
-  // The job's real start when the calculator knows it, else NZ midday, which
-  // lands on the intended NZ day whatever the server timezone or DST offset.
-  // A time-of-day promo needs the real start: judged at noon, an evening-only
-  // promo would never apply to an evening job.
+  // The real start when known (an evening-only promo needs it), else NZ midday, which
+  // lands on the right NZ day whatever the server timezone or DST offset.
   const timeStr = params.get("time");
   const [hour, minute] = timeStr && /^\d{2}:\d{2}$/.test(timeStr) ? timeParts(timeStr) : [12, 0];
   const [year, month, day] = dateKeyParts(dateStr);
   const at = nzWallClockUtc(year, month, day, hour, minute);
 
   const code = normalisePromoCode(params.get("code"));
-  // Per-customer and new-customer limits need someone to judge. Without it an
-  // operator-priced job would quietly ignore a limit the public flow enforces.
+  // Lets per-customer limits bind an operator-priced job too.
   const email = params.get("email");
   const bookingId = parseObjectId(params.get("bookingId"));
 
@@ -78,9 +65,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         })
         .catch(() => null)
     : null;
-  // The promo the customer booked with, carried to the invoice. Re-resolving it
-  // live instead would lose a booked code, and an automatic promo would settle a
-  // second redemption for the same job.
+  // Carry the booked promo through; re-resolving live would lose a booked code.
   const locked = booking?.promoIdAtBooking
     ? await lockedInPromo(booking.promoIdAtBooking, at, booking.promoTermsAtBooking)
     : null;
@@ -88,10 +73,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const [settings, holiday, resolved] = await Promise.all([
     getSettings(),
     lookupPublicHoliday(at).catch(() => null),
-    // Skipped when the locked-in promo stands and no code could displace it.
-    // Otherwise the dates are judged when the booking was made (a walk-up job
-    // is booked the day it is done), and the booking's own redemption is left
-    // out of its limits.
+    // Skipped when the locked-in promo stands. Dates are judged at booking time, and
+    // the booking's own redemption is left out of its limits.
     locked && !code
       ? Promise.resolve(null)
       : resolvePromo({

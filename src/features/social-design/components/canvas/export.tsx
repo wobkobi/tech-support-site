@@ -1,9 +1,7 @@
 "use client";
 // src/features/social-design/components/canvas/export.tsx
-// Draws one size of a design to a picture file at its exact pixel size. Every image,
-// QR code and font the size needs is loaded first, so the hidden full-size stage has
-// all of it on its first render; one stage is mounted at a time and dropped straight
-// after, which keeps memory down on phones. Independent of the editor's zoom.
+// Draws one size to a file at exact pixel size. Preloads every asset so the hidden stage has all
+// of it on first render; one stage at a time, dropped straight after, to spare phone memory.
 
 import { DesignPreview } from "@/features/social-design/components/canvas/DesignPreview";
 import { loadExo } from "@/features/social-design/components/canvas/fonts";
@@ -38,8 +36,7 @@ interface Job extends PictureRequest {
 }
 
 /**
- * Loads every file a size draws: photos, backdrops, logos, icons, QR codes and Exo.
- * Rejects when one can't be loaded, so a picture never goes out with a gap in it.
+ * Loads every file a size draws; rejects on any failure so a picture never has gaps.
  * @param doc - Design.
  * @param format - Size.
  * @param family - Exo's font-family list.

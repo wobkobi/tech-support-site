@@ -1,8 +1,6 @@
 // src/shared/lib/settings/set-settings.ts
-// Server-only writer for a single settings group. Upserts the `settings:<group>` row,
-// records an append-only `SettingAudit` entry for the change, then busts the `settings`
-// cache tag so the change is live immediately. Callers (the admin API route) validate the
-// payload first.
+// Server-only writer for one settings group: upserts the row, appends a SettingAudit entry and
+// busts the cache tag. Callers validate first.
 
 import { prisma } from "@/shared/lib/prisma";
 import { SETTINGS_KEY_PREFIX, SETTINGS_TAG } from "@/shared/lib/settings/get-settings";
@@ -10,8 +8,7 @@ import type { Settings, SettingsGroup } from "@/shared/lib/settings/types";
 import { revalidateTag } from "next/cache";
 
 /**
- * Persists one group's settings, records the change in the audit log, and
- * revalidates the cache tag.
+ * Stores one group's settings, logs an audit entry and revalidates the cache tag.
  * @param group - Which settings group to write.
  * @param value - The validated, full value for that group.
  * @returns Resolves once stored and the tag is busted.

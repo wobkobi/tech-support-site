@@ -1,7 +1,6 @@
 // src/app/api/business/trips/[id]/route.ts
-// Admin single-trip endpoint. PUT replaces the trip's date, km, purpose, destination,
-// contact and notes (the job link is fixed when the trip is logged); DELETE removes it, which puts a linked
-// job back on the suggestions list.
+// Admin single-trip endpoint. PUT replaces editable fields (the job link is fixed);
+// DELETE puts a linked job back on the suggestions list.
 
 import { parseTripInput, toTripRow } from "@/features/business/lib/trips";
 import { TRIP_SELECT } from "@/features/business/lib/trips.server";

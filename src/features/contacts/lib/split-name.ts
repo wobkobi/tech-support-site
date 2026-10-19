@@ -1,12 +1,8 @@
 // src/features/contacts/lib/split-name.ts
 
 /**
- * Splits a full display name into given (first) and family (last) parts. The
- * last whitespace-separated token becomes the family name and everything before
- * it the given name, so "Mary Jane Watson" > given "Mary Jane", family "Watson".
- * A single token has no family name; blank input yields two empty strings.
- * Returns empty strings (never null) so it can feed the Google People API
- * directly; callers that store nullable first/last names coerce "" to null.
+ * Splits a display name on its last token: "Mary Jane Watson" > "Mary Jane" + "Watson".
+ * Returns "" (never null) so it can feed the Google People API directly.
  * @param fullName - Full display name (may be blank).
  * @returns Given and family name parts, each "" when absent.
  */

@@ -38,12 +38,8 @@ export async function optOutContact(
 }
 
 /**
- * Takes addresses off the list after Resend reports a problem with them.
- * - A bounce drops only the dead address, with no contact id, so a contact whose other
- *   address works stays on the list through that one.
- * - A spam report drops the reader entirely: every address of the matching contact,
- *   the same as an unsubscribe, or just the address when no contact uses it.
- * An existing opt-out keeps its original source.
+ * Takes addresses off the list after Resend reports a problem. A bounce drops only the
+ * dead address (no contact id); a spam report opts out the whole matching contact.
  * @param action - What the webhook asked for.
  */
 export async function optOutForDelivery(action: OptOutAction): Promise<void> {
@@ -64,8 +60,7 @@ export async function optOutForDelivery(action: OptOutAction): Promise<void> {
 }
 
 /**
- * Re-subscribes a contact by removing every opt-out tied to them, by id or by
- * any address they use.
+ * Re-subscribes a contact by removing every opt-out tied to their id or any address.
  * @param contactId - Contact id.
  */
 export async function resubscribeContact(contactId: string): Promise<void> {

@@ -1,8 +1,6 @@
 // src/features/business/components/tax/DeductionsBreakdown.tsx
-// Deductions for one FY: each counted line (expenses, depreciation, write-offs, the km
-// claim, home office, disposal losses) and the total, then what was left out as
-// information: Fuel dated while a car was on kilometre rates, rows turned into assets,
-// and km logged on days no km-rate vehicle was on the register. Server-safe.
+// Deductions for one FY: each counted line and the total, then what was left out (Fuel
+// under km rates, rows turned into assets, km with no km-rate vehicle). Server-safe.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { WorkingRow } from "@/features/business/components/tax/WorkingRow";
@@ -14,8 +12,8 @@ import { formatDateSlash } from "@/shared/lib/date-format";
 import type React from "react";
 
 /**
- * What the km rate already pays for. Fuel is the only running cost the estimate leaves
- * out on its own, so the rest rely on not being logged. The accountant notes repeat it.
+ * What the km rate already pays for. Only Fuel is left out automatically; the rest rely on
+ * not being logged.
  */
 export const CAR_RUNNING_COSTS_NOTE =
   "The kilometre rate covers the car's running costs. Don't log its insurance, rego, WOF, repairs or tyres as expenses.";

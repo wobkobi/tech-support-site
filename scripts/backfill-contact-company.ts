@@ -1,13 +1,6 @@
 // scripts/backfill-contact-company.ts
-// Fills Contact.company from each linked Google contact's first organisation. The regular
-// import skips any Google contact whose etag hasn't moved, so contacts that were already in
-// sync never pick the field up on their own. Reads Google Contacts and the live database, so
-// it needs .env.local.
-// Run with: npm run backfill:company:dry      (writes nothing)
-//           npm run backfill:company:apply    (writes)
-//
-// Two scripts rather than one plus a flag, for the PowerShell 5.1 `--` reason given in
-// reconcile-booking-times.ts.
+// Fill Contact.company from each linked Google contact's first organisation (the regular
+// import skips unchanged etags). Run: npm run backfill:company:dry | backfill:company:apply
 
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { prisma } from "@/shared/lib/prisma";

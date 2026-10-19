@@ -1,8 +1,6 @@
 // src/app/api/business/invoices/[id]/convert/route.ts
-// Converts an accepted quote into a real invoice: allocates the next TTP number (quote
-// counter untouched), clears the quote flag, restamps issue/due dates from today, and
-// re-syncs the PDF to Drive under the new number. The row keeps its id, so links and
-// history carry over.
+// Converts a quote into an invoice: next TTP number, dates restamped from today, PDF
+// re-synced. The row keeps its id, so links and history carry over.
 
 import { completeBilledBookings } from "@/features/booking/lib/complete-billed-bookings.server";
 import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";
@@ -28,8 +26,7 @@ import { NextRequest, NextResponse } from "next/server";
  * @param request - Incoming Next.js request.
  * @param params - Route parameters containing the invoice ID.
  * @param params.params - Promise resolving to the dynamic route params object.
- * @returns JSON with the converted invoice, its previous Q- number, and an
- * optional sheet sync warning.
+ * @returns JSON with the converted invoice, its previous Q- number and a sheet warning.
  */
 export async function POST(
   request: NextRequest,
@@ -57,8 +54,7 @@ export async function POST(
 
   const previousNumber = existing.number;
   const identity = await getIdentity();
-  // A tax invoice states GST as it stands at conversion, not as it stood when the quote
-  // was written: a quote saved before GST registration would otherwise convert with none.
+  // GST as it stands at conversion, not when the quote was written.
   const { GST_REGISTERED } = await getPolicy();
   const totals = calcInvoiceTotals(
     existing.lineItems,
@@ -68,8 +64,7 @@ export async function POST(
   const now = new Date();
   const dueDate = new Date(now.getTime() + identity.paymentTermsDays * 24 * 60 * 60 * 1000);
 
-  // Allocate a real invoice number with the same collision-retry loop as
-  // creation; the quote counter is not touched.
+  // Same collision-retry loop as creation.
   let converted: Awaited<ReturnType<typeof prisma.invoice.update>> | null = null;
   let sheetNextCount: number | null = null;
   let sheetSyncWarning = false;
@@ -84,20 +79,17 @@ export async function POST(
           number: alloc.number,
           isQuote: null,
           quoteValidUntil: null,
-          // The customer's payment clock starts at conversion, not at the
-          // original quote date - restamp both dates from today.
+          // The payment clock starts at conversion.
           issueDate: now,
           dueDate,
           gst: totals.gstAmount > 0,
           subtotal: totals.subtotal,
           gstAmount: totals.gstAmount,
           total: totals.total,
-          // Back to DRAFT regardless of whether the quote was emailed: the
-          // operator reviews and sends the real invoice as its own step.
+          // Back to DRAFT: the operator sends the real invoice as its own step.
           status: "DRAFT",
           sentAt: null,
-          // A quote never gets a review ask, but clear any stamp so the real invoice's
-          // ask starts fresh when it's sent.
+          // Clear so the real invoice's review ask starts fresh.
           reviewAskOutcome: null,
           reviewAskNote: null,
           reviewAskDecidedAt: null,
@@ -131,9 +123,7 @@ export async function POST(
     },
     "[invoices/convert]",
   );
-  // Creating the quote left its promo unsettled, since a quote is not a use. Now it is
-  // billed work, so settle it here, the same as creating an invoice does; without this a
-  // quoted job never counted toward the promo's cap.
+  // A quote is not a promo use; now it is billed work, settle it toward the cap.
   if (converted.promoId && (converted.promoDiscount ?? 0) > 0) {
     await settlePromoRedemption({
       promoId: converted.promoId,

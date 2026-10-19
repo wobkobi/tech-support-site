@@ -1,8 +1,6 @@
 // src/app/api/business/invoices/[id]/preview-email/route.ts
-// Admin endpoint that renders the invoice email for review without sending it. POST
-// builds the subject + HTML body, applying optional operator overrides (greetingName,
-// customBody), and reports what the automatic review ask will do (including when the
-// gap or an opt-out will skip it) for the modal's checkbox.
+// Renders the invoice email for review without sending, plus what the automatic
+// review ask will do for the modal's checkbox.
 
 import {
   parseInvoiceEmailOverrides,
@@ -19,14 +17,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/business/invoices/[id]/preview-email
- * Returns the rendered subject + HTML body for the invoice email so the
- * operator can review it in a modal before sending. No email is sent.
+ * Rendered subject + HTML for the invoice email. Sends nothing.
  * @param request - Next.js request (admin-auth gated).
  * @param ctx - Route ctx with the invoice id.
  * @param ctx.params - Resolved Next.js dynamic route params.
  * @returns JSON with `{ ok, subject, html, to, reviewAsk, defaultGreeting }` or an error.
- *   `reviewAsk` is null when the invoice gets no ask: a quote, one whose ask is already
- *   decided, or automatic asks switched off.
+ *   `reviewAsk` is null for a quote, an already-decided ask, or asks switched off.
  */
 export async function POST(
   request: NextRequest,
@@ -42,8 +38,7 @@ export async function POST(
     return errorResponse("Invoice not found", 404);
   }
 
-  // Optional operator overrides: greetingName targets a person inside a
-  // company invoice, customBody replaces the intro paragraph.
+  // greetingName targets a person at a company; customBody replaces the intro.
   const { greetingName, customBody } = await parseInvoiceEmailOverrides(request);
 
   const payload = await toInvoiceEmailPayload(invoice);

@@ -1,10 +1,6 @@
 // src/app/api/business/invoices/[id]/void/route.ts
-// Admin endpoint that voids an invoice. POST flips status to VOIDED and stamps voidedAt
-// (idempotent for already-voided invoices, preserving the original timestamp),
-// releases the promo redemption the invoice settled, regenerates the PDF with the VOID watermark, optionally emails the client a void
-// notice, counts linked income entries for the operator warning, and re-syncs the stamped
-// PDF to Drive. Email and Drive sync are best-effort; the status change is authoritative
-// and never rolls back.
+// Voids an invoice (idempotent), releases its promo redemption and re-renders the
+// VOID-stamped PDF. Email and Drive sync are best-effort; the status change never rolls back.
 
 import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
 import {
@@ -21,9 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/business/invoices/[id]/void
- * Flips status to VOIDED, stamps voidedAt, regenerates the PDF with the VOID
- * watermark. Optional client email + Drive sync are best-effort; the status
- * change is authoritative and never rolls back on those failing.
+ * Void the invoice and optionally notify the client.
  * Body: { sendNotification: boolean, greetingName?, customBody? }
  * @param request - Next.js request (admin-auth gated).
  * @param ctx - Route ctx with the invoice id.
@@ -38,19 +32,15 @@ export async function POST(
     return errorResponse("Unauthorized", 401);
   }
 
-  // Load the invoice
   const { id } = await ctx.params;
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) {
     return errorResponse("Invoice not found", 404);
   }
 
-  // Parse optional overrides
   const { greetingName, customBody, sendNotification } = await parseInvoiceEmailOverrides(request);
 
-  // Idempotent for already-voided invoices: skip the status flip and voidedAt stamp,
-  // preserving the original timestamp, and just re-send the notification and re-sync
-  // Drive - for a first send that hit a Resend error, or a deliberate follow-up.
+  // Already voided: keep the original voidedAt and just re-send / re-sync.
   const alreadyVoided = invoice.status === "VOIDED";
   const voidedAt = alreadyVoided ? invoice.voidedAt : new Date();
   const updated = alreadyVoided
@@ -59,19 +49,13 @@ export async function POST(
         where: { id },
         data: { status: "VOIDED", voidedAt: voidedAt ?? new Date() },
       });
-  // A voided invoice gave no discount, so its promo use stops counting toward the
-  // promo's cap, the customer's limit and the stats. Runs on a repeat void too, which
-  // tidies invoices voided before this release existed.
+  // A voided invoice gave no discount, so its promo use stops counting.
   await releaseInvoiceRedemptions(id);
 
-  // Count linked income entries so the UI can warn the operator about manual
-  // reversal. PAID > VOIDED is the common case; DRAFT/SENT > VOIDED would
-  // typically have zero linked entries.
+  // Lets the UI warn that linked income needs manual reversal.
   const incomeEntryCount = await prisma.incomeEntry.count({ where: { invoiceId: id } });
 
-  // Generate the VOIDED-stamped PDF from the updated row. If this fails, the
-  // void still succeeds - the email and Drive sync are skipped. Surface
-  // notified:false to the caller so the operator can be advised to email manually.
+  // A PDF failure still voids; email and Drive are skipped and notified stays false.
   let pdfBytes: Buffer | null = null;
   try {
     pdfBytes = await generateInvoicePdf(serialiseInvoice(updated));
@@ -79,7 +63,6 @@ export async function POST(
     console.error(`[invoice-void] PDF generation failed for ${updated.number}:`, err);
   }
 
-  // Send the void notification
   let notified = false;
   if (sendNotification && pdfBytes && updated.clientEmail) {
     notified = await sendVoidNotification({

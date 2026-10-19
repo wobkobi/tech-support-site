@@ -1,8 +1,7 @@
 "use client";
 // src/features/business/hooks/use-job-context.ts
-// Resolves the calculator's job date (plus start time, promo code and customer) to the
-// date surcharge (public holiday or weekend) and the promo that applied then, via
-// /api/business/job-context.
+// Resolves the calculator's job date to its surcharge and the promo that applied then,
+// via /api/business/job-context.
 
 import type { DateSurcharge } from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
@@ -33,9 +32,8 @@ interface JobContext {
 }
 
 /**
- * Resolves the job date > { surcharge, promo } whenever the date changes, so a
- * past job is priced by what applied THEN, not today. Best effort: failures
- * leave the prior context in place.
+ * Resolves the job date > { surcharge, promo } so a past job is priced by what applied
+ * then. Failures leave the prior context in place.
  * @param args - Lookup inputs.
  * @param args.jobDate - Job date (YYYY-MM-DD).
  * @param args.jobStartTime - Earliest start (HH:MM), or "".
@@ -53,27 +51,21 @@ export function useJobContext({
   prefillBookingId,
   initialPromo,
 }: UseJobContextArgs): JobContext {
-  // activePromo holds the promo for the selected job date (refined by the
-  // lookup below).
+  // Promo for the selected job date, refined by the lookup below.
   const [activePromo, setActivePromo] = useState<ActivePromo | null>(initialPromo);
   // Labour surcharge for the selected date, with its reason for the UI.
   const [surcharge, setSurcharge] = useState<DateSurcharge | null>(null);
 
-  // Resolve the job date > { surcharge, promo } whenever the date changes. Best
-  // effort: failures leave the prior context in place. Overwrites activePromo
-  // with the date-resolved promo so every downstream consumer is date-aware.
+  // Overwrites activePromo with the date-resolved promo; failures keep the prior one.
   useEffect(() => {
     if (!jobDate) return;
     let cancelled = false;
     const query = new URLSearchParams({ date: jobDate });
     if (jobStartTime) query.set("time", jobStartTime);
     if (promoCode) query.set("code", promoCode);
-    // Sent so per-customer and new-customer limits bind an operator-priced job
-    // the same way they bind a public booking. Debounced below, since this is
-    // typed a character at a time.
+    // Sent so per-customer limits bind here as on a public booking; debounced below.
     if (clientEmail.trim()) query.set("email", clientEmail.trim());
-    // A booked job keeps the promo it was booked with, and its own redemption
-    // does not count against the customer's limits.
+    // A booked job keeps its promo, and its own redemption doesn't count against limits.
     if (prefillBookingId) query.set("bookingId", prefillBookingId);
     /** Fetches the surcharge + promo context for the current date, code and customer. */
     const run = (): void => {
@@ -90,8 +82,7 @@ export function useJobContext({
           /* leave the prior context in place */
         });
     };
-    // 400ms: long enough that typing an email is one request, short enough that
-    // the promo chip does not visibly lag a date change.
+    // 400ms: typing an email is one request without the promo chip visibly lagging.
     const timer = setTimeout(run, 400);
     return () => {
       cancelled = true;

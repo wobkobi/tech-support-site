@@ -1,9 +1,6 @@
 // src/shared/lib/resize-image.ts
-// Browser-side image shrink before upload, shared by the mailing and social editors.
-// Phone photos are 3-8 MB; an email shows them at 560px wide at most and Instagram
-// takes 320-1440px, so 1200px (crisp on high-DPI screens) as JPEG brings them to a few
-// hundred KB, keeping the upload under the function body limit. Post maker photos pass
-// a bigger edge: a full-bleed photo on a 1080x1920 story needs more than 1200px.
+// Browser-side JPEG shrink before upload. 1200px keeps phone photos to a few hundred KB, under the
+// function body limit; post maker photos pass a bigger edge for full-bleed stories.
 
 const MAX_EDGE = 1200;
 const JPEG_QUALITY = 0.85;
@@ -16,13 +13,11 @@ export interface ShrunkImage {
 }
 
 /**
- * Scales an image so its longest edge is at most `maxEdge` and re-encodes it as JPEG.
- * Smaller images are re-encoded without scaling, which also strips camera metadata
- * like GPS location.
+ * Scales an image to `maxEdge` and re-encodes as JPEG; smaller ones are re-encoded too, stripping
+ * metadata like GPS.
  * @param file - Image the operator picked.
  * @param maxEdge - Longest edge in pixels; 1200 unless a caller needs more.
- * @param shade - Opacity (0 to 1) of a brand navy wash laid over the picture, so white
- *   words on top stay readable; 0 leaves it as it is.
+ * @param shade - Opacity (0 to 1) of a navy wash so white words stay readable; 0 for none.
  * @returns A JPEG file ready to upload, with its width and height in pixels.
  */
 export async function shrinkImage(file: File, maxEdge = MAX_EDGE, shade = 0): Promise<ShrunkImage> {

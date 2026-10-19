@@ -1,15 +1,7 @@
 "use client";
 // src/app/admin/(shell)/business/invoices/[id]/InvoiceActions.tsx
-// Action buttons + modals for the invoice detail page: save PDF, open Drive PDF, record
-// payment (via PaymentDialog), send-to-client, void, re-issue a voided invoice (rebuilt in
-// the calculator, so the promo is priced again), and delete-draft. Below lg, an
-// invoice still awaiting payment pins Mark as paid and Send to the screen bottom. The
-// send flow opens a preview modal with an editable email body/greeting plus the automatic
-// review ask checkbox; the void flow previews the notification and warns
-// when linked income entries would be left behind. Housed beside the page so it ships in
-// the PageHeader actions slot. Built on the shared admin primitives (Modal /
-// ConfirmDialog / AdminButton / Toast). The send and void flows live in
-// SendInvoiceModal.tsx and VoidInvoiceModal.tsx.
+// Action buttons and modals for the invoice detail page (PDF, payment, send, void, re-issue,
+// delete). Below lg, unpaid invoices pin Mark as paid and Send to the screen bottom.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
@@ -161,8 +153,7 @@ export function InvoiceActions({
   const showPhoneBar = !isPaid && !isVoided;
 
   /**
-   * Downloads the real customer-facing PDF (same renderer as Drive + email
-   * attachment), bypassing window.print() so the file is the branded PDF.
+   * Downloads the real branded PDF (same renderer as Drive and email).
    */
   async function downloadPdf(): Promise<void> {
     try {
@@ -186,8 +177,7 @@ export function InvoiceActions({
   }
 
   /**
-   * Sends an overdue reminder (same variant + stamping as the cron) and
-   * refreshes so the timeline picks up the new stamp.
+   * Sends an overdue reminder (same as the cron) and refreshes.
    */
   async function sendReminder(): Promise<void> {
     setSendingReminder(true);
@@ -238,9 +228,7 @@ export function InvoiceActions({
   }
 
   /**
-   * Promotes the quote to a real invoice: the server allocates the next TTP
-   * number, clears the quote flag, and restamps issue/due dates from today.
-   * The page refreshes in place - same row, new number.
+   * Promotes the quote to an invoice: next TTP number, dates restamped from today.
    */
   async function convertToInvoice(): Promise<void> {
     setConverting(true);
@@ -266,8 +254,7 @@ export function InvoiceActions({
   }
 
   /**
-   * Saves a notes-only edit (allowed on SENT/PAID, not VOIDED) via the sparse
-   * PATCH branch, then refreshes so the preview + rail reflect the new note.
+   * Saves a notes-only edit (SENT/PAID only) via the sparse PATCH, then refreshes.
    */
   async function saveNotes(): Promise<void> {
     setNotesSaving(true);
@@ -356,9 +343,7 @@ export function InvoiceActions({
             Record payment details
           </AdminButton>
         )}
-        {/* The phone bar. On lg, or with no bar, `contents` drops the wrapper's box
-            and the buttons join the row. The page reserves room under it (see
-            globals.css). */}
+        {/* The phone bar; on lg `contents` drops the wrapper so the buttons join the row. */}
         <div
           data-phone-bar={showPhoneBar ? "fixed" : undefined}
           className={
@@ -438,8 +423,7 @@ export function InvoiceActions({
         onCancel={() => setConfirmReminderOpen(false)}
       />
 
-      {/* Edit-notes modal (SENT/PAID - content is audit-locked but notes stay
-          editable for IRD annotations via the sparse PATCH). */}
+      {/* Edit-notes modal: SENT/PAID content is locked but notes stay editable. */}
       <Modal
         open={notesOpen}
         onClose={() => !notesSaving && setNotesOpen(false)}

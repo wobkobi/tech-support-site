@@ -1,8 +1,6 @@
 // src/app/api/admin/settings/[group]/route.ts
-// Admin read/write for one settings group. GET returns the resolved group (defaults + DB
-// override); PUT validates the payload, runs cross-setting guardrails on the full
-// proposed settings, then persists. Guardrail BLOCKs always reject; WARNs reject unless
-// the client confirms.
+// Admin read/write for one settings group. PUT validates and runs guardrails: BLOCKs reject,
+// WARNs reject unless confirmed.
 
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -38,7 +36,6 @@ export async function GET(
 
 /**
  * PUT /api/admin/settings/[group] - validates + saves one group.
- *
  * Body: `{ value: Settings[group], confirmWarnings?: boolean }`.
  * Responses: 400 field errors, 409 guardrail warnings (resend with
  * `confirmWarnings`), 422 guardrail blocks, 200 on success.
@@ -73,8 +70,7 @@ export async function PUT(
     return NextResponse.json({ ok: false, error: "Invalid", fieldErrors }, { status: 400 });
   }
 
-  // 2. Cross-setting coherence on the full proposed settings. Assign via a
-  // widening cast - a computed-key object literal trips the union-key rule.
+  // 2. Cross-setting guardrails; a widening cast avoids the union-key rule.
   const proposed: Settings = { ...(await getSettings()) };
   (proposed as Record<SettingsGroup, unknown>)[group] = value;
   const issues = checkGuardrails(proposed);

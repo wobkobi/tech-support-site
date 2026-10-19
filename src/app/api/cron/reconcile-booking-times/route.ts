@@ -1,23 +1,15 @@
 // src/app/api/cron/reconcile-booking-times/route.ts
-// Cron that pulls booking times back from Google Calendar and
-// flags rows whose event has been deleted. Called externally via cron-job.org
-// every 30 minutes. See docs/CRON.md.
-//
-// Runs ahead of the reminder cron on purpose: it decides when to email from
-// Booking.startAt and skips a booking flagged here, so a time corrected in Calendar or a
-// job called off there has to land in the row first or the reminder goes out on stale
-// state. It also clears a reminder stamp that cannot belong to a booking's current times,
-// so a row that has been moved is reminded about the times it actually holds rather than
-// skipped on the strength of the ones it used to.
+// Cron (every 30 min, see docs/CRON.md) that pulls booking times back from Google Calendar
+// and flags rows whose event is gone. Runs ahead of the reminder cron so reminders see
+// current times, and clears reminder stamps that don't match a moved booking.
 
 import { reconcileBookingTimes } from "@/features/calendar/lib/reconcile-booking-times";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorised } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
-// Short lookback: the query has no upper bound, so every future booking is covered
-// anyway, and a week back catches times corrected after the job. The 60-day
-// default belongs to the manual sweep, which isn't paying an event lookup twice an hour.
+// The query has no upper bound, so a week back covers post-job corrections; the
+// 60-day default is for the manual sweep.
 const CRON_SINCE_DAYS = 7;
 
 /**
@@ -33,8 +25,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const result = await reconcileBookingTimes({ apply: true, sinceDays: CRON_SINCE_DAYS });
 
-    // Both corrections are worth a log line: a drifted time silently reschedules
-    // when a reminder fires, and a missing event silently stops one.
+    // Log corrections: each silently changes when (or whether) a reminder fires.
     for (const drift of result.drifted) {
       console.log(
         `[cron/reconcile-booking-times] ${drift.bookingId} moved to ${drift.to.startAt.toISOString()}${

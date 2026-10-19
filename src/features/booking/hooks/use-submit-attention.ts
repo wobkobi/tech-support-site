@@ -1,7 +1,6 @@
 "use client";
 // src/features/booking/hooks/use-submit-attention.ts
-// Moves focus to whatever stopped a booking submit: the error summary, or one of
-// the "did you mean?" prompts that sit up by their fields.
+// Moves focus to whatever stopped a booking submit.
 
 import { focusAndReveal } from "@/shared/lib/focus-and-reveal";
 import { useEffect, useRef, useState, type RefObject } from "react";
@@ -23,18 +22,15 @@ interface SubmitAttention {
 }
 
 /**
- * Tracks submit attempts and focuses what blocked them. On a long mobile form
- * the alerts sit well above the submit button, so without this a failed submit
- * looks like nothing happened.
+ * Tracks submit attempts and focuses what blocked them, since on mobile the alerts sit
+ * far above the button.
  * @returns Attempt state, the focus request and the refs to attach.
  */
 export function useSubmitAttention(): SubmitAttention {
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const emailPromptRef = useRef<HTMLDivElement>(null);
   const addressPromptRef = useRef<HTMLDivElement>(null);
-  // `seq` bumps on every attempt so a second click with the same problem still
-  // moves focus. Driven by submits only: the name and notes checks that run on
-  // blur must not yank the page away from the field being typed in.
+  // `seq` bumps per attempt so a repeat click still moves focus. Submits only, never blur.
   const [attention, setAttention] = useState<{ target: AttentionTarget; seq: number } | null>(null);
 
   useEffect(() => {

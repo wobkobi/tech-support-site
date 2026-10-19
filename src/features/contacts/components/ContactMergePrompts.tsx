@@ -1,8 +1,7 @@
 "use client";
 // src/features/contacts/components/ContactMergePrompts.tsx
-// The two prompts of a contact merge in the admin list: the amber banner shown while the
-// operator picks the contact to keep, and the confirm dialog once they have. The list owns
-// the merge state and passes it in.
+// Contact merge prompts: the banner while picking the contact to keep, then the confirm
+// dialog. The list owns the merge state.
 
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import type { ContactRow } from "@/features/contacts/components/ContactCard";

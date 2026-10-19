@@ -1,8 +1,6 @@
 // src/features/business/lib/sheets-import.ts
-// Sheet > site reconciliation for the Cashbook (income) and Expenses tabs. The sheet is
-// the source of truth: rows join to DB entries on the hidden column-Z Sync ID, differing
-// fields update the DB, unmatched rows are (re)created, manually-typed rows get a Sync ID
-// backfilled. Also self-heals entries whose sheet append failed, under a Setting lock.
+// Sheet > site reconciliation for the Cashbook and Expenses tabs; the sheet wins, joined on the
+// column-Z Sync ID. Also self-heals entries whose sheet append failed, under a Setting lock.
 import { calcGstFromInclusive } from "@/features/business/lib/business";
 import { listSpreadsheetsInFolder } from "@/features/business/lib/google-drive";
 import { withRetry } from "@/features/business/lib/google-retry";
@@ -30,12 +28,6 @@ const SYNC_ID_COLUMN_INDEX = 25;
 
 /** Site entries younger than this with no sheet row are self-heal appended. */
 const SELF_HEAL_MAX_AGE_MS = 24 * 60 * 60_000;
-
-/**
- * Parses a raw date string in DD/MM/YYYY, YYYY-MM-DD, or JS Date format.
- * @param raw - Raw cell value from the sheet.
- * @returns Parsed Date, or null if not a valid date.
- */
 
 /**
  * Strips currency symbols and commas, returning a float or null.
@@ -99,10 +91,8 @@ export interface ImportResult {
 }
 
 /**
- * In-memory view of the DB ledgers, shared across every sheet in one run so
- * per-row findFirst queries are unnecessary and cross-sheet duplicate Sync IDs
- * are visible. Dedup maps hold only rows with no sheetRowKey yet (the legacy
- * pre-Sync-ID guard); entries are consumed as they get linked.
+ * In-memory DB ledgers shared across every sheet in a run, so cross-sheet duplicate Sync IDs
+ * show. Dedup maps hold only unlinked rows and are consumed as rows link.
  */
 interface SyncState {
   incomeByKey: Map<string, IncomeEntry>;
@@ -117,11 +107,8 @@ interface SyncState {
 const WORKBOOK_MTIMES_KEY = "sheets:workbook-mtimes";
 
 /**
- * Reads the per-workbook modifiedTime marks from the last clean import.
- *
- * A missing or unparseable row means "import everything", which is the safe
- * direction: a wasted full scan costs time, a wrongly-skipped workbook loses
- * ledger rows.
+ * Reads the per-workbook modifiedTime marks from the last clean import. A missing or bad row
+ * means import everything, the safe direction.
  * @returns Map of Drive file id to the modifiedTime seen when it was imported.
  */
 async function readWorkbookMtimes(): Promise<Record<string, string>> {
@@ -186,8 +173,7 @@ interface ExpenseRowData {
 }
 
 /**
- * True when any sheet-owned income field differs between the DB row and the
- * parsed sheet row.
+ * True when any sheet-owned income field differs between the DB and sheet rows.
  * @param db - Current DB entry.
  * @param data - Values parsed from the sheet row.
  * @returns Whether a DB update is needed.
@@ -204,8 +190,7 @@ function incomeDiffers(db: IncomeEntry, data: IncomeRowData): boolean {
 }
 
 /**
- * True when any sheet-owned expense field differs between the DB row and the
- * parsed sheet row.
+ * True when any sheet-owned expense field differs between the DB and sheet rows.
  * @param db - Current DB entry.
  * @param data - Values parsed from the sheet row.
  * @returns Whether a DB update is needed.
@@ -225,9 +210,7 @@ function expenseDiffers(db: ExpenseEntry, data: ExpenseRowData): boolean {
 }
 
 /**
- * Whether two money amounts differ by at least a cent. Both are rounded to
- * cents first so float representation drift and the GST percent integer
- * round-trip don't flag a spurious diff that rewrites the DB every hour.
+ * Whether two amounts differ by at least a cent, so float drift doesn't rewrite the DB hourly.
  * @param a - First amount.
  * @param b - Second amount.
  * @returns True when they round to different cents.
@@ -237,11 +220,8 @@ function amountDiffers(a: number, b: number): boolean {
 }
 
 /**
- * Reconciles the Cashbook and Expenses tabs of a single spreadsheet against
- * the DB, with the sheet winning conflicts. Matching is by column-Z Sync ID;
- * rows without one fall back to the legacy (date+amount+description) guard and
- * get a Sync ID backfilled in one batched write per tab. Row-level errors are
- * captured and do not abort the run.
+ * Reconciles one spreadsheet's tabs against the DB (sheet wins). Rows without a Sync ID match
+ * on date+amount+description and get one backfilled; row errors don't abort the run.
  * @param spreadsheetId - The Google Sheet ID to read.
  * @param dryRun - When true, counts what would change without writing anywhere.
  * @param state - Shared in-memory DB view for this run.
@@ -307,10 +287,7 @@ async function importFromSheet(
 
     try {
       if (syncId) {
-        // A duplicate Sync ID within one run is a copy-pasted sheet row. Identical data
-        // means a machine copy (retried append, unedited paste) - skip it rather than
-        // double-count. Different data is a real second transaction that carried the
-        // hidden id along, so mint a fresh one and import it.
+        // Duplicate Sync ID = a copied row: skip it if identical, else import with a fresh id.
         if (state.seenSyncIds.has(syncId)) {
           const first = state.incomeByKey.get(syncId);
           if (!first || !incomeDiffers(first, data)) {
@@ -344,10 +321,8 @@ async function importFromSheet(
             incomeSkipped++;
           }
         } else {
-          // The snapshot is taken at run start, so an entry created mid-run (an invoice
-          // /pay, say) is invisible here. A deterministic Sync ID equals the entry's Mongo
-          // id, so look it up live before creating a DUPLICATE. Gated on the ObjectId
-          // shape - a legacy UUID would throw on findUnique.
+          // An entry created mid-run misses the snapshot; its Sync ID is its Mongo id, so
+          // look it up live (ObjectId shape only, a UUID throws) before creating a duplicate.
           const idLink = parseObjectId(syncId)
             ? await prisma.incomeEntry.findUnique({ where: { id: syncId } })
             : null;
@@ -431,8 +406,7 @@ async function importFromSheet(
       continue;
     }
 
-    // Derived columns I/J are never trusted from the sheet; recompute the GST
-    // split from the inclusive amount and the sheet's rate.
+    // Never trust derived columns I/J; recompute the GST split from amount and rate.
     const gstAmount = calcGstFromInclusive(amountIncl, gstRate);
     const amountExcl = roundCents(amountIncl - gstAmount);
     const data: ExpenseRowData = {
@@ -485,8 +459,7 @@ async function importFromSheet(
             expensesSkipped++;
           }
         } else {
-          // Live id-fallback link before creating a duplicate - see the income
-          // loop above for the full rationale.
+          // Live id-fallback link before creating a duplicate, as in the income loop.
           const idLink = parseObjectId(syncId)
             ? await prisma.expenseEntry.findUnique({ where: { id: syncId } })
             : null;
@@ -545,9 +518,7 @@ async function importFromSheet(
     }
   }
 
-  // Flush Sync ID backfills in one batched write per tab. Safe against row
-  // shift: the loops above never insert or delete rows, so the indices from
-  // the initial batchGet are still valid.
+  // One batched backfill per tab; no rows were inserted or deleted, so indices still hold.
   if (!dryRun) {
     try {
       await backfillSyncIds(spreadsheetId, "Cashbook", cashBackfills);
@@ -569,11 +540,8 @@ async function importFromSheet(
 }
 
 /**
- * Appends site entries that never made it to a sheet (append failed at create
- * time). Only entries younger than {@link SELF_HEAL_MAX_AGE_MS} are appended -
- * older unlinked rows predate the Sync ID rollout or reflect sheet-side
- * deletions, and are surfaced as warnings instead of being pushed back into
- * the ledger the operator may have deliberately cleaned.
+ * Appends site entries whose sheet append failed, if younger than {@link SELF_HEAL_MAX_AGE_MS}.
+ * Older unlinked rows may be deliberate sheet-side deletions, so they only warn.
  * @param warnings - Run-level warning sink.
  * @param errors - Run-level error sink.
  * @returns Number of entries healed.
@@ -582,9 +550,8 @@ async function healUnsyncedEntries(warnings: string[], errors: string[]): Promis
   let healed = 0;
   const cutoff = new Date(Date.now() - SELF_HEAL_MAX_AGE_MS);
 
-  // `sheetRowKey: null` alone finds nothing: recordIncome/recordExpense omit the field on
-  // create, so Mongo stores no key and Prisma compiles a bare null to "exists AND is
-  // null". The OR catches the unset shape - which is every entry this self-heal rescues.
+  // Prisma reads a bare null as "exists AND is null", but new entries omit the field
+  // entirely, so the OR also catches the unset shape.
   const unsyncedFilter = {
     OR: [{ sheetRowKey: null }, { sheetRowKey: { isSet: false } }],
   };
@@ -604,9 +571,7 @@ async function healUnsyncedEntries(warnings: string[], errors: string[]): Promis
         warnings.push(`Income ${entry.id}: no sheet resolves for ${entry.date.toISOString()}`);
         continue;
       }
-      // Deterministic Sync ID = the entry id, matching recordIncome. Without it
-      // the append mints a random id, skips the append-if-absent dedup, and a
-      // heal that follows a successful append writes the row a second time.
+      // Sync ID = the entry id (as recordIncome), so append-if-absent can't double-write.
       const sheetRowKey = await appendRowWithSyncId(
         spreadsheetId,
         "Cashbook",
@@ -631,8 +596,7 @@ async function healUnsyncedEntries(warnings: string[], errors: string[]): Promis
         warnings.push(`Expense ${entry.id}: no sheet resolves for ${entry.date.toISOString()}`);
         continue;
       }
-      // Deterministic Sync ID = the entry id, matching recordExpense (see the
-      // Cashbook branch above for why omitting it double-writes the row).
+      // Sync ID = the entry id (as recordExpense), so append-if-absent can't double-write.
       const sheetRowKey = await appendRowWithSyncId(
         spreadsheetId,
         "Expenses",
@@ -650,12 +614,8 @@ async function healUnsyncedEntries(warnings: string[], errors: string[]): Promis
 }
 
 /**
- * Reconciles every spreadsheet with the DB (sheet wins). When
- * `GOOGLE_BUSINESS_SHEETS_FOLDER_ID` is set, scans that Drive folder and
- * processes every spreadsheet inside (one per financial year); otherwise falls
- * back to `GOOGLE_SHEET_ID` only. Real runs take a lock so the hourly cron and
- * a manual import cannot overlap, then self-heal entries whose sheet append
- * failed, and log-only verify that every linked DB entry still has a sheet row.
+ * Reconciles every spreadsheet in the Drive folder (else `GOOGLE_SHEET_ID`) with the DB. Real
+ * runs take a lock, self-heal failed appends, and warn on linked entries missing a sheet row.
  * @param dryRun - When true, counts what would change without writing anywhere.
  * @returns Aggregate counts plus a per-spreadsheet breakdown.
  */
@@ -674,9 +634,7 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
   }
 
   try {
-    // One DB read up front instead of a findFirst per sheet row. The dedup
-    // maps deliberately hold only unlinked rows: a synced entry matching a
-    // manual row by value is a genuine second transaction, not a duplicate.
+    // Dedup maps hold only unlinked rows: a synced entry matching by value is a real second one.
     const [incomeRows, expenseRows] = await Promise.all([
       prisma.incomeEntry.findMany(),
       prisma.expenseEntry.findMany(),
@@ -707,25 +665,20 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
     const warnings: string[] = [];
     let result: ImportResult;
     let allSheetsClean = true;
-    // A scan that skipped workbooks cannot tell a deleted row from an archived
-    // one, which is what the orphan report below turns on.
+    // A scan that skipped workbooks can't tell a deleted row from an archived one.
     let excludedCount = 0;
     let skippedCount = 0;
 
     if (folderId) {
       const allSheets = await listSpreadsheetsInFolder(folderId);
-      // Retired workbooks prefixed "old" stay in the folder for reference but
-      // must not sync - they duplicate the replacement workbook's transactions,
-      // so importing both double-counts the ledger.
+      // Skip retired "old" workbooks; they duplicate their replacement's transactions.
       const sheetsToImport = allSheets.filter((s) => {
         const fileName = s.name.split(" / ").pop() ?? s.name;
         return !fileName.toLowerCase().startsWith("old");
       });
       excludedCount = allSheets.length - sheetsToImport.length;
 
-      // A workbook Drive says is untouched since the last clean import holds
-      // exactly the rows already in the DB, so re-reading every row of every
-      // financial year each hour is wasted work that grows as years accumulate.
+      // Skip workbooks Drive says are untouched since the last clean import.
       const lastSeen = dryRun ? {} : await readWorkbookMtimes();
       const seenNow: Record<string, string> = {};
 
@@ -771,15 +724,8 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
     if (!dryRun) {
       result.healed = await healUnsyncedEntries(warnings, result.errors);
 
-      // Log-only: a linked entry whose Sync ID appeared in no scanned sheet had its row
-      // deleted sheet-side. Sheet-wins says delete it too, but auto-deleting off a partial
-      // scan is destructive, so leave the call to the operator.
-      //
-      // "Partial" includes the workbooks this run chose not to read: retired "old"
-      // workbooks are always excluded, and unchanged ones are skipped. Rows that live in
-      // those are absent from seenSyncIds through no fault of the sheet, so listing them
-      // as deleted invites the operator to delete archived ledger rows. Only a run that
-      // read every workbook in the folder can tell the difference.
+      // Log-only: linked entries missing from every scanned sheet were likely deleted there.
+      // Listed only after a full scan, since excluded or skipped workbooks hide archived rows.
       const scanWasComplete = allSheetsClean && excludedCount === 0 && skippedCount === 0;
       const unmatched = [...state.incomeByKey.keys(), ...state.expenseByKey.keys()].filter(
         (key) => !state.seenSyncIds.has(key),

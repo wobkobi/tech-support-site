@@ -27,12 +27,8 @@ interface Props {
  */
 export function PromoBannerClient({ promo }: Props): React.ReactElement {
   const pathname = usePathname();
-  // Print artwork carries no chrome at all - a banner here would be printed
-  // onto the poster or business card.
-  // Admin pages have their own chrome - no public promo banner over the top.
-  // Business too, not just admin: promos are a home-rate offer, and the phrase
-  // is unscoped ("15% off"), so on the business page it would promise a
-  // discount the invoice does not honour.
+  // No banner on print artwork (it would print), admin (own chrome) or business: promos are a
+  // home-rate offer, so "15% off" there would promise a discount the invoice won't honour.
   const hidden =
     isPrintRoute(pathname) ||
     pathname === "/admin" ||

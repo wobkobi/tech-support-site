@@ -1,8 +1,6 @@
 // src/features/business/lib/tax/depreciation.ts
-// Per-asset depreciation schedule across financial years (IR260): diminishing value or
-// straight line, part-year months, the low-value write-off (threshold from settings),
-// Investment Boost, private-use split, and disposal recovery or loss. Pure; computed
-// fresh every time except where a filed year's snapshot pins the opening value.
+// Per-asset IR260 depreciation schedule: DV/SL, part-year months, low-value write-off,
+// Investment Boost, private-use split and disposal. Filed snapshots pin opening values.
 
 import { APRIL } from "@/features/business/lib/financial-year";
 import { ledgerDay, pctFraction, roundCents } from "@/features/business/lib/tax/helpers";
@@ -20,8 +18,7 @@ const INVESTMENT_BOOST_RATE = 0.2;
 export const INVESTMENT_BOOST_FROM = new Date(Date.UTC(2025, 4, 22));
 
 /**
- * One asset's filed closing values out of the all-assets map, so the tax maths and the
- * Assets page pin the same opening values.
+ * One asset's filed closing values out of the all-assets map.
  * @param assetId - Asset id.
  * @param filed - Closing ATV by FY key then asset id, from filed TaxYear snapshots.
  * @returns Closing ATV by FY key for this asset (empty when no filed year lists it).
@@ -39,8 +36,7 @@ export function filedAtvFor(
 }
 
 /**
- * The NZ day an asset starts depreciating: its in-service date, but never before
- * the business started (nothing is claimable before then).
+ * The NZ day an asset starts depreciating: its in-service date, but never before business start.
  * @param asset - The asset.
  * @param businessStart - Business start date.
  * @returns Ledger-scale start day.
@@ -52,12 +48,8 @@ export function assetStartDay(asset: AssetInput, businessStart: Date): Date {
 }
 
 /**
- * Combined cost of each asset's low-value group, keyed by asset id. Purchased
- * items in the same asset class bought from the same supplier on the same NZ day
- * are tested against the threshold together (s EE 38), whatever method or rate
- * each was set to. Introduced assets, km-rate vehicles and purchases with no
- * supplier recorded each stand alone: introduced items are never written off
- * here (accountant check), and a blank supplier can't evidence a shared purchase.
+ * Combined cost of each asset's low-value group (s EE 38): purchases of one class from one
+ * supplier on one NZ day. Introduced assets, km-rate vehicles and blank suppliers stand alone.
  * @param assets - Every asset on the register.
  * @returns Map of asset id to its group's total cost.
  */
@@ -84,8 +76,7 @@ export function lowValueGroupTotals(assets: readonly AssetInput[]): Map<string, 
 }
 
 /**
- * Whole months in use during the asset's first FY, counting the start month as
- * a full month (IR260: a part month counts as a month). Clamped to 0-12.
+ * Months in use in the asset's first FY; a part month counts as whole (IR260). Clamped to 0-12.
  * @param start - Ledger-scale start day.
  * @param fy - The FY the asset starts in.
  * @returns Months from the start month to March inclusive.
@@ -97,24 +88,11 @@ function firstYearMonths(start: Date, fy: TaxFy): number {
 }
 
 /**
- * Depreciation schedule for one asset: a row per FY in `fys` from the FY the
- * asset starts in, stopping after the FY it is disposed in. `fys` must include
- * every FY from that first one, as each opening value is the previous closing
- * value (or the filed snapshot's, when the year before was filed).
- *
- * Rules per FY:
- * - Disposal FY: no depreciation. Sale above ATV is recovery income, capped at
- *   the depreciation claimed to date (cost less opening ATV); sale below ATV is a
- *   deductible loss. Both are business share. Km-rate vehicles have neither.
- * - First FY of a purchased asset whose group total is within the low-value
- *   threshold: written off in full.
- * - First FY with Investment Boost (purchased, first used from 22 May 2025): 20%
- *   of cost, plus normal depreciation on the remaining 80%. SL then works from
- *   that 80% for life.
- * - Otherwise DV: opening ATV x rate; SL: base x rate, capped at the opening ATV.
- *   The first FY scales by months in use / 12.
- * - The ATV drops by the full depreciation; only the business share is deductible.
- * - Km-rate vehicles: never depreciated; the ATV stays at cost.
+ * Depreciation schedule for one asset, a row per FY from its start through its disposal FY.
+ * `fys` must include every FY from the first, as each opening ATV is the prior closing (or filed) value.
+ * - Disposal FY: no depreciation; sale above ATV is recovery (capped at cost less opening ATV), below is a loss.
+ * - First FY: low-value group written off in full; Investment Boost takes 20% of cost and SL runs on the 80% after.
+ * - Else DV: opening ATV x rate; SL: base x rate capped at ATV; first FY x months/12. Km-rate vehicles never depreciate.
  * @param asset - The asset.
  * @param fys - Financial years to schedule, any order.
  * @param ctx - Business start, threshold, group total and filed closing values.
@@ -151,8 +129,8 @@ export function assetSchedule(
     }
     const filed = prevKey === null ? undefined : ctx.filedClosingAtv.get(prevKey);
     const opening = roundCents(filed ?? carriedAtv);
-    // Rows stop after the disposal FY, so the first FY ending after the disposal
-    // date is that FY. A disposal dated before the start day lands in the first row.
+    // Rows stop after disposal, so the first FY ending after it is the disposal FY
+    // (a disposal before the start day lands in the first row).
     const disposedHere = disposedDay !== null && disposedDay.getTime() < fy.end.getTime();
     const months = disposedHere ? 0 : first ? firstYearMonths(start, fy) : 12;
 

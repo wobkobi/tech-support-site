@@ -1,13 +1,7 @@
 "use client";
 // src/features/booking/components/admin/BookingInfoCard.tsx
-// Editable customer/booking info card on the booking detail page:
-// name, email, phone, address, notes and visit notes. View mode shows the values, with a Maps link
-// on the address; Edit mode swaps in the shared email and phone inputs and the Places
-// autocomplete, checks them before saving via the sparse admin bookings PATCH, then
-// refreshes the page. Only the free text is shown and edited - the notes blob's
-// metadata block is machine-written mirror, surfaced on this page as chips - but the
-// address is still written back into its "Address:" line, the convention the PATCH
-// route and contact backfill both read.
+// Editable customer/booking info card on the booking detail page. Only the notes' free
+// text is edited; the address is still mirrored into its "Address:" line.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -106,8 +100,7 @@ export function BookingInfoCard({
     phone: `edit-phone-${id}`,
   };
 
-  // Prefer the column; legacy rows predate it and carry the address only in the
-  // notes text, which parseBookingNotes reads back off the "Address:" line.
+  // Legacy rows carry the address only in the notes' "Address:" line.
   const parsed = parseBookingNotes(notes);
   const initialAddress = address?.trim() || parsed.address;
   const [form, setForm] = useState({
@@ -120,7 +113,7 @@ export function BookingInfoCard({
   });
 
   /**
-   * Updates one field and clears its error, so a fix is acknowledged as it's typed.
+   * Updates one field and clears its error.
    * @param key - Field to update.
    * @param value - New value.
    */
@@ -129,9 +122,7 @@ export function BookingInfoCard({
     setErrors((e) => (key in e ? { ...e, [key]: undefined } : e));
   }
 
-  /**
-   * Resets the form to the current props and leaves edit mode.
-   */
+  /** Resets the form to the current props and leaves edit mode. */
   function cancel(): void {
     setForm({
       name,
@@ -146,10 +137,8 @@ export function BookingInfoCard({
   }
 
   /**
-   * Saves the edits once the fields check out. Puts the edited free text back in
-   * front of the untouched metadata block and keeps its "Address:" line in step.
-   * `address` is sent only when it changed, since the route copies it onto the
-   * linked contact; refreshes on success.
+   * Saves valid edits, keeping the metadata block and "Address:" line in step. `address` is
+   * sent only when changed, since the route copies it onto the contact.
    */
   async function save(): Promise<void> {
     const found = checkContactFields(form, { emailRequired: true });
@@ -159,8 +148,7 @@ export function BookingInfoCard({
     const nextAddress = form.address.trim();
     const addressChanged = nextAddress !== initialAddress.trim();
     const rebuilt = replaceUserNotes(notes, form.notes);
-    // A cleared address drops the notes line too, or the card would read it back
-    // as the address.
+    // A cleared address drops the notes line too.
     const mergedNotes = addressChanged
       ? rebuilt.replace(/^(Address:\s*).*$/im, nextAddress ? `$1${nextAddress}` : "")
       : rebuilt;

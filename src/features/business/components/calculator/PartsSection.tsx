@@ -1,8 +1,6 @@
 "use client";
 // src/features/business/components/calculator/PartsSection.tsx
-// Collapsible "Parts / materials" card. Each row is a description + cost; cost pastes
-// carrying "$"/commas route through parseMoney. Collapsed with an empty list is the
-// default - parts are opt-in per job.
+// Collapsible "Parts / materials" card: description + cost rows, opt-in per job.
 
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card } from "@/features/admin/components/ui/Card";
@@ -24,8 +22,7 @@ interface Props {
 }
 
 /**
- * Collapsible "Parts / materials" card on the calculator. Empty list +
- * collapsed state is the default - parts are an opt-in for jobs that need them.
+ * Collapsible "Parts / materials" card, collapsed and empty by default.
  * @param props - Component props.
  * @param props.parts - Current parts array.
  * @param props.onPartsChange - Functional setter that takes the previous parts list and returns the next.
@@ -36,8 +33,7 @@ interface Props {
 export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): React.ReactElement {
   return (
     <Card>
-      {/* Clear sits beside the collapse toggle rather than inside it - a button
-          cannot nest inside another button. */}
+      {/* Clear sits beside the toggle: buttons can't nest. */}
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -82,9 +78,8 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
                 placeholder="Cost"
                 value={part.cost || ""}
                 onPaste={(e) => {
-                  // Only intercept when the clipboard carries a "$", commas, or
-                  // other junk; plain numeric pastes fall through to the native
-                  // number input so decimal entry stays unaffected.
+                  // Intercept only pastes with "$", commas or other junk; plain numbers
+                  // fall through to the native input.
                   const text = e.clipboardData.getData("text");
                   if (!/[^\d.]/.test(text)) return;
                   const value = parseMoney(text);

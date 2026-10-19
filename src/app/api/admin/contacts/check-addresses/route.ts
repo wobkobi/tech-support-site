@@ -1,9 +1,6 @@
 // src/app/api/admin/contacts/check-addresses/route.ts
-// Admin sweep that re-geocodes every stored contact address and
-// flags the ones that don't resolve to a single confident Auckland match. The
-// import path only geocodes addresses that changed, so rows that were already
-// wrong never get re-checked - this is how they surface. On demand rather than
-// on the cron: it costs one Geocoding call per contact.
+// On-demand sweep re-geocoding every contact address and flagging unconfident matches
+// (one Geocoding call per contact).
 
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -12,10 +9,8 @@ import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * POST /api/admin/contacts/check-addresses - Re-checks every contact address
- * and updates the review flags. Only ever flags; never rewrites an address, so
- * the sweep cannot quietly reformat addresses the operator didn't ask it to
- * touch. Requires admin auth.
+ * POST /api/admin/contacts/check-addresses - Re-checks every address and updates the
+ * review flags; never rewrites an address.
  * @param request - Incoming request.
  * @returns JSON `{ ok: true, checked, flagged }`, or an error.
  */
@@ -43,8 +38,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!contact.address) continue;
 
     const resolution = await resolveAddress(contact.address);
-    // A failed lookup says nothing about the address - leave the row alone
-    // rather than flagging it or clearing a flag that still applies.
+    // A failed lookup says nothing about the address; leave the row alone.
     if (resolution.status === "skipped") continue;
     checked++;
 
@@ -52,17 +46,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const candidates = resolution.status === "ambiguous" ? resolution.candidates : [];
     if (unverified) flagged++;
 
-    // Skip the write when the flags already say this, so a rerun doesn't touch
-    // updatedAt on rows that haven't changed.
+    // Skip unchanged rows so updatedAt stays put.
     const sameFlags =
       contact.addressUnverified === unverified &&
       contact.addressCandidates.length === candidates.length &&
       contact.addressCandidates.every((value, i) => value === candidates[i]);
     if (sameFlags) continue;
 
-    // Raising a flag bumps updatedAt, which would mark the row dirty and re-push an
-    // address that never changed, so re-stamp lastSyncedAt to match. Only for rows that
-    // were already clean - re-stamping a dirty one would swallow a genuine pending push.
+    // Re-stamp lastSyncedAt on clean rows so the flag write doesn't mark them dirty.
     const wasClean = contact.lastSyncedAt !== null && contact.updatedAt <= contact.lastSyncedAt;
     const stampedAt = new Date();
 

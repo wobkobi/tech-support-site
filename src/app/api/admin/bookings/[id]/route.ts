@@ -32,9 +32,7 @@ import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Longest span a hand-typed time edit may produce. Not a policy limit - it's a
- * typo guard, since getting the date wrong on one of the two fields yields a
- * booking days long rather than an obviously bad value.
+ * Longest span a hand-typed time edit may produce: a typo guard, not a policy limit.
  */
 const MAX_SPAN_HOURS = 12;
 
@@ -48,16 +46,13 @@ interface PatchPayload {
   address?: string;
   status?: "confirmed" | "cancelled" | "completed";
   /**
-   * "operator" (default) = operator cancel, no customer fee. "on-behalf" =
-   * customer cancelled by phone/email; uses the standard fee rules.
+   * "operator" (default): no fee. "on-behalf": customer cancelled, standard fee rules.
    */
   cancelMode?: "operator" | "on-behalf";
   /** No-show: always charges callout + travel via the draft-invoice flow. */
   markNoShow?: boolean;
   /**
-   * Charging paths only. False records the fee on the booking but skips drafting
-   * the cancellation invoice, for a no-show the operator isn't chasing.
-   * Defaults to true when absent.
+   * Charging paths only. False records the fee but skips the invoice draft. Default true.
    */
   draftInvoice?: boolean;
   /** New start (ISO) for a time edit. Must be sent together with `endAt`. */
@@ -65,9 +60,7 @@ interface PatchPayload {
   /** New end (ISO) for a time edit. Must be sent together with `startAt`. */
   endAt?: string;
   /**
-   * Time edits only. False mutes a reschedule: the move still happens and is
-   * recorded, but neither party is emailed and the Google invite goes out
-   * silently. Defaults to true when absent.
+   * Time edits only. False moves silently: no emails, silent invite. Default true.
    */
   notifyCustomer?: boolean;
   /** Save a future time change that overlaps something else anyway. */
@@ -75,13 +68,8 @@ interface PatchPayload {
 }
 
 /**
- * Looks for anything already sitting in a proposed booking window: another live
- * booking, or an event on any of the watched calendars.
- *
- * Raw overlap only - the booking engine's travel buffers are deliberately not
- * applied here. An operator typing times by hand has already accounted for the
- * drive, and a buffer-based check would flag nearly every deliberate
- * back-to-back as a conflict.
+ * Finds a live booking or watched-calendar event in the proposed window. Raw overlap only:
+ * hand-typed times already allow for the drive.
  * @param bookingId - The booking being moved, so it can't clash with itself.
  * @param calendarEventId - Its own event, excluded for the same reason.
  * @param startAt - Proposed start.
@@ -94,8 +82,7 @@ async function findScheduleConflict(
   startAt: Date,
   endAt: Date,
 ): Promise<string | null> {
-  // loadBlockingBookings drops anything finishing before its cutoff, so passing
-  // the proposed start narrows it to the bookings that could actually overlap.
+  // Passing the proposed start as the cutoff narrows to bookings that could overlap.
   const [bookings, events] = await Promise.all([
     loadBlockingBookings(startAt, { excludeId: bookingId }),
     fetchAllCalendarEvents(startAt, endAt).catch((err: unknown) => {
@@ -122,15 +109,8 @@ async function findScheduleConflict(
 
 /**
  * PATCH /api/admin/bookings/[id]
- * Updates a booking's fields. Cancelling removes the calendar event and frees the slot.
- *
- * Sending `startAt` + `endAt` moves the booking, and what that means depends on
- * where both the old and new times sit. Shifting a job that has already run to
- * another past time is the operator recording what actually happened, and stays
- * silent; anything else is a real reschedule (conflicts checked, travel
- * re-snapshotted, both parties emailed). Either way the Google event is patched
- * to match, so the row and the calendar never drift.
- * Requires an admin session (cookie or X-Admin-Secret header).
+ * Updates a booking. Cancelling frees the slot. A past-to-past time move records what
+ * happened silently; any other move is a full reschedule. The Google event always follows.
  * @param request - Incoming request.
  * @param params - Route params.
  * @param params.params - Destructured route params containing booking id.
@@ -158,15 +138,8 @@ export async function PATCH(
 
   const now = new Date();
 
-  // Lock past events: the state changes that move money, and time edits, can't be
-  // rewritten once a booking is well past. Metadata-only edits
-  // (name/email/phone/notes/address) are still allowed.
-  //
-  // Completing is deliberately exempt. It is the expected terminal state and
-  // costs nothing - it sets the status and releases the slot, while cancelling
-  // computes a fee and a no-show drafts an invoice. Locking it meant a job that
-  // ran on a Friday could never be closed out on the Monday, which is not a
-  // safety property, just an unfinishable booking.
+  // Lock money-moving changes and time edits on well-past bookings; metadata edits and
+  // completing (which costs nothing) stay allowed.
   const isMoneyStateChange =
     (body.status !== undefined && body.status !== "completed") || body.markNoShow === true;
   const isTimeChange = body.startAt !== undefined || body.endAt !== undefined;
@@ -181,9 +154,7 @@ export async function PATCH(
     );
   }
 
-  // A completed job happened. Cancelling it would delete the Google event,
-  // emailing the customer a cancellation for a visit they had, and a no-show
-  // would bill them for one they turned up to.
+  // A completed job happened, so it can't be cancelled or marked a no-show.
   if (booking.status === "completed" && (body.status === "cancelled" || body.markNoShow === true)) {
     return errorResponse("This booking is already completed.", 409);
   }
@@ -207,19 +178,15 @@ export async function PATCH(
     if (/^Address:\s*/im.test(currentNotes)) {
       data.notes = currentNotes.replace(/^(Address:\s*).*$/im, newAddress ? `$1${newAddress}` : "");
     } else if (newAddress) {
-      // No existing Address: line (e.g. a remote booking being made in-person) -
-      // append one rather than dropping the edit, so notes and the contact agree.
+      // No Address: line yet, so append one.
       data.notes = currentNotes
         ? `${currentNotes}\nAddress: ${newAddress}`
         : `Address: ${newAddress}`;
     }
   }
 
-  // Time edit. Runs before the status branches so that cancelling in the same
-  // request still wins the activeSlotKey - a cancelled booking must release its
-  // slot, not move it.
-  // `notify` here is "the customer hears about it" - a reschedule the operator
-  // muted carries the same false as a silent past-time correction.
+  // Time edit runs before the status branches so a same-request cancel still releases the slot.
+  // `notify` means the customer hears about it.
   let timeChange: { startAt: Date; endAt: Date; notify: boolean } | null = null;
   if (isTimeChange) {
     if (body.startAt === undefined || body.endAt === undefined) {
@@ -240,14 +207,11 @@ export async function PATCH(
       );
     }
 
-    // Staying silent needs BOTH times in the past - only then is the edit purely
-    // "record what actually happened". Anything moving into the future is a reschedule
-    // the customer may not know about yet, so it notifies.
+    // Silent only when BOTH times are past; anything else notifies.
     const alreadyRun =
       booking.startAt.getTime() <= now.getTime() && startAt.getTime() <= now.getTime();
     const isReschedule = !alreadyRun && booking.status !== "cancelled";
-    // Muting is about who hears, not what happened: the conflict check, the
-    // sequence bump and the travel re-snapshot below all still run.
+    // Muting only skips emails; everything below still runs.
     const notify = isReschedule && body.notifyCustomer !== false;
 
     if (isReschedule && !body.force) {
@@ -259,25 +223,19 @@ export async function PATCH(
 
     data.startAt = startAt;
     data.endAt = endAt;
-    // Only a booking still holding its slot carries a live key; cancelled and
-    // completed rows keep `released:<id>` and must not reclaim one.
+    // Released rows keep `released:<id>` and must not reclaim a slot.
     if (!booking.activeSlotKey?.startsWith("released:")) {
       data.activeSlotKey = startAt.toISOString();
     }
-    // A moved start needs its 24h nudge again, and nothing else clears the stamp. Gated on
-    // the start actually changing, so correcting only the finish time doesn't re-send a
-    // reminder the customer already has.
+    // A moved start needs its 24h reminder again; a finish-only change doesn't.
     if (startAt.getTime() !== booking.startAt.getTime()) {
       data.emailReminderSentAt = null;
     }
 
     if (isReschedule) {
-      // The replacement invite only supersedes the old one when its SEQUENCE
-      // rises, and the ICS sequence is built from rescheduleCount.
+      // The ICS SEQUENCE comes from rescheduleCount and must rise to supersede.
       data.rescheduleCount = { increment: 1 };
-      // Re-snapshot both drive legs at the new times so a later cancellation bills the
-      // right travel. Not done on the past branch - travel freezes once a job has run, and
-      // a lookup against a historic departure time would only blank it.
+      // Re-snapshot travel at the new times; past jobs keep their frozen travel.
       if (booking.meetingType === "in_person" && booking.address) {
         try {
           const drive = await lookupDriveRoundTrip(booking.address, startAt, endAt);
@@ -298,8 +256,7 @@ export async function PATCH(
     // No-show ~ a customer cancel at startAt: both windows are inside.
     if (booking.calendarEventId) {
       try {
-        // Silently: a Google "event cancelled" email after they failed to turn
-        // up reads as the operator calling the visit off.
+        // Silent, or the cancellation email reads as the operator calling it off.
         await deleteBookingEvent({ eventId: booking.calendarEventId, notifyAttendees: false });
       } catch (err) {
         console.error("[admin/bookings] Failed to delete calendar event:", err);
@@ -307,8 +264,7 @@ export async function PATCH(
     }
     const noShowAt = new Date();
     const { CANCELLATION: noShowPolicy } = await getPolicy();
-    // A no-show always charges - they never called. The policy still decides
-    // whether a drive is billed, since a remote no-show has none.
+    // A no-show always charges; the policy still decides whether a drive is billed.
     const noShowCharge = assessCancellation(booking.startAt, noShowAt, {
       reason: "no-show",
       meetingType: booking.meetingType === "remote" ? "remote" : "in-person",
@@ -336,8 +292,7 @@ export async function PATCH(
     // Operator cancels never charge; on-behalf follows customer fee rules.
     data.cancelledBy = onBehalf ? "customer" : "operator";
     const { CANCELLATION } = await getPolicy();
-    // In-person and remote have their own windows and fees, so the policy reads
-    // the booking rather than one set of windows being applied to both.
+    // In-person and remote have their own windows and fees.
     const charge = assessCancellation(booking.startAt, now, {
       reason: "late-cancellation",
       meetingType: booking.meetingType === "remote" ? "remote" : "in-person",
@@ -352,9 +307,7 @@ export async function PATCH(
     data.status = "confirmed";
   }
 
-  // activeSlotKey is unique, so a time edit onto a start another live booking holds
-  // surfaces as P2002. Unlike an overlap it can't be forced through - that constraint is
-  // what keeps two bookings off the same slot.
+  // activeSlotKey is unique: P2002 means another live booking holds that start (can't be forced).
   const updated = await prisma.booking.update({ where: { id }, data }).catch((error: unknown) => {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return null;
@@ -365,11 +318,8 @@ export async function PATCH(
     return errorResponse("Another booking already starts at that time.", 409);
   }
 
-  // Recall what Resend is holding overnight before it goes out wrong: a
-  // reminder for a visit just called off, or an earlier "moved" notice showing
-  // a time that has changed again. Runs before the new notice below is held.
-  // A moved start only, matching the reminder-stamp reset above, so a finish
-  // time nudge can't recall a reminder the cron would never re-send.
+  // Recall now-wrong held Resend emails (reminders, earlier "moved" notices) before holding
+  // the new one. Only on a moved start, matching the reminder reset above.
   const cancelledNow = updated.status === "cancelled" && booking.status !== "cancelled";
   const startMoved =
     timeChange !== null && timeChange.startAt.getTime() !== booking.startAt.getTime();
@@ -377,9 +327,7 @@ export async function PATCH(
     await cancelHeldBookingEmails(id);
   }
 
-  // Keep the Google event in step with the row. Best-effort by necessity - the
-  // booking is already written - but a silent failure would recreate the exact
-  // drift this exists to remove, so it comes back as a warning.
+  // Keep the Google event in step; best-effort, but a failure comes back as a warning.
   let calendarWarning: string | undefined;
   if (timeChange && booking.calendarEventId) {
     try {
@@ -397,8 +345,7 @@ export async function PATCH(
     }
   }
 
-  // Tell both parties about a genuine reschedule. Both helpers catch their own
-  // errors and never throw, so a Resend hiccup can't fail the edit.
+  // Tell both parties about a real reschedule; the helpers never throw.
   if (timeChange?.notify) {
     const emailAddress = combineUnitAndAddress(updated.unit ?? "", updated.address ?? "");
     await Promise.all([
@@ -417,8 +364,7 @@ export async function PATCH(
           meetingType: updated.meetingType,
           rescheduleCount: updated.rescheduleCount,
         },
-        // Operator-driven move, so it waits for the quiet window; a customer
-        // rescheduling themselves gets theirs straight away.
+        // Operator-driven, so it waits for the quiet window.
         { kind: "rescheduled", previousStartAt: booking.startAt, quietHours: true },
       ),
       sendOwnerBookingNotification(
@@ -439,25 +385,19 @@ export async function PATCH(
     ]);
   }
 
-  // A cancelled or no-show booking never used its promo, so the booking-time
-  // redemption stops counting against the cap and the customer's own limit.
-  // Swallows its own errors.
+  // A cancelled or no-show booking frees its promo redemption. Swallows its own errors.
   if (updated.status === "cancelled" && booking.status !== "cancelled") {
     await releaseBookingRedemptions(id);
   }
 
-  // Same cancellation draft applies to on-behalf and no-show paths. Opting out
-  // skips only the invoice - the fee assessment stays on the booking, so a job
-  // recorded as chargeable can still be billed later from the invoices tab.
+  // Cancellation draft for on-behalf and no-show; opting out skips only the invoice, not the fee.
   if (
     updated.lateCancellation &&
     updated.cancelledBy === "customer" &&
     booking.status !== "cancelled" &&
     body.draftInvoice !== false
   ) {
-    // Awaited, not detached: Vercel freezes the instance once the response is sent, and
-    // the no-show path skips the awaits further down that would otherwise give a `void`
-    // call an incidental window - the fee invoice would never be drafted.
+    // Awaited: Vercel freezes the instance after the response, so a detached call may never run.
     try {
       await createDraftCancellationInvoice(updated, {
         reason: updated.noShow ? "no-show" : "late-cancellation",
@@ -467,8 +407,7 @@ export async function PATCH(
     }
   }
 
-  // Sync contact details. Match on the primary OR any alt email, case-insensitively,
-  // and skip soft-deleted contacts so an edit lands on the live contact.
+  // Sync the live contact matched by primary or alt email, case-insensitively.
   const contactEmailMatch = booking.email
     ? {
         OR: [
@@ -541,13 +480,9 @@ export async function DELETE(
     }
   }
 
-  // Drop the dangling reference first: Review.bookingId is a bare ObjectId, not a
-  // relation, so deleting the booking would leave reviews pointing at nothing. The review
-  // is kept - it stays linked to its contact via contactId/customerRef.
+  // Review.bookingId is a bare ObjectId, so clear it; the review keeps its contact link.
   await prisma.review.updateMany({ where: { bookingId: id }, data: { bookingId: null } });
-  // An unsettled redemption would otherwise outlive its booking and count
-  // against the promo's limits for good. A settled one records a discount that
-  // was really given, so it stays.
+  // Drop an unsettled redemption; a settled one records a real discount and stays.
   await releaseBookingRedemptions(id);
   await cancelHeldBookingEmails(id);
   await prisma.booking.delete({ where: { id } });

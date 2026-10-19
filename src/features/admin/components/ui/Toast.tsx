@@ -1,9 +1,6 @@
 // src/features/admin/components/ui/Toast.tsx
-// Global admin toast system. AdminToastProvider mounts a bottom-right stack (mounted once
-// by the admin layout); useToast returns a `toast(message, opts)` function. Info, success
-// and warning toasts auto-dismiss (4s, or 6s for a warning) and are announced politely.
-// Error toasts are announced assertively and stay until dismissed, so a failure that
-// lands while the operator is looking elsewhere is still there when they look back.
+// Admin toasts: info/success/warning auto-dismiss (4s, warning 6s) and announce politely;
+// errors announce assertively and stay until dismissed.
 
 "use client";
 
@@ -101,8 +98,7 @@ function ToastCard({
 }
 
 /**
- * Provides the toast API and renders the toast stack. Mount once near the root
- * of the admin tree.
+ * Provides the toast API and renders the stack. Mount once in the admin tree.
  * @param props - Component props.
  * @param props.children - The subtree that can raise toasts.
  * @returns The provider with its toast region.

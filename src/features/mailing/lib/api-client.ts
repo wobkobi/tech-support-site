@@ -1,7 +1,6 @@
 // src/features/mailing/lib/api-client.ts
-// Fetch wrapper for the mailing admin screens. Every mailing route answers
-// `{ ok, ...data }` or `{ ok: false, error }`, so callers branch on `ok` and show
-// `error` as-is; a network failure or a non-JSON reply becomes the same shape.
+// Fetch wrapper for mailing routes: `{ ok, ...data }` or `{ ok: false, error }`, with
+// network failures and non-JSON replies mapped to the same shape.
 
 /** A mailing route's reply. */
 export type ApiResult<T> = ({ ok: true } & T) | { ok: false; error: string };

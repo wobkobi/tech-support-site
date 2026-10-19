@@ -1,8 +1,6 @@
 // src/shared/lib/settings/types.ts
-// Shape of the admin-editable settings, one interface per group. Every value here was a
-// hardcoded constant before the settings panel; the matching defaults live in
-// `defaults.ts` and DB overrides merge on top in `get-settings.ts`. Optional rules use
-// `null`/`0` to mean "off" - see the disable-semantics table in the settings plan.
+// Admin-editable settings shapes, one interface per group. Defaults in defaults.ts; optional rules
+// use `null`/`0` for "off".
 
 import type { IetcConfig, TaxBracket, VehicleFuel } from "@/features/business/lib/tax/types";
 import type { Weekday } from "@/shared/lib/timezone-utils";
@@ -20,21 +18,14 @@ export interface DayWindow {
 }
 
 /**
- * Seven-day availability map keyed by {@link Weekday} (0 = Sunday .. 6 = Saturday).
- *
- * Every day is present: `defaults.ts` seeds all seven and the DB override merges
- * onto that base, so a stored partial can add a day's fields but never remove
- * one. Reads therefore need no presence check - except in `checkGuardrails`,
- * which also runs against a half-edited admin draft.
+ * Seven-day availability map keyed by {@link Weekday} (0 = Sunday .. 6 = Saturday). Every day is
+ * always present via the defaults, so reads need no presence check (except `checkGuardrails` on drafts).
  */
 export type WeeklySchedule = Record<Weekday, DayWindow>;
 
 /**
- * A "protect a morning once the night-before arrives" rule. Once `now` passes
- * `triggerDay` at `triggerHour`, slots on any `protectedDays` before
- * `earliestHour` are blocked - but stay bookable if reserved earlier. General
- * enough to cover the weekend lie-in (Fri 18:00 > Sat/Sun before noon) or any
- * other day. Days use `getUTCDay()` indexing (0 = Sunday .. 6 = Saturday).
+ * Once `now` passes `triggerDay` at `triggerHour`, slots on `protectedDays` before `earliestHour`
+ * block, unless booked earlier (e.g. Fri 18:00 > Sat/Sun before noon). Days use `getUTCDay()` indexing.
  */
 export interface MorningGuard {
   /** When false the rule is ignored. */
@@ -116,10 +107,8 @@ export interface PricingSettings {
   /** Round-to-nearest billable step (minutes); shared with the AI parser snap. */
   billingIncrementMins: number;
   /**
-   * Minutes a quick, one-shot task is billed at - the AI parser's SHORT set
-   * (a "quick" hint, a stated duration at/below the minimum, or an inherently
-   * one-shot action like a password reset). Caps trivial work so it can't take
-   * an even share of a long session.
+   * Minutes a quick one-shot task is billed at (the AI parser's SHORT set), so trivial work
+   * can't take an even share of a long session.
    */
   shortTaskMins: number;
   /** Minutes a task can shrink to before it's dropped from the invoice as descriptive noise. */
@@ -129,9 +118,8 @@ export interface PricingSettings {
   /** Public-holiday labour surcharge, fraction (0.25 = +25%). 0 = no surcharge. */
   publicHolidayUplift: number;
   /**
-   * Weekend labour surcharge, fraction (0.1 = +10%), for jobs on an NZ Saturday or Sunday.
-   * A public holiday on a weekend takes the holiday surcharge instead; the two never stack.
-   * 0 = no surcharge.
+   * Weekend labour surcharge fraction (0.1 = +10%); a weekend holiday takes the holiday surcharge
+   * instead, never both. 0 = none.
    */
   weekendUplift: number;
   /** Minimum travel charge floor (NZD). 0 = no floor. */
@@ -145,9 +133,7 @@ export interface PricingSettings {
   /** Days after a visit during which fallout from that visit's changes is fixed free. 0 = no stated guarantee. */
   workmanshipWindowDays: number;
   /**
-   * Largest gap (minutes) between two same-day calendar events for the
-   * calculator to offer billing them as one job. Nothing is merged
-   * automatically - it only decides what the event picker suggests.
+   * Largest same-day gap (minutes) for the calculator to suggest billing two events as one job.
    */
   mergeSuggestGapMins: number;
   cancellation: CancellationSettings;
@@ -164,10 +150,7 @@ export interface BaseAddress {
   lng: number | null;
 }
 
-/**
- * The opening hours advertised to search engines, when they should differ from
- * the bookable schedule. A single window applied to every enabled day.
- */
+/** Search-engine opening hours when they differ from the bookable schedule; one window for every enabled day. */
 export interface PublishedHours {
   /** Advertised opening hour, 0-23 NZ-local. */
   open: number;
@@ -193,16 +176,13 @@ export interface IdentitySettings {
   /** Advertised service-area radius in km (drives the SEO GeoCircle). */
   serviceRadiusKm: number;
   /**
-   * Overrides the hours published in the site's schema.org data, so the listing
-   * Google shows can be narrower than the hours the booking form actually
-   * offers. null = publish each day's real bookable window.
+   * Overrides the schema.org hours, so Google's listing can be narrower than bookable hours.
+   * null = publish each day's real window.
    */
   publishedHours: PublishedHours | null;
   /**
-   * Text block under the logo in every outgoing email, one line per row. Carries
-   * `{name}` / `{company}` / `{phone}` / `{email}` / `{website}` / `{location}`
-   * placeholders so the details stay sourced from the fields above rather than
-   * being retyped here, and `**bold**` for emphasis. Blank rows become spacing.
+   * Email signature under the logo, one line per row. Takes `{name}`/`{company}`/`{phone}`/
+   * `{email}`/`{website}`/`{location}` and `**bold**`; blank rows become spacing.
    */
   emailSignature: string;
 }
@@ -226,9 +206,8 @@ interface EstimatorRangeBand {
 }
 
 /**
- * Confidence-scaled range widths for the public estimator. As confidence falls
- * the band widens - and the LOW end drops faster than the HIGH end rises, so a
- * vague job reads "from $X" without inflating the top number.
+ * Confidence-scaled estimator range widths. The low end drops faster than the high end rises,
+ * so vague jobs read "from $X" without inflating the top.
  */
 export interface EstimatorRange {
   high: EstimatorRangeBand;
@@ -239,10 +218,7 @@ export interface EstimatorRange {
 }
 
 export interface EstimatorSettings {
-  /**
-   * Standalone task-duration baselines the public price estimator starts from
-   * before the stacking rules combine a multi-task visit. Editable as a list.
-   */
+  /** Task-duration baselines the estimator starts from before stacking rules combine tasks. */
   benchmarks: Benchmark[];
   /** Confidence-scaled width of the customer-facing price range. */
   range: EstimatorRange;
@@ -298,10 +274,7 @@ export interface CommsSettings {
   invoiceReminderMaxCount: number;
   /** Master switch for the apology sent when a reminder chased an already-paid invoice. */
   invoiceApologyEnabled: boolean;
-  /**
-   * Hold customer-facing email overnight rather than sending it the moment it is
-   * triggered. Resend does the waiting, so the action itself still completes now.
-   */
+  /** Hold customer email overnight; Resend does the waiting, so the action completes now. */
   quietHoursEnabled: boolean;
   /** NZ hour the quiet window opens (0-23). */
   quietHoursStart: number;
@@ -330,10 +303,8 @@ export interface ReviewsSettings {
   /** When true, reviews verified via a booking/contact token auto-approve. */
   autoApproveVerified: boolean;
   /**
-   * Google Business Profile "write a review" link: the main button of every review
-   * ask and of the /review page, with the site form as the fallback. Shown to
-   * everyone regardless of what they wrote - Google bans asking only happy
-   * customers. Empty string falls back to the site form alone.
+   * Google "write a review" link: the main button of every review ask and /review, shown to
+   * everyone (Google bans asking only happy customers). Empty falls back to the site form.
    */
   googleReviewUrl: string;
   /** When true, the daily job emails a review ask a few days after each invoice. */

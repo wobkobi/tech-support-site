@@ -1,13 +1,11 @@
 // scripts/lib/harness.ts
-// Pass/fail recording shared by the fixture checks (scripts/check-*.ts). Each assertion
-// records rather than throws, so every case runs even after one fails, and finish()
-// turns the tally into the exit code run-checks.ts reads.
+// Pass/fail recording for the fixture checks. Assertions record rather than throw;
+// finish() turns the tally into the exit code.
 
 let failures = 0;
 
 /**
- * Compares a value against its expectation by JSON, so arrays and plain objects compare
- * by content.
+ * Compares a value against its expectation by JSON (content equality).
  * @param label - Human-readable case name.
  * @param actual - What the call produced.
  * @param expected - What it should have produced.

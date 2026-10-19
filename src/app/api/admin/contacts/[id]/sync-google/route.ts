@@ -8,9 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/admin/contacts/[id]/sync-google
- * Syncs the specified contact to Google Contacts.
- * Never throws - all errors are captured and returned as { ok: false, error }.
- * Requires an admin session (cookie or X-Admin-Secret header).
+ * Syncs the contact to Google Contacts; errors come back as { ok: false, error }.
  * @param request - Incoming request.
  * @param params - Route segment params wrapper.
  * @param params.params - Promise resolving to the route segment containing the contact ID.

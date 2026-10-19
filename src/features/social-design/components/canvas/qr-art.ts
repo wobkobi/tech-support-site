@@ -1,9 +1,6 @@
 // src/features/social-design/components/canvas/qr-art.ts
-// QR code layers' artwork, in the same rounded style as the printed QR codes from
-// scripts/build-icons (rounded dots, extra-rounded corner squares, dot centres) on a
-// white square with a quiet-zone margin, so phones scan it off a busy backdrop. Drawn
-// once per address and colour to a PNG blob URL, which the canvas loads like any image;
-// blob URLs are same-origin, so the canvas stays exportable.
+// QR layers' artwork in the printed codes' rounded style, on a white quiet-zone square so phones
+// scan it off busy backdrops. Drawn once per address and colour to a same-origin PNG blob URL.
 
 import { useEffect, useState } from "react";
 

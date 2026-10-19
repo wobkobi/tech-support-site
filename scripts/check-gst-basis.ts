@@ -1,9 +1,6 @@
 // scripts/check-gst-basis.ts
-// GST basis in the profit readers: what an expense costs and what income counts for profit
-// depend on whether the business was GST registered on the row's NZ day. Covers the
-// settings > status mapping, the rate a new expense defaults to, the chart rows the
-// business page and the dashboard build, FY totals across a mid-year registration, and the
-// series labels.
+// GST basis in the profit readers: costs and income depend on GST registration on the row's
+// NZ day. Covers status mapping, default rate, chart rows, and FY totals across registration.
 // Run with: npm test -- gst-basis
 
 import { incomeExpenseSeries } from "@/features/admin/components/charts/series";
@@ -73,8 +70,7 @@ function main(): void {
     [115, 230],
   );
 
-  // Income stores only the GST-inclusive amount; from registration its GST (3/23 at 15%)
-  // is backed out, to the cent.
+  // Income is GST-inclusive; from registration 3/23 (15%) is backed out, to the cent
   const incomeRows = [
     { date: "2026-10-20T00:00:00.000Z", amount: 115 },
     { date: new Date("2026-11-05T00:00:00.000Z"), amount: 230 },

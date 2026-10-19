@@ -1,10 +1,7 @@
 "use client";
 // src/features/business/components/IncomeView.tsx
-// Records, edits, and lists income entries against /api/business/income. The add form
-// doubles as the edit form. The list has search, date-range + financial-year + method
-// filters, sortable columns, and filter-aware summary cards; rows created from an invoice
-// link back to it. The tax estimate lives on the Tax page and the overview's tax card, not
-// here.
+// Records, edits and lists income entries against /api/business/income, with filters
+// and summary cards; invoice-created rows link back to their invoice.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -62,8 +59,7 @@ export function IncomeView(): React.ReactElement {
     customer: "",
     description: "",
     amount: "",
-    // Cast to string so the field stays widenable; the const-array element is a
-    // literal type, which would otherwise pin `method` and reject edits.
+    // Widen to string, or the literal type pins `method`.
     method: INCOME_METHODS[0] as string,
     notes: "",
   };
@@ -72,11 +68,9 @@ export function IncomeView(): React.ReactElement {
   const contacts = useGoogleContacts();
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  // Phones only: the form starts folded so the list isn't pushed a screen down.
-  // lg+ always shows it.
+  // Phones start with the form folded; lg+ always shows it.
   const [formOpen, setFormOpen] = useState(false);
-  // The mobile + button links here with ?new=<stamp>; each fresh stamp opens the form,
-  // including when this page is already showing and only the query changed.
+  // Each fresh ?new=<stamp> from the mobile + button opens the form.
   const newStamp = useSearchParams().get("new");
   const [openedFor, setOpenedFor] = useState<string | null>(null);
   if (newStamp && newStamp !== openedFor) {
@@ -134,8 +128,7 @@ export function IncomeView(): React.ReactElement {
         setEntries((prev) =>
           editingId ? prev.map((en) => (en.id === editingId ? d.entry : en)) : [d.entry, ...prev],
         );
-        // A sheet-sync failure is the more useful message, so it replaces the
-        // plain confirmation rather than stacking a second toast on top of it.
+        // A sheet-sync failure replaces the plain confirmation.
         if (d.sheetSyncWarning) {
           toast("Saved, but the Cashbook sheet update didn't go through.", { tone: "warning" });
         } else {
@@ -210,8 +203,7 @@ export function IncomeView(): React.ReactElement {
   }
 
   /**
-   * Toggles the sort: same column flips direction, else switches (dates/amounts
-   * default to descending, text to ascending).
+   * Toggles the sort: same column flips, else switches (dates/amounts start descending).
    * @param key - Column to sort by.
    */
   function toggleSort(key: SortKey): void {

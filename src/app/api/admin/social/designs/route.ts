@@ -29,8 +29,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 /**
  * POST /api/admin/social/designs - creates a design.
- * Body: `{ source: "blank" | "copy", sourceId?, kind?, asTemplate?, postId? }`. postId
- * links the new design to the post it was started from in the composer.
+ * Body: `{ source: "blank" | "copy", sourceId?, kind?, asTemplate?, postId? }` (postId links its post).
  * @param request - Incoming request.
  * @returns JSON `{ design }` (summary), 201.
  */
@@ -75,8 +74,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!sourceId) return errorResponse("sourceId isn't a valid id.", 400);
     const source = await prisma.socialDesign.findUnique({ where: { id: sourceId } });
     if (!source) return errorResponse("That design no longer exists.", 404);
-    // Crossing between design and template (starting from a template, or saving a design
-    // as one) keeps the name; a copy alongside the original says it's one.
+    // Crossing design/template keeps the name; a same-kind copy says it's a copy.
     const name = source.isTemplate === asTemplate ? `${source.name} (copy)` : source.name;
     // Exports aren't copied: they belong to the source, and its clean-up may delete them.
     const created = await prisma.socialDesign.create({

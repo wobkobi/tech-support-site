@@ -1,13 +1,7 @@
 "use client";
 // src/features/booking/components/admin/BookingActions.tsx
-// Lifecycle actions for the booking detail page: mark completed, bill in the calculator,
-// cancel (my call / for customer), mark no-show (past bookings only), send / resend the
-// review email, reschedule (magic link), and delete (test bookings only). Every mutating
-// action routes through useBookingActions and is gated by a ConfirmDialog; on success the
-// page refreshes so the info, timeline, and linked-records cards reflect the new state.
-// Delete redirects back to the bookings list. Below lg, where this rail sits under the
-// customer and times cards, a bar pinned to the screen bottom keeps Call, Maps and the
-// next step (Complete, then Bill) in reach.
+// Booking detail lifecycle actions, each behind a ConfirmDialog and useBookingActions.
+// Below lg a pinned bottom bar keeps Call, Maps and the next step in reach.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
@@ -31,10 +25,7 @@ interface BookingActionsProps {
   endAt: string;
   /** Live past-edit lock window (hours) - scheduling.pastEditLockHours. */
   lockHours: number;
-  /**
-   * Google event id: a cancel emails the customer only when one exists, and the
-   * calculator's bill link keys on it.
-   */
+  /** Google event id; cancel emails and the bill link depend on it. */
   calendarEventId: string | null;
   /** Customer phone for the phone bar's Call button. */
   phone: string | null;
@@ -139,15 +130,12 @@ export function BookingActions({
   const isCompleted = status === "completed";
   const isPast = new Date(startAt).getTime() < renderedAt;
   const isFuture = !isPast;
-  // A completed job already happened, so cancelling it would only send the
-  // customer a Google "cancelled" email for a visit they had.
+  // Cancelling a completed job would only send a bogus Google "cancelled" email.
   const isOpen = !isCancelled && !isCompleted;
-  // Cancel / no-show lock after the booking ends, mirroring the PATCH route's
-  // gate, so the lock shows up front rather than as a rejection toast.
+  // Mirrors the PATCH route's past-edit lock.
   const isEditLocked = isPastEditWindow(new Date(endAt).getTime(), renderedAt, lockHours);
   const hasCalendarEvent = calendarEventId != null;
-  // The calculator prefills times, client and address from the (operator-corrected)
-  // calendar event, so billing needs one.
+  // The calculator prefills from the calendar event, so billing needs one.
   const billHref =
     (isConfirmed || isCompleted) && calendarEventId
       ? `/admin/business/calculator?eventId=${encodeURIComponent(calendarEventId)}`
@@ -163,8 +151,7 @@ export function BookingActions({
   }
 
   /**
-   * Runs the mutation for the confirmed action, then refreshes (or, for delete,
-   * navigates back to the list). Closes the dialog either way.
+   * Runs the confirmed action, then refreshes (delete navigates to the list).
    * @param kind - Which action was confirmed.
    */
   async function run(kind: ConfirmKind): Promise<void> {
@@ -200,8 +187,7 @@ export function BookingActions({
   const completeBody =
     "This only changes the status. The review request goes out with the invoice.";
 
-  // The fee is recorded on the booking either way; the box only decides whether
-  // the invoice for it is drafted now.
+  // The fee is always recorded; the box only decides whether to draft the invoice now.
   const noShowBody = (
     <div className="flex flex-col gap-2">
       <p>The call-out fee plus round-trip travel is charged for a no-show.</p>
@@ -215,8 +201,7 @@ export function BookingActions({
     </div>
   );
 
-  // The site sends no cancellation email of its own; the customer hears only
-  // through Google deleting the invite they were added to.
+  // The customer hears only through Google deleting their invite.
   const cancelBody = (
     <div className="flex flex-col gap-2">
       <p>{copy?.body}</p>

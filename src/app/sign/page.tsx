@@ -1,15 +1,7 @@
 // src/app/sign/page.tsx
-// Yard sign artwork - a 600x900mm corflute staked in the grass like a real estate sign.
-// Laid out at 3px per mm (1800x2700px); the exporter captures at 2x, which lands at
-// ~152 DPI on the finished sign, above the 100-150 DPI large-format printers ask for.
-// Pass ?mode=print to add a 3mm bleed on all edges (viewport 1818x2718px). Contact
-// details come from the live identity settings so the sign cannot drift from the site.
-//
-// Styled to match the home page hero so the sign and the site read as one brand: the
-// blurred backdrop photo, a frosted white panel, title-case navy headings, moonstone
-// icon badges on white service cards, and the navy phone button. Everything is sized
-// for reading from the footpath or a passing car, so the phone number is the largest
-// thing on the sign after the logo.
+// Yard sign artwork, 600x900mm corflute at 3px/mm (1800x2700px); 2x capture gives ~152 DPI.
+// ?mode=print adds 3mm bleed (1818x2718px). Styled like the home hero, sized to read from a
+// passing car, so the phone number is the largest thing after the logo.
 
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
@@ -37,10 +29,7 @@ interface SignService {
   icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 }
 
-/**
- * Six of the home page's twelve support items, three across. Twelve would shrink
- * the labels past what reads from the road.
- */
+/** Six of the home page's twelve items; twelve would be unreadable from the road. */
 const SERVICES: SignService[] = [
   { label: "Computers & Laptops", icon: FaLaptop },
   { label: "Phones & Tablets", icon: FaMobileScreen },
@@ -66,8 +55,7 @@ export default async function SignPage({
 }): Promise<React.ReactElement> {
   const { mode } = await searchParams;
   const { identity } = await getSettings();
-  // 25mm safe inset (75px at 3px/mm) clears the flute holes and frame clips of an
-  // H-stake, plus 9px bleed (3mm) on the print variant.
+  // 25mm safe inset (75px) clears H-stake holes and clips; print adds 9px (3mm) bleed.
   const padding = mode === "print" ? "84px" : "75px";
 
   return (

@@ -1,10 +1,7 @@
 "use client";
 // src/features/admin/components/settings/AvailabilityPreview.tsx
-// Live preview for the availability tab. Shows the weekly pattern the draft produces
-// (open hours / break / day-off per weekday) and, by running the same buildAvailableDays
-// engine the booking page uses, the next day a customer could actually book - so
-// booking-window rules (notice, same-day cutoff, caps) are reflected, not just the raw
-// hours.
+// Live preview for the availability tab: the draft's weekly pattern, plus the next bookable
+// day from the booking page's own buildAvailableDays engine so window rules apply.
 
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";

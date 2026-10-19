@@ -1,11 +1,6 @@
 // scripts/check-social-design.ts
-// Post maker logic the editor and exports rely on: the size registry, the design
-// document parser, placing layers on another size (every size pair), carrying linked
-// edits across sizes, the align and distribute moves, the out-of-date hash, and the
-// editor's edits (add, move, restack, group, paste, restyle) plus every new-layer kind,
-// the starter templates, the stored pictures and the AI draft (room, reply, review guard
-// and fill).
-// Pure logic, no database and no browser.
+// Post maker logic: size registry, doc parser, cross-size layout, editor edits, starter
+// templates, stored pictures and the AI draft. Pure logic, no database or browser.
 // Run with: npm test -- social-design
 
 import { ICON_ART, iconDataUri } from "@/features/social-design/components/canvas/icon-art";

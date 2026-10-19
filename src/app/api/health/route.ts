@@ -1,9 +1,6 @@
 // src/app/api/health/route.ts
-// Deployment health probe. Public callers get `{ ok, version }` so a post-deploy check
-// can confirm the app serves and which version is live. Admin- or cron-authenticated
-// callers additionally get per-dependency checks - database connectivity and required-env
-// presence (never the values) - and the response flips to HTTP 503 when a critical
-// dependency or required env var is missing. Consumed by the post-deploy smoke workflow.
+// Deployment health probe: public `{ ok, version }`; admin/cron callers also get DB and
+// required-env checks (never values), with HTTP 503 when either fails.
 
 import { isAdminRequest, isCronAuthorised } from "@/shared/lib/auth";
 import { getEnvReport } from "@/shared/lib/env";
@@ -22,9 +19,8 @@ interface DbCheck {
 }
 
 /**
- * Runs a cheap `Setting` read to confirm database connectivity. Imports the
- * Prisma client lazily and catches any error, so a database or init problem is
- * reported here as a failed check rather than crashing the route.
+ * Probe the database with a cheap `Setting` read; lazy Prisma import so init errors
+ * report as a failed check instead of crashing the route.
  * @returns Whether the database answered, with the error message on failure.
  */
 async function checkDatabase(): Promise<DbCheck> {
@@ -38,10 +34,7 @@ async function checkDatabase(): Promise<DbCheck> {
 }
 
 /**
- * GET /api/health
- * Public: `{ ok, version }`. Authenticated (admin cookie / X-Admin-Secret /
- * cron Bearer): adds `{ checks: { db, env } }` and returns HTTP 503 when the
- * database is unreachable or a required env var is blank.
+ * GET /api/health - authenticated callers also get `{ checks: { db, env } }` and a 503 on failure.
  * @param request - The incoming request.
  * @returns Health JSON.
  */

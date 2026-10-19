@@ -1,8 +1,5 @@
 // src/app/api/business/income/route.ts
-// Admin income-ledger endpoint. GET lists every income entry (newest first); POST creates
-// one and best-effort appends a matching row to the per-financial-year Cashbook sheet,
-// storing the returned sheet row key. Sheet failures are logged and swallowed so DB
-// recording is never blocked.
+// Admin income ledger: GET lists, POST creates and best-effort appends to the FY Cashbook.
 
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import { recordIncome } from "@/features/business/lib/income-recording";
@@ -43,9 +40,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Missing required fields", 400);
   }
 
-  // Gate on INCOME_METHODS like the /pay route does. Only truthiness was
-  // checked here, so an expense method or free text reached the Cashbook, whose
-  // method column is a fixed Data Validation list.
+  // The Cashbook method column is a fixed Data Validation list.
   if (!(INCOME_METHODS as readonly string[]).includes(method)) {
     return errorResponse("Invalid payment method", 400);
   }
@@ -70,9 +65,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     invoiceId,
   });
 
-  // sheetSyncWarning has to reach the client: recordIncome swallows a Cashbook append
-  // failure so the entry still saves, and dropping the flag here reports a clean 201 for a
-  // payment that never reached the sheet. The expenses route returns it too.
+  // recordIncome swallows a Cashbook failure, so the flag is the only signal.
   return NextResponse.json(
     { ok: true, entry: { ...entry, sheetRowKey }, sheetSyncWarning },
     { status: 201 },

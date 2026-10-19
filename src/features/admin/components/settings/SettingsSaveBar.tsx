@@ -1,9 +1,7 @@
 "use client";
 // src/features/admin/components/settings/SettingsSaveBar.tsx
-// Shared save/reset bar for every settings tab: "Save changes", "Reset to defaults", and
-// the dirty / saved indicators. High-impact confirmations live on the individual controls
-// that cause them, so a cancelled confirm leaves the switch where it was rather than
-// after a save.
+// Shared save/reset bar with dirty/saved indicators. High-impact confirmations live on the
+// controls that cause them, so a cancelled confirm just reverts that switch.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import type React from "react";
@@ -40,8 +38,7 @@ export function SettingsSaveBar({
   onReset,
 }: SettingsSaveBarProps): React.ReactElement {
   return (
-    // Sticky + full-bleed within the card padding so the actions stay reachable
-    // on long tabs without scrolling to the very bottom.
+    // Sticky + full-bleed so the actions stay reachable on long tabs.
     <div
       data-phone-bar="sticky"
       className="sticky bottom-0 z-10 -mx-4 mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-admin-border bg-admin-surface/95 px-4 py-2.5 backdrop-blur sm:-mx-5 sm:px-5"

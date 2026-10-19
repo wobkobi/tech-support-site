@@ -1,8 +1,6 @@
 "use client";
 // src/features/business/components/IncomeListRows.tsx
-// The visible income entries, as cards below lg and a sortable table from lg. IncomeView
-// owns the filtering, sorting, paging, the edit form and the delete confirm; these only
-// render the rows it hands over.
+// Income rows as phone cards or a sortable lg table; IncomeView owns the state.
 
 import {
   ROW_CLS,

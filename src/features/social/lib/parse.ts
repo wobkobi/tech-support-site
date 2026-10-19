@@ -1,7 +1,6 @@
 // src/features/social/lib/parse.ts
-// Request-body parsing for the social API. Sparse: only fields present in the body are
-// returned, so a PATCH writes exactly what the composer changed. Target edits are
-// merged into the stored targets so a platform's past outcome is never overwritten.
+// Social API body parsing. Sparse: only fields present are returned. Target edits merge so past
+// outcomes are never overwritten.
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import type { TargetState } from "@/features/social/lib/targets";
@@ -42,8 +41,7 @@ const MAX_COUPON = 50;
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Checks an optional YYYY-MM-DD date, stored at UTC midnight of that calendar day so
- * the day reads back the same in any timezone.
+ * Checks an optional YYYY-MM-DD date, stored at UTC midnight so it reads the same anywhere.
  * @param value - Raw value.
  * @param label - Field name for the error.
  * @returns The Date or null, or an error message.
@@ -271,8 +269,7 @@ const TARGET_EDIT_FIELDS = [
 ] as const;
 
 /**
- * Applies target edits to the stored targets. Only platforms with an adapter can be
- * switched on, and outcome fields are left as they were.
+ * Applies target edits; only adapter platforms switch on, and outcome fields are kept.
  * @param stored - Targets as stored.
  * @param edits - Edits from {@link parsePostPatch}.
  * @returns The merged targets.

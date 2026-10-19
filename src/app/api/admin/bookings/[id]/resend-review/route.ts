@@ -12,11 +12,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/admin/bookings/[id]/resend-review
- * Sends (or resends) the review ask for a booking. Lands a Contact for the booking's
- * email first, since the ask's stop link is signed per contact. Refuses with 409 when
- * the person has opted out of review asks or unsubscribed. Stamps reviewSentAt only
- * when the send succeeds; a booking with no email is rejected with 400.
- * Requires an admin session (cookie or X-Admin-Secret header).
+ * Sends (or resends) a booking's review ask, ensuring a Contact for the stop link. 409 when
+ * opted out, 400 with no email; reviewSentAt is stamped only on success.
  * @param request - Incoming request.
  * @param params - Route params.
  * @param params.params - Destructured route params containing booking id.
@@ -57,8 +54,7 @@ export async function POST(
     );
   }
 
-  // The booking's own token, so a review left through this link stays tied to the
-  // booking. Only a real send stamps reviewSentAt, so a failure stays retryable.
+  // The booking's own token keeps the review tied to the booking.
   const result = await sendReviewAsk({
     to: email,
     firstName: booking.name.split(" ")[0] ?? "",

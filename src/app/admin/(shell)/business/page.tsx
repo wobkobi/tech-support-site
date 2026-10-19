@@ -1,11 +1,6 @@
 // src/app/admin/(shell)/business/page.tsx
-// Business dashboard. Resolves the displayed scope from the `?fy=` param (all-time or a
-// financial year via resolveScope), aggregates income, expenses, and invoices into
-// BusinessDashboardCards and an income vs expenses chart (by month, or by FY for all
-// time), and shows a compact tax card (the Tax page's estimate for the same scope) plus a
-// Sheets import action.
-// Income and expenses count on the GST basis: incl. GST while not registered, excl. GST
-// once registered.
+// Business dashboard for the `?fy=` scope: totals cards, income vs expenses chart and a
+// tax card. Figures are incl. GST while unregistered, excl. once registered.
 
 import { BarChart } from "@/features/admin/components/charts/BarChart";
 import { incomeExpenseSeries } from "@/features/admin/components/charts/series";
@@ -52,10 +47,7 @@ export const metadata: Metadata = {
 const SCOPE_PARAM = "fy";
 
 /**
- * Resolves the displayed scope from a search-param value.
- * "all" > the all-time scope (no date filter).
- * Otherwise tries to match an FY key (e.g. "2025-26") against the listed FYs.
- * Falls back to the current FY when the param is missing or doesn't match.
+ * Resolves the scope from `?fy=`: "all", a listed FY key (e.g. "2025-26"), else the current FY.
  * @param raw - Raw `?fy=` query value (undefined, "all", or an FY key).
  * @param now - Reference time used to enumerate financial years.
  * @param startDate - Business start date (first FY listed).
@@ -109,8 +101,7 @@ function resolveScope(
 }
 
 /**
- * Filters a date-bearing array by an optional half-open ISO window.
- * Pass null bounds to skip filtering (used by the all-time scope).
+ * Filters a date-bearing array by an optional half-open ISO window (null bounds skip it).
  * @param entries - Items with an ISO `date` field.
  * @param startISO - Inclusive lower bound, or null for no lower bound.
  * @param endISO - Exclusive upper bound, or null for no upper bound.
@@ -126,13 +117,8 @@ function filterByScope<T extends { date: string }>(
 }
 
 /**
- * Business dashboard. The selected scope (All time / Current FY / a past FY)
- * comes from `?fy=` and drives every total: overview cards, breakdown modals,
- * the income vs expenses chart, the tax card, and the bottom-of-page
- * invoice/income/expense links. Past-FY scopes hide the "This month" cards
- * since the current calendar month falls outside the FY window.
- * Every render reads live data, so an old `?refresh=1` link still loads the page and
- * has nothing to clear.
+ * Business dashboard. The `?fy=` scope drives every total; past-FY scopes hide the
+ * "This month" cards.
  * @param root0 - Page props.
  * @param root0.searchParams - URL search params (`?fy=` scope).
  * @returns Business dashboard element.
@@ -146,17 +132,12 @@ export default async function BusinessPage({
   const { fy: fyParam } = await searchParams;
 
   const now = new Date();
-  // "This month" window on NZ midnight boundaries, not the server's UTC midnight
-  // (Vercel runs in UTC, 12-13h behind NZ), so entries dated the 1st are not
-  // dropped and the window flips to the new month at NZ midnight.
+  // "This month" on NZ midnight boundaries, since the server runs in UTC.
   const [nzYear, nzMonth] = nzDateParts(now);
   const monthStart = nzMidnightUtc(nzYear, nzMonth, 1);
   const monthEnd = nzMidnightUtc(nzYear, nzMonth + 1, 1);
 
-  // One parallel pass over the independent reads: identity (FY list +
-  // "(partial)" label), the three ledgers, the settings bundle (GST status for the
-  // expense basis), and the tax inputs for every FY. The tax inputs don't depend on the
-  // scope, so they load here and get filtered to it once the scope is resolved.
+  // One parallel pass over independent reads; tax inputs are filtered to the scope later.
   const [identity, incomeEntries, expenseEntries, invoices, settings, allTaxInputs] =
     await Promise.all([
       getIdentity(),
@@ -177,8 +158,7 @@ export default async function BusinessPage({
         },
       }),
       prisma.invoice.findMany({
-        // Quotes are excluded: this feed drives FY revenue aggregates and a
-        // quoted total is not revenue.
+        // Quotes are excluded: a quoted total is not revenue.
         where: { ...NOT_A_QUOTE_FILTER },
         orderBy: { issueDate: "desc" },
         select: {
@@ -197,8 +177,7 @@ export default async function BusinessPage({
   // Business start date (from identity settings) drives the FY list + "(partial)" label.
   const startDate = new Date(identity.startDateIso);
   const scope = resolveScope(fyParam, now, startDate);
-  // GST basis for every income and expense figure below: incl. GST while unregistered (or
-  // dated before registration took effect), excl. GST once registered.
+  // GST basis: incl. GST before registration, excl. GST after.
   const gst = gstStatusFromPricing(settings.pricing);
 
   // Plain-data shapes for the client component (avoids passing Date objects across the boundary).
@@ -239,9 +218,7 @@ export default async function BusinessPage({
     return inv.issueDate >= scope.startISO && inv.issueDate < scope.endISO;
   });
 
-  // Tax estimate for the scope, the figures the Tax page shows: a filed year's saved
-  // snapshot, any other year computed live. Each FY stands on its own (brackets, the IETC
-  // and ACC apply per year), then they are summed for "All time".
+  // Tax estimate as the Tax page shows it, per FY (filed snapshot or live), summed for "All time".
   const taxInputs = allTaxInputs.filter((input) => scope.isAllTime || input.fy.key === scope.key);
   const taxResults = await loadShownResults(taxInputs);
   const taxEstimate = taxResults.length > 0 ? sumTaxEstimates(taxResults) : null;
@@ -252,8 +229,7 @@ export default async function BusinessPage({
     currentTaxInput && currentTaxResult
       ? setAsideTargets(currentTaxResult.totalToSetAside, currentTaxInput.fy, now)
       : null;
-  // GST roll-up for a registered business, over the scoped rows dated from registration.
-  // gstToPay does its own registration-date gating, so the scoped rows go in as they are.
+  // GST roll-up; gstToPay does its own registration-date gating.
   const gstRollup = gst.registered ? gstToPay(income, expenses, gst) : null;
   const taxHref = scope.isAllTime
     ? "/admin/business/tax"
@@ -279,8 +255,7 @@ export default async function BusinessPage({
     return `/admin/business?${SCOPE_PARAM}=${encodeURIComponent(tabKey)}`;
   }
 
-  // Chart groups for the same scope as the cards: months inside an FY, FYs for all time.
-  // Both builders put every scoped row in a group, so the chart totals match the cards.
+  // Chart groups (months in an FY, FYs for all time) cover every scoped row, matching the cards.
   const chartRows = {
     income: income.map((r) => ({ date: r.date, amount: r.basisAmount })),
     expenses: expenses.map((e) => ({ date: e.date, amount: e.basisAmount })),
@@ -360,8 +335,7 @@ export default async function BusinessPage({
         href={taxHref}
       />
 
-      {/* Action links - full-width stacked on mobile, side-by-side from sm+. Outline, so four
-          equal links don't read as four competing primaries. */}
+      {/* Action links: stacked on mobile, side by side from sm; outline so none reads as primary. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         {links.map((l) => (
           <AdminButton key={l.label} href={l.href} variant="outline" className="w-full sm:w-auto">

@@ -11,7 +11,6 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * POST /api/admin/reviews
  * Creates a new pre-approved review (operator path for past client reviews).
- * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns JSON with the created review.
  */
@@ -57,8 +56,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // Surface the newly-approved review on the public marquee / reviews page
-    // now, not after the 24h cache TTL.
+    // Show the review publicly now, not after the 24h cache TTL.
     revalidateReviewPaths();
 
     return NextResponse.json({ ok: true, review }, { status: 201 });

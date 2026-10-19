@@ -1,9 +1,7 @@
 "use client";
 // src/features/business/components/calculator/EventPickerSection.tsx
-// "Bill a calendar event" card. On a blank calculator it lists recent booking-calendar
-// events to jump into; once one is loaded it becomes the billing banner and offers the
-// day's neighbouring events as a merge, via findMergeSuggestions. Merging keeps one time
-// slot per event, so the gaps between them are never billed.
+// "Bill a calendar event" card: recent events to load, then a billing banner offering the
+// day's neighbouring events as a merge (one slot per event, so gaps are never billed).
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
@@ -63,11 +61,8 @@ function minutesOfDay(hhmm: string): number | null {
 }
 
 /**
- * Total unbilled time sitting between consecutive slots. This is the figure
- * the merged banner puts in front of the operator: the whole point of merging
- * rather than stretching one slot across the day is that this time is not
- * charged. Overlapping slots count as no gap - a plain subtraction, not the
- * midnight-rolling timeDiffMins, which would read an overlap as most of a day.
+ * Total unbilled time between consecutive slots. Overlaps count as no gap: plain
+ * subtraction, since timeDiffMins would roll an overlap past midnight.
  * @param ranges - The job's time slots, in any order.
  * @returns Minutes between slots; 0 for a single slot.
  */
@@ -86,10 +81,8 @@ function gapMinutesBetween(ranges: ParsedRange[]): number {
 }
 
 /**
- * Rebuilds the billed events as merge anchors from the prefill itself. The
- * recent-event list reaches back a fortnight and caps at 30, so the job being
- * billed is not guaranteed to appear in it - and when it does, that richer row
- * (with the calendar's own location) is preferred for address matching.
+ * Rebuilds the billed events as merge anchors from the prefill, since the capped
+ * recent list may miss them. A matching recent row is preferred for its location.
  * @param prefill - The events currently being billed.
  * @param known - Recent events fetched from the admin endpoint.
  * @returns One anchor per billed slot, in slot order.
@@ -155,16 +148,14 @@ export function EventPickerSection({
   const [pickerOpen, setPickerOpen] = useState(false);
   // null until the fetch resolves, which doubles as the "still loading" flag.
   const [events, setEvents] = useState<RecentEvent[] | null>(null);
-  // Merge tickboxes, keyed by event id. Seeded from each suggestion's own
-  // preselect once the list arrives, then owned by the operator.
+  // Merge tickboxes by event id; seeded from each suggestion's preselect.
   const [ticked, setTicked] = useState<Record<string, boolean>>({});
   // Guards against a second fetch from the effect and the toggle racing.
   const requested = useRef(false);
 
   /**
-   * Fetches the recent-event list, once per mount. Deliberately sets no state
-   * before awaiting: called straight from an effect below, and a synchronous
-   * setState there would cascade renders.
+   * Fetches the recent-event list once per mount. Sets no state before awaiting,
+   * since it runs straight from an effect.
    */
   const loadEvents = useCallback((): void => {
     if (requested.current) return;
@@ -175,9 +166,8 @@ export function EventPickerSection({
       .catch(() => setEvents([]));
   }, []);
 
-  // In billing mode the list is needed up front - it is what the merge
-  // suggestion is computed from - so it loads without waiting for a click.
-  // The endpoint is served from the 60s schedule cache, so this is cheap.
+  // Billing mode needs the list up front for merge suggestions; it's served from
+  // the 60s schedule cache.
   useEffect(() => {
     if (prefill) loadEvents();
   }, [prefill, loadEvents]);
@@ -192,9 +182,8 @@ export function EventPickerSection({
   const anchors = prefill ? buildAnchors(prefill, events ?? []) : [];
   const suggestions = findMergeSuggestions(anchors, events ?? [], mergeSuggestGapMins);
   /**
-   * Whether a suggested event is ticked. One the operator has not touched
-   * falls back to its own verdict: same client or same address starts ticked,
-   * bare time proximity does not.
+   * Whether a suggested event is ticked, falling back to the suggestion's own
+   * preselect until the operator touches it.
    * @param id - Suggested event's calendar id.
    * @param preselected - The suggestion's own default.
    * @returns Whether the row is ticked.
@@ -205,9 +194,8 @@ export function EventPickerSection({
   const chosen = suggestions.filter((s) => isTicked(s.event.id, s.preselected));
 
   /**
-   * Adds an event to the job, or takes it back out when it is already on it.
-   * Unticking the last one leaves the calculator with no event at all, which
-   * {@link onBillEvents} turns back into a blank form.
+   * Adds an event to the job, or removes it. Unticking the last one gives
+   * {@link onBillEvents} an empty set, which resets to a blank form.
    * @param eventId - The row that was toggled.
    */
   function toggleEvent(eventId: string): void {
@@ -221,9 +209,8 @@ export function EventPickerSection({
   const rowClasses =
     "flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm";
 
-  // One list, two behaviours: on a blank calculator a row is a button that loads the job;
-  // once one is loaded every row becomes a tickbox, billed events ticked, so an accidental
-  // merge is undone by unticking rather than starting over.
+  // Blank calculator: rows are buttons that load a job. Billing: rows are tickboxes, so a
+  // stray merge is undone by unticking.
   const pickerList = (
     <div className="mt-3 max-h-64 space-y-1 overflow-y-auto">
       {events === null && <p className="text-sm text-admin-muted">Loading events…</p>}
@@ -295,9 +282,7 @@ export function EventPickerSection({
     );
   }
 
-  // Billing mode. The banner reflects the CURRENT job date + slots (which the
-  // operator may have edited below), and flags when they drift from the
-  // events' own windows so a stray edit is obvious.
+  // Billing mode: the banner shows the CURRENT date + slots and flags drift from the events.
   const merged = prefill.slots.length > 1;
   const slotsMatch =
     timeRanges.length === prefill.slots.length &&

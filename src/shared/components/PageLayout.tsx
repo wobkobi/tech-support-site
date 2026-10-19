@@ -10,11 +10,8 @@ import type React from "react";
 export const CARD = "border-seasalt-200/80 bg-white rounded-xl border p-4 shadow-sm sm:p-6";
 
 /**
- * Item card nested inside a CARD (a service category, a pricing box). On phones
- * it drops its border and shadow for a top divider, so the text gets the width
- * the extra frame would take; from sm up it is a card again. Use it on the
- * direct children of a single-column-on-phones grid or stack: the first child
- * skips the divider, and the container's gap sits above each divider.
+ * Item card nested in a CARD. On phones it swaps border and shadow for a top divider (skipped
+ * on the first child) to free width; from sm up it is a card again.
  */
 export const NESTED_CARD =
   "border-seasalt-200/60 border-t pt-4 first:border-t-0 first:pt-0 sm:rounded-lg sm:border sm:bg-white sm:p-4 sm:shadow-sm sm:first:border-t sm:first:pt-4";
@@ -29,8 +26,7 @@ export interface PageShellProps {
 }
 
 /**
- * Page wrapper: the main landmark on a white ground, with the site's body text
- * size (17px on phones, 18px from sm).
+ * Page wrapper: the main landmark on white, body text 17px on phones and 18px from sm.
  * @param props - Component props.
  * @param props.children - Page content.
  * @returns Page shell element.
@@ -57,9 +53,8 @@ export interface FrostedSectionProps {
 }
 
 /**
- * Frosted glass content section. On phones the frame drops away and the content sits on
- * the page gutter, so the cards inside line up with the redesigned pages instead of
- * nesting a frame inside a card inside the screen edge.
+ * Frosted content section. On phones the frame drops away so inner cards sit on the page
+ * gutter instead of nesting frames.
  * @param props - Component props.
  * @param props.children - Section content.
  * @param props.maxWidth - Optional max width override.

@@ -1,8 +1,6 @@
 // src/features/business/lib/tax/view.server.ts
-// Server loaders behind the Tax page, the CSV export and the filed toggle: one financial
-// year's live figures in snapshot shape, the saved snapshot when the year is filed (and how
-// a fresh calculation differs from it), the result every other page shows for a year (the
-// snapshot's while filed), and the filed years the asset and trip forms warn about.
+// Server loaders for the Tax page, CSV export and filed toggle: live figures, the filed
+// snapshot and its diff, the result other pages show, and the list of filed years.
 
 import "server-only";
 
@@ -34,10 +32,7 @@ export interface TaxYearView {
   fyKey: string;
   /** Live inputs, with blank rates already filled from IRD's published ones. */
   input: TaxYearInput;
-  /**
-   * The year's stored TaxYear row as saved (blank rates stay null), or null when none
-   * exists. The home office form starts from it.
-   */
+  /** Stored TaxYear row as saved (blank rates stay null), or null; seeds the home office form. */
   record: TaxYearRow | null;
   /** The year computed now. */
   live: TaxYearSnapshot;
@@ -45,10 +40,7 @@ export interface TaxYearView {
   filedAtIso: string | null;
   /** The saved snapshot; null when not filed or when the stored JSON can't be read. */
   filed: TaxYearSnapshot | null;
-  /**
-   * True when the year is filed but its saved snapshot can't be read (damaged or an older
-   * version). `shown` is then the live figures, and the page warns that they are fresh.
-   */
+  /** Filed but the snapshot can't be read; `shown` falls back to live figures with a warning. */
   snapshotUnreadable: boolean;
   /** What the page and CSV show: the snapshot while filed and readable, otherwise the live figures. */
   shown: TaxYearSnapshot;
@@ -72,8 +64,7 @@ export async function resolveFinancialYear(
 }
 
 /**
- * Trips dated inside a year, with purpose, oldest first. Half-open window, the same
- * bounds the tax maths uses.
+ * Trips inside a year (half-open window, as the tax maths uses), oldest first.
  * @param fy - The year.
  * @returns The trips.
  */
@@ -91,13 +82,12 @@ async function loadFyTrips(fy: FinancialYear): Promise<SnapshotTrip[]> {
 }
 
 /**
- * Computes a year now and wraps it in snapshot shape. The car's total km comes from the
- * year's TaxYear record as loaded, never a default, since it sets the Tier 1 split.
+ * Computes a year now in snapshot shape. Total car km comes from the stored record, never
+ * a default, since it sets the Tier 1 split.
  * @param fy - The year.
  * @param now - Reference instant.
  * @param filedAt - ISO filing instant to stamp, or null for a live view.
- * @returns The live inputs, the year's TaxYear row from the same read (null when none is
- * stored), and the snapshot built from them.
+ * @returns The live inputs, the TaxYear row from the same read (or null), and the snapshot.
  */
 export async function buildLiveSnapshot(
   fy: FinancialYear,
@@ -121,18 +111,15 @@ export async function buildLiveSnapshot(
 }
 
 /**
- * Loads one year for the Tax page or the CSV. A filed year shows its saved snapshot and
- * lists how a fresh calculation now differs; an unfiled year shows live figures. A filed
- * year whose snapshot can't be read falls back to the live figures with
- * `snapshotUnreadable` set, so the page still renders and the CSV still downloads.
+ * Loads one year for the Tax page or CSV: the filed snapshot plus its diff from live, or
+ * live figures when unfiled or the snapshot is unreadable (`snapshotUnreadable` set).
  * @param fy - The year.
  * @param now - Reference instant.
  * @returns The year's view.
  */
 export async function loadTaxYearView(fy: FinancialYear, now: Date): Promise<TaxYearView> {
   const fyKey = fyKeyOf(fy.label);
-  // The record comes from the same read as the inputs: a route handler (the CSV export)
-  // has no React cache to dedupe a second read.
+  // Same read as the inputs: the CSV route handler has no React cache to dedupe a second.
   const { input, record, snapshot: live } = await buildLiveSnapshot(fy, now);
   const filedAtIso = record?.filedAt ? record.filedAt.toISOString() : null;
   const filed = filedAtIso ? parseTaxYearSnapshot(record?.snapshot) : null;
@@ -152,8 +139,7 @@ export async function loadTaxYearView(fy: FinancialYear, now: Date): Promise<Tax
 /**
  * A filed year's saved result.
  * @param record - The year's TaxYear row, or undefined when none exists.
- * @returns The snapshot's result, or null when the year isn't filed or its snapshot
- * can't be read.
+ * @returns The snapshot's result, or null when unfiled or unreadable.
  */
 function filedResultOf(
   record: Pick<TaxYearRow, "filedAt" | "snapshot"> | undefined,
@@ -163,10 +149,8 @@ function filedResultOf(
 }
 
 /**
- * The figures a year shows outside the Tax page: the filed snapshot's result while the
- * year is filed, so the overview agrees with the Tax page and the CSV; the live result
- * for an unfiled year, or for a filed year whose snapshot can't be read (the same
- * fallback the Tax page makes).
+ * The figures a year shows outside the Tax page: the filed result while filed (so the
+ * overview matches the Tax page), else live, with the Tax page's unreadable fallback.
  * @param input - The year's live inputs.
  * @param record - The year's TaxYear row, or undefined when none exists.
  * @returns The result to show.
@@ -179,11 +163,9 @@ export function shownResultFor(
 }
 
 /**
- * One year's filed result, for a page that keeps its own live figures but names the
- * saved ones beside them (the Trips page's km claim).
+ * One year's filed result, shown beside live figures (the Trips page's km claim).
  * @param fyKey - FY key, e.g. "2025-26".
- * @returns The snapshot's result, or null when the year isn't filed or its snapshot
- * can't be read.
+ * @returns The snapshot's result, or null when unfiled or unreadable.
  */
 export async function loadFiledResult(fyKey: string): Promise<TaxYearResult | null> {
   const rows = await loadTaxYearRows();
@@ -191,8 +173,7 @@ export async function loadFiledResult(fyKey: string): Promise<TaxYearResult | nu
 }
 
 /**
- * {@link shownResultFor} for several years, matching each to its TaxYear row from the
- * request's single read.
+ * {@link shownResultFor} for several years from one TaxYear read.
  * @param inputs - Each year's live inputs.
  * @returns One result per input, in the same order.
  */

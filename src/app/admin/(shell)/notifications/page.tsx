@@ -1,7 +1,5 @@
 // src/app/admin/(shell)/notifications/page.tsx
-// Admin notifications page. Push state (permission, subscription, whether the app is
-// installed) lives entirely in the browser, so this is a thin auth gate around
-// NotificationsView.
+// Admin notifications page: a thin auth gate, since push state lives in the browser.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { NotificationsView } from "@/features/notifications/components/NotificationsView";

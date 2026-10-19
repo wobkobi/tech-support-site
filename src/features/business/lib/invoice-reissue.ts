@@ -1,8 +1,6 @@
 // src/features/business/lib/invoice-reissue.ts
-// Re-issuing a voided invoice: the calculator link that starts it, and the prefill the
-// calculator page builds from the voided invoice. The job is rebuilt in the calculator
-// rather than copied, so the promo is priced again for the job date instead of keeping
-// the voided invoice's stored figure.
+// Re-issuing a voided invoice: the calculator link and prefill. The job is rebuilt, not
+// copied, so the promo re-prices for the job date.
 
 import { formatNZD } from "@/features/business/lib/business-format";
 import { nzDateKey } from "@/shared/lib/timezone-utils";
@@ -50,8 +48,7 @@ export function reissueHref(invoiceId: string): string {
 }
 
 /**
- * Calendar events the voided invoice billed, earliest first: every merged event, or the
- * single one, or none for an invoice made without an event.
+ * Calendar events the voided invoice billed, earliest first (empty when it had none).
  * @param invoice - Invoice event links.
  * @param invoice.calendarEventId - The first (or only) billed event.
  * @param invoice.calendarEventIds - Every merged event; empty below two.
@@ -66,9 +63,7 @@ export function reissueEventIds(invoice: {
 }
 
 /**
- * One "Describe the job" row per invoice line: a timed line as "TV setup: 35 min", any
- * other line with its amount ("Round-trip travel (21 min drive): $15.00"), so the job
- * can be parsed again or rebuilt by hand.
+ * One "Describe the job" row per line: "TV setup: 35 min" when timed, else "Travel: $15.00".
  * @param line - An invoice line.
  * @param line.description - Line text.
  * @param line.qty - Quantity.

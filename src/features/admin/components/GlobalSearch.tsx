@@ -1,8 +1,6 @@
 "use client";
 // src/features/admin/components/GlobalSearch.tsx
-// Admin-wide search dialog and its keyboard shortcut. Typing queries /api/admin/search
-// (debounced, stale requests cancelled) and lists the grouped hits as an ARIA combobox
-// with a listbox: the arrow keys move through the hits and Enter opens one.
+// Admin-wide search dialog (ARIA combobox over /api/admin/search) and its keyboard shortcut.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
@@ -17,11 +15,7 @@ import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
-/**
- * Same values as MIN_QUERY_LENGTH and MAX_QUERY_LENGTH in global-search.ts. That module
- * is server-only, so only its types can be imported here; the route enforces both
- * limits again either way.
- */
+/** Mirrors global-search.ts, which is server-only; the route enforces both again. */
 const MIN_QUERY_LENGTH = 2;
 const MAX_QUERY_LENGTH = 100;
 
@@ -62,8 +56,7 @@ function hitKey(hit: SearchHit): string {
 }
 
 /**
- * Whether a key press lands somewhere the user is typing, where "/" must type a slash
- * rather than open search.
+ * Whether a key press lands in a text field, where "/" must type a slash.
  * @param target - The keydown event's target.
  * @returns True for inputs, textareas, selects and editable content.
  */
@@ -73,8 +66,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Whether a dialog is already showing. Only visible ones count, so a dialog element
- * kept mounted but hidden never blocks the shortcut.
+ * Whether a visible dialog is showing; a mounted but hidden one doesn't count.
  * @returns True when an open dialog is on screen.
  */
 function isDialogOpen(): boolean {
@@ -84,9 +76,7 @@ function isDialogOpen(): boolean {
 }
 
 /**
- * Whether the browser runs on an Apple platform, where the search shortcut is
- * Cmd+K rather than Ctrl+K. iPadOS reports itself as "Macintosh", which the Mac
- * test already covers.
+ * Whether the browser runs on an Apple platform (shortcut is Cmd+K). iPadOS reports "Macintosh".
  * @returns True on macOS and iOS.
  */
 export function isApplePlatform(): boolean {
@@ -94,13 +84,8 @@ export function isApplePlatform(): boolean {
 }
 
 /**
- * Opens search on Cmd+K on Apple platforms and Ctrl+K elsewhere, from anywhere; the
- * other modifier is left alone, so Ctrl+K on a Mac keeps its native delete-to-end-of-line.
- * The shortcut is taken but does nothing while another dialog is showing. "/" opens
- * search when no Ctrl, Cmd or Alt is held, focus is not in a text field, and no dialog
- * is open. Both take the key press, so the browser's own Ctrl+K and quick-find "/" do
- * not also fire. Shift is allowed because some keyboard layouts need it to type "/".
- * `onOpen` is read fresh on each key press, so an inline arrow never re-subscribes.
+ * Opens search on Cmd+K (Apple) or Ctrl+K (elsewhere), or "/" outside text fields;
+ * both are swallowed while a dialog is open. Shift is allowed since some layouts need it for "/".
  * @param onOpen - Opens the search dialog.
  */
 export function useGlobalSearchShortcut(onOpen: () => void): void {
@@ -140,12 +125,8 @@ export function useGlobalSearchShortcut(onOpen: () => void): void {
 }
 
 /**
- * Admin search dialog. The query is debounced, each request aborts the one before
- * it, and results stay on screen (dimmed) while the next set loads. The input is an
- * ARIA combobox: focus stays in it while ArrowUp/ArrowDown move the active hit
- * through every group (wrapping), and Enter opens it. The hits stay real links, so
- * Tab still reaches them and the focus trap in {@link Modal} keeps working. Everything
- * resets on close.
+ * Admin search dialog: debounced, each request aborts the last, old results stay dimmed
+ * while loading. Hits stay real links so Tab and the {@link Modal} focus trap still work.
  * @param props - Component props.
  * @param props.open - Whether the dialog is shown.
  * @param props.onClose - Closes the dialog.
@@ -193,8 +174,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps): React.ReactE
   const activeHit = flat[activeIndex] ?? null;
   const activeOptionId = activeHit ? `${baseId}-opt-${hitKey(activeHit)}` : undefined;
 
-  // Runs after Modal's own open effect (child effects run first), which focuses the
-  // dialog panel; this then moves focus on into the search box.
+  // Runs after Modal's open effect (children first), moving focus on into the box.
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
@@ -226,8 +206,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps): React.ReactE
   }, [activeOptionId]);
 
   /**
-   * Stores the typed query. Dropping under the minimum clears the old results, so
-   * they never reappear under an unrelated query typed afterwards.
+   * Stores the typed query; dropping under the minimum clears stale results.
    * @param e - The input change event.
    */
   function handleChange(e: React.ChangeEvent<HTMLInputElement>): void {
@@ -246,9 +225,8 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps): React.ReactE
   }
 
   /**
-   * Combobox keys: ArrowDown/ArrowUp move the active hit (wrapping), Enter opens it
-   * once the current query's results have loaded, so it never opens a stale hit.
-   * Escape and Tab are left to {@link Modal}.
+   * Combobox keys: arrows move the active hit (wrapping); Enter opens it once loaded,
+   * never a stale hit. Escape and Tab are left to {@link Modal}.
    * @param e - The keyboard event.
    */
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>): void {
@@ -266,8 +244,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps): React.ReactE
   }
 
   /**
-   * Clears the failed answer and runs the same query again. Focus returns to the
-   * search box, because the button that was pressed disappears with the error.
+   * Re-runs the failed query, refocusing the box since the button disappears.
    */
   function retry(): void {
     setResponse(null);
@@ -276,8 +253,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps): React.ReactE
   }
 
   const hitCount = flat.length;
-  // Screen-reader summary of the visible state. Empty for the idle hint, and for an
-  // error, which announces itself through its own alert.
+  // Screen-reader summary; empty when idle or on error (the alert announces itself).
   let liveText = "";
   if (loading) liveText = "Searching";
   else if (current && !error) {
@@ -287,8 +263,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps): React.ReactE
 
   return (
     <Modal open={open} onClose={onClose} title="Search" size="lg" placement="top">
-      {/* Pinned while results scroll; the negative margins cover the body padding so
-          rows slide under it cleanly. */}
+      {/* Pinned while results scroll; negative margins cover the body padding. */}
       <div className="sticky top-0 z-10 -mx-5 -mt-4 bg-admin-surface px-5 pt-4 pb-3">
         <AdminInput
           ref={inputRef}

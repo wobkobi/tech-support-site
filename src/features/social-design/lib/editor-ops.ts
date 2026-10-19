@@ -1,9 +1,6 @@
 // src/features/social-design/lib/editor-ops.ts
-// Every change the post maker editor makes to a design, as pure functions from one
-// document to the next: adding, moving, restyling, reordering, grouping and pasting
-// layers, plus adding, removing and re-laying-out whole sizes. Geometry edits on one
-// size carry across to the sizes where the layer is still linked. Pure and
-// client-safe; check-social-design covers them.
+// Every post maker edit as a pure document-to-document function. Geometry edits carry to sizes
+// where the layer is still linked. Covered by check-social-design.
 
 import { TEXT_PRESETS, type TextPreset } from "@/features/social-design/lib/brand";
 import {
@@ -34,10 +31,7 @@ export interface Box {
   h: number;
 }
 
-/**
- * Which sizes an edit reaches: "all" carries it to every size where the layer is
- * linked, "this" changes only the size on screen and unlinks the layer there.
- */
+/** Edit reach: "all" carries to every linked size; "this" changes only this size and unlinks it. */
 export type EditScope = "all" | "this";
 
 /** Layers and their places, as held on the editor's clipboard. */
@@ -93,8 +87,7 @@ export function selectionBox(doc: DesignDoc, format: FormatKey, ids: string[]): 
 }
 
 /**
- * Adds every member of a group when one member is picked, so a group always selects
- * as a whole.
+ * Adds every group mate of a picked layer, so groups always select as a whole.
  * @param doc - Design.
  * @param ids - Picked layer ids.
  * @returns Picked ids plus their group mates, in stack order.
@@ -110,8 +103,7 @@ export function expandGroups(doc: DesignDoc, ids: string[]): string[] {
 }
 
 /**
- * Applies a patch to some layers. The patch function sees each layer and returns the
- * fields to change, so one call can restyle a mixed selection.
+ * Applies a per-layer patch to some layers, so one call can restyle a mixed selection.
  * @param doc - Design.
  * @param ids - Layers to change.
  * @param patch - Fields to change per layer.
@@ -130,11 +122,8 @@ export function updateLayers(
 }
 
 /**
- * Writes new geometry for some layers on the size being edited. With "all", each
- * change carries to every other listed size where that layer is linked, as the same
- * move, resize and turn rather than a copy; with "this", only the edited size changes
- * and the layer becomes unlinked there. A layer already unlinked on the edited size
- * was set by hand for that size, so its edits stay there too.
+ * Writes new geometry on the edited size. "all" carries the same move, resize and turn to
+ * every linked size; "this" or an already-unlinked layer changes only the edited size.
  * @param doc - Design.
  * @param format - Size the edit was made on.
  * @param changes - New geometry per layer id on that size.
@@ -169,9 +158,7 @@ export function setGeometry(
 }
 
 /**
- * Updates the measured height of auto-height text layers without touching anything
- * else: no linking, no carrying across. A layer's text height depends on its width and
- * font size on each size, so each size gets its own.
+ * Updates measured heights of auto-height text layers per size, with no linking or carrying.
  * @param doc - Design.
  * @param heights - Measured height per size per layer id.
  * @returns New design, or the same object when nothing changed by half a pixel or more.
@@ -219,15 +206,10 @@ function within(a: Box, b: Box): boolean {
 }
 
 /**
- * Makes room for words that changed length, on every size: when a text or bullet
- * layer's height changes between `before` and `after` (both measured), the layers
- * under it in the same column move by the difference, so new words never run into
- * the stars or name below them. When the layer sits on a card (the smallest frosted
- * card or rectangle holding it), the card grows by the same amount and the column
- * moves up by half of it, so a card centred on the picture stays centred. Layers
- * beside the column (a photo next to the words on a wide size) stay where they are.
- * Full-bleed layers never move. Places are worked out from `before`, so several
- * changes in one column add up.
+ * Makes room for text or bullet layers whose height changed: layers below in the same column
+ * move by the difference. A layer's card grows with it and the column shifts up by half, so a
+ * centred card stays centred. Side layers and full-bleed layers stay put; places come from
+ * `before`, so several changes in one column add up.
  * @param before - Design before the change, measured.
  * @param after - Design after the change, measured.
  * @returns `after` with the room made, or `after` itself when no height changed.
@@ -292,8 +274,7 @@ export function makeRoom(before: DesignDoc, after: DesignDoc): DesignDoc {
 }
 
 /**
- * Places a new layer: given geometry on the size on screen, auto-placed on every other
- * listed size, and put on top of the stack (or right above `above`).
+ * Places a new layer on the size on screen, auto-placed elsewhere, on top (or above `above`).
  * @param doc - Design.
  * @param layer - New layer.
  * @param format - Size on screen.
@@ -350,10 +331,8 @@ export function copyLayers(doc: DesignDoc, ids: string[]): Clip {
 }
 
 /**
- * Pastes copied layers on top of the stack with fresh ids, shifted down and right so
- * the copy doesn't hide the original. Groups in the clip become new groups. A size the
- * clip has no place on (copied from a design without that size) is auto-placed from
- * the size on screen.
+ * Pastes copied layers on top with fresh ids, shifted so they don't hide the originals. Clip
+ * groups become new groups; sizes without a place are auto-placed from the size on screen.
  * @param doc - Design.
  * @param clip - Clipboard contents.
  * @param format - Size on screen.
@@ -427,8 +406,7 @@ export function duplicateLayers(
 export type StackMove = "forward" | "backward" | "front" | "back";
 
 /**
- * Moves layers up or down the stack, keeping their order among themselves. Forward and
- * backward step past one neighbour that isn't moving.
+ * Moves layers up or down, keeping their order; forward and backward pass one non-moving neighbour.
  * @param doc - Design.
  * @param ids - Layers to move.
  * @param how - Which way.
@@ -476,8 +454,7 @@ export function moveLayerTo(doc: DesignDoc, id: string, to: number): DesignDoc {
 }
 
 /**
- * Groups layers so they select and move together. Grouped layers are pulled together
- * in the stack, just under the topmost one, so the group sits as one block.
+ * Groups layers, pulling them just under the topmost so the group sits as one block.
  * @param doc - Design.
  * @param ids - Layers to group (two or more).
  * @returns New design.
@@ -504,8 +481,7 @@ export function ungroupLayers(doc: DesignDoc, ids: string[]): DesignDoc {
 }
 
 /**
- * Aligns layers: one layer against the picture, several against the box around them.
- * Locked layers stay put.
+ * Aligns one layer to the picture, or several to their box. Locked layers stay put.
  * @param doc - Design.
  * @param format - Size on screen.
  * @param ids - Layers to align.
@@ -634,8 +610,8 @@ export function styleOf(layer: Layer): LayerStyle {
 }
 
 /**
- * Applies a copied look to layers: every style field the target layer also has, so
- * pasting a headline's look onto a shape only carries opacity, shadow and flips.
+ * Applies a copied look to every matching style field, so a headline's look on a shape only
+ * carries opacity, shadow and flips.
  * @param doc - Design.
  * @param ids - Layers to restyle.
  * @param style - Copied look.
@@ -648,8 +624,7 @@ export function pasteStyle(doc: DesignDoc, ids: string[], style: LayerStyle): De
 }
 
 /**
- * Switches a text layer to another preset: its colour, weight, spacing and font size
- * on every size follow the preset, scaled by each size's shorter side.
+ * Switches a text layer's preset; font size on each size scales by its shorter side.
  * @param doc - Design.
  * @param id - Text layer.
  * @param preset - New preset.
@@ -685,8 +660,7 @@ export function presetFontSize(preset: TextPreset, format: FormatKey): number {
 }
 
 /**
- * Starting geometry for a new layer on the size on screen: centred, sized as a share
- * of the picture's shorter side, with a font size for text-like layers.
+ * Starting geometry for a new layer: centred, sized as a share of the shorter side.
  * @param layer - New layer.
  * @param format - Size on screen.
  * @param share - Width as a share of the shorter side.
@@ -719,8 +693,7 @@ export function startGeometry(
 }
 
 /**
- * Hides or shows layers on one size only. Hiding is about what each size shows, so it
- * never carries across and never unlinks the layer's place.
+ * Hides or shows layers on one size only; never carries across or unlinks.
  * @param doc - Design.
  * @param format - Size on screen.
  * @param ids - Layers to hide or show.
@@ -755,9 +728,8 @@ function ratioOf(key: FormatKey): number {
 }
 
 /**
- * The listed size nearest in shape to another, to lay a new size out from: the
- * smallest gap in aspect ratio, measured as a factor so 2:1 and 1:2 are equally far
- * from square.
+ * The listed size nearest in shape, by aspect ratio on a log scale so 2:1 and 1:2 are equally
+ * far from square.
  * @param doc - Design.
  * @param key - Size being added or laid out.
  * @returns The nearest other listed size, or null when there is none.
@@ -765,7 +737,7 @@ function ratioOf(key: FormatKey): number {
 export function nearestFormat(doc: DesignDoc, key: FormatKey): FormatKey | null {
   const r = ratioOf(key);
   /**
-   * Shape difference from the new size, on a log scale so 2:1 and 1:2 are equally far.
+   * Log-scale shape difference from the new size.
    * @param f - Size to compare.
    * @returns Distance between the two ratios.
    */
@@ -774,9 +746,8 @@ export function nearestFormat(doc: DesignDoc, key: FormatKey): FormatKey | null 
 }
 
 /**
- * Lays every layer out on one size from its place on another, all linked. A layer the
- * source size has no place for keeps the place it has, or is placed from the first
- * size that has one.
+ * Lays every layer out on one size from another, all linked. Layers missing on the source keep
+ * their place or take it from the first size that has one.
  * @param doc - Design.
  * @param from - Size to copy from.
  * @param to - Size to lay out.
@@ -803,8 +774,7 @@ function layoutFrom(doc: DesignDoc, from: FormatKey | null, to: FormatKey): Form
 }
 
 /**
- * Adds a size to a design, laying every layer out from the listed size nearest in
- * shape. Sizes stay in tab order.
+ * Adds a size laid out from the nearest-shaped listed size, kept in tab order.
  * @param doc - Design.
  * @param key - Size to add.
  * @returns New design, or the same one when the size is already listed.
@@ -833,8 +803,7 @@ export function removeFormat(doc: DesignDoc, key: FormatKey): DesignDoc {
 }
 
 /**
- * Replaces one size's layout with another size's, re-placed to fit, every layer
- * linked again. Undo is the way back.
+ * Replaces one size's layout with another's, re-placed to fit and re-linked.
  * @param doc - Design.
  * @param from - Size to copy from.
  * @param to - Size to lay out.
@@ -846,9 +815,7 @@ export function copyLayout(doc: DesignDoc, from: FormatKey, to: FormatKey): Desi
 }
 
 /**
- * Re-links layers on one size: each goes back to where it would be placed from a size
- * it is still linked on, and follows edits again. Whether it is hidden on this size
- * stays as it was.
+ * Re-links layers on one size, re-placing each from a linked size; hidden state is kept.
  * @param doc - Design.
  * @param format - Size to re-link on.
  * @param ids - Layers to re-link.

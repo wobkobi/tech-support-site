@@ -1,7 +1,5 @@
 // src/features/social/lib/targets.ts
-// Pure helpers for a post's per-platform targets: the starting set, how the targets'
-// outcomes roll up into the post's status, and how a take-down is recorded. No database, so the check script
-// covers them directly.
+// Pure per-platform target helpers: initial set, status roll-up and take-down records.
 
 /** A target as stored on the post (mirrors the Prisma SocialTarget type). */
 export interface TargetState {
@@ -48,8 +46,7 @@ export function defaultTargets(): TargetState[] {
 }
 
 /**
- * The post status its targets add up to. Disabled and taken-down targets don't
- * count. Anything still pending keeps the run open ("posting") for the cron to finish.
+ * The post status its targets add up to, ignoring disabled and taken-down ones; pending keeps it "posting".
  * @param targets - The post's targets after a run.
  * @returns posting, posted, partial or failed.
  */
@@ -62,8 +59,7 @@ export function rollUpStatus(targets: TargetState[]): "posting" | "posted" | "pa
 }
 
 /**
- * Resets failed targets to pending for a retry. Posted targets are left alone, so
- * a retry can never post twice to a platform that already has it.
+ * Resets failed targets to pending; posted ones stay, so a retry never double-posts.
  * @param targets - Current targets.
  * @returns New targets array.
  */
@@ -74,8 +70,7 @@ export function resetFailed(targets: TargetState[]): TargetState[] {
 }
 
 /**
- * Resets every enabled target to pending and marks disabled ones skipped, for a
- * fresh publish of a draft (a duplicated post may carry old outcomes).
+ * Resets enabled targets to pending and disabled to skipped, for a fresh publish.
  * @param targets - Current targets.
  * @returns New targets array.
  */
@@ -101,9 +96,8 @@ export function takeDownDue<T extends Pick<TargetState, "status">>(targets: T[])
 }
 
 /**
- * Records take-down results. A target that came down keeps its post id for the
- * record but drops its link, which now goes nowhere. One that didn't stays posted
- * with the reason, so pressing Take down again retries just that platform.
+ * Records take-down results: a removed target keeps its id but drops its dead link; a failed
+ * one stays posted with the reason, so Take down retries just it.
  * @param targets - Targets before the take-down.
  * @param outcomes - Result per platform that was attempted.
  * @param now - When it ran.
@@ -124,8 +118,7 @@ export function applyTakeDown(
 }
 
 /**
- * The post status after a take-down: "removed" once nothing is up anywhere,
- * otherwise what the targets still up add up to.
+ * Status after a take-down: "removed" when nothing is up, else the roll-up of what's left.
  * @param targets - Targets after the take-down.
  * @returns removed, or the roll-up of what's left.
  */

@@ -1,8 +1,7 @@
 "use client";
 // src/features/social/components/PostComposer.tsx
-// Write, preview and publish one social post. Drafts and presets autosave; the preview
-// cards and their warnings come from the same rules publishing enforces, filled with the
-// same promo wording, so what shows here is what goes out.
+// Write, preview and publish one social post. Drafts and presets autosave; previews use the
+// publishing rules and promo wording, so what shows is what goes out.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -164,8 +163,7 @@ function diff(now: Content, saved: Content): Record<string, unknown> {
  * @param props.details - Site address and contact details for the Add menu.
  * @param props.design - Post maker design the picture came from, or null.
  * @param props.onSaved - Called with the name and text after each successful save.
- * @param props.saveRef - Filled with a function that saves any pending edit, so the page
- *   can save before it opens another post in this composer's place.
+ * @param props.saveRef - Filled with a save-pending-edits function, used before another post opens.
  * @returns Composer element.
  */
 export function PostComposer({
@@ -337,8 +335,7 @@ export function PostComposer({
   }
 
   /**
-   * Inserts text at the cursor in the post or in one platform's own text,
-   * replacing any selection, then puts the cursor just after it.
+   * Inserts text at the cursor in the post or one platform's text, replacing any selection.
    * @param box - "body" or the platform whose own text gets it.
    * @param text - Text to insert.
    * @param line - Start on a fresh line.
@@ -373,8 +370,7 @@ export function PostComposer({
   }
 
   /**
-   * Shrinks and uploads a picture, replacing the current one it's for: the post's, or
-   * the platform's own picked through {@link pickPicture}.
+   * Shrinks and uploads a picture for the post or the platform picked via {@link pickPicture}.
    * @param file - Picked image.
    */
   async function addImage(file: File): Promise<void> {
@@ -468,8 +464,8 @@ export function PostComposer({
   }
 
   /**
-   * Deletes the post from every platform it's up on. A platform that refuses stays
-   * posted with its reason, and pressing Take down again retries just that one.
+   * Deletes the post from every platform; a refusing platform keeps its reason, and Take down
+   * again retries just that one.
    */
   async function takeDown(): Promise<void> {
     setConfirmingTakeDown(false);
@@ -615,8 +611,7 @@ export function PostComposer({
             : "Ready to post.";
 
   /**
-   * Switches between the form and the preview below xl, remembering how far down the
-   * page was in the one being left.
+   * Switches form and preview below xl, remembering each pane's scroll position.
    * @param next - Pane to show.
    */
   function switchPane(next: "write" | "preview"): void {

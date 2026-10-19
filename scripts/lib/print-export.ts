@@ -1,9 +1,6 @@
 // scripts/lib/print-export.ts
-// Shared Puppeteer > pdf-lib core for the print artwork exporters (poster,
-// business card). Screenshots a route at an exact pixel viewport, embeds the PNG
-// into a page sized in points, and draws ISO 12647 crop marks on bleed variants.
-// Nothing here knows which artwork it renders: callers own the page configs and
-// the CLI.
+// Shared Puppeteer > pdf-lib core for the print exporters: exact-viewport screenshot,
+// point-sized PDF page, and ISO 12647 crop marks on bleed variants.
 
 import fs from "fs";
 import { PDFDocument, PDFPage, rgb } from "pdf-lib";
@@ -28,8 +25,7 @@ export interface PageConfig {
   /** URL suffix appended to the base page URL (e.g. "?mode=print" > /poster?mode=print). */
   urlSuffix?: string;
   /**
-   * URL suffixes rendered in order as the pages of one PDF, such as a card's
-   * front then back. Takes the place of `urlSuffix` when set.
+   * URL suffixes rendered in order as the pages of one PDF; replaces `urlSuffix` when set.
    */
   pageSuffixes?: string[];
 }
@@ -37,9 +33,7 @@ export interface PageConfig {
 /* ---------- Constants ---------- */
 
 /**
- * Puppeteer device scale factor (CSS pixel > physical pixel multiplier).
- * 1 = 300 DPI (captures the viewport as-is).
- * 2 = 600 DPI effective.
+ * Puppeteer device scale factor. 1 = 300 DPI (viewport as-is), 2 = 600 DPI effective.
  */
 export const DEVICE_SCALE_FACTOR = 2 as const;
 
@@ -55,16 +49,10 @@ const CROP_MARK_THICKNESS_PT = 0.25 as const;
 /* ---------- Crop marks ---------- */
 
 /**
- * Adds ISO 12647 crop marks to a PDF page for print trimming.
- *
- * Draws L-shaped trim marks at all four corners of the content area. Marks sit
- * at the trim edge and extend outward into the bleed.
- *
- * The bleed margin is derived from the width alone and reused vertically, so
- * this holds only for artwork bled evenly on all four edges - which is what
- * printers quote, and what the poster and card configs both use.
+ * Adds ISO 12647 L-shaped crop marks at each corner, extending into the bleed. Assumes
+ * an even bleed on all edges (derived from the width alone).
  * @param page - pdf-lib PDFPage instance with bleed dimensions.
- * @param trimWidth - Width of the trim box in points - the intended content width after trimming (e.g. 419.53 pt for A5).
+ * @param trimWidth - Trim box width in points (e.g. 419.53 pt for A5).
  * @internal
  */
 function addCropMarks(page: PDFPage, trimWidth: number): void {
@@ -150,10 +138,8 @@ function addCropMarks(page: PDFPage, trimWidth: number): void {
 /* ---------- Core ---------- */
 
 /**
- * Screenshots one variant and writes it as a PDF: one page per entry in
- * `pageSuffixes`, or a single page from `urlSuffix`. Every page carries a
- * TrimBox at the trim size and a BleedBox at the full page, so a printer's
- * preflight finds the bleed without relying on crop marks.
+ * Screenshots one variant into a PDF, one page per `pageSuffixes` entry (or `urlSuffix`).
+ * Each page carries a TrimBox and BleedBox for printer preflight.
  * @param browser - Puppeteer browser instance.
  * @param config - Variant configuration (viewport, PDF size, crop marks).
  * @param url - Base URL of the page to screenshot.
@@ -185,9 +171,7 @@ export async function generateVariant(
       const targetUrl = url + suffix;
       console.log(`Loading: ${targetUrl}`);
 
-      // Refuse anything but a 2xx: a 404 or 500 still renders a full page, and
-      // capturing it would overwrite good artwork with an error page wearing the
-      // site chrome (a route not yet deployed to prod is the usual cause).
+      // Refuse anything but a 2xx, or an error page overwrites good artwork.
       const response = await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 30000 });
       const status = response?.status() ?? 0;
       if (status < 200 || status >= 300) {
@@ -196,9 +180,7 @@ export async function generateVariant(
         );
       }
 
-      // The dev server paints its route indicator into a <nextjs-portal> element,
-      // which otherwise lands in the corner of artwork captured with --local. No
-      // such element exists on a production capture, so this is a no-op there.
+      // Hide the dev server's <nextjs-portal> route indicator (no-op on production).
       await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
 
       // Allow fonts and lazy assets to finish rendering.
@@ -252,9 +234,7 @@ export async function renderVariants(
 ): Promise<string[]> {
   const browser = await puppeteer.launch({
     headless: true,
-    // force-color-profile pins rendering to sRGB so captured hexes match the
-    // stylesheet exactly regardless of the host machine's monitor profile
-    // (wide-gamut displays otherwise skew the screenshot's colour values).
+    // Pin rendering to sRGB so captured hexes match the stylesheet on wide-gamut displays.
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--force-color-profile=srgb"],
   });
 

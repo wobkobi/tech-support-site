@@ -1,7 +1,5 @@
 // src/features/social-design/lib/new-layer.ts
-// New layers as the Add menu makes them, already in the house style: preset text,
-// brand colours, the frosted card's corner radius. Each comes with how big it starts
-// (a share of the picture's shorter side) and its shape.
+// New layers from the Add menu, already in house style, with a starting size and shape.
 
 import {
   LOGOS,

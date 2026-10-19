@@ -12,9 +12,8 @@ import { NextRequest, NextResponse } from "next/server";
 const NZ_HOLIDAYS_CALENDAR_ID = "en.new_zealand#holiday@group.v.calendar.google.com";
 
 /**
- * Returns the region label for a holiday event. Auckland regional anniversary
- * lives on the same Google calendar as nationwide holidays; the description
- * field tags regional ones with "Regional holiday in <region>".
+ * Returns the region label for a holiday event; regional ones are tagged
+ * "Regional holiday in <region>" in the description.
  * @param description - Event description text from the Google calendar.
  * @returns NZ_REGION for nationwide, HOME_REGION for Auckland, or null to skip.
  */
@@ -28,8 +27,7 @@ function regionFor(description: string | null | undefined): string | null {
 
 /**
  * GET /api/cron/refresh-public-holidays
- * Fetches NZ public holidays for the current and next calendar year from the
- * Google holidays calendar, upserts each into `PublicHoliday`. Idempotent.
+ * Upserts this and next year's NZ public holidays into `PublicHoliday`. Idempotent.
  * @param request - The incoming cron request.
  * @returns JSON `{ ok, upserted, years }` or an error.
  */
@@ -38,9 +36,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
 
-  // Server-only key, no fallback to GOOGLE_MAPS_API_KEY: next.config.ts
-  // publishes that one to the browser, so falling back would spend a publicly
-  // readable key on server-side quota.
+  // Server-only key; GOOGLE_MAPS_API_KEY is public, so never fall back to it.
   const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY;
   if (!apiKey) {
     return NextResponse.json(

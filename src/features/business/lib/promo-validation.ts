@@ -1,10 +1,5 @@
 // src/features/business/lib/promo-validation.ts
-// One place deciding whether a promo is well formed.
-//
-// The create and edit routes each carried their own copy of this, and they
-// drifted: adding fixed_amount and free_travel to the create route left the
-// edit route still demanding exactly one of the two original columns, so
-// editing a fixed-amount promo was rejected outright.
+// One place deciding whether a promo is well formed, shared by the create and edit routes.
 
 /** The four shapes a promo's discount can take. */
 export type PromoDiscountType = "flat_hourly" | "percent" | "fixed_amount" | "free_travel";
@@ -33,9 +28,7 @@ export function resolveDiscountType(values: PromoDiscountValues): PromoDiscountT
 }
 
 /**
- * Checks that the value column matching the discount type is present and in
- * range. Validating per type rather than as a blanket XOR is what lets a
- * fixed-amount or travel promo exist at all.
+ * Checks that the value column matching the discount type is present and in range.
  * @param values - The promo's discount fields.
  * @returns An error message, or null when the discount is well formed.
  */
@@ -56,8 +49,7 @@ export function validateDiscount(values: PromoDiscountValues): string | null {
         ? null
         : "fixedAmount must be a positive number";
     case "free_travel":
-      // The fraction still charged: 0 is free travel, 0.5 is half price. 1
-      // would be a promo that does nothing.
+      // The fraction still charged: 0 is free, 0.5 half price; 1 would do nothing.
       return typeof values.travelPercent === "number" &&
         values.travelPercent >= 0 &&
         values.travelPercent < 1
@@ -66,11 +58,7 @@ export function validateDiscount(values: PromoDiscountValues): string | null {
   }
 }
 
-/**
- * How a customer comes by a promo. Mirrored from the schema enum rather than
- * imported, keeping this module free of the Prisma client for the same reason
- * {@link PromoDiscountType} is duplicated here.
- */
+/** How a customer comes by a promo. Mirrored from the schema enum to keep Prisma out of this module. */
 export type PromoKind = "automatic" | "code";
 
 /** The kind/code pairing as it arrives from a request. */
@@ -84,11 +72,7 @@ export interface PromoKindValues {
 const CODE_PATTERN = /^[A-Z0-9-]{3,32}$/;
 
 /**
- * Checks that a promo's kind and code agree.
- *
- * The pairing is validated rather than inferred: a code promo saved without a
- * code could never be claimed by anyone, and an automatic promo carrying one
- * would look like a code promo in the list while applying to every visitor.
+ * Checks that a promo's kind and code agree: a code promo needs a code, an automatic one has none.
  * @param values - The promo's kind and normalised code.
  * @returns An error message, or null when the pairing is well formed.
  */
@@ -112,11 +96,7 @@ export interface PromoLimitValues {
 }
 
 /**
- * Checks the eligibility limits are whole positive counts.
- *
- * Rejected rather than coerced: a limit of 0 would disable the promo through a
- * field nobody reads as an off switch, and a fractional one would compare
- * unpredictably against a count.
+ * Checks the eligibility limits are whole positive counts (0 would silently disable the promo).
  * @param values - The promo's limit fields.
  * @returns An error message, or null when the limits are well formed.
  */
@@ -141,11 +121,8 @@ export interface PromoWindowValues {
 }
 
 /**
- * Checks a promo's recurring restriction is one the resolver can act on.
- *
- * The two time bounds must both be set or both be absent. Half a range is
- * enforced as no range at all, so accepting one would silently give the
- * operator a wider promo than the form appeared to describe.
+ * Checks a promo's recurring restriction is one the resolver can act on. Both time bounds or
+ * neither: the resolver ignores half a range.
  * @param values - The promo's weekday and time-of-day fields.
  * @returns An error message, or null when the restriction is well formed.
  */
@@ -188,15 +165,8 @@ export interface PromoTierInput {
 }
 
 /**
- * Checks a promo's spend threshold and bands.
- *
- * Each band is put through {@link validateDiscount} against the parent's type,
- * so a band cannot carry a different kind of discount from the promo it belongs
- * to - a percent promo with a flat-rate band would price as neither.
- *
- * Floors must ascend with no repeats. Resolution takes the highest band reached
- * and must never depend on stored order, so two bands at the same floor have no
- * defined winner and are rejected rather than silently resolved.
+ * Checks a promo's spend threshold and bands. Each band is validated against the parent's type
+ * via {@link validateDiscount}, and duplicate floors are rejected since they have no defined winner.
  * @param discountType - The parent promo's resolved discount type.
  * @param minSpend - Floor for the whole promo, or null.
  * @param tiers - The spend bands, possibly empty.
@@ -227,8 +197,7 @@ export function validateTiers(
   if (new Set(floors).size !== floors.length) {
     return "two tiers cannot share a spend threshold";
   }
-  // The parent floor is the entry price, so a band below it could never be the
-  // one that applies and is a mistake rather than a narrower offer.
+  // A band below the parent floor could never apply.
   if (minSpend != null && floors.some((f) => f < minSpend)) {
     return "a tier cannot sit below the promo's own minimum spend";
   }

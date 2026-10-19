@@ -1,8 +1,6 @@
 // src/features/business/lib/google-retry.ts
-// Retry wrapper for googleapis calls. Transient failures (rate limits, 5xx,
-// connection resets) are retried with exponential backoff plus a small additive
-// jitter; permanent errors (bad range, auth, protected range) are rethrown
-// immediately.
+// Retry wrapper for googleapis calls: transient failures back off exponentially with jitter;
+// permanent errors rethrow at once.
 
 /** HTTP statuses worth retrying: rate limit + server-side hiccups. */
 const TRANSIENT_STATUSES = new Set([429, 500, 502, 503, 504]);
@@ -27,8 +25,7 @@ export interface RetryOpts {
 }
 
 /**
- * Extracts the HTTP status from a GaxiosError-shaped error. googleapis sets
- * both a numeric `code` and `response.status` depending on the failure path.
+ * Extracts the HTTP status from a GaxiosError (`response.status` or a numeric `code`).
  * @param err - The thrown error.
  * @returns HTTP status number, or null when not an HTTP error.
  */
@@ -69,9 +66,8 @@ function retryAfterMs(err: unknown): number | null {
 }
 
 /**
- * Runs a googleapis call, retrying transient failures with exponential backoff
- * plus a small additive jitter. Honours Retry-After on 429s. Wrap the individual API call,
- * not a multi-step function, so a retry re-issues only the failed request.
+ * Runs a googleapis call, retrying transient failures (honouring Retry-After). Wrap one API
+ * call, not a multi-step function, so a retry re-issues only the failed request.
  * @param fn - Thunk performing one API call.
  * @param opts - Retry tuning; see {@link RetryOpts}.
  * @returns The call's result.

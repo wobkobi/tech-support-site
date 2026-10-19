@@ -1,9 +1,7 @@
 "use client";
 // src/shared/components/ErrorPageShell.tsx
-// Shared layout for the App Router error boundaries. Each segment supplies its
-// own copy and secondary action; everything else - the "Oops!" numeral, the
-// heading scale, the retry button and the technical-details block - lives here
-// so the four boundaries cannot drift apart.
+// Shared layout for the App Router error boundaries, so the four cannot drift apart. Each
+// segment supplies its own copy and secondary action.
 
 import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";

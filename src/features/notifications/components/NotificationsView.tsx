@@ -1,11 +1,8 @@
 "use client";
 // src/features/notifications/components/NotificationsView.tsx
-// Per-device push notification setup. Resolves the browser into one of five states and
-// shows only the controls that can actually work there.
-//
-// iOS is the reason this is stateful rather than a single button: Apple only allows push
-// for home-screen web apps, and a declined permission prompt can only be undone in iOS
-// Settings, never re-prompted from the page.
+// Per-device push setup: resolves the browser to one of five states and shows only the
+// controls that work there. iOS needs a home-screen install, and a declined prompt there
+// can only be undone in iOS Settings.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
@@ -34,9 +31,8 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = window.atob(base64);
-  // Back the array with an explicit ArrayBuffer: applicationServerKey takes a
-  // BufferSource, and a bare `new Uint8Array(n)` widens to ArrayBufferLike,
-  // which includes SharedArrayBuffer and so does not satisfy it.
+  // Explicit ArrayBuffer: a bare `new Uint8Array(n)` widens to ArrayBufferLike, which
+  // isn't a valid BufferSource for applicationServerKey.
   const outputArray = new Uint8Array(new ArrayBuffer(rawData.length));
   for (let i = 0; i < rawData.length; ++i) {
     outputArray[i] = rawData.charCodeAt(i);
@@ -77,9 +73,7 @@ export function NotificationsView(): React.ReactElement {
     }
   }, [toast]);
 
-  // Resolve which of the five states this browser is in. Every branch is
-  // reachable on iOS, and showing the wrong one means an Enable button that
-  // silently does nothing.
+  // Every branch is reachable on iOS; the wrong one shows an Enable button that does nothing.
   useEffect(() => {
     /**
      * Works out which of the five states this browser is in and stores it.
@@ -91,8 +85,7 @@ export function NotificationsView(): React.ReactElement {
         return;
       }
 
-      // iOS only allows push for home-screen web apps, so an uninstalled
-      // iPhone gets install steps rather than a button that cannot work.
+      // iOS only allows push for home-screen web apps, so show install steps.
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
       const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
       if (isIOS && !isStandalone) {

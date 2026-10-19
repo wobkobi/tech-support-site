@@ -1,7 +1,5 @@
 // src/features/business/lib/invoice-email-request.ts
-// Shared request-side helpers for the invoice emails (preview / send / void / void-preview
-// routes and the overdue reminders): operator override parsing and the invoice > email
-// payload projection.
+// Request-side helpers for the invoice email routes: override parsing and the email payload.
 
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
@@ -15,15 +13,9 @@ export interface InvoiceEmailOverrides {
   greetingName?: string;
   /** Replaces the intro paragraph. */
   customBody?: string;
-  /**
-   * Send route only: false cancels this invoice's automatic review ask (the operator
-   * unticked it). Undefined or true leaves the ask to go out on schedule.
-   */
+  /** Send route only: false cancels this invoice's automatic review ask. */
   reviewAsk?: boolean;
-  /**
-   * Send route only: a recipient that replaces Invoice.clientEmail (e.g. the stored
-   * address bounced). Normalised; blank becomes undefined.
-   */
+  /** Send route only: normalised recipient replacing Invoice.clientEmail (e.g. a bounce). */
   toEmail?: string;
   /** Void route only: whether to email the customer about the void. */
   sendNotification: boolean;
@@ -48,10 +40,8 @@ export type InvoiceEmailPayload = Pick<
 };
 
 /**
- * Reads the operator overrides from a request body, tolerating a missing or
- * malformed body. Every field is parsed here rather than per-route because the
- * body can only be consumed once, so a route needing `sendNotification` could
- * not also call a narrower helper.
+ * Reads every operator override from a request body in one pass (it can only be consumed
+ * once), tolerating a missing or malformed body.
  * @param request - The incoming request.
  * @returns The parsed overrides, with unset or wrongly-typed fields left undefined.
  */

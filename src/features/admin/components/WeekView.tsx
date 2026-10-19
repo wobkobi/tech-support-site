@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/WeekView.tsx
-// Admin week-grid view. Renders booking, work, personal, and travel events for the
-// requested week and opens a manual-booking modal when an empty slot is clicked.
+// Admin week grid; clicking an empty slot opens the manual-booking modal.
 
 import { BlockDayButton } from "@/features/admin/components/BlockDayButton";
 import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
@@ -73,17 +72,14 @@ export function WeekView({
   const { pendingDays, optimisticBlock, setPending, applyOptimisticBlock, debouncedRefresh } =
     useOptimisticDayBlocks(events);
 
-  // useTransition keeps the current grid visible while the server rebuilds
-  // the buffer around a week that falls outside the current 21-day window.
+  // Keeps the grid visible while the server rebuilds the buffer.
   const [isPending, startTransition] = useTransition();
 
   const todayNzKey = useMemo(() => nzDateKey(new Date()), []);
   // Stable "now" for the past-event lock (hides block buttons on old days).
   const [renderedAt] = useState(() => Date.now());
 
-  // Live "now" for the current-time line - ticks each minute so the marker
-  // creeps down today's column. Separate from renderedAt (which stays stable so
-  // the block buttons don't flicker as the clock advances).
+  // Ticking "now" for the time line; renderedAt stays stable so block buttons don't flicker.
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 60_000);
@@ -92,8 +88,7 @@ export function WeekView({
   const nowKey = nzDateKey(new Date(nowMs));
   const nowOffsetMin = minuteOfDay(new Date(nowMs).toISOString());
 
-  // Prev/Next/Today Monday keys derived from current state for the nav
-  // chevrons and the "Today" button.
+  // Monday keys for the prev/next/Today buttons.
   const { prevWeekKey, nextWeekKey, todayWeekKey } = useMemo(() => {
     const ws = new Date(weekStartIso);
     return {
@@ -104,9 +99,7 @@ export function WeekView({
   }, [weekStartIso]);
 
   /**
-   * Navigates to a different week. Stays client-side when the target Monday
-   * is inside the buffered window (instant + URL mirrored); otherwise fires
-   * router.push so the server can rebuild the buffer.
+   * Navigates to a week: client-side inside the buffer, else router.push.
    * @param weekStartKey - NZ Monday-YYYY-MM-DD to navigate to.
    */
   function goToWeek(weekStartKey: string): void {
@@ -117,8 +110,7 @@ export function WeekView({
       });
       return;
     }
-    // Convert the NZ Monday key to a UTC ISO that represents NZ midnight
-    // (same shape as initialWeekStartIso so the days memo math stays consistent).
+    // NZ midnight as UTC ISO, the same shape as initialWeekStartIso.
     const [y, m, d] = dateKeyParts(weekStartKey);
     const iso = nzMidnightUtc(y, m, d).toISOString();
     setWeekStartIso(iso);
@@ -157,9 +149,7 @@ export function WeekView({
     }
     for (const ev of events) {
       if (ev.isAllDay) {
-        // Multi-day all-day events must land in every day bucket they overlap. Google's
-        // all-day end is exclusive (next NZ midnight), so the YYYY-MM-DD comparison is
-        // start-inclusive, end-exclusive.
+        // Google's all-day end is exclusive, so a multi-day event fills [start, end).
         const startKey = nzDateKey(new Date(ev.startAt));
         const endKey = nzDateKey(new Date(ev.endAt));
         for (const day of arr) {
@@ -174,8 +164,7 @@ export function WeekView({
         if (bucket) bucket.timedEvents.push(ev);
       }
     }
-    // Inject a placeholder Busy for days just blocked optimistically that don't
-    // yet have a real event, so the header button + a spanning bar show instantly.
+    // Placeholder Busy for days blocked optimistically with no real event yet.
     for (const day of arr) {
       if (
         optimisticBlock.get(day.key) === true &&
@@ -192,9 +181,8 @@ export function WeekView({
     [],
   );
 
-  // Merge consecutive-day all-day events into spanning bars, each covering its first to
-  // last visible day inclusive. Column numbering: 1 = time gutter, 2..8 = days, so day
-  // index i sits at grid column i + 2.
+  // Merge consecutive-day all-day events into spanning bars. Column 1 is the gutter,
+  // so day index i sits at grid column i + 2.
   const allDayBars = useMemo(() => {
     interface RawBar {
       key: string;
@@ -205,9 +193,8 @@ export function WeekView({
     }
     const raw: RawBar[] = [];
 
-    // Merge ANY contiguous run of blocked days (booking-kind all-day, optimistic
-    // placeholders included) into ONE "Busy" span, so the bar doesn't flicker while the
-    // server reconciles rapid blocks into a merged event.
+    // Any contiguous run of blocked days (placeholders included) is ONE "Busy" span,
+    // so the bar doesn't flicker while the server merges rapid blocks.
     const blocked = days.map((d) => d.allDayEvents.some((e) => e.kind === "booking"));
     for (let i = 0; i < days.length;) {
       if (!blocked[i]) {
@@ -261,8 +248,7 @@ export function WeekView({
       flush();
     }
 
-    // Pack bars onto rows: a bar reuses the first lane whose last bar ends before
-    // it starts, so non-overlapping bars share ONE row instead of staggering.
+    // Pack bars into the first lane whose last bar ends before this one starts.
     raw.sort((a, b) => a.startCol - b.startCol);
     const laneEnds: number[] = [];
     return raw.map((bar) => {
@@ -274,8 +260,7 @@ export function WeekView({
   }, [days]);
 
   /**
-   * Maps a click position inside a day column to a 15-min-rounded UTC ISO
-   * start time and opens the manual-booking modal at that time.
+   * Opens the booking modal at the click position, rounded to 15 minutes.
    * @param event - Mouse event for the click.
    * @param dayKey - YYYY-MM-DD key for the day column that was clicked.
    */
@@ -327,8 +312,7 @@ export function WeekView({
         </div>
       </div>
 
-      {/* relative wrapper carries the right-edge fade hint - the grid is wider
-          than the admin content area until ~xl, so it scrolls horizontally. */}
+      {/* Carries the right-edge fade: the grid scrolls horizontally until ~xl. */}
       <div className="relative">
         <div className="overflow-x-auto rounded-lg border border-admin-border bg-admin-surface">
           <div className="min-w-225">
@@ -337,8 +321,7 @@ export function WeekView({
               <div className="border-r border-admin-border" />
               {days.map((day) => {
                 const isToday = day.key === todayNzKey;
-                // Real block (for the unblock id) excludes the optimistic placeholder;
-                // `blocked` reflects the effective state so the button flips instantly.
+                // Real block (unblock id) excludes the placeholder; `blocked` is effective state.
                 const realBusy = day.allDayEvents.find(
                   (e) => e.kind === "booking" && !e.id.startsWith(OPTIMISTIC_BUSY_PREFIX),
                 );
@@ -353,8 +336,7 @@ export function WeekView({
                       isToday && "bg-russian-violet/5",
                     )}
                   >
-                    {/* Overlaid (no layout space) so a holiday never pushes the date
-                        down - every day/week keeps the same header height. */}
+                    {/* Overlaid so a holiday never changes the header height. */}
                     {holidayName && (
                       <div
                         className="absolute inset-x-0 top-1 truncate px-1 text-sm leading-none font-semibold text-amber-700 uppercase"
@@ -392,8 +374,7 @@ export function WeekView({
               })}
             </div>
 
-            {/* All-day events bar - merges consecutive days into one continuous
-              span so multi-day Busy blocks read as a single bar. */}
+            {/* All-day events bar, multi-day blocks as one span. */}
             {allDayBars.length > 0 && (
               <div className="grid grid-cols-[64px_repeat(7,1fr)] gap-y-0.5 border-b border-admin-border px-0 py-1">
                 {allDayBars.map((bar) => (
@@ -487,9 +468,7 @@ interface DayColumnProps {
 }
 
 /**
- * Renders a single day column with its events as absolute-positioned blocks.
- * Clicking the background opens the booking modal; clicking a booking card
- * opens its detail page. Today's column draws a live current-time line.
+ * Renders one day column. Background click opens the booking modal; a card opens its booking.
  * @param props - Component props.
  * @param props.day - Day bucket with the day key and its events.
  * @param props.onClick - Click handler forwarded from the parent week view.
@@ -527,9 +506,8 @@ function DayColumn({
         const durationMin =
           (new Date(ev.endAt).getTime() - new Date(ev.startAt).getTime()) / 60_000;
         const height = Math.max(18, durationMin * PX_PER_MINUTE);
-        // Single click, since a double-click silently fails if the clicks drift a pixel.
-        // With a DB row > in-app detail page; without one (added straight in Google
-        // Calendar) > open there. stopPropagation always runs so the add modal never fires.
+        // Single click (double-clicks fail on pixel drift). With a DB row > detail page,
+        // else > Google Calendar. Always stopPropagation so the add modal never fires.
         const bookingId = ev.kind === "booking" ? ev.booking?.id : undefined;
         const calendarLink =
           ev.kind === "booking" && !bookingId ? (ev.htmlLink ?? undefined) : undefined;
@@ -575,8 +553,7 @@ function DayColumn({
 }
 
 /**
- * Returns the NZ wall-clock minute-of-day for an ISO timestamp. Used to position
- * event blocks vertically within their day column.
+ * Returns the NZ wall-clock minute-of-day for an ISO timestamp.
  * @param iso - ISO 8601 timestamp.
  * @returns Minute-of-day relative to the grid's DAY_START_HOUR.
  */

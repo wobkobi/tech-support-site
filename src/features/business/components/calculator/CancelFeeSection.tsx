@@ -12,9 +12,7 @@ import type { CancelMeetingType, CancellationReason } from "@/features/business/
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
-/**
- * Props for the {@link CancelFeeSection} component.
- */
+/** Props for the {@link CancelFeeSection} component. */
 interface CancelFeeSectionProps {
   /** Which fee is being billed. */
   reason: CancellationReason;
@@ -73,8 +71,7 @@ const MEETING_TYPES: { value: CancelMeetingType; label: string }[] = [
 ];
 
 /**
- * Renders a policy window in hours. The windows are settings, so a value of 1
- * is reachable and "1 hours" would read as a bug.
+ * Renders a policy window in hours, singular for 1.
  * @param n - Number of hours.
  * @returns e.g. "1 hour", "12 hours".
  */
@@ -96,12 +93,8 @@ function formatNotice(hours: number): string {
 }
 
 /**
- * Dedicated form for billing an early cancel or no-show. Replaces the job-shaped
- * calculator body - a cancelled job has no work to bill, only a call-out fee and
- * optionally the round trip that was already driven. The charge is derived from
- * the cancellation policy using the booking's start and the moment the client
- * called it off, and the verdict is spelled out so the invoice can be justified
- * to the client without re-deriving the windows by hand.
+ * Form for billing an early cancel or no-show: a policy-derived call-out fee plus
+ * optional travel, with the verdict spelled out to justify the invoice.
  * @param props - Component props.
  * @param props.reason - Which fee is being billed.
  * @param props.onReasonChange - Called when the operator switches the fee type.
@@ -224,8 +217,7 @@ export function CancelFeeSection({
         </AdminField>
       </div>
 
-      {/* When they called it off. A no-show never called, so there is no notice
-          to measure and these inputs would only mislead. */}
+      {/* When they called it off; hidden for a no-show, which gave no notice. */}
       {!noShow && (
         <div className="grid gap-3 sm:grid-cols-2">
           <AdminField label="They cancelled on" htmlFor="cancel-at-date">
@@ -298,10 +290,7 @@ export function CancelFeeSection({
         )}
       </div>
 
-      {/* Fee is the policy's, not the operator's. Editing it here would quietly
-          bill something the published policy does not say, so it is shown rather
-          than typed - the fee follows the times and the settings. To let one go,
-          don't send the invoice; to bend one, edit the saved draft. */}
+      {/* Read-only: the fee follows the published policy. To bend it, edit the saved draft. */}
       <p className="text-sm text-admin-text-secondary">
         <span className="font-medium">Fee:</span>{" "}
         {fee > 0 ? `$${fee} (from your cancellation policy)` : "none"}

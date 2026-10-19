@@ -1,8 +1,5 @@
 // src/app/admin/(shell)/contacts/conflicts/page.tsx
-// Lists unresolved Google Contacts sync conflicts (fields that changed on both the site
-// DB and Google since the last sync). Joins each conflict to its contact, maps to
-// ConflictRows, and renders ContactConflictsView so the operator can pick the winning
-// value.
+// Lists unresolved Google Contacts sync conflicts so the operator can pick each winning value.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import {
@@ -27,8 +24,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Admin page listing pending Google Contacts sync conflicts and letting the
- * operator pick which side wins per row.
+ * Admin page listing pending Google Contacts sync conflicts.
  * @returns Conflicts page element.
  */
 export default async function AdminContactConflictsPage(): Promise<React.ReactElement> {
@@ -48,8 +44,7 @@ export default async function AdminContactConflictsPage(): Promise<React.ReactEl
     }),
   ]);
 
-  // A flagged row always has an address (the flag is only ever set alongside
-  // one), but the column is nullable so narrow it rather than asserting.
+  // A flagged row always has an address, but the column is nullable.
   const addressRows: AddressReviewRow[] = flagged.flatMap((c) =>
     c.address
       ? [

@@ -1,7 +1,5 @@
 // src/app/api/business/invoices/[id]/preview-void-email/route.ts
-// Admin endpoint that renders the void-notification email for review without sending it.
-// POST builds the subject + HTML body for the void notice, applying optional operator
-// overrides (greetingName, customBody).
+// Renders the void-notification email for review without sending it.
 
 import {
   parseInvoiceEmailOverrides,
@@ -15,8 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/business/invoices/[id]/preview-void-email
- * Returns the rendered subject + HTML body for the void notification email so
- * the operator can review it in the void modal before sending. No email is sent.
+ * Rendered subject + HTML for the void notice. Sends nothing.
  * @param request - Next.js request (admin-auth gated).
  * @param ctx - Route ctx with the invoice id.
  * @param ctx.params - Resolved Next.js dynamic route params.

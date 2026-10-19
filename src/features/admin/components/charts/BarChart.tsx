@@ -1,8 +1,7 @@
 "use client";
 // src/features/admin/components/charts/BarChart.tsx
-// Grouped column chart for money series (income vs expenses by month or by FY). Plain
-// HTML columns, no chart library: each group is a button, so hover, tap and keyboard focus
-// all show one readout listing every series. A "Show as table" twin holds every value.
+// Grouped column chart for money series in plain HTML; each group is a button that shows a
+// readout, with a "Show as table" twin.
 
 import { formatAxisDollars, niceScale } from "@/features/admin/components/charts/chart-scale";
 import type { ChartSeries } from "@/features/admin/components/charts/series";
@@ -50,12 +49,8 @@ interface BarChartProps {
 const PLOT_H = "h-56";
 
 /**
- * Renders the chart card: heading, legend with series totals, plot, axis and table view.
- *
- * Columns follow the dataviz mark spec: at most 24px wide, 4px rounded tops, square on
- * the baseline, a 2px surface gap between neighbours. A non-zero value too small to see
- * still gets a 2px column so it doesn't read as nothing; negative values plot as 0 (the
- * readout and table show the real figure).
+ * Renders the chart card: heading, legend with totals, plot, axis and table view. A tiny
+ * non-zero value still gets a 2px column; negatives plot as 0 (the table shows the real figure).
  * @param props - Component props.
  * @param props.title - Chart heading.
  * @param props.description - Optional line under the heading.
@@ -89,8 +84,7 @@ export function BarChart({
   const stop = Math.min(tabStop, groups.length - 1);
   const active = hovered ?? focused;
 
-  // A tapped readout stays up until a tap lands outside the plot (Safari never focuses a
-  // tapped button, so blur alone can't dismiss it).
+  // A tap outside dismisses a tapped readout; Safari never focuses a tapped button.
   useEffect(() => {
     if (hovered === null || pointerType.current === "mouse") return;
     /**
@@ -185,8 +179,7 @@ export function BarChart({
         <p className="py-10 text-center text-sm text-admin-muted">{emptyText}</p>
       ) : (
         <div className="flex gap-2">
-          {/* Y axis. The invisible widest label sizes the column; the real labels sit
-              absolutely on their gridlines. */}
+          {/* Y axis: an invisible widest label sizes the column. */}
           <div aria-hidden="true" className={cn("relative shrink-0", PLOT_H)}>
             <span className="invisible block text-sm tabular-nums">{widestTick}</span>
             {scale.ticks.map((t, ti) => (
@@ -236,8 +229,7 @@ export function BarChart({
                       if (e.pointerType === "mouse") setHovered(null);
                     }}
                     onFocus={() => {
-                      // The latest interaction wins: a parked mouse can't pin the readout
-                      // while the arrow keys move on.
+                      // Latest interaction wins over a parked mouse.
                       setHovered(null);
                       setFocused(gi);
                       setTabStop(gi);
@@ -267,10 +259,8 @@ export function BarChart({
                 ))}
               </div>
 
-              {/* Readout: spans the plot on phones, where the plot is narrower than the
-                  readout; from sm it anchors to the active group's near edge so it never
-                  runs off the card. Hidden from screen readers, which get each button's
-                  label. */}
+              {/* Readout: full width on phones, from sm anchored to the active group's
+                  near edge. Screen readers get each button's label instead. */}
               {activeGroup && active !== null && (
                 <div
                   aria-hidden="true"

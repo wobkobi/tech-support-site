@@ -1,17 +1,8 @@
 "use client";
 // src/features/business/components/TaxonomyManageModal.tsx
-// Lightweight modal for the Calculator that lists every distinct device + category
-// currently in use and lets the operator RENAME a tag (the safe fix for a drifted or
-// misspelt one - every task using it follows, and colliding rows merge) or CLEAR it.
-//
-// Casing is presentation only - every consumer matches tags case-insensitively - so a tag
-// appears here ONCE however its rows are spelt, with the rival casings named on the row.
-// Splitting them into two rows would hand the operator two handles on one tag, and
-// clearing either would take both.
-//
-// Clearing is permanent. The AI may only reuse tags from the live vocabulary, and that
-// vocabulary is built from these tags, so a cleared tag is never offered back to the
-// model and its rows go inert.
+// Calculator modal listing every device + category tag in use, to RENAME (colliding rows
+// merge) or CLEAR. Tags match case-insensitively, so each shows once with rival casings
+// named. Clearing is permanent: the tag leaves the AI's live vocabulary.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
@@ -50,9 +41,8 @@ interface Props {
 }
 
 /**
- * Lists every distinct device and category in use across saved task templates,
- * with a per-row "clear" button. Clicking clear sets that tag to null on every
- * task row currently using it - the tasks remain, just untagged.
+ * Lists every device and category tag in use. Clear nulls the tag on every task
+ * using it; the tasks remain.
  * @param props - Component props.
  * @param props.onClose - Dismiss handler.
  * @param props.onChanged - Optional callback fired after a successful delete.
@@ -67,17 +57,15 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  // Two-step confirm baked into the row instead of native window.confirm(),
-  // because Firefox's "stop showing this dialog" option permanently suppresses it.
+  // Inline two-step confirm: Firefox can permanently suppress window.confirm().
   const [pendingClear, setPendingClear] = useState<string | null>(null);
   // `kind:name` currently being renamed, plus the draft value for its input.
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
   /**
-   * Fetches the current taxonomy from the API and returns it.
-   * Pure data fetcher - the caller applies the result via setState so this
-   * never triggers a synchronous setState inside an effect.
+   * Fetches the current taxonomy. The caller applies it, so no setState runs
+   * synchronously inside an effect.
    * @param signal - Optional AbortController signal.
    * @returns Devices + actions, or null if the request was aborted.
    */
@@ -91,9 +79,7 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
     return { devices: data.devices ?? [], actions: data.actions ?? [] };
   }
 
-  /**
-   * Refreshes state from the API; used after a delete so the list re-syncs.
-   */
+  /** Refreshes state from the API after a change. */
   async function reload(): Promise<void> {
     try {
       const data = await fetchTaxonomy();
@@ -126,8 +112,7 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
   }, []);
 
   /**
-   * Clears a tag from every task tagged with it. Caller must have confirmed
-   * via the inline two-step (no window.confirm, Firefox suppresses it).
+   * Clears a tag from every task tagged with it, after the inline two-step confirm.
    * @param kind - Whether to clear a device or an action.
    * @param name - The tag value to clear.
    */
@@ -155,8 +140,7 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
   }
 
   /**
-   * Renames a tag across every task using it. Colliding rows merge server-side,
-   * so this is safe to use for fixing a drifted spelling.
+   * Renames a tag across every task using it; colliding rows merge server-side.
    * @param kind - Whether to rename a device or an action.
    * @param name - The current tag value.
    * @param to - The replacement value.
@@ -239,8 +223,7 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
 }
 
 /**
- * Taxonomy axis list. Rename is inline; clear uses a two-step inline confirm
- * (Firefox suppresses native confirm dialogs once the user opts out).
+ * Taxonomy axis list with inline rename and two-step inline clear.
  * @param props - Component props.
  * @param props.title - Section heading (e.g. "Devices").
  * @param props.tags - Tags to render, one per case-insensitive value.
@@ -309,8 +292,7 @@ function TagSection({
                 key={name}
                 className={cn(
                   "flex items-center justify-between gap-3 rounded-lg border px-3 py-2",
-                  // The pending confirm (label + two buttons) is wider than a phone row,
-                  // so it may drop under the name and wrap its buttons.
+                  // The pending confirm may wrap under the name on a phone.
                   isPending
                     ? "flex-wrap gap-y-2 border-red-300 bg-red-50"
                     : isRenaming

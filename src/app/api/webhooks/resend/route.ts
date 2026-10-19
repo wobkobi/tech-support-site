@@ -1,9 +1,6 @@
 // src/app/api/webhooks/resend/route.ts
-// Resend's delivery webhook. A hard bounce or a spam report takes the address off the
-// mailing list, so the list stops writing to dead addresses and people who don't want it,
-// both of which count against the sender's reputation. A hard bounce on a recent
-// booking's address also pushes the operator, since that booking is likely fake.
-// Every call is checked against the webhook's signing secret before anything is read.
+// Resend delivery webhook: hard bounces and spam reports opt the address out (protecting
+// sender reputation); a bounce on a recent booking alerts the operator as likely fake.
 
 import { flagBouncedBookings } from "@/features/booking/lib/bounced-booking.server";
 import { optOutActionFor } from "@/features/mailing/lib/delivery-events";
@@ -13,10 +10,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 
 /**
- * POST /api/webhooks/resend
- * Set up in Resend > Webhooks for `email.bounced`, `email.complained` and
- * `email.suppressed`, with the signing secret in RESEND_WEBHOOK_SECRET. Events that
- * don't change the list are acknowledged and ignored.
+ * POST /api/webhooks/resend - subscribed to `email.bounced`, `email.complained` and
+ * `email.suppressed`; other events are acknowledged and ignored.
  * @param request - Incoming request, signed with Svix headers.
  * @returns JSON `{ ok }`, a 401 for a bad signature, or a 503 when the secret isn't set.
  */
@@ -48,8 +43,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!action) return okResponse();
   try {
     await optOutForDelivery(action);
-    // A booking confirmation that bounces points at a fake booking. Swallows its own
-    // errors so a push failure can't make Resend retry the opt-out above.
+    // Swallows its own errors so a push failure can't make Resend retry the opt-out.
     if (action.source === "bounce") await flagBouncedBookings(action.emails);
     return okResponse();
   } catch (error) {

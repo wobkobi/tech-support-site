@@ -1,9 +1,7 @@
 "use client";
 // src/features/admin/components/settings/SettingsSearch.tsx
-// Filter box that searches every setting's title + description (and its group title)
-// across all tabs. Selecting a result asks the parent to jump to that field's tab and
-// focus it. The index is built once from the shared field metadata, so search and the
-// editors never drift apart.
+// Search box over every setting's title, description and group, built from the shared
+// field metadata. Picking a result jumps to that field's tab and focuses it.
 
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { FIELD_META_BY_GROUP, GROUP_META } from "@/shared/lib/settings/field-meta";

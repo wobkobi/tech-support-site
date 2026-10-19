@@ -1,7 +1,5 @@
 // src/features/business/lib/tax/income-tax.ts
-// NZ individual income tax on progressive brackets, and the independent earner tax
-// credit (IETC). The defaults are the rates in force since 1 April 2025; the live
-// values come from settings.tax and these only seed it.
+// NZ progressive income tax and the IETC. Defaults (from 1 April 2025) only seed settings.tax.
 
 import { roundCents } from "@/features/business/lib/tax/helpers";
 import type { IetcConfig, TaxBracket } from "@/features/business/lib/tax/types";
@@ -26,9 +24,7 @@ export const DEFAULT_IETC: IetcConfig = {
 };
 
 /**
- * Income tax on progressive brackets: each band's rate applies only to the slice
- * of income inside that band. Bands are read in ascending `upTo` order with the
- * open-ended (null) band last.
+ * Income tax on progressive brackets, each rate applying to its slice; bands sorted by `upTo`, null last.
  * @param taxable - Taxable income in dollars.
  * @param brackets - The bands.
  * @returns Tax in dollars, rounded to cents (0 for zero or negative income).

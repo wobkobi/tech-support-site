@@ -1,7 +1,6 @@
 // src/app/api/admin/social/designs/pictures/route.ts
-// Exported post maker pictures for the mail Picture block's "Use a design" picker:
-// designs (not templates) with at least one stored picture, newest first, each with its
-// sizes widest first and whether they still match the design as it stands.
+// Exported design pictures for the mail Picture block's "Use a design" picker, newest
+// first, with whether each still matches its design.
 
 import { docHash, parseDesignDoc } from "@/features/social-design/lib/doc";
 import { FORMATS, isFormatKey, type FormatKey } from "@/features/social-design/lib/formats";
@@ -13,8 +12,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 const MAX_DESIGNS = 40;
-// A story is too tall to read in an email and a profile picture is cut to a circle by
-// the apps, not by the picture itself, so neither is offered.
+// Stories are too tall for email and profile pictures get cropped to a circle.
 const NOT_FOR_EMAIL = new Set<FormatKey>(["story", "profile"]);
 
 /** One stored size of a design. */

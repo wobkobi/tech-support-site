@@ -1,7 +1,6 @@
 // src/features/mailing/lib/delivery-events.ts
-// Reads Resend's delivery webhooks into what the mailing list should do about them:
-// a hard bounce takes that one address off the list, a spam report takes the reader
-// off it altogether. Pure, so the check script covers it without a database.
+// Turns Resend delivery webhooks into list actions: a hard bounce drops that address, a
+// spam report drops the reader altogether. Pure, so the check script needs no database.
 
 /** What an event asks for: which addresses to take off the list, and why. */
 export interface OptOutAction {
@@ -23,13 +22,9 @@ function addressOf(raw: unknown): string {
 }
 
 /**
- * What a Resend webhook event means for the list, or null for events that don't
- * change it (sent, delivered, opened, a soft bounce).
- * - `email.bounced` with a Permanent bounce: the address doesn't exist, so it's
- *   dropped. A Transient bounce (full mailbox, server down) may clear, so it's kept.
- * - `email.complained`: the reader marked it as spam.
- * - `email.suppressed`: Resend refused to send because the address is on its own
- *   suppression list from an earlier bounce or complaint; follow its reason.
+ * What a Resend webhook event means for the list, or null when it changes nothing.
+ * Only Permanent bounces drop the address (Transient ones may clear); `email.suppressed`
+ * follows Resend's own suppression reason.
  * @param event - The verified webhook payload.
  * @returns The action, or null.
  */

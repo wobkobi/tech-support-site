@@ -1,16 +1,8 @@
 // src/app/api/cron/send-booking-reminders/route.ts
-// Cron that sends a 24h-out email reminder for confirmed bookings.
-//
-// Window: bookings starting in 13-25 hours from now, not previously emailed. Idempotent
-// via Booking.emailReminderSentAt. Lower bound = CANCELLATION.freeNoticeHours + 1 so
-// reminders always land while the customer can still cancel free - reading the $30 fee in
-// a reminder would read as a bait-and-switch.
-//
-// Called every 30 minutes via cron-job.org, and must not be slowed past that. Unlike the
-// other jobs this selects a bounded window rather than unbounded catch-up work, so a
-// booking the cron steps over is never revisited. The settings validator only guarantees
-// `reminderLeadHours > freeNoticeHours + 1`, which on whole-hour inputs allows a window
-// just 1 hour wide.
+// Cron (every 30 min, must not be slowed) sending a 24h-out reminder for confirmed
+// bookings, idempotent via emailReminderSentAt. The lower bound (freeNoticeHours + 1)
+// keeps reminders inside free cancellation. The window can be just 1 hour wide and a
+// stepped-over booking is never revisited.
 
 import {
   CALENDAR_EVENT_PRESENT_FILTER,
@@ -35,7 +27,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    // Load settings and policy
     const { comms } = await getSettings();
     if (!comms.notifyReminder) {
       return NextResponse.json({ ok: true, skipped: "reminders disabled", emailsSent: 0 });
@@ -43,19 +34,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const now = new Date();
     const { CANCELLATION } = await getPolicy();
-    // Send once the booking is inside the reminder lead window but still far
-    // enough out that free cancellation is possible (lower bound).
+    // Lower bound keeps the booking far enough out for free cancellation.
     const lowerHours = CANCELLATION.freeNoticeHours + 1;
     const fromTime = new Date(now.getTime() + lowerHours * 60 * 60 * 1000);
     const upperTime = new Date(now.getTime() + comms.reminderLeadHours * 60 * 60 * 1000);
 
-    // Find bookings needing reminders
     const emailCandidates = await prisma.booking.findMany({
       where: {
         status: "confirmed",
         startAt: { gt: fromTime, lte: upperTime },
-        // Two independent null-or-unset tests, so both live under AND - a second
-        // top-level OR would overwrite the first.
+        // Under AND: a second top-level OR would overwrite the first.
         AND: [
           { OR: [{ emailReminderSentAt: null }, { emailReminderSentAt: { isSet: false } }] },
           CALENDAR_EVENT_PRESENT_FILTER,
@@ -82,7 +70,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const results = { emailsSent: 0, failed: 0, errors: [] as string[] };
 
-    // Send each reminder email
     for (const b of emailCandidates) {
       try {
         const ok = await sendBookingReminderEmail({
@@ -99,9 +86,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           meetingType: b.meetingType,
           rescheduleCount: b.rescheduleCount,
         });
-        // Stamp sent-at only after Resend accepts: stamping first would drop the reminder
-        // forever on a transient hiccup, since the next run skips a non-null timestamp.
-        // A duplicate send is recoverable; a missed appointment reminder isn't.
+        // Stamp only after Resend accepts: a duplicate is recoverable, a missed reminder isn't.
         if (ok) {
           await prisma.booking.update({
             where: { id: b.id },

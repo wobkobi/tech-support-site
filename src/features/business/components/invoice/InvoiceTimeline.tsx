@@ -1,9 +1,6 @@
 // src/features/business/components/invoice/InvoiceTimeline.tsx
-// Vertical lifecycle timeline for an invoice: Created > Sent > Re-sent to a new address >
-// Review link sent (or the
-// review ask's due date or why it didn't go) > Reminder sent > Paid > Apology sent >
-// Voided. Steps render only once reached; a reached step with a null timestamp (legacy
-// rows) degrades to a muted "date not recorded" rather than vanishing. Server component.
+// Vertical lifecycle timeline for an invoice. Steps render once reached; one with no
+// timestamp shows a muted "date not recorded".
 
 import { dotClass, type StepTone } from "@/features/admin/components/ui/timeline-tone";
 import type { InvoiceStatus } from "@/features/business/types/business";
@@ -105,8 +102,7 @@ export function InvoiceTimeline({
 }: InvoiceTimelineProps): React.ReactElement {
   const steps: Step[] = [{ label: "Created", date: createdAt, tone: "neutral" }];
 
-  // Sent: reached once the invoice left DRAFT. VOIDED can't confirm a prior send
-  // on its own, so it only shows this step when an actual sentAt exists.
+  // Sent once out of DRAFT; a VOIDED invoice needs a real sentAt to show it.
   const wasSent = sentAt != null || status === "SENT" || status === "PAID";
   if (wasSent) steps.push({ label: "Sent to client", date: sentAt ?? null, tone: "info" });
   if (resentAt) {
@@ -164,8 +160,7 @@ export function InvoiceTimeline({
     steps.push({ label: "Paid", date: paidAt ?? null, detail, tone: "success" });
   }
 
-  // Sent at pay time, so it sits after Paid: the reminder above it turned out to
-  // have chased money that had already arrived.
+  // Sent at pay time, so it sits after Paid.
   if (apologySentAt != null) {
     steps.push({ label: "Apology sent", date: apologySentAt, tone: "info" });
   }

@@ -1,7 +1,6 @@
 // src/features/mailing/lib/render.ts
-// Turns a mailing-list email the operator typed into the HTML and text a recipient gets.
-// One renderer backs the editor preview, the test send and the real send, so all three
-// always match. Pure: everything it needs from the database arrives in the context.
+// Renders a mailing-list email to recipient HTML and text. Backs the preview, test send
+// and real send so all three match; pure, with DB data arriving in the context.
 
 import type { CampaignAudience } from "@/features/mailing/lib/audience";
 import { type Block, parseBlocks } from "@/features/mailing/lib/blocks";
@@ -70,10 +69,7 @@ export interface RenderContext {
   promo: PromoWording | null;
   /** This recipient's unsubscribe page. */
   unsubscribeUrl: string;
-  /**
-   * Tracking tags for the site's own links. Only a real send passes it, so the preview
-   * and test sends never count as visits from the email.
-   */
+  /** Tracking tags for the site's own links; only a real send passes it. */
   tracking?: LinkTracking;
 }
 
@@ -104,34 +100,28 @@ const KNOWN_KEYS: ReadonlySet<string> = new Set(PLACEHOLDERS.map((p) => p.key));
 const PLACEHOLDER_RE = /\{(\w+)\}/g;
 
 /**
- * A whole line shaped like a button or picture, `[text](...)` or `![alt](...)`,
- * optionally wrapped in a link. Used to catch one whose link is missing or
- * isn't a web address, which would otherwise go out as raw brackets.
+ * A whole line shaped like a button or picture (optionally linked), to catch one whose
+ * link is missing or not a web address before it goes out as raw brackets.
  */
 const LINK_SHAPED_LINE_RE = /^\[?!?\[[^\]\n]*\]\([^)\n]*\)(?:\]\([^)\n]*\))?$/;
 
-// Inline styles: email clients ignore stylesheets. 16px body text because most
-// recipients are older and read on a phone.
+// Inline styles: email clients ignore stylesheets. 16px text for older phone readers.
 const P_STYLE = "margin:0 0 14px;color:#333;font-size:16px;line-height:1.6";
 const H1_STYLE = "margin:8px 0 12px;color:#0c0a3e;font-size:22px;line-height:1.3";
 const H2_STYLE = "margin:8px 0 10px;color:#0c0a3e;font-size:18px;line-height:1.3";
 const UL_STYLE = "margin:0 0 14px;padding-left:22px;color:#333;font-size:16px;line-height:1.6";
 const LINK_STYLE = "color:#43bccd";
-// Moonstone-700: white on it is 5.8:1, where the brand moonstone is 2.3:1 and
-// fails for 16px text.
+// Moonstone-700: white on it is 5.8:1; the brand moonstone (2.3:1) fails for 16px text.
 const BUTTON_BG = "#206f79";
 const BUTTON_STYLE = `display:inline-block;background:${BUTTON_BG};color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:16px`;
-// Outlook ignores padding and radius on an <a>, so the button also sits in a
-// one-cell table whose cell carries the colour: there it still shows as a
-// solid, tappable block rather than a bare link.
+// Outlook ignores padding and radius on an <a>, so a one-cell table carries the colour.
 const BUTTON_TABLE = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 22px"><tr><td style="background:${BUTTON_BG};border-radius:8px">`;
 // 496px = the 560px card less its 32px padding each side; a small picture is half that.
 const IMAGE_STYLE =
   "display:block;width:100%;max-width:496px;height:auto;border:0;border-radius:8px";
 const SMALL_IMAGE_STYLE =
   "display:block;width:100%;max-width:248px;height:auto;border:0;border-radius:8px;margin:0 auto";
-// Boxed blocks use a full-width one-cell table: the reliable way to get a
-// background, border and padding in every email client.
+// Full-width one-cell table: the reliable way to get background, border and padding.
 const BOX_TABLE =
   '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 18px">';
 const PROMO_CELL_STYLE =
@@ -145,10 +135,9 @@ const STARS_STYLE = "margin:0 0 6px;color:#cb9801;font-size:20px;letter-spacing:
 const QUOTE_TEXT_STYLE =
   "margin:0 0 8px;color:#333;font-size:17px;line-height:1.6;font-style:italic";
 const QUOTE_NAME_STYLE = "margin:0;color:#555;font-size:15px;line-height:1.5";
-// Big box: a brand-colour panel, or a photo darkened at upload, under large white
-// text. The colour sits on the cell (bgcolor plus background-color) so an app that
-// drops the photo, like Outlook on Windows, still shows white on moonstone-700 at
-// 5.8:1. The `background` attribute is the photo for apps that skip the CSS one.
+// Big box: brand colour or a darkened photo under white text. bgcolor plus background-color
+// keep 5.8:1 when an app (Outlook) drops the photo; the `background` attribute covers apps
+// that skip the CSS one.
 const BOX_CELL_STYLE = `background-color:${BUTTON_BG};background-size:cover;background-position:center;border-radius:12px;padding:40px 24px;text-align:center`;
 const BOX_TEXT_SHADOW = "text-shadow:0 1px 3px rgba(0,0,0,.45)";
 const BOX_HEADLINE_STYLE = `margin:0;color:#ffffff;font-size:30px;font-weight:800;line-height:1.2;${BOX_TEXT_SHADOW}`;
@@ -160,8 +149,7 @@ const BOX_BUTTON_STYLE =
   "display:inline-block;background:#ffffff;color:#0c0a3e;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:16px";
 const DIVIDER_HTML = '<hr style="border:0;border-top:1px solid #dde3e8;margin:22px 0" />';
 const SPACER_HTML = '<div style="height:20px;line-height:20px;font-size:1px">&nbsp;</div>';
-// Text links, not icons: many email apps block images by default, and words
-// read better for older recipients than small logos.
+// Text links, not icons: many email apps block images, and words read better.
 const SOCIAL_HTML = `<p style="${P_STYLE};text-align:center">Find us on <a href="${GOOGLE_BUSINESS_PROFILE_URL}" style="${LINK_STYLE}">Google</a> · <a href="${FACEBOOK_PAGE_URL}" style="${LINK_STYLE}">Facebook</a> · <a href="${INSTAGRAM_URL}" style="${LINK_STYLE}">Instagram</a></p>`;
 
 /**
@@ -175,8 +163,8 @@ function firstNameOf(name: string | null): string | null {
 }
 
 /**
- * Plain-text value for each placeholder for one recipient. Promo keys are blank
- * when no promo applies; {@link listProblems} warns about that before sending.
+ * Plain-text placeholder values for one recipient; promo keys are blank with no promo
+ * ({@link listProblems} warns).
  * @param recipient - Who this copy is for.
  * @param promo - Promo wording, or null.
  * @returns Map from placeholder key to its value.
@@ -196,9 +184,7 @@ function placeholderValues(
 }
 
 /**
- * Fills placeholders in plain text (the subject and preheader). An unknown
- * `{word}` is left visible, so a typo shows in the preview instead of silently
- * blanking.
+ * Fills placeholders in the subject and preheader; an unknown `{word}` stays visible.
  * @param text - Text containing placeholders.
  * @param values - Placeholder values.
  * @returns The filled text.
@@ -208,9 +194,8 @@ function fillText(text: string, values: Record<string, string>): string {
 }
 
 /**
- * Inline formatting for one escaped line: `**bold**`, `[text](url)` links, then
- * bare URLs. Bare-URL linkifying runs only on the text between explicit links,
- * so a URL already inside an href never gets wrapped twice.
+ * Inline formatting for one escaped line: bold, `[text](url)` links, then bare URLs only
+ * between explicit links so an href is never wrapped twice.
  * @param escaped - A line that has already been through escapeHtml.
  * @returns The line as HTML.
  */
@@ -228,8 +213,7 @@ function renderInline(escaped: string): string {
 }
 
 /**
- * HTML for one picture, or null when its host isn't allowed (the editor lists
- * that as a problem). A small picture is half width and centred.
+ * HTML for one picture, or null when its host isn't allowed.
  * @param alt - Alt text, already escaped.
  * @param url - Image URL.
  * @param small - Whether the picture is the small size.
@@ -246,9 +230,8 @@ function pictureHtml(alt: string, url: string, small: boolean, link: string | nu
 }
 
 /**
- * HTML for a big box block (placeholders still tokens), or an empty string when it
- * has no headline. A photo off the site's Blob store is dropped for the plain colour,
- * and a button still waiting for its link is left out; {@link listProblems} names both.
+ * HTML for a big box block, or "" with no headline. Drops a non-Blob photo and a linkless
+ * button ({@link listProblems} names both).
  * @param box - The box block.
  * @returns The box's HTML.
  */
@@ -269,9 +252,8 @@ function boxHtml(box: Extract<Block, { type: "box" }>): string {
 }
 
 /**
- * HTML for a `::word` line: the promo card, a spacer or the social links row.
- * The promo card is empty when no promo applies; {@link listProblems} warns
- * about that before sending. An unknown word renders nothing.
+ * HTML for a `::word` line: promo card, spacer or social row. An unknown word, or the
+ * promo card with no promo, renders nothing.
  * @param word - The word after `::`.
  * @param promo - Promo wording, or null.
  * @returns The block's HTML, or an empty string.
@@ -286,10 +268,8 @@ function directiveHtml(word: string, promo: PromoWording | null): string {
 }
 
 /**
- * Renders the body text to HTML. Placeholders are swapped for private-use
- * sentinel characters before parsing and filled in after, already escaped, so
- * a value can never be read as formatting: a contact named "**Bob**" gets
- * asterisks, not bold, and a name can't become a button.
+ * Renders the body text to HTML. Placeholders become private-use sentinels before
+ * parsing and are filled escaped after, so a name like "**Bob**" never becomes bold.
  * @param body - The operator's body text.
  * @param values - Placeholder values for this recipient.
  * @param promo - Promo wording for the promo card, or null when none applies.
@@ -319,8 +299,7 @@ export function renderBody(
     );
   }
 
-  // The editor's parser groups the lines, so the editor and the email can never
-  // disagree about where one block ends and the next begins.
+  // Share the editor's parser so both agree on block boundaries.
   const html = parseBlocks(tokenised)
     .map((block) => blockHtml(block, promo, fill))
     .filter(Boolean);
@@ -328,10 +307,8 @@ export function renderBody(
 }
 
 /**
- * HTML for one parsed block, or an empty string when it renders nothing: a button or
- * picture still waiting for its link, a picture or box photo off the site's Blob
- * store, a box with no headline, a quote that comes out blank for this recipient, and
- * an unknown `::word` (which the editor keeps as a Text block so it isn't lost).
+ * HTML for one parsed block, or "" when it renders nothing (missing link, non-Blob
+ * picture, blank quote, unknown `::word`).
  * @param block - The block, with placeholders still as sentinel tokens.
  * @param promo - Promo wording for the promo card, or null when none applies.
  * @param fill - Swaps sentinel tokens for their values, to test whether a quote is blank.
@@ -369,8 +346,7 @@ function blockHtml(
     case "box":
       return boxHtml(block);
     case "quote": {
-      // A quote whose text comes out blank for this recipient (an empty
-      // {reviewText}) is left out entirely rather than sent as an empty box.
+      // Drop a quote that is blank for this recipient (empty {reviewText}).
       const text = block.text
         .split("\n")
         .map((l) => renderInline(escapeHtml(l)))
@@ -431,11 +407,8 @@ ${footer}
 }
 
 /**
- * Problems worth stopping for before a send: empty fields, unknown or
- * promo-less placeholders, {reviewText} on an email that isn't going to
- * reviewers (it would be blank for everyone else), images from outside the
- * Blob store, a promo card with no promo, unknown `::` blocks, and buttons or
- * pictures whose link is missing or not https.
+ * Problems worth stopping for before a send: empty fields, bad placeholders, non-Blob
+ * images, a promo card with no promo, unknown `::` blocks and non-https links.
  * @param content - Subject, preheader and body.
  * @param hasPromo - Whether promo wording is available.
  * @param audience - Who the email goes to.
@@ -543,9 +516,8 @@ export function listProblems(
 }
 
 /**
- * The email's name in Google Analytics (`utm_campaign`): its subject as a slug, with
- * placeholders dropped so every recipient's copy shares one name. The subject is
- * what readers see anyway, unlike the admin-only campaign name.
+ * The email's `utm_campaign`: the subject as a slug, placeholders dropped so every copy
+ * shares one name.
  * @param subject - The subject as typed, before placeholders are filled.
  * @returns A lowercase slug of up to 60 characters, or "email" when nothing is left.
  */
@@ -560,12 +532,8 @@ export function campaignTag(subject: string): string {
 }
 
 /**
- * Adds `utm_source=newsletter`, `utm_medium=email` and `utm_campaign` to every link
- * that points at the site, so Google Analytics shows the visits and bookings each email
- * brought in. Other sites' links (Google reviews, Facebook) are left alone, as are
- * unsubscribe and API links and any link that already carries its own `utm_source`.
- * hrefs arrive HTML-escaped, so `&amp;` is undone before parsing and the result is
- * escaped again.
+ * Adds UTM tags to every link to the site, skipping other hosts, unsubscribe/API links
+ * and links with their own `utm_source`. hrefs arrive escaped, so `&amp;` is undone first.
  * @param html - Rendered HTML.
  * @param tracking - The site and the email's tag.
  * @returns The HTML with the site's links tagged.

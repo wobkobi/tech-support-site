@@ -1,23 +1,14 @@
 // src/shared/lib/env.ts
-// Required environment variable access plus a startup validation pass. Most secrets are
-// read lazily and degrade gracefully, so only the handful the server cannot run without
-// are fatal; the rest warn so a misconfigured deploy is visible without taking the site
-// down.
+// Env access and startup validation. Only vars the server can't run without are fatal; the rest
+// warn.
 
 /**
- * Secrets the server cannot function without. Missing one in production fails
- * at boot; elsewhere it only warns. MONGODB_URI is validated here (not at
- * Prisma module scope, where a throwing top-level side effect breaks some
- * module-eval contexts) so a value blanked by dotenv-expand's `$` expansion
- * fails by name instead of as a cryptic Prisma error on first query.
+ * Secrets the server can't run without; fatal in production, warnings elsewhere. MONGODB_URI is
+ * checked here (not Prisma module scope) so a `$`-expansion blank fails by name.
  */
 const REQUIRED_ENV = ["MONGODB_URI", "ADMIN_SECRET", "CRON_SECRET"] as const;
 
-/**
- * Feature-specific vars. A missing one disables or degrades the related feature
- * (booking calendar, email, AI estimates, travel distance, sheets sync, mailing list, social
- * posting) but is never fatal, so these only ever warn.
- */
+/** Feature vars; a missing one degrades its feature but only warns. */
 const RECOMMENDED_ENV = [
   "GOOGLE_OAUTH_CLIENT_ID",
   "GOOGLE_OAUTH_CLIENT_SECRET",
@@ -42,9 +33,7 @@ const RECOMMENDED_ENV = [
 ] as const;
 
 /**
- * Reads a required environment variable, throwing a clear, named error when it
- * is absent or blank. Use this in place of `process.env.X!` so the failure
- * names the missing variable instead of surfacing as a downstream undefined.
+ * Reads a required env var, throwing a named error when absent or blank (instead of `process.env.X!`).
  * @param name - The environment variable name.
  * @returns The trimmed, non-empty value.
  */
@@ -58,12 +47,7 @@ export function requireEnv(name: string): string {
   return value;
 }
 
-/**
- * Validates the environment at startup. In production, any missing REQUIRED var
- * throws so a misconfigured deploy fails fast at boot rather than mid-request;
- * elsewhere it warns so local dev is not blocked. Missing RECOMMENDED vars
- * always warn only.
- */
+/** Validates env at startup: missing REQUIRED throws in production, else warns; RECOMMENDED always warns. */
 export function validateEnv(): void {
   const missingRequired = REQUIRED_ENV.filter((name) => !process.env[name]?.trim());
   const missingRecommended = RECOMMENDED_ENV.filter((name) => !process.env[name]?.trim());
@@ -96,8 +80,7 @@ export interface EnvReportEntry {
 }
 
 /**
- * Whether an env var is set and non-blank after trimming. The trim is what
- * catches a `$`-expansion silent-blank (a var present but empty).
+ * Whether an env var is non-blank after trim, catching `$`-expansion blanks.
  * @param name - Environment variable name.
  * @returns True when the value is non-empty.
  */
@@ -106,9 +89,8 @@ function isEnvPresent(name: string): boolean {
 }
 
 /**
- * Reports presence (never values) of every env var the app depends on, for the
- * authed health endpoint. Composed from the same REQUIRED_ENV / RECOMMENDED_ENV
- * sources the boot validation uses, so the list cannot drift.
+ * Presence (never values) of every tracked env var for the authed health endpoint, from the
+ * same lists as boot validation.
  * @returns One entry per tracked var, required (database + secrets) first.
  */
 export function getEnvReport(): EnvReportEntry[] {

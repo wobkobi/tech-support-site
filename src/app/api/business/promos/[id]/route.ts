@@ -1,7 +1,6 @@
 // src/app/api/business/promos/[id]/route.ts
-// Admin single-promo endpoint. PATCH applies a sparse update (only fields present in the
-// body are written); DELETE removes the promo while invoice snapshots stay intact. Both
-// revalidate the active-promo cache tag and return 404 when the promo does not exist.
+// Admin single-promo endpoint: sparse PATCH and DELETE (invoice snapshots stay). Both
+// revalidate the active-promo cache tag.
 
 import {
   resolveDiscountType,
@@ -73,10 +72,8 @@ export async function PATCH(
     return errorResponse("Promo not found", 404);
   }
 
-  // Re-validate the MERGED row, not just the patch: a sparse PATCH could otherwise land
-  // a promo POST would reject (both discount fields set, endAt before startAt) straight
-  // into public pricing. Dates are parsed rather than tested for undefined - a cleared
-  // input sends "", and the resulting Invalid Date compares false against everything.
+  // Validate the MERGED row so a sparse PATCH can't land a promo POST would reject.
+  // A cleared date input sends "", so parse rather than test for undefined.
   const startAt = body.startAt !== undefined ? parseDate(body.startAt) : existing.startAt;
   const endAt = body.endAt !== undefined ? parseDate(body.endAt) : existing.endAt;
   if (!startAt || !endAt) {
@@ -86,9 +83,7 @@ export async function PATCH(
     return errorResponse("startAt must be before endAt", 400);
   }
 
-  // A sparse edit only carries the fields that changed, so validate the merged
-  // result rather than the patch: switching a promo's type sends the new value
-  // column and nulls the old one, and judging either in isolation rejects it.
+  // Switching type sends the new value column and nulls the old, so judge the merge.
   const merged = {
     discountType: body.discountType ?? existing.discountType,
     flatHourlyRate:
@@ -103,12 +98,8 @@ export async function PATCH(
     return errorResponse(discountError, 400);
   }
 
-  // Merged for the same reason as the discount: switching a promo to automatic
-  // sends kind without a code, and judging the patch alone would keep the old
-  // code on an automatic promo.
+  // Switching to automatic sends kind without a code; drop the leftover code.
   const kind = body.kind ?? existing.kind;
-  // Switching to automatic drops whatever code the promo had, rather than
-  // failing validation on a leftover the caller never meant to keep.
   const code =
     kind === "automatic"
       ? null
@@ -119,14 +110,12 @@ export async function PATCH(
   if (kindError) {
     return errorResponse(kindError, 400);
   }
-  // Excluding this promo matters: without it, saving one without touching its
-  // code conflicts with itself.
+  // Exclude this promo so an unchanged code doesn't conflict with itself.
   if (await isPromoCodeTaken(code, id)) {
     return errorResponse("that code is already used by another promo", 409);
   }
 
-  // Merged like the rest: a sparse edit that moved only one end of the time
-  // range has to be judged against the end already stored.
+  // Merged: moving one end of a range is judged against the stored other end.
   const limitError = validateLimits({
     maxRedemptions:
       body.maxRedemptions !== undefined ? body.maxRedemptions : existing.maxRedemptions,
@@ -147,8 +136,7 @@ export async function PATCH(
   if (windowError) {
     return errorResponse(windowError, 400);
   }
-  // Judged against the merged discount type: switching a promo's type sends the
-  // new value column, and the bands have to match what it became.
+  // Bands must match the merged discount type.
   const tierError = validateTiers(
     resolveDiscountType(merged),
     body.minSpend !== undefined ? body.minSpend : existing.minSpend,
@@ -173,8 +161,7 @@ export async function PATCH(
       ...(body.fixedAmount !== undefined && { fixedAmount: body.fixedAmount }),
       ...(body.travelPercent !== undefined && { travelPercent: body.travelPercent }),
       ...(body.kind !== undefined && { kind }),
-      // Written whenever kind moves too: an automatic promo must not keep the
-      // code it had as a code promo, or the list shows a code that does nothing.
+      // Written when kind moves too, so an automatic promo drops its old code.
       ...((body.code !== undefined || body.kind !== undefined) && { code }),
       ...(body.maxRedemptions !== undefined && { maxRedemptions: body.maxRedemptions }),
       ...(body.perCustomerLimit !== undefined && { perCustomerLimit: body.perCustomerLimit }),

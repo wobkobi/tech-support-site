@@ -1,8 +1,7 @@
 "use client";
 // src/features/business/hooks/use-cancel-mode.ts
-// Cancel mode for the job calculator: a cancelled job has no work to bill, so the
-// policy's verdict (fee line, note, round-trip decision) is written straight into the
-// calculator's tasks, notes and travel whenever a cancel input changes.
+// Cancel mode for the job calculator: the policy's verdict (fee line, note, round trip) is
+// written into the calculator's tasks, notes and travel whenever a cancel input changes.
 
 import {
   assessCancellation,
@@ -71,9 +70,8 @@ interface UseCancelMode {
 }
 
 /**
- * Owns cancel mode's inputs and applies the cancellation policy to the
- * calculator's shared state. Client picker, travel, invoice preview, and save
- * are reused as-is; only tasks, notes, parts and travel are rewritten.
+ * Owns cancel mode's inputs and applies the cancellation policy to the calculator's tasks,
+ * notes, parts and travel.
  * @param args - Calculator state the cancel flow reads and writes.
  * @param args.cancellation - Live cancellation policy.
  * @param args.eventPrefill - Schedule-event prefill, or null.
@@ -101,35 +99,27 @@ export function useCancelMode({
   setNotes,
   setParts,
 }: UseCancelModeArgs): UseCancelMode {
-  // Cancel mode: a cancelled job has no work to bill, so the job-shaped sections
-  // are swapped for CancelFeeSection and the fee is written into tasks as one
-  // flat line. Client picker, travel, invoice preview, and save are reused as-is.
+  // Cancel mode swaps the job sections for CancelFeeSection and bills the fee as one flat line.
   const [cancelMode, setCancelMode] = useState(false);
   const [cancelReason, setCancelReason] = useState<CancellationReason>("late-cancellation");
   const [includeCancelTravel, setIncludeCancelTravel] = useState(true);
-  // The booking's start and the moment the client called it off. The policy
-  // windows are measured between these two, so both are operator-entered rather
-  // than read off the clock - this is usually written up after the fact.
+  // Booking start and call-off moment, operator-entered since this is usually written up later.
   const [cancelBookingTime, setCancelBookingTime] = useState("09:00");
   const [cancelledAtDate, setCancelledAtDate] = useState("");
   const [cancelledAtTime, setCancelledAtTime] = useState("09:00");
-  // On site or remote. The fee covers the held slot either way, but only an
-  // in-person booking has a drive, so the travel window never applies remotely.
+  // On site or remote; only an in-person booking has travel.
   const [cancelMeetingType, setCancelMeetingType] = useState<CancelMeetingType>("in-person");
   const cancelSectionRef = useRef<HTMLDivElement>(null);
-  // Travel entries parked while the policy says no round trip, so flipping the
-  // decision back restores the figure instead of forcing a fresh lookup.
+  // Travel parked while the policy says no round trip, so flipping back restores it.
   const [stashedTravel, setStashedTravel] = useState<TravelEntry[]>([]);
 
-  // Cancel-mode verdict for the form's explanation, measured from the booking's start back
-  // to when the client called it off. Pure: new Date(string) is deterministic, unlike the
-  // argless new Date() / Date.now() the React Compiler purity rule rejects in render.
+  // Notice between call-off and booking start. new Date(string) is pure, unlike the argless
+  // new Date() the React Compiler purity rule rejects in render.
   const cancelBookingStart = new Date(`${jobDate}T${cancelBookingTime || "00:00"}`);
   const cancelledAtStamp = new Date(`${cancelledAtDate || jobDate}T${cancelledAtTime || "00:00"}`);
   const cancelNoticeHours =
     (cancelBookingStart.getTime() - cancelledAtStamp.getTime()) / (60 * 60 * 1000);
-  // Same helper the charge itself goes through, so the explanation can never
-  // disagree with what lands on the invoice.
+  // Same helper as the charge, so the explanation matches the invoice.
   const cancelCharge = assessCancellation(cancelBookingStart, cancelledAtStamp, {
     reason: cancelReason,
     meetingType: cancelMeetingType,
@@ -137,10 +127,8 @@ export function useCancelMode({
   });
 
   /**
-   * The cancellation fee as a single flat task. isFlatFee keeps it out of labour
-   * (isHourlyTask): it bills qty * unitPrice, is never padded to the minimum billable
-   * time, and window fitting ignores it. No RateConfig needed - rateConfigId only
-   * links flat rate rows like Travel.
+   * The cancellation fee as a single flat task. isFlatFee keeps it out of labour: it bills
+   * qty * unitPrice and is never padded to the billable minimum.
    * @param reason - Which fee is being billed.
    * @param date - The cancelled booking's date (YYYY-MM-DD).
    * @param fee - Fee amount in NZD.
@@ -159,9 +147,7 @@ export function useCancelMode({
   }
 
   /**
-   * Bills the round trip or parks it. Parking stashes the entries rather than
-   * dropping them, so reversing the decision restores the figure instead of
-   * forcing a fresh address lookup.
+   * Bills the round trip or parks it, so reversing the decision restores the figure.
    * @param include - Whether to bill travel.
    */
   function applyCancelTravel(include: boolean): void {
@@ -177,11 +163,8 @@ export function useCancelMode({
   }
 
   /**
-   * Applies the cancellation policy to the entered times and rewrites the fee
-   * line, note, and travel decision. Every cancel input funnels through here
-   * so the invoice always reflects the policy: more than freeNoticeHours'
-   * notice zeroes the fee, a no-show always bills (no notice to measure), and
-   * travel only ever applies to an in-person booking.
+   * Applies the cancellation policy and rewrites the fee line, note and travel. More than
+   * freeNoticeHours' notice zeroes the fee; a no-show always bills.
    * @param next - The changed inputs; anything omitted keeps its current value.
    * @param next.reason - Late cancellation or no-show.
    * @param next.meetingType - On site or remote.
@@ -217,14 +200,12 @@ export function useCancelMode({
   }
 
   /**
-   * Enters cancel mode, replacing job work with the policy's verdict. Tasks
-   * and parts clear (nothing was done on site); the cancel moment seeds at the
-   * booking start so the worst case shows until the real time is entered.
+   * Enters cancel mode: tasks and parts clear, and the cancel moment seeds at the booking
+   * start so the worst case shows first.
    */
   function enterCancelMode(): void {
     const bookingTime = eventPrefill?.slots[0]?.startTime ?? timeRanges[0]?.startTime ?? "09:00";
-    // Prefer the booking's own answer. Without one (an event created straight on
-    // the calendar), infer from whether there is anywhere to drive to.
+    // Prefer the booking's own answer, else infer from whether there is an address.
     const meetingType: CancelMeetingType =
       eventPrefill?.meetingType ??
       (jobAddress.trim() || travelEntries.length > 0 ? "in-person" : "remote");
@@ -245,8 +226,7 @@ export function useCancelMode({
   }
 
   /**
-   * Leaves cancel mode and clears the fee line so a half-finished cancel cannot
-   * leak into a job invoice.
+   * Leaves cancel mode and clears the fee line so it can't leak into a job invoice.
    */
   function exitCancelMode(): void {
     setCancelMode(false);
@@ -266,9 +246,8 @@ export function useCancelMode({
     setStashedTravel([]);
   }
 
-  // The button that opens cancel mode sits at the bottom of the column while the form
-  // renders at the top, so without this the click looks like it did nothing. Runs after
-  // the form exists; exiting is left alone, as that button is already under the cursor.
+  // The cancel button sits below the form, so scroll to the form on entry or the click
+  // looks like it did nothing.
   useEffect(() => {
     if (!cancelMode) return;
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -288,9 +267,7 @@ export function useCancelMode({
   }
 
   /**
-   * Switches between an on-site and a remote booking and re-applies the policy.
-   * Flipping to remote parks the round trip; flipping back restores it when the
-   * timing still warrants one.
+   * Switches between on-site and remote and re-applies the policy (remote parks the round trip).
    * @param meetingType - The newly-picked meeting type.
    */
   function handleCancelMeetingTypeChange(meetingType: CancelMeetingType): void {

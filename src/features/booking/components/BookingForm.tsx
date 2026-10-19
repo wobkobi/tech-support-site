@@ -126,23 +126,17 @@ export default function BookingForm({
 }: BookingFormProps): React.ReactElement {
   const router = useRouter();
   const isEditMode = Boolean(cancelToken);
-  // Estimate id sent with the booking so it can snapshot which public quote the
-  // customer saw - seeded from the /pricing wizard's "Book now" link
-  // (?estimate=<id>, 24-hex) and replaced if they run the inline estimate below.
+  // Estimate id snapshotting the quote the customer saw; seeded from ?estimate=<id>.
   const searchParams = useSearchParams();
   const estimateParam = searchParams.get("estimate");
   const [estimateId, setEstimateId] = useState<string | undefined>(
     parseObjectId(estimateParam) ?? undefined,
   );
-  // Carried over from the wizard's "Book now" link (?promo=CODE) so a code the
-  // customer already entered on /pricing does not have to be typed again. It is
-  // re-resolved server-side at submit, never trusted from here.
+  // Code carried from ?promo=CODE; re-resolved server-side at submit.
   const promoParam = normalisePromoCode(searchParams.get("promo"));
   const [promoCode, setPromoCode] = useState(promoParam ?? "");
 
-  // `selectedDateKey` rather than the full BookableDay: when `availableDays` changes (a
-  // router.refresh after a 409), the latest slot data is read from props during render,
-  // with no useEffect reconciliation.
+  // Store the key, not the BookableDay, so fresh slot data is read from props after a refresh.
   const [duration, setDuration] = useState<JobDuration>(initialValues?.duration ?? "short");
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(() => {
     if (initialValues?.dateKey && availableDays.some((d) => d.dateKey === initialValues.dateKey)) {
@@ -157,9 +151,7 @@ export default function BookingForm({
     initialValues?.startMinute ?? 0,
   );
 
-  // Resolve the BookableDay object from the stored key on every render. If the
-  // pick has since disappeared from the prop (refresh, etc.), this returns null
-  // and the time picker hides until the user picks again.
+  // Null when the pick has since disappeared, hiding the time picker.
   const selectedDay: BookableDay | null = selectedDateKey
     ? (availableDays.find((d) => d.dateKey === selectedDateKey) ?? null)
     : null;
@@ -183,8 +175,7 @@ export default function BookingForm({
     setShowUnit,
     mapsFallback,
   } = addressState;
-  // Likely email correction (e.g. gmial.com > gmail.com) surfaced at submit, so
-  // an autofilled typo that never triggered the blur hint still gets caught.
+  // Email typo correction (gmial.com > gmail.com) offered at submit.
   const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
   const [emailSuggestionAcked, setEmailSuggestionAcked] = useState(false);
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
@@ -194,8 +185,7 @@ export default function BookingForm({
   const [submitting, setSubmitting] = useState(false);
 
   /**
-   * The chosen slot's start as an instant, applying the NZ offset for the
-   * slot's own date (DST-correct, unlike the browser's timezone).
+   * The chosen slot's start, using the NZ offset for that date (DST-correct).
    * @returns The slot start, or null when day or time isn't chosen yet.
    */
   function slotStartInstant(): Date | null {
@@ -241,8 +231,7 @@ export default function BookingForm({
   });
 
   /**
-   * Removes a single inline field error (used by on-blur/on-change handlers so a
-   * corrected field clears without touching the others).
+   * Removes a single inline field error.
    * @param key - Field-error key to clear.
    */
   function clearFieldError(key: string): void {
@@ -265,14 +254,11 @@ export default function BookingForm({
     emailPromptRef,
     addressPromptRef,
   } = useSubmitAttention();
-  // True when the server returned 409 (someone booked the same slot first).
-  // Drives a more prominent error with a "Refresh available times" link.
+  // Server returned 409: someone booked the slot first.
   const [slotStale, setSlotStale] = useState(false);
   const [contactHint, setContactHint] = useState<string | null>(null);
 
-  // `submittingRef` blocks Enter-key spam regardless of React's setState timing.
-  // `idempotencyKey` is minted once per mount in the lazy useState initialiser (allowed to
-  // be impure); the server logs it so a retried submit correlates with the original.
+  // `submittingRef` blocks Enter-key spam; `idempotencyKey` is minted once per mount.
   const submittingRef = useRef(false);
   const [idempotencyKey] = useState<string>(() =>
     typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -281,10 +267,7 @@ export default function BookingForm({
   );
   const lookupContact = useContactLookup();
 
-  /**
-   * On email blur (new bookings only): look up the email in contacts and
-   * pre-fill name / phone / address for any fields the user left empty.
-   */
+  /** On email blur (new bookings): pre-fill empty fields from a matching contact. */
   async function handleEmailBlur(): Promise<void> {
     if (isEditMode) return;
     const data = await lookupContact(email);
@@ -310,9 +293,7 @@ export default function BookingForm({
     }
   }
 
-  // React's "adjust state when a prop changes" pattern, not a useEffect: drop the
-  // selected time during render once it stops being available for the current day +
-  // duration. The `!== null` guard breaks the setState loop - the next render sees null.
+  // Drop an unavailable time during render; the `!== null` guard stops the setState loop.
   if (
     selectedTime !== null &&
     selectedDay &&
@@ -370,11 +351,7 @@ export default function BookingForm({
     onRestore: applyRestoredDraft,
   });
 
-  /**
-   * Clear the saved draft + reset all form fields the user filled in. Leaves
-   * the schedule selection alone since that's already constrained by what's
-   * available.
-   */
+  /** Clear the saved draft and the filled-in fields; the schedule pick stays. */
   function clearDraft(): void {
     forgetDraft();
     setName("");
@@ -404,8 +381,7 @@ export default function BookingForm({
     clearFieldError("day");
     // Picking a different day clears the stale-slot warning if it was set.
     setSlotStale(false);
-    // Time + minute validity gets re-checked during render against the new day
-    // (see the synchronise-during-render block above); no extra work needed.
+    // Time validity is re-checked during render.
   }
 
   /**
@@ -438,9 +414,7 @@ export default function BookingForm({
   }
 
   /**
-   * Handle form submission. The `submittingRef` guard blocks Enter-key spam
-   * (the disabled prop on the submit button doesn't catch keyboard submits
-   * from inside a focused text field).
+   * Handle form submission; `submittingRef` blocks keyboard submits the disabled button misses.
    * @param e - Form event
    */
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
@@ -468,9 +442,7 @@ export default function BookingForm({
     // Field-errors guard above guarantees these are set; narrow for TS.
     if (!selectedDay || !selectedTime || !duration || !meetingType) return;
 
-    // Email typo catch: an autofilled address that never triggered the blur hint
-    // can still be a likely typo (gmial.com). Offer the correction once and block
-    // this submit until the customer confirms or dismisses it.
+    // Offer a likely email correction once, blocking this submit until answered.
     if (!emailSuggestionAcked) {
       const suggestion = suggestEmailCorrection(email);
       if (suggestion) {
@@ -483,16 +455,13 @@ export default function BookingForm({
     submittingRef.current = true;
     setSubmitting(true);
 
-    // Google-verify a typed-but-not-picked address before booking; more than one match
-    // asks the customer which they meant rather than assuming. Skipped in maps-fallback
-    // mode, and once they have picked a candidate or chosen their text as-is.
-    // Null means verification could not run - submit anyway.
+    // Verify a typed (not picked) address; several matches ask which one. Skipped in
+    // maps-fallback mode. Null means verification couldn't run - submit anyway.
     if (meetingType === "in-person" && !addressVerified && !addressOverrideAcked && !mapsFallback) {
       const typed = combineUnitAndAddress(unit, address);
       const candidates = await verifyBookingAddress(typed);
       if (candidates?.length === 0) {
-        // Google found nothing precise - warn, then let a second click submit
-        // the typed text as-is (some new addresses genuinely don't geocode).
+        // Nothing precise found: warn, then a second click submits as typed.
         setError(
           "We couldn't find that address on the map. Double-check the spelling, or click Submit again to use it as-is.",
         );
@@ -513,8 +482,7 @@ export default function BookingForm({
       }
     }
 
-    // Edit and create hit different endpoints: edit identifies the booking by
-    // cancel token; create adds the honeypot field + idempotency key instead.
+    // Edit uses the cancel token; create sends the honeypot and idempotency key.
     try {
       const endpoint = isEditMode ? "/api/booking/edit" : "/api/booking/request";
       const payload = isEditMode
@@ -559,9 +527,7 @@ export default function BookingForm({
 
       if (!res.ok) {
         if (res.status === 409) {
-          // Someone else booked this slot between page load and submit. Show
-          // the dedicated stale-slot UI so the customer can refresh and pick
-          // another time rather than re-clicking submit into a dead slot.
+          // Slot taken since page load: show the stale-slot UI.
           setSlotStale(true);
           setError(null);
         } else {
@@ -573,12 +539,10 @@ export default function BookingForm({
         return;
       }
 
-      // Successful submit: clear the saved draft so the next page load is a
-      // clean slate.
+      // Clear the saved draft.
       if (!isEditMode) removeBookingDraft();
 
-      // Redirect to the success page. Edit mode flags itself so the success
-      // page does not report the reschedule as a fresh lead conversion.
+      // Edit mode flags itself so a reschedule isn't counted as a lead conversion.
       if (isEditMode) {
         router.push(`/booking/success?cancelToken=${encodeURIComponent(cancelToken!)}&edited=1`);
       } else {
@@ -595,8 +559,7 @@ export default function BookingForm({
     }
   }
 
-  // Resolved once per render: the screen-reader status line and the summary
-  // card both read the picked start time.
+  // Read by the screen-reader status line and the summary card.
   const activeWindow =
     selectedDay && selectedTime
       ? (selectedDay.timeWindows.find((w) => w.value === selectedTime) ?? null)
@@ -608,16 +571,12 @@ export default function BookingForm({
   return (
     <form
       onSubmit={handleSubmit}
-      // `noValidate` so the JS error-summary takes over from native browser
-      // tooltips; required + aria-required stay for assistive tech.
+      // JS error summary replaces native tooltips; required attributes stay for AT.
       noValidate
       className="flex flex-col gap-8"
       autoComplete="off"
     >
-      {/* Honeypot: visually hidden + off-screen + tab-skipped + aria-hidden.
-          Real users never see or focus this. Bots that auto-fill contact-
-          style inputs will fill it, and the server fakes a success response
-          without creating a booking. */}
+      {/* Honeypot: hidden from users; a bot filling it gets a faked success. */}
       <div
         aria-hidden="true"
         style={{
@@ -718,8 +677,7 @@ export default function BookingForm({
           value={meetingType}
           onChange={(next) => {
             setMeetingType(next);
-            // Phone and address requirements both hang off the meeting
-            // type, so their errors are re-judged at the next submit.
+            // Phone/address errors are re-judged at the next submit.
             clearFieldError("meetingType");
             clearFieldError("phone");
             clearFieldError("address");
@@ -772,23 +730,18 @@ export default function BookingForm({
           />
         )}
 
-        {/* Outside the estimate block on purpose: a code changes what the job
-            is invoiced at, so it must be enterable whether or not the customer
-            asked for a ballpark first. Hidden when editing, where the promo was
-            already snapshotted onto the booking, and when no code promo is
-            active right now, unless the link carried a code. */}
+        {/* Outside the estimate block: a code affects the invoice either way. Hidden when
+            editing (promo already snapshotted) or no code promo is active. */}
         {!isEditMode && (showPromoCode || promoParam !== null) && (
           <PromoCodeField
             value={promoCode}
             onChange={setPromoCode}
             onApplied={() => {
-              // Refresh only a quote already on screen. Applying a code should
-              // not spend an AI estimate the customer never asked for.
+              // Refresh only a quote already on screen; don't spend an unrequested AI estimate.
               if (quote) void runInlineEstimate();
             }}
             applyOnMount={promoParam !== null}
-            // Judged as the booking will judge it: against the picked slot for
-            // a day-restricted code, and this customer for a per-customer one.
+            // Judge against the picked slot and this customer, as the booking will.
             startAt={slotStartInstant()}
             email={email}
             className="max-w-sm"
@@ -813,8 +766,7 @@ export default function BookingForm({
         onClearDraft={clearDraft}
       />
 
-      {/* Cancellation / rescheduling policy - keeps expectations clear so a
-          customer who later wants to change their booking knows it's easy. */}
+      {/* Cancellation / rescheduling policy. */}
       <p className="text-base text-rich-black/70">
         Need to change or cancel? Use the link in the confirmation email any time before your
         appointment, or call or text me{phoneLink ? <> on {phoneLink}</> : " directly"}.

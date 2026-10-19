@@ -1,9 +1,6 @@
 "use client";
 // src/features/social/components/PostWriteForm.tsx
-// The composer's form card: name, linked promo, which apps it posts to, the post text with
-// its Add menu and counter, the picture, the link, Google's post type and button or offer
-// details, and per-app text. The composer owns
-// every value and handler; this file only lays them out.
+// The composer's form card. The composer owns every value and handler; this only lays them out.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -500,10 +497,8 @@ const FIT_WORDS: Record<SocialPlatformKey, string> = {
 };
 
 /**
- * One app's picture row under Picture. Shows the app's own picture when it has one,
- * and, when the picture it would get doesn't fit its shape, why and what to do: add a
- * picture for that app, or OK the cut (Facebook and Google only; Instagram refuses the
- * shape outright). Renders nothing while the post's picture fits the app.
+ * One app's picture row: its own picture, or why the shared picture doesn't fit and what to do
+ * (add one, or OK the cut on Facebook and Google). Renders nothing when it fits.
  * @param props - Component props.
  * @param props.platform - The app.
  * @param props.content - Current field values.

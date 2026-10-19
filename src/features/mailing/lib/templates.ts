@@ -40,9 +40,8 @@ function same(a: string, b: string): boolean {
 }
 
 /**
- * True when a field still holds template text rather than the operator's own: it is
- * empty, matches the template it came from, or is the blank email's starter text.
- * Trailing whitespace is ignored so a stray newline doesn't make a field "edited".
+ * True when a field is empty or still matches its template or the blank starter text
+ * (trailing whitespace ignored).
  * @param value - Current field value.
  * @param fromValue - The same field in the template currently applied, if known.
  * @param blankValue - The same field in the blank template.
@@ -76,10 +75,8 @@ export function switchTemplate(
 }
 
 /**
- * Works out which template an existing draft was started from. The body is the
- * distinctive part, so a body match wins even when the subject has been edited; the
- * subject is the fallback for a draft whose body has been rewritten. Null when
- * neither matches, so nothing gets mistaken for template text.
+ * Works out which template a draft was started from: a body match wins, the subject is
+ * the fallback.
  * @param current - The draft's fields.
  * @param templates - Templates to match against, blank included.
  * @returns The matching template's id, or null.

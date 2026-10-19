@@ -1,8 +1,6 @@
 // src/app/api/business/rates/route.ts
-// Admin rate-config collection endpoint. GET returns every rate, seeding any missing
-// DEFAULT_RATE_ROWS and running passive migrations (drop Student / Complex, retire the Travel row
-// into the pricing settings, backfill updatedAt). POST creates a rate (clearing other
-// defaults when isDefault is set); DELETE wipes all rows and reseeds DEFAULT_RATE_ROWS.
+// Admin rate-config collection endpoint. GET seeds missing DEFAULT_RATE_ROWS and runs
+// passive migrations; POST creates a rate; DELETE wipes and reseeds the defaults.
 
 import { DEFAULT_RATE_ROWS } from "@/features/business/lib/pricing-policy";
 import { RATE_CONFIG_TAG } from "@/features/business/lib/pricing-policy.server";
@@ -25,9 +23,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
 
-  // Read once and decide in memory which passive migrations still apply, so
-  // the steady state (nothing to migrate) stays a single read - the admin
-  // calculator hits this endpoint on every mount.
+  // Decide migrations in memory so the steady state stays a single read (the
+  // admin calculator hits this on every mount).
   let rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
 
   const existingLabels = new Set(rates.map((r) => r.label));
@@ -42,9 +39,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     await prisma.rateConfig.deleteMany({ where: { label: { in: ["Student", "Complex"] } } });
   }
 
-  // Travel-row retirement: the travel $/hr lives in pricing settings now. Carry a
-  // surviving row's rate into the blob first if it states none - a customised rate must
-  // never silently reset - then delete the rows. Legacy per-km rows just delete.
+  // Travel-row retirement: carry a row's rate into pricing settings if they state none
+  // (a customised rate must never reset), then delete the rows.
   const travelRows = rates.filter((r) => r.unit === "travel-hour" || r.unit === "km");
   let travelRetired = false;
   if (travelRows.length > 0) {
@@ -54,8 +50,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         const raw = await prisma.setting.findUnique({
           where: { key: SETTINGS_KEY_PREFIX + "pricing" },
         });
-        // Sparse blob: only operator-set keys exist; resolveSettings fills the
-        // rest from defaults, so add the key rather than a full group value.
+        // Sparse blob: add only the key; resolveSettings fills the rest from defaults.
         const blob = raw?.value ? (JSON.parse(raw.value) as Record<string, unknown>) : {};
         if (blob.travelRatePerHour === undefined) {
           await saveSettingsGroup("pricing", {
@@ -72,9 +67,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  // updatedAt backfill: rows predating the field have no value in Mongo, and an unset
-  // nullable field reads back as null, so the null check covers both. Stamp once with
-  // "now" so the pricing-page footer has something to show; later edits use @updatedAt.
+  // updatedAt backfill: an unset Mongo field reads back as null, so the null check
+  // covers both. Stamp "now" once for the pricing-page footer.
   const needsUpdatedAtBackfill = rates.some((r) => r.updatedAt === null);
   if (needsUpdatedAtBackfill) {
     await prisma.rateConfig.updateMany({
@@ -110,9 +104,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("label is required", 400);
   }
 
-  // Reject non-finite numerics before they reach Prisma (NaN from an empty form
-  // field, Infinity from a crafted body) - these values feed the public
-  // estimator and the AI calculator, so a bad rate must never persist.
+  // Reject NaN/Infinity: rates feed the public estimator and AI calculator.
   for (const [key, val] of Object.entries({ ratePerHour, flatRate, hourlyDelta, percentDelta })) {
     if (val !== undefined && val !== null && !Number.isFinite(val)) {
       return errorResponse(`Invalid ${key}`, 400);
@@ -131,8 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     },
   });
 
-  // Clear the default flag on the other rows only after the new row is created -
-  // a failed create must not wipe every default and leave zero default rates.
+  // Clear other defaults only after the create succeeds.
   if (isDefault) {
     await prisma.rateConfig.updateMany({
       where: { id: { not: rate.id } },

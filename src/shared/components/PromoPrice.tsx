@@ -16,11 +16,8 @@ interface PromoPriceProps {
 }
 
 /**
- * Renders a price, accented when a promo has moved it.
- *
- * Colour alone would not carry the meaning - it fails for anyone who cannot
- * distinguish it, and this site's readers skew older - so the accent is paired
- * with bold weight and the offer is always stated in words nearby.
+ * Renders a price, accented when a promo moved it. Colour is paired with bold weight, since
+ * colour alone fails for some readers.
  * @param props - Component props.
  * @param props.children - The formatted price.
  * @param props.discounted - Whether a promo changed this figure.

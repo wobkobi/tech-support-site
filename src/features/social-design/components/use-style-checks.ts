@@ -1,9 +1,7 @@
 "use client";
 // src/features/social-design/components/use-style-checks.ts
-// Runs the post maker's style checks while the operator edits. The checks that read the
-// design alone run on every change; contrast waits until editing pauses, then draws each
-// size without its words at a quarter of its size and reads the pixels behind every
-// word box. A newer edit cancels a contrast run part way.
+// Runs style checks while editing. Contrast waits for a pause, then draws each size without
+// words at quarter size and reads pixels behind each word box; a newer edit cancels it.
 
 import { usePictureExporter } from "@/features/social-design/components/canvas/export";
 import type { BoundValues, DesignDoc } from "@/features/social-design/lib/doc";

@@ -1,8 +1,6 @@
 // src/features/business/lib/tax/gst-basis.ts
-// Which side of GST an income or expense row counts on for income tax. While not
-// registered (or for a row dated before registration took effect) no GST is owed or
-// claimable, so the GST-inclusive amount counts; once registered it is the GST-exclusive
-// amount.
+// Which side of GST a row counts on for income tax: GST-inclusive before registration,
+// GST-exclusive once registered.
 
 import { GST_RATE } from "@/features/business/lib/pricing-policy";
 import { ledgerDay, roundCents } from "@/features/business/lib/tax/helpers";
@@ -37,10 +35,8 @@ export function expenseTaxBasis(
 }
 
 /**
- * The amount an income row counts as income. Income rows store only the
- * GST-inclusive amount, so a row dated on or after the registration date has
- * its GST at {@link GST_RATE} (3/23 of the amount at 15%) backed out here: that
- * GST goes to IRD, not into profit.
+ * The amount an income row counts as income. Rows store GST-inclusive amounts, so once
+ * registered the GST at {@link GST_RATE} (3/23 at 15%) is backed out.
  * @param row - The income row.
  * @param gst - Registration status.
  * @returns `amount / (1 + GST_RATE)` to the cent when registered on the row date, else `amount`.
@@ -50,8 +46,7 @@ export function incomeTaxBasis(row: LedgerIncome, gst: GstStatus): number {
 }
 
 /**
- * GST status from the pricing settings. A blank "registered from" date means registered
- * from the business start.
+ * GST status from the pricing settings; a blank "registered from" means from business start.
  * @param pricing - The two GST fields of the pricing settings.
  * @param pricing.gstRegistered - Whether the business is GST registered.
  * @param pricing.gstRegisteredFrom - "YYYY-MM-DD" registration took effect, or "".
@@ -66,9 +61,7 @@ export function gstStatusFromPricing(pricing: {
 }
 
 /**
- * GST rate for an expense dated `date` when the caller gave none: 0 while not registered
- * (or before registration took effect), since there is no GST to claim back, else the
- * registered rate.
+ * Default GST rate for an expense on `date`: 0 before registration, else the registered rate.
  * @param date - Expense date.
  * @param gst - Registration status.
  * @param registeredRate - Rate once registered ({@link GST_RATE}).

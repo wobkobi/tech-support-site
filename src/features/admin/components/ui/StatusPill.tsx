@@ -1,8 +1,6 @@
 // src/features/admin/components/ui/StatusPill.tsx
-// Tone-mapped status badge for admin lists and detail views,
-// replacing the ad-hoc per-view pill colour maps with one vocabulary:
-// DRAFT = neutral, SENT = info, PAID = success, OVERDUE = critical,
-// VOIDED = violet. Server-safe (no client hooks).
+// Tone-mapped admin status badge (DRAFT neutral, SENT info, PAID success, OVERDUE critical,
+// VOIDED violet). Server-safe.
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -11,9 +9,7 @@ import type React from "react";
 export type StatusTone = "neutral" | "info" | "success" | "warning" | "critical" | "violet";
 
 /**
- * Light-tint background + dark text for each tone, from the public palette where one
- * fits. Critical uses the brand coquelicot; violet uses the #5a2a82 that matches the
- * PDF VOID watermark.
+ * Light-tint background and dark text per tone; violet #5a2a82 matches the PDF VOID watermark.
  * @param tone - The pill tone.
  * @returns Class string.
  */

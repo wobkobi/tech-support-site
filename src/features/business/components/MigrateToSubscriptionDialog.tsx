@@ -1,13 +1,7 @@
 "use client";
 // src/features/business/components/MigrateToSubscriptionDialog.tsx
-// Turns a repeat expense into a recurring subscription. Prefilled from the expense
-// (supplier, description, category, amount, GST, method, notes). When the same
-// supplier+description recurs across several expenses, the caller passes the whole
-// matching set - the dialog treats them as one subscription, guesses the frequency from
-// the gaps between their dates, and defaults next-due off the most recent one. POSTs the
-// subscriptions API, which refuses an exact supplier+description copy of an active
-// subscription; that error shows as a toast. Sheets-safe: the expense entries and their
-// sheet rows are left untouched; the new subscription is site-only.
+// Turns a repeat expense (or a recurring set) into a site-only subscription, guessing the
+// frequency from the date gaps. Expense rows and their sheet rows are left untouched.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -89,8 +83,7 @@ export function MigrateToSubscriptionDialog({
   const { toast } = useToast();
   const matchList = matches && matches.length > 0 ? matches : [expense];
   const recurring = matchList.length >= 2;
-  // Most recent match anchors the next-due default; frequency is guessed from
-  // the gaps when the expense recurs, else defaults to monthly.
+  // Most recent match anchors next-due; frequency defaults to monthly for a one-off.
   const latestDate = matchList.reduce(
     (latest, m) => (new Date(m.date) > new Date(latest) ? m.date : latest),
     matchList[0]!.date,

@@ -1,7 +1,6 @@
 // src/features/business/lib/event-prefill.server.ts
-// Resolves Google Calendar booking events into a job prefill: corrected on-site times,
-// the booking's client details, and one round trip of frozen drive time. Used by the
-// calculator's "Bill in calculator" deep link and the draft-invoice editor's AI box.
+// Resolves booking calendar events into a job prefill: corrected times, client details, and
+// one round trip of frozen drive time.
 
 import type { EventPrefill, EventPrefillSlot } from "@/features/business/types/business";
 import { fetchBookingEvent } from "@/features/calendar/lib/google-calendar";
@@ -51,9 +50,7 @@ interface ResolvedEvent {
 }
 
 /**
- * Loads one calendar event with its Booking row and frozen TravelBlock. Live
- * event fetch - a just-saved time correction must be reflected, not the 60s
- * schedule cache.
+ * Loads one event (live, so a just-saved time correction shows) with its Booking and TravelBlock.
  * @param eventId - Google Calendar event id.
  * @returns The resolved event, or null when it is missing or unbillable.
  */
@@ -65,9 +62,7 @@ async function resolveEvent(eventId: string): Promise<ResolvedEvent | null> {
     prisma.booking
       .findFirst({ where: { calendarEventId: eventId }, select: BOOKING_SELECT })
       .catch(() => null),
-    // Frozen drive prediction for the event's actual window. Raw minutes, not
-    // rounded - the rounding carries the scheduling buffer, which pads the
-    // calendar but must not be billed.
+    // Raw minutes: the rounded figure carries a scheduling buffer that must not be billed.
     prisma.travelBlock
       .findFirst({
         where: { sourceEventId: eventId },
@@ -88,11 +83,8 @@ async function resolveEvent(eventId: string): Promise<ResolvedEvent | null> {
 }
 
 /**
- * Drive prediction for one event, preferring the frozen TravelBlock over the
- * booking snapshot. Booking snapshots are only trusted when they carry a back
- * leg - that field exists only since the traffic-aware two-leg change, so
- * one-way-only snapshots are free-flow-era quotes that would bill as if there
- * were no traffic.
+ * Drive prediction for one event: the frozen TravelBlock, else a booking snapshot only when it
+ * has a back leg (one-way snapshots are traffic-free quotes).
  * @param resolved - The resolved event.
  * @returns There/back raw minutes; either may be null when nothing is known.
  */
@@ -109,9 +101,7 @@ function travelFor(resolved: ResolvedEvent): { there: number | null; back: numbe
 }
 
 /**
- * Flattens a calendar location or booking address to one line. Calendar
- * locations are often multi-line; `<input>` values strip newlines into
- * run-together text ("RoadEpsom"), so they are comma-joined instead.
+ * Flattens an address to one comma-joined line, since `<input>` strips newlines ("RoadEpsom").
  * @param resolved - The resolved event to read an address from.
  * @returns Single-line address, or an empty string when there is none.
  */
@@ -124,12 +114,8 @@ function addressOf(resolved: ResolvedEvent): string {
 }
 
 /**
- * Builds the calculator prefill for one or more booking-calendar events. A
- * single id behaves exactly as before; several ids bill as one job, with each
- * event contributing its own time slot so the gaps between them are never
- * billed. Client details come from the earliest event that has a Booking row,
- * and travel is one round trip - out to the first event, home from the last -
- * because that is what the day actually cost.
+ * Builds the prefill for one or more events billed as one job, one slot each so gaps aren't
+ * billed. Client from the earliest booked event; travel out to the first, home from the last.
  * @param eventIds - Google Calendar event ids, in any order.
  * @returns Prefill object, or null when no id resolves to a billable event.
  */
@@ -141,9 +127,7 @@ export async function buildEventPrefill(eventIds: string[]): Promise<EventPrefil
 
   const first = resolved[0]!;
   const last = resolved[resolved.length - 1]!;
-  // Client identity comes from the earliest event that actually has a booking:
-  // a merged run can start with a bare calendar entry and still be the same
-  // customer's job.
+  // A merged run can start with a bare calendar entry, so use the first booked event.
   const withBooking = resolved.find((e) => e.booking) ?? first;
   const booking = withBooking.booking;
 
@@ -156,9 +140,7 @@ export async function buildEventPrefill(eventIds: string[]): Promise<EventPrefil
     summary: e.summary ?? "(no title)",
   }));
 
-  // One round trip for the whole job: drive out for the first event, home
-  // after the last. Hops between merged events are not billed - they are the
-  // same trip, and the operator never charges twice for being in the area.
+  // One round trip per job; hops between merged events aren't billed.
   const outbound = travelFor(first);
   const inbound = travelFor(last);
 
@@ -170,9 +152,7 @@ export async function buildEventPrefill(eventIds: string[]): Promise<EventPrefil
     clientName: booking?.name ?? withBooking.summary ?? "",
     clientEmail: booking?.email ?? "",
     jobAddress: addressOf(withBooking) || addressOf(first),
-    // Cancel mode bills no round trip on a remote session. Map the Prisma enum
-    // to the hyphenated form the client side uses; null when no booking backs
-    // the event, and the calculator falls back to inferring from the address.
+    // Prisma enum > client form; null lets the calculator infer from the address.
     meetingType:
       booking?.meetingType === "remote"
         ? "remote"

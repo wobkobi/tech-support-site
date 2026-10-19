@@ -1,8 +1,7 @@
 "use client";
 // src/app/admin/(shell)/business/invoices/[id]/VoidInvoiceModal.tsx
-// Void flow for the invoice detail page: the state + requests behind voiding (or
-// re-notifying a VOIDED invoice), and the modal that previews the notification and warns
-// when linked income entries would be left behind.
+// Void flow for the invoice detail page: state and requests, and the modal that previews
+// the notification and warns about linked income.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -86,8 +85,7 @@ export function useInvoiceVoid({
   const [voidPreviewLoading, setVoidPreviewLoading] = useState(false);
 
   /**
-   * Opens the SENT/PAID void modal, resetting the message to the default so a
-   * previous custom message doesn't leak across voids.
+   * Opens the SENT/PAID void modal with the message reset to the default.
    */
   function openVoidModal(): void {
     setError(null);
@@ -95,16 +93,12 @@ export function useInvoiceVoid({
     setVoidGreetingName("");
     setVoidSendNotification(Boolean(clientEmail));
     setVoidModalOpen(true);
-    // Pass the just-reset values explicitly: the setters above have not applied
-    // yet, so loadVoidPreview reading component state would post the previous
-    // session's edited body/greeting.
+    // Pass the reset values explicitly; the setters above haven't applied yet.
     void loadVoidPreview("", DEFAULT_VOID_EMAIL_BODY);
   }
 
   /**
-   * Reopens the void modal on an already-VOIDED invoice to (re)send the
-   * notification. The void endpoint is idempotent on VOIDED rows: no status
-   * change, just (re)send.
+   * Reopens the void modal on a VOIDED invoice to resend the notification (idempotent).
    */
   function resendVoidNotification(): void {
     if (!clientEmail) return;
@@ -117,10 +111,8 @@ export function useInvoiceVoid({
   }
 
   /**
-   * Fetches the rendered void notification email into state for the iframe
-   * preview. Only spins on the first load so edit re-fetches keep the preview.
-   * @param greetingOverride - Greeting to preview instead of component state
-   * (pass the just-set value right after a setState to dodge the stale closure).
+   * Fetches the void notification preview; only the first load spins.
+   * @param greetingOverride - Greeting to preview instead of state (avoids a stale closure).
    * @param bodyOverride - Body to preview instead of component state.
    */
   async function loadVoidPreview(greetingOverride?: string, bodyOverride?: string): Promise<void> {
@@ -154,8 +146,7 @@ export function useInvoiceVoid({
   }
 
   /**
-   * Posts the void to the /void endpoint and updates local state. Shared by the
-   * DRAFT silent path (via ConfirmDialog) and the modal Confirm action.
+   * Posts the void and updates local state, for both the silent DRAFT path and the modal.
    * @param opts - Whether to notify + any operator overrides.
    * @param opts.sendNotification - True to email the client; false to void silently.
    * @param opts.greetingName - Optional override for the email greeting.
@@ -186,8 +177,7 @@ export function useInvoiceVoid({
       if ("error" in d) throw new Error(d.error);
       onVoided();
       setVoidModalOpen(false);
-      // Compose a message surfacing the notification outcome + linked-income
-      // warning. A remaining ledger entry or a failed email downgrades to warning.
+      // A remaining ledger entry or failed email downgrades the toast to a warning.
       const parts: string[] = [];
       if (d.alreadyVoided) {
         parts.push(

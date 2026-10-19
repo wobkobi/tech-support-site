@@ -1,8 +1,6 @@
 // src/app/api/admin/social/designs/ai-draft/route.ts
-// Writes the words for a post maker design from a one-line brief: headline, short line,
-// ticked points, a review's quote and name (only ever cut from the brief) and the post
-// words, in the operator's voice. The editor fills them into the layers; nothing is
-// saved or posted from here.
+// Drafts a post maker design's words from a one-line brief for the editor; nothing is
+// saved or posted. Review quotes only ever come from the brief.
 
 import {
   HEADLINE_TARGET,
@@ -27,8 +25,7 @@ const NO_REVIEW_WORDS =
   "Paste the customer's review into the brief, word for word, with who left it. A review post only uses what a customer actually said.";
 
 /**
- * One YES/NO branch per part of the picture, so a part the design has no layer for is
- * always "" and the model never fills a slot that isn't there.
+ * One YES/NO branch per part of the picture, so missing slots are always "".
  * @param room - What the design has room for.
  * @returns The ON THE PICTURE lines.
  */
@@ -55,8 +52,7 @@ function roomLines(room: DraftRoom): string {
 }
 
 /**
- * The system prompt. Live values (who's writing, the promo, the booking page) come in
- * as arguments so nothing here goes stale.
+ * The system prompt; live values come in as arguments.
  * @param who - Who is writing.
  * @param kindGuide - What this kind of post is for.
  * @param room - What the picture has room for.
@@ -119,9 +115,8 @@ Plain text only: no markup, no bold, no headings.`;
 
 /**
  * POST /api/admin/social/designs/ai-draft
- * Body: `{ brief, kind, room, paidAd }` - the brief is at most {@link POST_BRIEF_MAX}
- * characters, `kind` a {@link POST_DRAFT_KINDS} key, `room` what the design has
- * somewhere to put (from `draftRoom`), `paidAd` the design's paid-ad switch.
+ * Body: `{ brief, kind, room, paidAd }`: brief up to {@link POST_BRIEF_MAX} chars, a
+ * {@link POST_DRAFT_KINDS} key, `draftRoom` output, and the paid-ad switch.
  * @param request - Incoming request.
  * @returns JSON `{ draft }`, a 429 with a retry hint when the AI provider is rate limited, or an error.
  */
@@ -151,9 +146,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const [settings, bound] = await Promise.all([getSettings(), loadBoundValues()]);
     const { name, company, location } = settings.identity;
     const who = `${name}, who runs ${company}${location ? ` in ${location}` : ""}`;
-    // The promo layers draw the figures live, so the picture words never repeat them and
-    // stay right if the promo changes; the post words are fixed once posted, so they may
-    // give the offer, but only as worded here.
+    // Promo layers draw figures live, so picture words never repeat them; post words may.
     const promoLine = bound.promoSummary
       ? `A promo is running: ${bound.promoSummary}. Is this post about it?\n- YES: INVARIANT: the picture words never give its figures (the promo layers show them); say what the deal is good for. The post words may give the offer and end date exactly as written in this line, which counts as given like the brief.\n- NO: don't mention it.`
       : "No promo is running. INVARIANT: never mention a deal, discount or promo.";
@@ -180,8 +173,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       maxRetries: 0,
     });
     const draft = readDesignDraft(JSON.parse(text), room, brief);
-    // A review post stands on a customer's real words: with none in the brief there's
-    // nothing true to share, and post words thanking someone would invent a review.
+    // A review post needs real customer words; with none, refuse rather than invent one.
     if (kind.key === "review" && (!draft || (room.quote && !draft.quote))) {
       return errorResponse(NO_REVIEW_WORDS, 422);
     }

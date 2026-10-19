@@ -1,8 +1,6 @@
 // scripts/check-tax.ts
-// Fixtures for the tax maths library: GST basis, IR265 classes, depreciation schedules
-// (part years, brought-in assets, low-value grouping, Investment Boost, disposals, filed
-// carry-forward), km tiers, home office, brackets, IETC, set-aside targets and one
-// end-to-end FY 2026-27 estimate. Every expected figure is worked by hand in a comment.
+// Tax maths fixtures: GST basis, depreciation, km tiers, home office, brackets, IETC,
+// set-aside and an end-to-end FY 2026-27 estimate. Expected figures are worked in comments.
 // Run with: npm test -- tax
 
 import { getFinancialYear } from "@/features/business/lib/financial-year";
@@ -298,8 +296,7 @@ function checkKmAndHomeOffice(): void {
     tier2Km: 1000,
     amount: 17170,
   });
-  // A total below the business km is impossible, so it is ignored: 15,000 business km
-  // splits at 14,000 as if no total were given.
+  // A total below the business km is ignored: 15,000 business km splits at 14,000.
   expectEqual("total below business km > treated as missing", kmClaim(15_000, petrol, 14_500), {
     businessKm: 15000,
     tier1Km: 14000,
@@ -654,9 +651,8 @@ function checkDepreciation(): void {
     schedule({ ...broughtIn, investmentBoost: true })[0]?.investmentBoost,
     0,
   );
-  // First used 1 May 2025, before Investment Boost began on 22 May 2025. Depreciation
-  // starts at the 1 Oct 2025 business start, but the first-use date decides the boost:
-  // none. Oct-Mar = 6 months: 3000 x 0.5 x 6/12 = 750.
+  // First used 1 May 2025, before Investment Boost (22 May 2025): no boost.
+  // Oct-Mar = 6 months: 3000 x 0.5 x 6/12 = 750.
   const preBoost = schedule(
     asset({ costBase: 3000, investmentBoost: true, inServiceDate: "2025-05-01T00:00:00.000Z" }),
   )[0];
@@ -1126,8 +1122,7 @@ function checkTaxYear(): void {
       ["loss-on-disposal", 16],
     ],
   );
-  // The Tax page renders `lines` as the counted deductions, so they must add up to the total
-  // and carry no excluded rows.
+  // The Tax page renders `lines` as counted deductions: they must sum to the total.
   expectEqual(
     "lines add up to the total",
     roundCents(r.deductions.lines.reduce((s, l) => s + l.amount, 0)),
@@ -1180,11 +1175,8 @@ function checkTaxYear(): void {
     ],
     [5571.5, 0, 345, 0, 225],
   );
-  // A km-rate van held 1 Dec 2025 until its sale on 20 Jun 2026 covers its own days only.
-  // fuel-early (10 May) is now inside the van's period: out. A 1 Jul fill-up falls between
-  // the sale and the car: deducted. Expenses 887.50 + 46 = 933.50; excluded fuel 69 + 115
-  // = 184. A 30 km van trip on 1 Jun earns the rate: 230 km x 1.20 = 276. The 15 Jul trip
-  // is still in the gap: 25 km unclaimed.
+  // Km-rate van 1 Dec 2025 - 20 Jun 2026: fuel-early out, 1 Jul fill-up in. Expenses
+  // 887.50 + 46 = 933.50; excluded fuel 69 + 115 = 184. 230 km x 1.20 = 276; 15 Jul 25 km unclaimed.
   const withVan = computeTaxYear({
     ...input,
     assets: [
@@ -1251,8 +1243,7 @@ function checkTaxYear(): void {
     [registered.income, registered.profit, registered.ir.ir3NetIncome],
     [28173.91, 23347.57, 23347.57],
   );
-  // Registered from 1 May 2027, after FY 2026-27 ends: no day of the FY is registered, so
-  // every figure stays GST-inclusive and the Expenses note says so.
+  // Registered from 1 May 2027, after the FY ends: every figure stays GST-inclusive.
   const laterReg = computeTaxYear({
     ...input,
     gst: { registered: true, registeredFrom: "2027-05-01T00:00:00.000Z" },
@@ -1349,10 +1340,7 @@ const SNAPSHOT_ASSETS: AssetInput[] = [
   },
 ];
 
-/**
- * Hand-built FY 2025-26 result. It only has to be internally consistent: these fixtures
- * test storage, comparison and export, not the tax maths (the fixtures above cover that).
- */
+/** Hand-built FY 2025-26 result; only needs to be internally consistent. */
 const SNAPSHOT_RESULT: TaxYearResult = {
   fyKey: "2025-26",
   income: 4207.5,
@@ -1431,10 +1419,7 @@ const SNAPSHOT_RESULT: TaxYearResult = {
   },
 };
 
-/**
- * Rates and home office inputs the snapshot records; council rates left unentered. The
- * three-decimal Tier 2 rate checks the CSV prints rates unrounded.
- */
+/** Snapshot rates and home office inputs; the three-decimal Tier 2 rate checks unrounded CSV output. */
 const SNAPSHOT_YEAR_INPUTS: SnapshotYearInputs = {
   kmTier1: 1.2,
   kmTier2: 0.355,
@@ -1454,10 +1439,7 @@ const FILED_2025: FiledYearRef = {
   filedAtIso: "2026-06-30T13:00:00.000Z",
 };
 
-/**
- * Filed-year snapshot fixtures: build, JSON round trip, closing-value carry-forward,
- * comparison with a live recompute, and which filed years an edit reaches.
- */
+/** Filed-year snapshot fixtures: build, round trip, carry-forward, comparison and edit reach. */
 function checkSnapshots(): void {
   console.log("\nFiled-year snapshots:");
   const trips = [

@@ -1,8 +1,6 @@
 // src/app/api/promos/active/route.ts
-// Public active-promo endpoint for the estimators. Resolved live through resolvePromo
-// rather than the cached getActivePromo, so a promo past its redemption cap stops
-// pricing estimates, and a customer-limited one is judged against the email when
-// the caller sends one.
+// Public active-promo endpoint for the estimators. Resolved live (not cached) so a
+// capped promo stops pricing estimates.
 
 import { resolvePromo } from "@/features/business/lib/promos";
 import { parseDate, parseString } from "@/features/business/lib/validation";
@@ -21,12 +19,8 @@ export async function GET(): Promise<NextResponse> {
 }
 
 /**
- * POST /api/promos/active - The automatic promo for a given slot and email, as
- * the booking will resolve it. `customerChecked` says whether the email was
- * there to judge per-customer limits against.
- *
- * Rate limited like /api/promos/validate: with an email, the answer to a
- * new-customers-only promo says whether that email has booked before.
+ * POST /api/promos/active - The automatic promo for a slot and email, as the booking
+ * will resolve it. Rate limited: the answer reveals whether an email has booked before.
  * @param request - Incoming request with `{ startAt?, email? }`.
  * @returns JSON with the promo or null, and whether the customer was judged.
  */

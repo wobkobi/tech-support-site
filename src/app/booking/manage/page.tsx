@@ -1,7 +1,5 @@
 // src/app/booking/manage/page.tsx
-// Find-my-booking page. Customers who have lost the confirmation email can have their
-// change / cancel links re-sent to the address they booked with, without needing the
-// token.
+// Find-my-booking page: re-send change/cancel links to the address booked with.
 
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -19,10 +17,7 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: "/booking/manage" },
-  // Matches its siblings (cancel / edit / success), which are all noindex: this
-  // is a utility form reached from a confirmation email, not a landing page,
-  // and it is deliberately absent from the sitemap. Indexable-but-unlisted was
-  // the one incoherent combination.
+  // Utility form, noindex like its siblings and absent from the sitemap.
   robots: { index: false, follow: false },
   openGraph: pageOpenGraph({ title: TITLE, description: DESCRIPTION, url: "/booking/manage" }),
 };

@@ -1,7 +1,5 @@
 // src/features/social-design/lib/load-bound.ts
-// Server-side loader for the live values bound layers draw: contact details from the
-// identity settings and the running promo's wording, read the same way the social
-// composer reads them.
+// Server-side loader for bound layers' live values, read the same way the social composer reads them.
 
 import { promoWording } from "@/features/mailing/lib/context";
 import type { BoundValues } from "@/features/social-design/lib/doc";

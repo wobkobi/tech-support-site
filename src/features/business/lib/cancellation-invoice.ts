@@ -1,8 +1,6 @@
 // src/features/business/lib/cancellation-invoice.ts
-// Builds + writes the DRAFT invoice that covers a late cancellation or no-show. Shared by
-// /api/booking/cancel (customer) and /api/admin/bookings/[id] (operator). Fire-and-forget
-// callable; failures log but never throw so the cancel action that triggered this stays
-// clean.
+// Builds and saves the DRAFT invoice for a late cancellation or no-show, for both the
+// customer and operator cancel routes.
 
 import { calcInvoiceTotals } from "@/features/business/lib/business";
 import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
@@ -28,22 +26,17 @@ import { prisma } from "@/shared/lib/prisma";
 import { Prisma, type Booking, type Invoice } from "@prisma/client";
 
 export interface DraftCancellationInvoiceOptions {
-  /**
-   * When the client called it off. Defaults to the booking's stamped
-   * cancelledAt, then to now. The policy measures notice from this.
-   */
+  /** When the client called it off, for the notice check; defaults to cancelledAt, then now. */
   cancelledAt?: Date;
-  /** Hint shown in the auto-draft's customer-facing notes (e.g. "Late cancellation" / "No-show"). */
+  /** Drives the customer-facing notes ("Late cancellation" / "No-show"). */
   reason?: CancellationReason;
-  /** When true, email the invoice and flip it to SENT instead of leaving it DRAFT. Best-effort: a send failure leaves the draft intact. */
+  /** Email it and mark SENT; a send failure leaves the draft. */
   autoSend?: boolean;
 }
 
 /**
- * Builds + persists a DRAFT cancellation invoice. Idempotency is the
- * caller's job; this creates a new draft per call. Travel time prefers the
- * booking-time snapshot, falls back to parsing "Address: X" from notes +
- * a live Distance Matrix lookup for legacy rows.
+ * Builds and saves a DRAFT cancellation invoice, one per call (callers handle idempotency).
+ * Travel uses the booking-time snapshot, else a live lookup of the notes' address.
  * @param booking - Booking row, already stamped with cancellation flags.
  * @param options - Travel + reason flags.
  */
@@ -54,9 +47,7 @@ export async function createDraftCancellationInvoice(
   const reason = options.reason ?? "late-cancellation";
   const { CANCELLATION, GST_REGISTERED, MIN_TRAVEL_CHARGE, TRAVEL_RATE_PER_HOUR } =
     await getPolicy();
-  // The policy reads the tier off the booking itself. In-person and remote are
-  // priced separately, so taking the tier from a caller flag would just be a
-  // chance for the two paths to drift.
+  // Tier comes from the booking itself so the two cancel paths can't drift.
   const charge = assessCancellation(
     booking.startAt,
     options.cancelledAt ?? booking.cancelledAt ?? new Date(),
@@ -67,8 +58,7 @@ export async function createDraftCancellationInvoice(
     },
   );
 
-  // Enough notice to be free. Callers gate on this too, but a draft for $0 is
-  // never right, so refuse it here rather than trust every caller.
+  // Enough notice to be free; a $0 draft is never right, whatever the caller checked.
   if (charge.fee <= 0) {
     console.log(`[cancellation-invoice] No fee applies for booking ${booking.id}; no draft.`);
     return;
@@ -89,9 +79,7 @@ export async function createDraftCancellationInvoice(
     // Legacy rows missing the back-leg snapshot fall back to the outbound figure.
     let travelMinsBack = booking.travelMinsBackAtBooking ?? 0;
     if (!travelMins) {
-      // Legacy fallback for pre-snapshot rows: notes-parse + live lookup.
-      // No times passed - the drive "would have been" about now, matching
-      // the cancellation moment.
+      // Pre-snapshot rows: live lookup of the notes' address, timed at now.
       const addressMatch = booking.notes?.match(/Address:\s*(.+)/i);
       const address = addressMatch?.[1]?.trim();
       if (address) {
@@ -107,8 +95,7 @@ export async function createDraftCancellationInvoice(
       }
     }
     if (travelMins > 0) {
-      // Snapshot wins to lock in the rate the customer was quoted; pre-snapshot
-      // bookings fall back to the live pricing setting.
+      // Bill the rate the customer was quoted; live setting for pre-snapshot bookings.
       const travelRatePerHour = booking.travelRatePerHourAtBooking || TRAVEL_RATE_PER_HOUR;
       const travelCost = calcTravelCharge(
         travelMins,
@@ -147,9 +134,7 @@ export async function createDraftCancellationInvoice(
 
   const customerNotes = cancellationNotes(reason, booking.startAt);
 
-  // Retry on a number collision, matching the admin create and convert paths.
-  // getNextInvoiceNumber is a non-atomic read-modify-write, so a concurrent
-  // save can mint the same number - and a bare P2002 lost the fee invoice.
+  // Retry on P2002: getNextInvoiceNumber isn't atomic, so a concurrent save can collide.
   let invoice: Invoice | null = null;
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
@@ -168,11 +153,9 @@ export async function createDraftCancellationInvoice(
           status: "DRAFT",
           notes: customerNotes,
           contactId,
-          // Link the auto-draft to the booking it bills so the booking detail page
-          // (Phase 9) can surface it. Legacy cancellation invoices stay unlinked.
+          // Lets the booking detail page show it.
           bookingId: booking.id,
-          // Born decided, so a fee invoice the operator later sends by hand never
-          // triggers a review ask.
+          // A fee invoice never triggers a review ask, even sent by hand later.
           reviewAskOutcome: "skipped",
           reviewAskNote: "cancellation_fee",
           reviewAskDecidedAt: now,
@@ -201,18 +184,15 @@ export async function createDraftCancellationInvoice(
 
   await writeBackInvoiceCounter(sheetNextCount);
 
-  // Auto-send is best-effort: any failure logs and leaves the invoice DRAFT so
-  // the operator can still send it by hand from the admin invoices list.
+  // Best-effort: a failure leaves it DRAFT to send by hand.
   if (options.autoSend) {
     await sendCancellationInvoice(invoice, reason);
   }
 }
 
 /**
- * Emails a freshly-drafted cancellation invoice and flips it to SENT. Mirrors
- * the operator send path (PDF > email > status > Drive sync). The invoice was created
- * with its review ask already skipped - a fee invoice is not the moment to ask.
- * Swallows all errors: the booking is already cancelled and the draft stands.
+ * Emails a new cancellation invoice and marks it SENT (PDF > email > status > Drive).
+ * Swallows all errors; the draft stands.
  * @param invoice - The DRAFT cancellation invoice row just created.
  * @param reason - Drives the email body wording.
  */

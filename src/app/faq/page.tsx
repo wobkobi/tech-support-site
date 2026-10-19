@@ -1,9 +1,6 @@
 // src/app/faq/page.tsx
-// FAQ page: common questions about services, pricing, and ways of working.
-// Server-rendered with live rates from the RateConfig table so the headline prices stay
-// in sync with whatever the operator has set, and cancellation / unsuccessful-work / GST
-// copy comes from pricing-policy.ts so this page never drifts from the /pricing accordion
-// + booking emails.
+// FAQ page. Live rates, and policy copy from pricing-policy.ts so it matches /pricing
+// and the booking emails.
 
 import { formatMoneyCompact } from "@/features/business/lib/business";
 import {
@@ -47,9 +44,7 @@ export const metadata: Metadata = {
   openGraph: pageOpenGraph({ title: TITLE, description: DESCRIPTION, url: "/faq" }),
 };
 
-// ISR with tag-based purge: rate and settings edits bust their cache tags,
-// which invalidates this page immediately - no per-request render needed. The daily
-// timer is only a fallback.
+// Rate and settings edits purge via cache tags; the daily timer is a fallback.
 export const revalidate = 86400;
 
 interface FaqItem {
@@ -81,10 +76,8 @@ export default async function FaqPage(): Promise<React.ReactElement> {
     getSettings(),
     getActivePromo(),
   ]);
-  // Quote the promo prices, or the FAQ contradicts the banner running above it.
-  // A promo restricted to certain days or to jobs over a spend floor is
-  // deliberately not priced in: the FAQ has no appointment or job total to
-  // check it against, so it would quote a discount the reader may not earn.
+  // Quote promo prices to match the banner, except day- or spend-restricted promos,
+  // which the FAQ can't check.
   const pricedPromo = promoForRateCard(promo);
   const displayRate = promoDisplayRate(pricing.baseRate, pricedPromo);
   const travelFactor = promoTravelFactor(pricedPromo);
@@ -347,8 +340,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
         </>
       ),
     },
-    // A 0-day window means no stated guarantee, so the question is dropped
-    // rather than rendered with nonsense copy.
+    // A 0-day window means no guarantee, so drop the question.
     ...(policy.WORKMANSHIP_WINDOW_DAYS > 0
       ? [
           {

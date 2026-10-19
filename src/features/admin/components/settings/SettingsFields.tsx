@@ -1,9 +1,7 @@
 "use client";
 // src/features/admin/components/settings/SettingsFields.tsx
-// Reusable settings inputs shared by every settings tab. Each field renders its title, a
-// plain-English description, the unit, an optional "what off does" note, and an inline
-// validation error - sourced from `field-meta`. Controls are the admin kit's inputs, so
-// every tab matches the rest of the back office.
+// Settings inputs shared by every tab: title, description, unit, off-note and inline error
+// from `field-meta`, around the admin kit's controls.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
@@ -16,16 +14,14 @@ import type React from "react";
 import { createContext, useContext, useState } from "react";
 
 /**
- * Dotted paths edited since the last save, supplied by {@link SettingsTabBody}.
- * Null when no provider is present, in which case rows simply show no unsaved
- * marker rather than breaking.
+ * Dotted paths edited since the last save, supplied by {@link SettingsTabBody}. Null
+ * without a provider, so rows show no unsaved marker.
  */
 const ChangedPathsContext = createContext<Set<string> | null>(null);
 
 /**
- * Root element for a settings tab, publishing which fields are unsaved so each
- * row can mark itself. Supplied once per tab instead of threaded through every
- * field, which is why it works off the field id rather than a prop.
+ * Root element for a settings tab, publishing which fields are unsaved so each row can
+ * mark itself by its field id.
  * @param props - Component props.
  * @param props.changed - Dotted paths edited since the last save.
  * @param props.children - Tab contents.
@@ -57,8 +53,7 @@ interface FieldShellProps {
 
 /**
  * Wraps a control with its label, description, off-note, and error message. From lg up
- * the label and notes sit in a left column beside the control, so each field takes one
- * row instead of three and more of a tab fits on screen.
+ * the label and notes sit in a left column beside the control.
  * @param props - Component props.
  * @param props.id - Input id the label points at.
  * @param props.meta - Field metadata (title/description/unit/off).
@@ -84,8 +79,7 @@ export function FieldShell({
         <label htmlFor={id} className="flex items-baseline justify-between gap-3">
           <span className="text-sm font-semibold text-russian-violet">
             {meta.title}
-            {/* One slot, escalating: what you are about to save outranks what you
-              changed at some point in the past, so only the louder one shows. */}
+            {/* One slot: "unsaved" outranks "edited", so only the louder one shows. */}
             {unsaved ? (
               <span
                 className="ml-2 align-middle text-sm font-normal text-amber-700"
@@ -221,8 +215,7 @@ interface TextFieldProps {
 }
 
 /**
- * Text settings input. Supports masked secrets (with a show/hide toggle) and a
- * multi-line variant.
+ * Text settings input, with masked-secret and multi-line variants.
  * @param props - Component props.
  * @param props.id - Input id.
  * @param props.meta - Field metadata.

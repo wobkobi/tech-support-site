@@ -4,9 +4,8 @@
 import { useEffect } from "react";
 
 /**
- * Raises the browser's own "leave this page?" prompt on a reload, tab close or
- * external navigation while `dirty` is true. In-app links are client-side
- * navigations that never fire beforeunload, so they aren't covered.
+ * Raises the browser's "leave this page?" prompt while `dirty`. In-app links don't fire
+ * beforeunload, so they aren't covered.
  * @param dirty - Whether there are unsaved edits.
  */
 export function useUnsavedChangesWarning(dirty: boolean): void {

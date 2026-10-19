@@ -1,8 +1,6 @@
 // src/features/business/lib/tax/year-rates.ts
-// IRD's yearly home-office square-metre rate and vehicle kilometre rates. IRD publishes
-// each year's figures after it ends (2026-27's around mid-2027), so a year with no
-// entry borrows the latest earlier one. These only seed a TaxYear record; the record's
-// own copy is what the maths reads.
+// IRD's yearly home-office sqm and vehicle km rates, published after each year ends, so a
+// missing year borrows the latest earlier one. Only seeds a TaxYear record; maths reads the record.
 
 import type { IrdYearRates } from "@/features/business/lib/tax/types";
 
@@ -23,9 +21,8 @@ const IRD_YEAR_RATES: Record<string, IrdYearRates> = {
 };
 
 /**
- * Rates for a tax year: the exact year when published, else the latest year
- * before it, else the earliest year known. FY keys sort as strings because they
- * lead with the four-digit start year.
+ * Rates for a tax year: exact, else the latest earlier year, else the earliest known.
+ * FY keys sort as strings since they lead with the start year.
  * @param fyKey - FY key, e.g. "2026-27".
  * @returns The IRD rates to use.
  */

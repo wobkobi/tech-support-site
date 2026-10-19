@@ -1,10 +1,6 @@
 // src/features/business/lib/business.ts
-// Core business calculation helpers - billable-minute and hourly-rate maths, travel
-// totals, job-to-line-item building, promo discounts and job totals. Also the stable
-// public entry for the display helpers (business-format.ts), task-timing maths
-// (task-timing.ts) and invoice/GST/ledger helpers (invoice-maths.ts), re-exported below
-// so importers keep one path. Shared by the calculator, invoice, ledger, and admin
-// booking views.
+// Core business maths: billable minutes, hourly rates, travel, line items, promo discounts
+// and job totals. Also re-exports the format, task-timing and invoice-maths helpers.
 
 import {
   calcGstFromInclusive,
@@ -75,18 +71,16 @@ export {
 } from "@/features/business/lib/task-timing";
 
 /**
- * Fallback floor (NZD) for an auto-calculated trip: a non-zero trip that works
- * out below this is charged at the minimum instead (see {@link splitTravel}).
- * The live value comes from pricing settings.
+ * Fallback minimum (NZD) for a non-zero auto-calculated trip (see {@link splitTravel});
+ * the live value comes from pricing settings.
  */
 export const MIN_TRAVEL_CHARGE = 10;
 
 /**
- * Rounds a duration to the nearest {@link BILLING_INCREMENT_MINS} slot. Symmetric
- * rounding so customers are never bumped a full slot for a single minute of
- * overage; the operator gives back as often as they collect.
+ * Rounds a duration to the nearest {@link BILLING_INCREMENT_MINS} slot, symmetrically so
+ * one minute over never bumps a full slot.
  * @param mins - Actual duration in minutes
- * @param incrementMins - Billing increment (live pricing setting); defaults to the code const, and a non-positive value falls back to it (guards a divide-by-zero).
+ * @param incrementMins - Billing increment; a missing or non-positive value uses the code const.
  * @returns Billable duration rounded to the nearest billing increment
  */
 export function billableMins(mins: number, incrementMins: number = BILLING_INCREMENT_MINS): number {
@@ -96,12 +90,8 @@ export function billableMins(mins: number, incrementMins: number = BILLING_INCRE
 }
 
 /**
- * Minutes between two HH:MM strings, rolling past midnight. Empty/invalid
- * inputs collapse to 0 (matches the calculator's pre-existing behaviour). An
- * End earlier than Start is treated as the next day (e.g. 23:40 > 00:10 is 30
- * min), so overnight slots read straight off the clock without a duration
- * override. Equal times stay 0 so a half-typed session doesn't sneak a full
- * day into the aggregate.
+ * Minutes between two HH:MM strings, rolling past midnight (23:40 > 00:10 is 30 min).
+ * Invalid inputs and equal times give 0.
  * @param start - HH:MM start.
  * @param end - HH:MM end.
  * @returns Non-negative minute diff, or 0 when inputs are unusable.
@@ -118,8 +108,7 @@ export function timeDiffMins(start: string, end: string): number {
 }
 
 /**
- * Sums every travel-entry cost into the single "Travel" total used by the
- * invoice line item and the job totals breakdown.
+ * Sums every travel-entry cost into the single "Travel" total.
  * @param entries - Travel entries from the calculator (may be empty).
  * @returns Total travel charge in NZD, rounded to 2dp.
  */
@@ -128,11 +117,9 @@ export function travelEntriesTotal(entries: TravelEntry[]): number {
 }
 
 /**
- * Whether a travel entry is the drive to the client: the entry the address lookup made,
- * including after the operator edits its price (which clears isAuto but keeps the drive
- * time). Re-parse and Look up replace this entry rather than adding a second one beside
- * it, and a free-travel promo covers it; typed and parsed entries without a drive time
- * are disbursements like parking.
+ * Whether a travel entry is the looked-up drive to the client, even after its price is
+ * edited (which clears isAuto but keeps the drive time). Entries without one are
+ * disbursements like parking.
  * @param entry - Travel entry to classify.
  * @returns True for the client drive; false for store runs and disbursements.
  */
@@ -144,10 +131,7 @@ export function isTripDrive(entry: TravelEntry): boolean {
 export interface TravelSplit {
   /** The trip to the client plus disbursements (parking, tolls), after the minimum charge. */
   tripTotal: number;
-  /**
-   * The drive part of tripTotal: looked-up drives plus any minimum-charge lift, without
-   * disbursements. What a free-travel promo covers - it waives the drive, not parking.
-   */
+  /** The drive part of tripTotal, without disbursements: what free travel waives. */
   driveTotal: number;
   /** Store runs with a cost, each billed on its own line. */
   storeRuns: TravelEntry[];
@@ -156,10 +140,8 @@ export interface TravelSplit {
 }
 
 /**
- * Splits a job's travel into the trip to the client and any store runs. The minimum
- * travel charge lifts only the trip, and only when it has a looked-up drive, so
- * manual-only entries like parking never trigger it. Store runs bill as priced, with no
- * minimum, so a $0 run adds nothing.
+ * Splits a job's travel into the trip to the client and any store runs. The minimum charge
+ * lifts only a trip with a looked-up drive; store runs bill as priced.
  * @param entries - Travel entries from the calculator (may be empty).
  * @param minTravelCharge - Live minimum travel charge.
  * @returns The trip total, the store runs, and the combined total.
@@ -178,18 +160,14 @@ export function splitTravel(entries: TravelEntry[], minTravelCharge: number): Tr
 }
 
 /**
- * Delivery-channel modifier labels, lower-cased. A task has exactly one channel
- * - the work happened at the client's place, at the operator's, over a screen
- * share, or on a call - so these never stack, and picking one replaces any
- * other. Matched on the DEFAULT label names, so a renamed channel row drops out
- * of the group and stacks again.
+ * Delivery-channel modifier labels, lower-cased. A task has exactly one channel, so these
+ * never stack. Matched on the default labels, so a renamed row stacks again.
  */
 export const CHANNEL_MODIFIER_LABELS = new Set(["at home", "remote", "phone"]);
 
 /**
- * Tests whether a rate row is a delivery channel rather than a freely stacking
- * modifier. Shared by the calculator's chips and the parse-job route so the UI
- * and the AI output enforce the same exclusivity.
+ * Whether a rate row is a delivery channel rather than a freely stacking modifier. Shared
+ * by the calculator and the parse-job route.
  * @param rate - Rate row to test, or anything carrying its label.
  * @param rate.label - Label to match, compared trimmed and case-insensitively.
  * @returns True for a delivery channel (At home / Remote / Phone).
@@ -199,10 +177,8 @@ export function isChannelModifier(rate: { label: string }): boolean {
 }
 
 /**
- * Computes the effective hourly rate for a task by composing the base rate
- * with its modifiers. Sums `hourlyDelta` first, then multiplies by any
- * `percentDelta` (e.g. Public Holiday +25%) so the uplift acts on the
- * post-modifier base. E.g. Standard ($65) + At home (-$10) = $55.
+ * Effective hourly rate for a task: sums `hourlyDelta` first, then applies any
+ * `percentDelta`. E.g. Standard ($65) + At home (-$10) = $55.
  * @param rates - All rate configurations (used to look up by ID).
  * @param baseRateId - Base rate ID (must point to a rate with ratePerHour set).
  * @param modifierIds - Modifier rate IDs.
@@ -224,9 +200,8 @@ export function effectiveHourlyRate(
 }
 
 /**
- * Task line totals in dollars, split by {@link splitLineTotals}. A task counts as timed
- * on exactly the condition {@link jobToLineItems} uses to put `minutes` on its line item,
- * so the calculator's totals and the saved invoice's re-total split the same cents.
+ * Task line totals in dollars, split by {@link splitLineTotals}. Timed tasks match
+ * {@link jobToLineItems} so the preview and saved invoice split the same cents.
  * @param tasks - Task lines, in display order.
  * @returns Each task's line total, in the same order.
  */
@@ -241,14 +216,10 @@ export function taskLineTotals(tasks: readonly TaskLine[]): number[] {
 }
 
 /**
- * Converts a job calculation into a flat array of invoice line items.
- * Emits one row per task, one row per part, and a single Travel row summed
- * from `travelEntries`. Mirrors {@link calcJobTotal}'s {@link MIN_TRAVEL_CHARGE}
- * and {@link enforceMinBillable} floors so the issued invoice matches the
- * operator's on-screen total.
+ * Converts a job calculation into invoice line items: one per task and part, plus travel.
+ * Mirrors {@link calcJobTotal}'s {@link MIN_TRAVEL_CHARGE} and {@link enforceMinBillable} floors.
  * @param job - Job calculation with tasks, parts, and travel.
- * @param surcharge - Date-based labour surcharge (public holiday or weekend), or null; adds
- * one surcharge line worded from its label.
+ * @param surcharge - Date-based labour surcharge, or null; adds one surcharge line.
  * @param minTravelCharge - Minimum auto-travel charge (live pricing setting); defaults to the code const.
  * @param minBillableMins - Minimum billable labour minutes (live pricing setting); defaults to the code const.
  * @returns Array of line items ready for an invoice.
@@ -260,8 +231,7 @@ export function jobToLineItems(
   minBillableMins: number = MIN_BILLABLE_MINS,
 ): LineItem[] {
   const items: LineItem[] = [];
-  // Running total of hourly-task labour so the public-holiday surcharge line
-  // can uplift exactly that, never travel or parts.
+  // Hourly labour only, so the surcharge never uplifts travel or parts.
   let labourTotal = 0;
 
   const tasks = enforceMinBillable(job.tasks, minBillableMins);
@@ -273,8 +243,7 @@ export function jobToLineItems(
       qty: task.qty,
       unitPrice: task.unitPrice,
       lineTotal,
-      // Carry the billed minutes onto hourly rows so the invoice renders h:mm
-      // and the column sums to the session; flat rows keep a plain count.
+      // Billed minutes on hourly rows so the invoice renders h:mm.
       ...(task.minutes != null && isHourlyTask(task) && { minutes: task.minutes }),
     });
     if (isHourlyTask(task)) labourTotal += lineTotal;
@@ -303,8 +272,7 @@ export function jobToLineItems(
 
   const { tripTotal, storeRuns } = splitTravel(job.travelEntries, minTravelCharge);
   if (tripTotal > 0) {
-    // Drive minutes across the trip entries (back leg falls back to outbound on
-    // legacy drafts) so the line reads "Round-trip travel (46 min drive)".
+    // Drive minutes for "Round-trip travel (46 min drive)"; a missing back leg uses outbound.
     const driveMins = job.travelEntries.reduce((sum, e) => {
       if (!isTripDrive(e) || !e.durationMinsOneWay) return sum;
       return sum + e.durationMinsOneWay + (e.durationMinsBack ?? e.durationMinsOneWay);
@@ -358,45 +326,27 @@ export interface JobPricing {
   minTravelCharge: number;
   /** Minimum billable labour minutes; the whole-job floor applied by {@link enforceMinBillable}. */
   minBillableMins: number;
-  /**
-   * Date-based labour uplift as a fraction (public holiday 0.25, weekend 0.1); 0/undefined
-   * when neither applies to the job date.
-   */
+  /** Date-based labour uplift as a fraction (public holiday 0.25, weekend 0.1), else 0. */
   surchargeUplift?: number;
   /** Fraction charged for an unsuccessful visit (e.g. 0.5 = half); defaults to 0.5. */
   unsuccessfulFactor?: number;
-  /**
-   * RateConfig id of the "Business" modifier. Labour carrying it is excluded
-   * from promo discounts: promos are a home-rate offer, and without this a
-   * business job priced during one is silently under-charged.
-   */
+  /** RateConfig id of the "Business" modifier; its labour is excluded from promos. */
   businessModifierId?: string | null;
-  /**
-   * The undiscounted Standard $/hr. A flat promo takes (Standard - flat) off
-   * every home-rate hour, so a remote or phone line moves down with it; without
-   * this each line is instead capped at the flat rate.
-   */
+  /** Undiscounted Standard $/hr; a flat promo takes (Standard - flat) off every home-rate hour. */
   standardRate?: number | null;
-  /**
-   * Live rate list. Lets a flat promo floor each line at the promo price for its
-   * rate tags, so a line priced below the live rate (an old price, a stale
-   * draft) is not cut by the full (Standard - flat) and billed under the promo.
-   */
+  /** Live rate list, so a flat promo floors each line at the promo price for its tags. */
   rates?: RateConfig[];
   /**
-   * Live task-timing settings for {@link collapseToWindow} and
-   * {@link explicitRoundingAllowanceMins}. Not a {@link calcJobTotal} input -
-   * it rides along so the calculator's apportionment reads the same settings
-   * bundle as the totals. Falls back to {@link TASK_TIMING_FALLBACK}.
+   * Task-timing settings for {@link collapseToWindow} and {@link explicitRoundingAllowanceMins};
+   * not read by {@link calcJobTotal}.
+   * Falls back to {@link TASK_TIMING_FALLBACK}.
    */
   taskTiming?: TaskTimingConfig;
 }
 
 /**
- * Promo discount on a job's labour only (hourly task lines).
- *
- * Exported for scripts/check-promo-pricing.ts - this decides real money on an invoice and
- * the business exclusion below has no other coverage.
+ * Promo discount on a job's labour only (hourly task lines). Exported for
+ * scripts/check-promo-pricing.ts.
  * @param job - Job calculation.
  * @param resolvedPromo - Active promo or null, before spend narrows it.
  * @param travelTotal - The job's travel charge, which a free-travel promo discounts.
@@ -427,11 +377,8 @@ export function computeJobPromoDiscount(
 }
 
 /**
- * {@link computeJobPromoDiscount}'s total plus each task line's share of it, so
- * {@link calcJobTotal} can take the unsuccessful-work discount off what the line
- * costs after the promo. Shares are unrounded, in `job.tasks` order, and 0 for
- * lines the promo skips (all 0 for a travel promo). A fixed amount is spread
- * across the discounted lines in proportion to their totals.
+ * {@link computeJobPromoDiscount}'s total plus each task line's unrounded share (0 for
+ * skipped lines), so {@link calcJobTotal} can apply the unsuccessful discount after the promo.
  * @param job - Job calculation.
  * @param resolvedPromo - Active promo or null, before spend narrows it.
  * @param travelTotal - The job's travel charge, which a free-travel promo discounts.
@@ -451,10 +398,8 @@ function jobPromoBreakdown(
   rates?: RateConfig[],
 ): { total: number; byTask: number[] } {
   const none = { total: 0, byTask: job.tasks.map(() => 0) };
-  // Narrowed to the band this job actually earns, through the same function the
-  // public estimate uses. Judged on the pre-discount subtotal the caller has
-  // already computed; without one there is nothing to judge, so an untiered
-  // promo passes through and a tiered one cannot apply.
+  // Narrow to the band the pre-discount subtotal earns, as the public estimate does.
+  // Without a subtotal a tiered promo can't apply.
   const promo = promoForSpend(resolvedPromo, preDiscountSubtotal ?? 0);
   if (!promo) return none;
 
@@ -466,21 +411,17 @@ function jobPromoBreakdown(
   const isBusinessTask = (t: (typeof job.tasks)[number]): boolean =>
     !!businessModifierId && (t.modifierIds ?? []).includes(businessModifierId);
 
-  // Travel is its own flat line rather than an hourly task, so a travel promo
-  // is the one type that does not touch the labour subtotal at all.
+  // A travel promo never touches the labour subtotal.
   if (promo.discountType === "free_travel" && promo.travelPercent != null) {
-    // A visit that did any business work is a business visit, so its drive is
-    // not discounted either. Erring toward charging in full: promos are a home
-    // offer, and the alternative silently under-bills a business customer.
+    // Any business work makes it a business visit, so the drive isn't discounted either.
     if (job.tasks.some(isBusinessTask)) return none;
     const charged = Math.min(1, Math.max(0, promo.travelPercent));
     return { ...none, total: roundCents(travelTotal * (1 - charged)) };
   }
 
   /**
-   * Whether the promo discounts a task: hourly labour ({@link isHourlyTask}) that isn't
-   * business labour, which is out of scope for a promo. Checked per task rather than
-   * per job so a mixed job discounts only its home-rate lines.
+   * Whether the promo discounts a task: non-business hourly labour ({@link isHourlyTask}),
+   * checked per task so a mixed job discounts only its home-rate lines.
    * @param t - The task line to classify.
    * @returns True when the promo applies to the line.
    */
@@ -504,34 +445,24 @@ function jobPromoBreakdown(
 
   if (promo.flatHourlyRate !== null) {
     const flat = promo.flatHourlyRate;
-    // With the Standard rate known, the promo is a per-hour cut of
-    // (Standard - flat) off every home-rate hour, so each modified line keeps
-    // its usual gap from Standard, matching applyPromoToHourlyRate. Each
-    // line's cut is capped at the line, so no line goes negative.
+    // With Standard known, cut (Standard - flat) off every home-rate hour, as
+    // applyPromoToHourlyRate does, capped at the line.
     const cut = standardRate != null ? Math.max(0, standardRate - flat) : null;
-    // Per line, never netted across the job. Without the Standard rate, a line
-    // already under the flat rate stays as it is; netting its shortfall against
-    // a line above would cancel the saving the pricing page promises there.
+    // Per line, never netted across the job: a line already under the flat rate stays put.
     const hourCuts = job.tasks.map((t) => {
       if (!isDiscounted(t)) return 0;
       if (cut == null) return Math.max(0, t.unitPrice - flat);
-      // Floor the hour at the promo price for the line's tags (live rate less
-      // the cut). A line typed or saved under the live rate only comes down to
-      // that floor: at an old $75 Standard the full $35 cut would bill $40/hr,
-      // under the $65 the promo promises.
-      // A "No base" row has no live rate to measure from, so its floor is the promo
-      // price itself: a $40/hr row under a $50 promo stays at $40, as a Standard row
-      // typed at $40 does.
+      // Floor the hour at the promo price for the line's tags (live rate less the cut).
+      // E.g. at an old $75 Standard the full $35 cut would bill $40/hr, under the $65 promised.
+      // A "No base" row floors at the promo price itself.
       const live =
         rates && t.baseRateId ? effectiveHourlyRate(rates, t.baseRateId, t.modifierIds) : 0;
       if (live > 0) return Math.min(cut, Math.max(0, t.unitPrice - Math.max(0, live - cut)));
       return t.baseRateId == null ? Math.min(cut, Math.max(0, t.unitPrice - flat)) : cut;
     });
     const byTask = job.tasks.map((t, i) => Math.min(lineTotals[i]!, t.qty * hourCuts[i]!));
-    // The total is what the lines lose at the promo price, both sides rounded the way
-    // the invoice rounds its lines. 4h20m prints $433.33 at $100/hr and is $281.67 at
-    // $65/hr, so the promo takes $151.66; rounding the raw $35/hr cut ($151.667) on its
-    // own takes $151.67 and bills the hours a cent under the promo price.
+    // Gap between the rounded lines at each rate: 4h20m is $433.33 at $100/hr and
+    // $281.67 at $65/hr, so $151.66. Rounding the raw cut ($151.667) bills a cent under.
     const promoLineTotals = taskLineTotals(
       job.tasks.map((t, i) =>
         hourCuts[i]! > 0
@@ -553,9 +484,7 @@ function jobPromoBreakdown(
     };
   }
   if (promo.discountType === "fixed_amount" && promo.fixedAmount != null) {
-    // Capped at the labour subtotal, matching applyPromoToQuote: travel is the
-    // operator's driving time rather than margin, so a discount larger than the
-    // labour is capped instead of eating into it.
+    // Capped at the labour subtotal, as applyPromoToQuote does, so it never eats into travel.
     const amount = Math.min(Math.max(0, promo.fixedAmount), labourSubtotal);
     return {
       total: roundCents(amount),
@@ -566,16 +495,9 @@ function jobPromoBreakdown(
 }
 
 /**
- * Cost breakdown for a job. Promo discount applies to labour only; travel +
- * parts stay at full price. The whole-job unsuccessful flag discounts the entire
- * labour portion (hourly task lines) by the unsuccessful-work factor; otherwise
- * per-task `unsuccessful` flags discount just those lines. Both fold into the
- * single `unsuccessfulDiscount`.
- * GST mode is driven by {@link GST_REGISTERED} (see {@link calcInvoiceTotals}).
- * Travel floor ({@link MIN_TRAVEL_CHARGE}) only applies when an auto entry
- * contributed - manual-only travel passes through unchanged. The whole-job
- * minimum-billable floor ({@link enforceMinBillable}) is applied up front so
- * short jobs bill at least the configured minimum.
+ * Cost breakdown for a job. Promo and unsuccessful discounts hit labour only. GST follows
+ * {@link GST_REGISTERED} (see {@link calcInvoiceTotals}); {@link MIN_TRAVEL_CHARGE} and
+ * {@link enforceMinBillable} floors apply.
  * @param jobIn - Job calculation with tasks, parts, and travel.
  * @param promo - Optional active promo to apply.
  * @param pricing - Live pricing (GST, min travel, min billable, holiday uplift); defaults to the code consts.
@@ -584,8 +506,7 @@ function jobPromoBreakdown(
 export function calcJobTotal(
   jobIn: JobCalculation,
   promo: JobPromo | null = null,
-  // Default built lazily (call-time, not module-eval) so reading the consts
-  // here can't trip the circular-import TDZ with the pricing-policy module.
+  // Built at call time to avoid a circular-import TDZ with the pricing-policy module.
   pricing: JobPricing = {
     gstRegistered: GST_REGISTERED,
     minTravelCharge: MIN_TRAVEL_CHARGE,
@@ -602,9 +523,7 @@ export function calcJobTotal(
   gstAmount: number;
   total: number;
 } {
-  // Apply the whole-job minimum-billable floor once, up front, so every
-  // labour-derived figure below (tasks total, holiday uplift, promo and
-  // unsuccessful discounts) agrees with the floored invoice lines.
+  // Floor once, up front, so every labour figure below matches the invoice lines.
   const job = { ...jobIn, tasks: enforceMinBillable(jobIn.tasks, pricing.minBillableMins) };
   // Sum the per-line cents jobToLineItems prints: this preview and the saved invoice must
   // land on the same cent.
@@ -618,9 +537,7 @@ export function calcJobTotal(
   // The date surcharge (public holiday or weekend) uplifts labour only (hourly task
   // lines), never travel or parts. 0 when neither applies.
   const surchargeUplift = pricing.surchargeUplift ?? 0;
-  // Per-line rounding again: jobToLineItems accumulates its labour running
-  // total from the ROUNDED lineTotals, so the surcharge must be derived from
-  // the same base or the surcharge line itself drifts a cent.
+  // From the rounded line totals, as jobToLineItems does, or the surcharge drifts a cent.
   const hourlyTasksTotal = job.tasks.reduce(
     (s, t, i) => (isHourlyTask(t) ? s + lineTotals[i]! : s),
     0,
@@ -630,27 +547,18 @@ export function calcJobTotal(
   const { total: promoDiscount, byTask: promoByTask } = jobPromoBreakdown(
     job,
     promo,
-    // A free-travel promo covers the drive to the client: not a store run, and not
-    // parking or tolls paid on the way.
+    // Free travel covers the drive only, not store runs, parking or tolls.
     driveTotal,
     pricing.businessModifierId,
-    // The subtotal above is exactly the pre-discount total a spend threshold and
-    // a tier band are judged against.
+    // Spend thresholds and tier bands are judged on this pre-discount subtotal.
     subtotal,
     pricing.standardRate,
     pricing.rates,
   );
   // Fraction removed from an unsuccessful line: 1 - the charged share.
   const unsuccessfulCut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
-  // "Half price" is half of what the customer was due to pay, so each unsuccessful
-  // line is cut after its promo share comes off. Taking both off the full line would
-  // stack them: a 35%-off promo plus half price would bill 15% of the labour, not
-  // 32.5%. The whole-job flag covers every hourly task and subsumes per-task flags,
-  // so a task can't be discounted twice; lines are rounded the same way in both
-  // cases, so flagging every task matches the whole-job flag to the cent. A weekend
-  // or holiday surcharge is part of what the labour costs that day, so the line's
-  // share of it is halved along with it: 2h on a +25% holiday bills $81.25, half of
-  // $162.50, not $65 of labour plus the full $32.50 surcharge.
+  // Halve what was due after the promo (35% off then half bills 32.5%, not 15%). The
+  // surcharge share halves too: 2h on a +25% holiday bills $81.25, half of $162.50.
   const unsuccessfulBase = job.tasks.reduce(
     (s, t, i) =>
       isHourlyTask(t) && (job.unsuccessful || t.unsuccessful)
@@ -659,9 +567,8 @@ export function calcJobTotal(
     0,
   );
   const unsuccessfulDiscount = Math.max(0, roundCents(unsuccessfulBase * unsuccessfulCut));
-  // GST applies to the discounted amount, per IRD price-reduction treatment. Clamped at 0
-  // like calcInvoiceTotals, so stacked promo + unsuccessful discounts can't drive the
-  // total negative and disagree with the persisted invoice.
+  // GST on the discounted amount (IRD price-reduction treatment), clamped at 0 like
+  // calcInvoiceTotals.
   const taxableAmount = Math.max(0, roundCents(subtotal - promoDiscount - unsuccessfulDiscount));
   const gstAmount = pricing.gstRegistered ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {

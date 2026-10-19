@@ -1,8 +1,6 @@
 // src/app/api/admin/settings/[group]/history/route.ts
-// Admin read of the change history for one settings group. Returns the most recent
-// `SettingAudit` rows (newest first) with the set of top-level keys that changed in each,
-// plus the raw post-change value so the panel can load a prior version back into the
-// editor for review + re-save.
+// Change history for one settings group: recent `SettingAudit` rows with changed keys and
+// the post-change value, so a prior version can be reloaded.
 
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -16,9 +14,7 @@ export const dynamic = "force-dynamic";
 const HISTORY_LIMIT = 20;
 
 /**
- * Lists the top-level keys whose JSON differs between two stored group values.
- * A null `oldJson` (the first write) yields an empty list - the panel labels
- * that row as the first saved version instead.
+ * Lists the top-level keys whose JSON differs; a null `oldJson` (first write) gives [].
  * @param oldJson - Previous group JSON, or null on the first write.
  * @param newJson - New group JSON.
  * @returns Sorted list of changed top-level keys.

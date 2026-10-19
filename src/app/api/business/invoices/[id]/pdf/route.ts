@@ -1,7 +1,5 @@
 // src/app/api/business/invoices/[id]/pdf/route.ts
-// Admin endpoint that downloads the PDF for a saved invoice. GET re-generates the bytes
-// with the same renderer used for Drive uploads and email attachments and returns them as
-// an attachment, so the operator's copy matches what the customer receives.
+// Admin PDF download for a saved invoice, from the same renderer as Drive and email.
 
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -11,9 +9,7 @@ import { NextRequest } from "next/server";
 
 /**
  * GET /api/business/invoices/[id]/pdf
- * Re-generates the PDF bytes for a saved invoice and returns them as an
- * attachment download. Same renderer used for Drive uploads + email
- * attachments, so what the operator saves is what the customer receives.
+ * Re-generate the invoice PDF so the operator's copy matches what the customer gets.
  * @param request - Next.js request, admin-auth gated.
  * @param ctx - Route ctx with the invoice id.
  * @param ctx.params - Resolved Next.js dynamic route params.

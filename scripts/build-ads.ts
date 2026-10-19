@@ -1,13 +1,6 @@
 // scripts/build-ads.ts
-// Generates Meta (Facebook/Instagram) ad creatives by rendering branded HTML with
-// Puppeteer and screenshotting it at the exact ad sizes (1:1 Feed, 4:5 Feed, 9:16
-// Stories/Reels, 1.91:1 right column). Follows Meta's image-ad guidance: ONE message per
-// image - a 3-layer stack of brand logo, one big outcome headline, and one short support
-// line (no benefits list, no fake buttons; the feed chrome + Meta's own CTA button carry
-// name/URL/CTA). The frosted card mirrors the website's FrostedSection. The 9:16 keeps
-// its content in the vertical safe zone (Meta overlays UI top/bottom). Edit AD_COPY /
-// AD_SPECS / STYLES below and re-run. Output lands in marketing/ads/ (not served or
-// committed).
+// Render Meta ad creatives (1:1, 4:5, 9:16, 1.91:1) with Puppeteer into marketing/ads/.
+// One message per image: logo, headline, support line - no fake buttons (Meta review).
 // Run with: npm run build:ads
 
 import fs from "node:fs";
@@ -18,13 +11,11 @@ import { BACKDROP, LOGO_FULL, LOGO_PROFILE, PALETTE } from "./build-icons/config
 /* ---------- Editable copy ---------- */
 
 /**
- * On-image wording. Kept to the guide's two lines: an outcome-led headline
- * (the hook) and a short support line (the proof). The logo is the third layer.
+ * On-image wording: an outcome-led headline and a short support line.
  */
 const AD_COPY = {
   headline: "Friendly local IT support",
-  // Feed tiles (small) use the single support line; the full-screen 9:16 has
-  // room for the fuller check list instead.
+  // Feed tiles use the support line; the 9:16 uses the bullets
   support: "No jargon · Fair pricing · On-site & remote",
   bullets: [
     "No jargon, ever",
@@ -58,13 +49,11 @@ interface AdSpec {
 
 const OUTPUT_DIR = "marketing/ads";
 
-// Export at 2x the layout size for crisp text/logo on high-DPI phones. Meta
-// downsizes per placement; the blurred 3456x2304 backdrop upscales invisibly.
+// 2x for crisp text on high-DPI phones; Meta downsizes per placement
 const SCALE = 2;
 
 const AD_SPECS: AdSpec[] = [
-  // Feed / Instagram Feed / Explore / Marketplace - Meta's recommended image
-  // ratio. Shown small in reels tiles, so it gets the biggest headline.
+  // Feeds / Explore / Marketplace - shown small in reels tiles, so biggest headline
   {
     name: "meta-ad-4x5-2160x2700.jpg",
     width: 1080,
@@ -111,12 +100,8 @@ const ICON_CHECK = `<svg viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-
 /* ---------- Styling ---------- */
 
 /**
- * Full stylesheet. Base rules mirror the website (frosted card, brand colours);
- * `.tall` / `.portrait` / `.square` / `.wide` blocks hold every size so tweaking
- * one dimension never touches the markup. The card is sized to its content and
- * vertically centred so the backdrop frames it (the 9:16 nudges up via `top` to
- * sit in the Stories safe zone). One focal point: the headline is the largest
- * element; the logo is the brand mark above it.
+ * Full stylesheet: base rules mirror the site's frosted card; per-template blocks hold
+ * every size so the markup stays shared.
  */
 const STYLES = `
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Exo", sans-serif; }
@@ -175,9 +160,8 @@ const STYLES = `
 /* ---------- Asset loading ---------- */
 
 /**
- * Read a file and wrap it as a base64 data URI so the rendered page needs no
- * local server or network for its imagery.
- * @param file - Path to the asset, relative to the current working directory.
+ * Read a file as a base64 data URI so the page needs no server for imagery.
+ * @param file - Asset path, relative to the cwd.
  * @param mime - MIME type to embed in the data URI.
  * @returns The asset as a `data:` URI string.
  */
@@ -195,8 +179,7 @@ const BG_URI = dataUri(BACKDROP, "image/jpeg");
 /* ---------- HTML building blocks ---------- */
 
 /**
- * Render the logo `<img>` for a spec. The `logo-sq` class lets the square
- * profile mark size independently of the wide wordmark.
+ * Render the logo `<img>`; `logo-sq` sizes the square mark apart from the wordmark.
  * @param spec - The spec being rendered (chooses the logo art).
  * @returns HTML string for the logo image.
  */
@@ -237,23 +220,19 @@ function wrapHtml(spec: AdSpec, inner: string): string {
 }
 
 /**
- * Build a creative: brand logo, one big outcome headline, one support line.
- * Same markup for every format; sizes come from the template's CSS block.
+ * Build a creative: logo, headline, support line; sizes come from the template's CSS.
  * @param spec - The spec being rendered.
  * @returns Full HTML document string.
  */
 function adHtml(spec: AdSpec): string {
-  // Full-screen 9:16 shows the fuller check list; the 4:5 is logo + headline
-  // only (cleanest for the tiny reels tile); other feed tiles get the support
-  // line.
+  // 9:16 gets the check list, 4:5 no detail (tiny reels tile), others the support line
   let detail = `<p class="support">${AD_COPY.support}</p>`;
   if (spec.template === "tall") {
     detail = `<ul>${AD_COPY.bullets.map(bullet).join("")}</ul>`;
   } else if (spec.template === "portrait") {
     detail = "";
   }
-  // 1:1 and 4:5 break the headline as "Friendly local" / "IT support"; the
-  // 9:16 and 1.91:1 wrap naturally.
+  // 1:1 and 4:5 break before "IT"; the rest wrap naturally
   const twoLine = spec.template === "square" || spec.template === "portrait";
   const headline = twoLine ? AD_COPY.headline.replace(/\s+IT\b/, "<br>IT") : AD_COPY.headline;
   const inner = `

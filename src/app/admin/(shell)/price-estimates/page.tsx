@@ -1,8 +1,6 @@
 // src/app/admin/(shell)/price-estimates/page.tsx
-// Audit page for the public price estimator. Lists the last 500 estimate logs (raw
-// description, AI interpretation, per-task split, and the range shown to the user) with
-// today/week/month counts. Dev/test rows are hidden unless `?showDev=1` is set; entries
-// are purged after 30 days.
+// Audit page for the public price estimator: the last 500 logs with counts. Dev rows hidden
+// unless `?showDev=1`; entries purge after 30 days.
 
 import { Card } from "@/features/admin/components/ui/Card";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
@@ -28,9 +26,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Admin audit page for the public price estimator. Lists the last 500 logs
- * with the raw description, AI interpretation, per-task split, and the price
- * range shown to the user. Cleaned up automatically after 30 days.
+ * Admin audit page for the public price estimator's last 500 logs.
  * @param root0 - Page props.
  * @param root0.searchParams - URL params with optional `?showDev=1` to include dev/test entries.
  * @returns Price estimates admin page element.
@@ -49,9 +45,7 @@ export default async function AdminPriceEstimatesPage({
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  // Hide rows logged from `npm run dev` by default so local test submissions
-  // don't pollute the audit view. The ?showDev=1 toggle in the header flips
-  // this when inspecting them is wanted.
+  // Hide `npm run dev` rows unless ?showDev=1.
   const envFilter: Prisma.PriceEstimateLogWhereInput = includeDev
     ? {}
     : { environment: AppEnvironment.production };

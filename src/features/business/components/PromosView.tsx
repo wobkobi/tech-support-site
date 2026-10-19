@@ -1,7 +1,6 @@
 "use client";
 // src/features/business/components/PromosView.tsx
-// Admin promo CRUD - form-on-top + table-below + overlap warning. Holds all the list and
-// form state; PromoForm and PromoListRows render the markup.
+// Admin promo CRUD with overlap warning. Holds the state; PromoForm and PromoListRows render.
 
 import type { PromoRow } from "@/app/admin/(shell)/promos/page";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
@@ -65,24 +64,19 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
   const [emailingId, setEmailingId] = useState<string | null>(null);
   const [postingId, setPostingId] = useState<string | null>(null);
   const router = useRouter();
-  // Phones only: the form starts folded so the promo list isn't a long form
-  // away. lg+ always shows it.
+  // Phones start with the form folded; lg+ always shows it.
   const [formOpen, setFormOpen] = useState(false);
-  // Held in state rather than derived, so clearing the last advanced field
-  // while typing doesn't snap the section shut under the cursor.
+  // State, not derived, so clearing the last advanced field doesn't snap the section shut.
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   const { ids: overlaps, winners: overlapWinners } = findOverlaps(promos);
   const [stats, setStats] = useState<Record<string, PromoStats>>({});
   const [statusFilter, setStatusFilter] = useState<PromoStatus | "all">("all");
-  // Ids whose stats block is open. Collapsed by default so the list stays
-  // scannable when most promos have nothing interesting to report.
+  // Ids whose stats block is open; collapsed by default.
   const [openStats, setOpenStats] = useState<Set<string>>(new Set());
 
-  // Overlaps are computed across ALL promos, not the filtered view: a promo
-  // hidden by the filter still competes with a visible one, and warning only
-  // about what happens to be on screen would be worse than not warning.
+  // Overlaps span ALL promos: a filtered-out promo still competes with a visible one.
   const visiblePromos =
     statusFilter === "all" ? promos : promos.filter((p) => getStatus(p) === statusFilter);
   const statusCounts = promos.reduce<Record<string, number>>((acc, p) => {
@@ -124,8 +118,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
   }
 
   /**
-   * Loads a promo into the form for editing and scrolls up to it, since the
-   * row's Edit button sits below the whole form.
+   * Loads a promo into the form for editing and scrolls up to it.
    * @param p - Promo row.
    */
   function startEdit(p: PromoRow): void {
@@ -142,12 +135,8 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
   }
 
   /**
-   * Loads a promo into the form as a NEW one.
-   *
-   * Promos are nearly always a variation on the last, so the whole
-   * configuration is carried across - only the title is marked and the dates
-   * are pushed forward, since reusing a finished window would create a promo
-   * that is already expired.
+   * Loads a promo into the form as a NEW one: config carried across, title
+   * marked, dates pushed forward so the copy isn't already expired.
    * @param p - Promo to copy.
    */
   function startDuplicate(p: PromoRow): void {
@@ -160,8 +149,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
       title: `${p.title} (copy)`,
       startDate: toDateInput(today.toISOString()),
       endDate: toDateInput(weekOut.toISOString()),
-      // A code is unique, so the copy cannot keep it - cleared rather than
-      // suffixed, so the operator has to choose one rather than ship "SPRING25-2".
+      // Codes are unique: clear it so the operator picks a new one.
       code: "",
     }));
     setError(null);
@@ -187,8 +175,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
       setError("A code promo needs a code.");
       return;
     }
-    // Caught here as well as server-side so the operator is told before the
-    // round trip which half of the pair is missing.
+    // Also checked server-side; here it names the missing half before the round trip.
     if (Boolean(form.activeFrom) !== Boolean(form.activeTo)) {
       setError("A time-of-day restriction needs both a start and an end.");
       return;
@@ -203,18 +190,15 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
       // Widen day-level inputs: end is start-of-next-day so it's inclusive.
       startAt: startOfDayISO(form.startDate),
       endAt: endOfDayISO(form.endDate),
-      // Send only the column that matches the selected type; the route
-      // validates per type and rejects anything half-filled.
+      // Send only the selected type's column; the route rejects half-filled types.
       discountType: DISCOUNT_TYPE[form.type],
       ...discountColumns(form.type, amount),
       isActive: form.isActive,
       priority: parseInt(form.priority, 10) || 0,
       kind: form.kind,
-      // Always sent, including as null for automatic, so switching a promo back
-      // to automatic clears the code it used to carry.
+      // Null for automatic so switching back clears the old code.
       code: form.kind === "code" ? form.code.trim() : null,
-      // Blank means no cap, which is null rather than 0 - the route rejects 0,
-      // since a limit of nothing reads as an off switch nobody looks for.
+      // Blank means no cap (null); the route rejects 0.
       maxRedemptions: form.maxRedemptions.trim() ? parseInt(form.maxRedemptions, 10) : null,
       perCustomerLimit: form.perCustomerLimit.trim() ? parseInt(form.perCustomerLimit, 10) : null,
       newCustomersOnly: form.newCustomersOnly,
@@ -222,8 +206,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
       activeFromMinute: toMinuteOfDay(form.activeFrom),
       activeToMinute: toMinuteOfDay(form.activeTo),
       minSpend: form.minSpend.trim() ? parseFloat(form.minSpend) : null,
-      // Bands carry the same kind of discount as their parent, built by the
-      // same converter.
+      // Bands share the parent's discount kind and converter.
       tiers: form.tiers.map((t) => ({
         minSpend: parseFloat(t.minSpend),
         ...discountColumns(form.type, parseFloat(t.amount)),
@@ -278,8 +261,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
   }
 
   /**
-   * Starts a mailing-list draft from the promo preset, linked to this promo, and
-   * opens it in the email editor.
+   * Starts a mailing-list draft for this promo and opens it in the email editor.
    * @param p - Running automatic promo to advertise.
    */
   async function emailPromo(p: PromoRow): Promise<void> {
@@ -297,8 +279,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
   }
 
   /**
-   * Starts a social post draft from the promo preset, linked to this promo, and
-   * opens it in the composer.
+   * Starts a social post draft for this promo and opens it in the composer.
    * @param p - Running automatic promo to advertise.
    */
   async function postPromo(p: PromoRow): Promise<void> {
@@ -369,8 +350,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
       )}
 
       <div>
-        {/* Status filter. Counts come from the full list, so a zero is visible
-            rather than the tab simply being absent. */}
+        {/* Status filter; counts come from the full list, so zero tabs still show. */}
         {promos.length > 0 && (
           <ListToolbar
             filters={(["all", "active", "upcoming", "expired", "disabled"] as const).map((key) => {

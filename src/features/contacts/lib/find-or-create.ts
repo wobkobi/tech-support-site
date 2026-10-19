@@ -1,12 +1,6 @@
 // src/features/contacts/lib/find-or-create.ts
-// Shared find-or-create helpers for Contact records. Centralises the pattern used by
-// booking, review-request and admin flows that need to land a Contact row when one
-// doesn't already exist for an email or phone. An email miss falls back to the Google
-// link, then an NZ mobile, attaching the email to that contact rather than duplicating it.
-//
-// Email is not `@unique` in the schema (see model Contact in schema.prisma) so
-// prisma.contact.upsert cannot be used directly - the find + conditional create pattern
-// below is the canonical replacement.
+// Find-or-create helpers for Contact rows by email or phone.
+// Email is not `@unique`, so prisma.contact.upsert can't be used; find + conditional create replaces it.
 
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { isNZMobileKey, normaliseContactPhone } from "@/shared/lib/normalise-phone";
@@ -39,23 +33,9 @@ export interface FindOrCreateResult {
 }
 
 /**
- * Finds a Contact by email, creating one with `seed` if none exists. Matching is
- * case-insensitive and the email is stored lowercased, so callers can't create a
- * duplicate just by varying case. Soft-deleted contacts are ignored (a fresh row
- * is created). The email passed in is written to the created row, overriding any
- * email present on `seed`.
- *
- * When no row has the email but `seed.googleContactId` matches a live contact,
- * the email is attached to that contact instead of creating a duplicate: it
- * becomes the primary email when the contact has none, otherwise an alt email.
- * This is the "Wendy is in contacts, just not her email" case - a contact picked
- * from Google that was saved without one.
- *
- * Failing that, a `seed.phone` that is an NZ mobile matching a live contact with
- * NO email gets the email set on that contact - the same rule the sync's
- * phone-only merge applies later, just before a duplicate exists. Landlines never
- * match (households share them), and a mobile on a contact that already has a
- * different email is left alone, since that is not proof it's the same person.
+ * Finds a live Contact by email (case-insensitive), creating one with `seed` if none exists.
+ * On a miss, attach the email to the contact matching `seed.googleContactId`, then to a
+ * no-email contact matching an NZ mobile (landlines are shared by households, so never match).
  * @param email - Email to match on (normalised internally).
  * @param seed - Fields used if a new row is created.
  * @returns The contact, whether it was newly created, and whether the email was attached.
@@ -120,9 +100,7 @@ export async function findOrCreateContactByEmail(
       addressUnverified: seed.addressUnverified ?? false,
       addressCandidates: seed.addressCandidates ?? [],
       company: seed.company?.trim() || null,
-      // Explicit null, not omitted: Mongo stores no key for an omitted optional field, and
-      // `where: { deletedAt: null }` - the filter every reader uses - won't match an absent
-      // key. Omit it and the new contact is invisible to the list, sync and matchers.
+      // Explicit null: `where: { deletedAt: null }` won't match an absent Mongo key.
       deletedAt: null,
       googleContactId: seed.googleContactId ?? null,
     },
@@ -131,10 +109,7 @@ export async function findOrCreateContactByEmail(
 }
 
 /**
- * Finds a Contact by phone, creating one with `seed` if none exists. The phone
- * is normalised to its canonical E.164 key for matching and storage, so callers
- * can pass raw input. Soft-deleted contacts are ignored. The phone passed in is
- * written to the created row, overriding any phone present on `seed`.
+ * Finds a live Contact by phone (normalised to E.164), creating one with `seed` if none exists.
  * @param phone - Phone number to match on (normalised internally).
  * @param seed - Fields used if a new row is created.
  * @returns The contact and whether it was newly created.

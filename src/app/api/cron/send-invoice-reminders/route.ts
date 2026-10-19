@@ -1,8 +1,6 @@
 // src/app/api/cron/send-invoice-reminders/route.ts
-// Daily cron chasing overdue SENT invoices: up to the configured max nudges per
-// invoice at the comms-settings offsets, idempotent via reminderCount. An
-// invoice whose payment is already sitting in the income ledger is held back
-// rather than chased. See docs/CRON.md.
+// Daily cron chasing overdue SENT invoices, idempotent via reminderCount. Invoices whose
+// payment is already in the income ledger are held back. See docs/CRON.md.
 
 import { balanceDue } from "@/features/business/lib/invoice-maths";
 import { findRecordedPayment } from "@/features/business/lib/invoice-payment-match";
@@ -31,14 +29,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const now = new Date();
-    // Coarse filter only - the per-invoice tier check decides what's due,
-    // since reminderCount's null-reads-as-0 can't be queried cheaply.
+    // Coarse filter; the per-invoice tier check decides (null reminderCount reads as 0).
     const firstThreshold = new Date(
       now.getTime() - comms.invoiceReminderFirstDays * 24 * 60 * 60 * 1000,
     );
     const candidates = await prisma.invoice.findMany({
-      // A SENT quote has a placeholder dueDate, not a payment deadline -
-      // never remind on quotes.
+      // A quote's dueDate is a placeholder; never remind on quotes.
       where: { status: "SENT", dueDate: { lte: firstThreshold }, ...NOT_A_QUOTE_FILTER },
       orderBy: { dueDate: "asc" },
     });
@@ -47,7 +43,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     for (const inv of candidates) {
       const count = inv.reminderCount ?? 0;
-      // Stop once the configured max is reached - after that it's the operator's problem.
+      // Past the configured max, it's the operator's call.
       if (count >= comms.invoiceReminderMaxCount) {
         results.skipped++;
         continue;
@@ -72,9 +68,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         continue;
       }
 
-      // The money may already be in, entered straight into the Cashbook rather than
-      // against the invoice. Chasing someone who has paid is worse than a late nudge, so
-      // hold off - the invoice page shows the same match with a prompt to record it.
+      // Payment may be in the Cashbook but not against the invoice; chasing a payer is
+      // worse than a late nudge.
       const payment = await findRecordedPayment(inv);
       if (payment) {
         results.paid++;

@@ -1,7 +1,5 @@
 // src/app/business/page.tsx
-// Business page: ad-hoc IT support and monthly retainers for Auckland small businesses.
-// Reads the live business rate from the rate config; retainer tiers are page copy
-// (nothing downstream derives from them).
+// Business page: ad-hoc IT support and retainers. Live business rate; retainer tiers are copy only.
 
 import { BusinessEnquiryForm } from "@/features/business/components/BusinessEnquiryForm";
 import { formatMoneyCompact } from "@/features/business/lib/business";
@@ -22,8 +20,7 @@ import type { Metadata } from "next";
 import type React from "react";
 import { FaPhone } from "react-icons/fa6";
 
-// ISR so rate edits propagate via the rate-config tag purge instead of
-// requiring a redeploy. The daily timer is only a fallback.
+// Rate edits propagate via the rate-config tag purge; the daily timer is a fallback.
 export const revalidate = 86400;
 
 const TITLE = "Small Business IT Support in Auckland";
@@ -76,8 +73,7 @@ interface RetainerTier {
   inclusions: string[];
 }
 
-// Marketing copy only - retainers are quoted per client and invoiced manually
-// through the normal invoice flow; no value below feeds billing.
+// Marketing copy only; retainers are quoted per client and nothing here feeds billing.
 const retainerTiers: ReadonlyArray<RetainerTier> = [
   {
     name: "Essentials",
@@ -156,9 +152,7 @@ const siteUrl = getSiteUrl();
  */
 export default async function BusinessPage(): Promise<React.ReactElement> {
   const [pricing, identity] = await Promise.all([getPublicPricing(), getIdentity()]);
-  // Deliberately undiscounted. Promos are a home offer, and the calculator
-  // charges a business visit's travel in full, so discounting it here would
-  // quote a rate the invoice does not honour.
+  // Undiscounted: promos are a home offer and business travel is invoiced in full.
   const displayTravelRate = pricing.travelRatePerHour;
   const businessJsonLd = {
     "@context": "https://schema.org",

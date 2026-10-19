@@ -1,9 +1,7 @@
 "use client";
 // src/features/business/components/ExpensesListRows.tsx
-// The visible expense entries, as cards below lg and a sortable table from lg, with the
-// recurring and missing-receipt markers and the row actions (asset link, Migrate, Edit,
-// Delete). ExpensesView owns the filtering, sorting, paging, the form and the dialogs;
-// these only render the rows it hands over.
+// Expense rows as phone cards or a sortable lg table, with markers and row actions.
+// ExpensesView owns the state; these only render.
 
 import {
   PINNED_CELL_CLS,
@@ -62,10 +60,8 @@ interface ExpenseRowsProps {
 }
 
 /**
- * "Turn into an asset" for an expense over the low-value threshold, or "View asset" once
- * an asset links it; nothing for smaller rows. Both open the Assets page, which fills a
- * new asset from the expense or opens the linked one. The cost compared is the GST basis
- * (incl. GST before registration, excl. after), the same figure the write-off test uses.
+ * "Turn into an asset" (or "View asset" once linked) for an expense over the low-value
+ * threshold, compared on the same GST basis as the write-off test.
  * @param props - Component props.
  * @param props.entry - The expense row.
  * @param props.gst - GST registration status, for the expense's cost basis.
@@ -237,8 +233,7 @@ export function ExpensesListCards({
 }
 
 /**
- * Desktop table with sortable Date, Supplier and Excl. GST columns. The actions column is
- * pinned right, so the row actions stay reachable when the table scrolls sideways.
+ * Desktop table with sortable columns and the actions column pinned right.
  * @param props - Component props.
  * @param props.rows - Entries on screen.
  * @param props.recurringGroups - Supplier+description groups.

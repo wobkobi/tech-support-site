@@ -1,7 +1,6 @@
 // scripts/check-task-window.ts
-// How task durations are fitted to the job window. This decides what a real
-// invoice charges for labour, in both directions: an over-long parse is scaled
-// down, and a parse that falls short of the window is grown to meet it.
+// How task durations are fitted to the job window (sets billed labour): over-long
+// parses scale down, short ones grow to meet it.
 // Run with: npm test -- task-window
 
 import {
@@ -62,12 +61,9 @@ function main(): void {
   );
 
   // ---- Short of the window ----
-  //
-  // The event end is the actual finish, so a shortfall is real time on the job
-  // that a rounded description did not capture. It is billed, not written off.
+  // The event end is the actual finish, so a shortfall is real billed time.
 
-  // Every line is pinned and one has a stated duration, so the largest line takes
-  // the difference.
+  // Every line is pinned, so the largest takes the difference.
   const pinned = collapseToWindow(
     [task("stated", 90, "explicit"), task("quick", 15, "short")],
     110,
@@ -81,8 +77,7 @@ function main(): void {
   expectEqual("filling counts as a rebalance, so the operator is told", pinned.rescaled, true);
   expectEqual("nothing is dropped when growing", pinned.dropped, 0);
 
-  // A floating task has no stated duration, so it absorbs the difference before
-  // any pinned line is touched.
+  // A floating task absorbs the difference before any pinned line.
   expectEqual(
     "a floating task takes the shortfall, not the explicit one",
     minutesOf(
@@ -97,16 +92,14 @@ function main(): void {
     [80, 40],
   );
 
-  // Only quick-task guesses and no stated time: none of them is the main job, so
-  // they share the window rather than one line taking all the slack.
+  // Only quick-task guesses: they share the window.
   expectEqual(
     "quick-task guesses with no stated time share the window evenly",
     minutesOf(collapseToWindow([task("a", 15, "short"), task("b", 15, "short")], 70, timing).tasks),
     [35, 35],
   );
 
-  // A floating line at 0 min has no proportion to scale by; it must not turn the
-  // totals into NaN.
+  // A floating line at 0 min must not turn the totals into NaN.
   expectEqual(
     "floating lines at 0 min split what the pinned lines leave",
     minutesOf(
@@ -121,8 +114,7 @@ function main(): void {
     [85, 15],
   );
 
-  // The snap grid cannot always divide the remainder evenly, so the leftover is
-  // parked on the largest line and the total still lands on the window.
+  // Snap-grid leftover goes on the largest line so the total still meets the window.
   const uneven = collapseToWindow([task("a", 50), task("b", 25)], 98, timing);
   expectEqual(
     "an uneven split still totals the window exactly",
@@ -139,8 +131,6 @@ function main(): void {
   );
 
   // ---- Over the window ----
-  //
-  // Unchanged behaviour, kept here so the two directions are pinned together.
 
   expectEqual(
     "an over-long floating task is scaled down",

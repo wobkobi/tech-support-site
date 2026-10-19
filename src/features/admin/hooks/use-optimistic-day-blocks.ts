@@ -1,8 +1,7 @@
 "use client";
 // src/features/admin/hooks/use-optimistic-day-blocks.ts
-// Optimistic block/unblock state for the schedule views. Google lags a write and the 30s
-// cache can serve a stale read, so a plain refetch shows the old state; this holds an
-// override per day to bridge the gap and coalesces the refetches that follow.
+// Optimistic block/unblock state for schedule views, bridging Google's write lag and the
+// 30s cache.
 
 import type { WeekEvent } from "@/features/admin/lib/schedule-types";
 import { useRouter } from "next/navigation";
@@ -26,23 +25,15 @@ interface UseOptimisticDayBlocks {
 }
 
 /**
- * Tracks in-flight day blocks and their optimistic overrides.
- *
- * Blocking several days fires one refresh, not one per click: each block busts
- * the 30s cache, so N immediate refreshes would each re-hit Google and back the
- * server up (locking out further clicks). The optimistic UI covers the interim.
- *
- * Overrides only bridge click > next refresh, so fresh server data drops the
- * overrides for days no longer in flight (a lost or merged block falls back to
- * its real state). Pending lives in a ref so reconciliation keys off server
- * data alone, not off a request settling.
+ * Tracks in-flight day blocks and their optimistic overrides. Refreshes are debounced
+ * since each block busts the cache and re-hits Google. Fresh server data drops overrides
+ * for days no longer in flight.
  * @param events - Server events; a new array is the signal to reconcile.
  * @returns Pending set, override map, and the three actions.
  */
 export function useOptimisticDayBlocks(events: readonly WeekEvent[]): UseOptimisticDayBlocks {
   const router = useRouter();
-  // A Set so several days can be in flight at once (each button disables only
-  // its own day, not the whole view).
+  // Several days can be in flight; each button disables only its own day.
   const [pendingDays, setPendingDays] = useState<Set<string>>(() => new Set());
   const [optimisticBlock, setOptimisticBlock] = useState<Map<string, boolean>>(() => new Map());
 
@@ -66,8 +57,7 @@ export function useOptimisticDayBlocks(events: readonly WeekEvent[]): UseOptimis
     refreshTimer.current = setTimeout(() => router.refresh(), REFRESH_DEBOUNCE_MS);
   }, [router]);
 
-  // Navigating away mid-debounce would otherwise fire router.refresh() against
-  // an unmounted view.
+  // Don't refresh an unmounted view.
   useEffect(() => {
     return () => {
       if (refreshTimer.current) clearTimeout(refreshTimer.current);

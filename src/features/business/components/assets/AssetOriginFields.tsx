@@ -1,8 +1,6 @@
 // src/features/business/components/assets/AssetOriginFields.tsx
-// Where an asset came from and what it's worth: the brought-in / bought choice, the date
-// it went into business use, market value and how it was worked out (brought in) or cost,
-// supplier and an optional expense link (bought). The cost label says whether to include
-// GST, going by the GST registration on the in-service date.
+// Where an asset came from and what it's worth: brought in (market value) or bought (cost,
+// supplier, expense link), plus the in-service date that sets the cost's GST basis.
 
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";

@@ -1,13 +1,6 @@
 // scripts/check-promo-pricing.ts
-// What each promo type does to a quote, and - the point of this file - proof
-// that the two existing types still produce exactly the numbers they did
-// before the quote-level stage existed.
-//
-// The pricing pipeline discounts the hourly rate BEFORE priceRangeFor builds
-// the band, so a quote-level discount that scaled the band afterwards would
-// round differently. flat_hourly and percent therefore stay on the rate stage
-// and must leave the quote stage untouched; the equivalence cases below fail
-// if that ever stops being true.
+// What each promo type does to a quote. flat_hourly and percent discount the rate before
+// priceRangeFor builds the band, so they must leave the quote stage untouched.
 // Run with: npm test -- promo-pricing
 
 import {
@@ -170,10 +163,6 @@ function main(): void {
   );
 
   // ---- Validation: each type is judged on its own value column ----
-  //
-  // The create and edit routes each had their own copy of this and drifted:
-  // the edit route kept demanding one of the two original columns, so editing
-  // a fixed-amount promo was rejected outright. These cases pin the shape.
 
   expectEqual(
     "fixed amount is valid with both original columns null",
@@ -199,11 +188,7 @@ function main(): void {
   );
 
   // ---- A restricted promo is advertised but not priced in ----
-  //
-  // Words and numbers part company: the banner names the restriction, while any
-  // surface without an appointment to check declines to discount. Quoting a
-  // Tuesday discount to someone who has not picked a day promises a price the
-  // invoice will not honour.
+  // Without an appointment to check, quoting the discount would promise an unhonoured price.
 
   const tuesdayOnly: ActivePromo = { ...promo("percent", 0.2), activeWeekdays: [2] };
 
@@ -229,8 +214,7 @@ function main(): void {
   );
   expectEqual("null in, null out", promoForAppointment(null, null), null);
 
-  // A new-customers-only or once-per-customer promo waits on the server having judged
-  // the customer: a returning customer quoted the new-customer rate loses it at booking.
+  // Customer-limited promos price only once the server has judged the customer
   const newCustomers: ActivePromo = { ...promo("percent", 0.2), customerLimited: true };
   expectEqual(
     "a customer-limited promo does not price an anonymous quote",
@@ -255,9 +239,8 @@ function main(): void {
     true,
   );
 
-  // endAt is exclusive: the admin form saves a promo's last day as NZ midnight starting
-  // the next day, so the banner must name the day before endAt. One summer date (NZDT,
-  // +13) and one winter date (NZST, +12) so the offset can't hide an off-by-one.
+  // endAt is exclusive (NZ midnight after the last day), so the banner names the day before.
+  // One NZDT (+13) and one NZST (+12) date so the offset can't hide an off-by-one.
   const lastDayCases: [string, string][] = [
     ["2026-10-31T11:00:00.000Z", "31 Oct"],
     ["2026-07-31T12:00:00.000Z", "31 Jul"],
@@ -273,11 +256,7 @@ function main(): void {
   }
 
   // ---- Spend thresholds and tiers ----
-  //
-  // Judged against the LOW end of the pre-discount total. A job quoted $90-$140
-  // sits below a $100 threshold at one end and above it at the other; the low
-  // end quotes the discount the customer is certain to get, and a job that
-  // lands higher earns more at invoice time.
+  // Judged on the LOW end of the pre-discount total: the discount the customer is sure of.
 
   /**
    * Builds a percent promo with spend bands.
@@ -355,9 +334,7 @@ function main(): void {
     0.2,
   );
 
-  // The band replaces the promo's own columns wholesale. Merging them would let
-  // a half-filled tier inherit the parent's value and discount by an amount
-  // that appears in neither.
+  // The band replaces the promo's columns wholesale; merging would mix values
   expectEqual(
     "a band's value replaces the promo's own",
     promoForSpend(tiered([[100, 0.25]]), 150)?.percentDiscount ?? null,
@@ -374,9 +351,7 @@ function main(): void {
   expectEqual("null in, null out", promoForSpend(null, 500), null);
 
   // ---- What a tiered promo says it is ----
-  //
-  // Its own value columns are ignored by the engine, so quoting them would name
-  // a discount nobody can earn.
+  // The engine ignores its own value columns, so they must not be quoted.
 
   expectEqual(
     "a tiered promo names its bands, not its own column",
@@ -406,10 +381,6 @@ function main(): void {
   );
 
   // ---- Validation: kind and code have to agree ----
-  //
-  // A code promo saved without a code could never be claimed by anyone, and an
-  // automatic promo carrying one would read as code-only in the admin list
-  // while quietly applying to every visitor.
 
   expectEqual("an automatic promo needs no code", validateKind({ kind: "automatic" }), null);
 
@@ -431,9 +402,7 @@ function main(): void {
     "a code promo needs a code",
   );
 
-  // Lowercase never reaches here - the routes normalise first - so the pattern
-  // judges the stored form, and a space would make the code unspeakable over
-  // the phone.
+  // Routes uppercase first, so this judges the stored form
   expectEqual(
     "a code with a space is rejected",
     validateKind({ kind: "code", code: "SPRING 25" }),
@@ -477,9 +446,7 @@ function main(): void {
   );
 
   // ---- Customer-facing copy ----
-  //
-  // A non-rate promo leaves the headline $/hr alone, so this phrase is the only
-  // place the pricing page says what the offer actually gives.
+  // For a non-rate promo this phrase is the only place the offer is stated.
 
   expectEqual(
     "fixed amount reads as money off",
@@ -538,8 +505,7 @@ function main(): void {
     { before: 65, after: 0 },
   );
 
-  // A travel promo must not touch the hourly pair, or the page crosses out a
-  // price and shows the identical one back - the reported bug.
+  // A travel promo must not cross out a rate only to show the same one back
   expectEqual(
     "free travel leaves the hourly pair alone",
     promoRateBeforeAfter(65, promo("free_travel", 0)),
@@ -565,10 +531,7 @@ function main(): void {
   );
 
   // ---- Money formatting ----
-  //
-  // A promo can halve a whole-dollar setting into cents. Bare arithmetic then
-  // prints "$7.5", and toFixed(0) rounded $8.50 up to "$9" beside a "$8.50"
-  // stated lower down the same page. Both shipped once.
+  // Halved whole dollars must print "$7.50", never "$7.5" or a rounded "$9".
 
   expectEqual("whole dollars stay whole", formatMoneyCompact(65), "$65");
   expectEqual("half a dollar keeps both digits", formatMoneyCompact(8.5), "$8.50");
@@ -576,11 +539,8 @@ function main(): void {
   expectEqual("a discounted whole rate stays whole", formatMoneyCompact(34), "$34");
 
   // ---- Modifier rates during a promo ----
-  //
-  // Mirrors the engine. A delta modifier changes the task's own rate, so the
-  // promo discounts the modified figure. An uplift is a surcharge on full
-  // labour and the promo discount comes off full labour too, so they add
-  // rather than multiply - 65 + 25% - 15% is 71.50, not 81.25 x 0.85.
+  // A delta modifier is discounted; an uplift and the promo both apply to full labour, so
+  // they add: 65 + 25% - 15% is 71.50, not 81.25 x 0.85.
 
   expectEqual(
     "percent promo discounts a delta modifier",
@@ -616,10 +576,7 @@ function main(): void {
   expectEqual("no promo leaves modifiers alone", promoModifierRate(65, 40, "delta", null), 40);
 
   // ---- The calculator: promos are a home offer ----
-  //
-  // This decides what a real invoice charges. Business labour is excluded, and
-  // so is a business visit's travel - a travel promo used to discount it
-  // because the travel branch returned before the business filter ran.
+  // Business labour and a business visit's travel are both excluded.
 
   const BIZ = "biz-modifier-id";
 
@@ -679,15 +636,13 @@ function main(): void {
     40,
   );
 
-  // The bug this pins: the travel branch used to return before the filter.
   expectEqual(
     "travel is NOT discounted on a business visit",
     computeJobPromoDiscount(job(95, true), promo("free_travel", 0), 40, BIZ),
     0,
   );
 
-  // The invoice path narrows by spend through the same function as the public
-  // estimate, judged on the subtotal calcJobTotal has already computed.
+  // The invoice path narrows by spend like the public estimate, on calcJobTotal's subtotal
 
   const TIERED = {
     ...promo("percent", 0.1),
@@ -709,8 +664,7 @@ function main(): void {
     ],
   };
 
-  // job(65, false) is one hour of home labour at $65; the subtotal argument is
-  // what selects the band.
+  // One $65 home hour; the subtotal argument selects the band
   expectEqual(
     "a job under every band earns nothing on the invoice either",
     computeJobPromoDiscount(job(65, false), TIERED, 0, BIZ, 65),
@@ -739,11 +693,7 @@ function main(): void {
   );
 
   // ---- A flat rate on a mixed-rate job ----
-  //
-  // Discounted per line, never netted across the job: a line already under the
-  // flat rate stays as it is, and its shortfall must not cancel the saving on a
-  // line above it. Netted, $65 + $40 under $55/hr gave $0 off where the pricing
-  // page promises $10.
+  // Per line, never netted: $65 + $40 under $55/hr is $10 off, not $0.
 
   const mixed = job(65, false);
   mixed.tasks.push({ ...mixed.tasks[0]!, unitPrice: 40, lineTotal: 40 });
@@ -759,11 +709,7 @@ function main(): void {
   );
 
   // ---- A flat rate with the Standard rate known ----
-  //
-  // A flat promo is a cut of (Standard - flat) off every home-rate hour, so each
-  // modifier keeps its usual gap from Standard. Rates come from the seeded
-  // defaults and expectations are derived from them, so the cases track the
-  // real rate card instead of repeating its figures.
+  // A cut of (Standard - flat) off every home hour; figures derive from the seeded rates.
 
   /**
    * The seeded hourly delta for one modifier label.
@@ -831,10 +777,8 @@ function main(): void {
     0,
   );
   // ---- A line priced under the live rate ----
-  //
-  // With the live rates known, each hour floors at the promo price for its rate
-  // tags. The bug this pins: a line still at an old, lower Standard took the
-  // full cut and billed under the flat rate the promo advertises.
+  // Each hour floors at the promo price for its rate tags, so a stale line never bills
+  // under the advertised flat rate.
 
   const LIVE_RATES = [
     { id: "base", ratePerHour: STANDARD, hourlyDelta: null, percentDelta: null },
@@ -905,10 +849,7 @@ function main(): void {
   );
 
   // ---- The rate card ----
-  //
-  // /pricing and /faq have no job total, so a promo with a spend floor or tiers
-  // is named there but never priced: a crossed-out $/hr beside a $100 minimum
-  // promises a one-hour job a discount it never earns.
+  // /pricing and /faq have no job total, so spend-gated promos are named but never priced.
 
   expectEqual(
     "an unconditional promo prices the rate card",
@@ -933,10 +874,7 @@ function main(): void {
   );
 
   // --- Unsuccessful visit during a promo ---
-  //
-  // "Half price" on a failed visit is half of what the customer was due to pay,
-  // so it comes off each line after the promo. Taken off the full line instead,
-  // a $35/hr cut plus half price would bill $22.50 of $150 labour, not $48.75.
+  // Half price comes off each line after the promo: 1.5h at $65 promo bills $48.75.
 
   /**
    * Builds a job of hourly lines for the unsuccessful cases.
@@ -1088,8 +1026,7 @@ function main(): void {
   );
   expectEqual("free travel covers the drive, not the parking", freeTravel.promoDiscount, 30);
 
-  // Timed lines at one rate share their cents: rounded alone, 35 + 35 + 20 min at
-  // $100/hr printed $58.33 + $58.33 + $33.33 = $149.99 for 90 minutes worth $150.
+  // Timed lines share cents: 35 + 35 + 20 min at $100/hr must total $150, not $149.99
   console.log("\nline totals split cents across timed lines\n");
   /**
    * A timed line item as jobToLineItems emits one.

@@ -1,9 +1,7 @@
 "use client";
 // src/features/admin/components/settings/TaxBracketsField.tsx
-// Row editor for the income-tax bands on the tax settings tab. Each row is an upper limit
-// and a rate (edited as a percent, stored as a fraction); the last row is the top band and
-// has no limit. Row errors are keyed `brackets.<index>.upTo` / `brackets.<index>.rate` to
-// match the validator.
+// Row editor for the income-tax bands; the last row is the open-ended top band. Row errors
+// are keyed `brackets.<index>.upTo` / `.rate` to match the validator.
 
 import { FieldShell } from "@/features/admin/components/settings/SettingsFields";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";

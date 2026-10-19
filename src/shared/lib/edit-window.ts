@@ -1,8 +1,6 @@
 // src/shared/lib/edit-window.ts
-// Editing window for past schedule items: an event or blocked day is locked once it ended
-// more than MAX_PAST_EDIT_HOURS ago, so stale history can't be mutated by accident.
-// Enforced server-side in the mutation routes and mirrored client-side to disable the
-// controls.
+// Past schedule items lock MAX_PAST_EDIT_HOURS after they end. Enforced server-side, mirrored
+// client-side.
 
 import { dateKeyParts, getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
@@ -25,8 +23,7 @@ export function isPastEditWindow(
 }
 
 /**
- * Epoch ms of the END of an NZ day (its next NZ midnight). Used to age-check a
- * blocked all-day event, whose "end" is midnight after the blocked date.
+ * Epoch ms of the end of an NZ day (next NZ midnight), for aging blocked all-day events.
  * @param dateKey - NZ YYYY-MM-DD.
  * @returns The day's end (next NZ midnight) as epoch ms.
  */

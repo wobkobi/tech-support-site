@@ -1,7 +1,5 @@
 // src/features/business/lib/calculator-helpers.ts
-// Pure helpers behind the job calculator: date/time arithmetic, task-line edits that
-// recompute prices from the rate table, and the travel lookups for the auto entry and
-// store runs.
+// Job calculator helpers: date/time arithmetic, task-line re-pricing and travel lookups.
 
 import { effectiveHourlyRate, isChannelModifier, todayISO } from "@/features/business/lib/business";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
@@ -30,14 +28,11 @@ export function addHour(t: string): string {
 }
 
 /**
- * Builds a UTC ISO timestamp for an HH:MM NZ wall-clock start on the next
- * occurrence of the job date's WEEKDAY (today counts while the time is still
- * ahead). Google only quotes traffic for future departures, so a past job is
- * priced at the same weekday + time as a proxy for that day's actual traffic.
- * Returns null when the input isn't a valid HH:MM string.
+ * UTC ISO timestamp for an HH:MM NZ start on the next occurrence of the job date's weekday.
+ * Google only quotes future traffic, so a past job uses the same weekday and time as a proxy.
  * @param hhmm - Start time in HH:MM (24h) NZ wall-clock.
- * @param anchorDate - NZ-local YYYY-MM-DD whose weekday to match (the job date); malformed values fall back to today.
- * @returns ISO 8601 UTC timestamp, or null.
+ * @param anchorDate - NZ YYYY-MM-DD whose weekday to match; malformed falls back to today.
+ * @returns ISO 8601 UTC timestamp, or null for an invalid time.
  */
 function jobStartIsoFromTime(hhmm: string, anchorDate?: string): string | null {
   if (!/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
@@ -47,9 +42,7 @@ function jobStartIsoFromTime(hhmm: string, anchorDate?: string): string | null {
 }
 
 /**
- * Builds an empty hourly task line seeded with the default base rate (e.g.
- * Standard $65/hr) and no modifiers. Flat-rate rows (Travel etc.) come from
- * AI parse or address lookup.
+ * Builds an empty hourly task line at the default base rate with no modifiers.
  * @param rates - The list of available rate configurations.
  * @returns A default hourly TaskLine.
  */
@@ -74,8 +67,7 @@ export function emptyTask(rates: RateConfig[]): TaskLine {
 }
 
 /**
- * Updates a single field on a task line, recalculating the line total when quantity or unit price
- * changes, and auto-filling description and price when a rate config is selected.
+ * Updates one field on a task line, re-totalling it and filling from a picked rate config.
  * @param prev - Current task lines.
  * @param idx - The zero-based index of the task in the tasks array.
  * @param field - The field on the TaskLine to update.
@@ -94,16 +86,14 @@ export function updateTaskField(
   const existing = t[idx];
   if (!existing) return prev;
   const item = { ...existing, [field]: val };
-  // Minutes are the billed unit on hourly rows, so a hand-edited qty must rewrite them
-  // or the stale value keeps winning downstream. The row edits hrs + mins, so the
-  // incoming qty is already whole minutes: snap it, and carry qty unrounded.
+  // Minutes are the billed unit on hourly rows, so a typed qty must rewrite them. It is
+  // already whole minutes (hrs + mins inputs): snap it and keep qty unrounded.
   if (field === "qty") {
     const mins = Math.round(Number(val) * 60);
     if (isHourlyTask(item)) {
       item.minutes = mins;
       item.qty = mins / 60;
-      // A typed time is the operator's own measurement, no longer the parser's
-      // quick-task guess, so window fitting must keep it rather than reset it.
+      // A typed time is the operator's own, so window fitting must keep it.
       item.isShort = false;
       item.isExplicit = true;
     } else {
@@ -130,8 +120,7 @@ export function updateTaskField(
 }
 
 /**
- * Toggles a modifier rate on a task and recomputes the unit price + line
- * total from the resulting base + modifiers combo.
+ * Toggles a modifier rate on a task and re-prices it from base + modifiers.
  * @param prev - Current task lines.
  * @param idx - Task index.
  * @param modifierId - Modifier rate ID being toggled on/off.
@@ -153,8 +142,7 @@ export function toggleTaskModifierLine(
   if (current.includes(modifierId)) {
     next = current.filter((m) => m !== modifierId);
   } else if (picked && isChannelModifier(picked)) {
-    // One task, one delivery channel: picking a second SWAPS rather than stacking,
-    // which would compound both discounts into a rate the invoice never charges.
+    // One delivery channel per task: a second one swaps in, so discounts never compound.
     const channelIds = new Set(rates.filter(isChannelModifier).map((r) => r.id));
     next = [...current.filter((m) => !channelIds.has(m)), modifierId];
   } else {
@@ -200,10 +188,8 @@ export function setTaskBaseLine(
 }
 
 /**
- * Re-prices every hourly line from the live rates for its base and modifiers.
- * A restored draft keeps the prices it was saved with, so a rate change since
- * would otherwise bill the old rate, and a flat promo would then cut the full
- * (Standard - flat) from it. A $/hr the operator typed is left alone.
+ * Re-prices every hourly line from the live rates, so a restored draft doesn't bill a stale
+ * rate. A typed $/hr is left alone.
  * @param tasks - Task lines, e.g. from a saved draft.
  * @param rates - Live rate configs.
  * @returns The lines with hourly prices brought up to date; flat and untagged lines unchanged.
@@ -236,21 +222,16 @@ interface AutoTravelLookup {
 }
 
 /**
- * Calls the travel-time API and builds the auto travel entry. Each leg quotes
- * at its own departure: outbound at job start, return at job end. Zero drive
- * time yields no entry; any non-zero drive bills the $10 minimum via
- * {@link calcTravelCharge}. Network failures throw to the caller.
+ * Builds the auto travel entry from the travel-time API, outbound at job start and return at
+ * job end. Network failures throw.
  * @param input - Address, slot bounds, date and live travel pricing.
  * @returns The auto travel entry, or null when the API found no drive time.
  */
 export async function lookupAutoTravel(input: AutoTravelLookup): Promise<TravelEntry | null> {
   const { jobAddress, aggregateStart, aggregateEnd, jobDate, durationMins } = input;
-  // Both legs anchor to the JOB DATE's weekday so a past job is quoted
-  // with the traffic pattern of the day it actually happened.
   const departureTimeIso = jobStartIsoFromTime(aggregateStart, jobDate);
-  // Return departure: the job's end time, guarded against
-  // jobStartIsoFromTime's independent roll-forward inverting the pair;
-  // falls back to departure + estimated duration, else the server's default.
+  // Each leg rolls forward on its own, so push an inverted return a day on; without an end
+  // time, use departure + duration.
   let returnDepartureTimeIso = jobStartIsoFromTime(aggregateEnd, jobDate);
   if (departureTimeIso && returnDepartureTimeIso && returnDepartureTimeIso <= departureTimeIso) {
     returnDepartureTimeIso = new Date(
@@ -278,8 +259,7 @@ export async function lookupAutoTravel(input: AutoTravelLookup): Promise<TravelE
   };
   if (!d.durationMinsThere || d.durationMinsThere <= 0) return null;
   const backMins = d.durationMinsBack || d.durationMinsThere;
-  // calcTravelCharge sums the legs and floors at MIN_TRAVEL_CHARGE, so
-  // a 1-min drive still bills the $10 minimum.
+  // Floors at the minimum charge, so a 1-min drive still bills it.
   const cost = calcTravelCharge(
     d.durationMinsThere,
     backMins,
@@ -299,9 +279,7 @@ export async function lookupAutoTravel(input: AutoTravelLookup): Promise<TravelE
 }
 
 /**
- * Builds a store-run travel entry from its two drive legs, priced at the travel rate
- * and rounded to $5 like the trip to the client, but with no minimum charge, so a short
- * run can come to $0.
+ * Builds a store-run travel entry priced like client travel but with no minimum (can be $0).
  * @param store - The store, as named.
  * @param thereMins - Drive minutes from the client to the store.
  * @param backMins - Drive minutes from the store back to the client.

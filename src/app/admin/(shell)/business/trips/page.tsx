@@ -1,9 +1,6 @@
 // src/app/admin/(shell)/business/trips/page.tsx
-// Business trips page: the FY's km log, jobs that still need a trip, and the IRD
-// kilometre-rate claim (tier 1 for the business share of the car's first 14,000 km, tier
-// 2 after). FY tabs drive it through ?fy=, defaulting to the current year; the rates, the
-// car's total km and the km-rate vehicle periods come from the FY's tax inputs, the same
-// source the Tax page uses.
+// Business trips page for `?fy=`: km log, jobs needing a trip, and the IRD km-rate claim
+// (tier 1 to 14,000 km), using the Tax page's inputs.
 
 import { AdminTabs } from "@/features/admin/components/ui/AdminTabs";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";

@@ -1,7 +1,6 @@
 // src/features/business/components/assets/AssetClassFields.tsx
-// How an asset is depreciated: the IR265 class picker (which fills in the rate for the
-// chosen method), method, rate, business-use share, the kilometre-rate option for the
-// motor vehicle class, and Investment Boost for brand-new bought items.
+// How an asset is depreciated: IR265 class (fills the rate), method, rate, business use,
+// km rates for vehicles and Investment Boost.
 
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { AdminField } from "@/features/admin/components/ui/AdminField";

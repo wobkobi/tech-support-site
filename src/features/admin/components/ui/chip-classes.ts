@@ -1,7 +1,5 @@
 // src/features/admin/components/ui/chip-classes.ts
-// Class strings for the admin's single-choice controls: the rounded filter / option chip
-// and the violet segmented toggle (Short/Long, Cash/Bank, Desktop/Phone). Callers keep
-// their own button markup, aria-pressed and handlers; only the look is shared.
+// Class strings for admin filter chips and segmented toggles; callers own markup and ARIA.
 
 import { cn } from "@/shared/lib/cn";
 
@@ -24,8 +22,7 @@ export const SEGMENTED_GROUP_CLS =
   "inline-flex rounded-lg border border-admin-border bg-admin-bg p-0.5";
 
 /**
- * Classes for one button of a segmented toggle: solid violet when selected, so the choice
- * never reads as a second coquelicot primary beside a Save button.
+ * Classes for one segmented-toggle button; violet when selected so it never reads as a primary.
  * @param active - Whether this option is selected.
  * @returns Class string.
  */

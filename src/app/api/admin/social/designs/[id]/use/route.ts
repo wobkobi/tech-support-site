@@ -1,8 +1,6 @@
 // src/app/api/admin/social/designs/[id]/use/route.ts
-// Hands a design's pictures to a social post: the 4:5 picture becomes the post's
-// picture (Facebook and Instagram), the 4:3 one Google's own picture. Both match the
-// shapes the apps show, so nothing is cut off. Updates the post the design is linked
-// to while it's still a draft, otherwise starts a new draft.
+// Hands a design's pictures to a social post (4:5 for Facebook and Instagram, 4:3 for
+// Google), updating its linked draft or starting a new one.
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import { docHash, parseDesignDoc } from "@/features/social-design/lib/doc";
@@ -43,8 +41,7 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
   if ("error" in parsed) return errorResponse(parsed.error, 400);
   const doc = parsed.doc;
 
-  // Checked against the design as stored and the contact details and promo as they are
-  // now, so a post never gets pictures showing an old phone number or offer.
+  // Checked against current contact details and promo, so pictures are never stale.
   const hash = docHash(doc, await loadBoundValues());
   /**
    * A size's stored picture, when it matches the design as it is now.
@@ -73,8 +70,7 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
         where: { id: design.postId, status: "draft", isPreset: false },
       })
     : null;
-  // Facebook and Instagram drop any picture of their own so the 4:5 one shows; Google
-  // takes the 4:3 one when the design has that size.
+  // Facebook and Instagram drop their own pictures; Google takes the 4:3 one if present.
   const targets = (linked?.targets ?? defaultTargets()).map((t) => {
     if (t.platform === "google" && !google) return t;
     const own = t.platform === "google" ? google : null;

@@ -1,9 +1,7 @@
 "use client";
 // src/features/contacts/components/ContactAddressReviewList.tsx
-// Review queue for imported contact addresses the geocoder could not confidently resolve.
-// Each card offers the Auckland candidates as one-click picks plus a free-text box
-// checked through /api/admin/contacts/verify-address, and saves through PATCH
-// /api/admin/contacts/[id]. A saved or dismissed row drops out of the list.
+// Review queue for imported contact addresses the geocoder could not resolve: pick a
+// candidate or type and check one; saved or dismissed rows drop out.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -26,10 +24,7 @@ export interface AddressReviewRow {
   candidates: string[];
 }
 
-/**
- * Candidate buttons carry full formatted addresses, so they override the
- * AdminButton default of a single centred line.
- */
+/** Candidate buttons hold full addresses, so they wrap instead of one centred line. */
 const CANDIDATE_CLASS = "w-full justify-start text-left whitespace-normal";
 
 interface AddressReviewCardProps {
@@ -199,8 +194,7 @@ interface ContactAddressReviewListProps {
 }
 
 /**
- * Lists every contact whose imported address needs a decision. Renders nothing
- * when the queue is empty so the conflicts page stays clean.
+ * Lists every contact whose imported address needs a decision; nothing when empty.
  * @param props - Component props.
  * @param props.initial - Server-loaded review rows.
  * @returns Review list element, or null when there is nothing to review.

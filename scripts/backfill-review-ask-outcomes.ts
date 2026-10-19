@@ -1,14 +1,7 @@
 // scripts/backfill-review-ask-outcomes.ts
-// Marks every invoice sent before automatic review asks started as already decided
-// (skipped, "before_auto"), so switching the job on doesn't email a review ask about
-// every past job at once. Run once against production right after the deploy, before
-// turning on Settings > Reviews > Automatic review asks. Also the safety step before
-// testing the job locally against a database full of real invoices.
-// Run with: npm run backfill:review-asks:dry      (writes nothing)
-//           npm run backfill:review-asks:apply    (writes)
-//
-// The cut-off defaults to now. Pass --before=<ISO date> to pick another one - from
-// PowerShell quote the separator: npm run backfill:review-asks:dry '--' --before=2026-10-07
+// Mark invoices sent before automatic review asks as skipped ("before_auto") so enabling
+// the job doesn't email every past client. Run before turning the setting on.
+// Run: npm run backfill:review-asks:dry | :apply, optional '--' --before=<ISO date> (default now)
 
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
 import { reviewAskClockStart } from "@/features/reviews/lib/review-ask-rules";

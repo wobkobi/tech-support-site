@@ -1,8 +1,6 @@
 // src/features/social/lib/meta-graph.ts
-// Small fetch wrapper for Meta's Graph API, shared by the Facebook and Instagram
-// adapters. Every call uses the Page access token: a Page token derived from a
-// long-lived user token has no expiry date, but a password change, removing the app
-// or losing the Page role revokes it, and that surfaces here as error code 190.
+// Graph API fetch wrapper for the Facebook and Instagram adapters. The Page token doesn't expire,
+// but a password change or lost Page role revokes it (error 190).
 
 // Pinned so a Meta release can't change behaviour underneath. v26.0 is supported
 // until at least mid-2028; bump it here alone.
@@ -49,8 +47,7 @@ interface GraphErrorBody {
 }
 
 /**
- * Turns Meta's error into something the operator can act on. Codes from the Graph
- * API error reference: 190 bad or revoked token, 10/200-299 missing permission,
+ * Turns Meta's error into an actionable one: 190 bad token, 10/200-299 permission,
  * 4/17/32/613 rate limits.
  * @param body - Parsed error response.
  * @param status - HTTP status.
@@ -75,8 +72,7 @@ function toGraphError(body: GraphErrorBody | null, status: number): GraphError {
 }
 
 /**
- * Calls the Graph API with the Page token. GET and DELETE send params in the query
- * string; POST sends them form-encoded, the way the Graph API documents its examples.
+ * Calls the Graph API with the Page token: GET/DELETE params in the query, POST form-encoded.
  * @param path - Path after the version, like "/123/feed".
  * @param method - HTTP method.
  * @param params - Request parameters, without the token.
@@ -102,15 +98,10 @@ export async function graph<T>(
 }
 
 /**
- * Deletes a Page post or Instagram media. Deleting something that's already gone
- * fails with error 100 ("does not exist, cannot be loaded due to missing
- * permissions"), and so does deleting with a token that has lost sight of the
- * account. It only counts as already deleted (so pressing Take down twice is safe)
- * when the object can't be read either AND the token can still see the account that
- * owns it; otherwise the original error stands and the post stays marked as up.
+ * Deletes a Page post or Instagram media. Error 100 means gone OR lost access, so it counts as
+ * already deleted only when the object is unreadable AND the owner is still visible.
  * @param id - Post or media id.
- * @param ownerVisible - Resolves true when the token can still see the owning Page or
- *   Instagram account.
+ * @param ownerVisible - Resolves true when the token can still see the owning account.
  */
 export async function deleteObject(
   id: string,

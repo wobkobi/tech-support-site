@@ -1,7 +1,5 @@
 // src/features/admin/components/ui/ListToolbar.tsx
-// Toolbar above an admin list: search on the left, filters beside it, the result count
-// and list-level actions on the right. Slots only - each list keeps its own filter state
-// and URL sync. Server-safe.
+// Admin list toolbar: search, filters, count and actions as slots. Server-safe.
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";

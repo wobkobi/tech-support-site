@@ -1,9 +1,6 @@
 "use client";
 // src/features/admin/components/settings/PricingTab.tsx
-// Editor for the pricing & cancellation group. Renders each field from
-// PRICING_FIELD_META, tracks dirty state via useSettingsForm, and saves to the admin
-// settings route - surfacing inline field errors, guardrail blocks, and warnings (with a
-// "save anyway" confirm).
+// Editor for the pricing & cancellation group, rendered from PRICING_FIELD_META.
 
 import { PricingPreview } from "@/features/admin/components/settings/PricingPreview";
 import {
@@ -49,9 +46,8 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
   const setTop = (patch: Partial<PricingSettings>): void => setDraft((p) => ({ ...p, ...patch }));
 
   /**
-   * Flips GST registration, then confirms if it has just been turned on (and
-   * wasn't on at load). The switch moves right away so the dialog reflects the
-   * change; Cancel restores it to its saved state.
+   * Flips GST registration, confirming if it was just turned on from saved-off. Cancel
+   * restores the saved state.
    * @param v - The attempted GST-registered value.
    */
   const setGst = (v: boolean): void => {

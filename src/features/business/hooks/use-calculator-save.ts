@@ -1,9 +1,7 @@
 "use client";
 // src/features/business/hooks/use-calculator-save.ts
-// Save paths for the job calculator: invoice / save & send / quote via the invoices API
-// (with the add-to-contacts gate and contactId backfill), marking a paid-in-full invoice
-// paid, sending any already-paid amount, asking for the job's trip when you drove
-// there, and the direct income entry.
+// Save paths for the job calculator: invoice / save & send / quote (with the add-to-contacts
+// gate and contactId backfill), mark-paid, trip logging, and the direct income entry.
 
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { validateEmail } from "@/features/booking/lib/booking";
@@ -58,8 +56,7 @@ interface UseCalculatorSaveArgs {
   /** Job date the income entry is recorded against, and the logged trip's date. */
   jobDate: string;
   /**
-   * Where you drove for this job, or null when you didn't (no address, a walk, a remote
-   * job, or a cancelled one with no travel billed). Set, an invoice save logs the trip.
+   * Where you drove for this job, or null when you didn't. Set, an invoice save logs the trip.
    */
   tripAddress: string | null;
   /** "Paid in cash" ticked: an invoice saves as paid, an income entry records Cash. */
@@ -133,26 +130,23 @@ export function useCalculatorSave({
   const { toast } = useToast();
   const { tasks, clientName, clientEmail, notes } = job;
 
-  // Direct-save (Save invoice) state. pendingInvoiceId is set after a
-  // successful POST so handleAddContactClose can PATCH `contactId` once the
-  // modal returns the new Contact's id, then navigate to the detail page.
+  // Set after a successful POST so handleAddContactClose can PATCH `contactId` once the
+  // modal returns the new Contact's id.
   const [savingInvoice, setSavingInvoice] = useState(false);
-  // True while the in-flight save is a "Save & send" (routes to ?send=1 and
-  // skips the calculator's add-to-contacts gate); drives the two button labels.
+  // True while the in-flight save is a "Save & send"; drives the two button labels.
   const [saveSendMode, setSaveSendMode] = useState(false);
   // True while the in-flight save is a "Save as quote"; drives its busy label.
   const [saveQuoteMode, setSaveQuoteMode] = useState(false);
   const [saveInvoiceError, setSaveInvoiceError] = useState<string | null>(null);
   const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
-  // Name of an existing contact (matched by Google link) that lacks the typed email,
-  // so the add-to-contacts popup offers to add the email instead of a new contact.
+  // Existing contact (matched by Google link) lacking the typed email, so the popup
+  // offers to add the email.
   const [pendingExistingName, setPendingExistingName] = useState<string | null>(null);
   // That contact's id, so the invoice still links to it when the operator declines.
   const [pendingExistingId, setPendingExistingId] = useState<string | null>(null);
   const [savingIncome, setSavingIncome] = useState(false);
   const [incomeError, setIncomeError] = useState<string | null>(null);
-  // Income rows already in ("part" / "rest" / "whole"), so a retry after a half-saved
-  // split posts only the missing one.
+  // Income rows already in, so a retry after a half-saved split posts only the missing one.
   const [savedIncomeRows, setSavedIncomeRows] = useState<string[]>([]);
 
   /**
@@ -160,14 +154,10 @@ export function useCalculatorSave({
    * @param taskList - Tasks from the current job to persist as templates
    */
   async function saveTaskTemplates(taskList: TaskLine[]): Promise<void> {
-    // Only save tasks that have BOTH device + action populated. Description-only
-    // rows (e.g. flat-rate travel lines) skip templating.
+    // Only tasks with both device and action become templates.
     const tagged = taskList.filter((t) => t.rateConfigId == null && t.device && t.action);
-    // One request per distinct tag pair. The endpoint upserts by looking the row
-    // up and then creating it, so two line items sharing a pair would both miss
-    // the lookup in this parallel batch and insert a duplicate template - which
-    // is how a second "Software repair" row appeared at a different price. The
-    // last occurrence wins, matching the sequential upsert's final state.
+    // One request per distinct tag pair: the endpoint's look-up-then-create upsert would
+    // insert duplicates in this parallel batch. The last occurrence wins.
     const byPair = new Map<string, TaskLine>();
     for (const t of tagged) {
       byPair.set(`${t.device?.toLowerCase()}|${t.action?.toLowerCase()}`, t);
@@ -181,8 +171,7 @@ export function useCalculatorSave({
             defaultPrice: t.unitPrice,
             device: t.device,
             action: t.action,
-            // Description fallback for the server's composeDescription() in case
-            // either tag accidentally drops out before persist.
+            // Fallback for the server's composeDescription() if a tag drops out.
             description: t.description.trim(),
           }),
         })
@@ -202,9 +191,8 @@ export function useCalculatorSave({
   }
 
   /**
-   * Attaches a saved invoice to a Contact. Best-effort: the invoice still
-   * stands without the FK, but losing it costs the review link and the
-   * contact's invoice history.
+   * Attaches a saved invoice to a Contact. Best-effort, though the review link and the
+   * contact's invoice history depend on it.
    * @param invoiceId - The saved invoice.
    * @param contactDbId - Contact to attach it to.
    * @returns Promise that resolves once the write has been attempted.
@@ -222,8 +210,7 @@ export function useCalculatorSave({
   }
 
   /**
-   * Renames the picked contact to the name typed on the invoice. The contact route pushes
-   * the change to Google Contacts. The invoice is already saved, so a failure only warns.
+   * Renames the picked contact (and its Google Contact) to the invoice name; a failure only warns.
    * @param contactDbId - The picked contact's DB id.
    * @param name - The new name.
    */
@@ -244,13 +231,10 @@ export function useCalculatorSave({
   }
 
   /**
-   * Closes the add-to-contacts modal after a direct save. If the modal
-   * created a Contact, PATCH the just-saved invoice with that contact's id
-   * before navigating to the detail page. Best-effort backfill - the invoice
-   * still navigates without the FK if PATCH fails.
-   * @param contactDbId - DB id returned by the modal when the operator
-   *   confirmed and a Contact was created or updated. Null on dismiss / failure,
-   *   in which case an already-known contact missing the email is linked instead.
+   * Closes the add-to-contacts modal after a direct save, best-effort linking the invoice
+   * to the contact before navigating to the detail page.
+   * @param contactDbId - Contact the modal created or updated, or null on dismiss / failure
+   *   (an already-known contact missing the email is linked instead).
    */
   async function handleAddContactClose(contactDbId?: string | null): Promise<void> {
     const invoiceId = pendingInvoiceId;
@@ -270,9 +254,8 @@ export function useCalculatorSave({
   const prepaidCovers = prepaid > 0 && prepaid >= totals.total;
 
   /**
-   * Marks a just-saved invoice paid on the job date, through the same route as the
-   * Payment dialog, which also records the income. A failure leaves the invoice saved
-   * and unpaid, so the operator is told to finish it from the invoice page.
+   * Marks a just-saved invoice paid on the job date via the Payment dialog's route, which
+   * also records the income. A failure leaves it unpaid and says so.
    * @param invoiceId - The saved invoice.
    * @param method - How the money came in (an INCOME_METHODS value).
    */
@@ -308,24 +291,17 @@ export function useCalculatorSave({
     setIncomeError(null);
     setSaveInvoiceError(null);
     setSavedIncomeRows([]);
-    // In-flight save bookkeeping. saveSendMode/saveQuoteMode are only ever set
-    // when a save starts, so a failed Save & send leaves them true and puts the
-    // next save's "Saving..." label on the wrong button.
+    // A failed Save & send would leave saveSendMode true and mislabel the next save.
     setSaveSendMode(false);
     setSaveQuoteMode(false);
     setPendingInvoiceId(null);
   }
 
   /**
-   * Direct save: POSTs the calculator state straight to the invoices API and
-   * navigates to the detail page. Backdating / custom invoice number / custom
-   * due date is handled by editing a saved DRAFT after the fact.
-   * @param send - When true ("Save & send"), skip the add-to-contacts gate and
-   *   route to the detail page with `?send=1` so it auto-opens the send preview
-   *   (which has its own add-to-contacts hook-in + contactId backfill).
-   * @param quote - When true ("Save as quote"), the row saves as a QUOTE: a
-   *   Q- number from the quote counter, QUOTE PDF, 30-day validity default,
-   *   convertible to a real invoice from the detail page.
+   * Direct save: POSTs the calculator state to the invoices API and navigates to the
+   * detail page. Backdating and custom numbers are done by editing the saved DRAFT.
+   * @param send - "Save & send": skip the add-to-contacts gate and open `?send=1`.
+   * @param quote - "Save as quote": saves as a QUOTE with a Q- number and 30-day validity.
    */
   async function handleSaveInvoice(send = false, quote = false): Promise<void> {
     // Validate required fields
@@ -341,9 +317,7 @@ export function useCalculatorSave({
       setSaveInvoiceError("The amount already paid is more than the invoice total.");
       return;
     }
-    // Validate the email format before the POST so a malformed address blocks
-    // invoice creation entirely. Otherwise the draft saves first and the bad
-    // email only surfaces later when the add-to-contacts step rejects it.
+    // Check the email before the POST, or the draft saves and the bad email surfaces later.
     const emailCheck = validateEmail(clientEmail);
     if (emailCheck === "empty") {
       setSaveInvoiceError("Client email is required.");
@@ -382,18 +356,14 @@ export function useCalculatorSave({
           notes: notes || null,
           promoTitle: promoActive ? activePromo.title : null,
           promoDiscount: promoActive ? totals.promoDiscount : null,
-          // The id, not just the title: the redemption this settles is keyed by
-          // promo, and matching on a title would break the moment one is edited.
+          // The id, not the title: redemptions are keyed by promo and titles can be edited.
           promoId: promoActive ? activePromo.id : null,
-          // Send the flag alongside its discount: the server stores
-          // `unsuccessful === true`, so omitting it records every calculator-raised
-          // invoice as successful even when the half-price reduction was applied.
+          // The server stores `unsuccessful === true`, so omitting it would record success.
           unsuccessful: totals.unsuccessfulDiscount > 0,
           unsuccessfulDiscount:
             totals.unsuccessfulDiscount > 0 ? totals.unsuccessfulDiscount : null,
-          // Match back to the billed job when the session came from the schedule's
-          // "Bill in calculator" action. calendarEventId stays the earliest event for
-          // existing readers; the full set lets every merged event find this invoice.
+          // Link back to the billed job from "Bill in calculator". calendarEventId is the
+          // earliest event; the full set lets every merged event find this invoice.
           bookingId: eventPrefill?.bookingId ?? null,
           calendarEventId: eventPrefill?.calendarEventId ?? null,
           calendarEventIds: eventPrefill?.slots.map((slot) => slot.calendarEventId) ?? [],
@@ -409,8 +379,7 @@ export function useCalculatorSave({
               alreadyPaidMethod: alreadyPaid.method,
               alreadyPaidDate: jobDate,
             }),
-          // You drove there, charged for or not, so the server logs the job's trip at
-          // Google's round-trip km.
+          // The server logs the trip at Google's round-trip km, charged for or not.
           ...(!quote && tripAddress && { trip: { address: tripAddress, date: jobDate } }),
           // issueDate, dueDate, number all defaulted server-side.
         }),
@@ -449,18 +418,12 @@ export function useCalculatorSave({
         });
       }
       const invoiceId = d.invoice.id;
-      // Before the contacts gate, which can stop here to wait on its modal. A quote
-      // can't be paid.
+      // Before the contacts gate, which can stop here for its modal. A quote can't be paid.
       if (!quote && (paidCash || prepaidCovers)) {
         await markPaid(invoiceId, paidCash ? CASH : alreadyPaid.method);
       }
-      // Add-to-contacts gate: defer nav until the modal closes so
-      // handleAddContactClose can backfill contactId via PATCH. "Save & send"
-      // skips this - the detail send flow runs its own add-to-contacts hook-in.
-      // Only the "new contact" path ever set contactId, via the prompt below,
-      // so an invoice for a customer already on file was never linked to them.
-      // That link is what the review-link check and the contact's invoice
-      // history read, so resolve it here whether or not the prompt fires.
+      // Add-to-contacts gate: defer nav until the modal closes so handleAddContactClose can
+      // backfill contactId. Link a known contact here whether or not the prompt fires.
       if (clientEmail.trim()) {
         try {
           const checkParams = new URLSearchParams({ email: clientEmail.trim() });
@@ -474,8 +437,7 @@ export function useCalculatorSave({
             existingContactName?: string | null;
           };
           if (checkRes.ok) {
-            // Found by the picked contact's Google link, so a changed email can't point
-            // the rename at someone else.
+            // Found by Google link, so a changed email can't aim the rename at someone else.
             if (renameContactTo && checkData.linkedContactId) {
               await renameContact(checkData.linkedContactId, renameContactTo);
             }
@@ -483,15 +445,11 @@ export function useCalculatorSave({
             if (checkData.contactId) {
               await linkInvoiceToContact(invoiceId, checkData.contactId);
             } else if (existingId && send) {
-              // Client picked from Google is already a contact, just without this
-              // email. Link now so the send page finds the contact instead of
-              // offering to add a duplicate.
+              // Already a contact, just without this email: link now to avoid a duplicate.
               await linkInvoiceToContact(invoiceId, existingId);
             } else if (checkData.exists === false && !send) {
-              // Unknown email (or a known contact missing it): defer nav so
-              // handleAddContactClose can create or update the contact and link
-              // it. "Save & send" skips the prompt - the detail send flow runs
-              // its own add-to-contacts hook-in.
+              // Unknown email: defer nav so handleAddContactClose can create and link the
+              // contact. "Save & send" skips this; the send flow has its own prompt.
               setPendingExistingId(existingId);
               setPendingExistingName(checkData.existingContactName ?? null);
               setPendingInvoiceId(invoiceId);
@@ -503,9 +461,7 @@ export function useCalculatorSave({
           // Fall through to navigate.
         }
       }
-      // Drop the saved draft so the calculator starts blank next time the
-      // operator opens it (mirrors the AddToContactsModal-gated path: the
-      // backfill handler in handleAddContactClose ALSO clears the draft).
+      // Drop the saved draft so the calculator starts blank (handleAddContactClose does too).
       clearDraft();
       router.push(`/admin/business/invoices/${invoiceId}${send ? "?send=1" : ""}`);
     } catch (err) {
@@ -515,16 +471,13 @@ export function useCalculatorSave({
   }
 
   /**
-   * Posts the current job to the income API, then resets the calculator and toasts on
-   * success. A part Already paid by Cash becomes its own Cash row with the rest by Bank,
-   * the same split an invoice's already-paid part and its balance get. Rows already in
-   * are skipped, so a retry after a partial failure never doubles one.
+   * Posts the current job to the income API, then resets the calculator. A part paid in
+   * Cash gets its own row; rows already in are skipped on retry.
    */
   async function handleSaveIncome(): Promise<void> {
     setSavingIncome(true);
     setIncomeError(null);
-    // Not a bare literal: this is income, and "Business Account" is an expense method
-    // that INCOME_METHODS does not contain.
+    // "Business Account" is an expense method, not in INCOME_METHODS.
     const bank = INCOME_METHODS[0];
     const split = prepaid > 0 && !prepaidCovers && alreadyPaid.method !== bank;
     const rows: { key: string; method: string; amount: number }[] = split
@@ -549,8 +502,7 @@ export function useCalculatorSave({
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            // Record against the selected job date (NZ-local), not UTC "now",
-            // and store the discounted total the customer actually pays.
+            // NZ-local job date, and the discounted total the customer actually pays.
             date: jobDate,
             customer: clientName || "Walk-in",
             description,
@@ -572,8 +524,7 @@ export function useCalculatorSave({
           );
           return;
         }
-        // recordIncome swallows the sheet error so the entry still saves, so a
-        // plain success toast would hide money that never reached the sheet.
+        // recordIncome swallows the sheet error, so surface it rather than a plain success.
         if (d.sheetSyncWarning) sheetWarning = true;
         setSavedIncomeRows((prev) => [...prev, row.key]);
       }

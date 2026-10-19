@@ -1,8 +1,6 @@
 "use client";
 // src/features/business/components/InvoicesListRows.tsx
-// The current page of invoices, as tap-to-open cards below lg and a sortable table from
-// lg. InvoicesListView owns the filtering, sorting, paging and the payment dialog; these
-// only render the rows it hands over.
+// Invoice rows as phone cards or a sortable lg table; InvoicesListView owns the state.
 
 import {
   PINNED_CELL_CLS,

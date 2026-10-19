@@ -1,18 +1,8 @@
 // scripts/export-social-screenshot.ts
-// Exports the /intro route as social JPEGs. The 4:5 set is 1080x1350, Meta's recommended
-// feed ratio, captured at 2x > 2160x2700. v3 also gets a 1x copy for posting through the
-// admin social tool, since Instagram's publishing API refuses anything over 1440px wide,
-// and a 1200x900 (4:3) layout for Google Business Profile, which crops 4:5 images to
-// roughly 4:3. Built for ORGANIC posts, so unlike the paid
-// creatives in build-ads.ts the artwork carries its own contact details; capturing a live
-// route (rather than self-contained HTML the way build-ads.ts does) is what keeps the
-// phone number and website reading from the live settings.
-// Output lands in marketing/posts/, next to the paid creatives in marketing/ads/ -
-// gitignored, not served.
+// Exports /intro as organic social JPEGs (1080x1350 at 2x, a 1x copy under Instagram's
+// 1440px cap, and 1200x900 for Google) into gitignored marketing/posts/.
 // Run with: npm run build:social
-// Flags go through npx directly (npx tsx scripts/export-social-screenshot.ts --url=<url>):
-// PowerShell strips the bare `--` in `npm run <script> -- --flag`, so the flag vanishes
-// with no warning. Accepts --url=<url> and --output-dir=<dir>.
+// Pass flags via npx tsx directly (PowerShell strips the bare `--`): --url=<url>, --output-dir=<dir>.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -34,14 +24,12 @@ interface SocialSpec {
   scale: number;
 }
 
-// The route is artwork under active iteration and the portrait may not be committed
-// yet, so capture the dev server by default. Pass --url to capture a deployed copy.
+// Capture the dev server by default; pass --url for a deployed copy.
 const DEFAULT_URL = "http://localhost:3000/intro";
 
 const OUTPUT_DIR = "marketing/posts";
 
-// 4:5 at 1080 wide is what Meta recommends for feed; 2x keeps text crisp on
-// high-DPI phones, which is where nearly all of this gets read.
+// Meta's recommended 4:5 feed size; 2x keeps text crisp on phones.
 const FEED = { width: 1080, height: 1350 };
 
 // Google's recommended post image size. 1x keeps it at exactly that size.
@@ -119,8 +107,7 @@ async function renderSpec(
     const targetUrl = `${baseUrl}${separator}variant=${spec.variant}`;
     const response = await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 30000 });
 
-    // Refuse anything but a 2xx: a 404 or 500 still renders a full page, and
-    // capturing it would write an error page out as artwork.
+    // Refuse anything but a 2xx, or an error page gets saved as artwork.
     const status = response?.status() ?? 0;
     if (status < 200 || status >= 300) {
       throw new Error(
@@ -128,8 +115,7 @@ async function renderSpec(
       );
     }
 
-    // The dev server paints its route indicator into a <nextjs-portal> element,
-    // which otherwise lands in the corner of the artwork.
+    // Hide the dev server's <nextjs-portal> route indicator.
     await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
 
     // Wait for the web font so text metrics match the final render.

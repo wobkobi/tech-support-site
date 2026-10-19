@@ -6,10 +6,8 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 /**
- * Same reason as GoogleTag: a client-side hop into /admin doesn't unload Thryv's
- * GTM container, and its GA4 tag fires a page_view on every history change. Thryv's
- * tag publishes the GA4 ID it picked as `window.measurementId`, so
- * `ga-disable-<ID>` mutes those hits in /admin.
+ * Mutes Thryv's GA4 page_views in /admin via `ga-disable-<ID>` on `window.measurementId`,
+ * since a client hop into /admin doesn't unload its GTM container.
  * @returns Nothing; the component only runs the effect.
  */
 export function ThryvAdminMute(): null {

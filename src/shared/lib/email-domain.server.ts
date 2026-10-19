@@ -37,14 +37,9 @@ async function records<T>(lookup: () => Promise<T[]>): Promise<T[] | "none" | "e
 }
 
 /**
- * Checks that the domain of an already format-valid address can take mail.
- * - MX records: ok, unless the only one is the RFC 7505 null MX (host "."),
- *   which is a domain saying it never accepts mail.
- * - No MX: mail falls back to the domain's own A/AAAA record (RFC 5321 5.1),
- *   so a domain with an address is still ok.
- * - The domain doesn't exist, or has neither: no-mail.
- * - A timeout or server failure at any step: unknown, so a DNS hiccup never
- *   blocks a real booking.
+ * Checks a format-valid address's domain can take mail: MX ok unless only the RFC 7505 null
+ * MX; no MX falls back to A/AAAA (RFC 5321 5.1); neither or NXDOMAIN is no-mail. DNS failures
+ * are unknown, so a hiccup never blocks a booking.
  * @param email - Email address that has passed the format check.
  * @param resolver - DNS calls, for the checks.
  * @returns Whether the domain can receive mail.

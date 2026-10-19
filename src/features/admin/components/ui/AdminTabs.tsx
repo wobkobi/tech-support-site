@@ -1,11 +1,6 @@
 // src/features/admin/components/ui/AdminTabs.tsx
-// Underline tab strip for admin pages. A tab with `href` renders as a Link (the page
-// owns the state through the URL, e.g. `?fy=`); otherwise it is a button that calls
-// `onSelect`. Roving tabindex: Tab enters the strip on the active tab, the arrow keys and
-// Home/End move focus between tabs, and Enter/Space activates (manual activation, so
-// arrowing past a tab never fires a navigation or a state change on its own). On phones
-// the strip scrolls sideways, and a selected tab past the edge (a deep link such as
-// `?tab=rates`) is scrolled into view within the strip.
+// Underline tab strip for admin pages: Link tabs when `href` is set, else buttons calling
+// `onSelect`. Roving tabindex with manual activation, so arrowing never navigates.
 
 "use client";
 
@@ -59,16 +54,14 @@ export function AdminTabs<K extends string>({
   const listRef = useRef<HTMLDivElement>(null);
   const activeIndex = tabs.findIndex((t) => t.key === active);
 
-  // Bring the selected tab into the strip's own sideways scroll. Sets scrollLeft directly
-  // rather than calling scrollIntoView, which can also scroll the page vertically. A strip
-  // that doesn't overflow (every tab fits, or md and up where it wraps) is left alone.
+  // Bring the selected tab into the strip's sideways scroll via scrollLeft, since
+  // scrollIntoView can also scroll the page vertically.
   useEffect(() => {
     const list = listRef.current;
     const tab = tabRefs.current[activeIndex];
     if (!list || !tab || list.scrollWidth <= list.clientWidth) return;
-    // The tab's position within the scrolled content: its on-screen offset from the
-    // strip plus how far the strip is already scrolled. Measured from the boxes rather
-    // than offsetLeft, so a positioned ancestor can't skew it.
+    // Position within the scrolled content, from the boxes so a positioned ancestor
+    // can't skew it the way offsetLeft would.
     const left =
       tab.getBoundingClientRect().left - list.getBoundingClientRect().left + list.scrollLeft;
     const right = left + tab.offsetWidth;

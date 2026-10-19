@@ -1,9 +1,6 @@
 // src/app/admin/(shell)/bookings/page.tsx
-// Admin bookings list. Loads the most recent 1000 bookings (soft cap to avoid unbounded
-// scans), maps them to AdminBookingRows, and renders the filterable BookingAdminList
-// (which owns the summary StatCards, search, date-range filter, and sort). The select is
-// kept to just the columns the list shows; the detail page loads the full booking row
-// itself.
+// Admin bookings list: the latest 1000 bookings, list columns only, rendered by the
+// filterable BookingAdminList.
 
 import { Card } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
@@ -38,8 +35,7 @@ export default async function AdminBookingsPage({
   await requireAdminAuth();
   const query = await searchParams;
 
-  // Soft cap to prevent unbounded scans as the booking history grows.
-  // Swap for cursor pagination if more than the most recent 1000 bookings ever needs to be visible.
+  // Soft cap against unbounded scans; swap for cursor pagination if more are ever needed.
   const allBookings = await prisma.booking.findMany({
     orderBy: { startAt: "desc" },
     take: 1000,

@@ -1,7 +1,6 @@
 // src/app/api/enquiry/business/route.ts
-// Public business enquiry endpoint. Validates the form payload, then emails the operator
-// a notification and the enquirer an acknowledgement. Email-only - no DB record is
-// written. Deliberately outside /api/business/*, which is the admin-guarded namespace.
+// Public business enquiry: validate, then email the operator and an ack to the enquirer (no DB).
+// Outside /api/business/*, which is admin-guarded.
 
 import { validateEmail } from "@/features/booking/lib/booking";
 import {
@@ -49,8 +48,7 @@ function pickOption(value: unknown, options: readonly string[]): string | null {
 }
 
 /**
- * POST /api/enquiry/business - accepts a business enquiry and sends the
- * notification + ack emails.
+ * POST /api/enquiry/business - send the notification and ack emails.
  * @param request - Next.js request with the enquiry payload.
  * @returns JSON `{ ok }` or a 4xx error response.
  */
@@ -61,9 +59,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = (await request.json()) as BusinessEnquiryPayload;
 
-    // Honeypot trip: silently report success without sending anything so the
-    // bot moves on. Real users never fill this field (it's visually hidden
-    // and tab-skipped on the form).
+    // Honeypot trip: fake success so the bot moves on.
     if (typeof body.website === "string" && body.website.trim().length > 0) {
       console.warn("[enquiry/business] Honeypot tripped; faking success.", {
         ip: request.headers.get("x-forwarded-for") ?? "unknown",
@@ -105,8 +101,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const enquiry: BusinessEnquiryData = {
-      // Personal enquiries carry no company even if one was typed then the
-      // toggle flipped - the kind is what the visitor last chose.
+      // Drop a company typed before the toggle flipped to personal.
       company: kind === "business" ? company : null,
       name,
       email,
@@ -116,8 +111,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       urgency: pickOption(body.urgency, URGENCY_OPTIONS),
     };
 
-    // Both senders warn-and-skip when email env is unconfigured - the enquiry
-    // still reports success so the visitor isn't shown an error they can't fix.
+    // Senders warn-and-skip without email env; still report success.
     await Promise.all([sendBusinessEnquiryNotification(enquiry), sendBusinessEnquiryAck(enquiry)]);
 
     return NextResponse.json({ ok: true });

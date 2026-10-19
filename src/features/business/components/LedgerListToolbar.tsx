@@ -1,8 +1,6 @@
 "use client";
 // src/features/business/components/LedgerListToolbar.tsx
-// Filter toolbar above the income and expenses ledgers: search, financial year, method,
-// a from/to date range, plus the category select and missing-receipt toggle that only the
-// expenses ledger passes. Controlled: each view owns its filter state.
+// Controlled filter toolbar above the income and expenses ledgers.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";

@@ -1,8 +1,6 @@
 // src/features/business/lib/invoice-payment-match.ts
-// Finds the income entry that looks like a still-SENT invoice's payment. Money typed
-// straight into the Cashbook sheet never touches the invoice (only POST /pay links the
-// two), so the row stays SENT and the reminder cron would chase someone who has paid.
-// The cron uses this to hold off; the invoice page uses it to prompt for the record.
+// Finds an income entry that looks like a still-SENT invoice's payment, since money typed
+// into the Cashbook sheet never links to it. Stops reminders chasing someone who has paid.
 
 import { balanceIncomeWhere } from "@/features/business/lib/invoice-already-paid";
 import { balanceDue } from "@/features/business/lib/invoice-maths";
@@ -18,11 +16,7 @@ export interface PaymentMatch {
   date: Date;
   amount: number;
   method: string;
-  /**
-   * How certain the match is. "linked" is proof - only the pay route writes
-   * invoiceId. "likely" is the operator's own numbers lining up, and needs
-   * confirming before anything irreversible happens.
-   */
+  /** "linked" is proof (only the pay route writes invoiceId); "likely" needs confirming. */
   strength: "linked" | "likely";
 }
 
@@ -39,9 +33,7 @@ export interface PaymentMatchInput {
 }
 
 /**
- * Reduces a name to something two hand-typed spellings can agree on: case,
- * surrounding space and punctuation all vary between the invoice and whatever
- * was typed into the sheet.
+ * Normalises case, spacing and punctuation so hand-typed names compare.
  * @param name - Raw customer or client name.
  * @returns Comparable form.
  */
@@ -54,12 +46,8 @@ function normaliseCustomerName(name: string): string {
 }
 
 /**
- * Looks for a recorded payment against an unpaid invoice.
- *
- * Checks the linked entry first, then falls back to the pair the operator would
- * have typed into the sheet: this invoice's balance due, for the same customer,
- * dated on or after the issue date. Unlinked entries only, so a match can never
- * be another invoice's payment being counted twice.
+ * Looks for a recorded payment: the linked entry, else an unlinked one for the balance due,
+ * same customer, on or after the issue date.
  * @param invoice - The invoice being checked.
  * @returns The match, or null when nothing looks like a payment.
  */
@@ -80,13 +68,10 @@ export async function findRecordedPayment(
   const owed = balanceDue(invoice);
   const candidates = await prisma.incomeEntry.findMany({
     where: {
-      // Sheet-imported rows have no invoiceId key at all, and Prisma compiles a
-      // bare `invoiceId: null` to "exists AND is null" on Mongo - which skips
-      // exactly the rows this is looking for. The OR catches both shapes.
+      // Sheet-imported rows lack the key, and `invoiceId: null` on Mongo means "exists AND
+      // is null", so the OR catches both shapes.
       OR: [{ invoiceId: null }, { invoiceId: { isSet: false } }],
-      // Floored to the issue date's NZ day, not the instant: ledger rows sit at
-      // UTC midnight while issueDate carries a time, so an invoice raised at 3pm
-      // and paid that evening matched nothing and got chased as overdue.
+      // Floor to the NZ day: ledger rows sit at UTC midnight but issueDate carries a time.
       date: { gte: nzDayStartUtc(invoice.issueDate) },
       amount: { gte: owed - AMOUNT_TOLERANCE, lte: owed + AMOUNT_TOLERANCE },
     },

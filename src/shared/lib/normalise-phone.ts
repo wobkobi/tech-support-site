@@ -16,10 +16,8 @@ export function normalisePhone(raw: string): string {
 }
 
 /**
- * Formats a phone number string for display with NZ-style spacing as the user types.
- * Preserves a leading '+' for international numbers.
- * Mobile (021/022/027/028/029): XXX XXX XXXX
- * Landline (09/04/03/06/07): XX XXX XXXX
+ * Formats a phone for display as typed, keeping a leading '+'. Mobile XXX XXX XXXX,
+ * landline XX XXX XXXX.
  * @param raw - Raw phone input (may contain spaces, dashes, etc.).
  * @returns Display-formatted phone string.
  */
@@ -56,27 +54,13 @@ export function formatNZPhone(raw: string): string {
   return [a, b, c].filter(Boolean).join(" ");
 }
 
-/**
- * The national part of a real NZ number (what follows +64): a mobile is 2 plus 7-9
- * digits, a landline is a 3/4/6/7/9 area code plus 7 digits, and freephone is 800
- * plus 6-7 digits or 508 plus 6.
- */
+/** National part after +64: mobile 2 + 7-9 digits, landline 3/4/6/7/9 + 7, freephone 800 + 6-7 or 508 + 6. */
 const NZ_NATIONAL_NUMBER = /^(?:2\d{7,9}|[34679]\d{7}|800\d{6,7}|508\d{6})$/;
 
 /**
- * Converts a NZ phone number to E.164 format (+64...).
- * Handles all common NZ inputs:
- *   "021 123 1234"     > "+64211231234"
- *   "09 123 4567"      > "+6491234567"   (landline)
- *   "21 123 1234"      > "+64211231234"  (no leading 0)
- *   "9 123 4567"       > "+6491234567"   (landline, no leading 0)
- *   "+64 21 123 1234"  > "+64211231234"  (already E.164)
- *   "+64 (0)21 123 1234" > "+64211231234" (trunk 0 kept after +64)
- *   "64 21 123 1234"   > "+64211231234"  (country code without its +)
- *   "0064 21 123 1234" > "+64211231234"  (overseas dialling prefix for +)
- *   "+61 400 000 000"  > "+61400000000"  (non-NZ: left as-is)
- * Anything else comes back as bare digits with no '+', which validatePhone rejects:
- * "1234567" has no area code, so there is no telling 09 from 03.
+ * Converts an NZ phone to E.164: "021 123 1234", "21 123 1234", "64 21...", "0064 21..." and
+ * "+64 (0)21..." all > "+64211231234"; non-NZ "+61..." stays as-is. Anything else returns bare
+ * digits with no '+', which validatePhone rejects ("1234567" has no area code).
  * @param raw - Raw phone input string.
  * @returns E.164-normalised phone string, or empty string if input is blank.
  */
@@ -105,12 +89,8 @@ export function toE164NZ(raw: string): string {
 }
 
 /**
- * Canonical matching key for a contact/booking phone. Runs the raw value through
- * E.164 conversion first (so "021 123 4567" and "+64211234567" collapse to the
- * same key) then strips formatting. Returns null for blank/unparseable input so
- * callers can skip it. This is the ONE normaliser every phone-based lookup must
- * use - reimplementing the `toE164NZ` + `normalisePhone` combo inline is what let
- * the site and Google matchers drift apart.
+ * Canonical phone matching key: E.164 then stripped, so "021 123 4567" and "+64211234567" match.
+ * Every phone lookup must use this one normaliser so matchers can't drift.
  * @param raw - Raw phone input (may be null/undefined).
  * @returns Normalised E.164 digit key, or null when there is nothing to match on.
  */
@@ -133,9 +113,7 @@ export function isValidPhone(normalised: string): boolean {
 }
 
 /**
- * True when a normalised phone key is an NZ mobile (02x prefix). Mobiles are
- * personal; landlines are often shared across a household, so only mobiles are
- * safe to treat as a person-identity key when auto-merging contacts.
+ * Whether a phone key is an NZ mobile (02x). Only mobiles are personal enough to auto-merge on.
  * @param key - A normalised phone key from {@link normaliseContactPhone} (E.164 "+642x...", or a domestic "02x" form).
  * @returns Whether the number is an NZ mobile.
  */
@@ -145,17 +123,12 @@ export function isNZMobileKey(key: string | null | undefined): boolean {
   return /^64(21|22|27|28|29)\d/.test(digits) || /^02(1|2|7|8|9)\d/.test(digits);
 }
 
-/**
- * Discriminator returned by {@link validatePhone}. "empty" means the input is blank
- * (callers decide whether that's allowed based on whether the field is required).
- */
+/** {@link validatePhone} result; "empty" is blank input, which callers allow or not. */
 export type PhoneValidationResult = "empty" | "invalid" | "ok";
 
 /**
- * Whether an E.164 value from {@link toE164NZ} could be dialled. No leading '+'
- * means the input had no 0, no NZ mobile prefix and no country code ("123123123"),
- * so there is no country to dial it in. NZ numbers must have a real NZ shape;
- * other countries only get the 7-15 digit length check.
+ * Whether a {@link toE164NZ} value is diallable: needs a '+', NZ numbers need a real NZ shape,
+ * others only the 7-15 digit check.
  * @param e164 - Output of {@link toE164NZ}.
  * @returns Whether the number is diallable.
  */
@@ -172,9 +145,7 @@ export interface ValidatePhoneOptions {
 }
 
 /**
- * Single canonical phone validator used by the shared PhoneInput component and
- * by every submit handler that accepts a phone number. Returns a discriminator
- * so callers can pick their own wording, plus the E.164 form for storage.
+ * The canonical phone validator, returning a verdict for caller wording plus the E.164 form.
  * @param raw - Raw phone input.
  * @param opts - Validation options.
  * @param opts.nzOnly - Reject numbers from any country but NZ.

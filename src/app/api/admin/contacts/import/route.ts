@@ -10,7 +10,6 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * POST /api/admin/contacts/import
  * Imports all contacts from Google Contacts into the local database.
- * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns JSON with importedCount on success, or error on failure.
  */
@@ -20,17 +19,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    // A contact missing the deletedAt key is invisible to every `deletedAt: null` reader,
-    // the index the import matches against included, so importing over that state
-    // re-creates every Google contact as a duplicate. The cron path normalises too.
+    // A missing deletedAt key hides rows from `deletedAt: null` readers and duplicates the import.
     await normaliseSoftDeleteField();
     const importedCount = await importFromGoogleContacts();
     return NextResponse.json({ ok: true, importedCount });
   } catch (error) {
     console.error("[api/admin/contacts/import] Error:", error);
-    // Generic message to the client; the OAuth / Google API detail goes only
-    // to the server log so a transient Google failure can't leak credential
-    // shape or integration internals.
+    // Generic message to the client; Google/OAuth detail stays in the server log.
     return errorResponse("Contact import failed.", 500);
   }
 }

@@ -1,8 +1,6 @@
 // src/shared/lib/image-upload.ts
-// Stores an admin-uploaded image in the public Blob store, for the mailing and social
-// editors. The editors shrink images in the browser first, so uploads are a few hundred
-// KB and fit well inside the function body limit; the 5 MB cap only stops something
-// unshrunk slipping through.
+// Stores admin-uploaded editor images in the public Blob store. Browsers shrink them first; the
+// 5 MB cap only catches unshrunk files.
 
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

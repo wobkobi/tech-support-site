@@ -1,7 +1,6 @@
 // src/features/social-design/lib/layout.ts
-// Layout maths for the post maker: placing a layer on a new size, carrying an edit on
-// one size across to the linked sizes, and the centre/align moves. Pure and
-// client-safe; check-social-design covers every size pair.
+// Post maker layout maths: placing on a new size, carrying edits to linked sizes, align moves.
+// Pure; check-social-design covers every size pair.
 
 import type { DesignDoc, Geometry } from "@/features/social-design/lib/doc";
 import { FORMATS, type FormatKey } from "@/features/social-design/lib/formats";
@@ -47,8 +46,7 @@ export function isFullBleed(g: Geometry, key: FormatKey): boolean {
 type Anchor = "start" | "centre" | "end";
 
 /**
- * Picks the anchor on one axis: centred when the layer sits on the centre line,
- * otherwise whichever edge is nearer.
+ * Picks the anchor on one axis: centre when on the centre line, else the nearer edge.
  * @param pos - Layer start on the axis.
  * @param size - Layer length on the axis.
  * @param total - Picture length on the axis.
@@ -86,8 +84,7 @@ function placeOnAxis(
 }
 
 /**
- * Keeps a placed layer inside the picture when it fits, nudging it in from whichever
- * edge it crosses. A layer bigger than the picture is centred on that axis instead.
+ * Nudges a layer back inside the picture from the edge it crosses; one too big is centred.
  * @param pos - Start on the axis.
  * @param size - Length on the axis.
  * @param total - Picture length on the axis.
@@ -99,13 +96,9 @@ function keepInside(pos: number, size: number, total: number): number {
 }
 
 /**
- * Places a layer on another size from its geometry on one size.
- * - Full-bleed layers stay full-bleed.
- * - Other layers scale by the ratio of the two sizes' shorter sides, so a headline
- *   stays the same share of the picture, and keep their distance to their anchor
- *   (left/centre/right, top/middle/bottom), so a centred layer stays centred.
- * - A layer spanning 90%+ of an axis keeps that share of the new axis.
- * - The result is nudged back inside the picture if scaling pushed it off.
+ * Places a layer on another size. Full-bleed stays full-bleed; others scale by the shorter-side
+ * ratio and keep their anchor distance, a 90%+ span keeps its share, and the result is nudged
+ * back inside.
  * @param g - Geometry on the source size.
  * @param from - Source size.
  * @param to - Target size.
@@ -149,10 +142,8 @@ export function autoPlace(g: Geometry, from: FormatKey, to: FormatKey): Geometry
 }
 
 /**
- * Carries an edit made on one size across to another size's geometry, as a change
- * rather than a copy, so a hand-tuned template layout on the other size keeps its own
- * shape: the centre moves by the same share of the picture, the size and font size
- * scale by the same factor, and the rotation turns by the same angle.
+ * Carries an edit to another size as a change, not a copy, so a hand-tuned layout keeps its
+ * shape: centre moves by the same share, size scales by the same factor, rotation by the same angle.
  * @param target - The layer's geometry on the other size.
  * @param before - Geometry on the edited size before the edit.
  * @param after - Geometry on the edited size after the edit.
@@ -199,8 +190,7 @@ export function propagate(
 export type AlignTo = "left" | "centre-x" | "right" | "top" | "centre-y" | "bottom" | "centre";
 
 /**
- * Aligns a layer against the picture, or against a box (a multi-selection's bounds).
- * Uses the layer's unrotated box, which is what the handles show.
+ * Aligns a layer's unrotated box against the picture or a multi-selection's bounds.
  * @param g - Layer geometry.
  * @param how - Which edge or centre line.
  * @param box - Box to align against.
@@ -262,9 +252,8 @@ export function distribute(
 }
 
 /**
- * The size a re-linked layer takes its place from: the first size in the design's tab
- * order that isn't the one being re-linked and where the layer is still linked,
- * falling back to the first other size.
+ * Source size for re-linking: the first other size where the layer is linked, else the first
+ * other size.
  * @param doc - Design.
  * @param layerId - Layer being re-linked.
  * @param key - Size it is being re-linked on.
@@ -288,8 +277,7 @@ function normaliseAngle(deg: number): number {
 }
 
 /**
- * Rounds geometry to tenths of a pixel, so saved documents stay short and repeated
- * edits don't build up float noise.
+ * Rounds geometry to tenths of a pixel to keep documents short and stop float drift.
  * @param g - Geometry.
  * @returns Rounded copy.
  */

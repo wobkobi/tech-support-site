@@ -1,7 +1,5 @@
 // src/features/business/lib/tax/tax-year.ts
-// One FY's income tax estimate for a sole trader: income and every deduction on the GST
-// basis (expenses, depreciation, km claim, home office, disposal losses), progressive tax,
-// IETC, ACC and the IR3/IR10 figures for the accountant. Pure; the server loader feeds it.
+// One FY's sole-trader income tax estimate: income, deductions, tax, IETC, ACC and IR3/IR10 figures.
 
 import type { EXPENSE_CATEGORIES } from "@/features/business/lib/constants";
 import {
@@ -58,8 +56,7 @@ export function toTaxFy(fy: FinancialYear): TaxFy {
 }
 
 /**
- * Every FY from the one the business started in through `fy`, oldest first:
- * the span an asset schedule needs to carry values forward.
+ * Every FY from the business start through `fy`: the span an asset schedule carries values over.
  * @param businessStart - Business start date.
  * @param fy - The last FY wanted.
  * @param now - Current instant (for the `current` flag).
@@ -76,21 +73,9 @@ function fysThrough(businessStart: Date, fy: TaxFy, now: Date): TaxFy[] {
 }
 
 /**
- * Computes one FY's tax estimate.
- *
- * Income rows count on the GST basis for their date: GST-exclusive from the
- * registration date, as entered before it. Expense rows count on the GST basis
- * for their date, times their category's business-use %. Rows linked to an
- * asset are left out (the asset is depreciated instead). A Fuel row is left out
- * only when its own date falls in a
- * km-rate vehicle's service period, and only trips dated in such a period earn
- * the km rate; km logged outside every period is reported as `unclaimedKm`. The
- * year's total vehicle km, when given, sets how much of that is Tier 1.
- * Asset schedules run from the business-start FY so opening values
- * carry forward, with filed snapshots pinning the closing value of a filed year.
- * Low-value group totals are worked out across the whole register and filed
- * values are picked out per asset, the same way the Assets page builds its
- * schedules, so both pages show the same figures.
+ * Computes one FY's tax estimate. Rows count on the GST basis for their date; expenses are
+ * scaled by category business %, skipping asset-linked rows and Fuel/Vehicle rows dated in a
+ * km-rate vehicle period. Asset schedules run from the business-start FY, as the Assets page does.
  * @param input - Ledger rows, register, trips, the FY's TaxYear figures, settings and GST status.
  * @returns The estimate, its deductions breakdown and the IR3/IR10 figures.
  */
@@ -171,9 +156,8 @@ export function computeTaxYear(input: TaxYearInput): TaxYearResult {
   );
   const homeOffice = homeOfficeClaim(input.year);
 
-  // Deduction totals and the breakdown lines, in table order. A registration that
-  // takes effect after the FY ends leaves every row of it GST-inclusive, so the
-  // Expenses note asks whether the FY's last day is registered.
+  // Deduction totals and breakdown lines. The Expenses note checks the FY's last day,
+  // since a registration after the FY leaves every row GST-inclusive.
   const registeredInFy = isGstRegisteredOn(new Date(fy.end.getTime() - DAY_MS), input.gst);
   const deductions = {
     expenses: roundCents(expenses),

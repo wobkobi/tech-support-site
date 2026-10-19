@@ -1,8 +1,5 @@
 // src/app/api/admin/contacts/backfill/route.ts
-// Admin trigger for the booking-to-contact backfill. Merges phone-only duplicate
-// contacts, then creates a Contact for every unique booking email that has no live
-// contact yet. The logic lives in the shared contacts maintenance module so this route
-// and the sync-contacts cron can never diverge.
+// Admin trigger for the booking-to-contact backfill (shared with the sync-contacts cron).
 
 import {
   backfillContactsFromBookings,
@@ -15,7 +12,6 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * POST /api/admin/contacts/backfill
  * Merges phone-only duplicates then upserts a Contact per unique booking email.
- * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request.
  * @returns JSON with the number of contacts created.
  */

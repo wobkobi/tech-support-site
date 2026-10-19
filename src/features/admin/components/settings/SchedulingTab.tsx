@@ -1,9 +1,7 @@
 "use client";
 // src/features/admin/components/settings/SchedulingTab.tsx
-// Editor for the advanced scheduling group: the travel-block heuristics used by the
-// calendar travel engine (rounding buffer, minimum home dwell, travel-back departure
-// buffer, smart-origin lookahead). Marked advanced - the defaults are sensible and most
-// operators never need to touch these.
+// Editor for the advanced scheduling group: the calendar travel engine's travel-block
+// heuristics. Marked advanced - the defaults rarely need changing.
 
 import { NumberField, SettingsTabBody } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";

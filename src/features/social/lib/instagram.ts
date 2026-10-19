@@ -1,8 +1,6 @@
 // src/features/social/lib/instagram.ts
-// Publishes to the business Instagram account through the Instagram API with Facebook
-// Login, and takes posts down again. Publishing is two steps: create a media container
-// from a public JPEG URL, wait for Instagram to finish fetching and processing it, then
-// publish the container. Deleting needs the token to carry instagram_manage_contents.
+// Publishes to and deletes from Instagram. Publishing creates a container from a public JPEG URL,
+// waits for processing, then publishes it. Deleting needs instagram_manage_contents.
 
 import {
   StillProcessingError,
@@ -55,8 +53,7 @@ async function waitUntilFinished(containerId: string): Promise<void> {
 }
 
 /**
- * Posts a picture with its caption. Links aren't clickable in captions, so the
- * link is left off rather than shown as dead text.
+ * Posts a picture with its caption. Caption links aren't clickable, so the link is left off.
  * @param input - Filled caption and picture.
  * @returns The media id and its permalink.
  */
@@ -84,9 +81,7 @@ async function publish(input: PublishInput): Promise<PublishResult> {
 }
 
 /**
- * Deletes a published post. The generic missing-permission message is swapped for the
- * one permission this needs, since posting works without it and the token may predate
- * the take-down feature.
+ * Deletes a published post, naming the one permission needed since older tokens may lack it.
  * @param mediaId - Media id saved when it was posted.
  */
 async function remove(mediaId: string): Promise<void> {

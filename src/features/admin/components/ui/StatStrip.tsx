@@ -41,10 +41,8 @@ const LG_SPAN = [
 ];
 
 /**
- * Span classes for a strip's last card, so it stretches across whatever its row leaves
- * empty at each breakpoint: 5 cards in 2 columns gives the fifth `col-span-2`, 5 in 4
- * gives it `sm:col-span-4`. A full row gives span 1, which also resets a smaller
- * breakpoint's span. Columns above 5 are not supported.
+ * Span classes that stretch the last card across its row's gap at each breakpoint
+ * (5 cards in 2 columns: `col-span-2`). Max 5 columns.
  * @param count - Number of cards in the strip.
  * @param cols - Column count at each breakpoint the strip sets.
  * @returns Classes for the last card.
@@ -67,11 +65,8 @@ export function lastCardSpan(count: number, cols: StripColumns): string {
 }
 
 /**
- * Renders the strip. The dividers are the 1px grid gaps showing the border-coloured
- * background, so they stay right however the columns wrap; the admin-stat-strip rule in
- * globals.css strips each card's own border and radius. A row the cards don't fill shows
- * the background in the gap, so pick column counts the cards divide into, or give the
- * last card {@link lastCardSpan}.
+ * Renders the strip; dividers are 1px grid gaps over the border-coloured background.
+ * An unfilled row shows that background, so use even column counts or {@link lastCardSpan}.
  * @param props - Component props.
  * @param props.children - The StatCards.
  * @param props.className - Grid column classes, plus any margin.

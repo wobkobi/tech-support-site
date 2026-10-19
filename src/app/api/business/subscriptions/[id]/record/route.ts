@@ -1,8 +1,6 @@
 // src/app/api/business/subscriptions/[id]/record/route.ts
-// Admin endpoint to record a single subscription payment. POST claims the period, creates
-// an ExpenseEntry with the GST split, advances the subscription's nextDue, and appends a
-// row to the Expenses Google Sheet. Sheet-append failures are non-fatal and surface as a
-// sheetSyncWarning flag in the response; an already-claimed period returns 409.
+// Admin endpoint to record one subscription payment. Sheet-append failures are non-fatal
+// (sheetSyncWarning); an already-claimed period returns 409.
 
 import { recordSubscriptionPayment } from "@/features/business/lib/subscription-recording";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -34,9 +32,7 @@ export async function POST(
   }
 
   const { claimed, expense, nextDue, sheetSyncWarning } = await recordSubscriptionPayment(sub);
-  // The CAS lost, so this period is already on the ledger - either the cron beat
-  // the operator to it or the button was double-clicked. Say so rather than
-  // reporting a success that wrote nothing.
+  // CAS lost: the cron or a double-click already recorded this period.
   if (!claimed) {
     return errorResponse("Already recorded for this period.", 409);
   }

@@ -1,7 +1,5 @@
 // src/app/admin/(shell)/not-found.tsx
-// Admin-styled 404 for /admin/* routes. Keeps the operator inside the admin shell
-// (sidebar + top bar) instead of dropping to the public root 404, so a missing
-// invoice/record still has the nav to recover from.
+// Admin-styled 404 for /admin/* routes, keeping the admin nav to recover from.
 
 import Link from "next/link";
 import type React from "react";

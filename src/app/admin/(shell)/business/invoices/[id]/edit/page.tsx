@@ -1,9 +1,6 @@
 // src/app/admin/(shell)/business/invoices/[id]/edit/page.tsx
-// DRAFT-only invoice edit page. Loads the invoice; a non-DRAFT status redirects to the
-// detail page (SENT/PAID are audit-locked - void and reissue). Loads live identity +
-// pricing policy in parallel so the form's totals and preview match what the server will
-// recompute on save. The invoice's billed calendar events are resolved too, so the
-// "Describe the job" box bills against the booked window and address like the calculator.
+// DRAFT-only invoice edit page (others redirect to detail). Loads live pricing so totals
+// match the server's recompute, and billed events so the AI box uses the booked window.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { EditInvoiceView } from "@/features/business/components/invoice/EditInvoiceView";
@@ -88,10 +85,8 @@ export default async function EditInvoicePage({
     isDefault: r.isDefault,
     createdAt: r.createdAt.toISOString(),
   }));
-  // The promo the invoice was raised with, re-applied when the AI box rebuilds the lines.
-  // The window is not judged again: the invoice carrying it means it already applied.
-  // One that can no longer be found (deleted, with no terms saved on a booking) comes
-  // off as the stored dollar figure, spread over the labour.
+  // The invoice's promo, re-applied when the AI box rebuilds the lines (window not
+  // re-judged). A deleted promo falls back to the stored dollar figure.
   const promoTerms = promoId
     ? await lockedInPromo(promoId, null, booking?.promoTermsAtBooking)
     : null;
@@ -105,8 +100,7 @@ export default async function EditInvoicePage({
           percentDiscount: null,
         }
       : null);
-  // The issue date is only the last resort: a job invoiced the Monday after a
-  // Saturday visit would otherwise lose its weekend surcharge on edit.
+  // Issue date is the last resort, or a Saturday job invoiced Monday loses its surcharge.
   const jobDate = prefill?.jobDate ?? invoice.jobDate ?? nzDateKey(invoice.issueDate);
   // UTC midnight is midday in NZ, so the key's own NZ date is the one looked up.
   const jobDay = new Date(`${jobDate}T00:00:00Z`);
@@ -130,8 +124,7 @@ export default async function EditInvoicePage({
         weekendUplift: policy.WEEKEND_UPLIFT,
       }),
       unsuccessfulFactor: policy.UNSUCCESSFUL_WORK_FACTOR,
-      // Picked the same way the calculator picks them, so a rebuilt draft and a fresh
-      // calculator job price a promo identically.
+      // Picked like the calculator, so both price a promo identically.
       businessModifierId:
         rates.find((r) => r.label === "Business" && r.unit === "modifier")?.id ?? null,
       standardRate:
@@ -146,8 +139,7 @@ export default async function EditInvoicePage({
   const initial: InvoiceFormData = {
     clientName: invoice.clientName,
     clientEmail: invoice.clientEmail,
-    // NZ calendar dates: an invoice raised before midday NZ is still the previous
-    // day in UTC, and the form would save that shifted date back.
+    // NZ calendar dates: before midday NZ is still the previous day in UTC.
     issueDate: nzDateKey(invoice.issueDate),
     dueDate: nzDateKey(invoice.dueDate),
     lineItems: invoice.lineItems,

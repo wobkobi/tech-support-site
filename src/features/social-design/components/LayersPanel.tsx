@@ -1,9 +1,7 @@
 "use client";
 // src/features/social-design/components/LayersPanel.tsx
-// The post maker's layer list, top layer first as it stacks on the picture: drag to
-// reorder, click to select (Shift adds), double-click to rename, and hide or lock each
-// layer. Hiding applies to the size on screen only. With more than one size, a chain
-// shows whether the layer still follows the other sizes here; a broken chain re-links.
+// The post maker's layer list, top layer first. Hiding is per size; with several sizes a
+// chain shows whether the layer still follows the others, and a broken chain re-links.
 
 import { IconButton } from "@/features/social-design/components/editor-fields";
 import type { DesignDoc, Layer, LayerType } from "@/features/social-design/lib/doc";
@@ -205,8 +203,7 @@ function LayerRow({
     isDragging,
   } = useSortable({ id: layer.id });
   const [renaming, setRenaming] = useState(false);
-  // Focus follows the double-click that opened the rename box. Stable, so a re-render
-  // while typing doesn't select the text again.
+  // Stable, so a re-render while typing doesn't reselect the text.
   const selectOnMount = useCallback((el: HTMLInputElement | null) => el?.select(), []);
   const Icon = TYPE_ICON[layer.type];
 

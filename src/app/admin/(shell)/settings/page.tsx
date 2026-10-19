@@ -1,7 +1,6 @@
 // src/app/admin/(shell)/settings/page.tsx
-// Admin settings panel. Loads the resolved settings server-side and hands each editable
-// group, paired with its DEFAULT_SETTINGS fallback, to the tabbed SettingsView client
-// component, along with the rate rows for the Rates tab. `?tab=` opens a given tab.
+// Admin settings panel: each group with its default, plus rate rows, for the tabbed
+// SettingsView. `?tab=` opens a given tab.
 
 import {
   SettingsView,
@@ -37,8 +36,7 @@ const TAB_KEYS = new Set<string>([
 ]);
 
 /**
- * Admin settings panel - loads the resolved settings and the rate rows server-side and
- * hands them to the tabbed client view.
+ * Admin settings panel: loads settings and rate rows for the tabbed view.
  * @param props - Page props.
  * @param props.searchParams - Query string; `tab` picks the tab to open on.
  * @returns Settings page element.

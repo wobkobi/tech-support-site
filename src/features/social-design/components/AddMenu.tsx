@@ -1,8 +1,7 @@
 "use client";
 // src/features/social-design/components/AddMenu.tsx
-// The post maker's "Add" dropdown: every element the canvas can hold, grouped. Photos
-// open the photo picker (recent photos or an upload); everything else goes straight
-// onto the picture, centred.
+// The post maker's "Add" dropdown, grouped. Photos open the photo picker; everything else
+// lands centred on the picture.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import {

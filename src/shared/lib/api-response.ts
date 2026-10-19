@@ -1,16 +1,11 @@
 // src/shared/lib/api-response.ts
-// Shared JSON response helpers so every API route returns a consistent `{ ok, ... }`
-// shape, letting clients branch on `ok` instead of guessing between `{ error }` and
-// `{ ok: false, error }`. Also the no-store marker and the Prisma error checks routes use
-// to pick a 404 or a retry.
+// JSON response helpers for a consistent `{ ok, ... }` shape, plus no-store and Prisma error checks.
 
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 /**
- * Builds a failed JSON response with a consistent `{ ok: false, error }` body.
- * Generic in the response payload so it's assignable in handlers annotated with
- * a specific `NextResponse<T>` return type; `T` infers from the return context.
+ * Builds a `{ ok: false, error }` response. Generic so it fits handlers typed `NextResponse<T>`.
  * @param message - Human-readable error message returned to the client.
  * @param status - HTTP status code (defaults to 400).
  * @returns A {@link NextResponse} carrying the error body and status.
@@ -20,8 +15,7 @@ export function errorResponse<T = never>(message: string, status = 400): NextRes
 }
 
 /**
- * Builds a successful JSON response with a consistent `{ ok: true, ...data }`
- * body, mirroring {@link errorResponse} so clients branch on `ok`.
+ * Builds a `{ ok: true, ...data }` response, mirroring {@link errorResponse}.
  * @param data - Payload object merged into the body alongside `ok: true`.
  * @param status - HTTP status code (defaults to 200).
  * @returns A {@link NextResponse} carrying the success body and status.
@@ -51,8 +45,7 @@ function isPrismaError(err: unknown, code: string): boolean {
 }
 
 /**
- * Whether an error is Prisma's unique-constraint violation (P2002), as when two first
- * saves race to create the same row.
+ * Whether an error is Prisma's unique-constraint violation (P2002), as when first saves race.
  * @param err - Caught error.
  * @returns True for P2002.
  */
@@ -61,8 +54,7 @@ export function isUniqueConflict(err: unknown): boolean {
 }
 
 /**
- * Whether an error is Prisma's "record to update or delete does not exist" (P2025): a
- * missing or stale id, which a route answers with 404 while rethrowing anything else.
+ * Whether an error is Prisma's missing-record P2025, which routes answer with 404.
  * @param err - Caught error.
  * @returns True for P2025.
  */

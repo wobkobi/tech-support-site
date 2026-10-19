@@ -1,12 +1,7 @@
 "use client";
 // src/features/business/components/AddToContactsModal.tsx
-// Post-action prompt asking the operator whether to save the current client to the DB
-// Contact table (and Google Contacts via the fire-and-forget sync). Triggered after an
-// invoice save succeeds or when the calculator hands off to the invoice builder, but only
-// when the email doesn't already exist in the DB. When the client is a known contact
-// missing that email, it offers to add the email to them instead. A new contact's name and
-// company are editable, so an invoice addressed to "68 Ltd" saves Michael Smith at 68 Ltd
-// rather than a contact named after the company.
+// Prompt to save an unknown client email as a Contact (and Google Contacts), or to add the
+// email to a known contact missing it. Name and company stay editable for company-named invoices.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -23,10 +18,7 @@ import { useState } from "react";
 interface AddToContactsModalProps {
   /** Client name to seed the new Contact row with (the invoice's addressed-to name). */
   name: string;
-  /**
-   * The picked contact's company, when known. With none, a business-looking `name`
-   * seeds the Company field instead and the person's name is asked for.
-   */
+  /** The picked contact's company; without one, a business-looking `name` seeds Company. */
   company?: string | null;
   /** Client email - dedup key on the server. */
   email: string;
@@ -34,25 +26,15 @@ interface AddToContactsModalProps {
   phone?: string | null;
   /** Optional Google People API resource name (e.g. "people/c1234"). */
   googleContactId?: string | null;
-  /**
-   * Name of the contact already linked to `googleContactId` that lacks this email.
-   * When set, the popup offers to add the email to that contact instead.
-   */
+  /** Contact linked to `googleContactId` that lacks this email; when set, offer to add it there. */
   existingContactName?: string | null;
-  /**
-   * Called whenever the modal closes - Yes, No, backdrop, Escape.
-   * When the operator confirmed and the POST returned a Contact id, that id
-   * is passed back so the caller can backfill an FK (e.g. patch the just-
-   * saved invoice's `contactId`). Null on dismiss / failure.
-   */
+  /** Called on every close with the saved Contact id (for FK backfill), or null. */
   onClose: (contactDbId?: string | null) => void;
 }
 
 /**
- * Confirmation popup: "{name} isn't in your contacts yet - add them?", or, when
- * the client is already a contact without this email, "add the email to them?".
- * On Yes, POSTs to /api/admin/contacts (which attaches the email to the linked
- * contact in the second case) and closes once the request settles.
+ * Confirmation popup to add the client (or their email) to contacts. On Yes, POSTs to
+ * /api/admin/contacts and closes once the request settles.
  * @param props - Component props.
  * @param props.name - Client name to seed the new Contact row with.
  * @param props.company - The picked contact's company, when known.
@@ -81,12 +63,7 @@ export function AddToContactsModal({
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  /**
-   * Persists the contact then closes. Passes the new Contact's DB id back via
-   * `onClose` so the caller can backfill an FK on a parent row (e.g. set
-   * `Invoice.contactId`). Closes anyway with `null` if the request fails so
-   * the caller's deferred navigation still happens.
-   */
+  /** Persists the contact then closes with its id, or `null` on failure. */
   async function handleConfirm(): Promise<void> {
     setSaving(true);
     setError(null);

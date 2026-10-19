@@ -1,8 +1,7 @@
 "use client";
 // src/features/social-design/components/PropertiesPanel.tsx
-// The post maker's right-hand panel: arrange tools (align, centre, spread, stack order,
-// flip, group), exact position and size, the layer's look, and the controls for its
-// type. Shows design-wide help when nothing is selected.
+// The post maker's right-hand panel: arrange tools, position and size, look, and per-type
+// controls; design-wide help when nothing is selected.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
@@ -919,8 +918,7 @@ function TypeFields({
 }
 
 /**
- * QR code controls: where it points (one-click links or any web address) and colour.
- * The address field holds a draft and only saves a valid address.
+ * QR code controls: target address and colour. Only a valid typed address saves.
  * @param props - Component props.
  * @param props.layer - QR layer.
  * @param props.patch - Patches the layer.

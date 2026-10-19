@@ -1,7 +1,5 @@
 // scripts/check-promo-selection.ts
-// Which promo wins when several windows overlap, and how a customer-entered
-// code is normalised before it is compared. Pure logic, no database: the window
-// filter itself is Prisma's job.
+// Which promo wins when windows overlap, and how a typed code is normalised. Pure logic, no DB.
 // Run with: npm test -- promo-selection
 
 import {
@@ -73,7 +71,7 @@ function main(): void {
     "old-important",
   );
 
-  // Existing promos all sit at 0, so the old behaviour must survive untouched.
+  // Existing promos all sit at 0.
   expectEqual(
     "equal priority falls back to newest",
     pickWinningPromo([promo("older", 0, "2026-01-01"), promo("newer", 0, "2026-06-01")])?.id ??
@@ -99,25 +97,19 @@ function main(): void {
   );
 
   // ---- Code normalisation ----
-  //
-  // Stored codes are uppercase, so comparing anything else silently fails to
-  // match and the customer is told a real code is invalid.
+  // Stored codes are uppercase; anything else fails to match.
 
   expectEqual("trims and uppercases", normalisePromoCode("  spring25 "), "SPRING25");
   expectEqual("blank becomes null", normalisePromoCode("   "), null);
   expectEqual("undefined becomes null", normalisePromoCode(undefined), null);
   expectEqual("null stays null", normalisePromoCode(null), null);
   expectEqual("already uppercase is unchanged", normalisePromoCode("SPRING25"), "SPRING25");
-  // Public routes hand over whatever JSON arrived. A throw here took the
-  // automatic promo down with the code in booking/request.
+  // Public routes pass raw JSON; a throw here would drop the automatic promo too.
   expectEqual("a number is not a code", normalisePromoCode(25), null);
   expectEqual("an object is not a code", normalisePromoCode({ $ne: "" }), null);
 
   // ---- Booking date vs appointment ----
-  //
-  // A promo's start and end dates bound when the booking was made; its weekday
-  // restriction is judged at the appointment. Booking on the last day of a promo
-  // for a visit the week after keeps it.
+  // Promo dates are judged at booking time, the weekday restriction at the appointment.
 
   const NOW = new Date("2026-09-18T01:00:00Z");
   const SLOT = new Date("2026-09-29T21:00:00Z");
@@ -155,11 +147,7 @@ function main(): void {
   );
 
   // ---- Recurring windows, in NZ time ----
-  //
-  // The whole point of these cases. NZ runs +13 (NZDT) in March and +12 (NZST)
-  // in June, so a UTC weekday read puts the day boundary at 11am or noon NZ and
-  // a Tuesday promo half-applies on Monday. Each pair below is the same NZ wall
-  // clock either side of a daylight saving change, and both must agree.
+  // NZ is +13 in March, +12 in June. Each pair is the same NZ wall clock at both offsets.
 
   const TUESDAY = [2];
 
@@ -217,9 +205,7 @@ function main(): void {
     true,
   );
 
-  // A range that ends before it starts wraps midnight. Read the other way it
-  // would admit nothing, which looks like a broken promo rather than a
-  // misconfigured one.
+  // A range that ends before it starts wraps midnight.
   const OVERNIGHT = window([], 20 * 60, 2 * 60);
   expectEqual(
     "an overnight range admits the late evening",
@@ -237,8 +223,7 @@ function main(): void {
     false,
   );
 
-  // Half a range is not a range: treating one end as open would silently widen
-  // a restriction the operator thought they had set.
+  // Half a range is no restriction, never an open-ended one.
   expectEqual(
     "a start with no end is not a restriction",
     matchesRecurringWindow(window([], 9 * 60, null), new Date("2026-06-01T20:00:00Z")),
@@ -251,11 +236,7 @@ function main(): void {
   expectEqual("half a time range is not", hasRecurringWindow(window([], 9 * 60, null)), false);
 
   // ---- Naming the restriction ----
-  //
-  // The banner shows a recurring promo whenever its outer window is open, so
-  // this wording is what stops "20% off" reading as an offer that applies right
-  // now. Hiding it until the day itself would keep it from exactly the person
-  // deciding whether to book one.
+  // The banner shows a recurring promo whenever its outer window is open; this wording says when it applies.
 
   expectEqual("no restriction has nothing to say", describeRecurringWindow(window([])), null);
   expectEqual("one day", describeRecurringWindow(window(TUESDAY)), "Tuesdays");

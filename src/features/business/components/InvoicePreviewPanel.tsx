@@ -1,8 +1,6 @@
 "use client";
 // src/features/business/components/InvoicePreviewPanel.tsx
-// Live A4-styled invoice preview. The layout must stay in sync with the generated PDF so
-// the operator sees the same invoice the customer receives. Pure presentational;
-// memoised.
+// Live A4-styled invoice preview; the layout must match the generated PDF.
 
 import {
   balanceDue,
@@ -47,8 +45,7 @@ interface Props {
 }
 
 /**
- * Live A4-styled invoice preview. Matches the generated PDF layout so the
- * operator sees the same invoice the customer will receive. Pure presentational.
+ * Live A4-styled invoice preview matching the generated PDF layout.
  * @param props - Component props.
  * @param props.identity - Live business identity for the header/payment/footer.
  * @param props.number - Invoice number to display ("DRAFT" for unsaved).
@@ -86,9 +83,8 @@ function InvoicePreviewPanelImpl({
   const showPromoLine = promoDiscount > 0;
   const showUnsuccessfulLine = unsuccessfulDiscount > 0;
   return (
-    // Only this frame is admin chrome. The body inside keeps its own slate palette, sizes
-    // and Helvetica face (not the admin UI font) because it must match the generated PDF
-    // (invoice-pdf.ts embeds Helvetica).
+    // Only this frame is admin chrome; the body keeps its own palette and Helvetica to
+    // match the PDF (invoice-pdf.ts embeds Helvetica).
     <div
       className={cn(
         "flex flex-col overflow-hidden rounded-lg border border-admin-border bg-admin-surface",

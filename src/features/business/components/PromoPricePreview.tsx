@@ -1,8 +1,6 @@
 "use client";
 // src/features/business/components/PromoPricePreview.tsx
-// Before/after rate table for the promo form. Prices through the same promo
-// helpers the pricing page and the invoice engine use, so what the operator
-// previews is what customers are charged.
+// Before/after rate table for the promo form, priced through the same helpers as invoices.
 
 import { formatNZD } from "@/features/business/lib/business";
 import {
@@ -49,9 +47,8 @@ interface PriceRow {
 }
 
 /**
- * The columns to price. A tiered promo gets one per band, judged at each
- * band's floor through promoForSpend, since the rate depends on which band the
- * job reaches and the promo's own amount is ignored.
+ * The columns to price. A tiered promo gets one per band, priced at the band's
+ * floor through promoForSpend.
  * @param promo - The previewed promo.
  * @returns The scenarios to show.
  */

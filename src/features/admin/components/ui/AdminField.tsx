@@ -1,7 +1,5 @@
 // src/features/admin/components/ui/AdminField.tsx
-// Labelled admin form field. The label is associated with its input via `htmlFor`, and a
-// consistent required/optional marker (red `*` or muted "(optional)") signals mandatory
-// fields the same way the public booking/review forms do. Server-safe.
+// Labelled admin form field with the public forms' required/optional marker. Server-safe.
 
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import type React from "react";

@@ -11,9 +11,8 @@ interface Props {
 }
 
 /**
- * Small "Clear" affordance for a calculator card header. Wipes one card and
- * nothing else, and leaves the saved draft in place - so unlike the toolbar's
- * full clear it needs no confirm step to stay recoverable.
+ * Small "Clear" for a calculator card header. Wipes one card only, so it needs no
+ * confirm step.
  * @param props - Component props.
  * @param props.onClear - Empties this card's fields.
  * @param props.label - Card name used in the screen-reader label.

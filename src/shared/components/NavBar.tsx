@@ -125,11 +125,8 @@ export function NavBar({ phone, phoneTel }: NavBarProps): React.ReactElement | n
     };
   }, [menuOpen, closeMenu]);
 
-  // Lock page scroll while the panel is open, and flag it on <body> so the phone bar
-  // (globals.css) hides instead of stacking under the panel. The lock is overflow on
-  // <html>, which keeps the viewport as the scroller. Pinning <body> with position:
-  // fixed would shift it up by the scroll offset and carry the sticky header (and the
-  // panel inside it) off the top of the screen.
+  // Lock scroll while the panel is open and flag <body> so the phone bar hides. The lock is
+  // overflow on <html>; fixing <body> would carry the sticky header off screen.
   useEffect(() => {
     if (!menuOpen) return;
     const root = document.documentElement;

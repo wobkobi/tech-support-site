@@ -1,8 +1,5 @@
 // src/features/social/lib/open-post.ts
-// Server-side loader for the post open in the Social page's composer: the post, the
-// promo wording its placeholders fill with, which env vars each platform still needs,
-// the site address and contact details the Add menu inserts, and the post maker design
-// its picture came from.
+// Server-side loader for the composer's open post and everything around it.
 
 import { insertDetailsOf, type InsertDetails } from "@/features/admin/lib/insertables";
 import { promoWording } from "@/features/mailing/lib/context";
@@ -21,10 +18,7 @@ import type { SocialPost } from "@prisma/client";
 /** The post maker design linked to a post. */
 export interface PostDesign {
   id: string;
-  /**
-   * True when the post's picture isn't the design as it is now: the design (or a phone
-   * number or promo it shows) changed since, or the picture was swapped by hand.
-   */
+  /** The picture no longer matches the design: the design or its live values changed, or it was swapped. */
   stale: boolean;
 }
 

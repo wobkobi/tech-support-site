@@ -1,8 +1,7 @@
 "use client";
 // src/shared/components/SiteFooter.tsx
-// Dark site footer: brand line, Services and Company links, contact details and social
-// profiles. Hidden on admin and print routes, matching the header. A direct child of
-// <body>, so it is the page's single contentinfo landmark.
+// Dark site footer, hidden on admin and print routes. A direct child of <body>, so it is the
+// single contentinfo landmark.
 
 import { CONTAINER } from "@/shared/components/Section";
 import {

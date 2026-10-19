@@ -1,6 +1,5 @@
 // src/features/admin/components/ui/admin-table.ts
-// Class strings for admin data tables, so every list (bookings, contacts, invoices,
-// income, expenses) renders the same header band, row dividers and cell padding.
+// Shared class strings for admin data tables.
 
 /** The `<table>` itself. */
 export const TABLE_CLS = "w-full text-[0.9375rem] tabular-nums";
@@ -22,9 +21,7 @@ export const ROW_CLS = "hover:bg-admin-bg";
 export const TD_CLS = "px-4 py-3";
 
 /**
- * Actions column pinned to the right edge, so the row actions stay on screen when a wide
- * table scrolls sideways. Collapsed table borders don't travel with a sticky cell, so the
- * left rule is an inset shadow; give the cell an opaque background so scrolled cells pass
- * under it.
+ * Actions column pinned right. Collapsed borders don't follow a sticky cell, so the rule is
+ * an inset shadow; give the cell an opaque background.
  */
 export const PINNED_CELL_CLS = "sticky right-0 shadow-[inset_1px_0_0_var(--color-admin-border)]";

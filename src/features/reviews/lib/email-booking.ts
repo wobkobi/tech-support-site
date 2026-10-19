@@ -31,7 +31,7 @@ export interface BookingNotificationData {
   name: string;
   /** Customer email */
   email: string;
-  /** Formatted notes (includes time slot, duration, meeting type, address, phone, description) */
+  /** Formatted notes (time slot, meeting type, address, phone, description) */
   notes: string;
   /** Appointment start (UTC) */
   startAt: Date;
@@ -41,15 +41,9 @@ export interface BookingNotificationData {
   cancelToken: string;
   /** Promo title snapshotted at booking time, or null when none was active. */
   promoTitleAtBooking?: string | null;
-  /**
-   * Appointment address, already combined with any unit. Drives the map link
-   * and the calendar attachment's LOCATION. Omit for remote jobs.
-   */
+  /** Address with any unit; drives the map link and calendar LOCATION. Omit for remote jobs. */
   address?: string | null;
-  /**
-   * Nullable on older bookings. Only an explicit "remote" suppresses the
-   * address ({@link onSiteAddress}); address and meetingType are written together.
-   */
+  /** Null on older bookings; only an explicit "remote" suppresses the address ({@link onSiteAddress}). */
   meetingType?: "in_person" | "remote" | null;
   /** How many times the booking has moved; becomes the calendar SEQUENCE. */
   rescheduleCount?: number;
@@ -72,8 +66,7 @@ function accessNotesPanel(booking: BookingNotificationData): string {
 }
 
 /**
- * Cancellation copy from LIVE settings (fee terms must never drift from what
- * is configured), narrowed to the tier that binds this booking.
+ * Cancellation copy from live settings, narrowed to the tier that binds this booking.
  * @param booking - The booking being emailed about.
  * @returns Policy copy in the `**…**` emphasis convention.
  */
@@ -94,16 +87,14 @@ function onSiteAddress(booking: BookingNotificationData): string {
 }
 
 /**
- * Maps link for the OWNER's emails only - the customer's address is their own
- * home; the operator is the one driving there.
+ * Maps link for the owner's emails only - the operator is the one driving there.
  * @param booking - The booking being emailed about.
  * @returns HTML paragraph, or "" when there's nothing to map.
  */
 function ownerMapHtml(booking: BookingNotificationData): string {
   const address = onSiteAddress(booking);
   if (!address) return "";
-  // Just the action - the notes block directly above already prints the full
-  // address, so repeating it here only makes the email longer.
+  // Just the action - the notes block above already prints the full address.
   return `<p style="margin:0 0 20px"><a href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(
     address,
   )}" style="color:#43bccd;font-size:14px;font-weight:600">📍 Get directions</a></p>`;
@@ -223,9 +214,7 @@ export async function sendOwnerBookingNotification(
 }
 
 /**
- * Tells the owner a customer has cancelled, so a cancellation isn't silent
- * until someone looks at the calendar. Failures are caught and logged - never
- * throws.
+ * Tells the owner a customer has cancelled. Failures are caught and logged - never throws.
  * @param booking - The cancelled booking's details.
  * @param options - Optional flags.
  * @param options.lateCancellation - True when the cancel landed inside the fee window.
@@ -287,9 +276,8 @@ export async function sendOwnerBookingCancellation(
  * @param options - Optional flags.
  * @param options.kind - "new" (default) for a fresh booking; "rescheduled" for an edit.
  * @param options.previousStartAt - Original start time, shown crossed-out when rescheduled.
- * @param options.quietHours - Hold this one for the quiet window. Set by the
- * operator-driven move; a customer who just booked or rescheduled themselves is
- * waiting on the confirmation, so those stay immediate.
+ * @param options.quietHours - Hold for the quiet window. Set only by operator-driven
+ * moves; customer self-service confirmations stay immediate.
  */
 export async function sendCustomerBookingConfirmation(
   booking: BookingNotificationData,
@@ -316,8 +304,7 @@ export async function sendCustomerBookingConfirmation(
   const previous = options?.previousStartAt ? formatDateTimeLong(options.previousStartAt) : null;
   const cancelUrl = `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`;
   const editUrl = `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`;
-  // Only the customer's own words: the rest of the notes blob restates the time
-  // (already shown above) and the meeting type / address (now their own line).
+  // Only the customer's own words; the rest of the notes blob repeats lines shown above.
   const userNotesHtml = escapeHtml(parseBookingNotes(booking.notes).userNotes).replace(
     /\n/g,
     "<br>",
@@ -446,8 +433,7 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
     : "";
   const attachments = await bookingIcsAttachment(booking);
 
-  // Render the email body. The "tomorrow" wording assumes comms.reminderLeadHours
-  // stays near 24h; revisit this copy if that lead time moves far from a day.
+  // "Tomorrow" wording assumes comms.reminderLeadHours stays near 24h.
   const html = renderNotificationEmail(`
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName}, just a reminder</h2>
     <p style="margin:0 0 20px;color:#444;line-height:1.6">Your appointment with ${escapeHtml(brandName(identity))} is coming up tomorrow.</p>
@@ -495,8 +481,7 @@ ${await buildEmailSignature(siteUrl)}
       },
       booking.id,
     );
-    // Resend answers a rejection with { error }, not a throw, and the cron
-    // stamps the reminder sent on true - it would never be retried.
+    // Resend rejects with { error }, not a throw; returning true would stop the cron retrying.
     if (result.error) {
       console.error(`[email] Resend rejected reminder for ${booking.id}:`, result.error);
       return false;
@@ -517,8 +502,8 @@ export interface ManageLinksBooking {
 }
 
 /**
- * Emails manage links after a find-my-booking lookup. Only ever sent to the
- * address that owns the bookings, so carrying the tokens is safe.
+ * Emails manage links after a find-my-booking lookup. Safe to carry tokens: only
+ * sent to the address that owns the bookings.
  * @param to - Recipient address (the booking email).
  * @param bookings - Their upcoming bookings, soonest first.
  * @returns True if Resend accepted the message, false on misconfig / failure.

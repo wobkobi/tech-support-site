@@ -1,18 +1,7 @@
 // src/app/api/business/task-templates/devices/[name]/route.ts
-// Admin endpoint to retire a task-template device tag. DELETE clears the device (sets it
-// to null, case-insensitive match) on every matching TaskTemplate and returns the count
-// of rows updated.
-//
-// Clearing a device is effectively PERMANENT - nothing re-tags the rows later. parse-job
-// may only reuse device tags from the live vocabulary, and that vocabulary is built from
-// this very field, so a retired tag is never offered to the model again;
-// `findTemplateByTags` also needs BOTH device and action, so a null-device row can never
-// match. The rows survive but go inert, and the work they described gets tagged as
-// something else (or an invented tag) from then on.
-//
-// Retire a tag only when that work is genuinely gone. To fix a drifted or misspelt tag
-// ("Desktop / Pc" vs "Desktop / PC"), re-tag the rows to the canonical spelling - do NOT
-// clear it and expect it to come back.
+// Admin endpoint to rename (PATCH) or retire (DELETE) a task-template device tag.
+// Clearing is effectively permanent: the tag leaves parse-job's vocabulary and null-device
+// rows never match. To fix a misspelt tag ("Pc" vs "PC"), PATCH it instead.
 
 import { renameTaxonomyTag } from "@/features/business/lib/task-taxonomy.server";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -22,10 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * PATCH /api/business/task-templates/devices/[name]
- * Renames a device tag across every template using it, merging any row that
- * collides with an existing (device, action) pair. Use this - not DELETE - to
- * fix a drifted or misspelt tag, because a rename is recoverable and a clear
- * is not.
+ * Renames a device tag across every template, merging (device, action) collisions.
  * @param request - Incoming Next.js request with `{ to: string }` body.
  * @param root0 - Route context.
  * @param root0.params - Promise resolving to the route param object.
@@ -46,8 +32,7 @@ export async function PATCH(
 
   if (!from) return errorResponse("name is required", 400);
   if (!to) return errorResponse("to is required", 400);
-  // A case-only rename is allowed - it is the fix for a tag stored under two
-  // spellings - so only an exact repeat is rejected.
+  // Case-only renames are allowed (they fix split spellings).
   if (from === to) return errorResponse("to must differ from the current name", 400);
 
   const result = await renameTaxonomyTag("device", from, to);
@@ -56,9 +41,7 @@ export async function PATCH(
 
 /**
  * DELETE /api/business/task-templates/devices/[name]
- * Clears `device` (case-insensitive match) on every matching TaskTemplate. The
- * rows survive but go inert - nothing re-tags them automatically (see the file
- * header); re-tag by hand if the work still exists.
+ * Clears `device` (case-insensitive) on every matching TaskTemplate; the rows go inert.
  * @param request - Incoming Next.js request.
  * @param root0 - Route context.
  * @param root0.params - Promise resolving to the route param object.

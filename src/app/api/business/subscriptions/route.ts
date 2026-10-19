@@ -1,7 +1,6 @@
 // src/app/api/business/subscriptions/route.ts
-// Admin subscription collection endpoint. GET lists all subscriptions ordered by nextDue
-// ascending; POST validates required fields, frequency, amount, and GST rate, refuses a
-// second active subscription for the same supplier+description, then creates it.
+// Admin subscription collection endpoint: GET lists by nextDue, POST validates and
+// creates, refusing a duplicate active supplier+description.
 
 import { VALID_FREQUENCIES } from "@/features/business/lib/constants";
 import { parseAmount, parseDate, parseRate } from "@/features/business/lib/validation";
@@ -90,10 +89,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Invalid nextDue date", 400);
   }
 
-  // Refuse only an exact copy: same supplier AND same description (case and spacing
-  // ignored). A supplier can have any number of subscriptions (Google Workspace and
-  // Google One both pass); a copy would book each payment twice, since the cron
-  // records every due subscription.
+  // Refuse only an exact supplier+description copy, which the cron would book twice.
+  // A supplier may have several subscriptions.
   const active = await prisma.subscription.findMany({
     where: { isActive: true },
     select: { supplier: true, description: true },

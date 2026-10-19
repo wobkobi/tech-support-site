@@ -1,8 +1,7 @@
 "use client";
 // src/app/booking/manage/ManageLookupForm.tsx
-// Email box for the find-my-booking page. Posts to /api/booking/manage-lookup, which
-// replies identically whether or not the address matched - so this form must not imply a
-// match either way.
+// Find-my-booking email form. The API replies the same whether or not the address
+// matched, so never imply a match.
 
 import { Button } from "@/shared/components/Button";
 import { PhoneLink } from "@/shared/components/PhoneLink";
@@ -66,8 +65,7 @@ export function ManageLookupForm({ phone, phoneTel }: ManageLookupFormProps): Re
     return (
       <div>
         <p className="text-base text-rich-black/80 sm:text-lg">{state.message}</p>
-        {/* They're here because they couldn't find an email, so pointing them
-            back at their inbox is a dead end - give them the phone number. */}
+        {/* They already lost an email, so offer the phone number too. */}
         <p className="mt-4 text-base text-rich-black/80 sm:text-lg">
           Nothing arrives, or not sure which address you used? Call or text me on{" "}
           <PhoneLink phone={phone} phoneTel={phoneTel} /> and I'll sort it out.

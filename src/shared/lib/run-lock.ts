@@ -1,8 +1,6 @@
 // src/shared/lib/run-lock.ts
-// Cross-process run lock for long jobs that must not overlap (sheet import,
-// contacts sync). Backed by a Setting row keyed per job, so it holds across
-// serverless instances - an in-memory flag would not, since the cron and a
-// manual click can land on different machines.
+// Cross-instance run lock for long jobs (sheet import, contacts sync), backed by a Setting row
+// since cron and a manual click can land on different machines.
 
 import { prisma } from "@/shared/lib/prisma";
 
@@ -10,16 +8,9 @@ import { prisma } from "@/shared/lib/prisma";
 export const RUN_LOCK_TTL_MS = 10 * 60_000;
 
 /**
- * Attempts to take a named run lock.
- *
- * Two steps, both race-safe. First a compare-and-set that atomically steals a
- * stale lock: the stored value is an ISO timestamp, which sorts
- * chronologically, so `value < staleThreshold` means older than the TTL, and
- * `updateMany` is a single atomic op per document - after the first caller
- * stamps the new time the row no longer satisfies a second caller's stale
- * filter. If nothing stale was there to steal, the lock is either held fresh or
- * absent, so it tries to create the row; the unique `key` index makes
- * concurrent creates race-safe, with only one winner.
+ * Takes a named run lock. First an atomic compare-and-set steals a stale lock (ISO timestamps
+ * sort chronologically, and `updateMany` is atomic per document); otherwise create the row, where
+ * the unique `key` index lets only one concurrent creator win.
  * @param key - Setting key identifying this job's lock.
  * @param ttlMs - Age past which an existing lock is considered abandoned.
  * @returns True when the lock was acquired and the caller may proceed.
@@ -44,8 +35,7 @@ export async function acquireRunLock(
 }
 
 /**
- * Releases a named run lock. Never throws - a leftover lock expires via its TTL,
- * so failing to release delays the next run rather than blocking it forever.
+ * Releases a run lock. Never throws; a leftover lock just expires via its TTL.
  * @param key - Setting key identifying this job's lock.
  */
 export async function releaseRunLock(key: string): Promise<void> {
@@ -57,9 +47,7 @@ export async function releaseRunLock(key: string): Promise<void> {
 }
 
 /**
- * Whether a job is currently running, for UI that needs to reflect real state
- * rather than a local flag. A lock past its TTL reads as not running, matching
- * what {@link acquireRunLock} would do with it.
+ * Whether a job is running; a lock past its TTL reads as not running, as in {@link acquireRunLock}.
  * @param key - Setting key identifying this job's lock.
  * @param ttlMs - Age past which an existing lock is considered abandoned.
  * @returns True when a live lock is held.

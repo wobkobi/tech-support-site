@@ -1,8 +1,5 @@
 // scripts/eval-ai/index.ts
-// On-demand eval harness for the AI routes: black-box tests estimate-duration, parse-job
-// and the mailing and post maker ai-drafts against a running dev server (`npm run dev` in
-// another terminal).
-//
+// On-demand black-box eval of the AI routes against a running dev server.
 // Usage:
 //   npm run eval:ai -- --self-test        # pure checks, no server, no API calls
 //   npm run eval:ai                       # full run against http://localhost:3000
@@ -23,9 +20,7 @@ import {
 } from "./assert";
 import type { LiveContext } from "./context";
 
-// One errored case must not discard the run's completed paid calls: record
-// it and carry on. Three consecutive errors mean the upstream API is down
-// (dead key, exhausted quota) - abort then, keeping everything collected.
+// Record an errored case and carry on; three in a row means the API is down, so abort.
 const MAX_CONSECUTIVE_ERRORS = 3;
 
 /** One assertion check with expected/actual values, hardcoded - no network. */
@@ -92,8 +87,7 @@ const SAMPLE_ROOM = { headline: true, support: true, bullets: 0, quote: false, n
  */
 function runSelfTest(): number {
   const cases: SelfCase[] = [
-    // 480 is the self-test's own canonical ceiling, hardcoded like the rest of
-    // these expectations - the live value now comes from settings.maxJobMins.
+    // 480 is the self-test's hardcoded ceiling; live runs use settings.maxJobMins.
     { name: "estimate snaps to benchmark", got: expectedEstimateMins(45, 30, 15, 480), want: 45 },
     {
       name: "estimate floors to min-billable",
@@ -243,9 +237,7 @@ function parseArgs(): {
 }
 
 /**
- * Runs one case `runs` times, collecting the measured number each run and the
- * first run's full result. Shared by all three case kinds so the collection
- * loop is written once.
+ * Runs one case `runs` times, collecting each run's number and the first run's result.
  * @param runs - Repeat count for this case (reproducibility).
  * @param call - Makes one call, returning the number to track and the raw result.
  * @returns The per-run numbers and the first run's raw result.
@@ -265,9 +257,7 @@ async function runCase(
 }
 
 /**
- * Runs every case `runs` times and collects the numeric result each time
- * (estimatedMins for estimate cases, durationMins for parse cases). Prints a
- * live single-line progress counter so a multi-minute run does not look hung.
+ * Runs every case `runs` times and collects each numeric result, with a live progress line.
  * @param url - Server base URL.
  * @param adminSecret - Admin secret for both routes.
  * @param runs - Repeat count per case (reproducibility).
@@ -296,8 +286,7 @@ async function collectRaw(
   const raw: RawRun[] = [];
 
   /**
-   * Whether --only keeps a case. Filters match by substring, so a single failing case
-   * can be re-run without paying for the other 80.
+   * Whether --only keeps a case (substring match).
    * @param id - Case id (benchmarks are `est-<label>`).
    * @returns True when no filter is given or the id contains one of them.
    */
@@ -324,8 +313,7 @@ async function collectRaw(
 
   let done = 0;
   /**
-   * Overwrites one status line (\r + clear-line) with the case about to run, so
-   * progress does not scroll a line per case.
+   * Overwrites one status line (\r + clear-line) with the case about to run.
    * @param id - The case id currently being collected.
    */
   const tick = (id: string): void => {
@@ -410,8 +398,7 @@ async function collectRaw(
     });
   }
 
-  // Travel decisions. Run once each: the answer is a branch, not a measured
-  // number, so repeated runs would only re-walk the same branch.
+  // Travel decisions run once each: the answer is a branch, not a measurement.
   for (const c of travelCases) {
     if (aborted) break;
     tick(c.id);
@@ -436,8 +423,7 @@ async function collectRaw(
     });
   }
 
-  // Mailing drafts. Run once each: the checks are rules every draft must keep, so a
-  // repeat only spends another call on the same rules.
+  // Mailing drafts run once each.
   for (const c of draftCases) {
     if (aborted) break;
     tick(c.id);
@@ -461,8 +447,7 @@ async function collectRaw(
     });
   }
 
-  // Post maker drafts, once each like the mailing ones. The review cases also check the
-  // quote both ways: cut from real review words, and left empty when there are none.
+  // Post maker drafts run once each; review cases check the quote is real or empty.
   for (const c of postDraftCases) {
     if (aborted) break;
     tick(c.id);
@@ -506,8 +491,7 @@ async function collectRaw(
     });
   }
 
-  // Cross-route: same job to BOTH routes (once each) so the report can compare
-  // the public benchmark estimate against the admin stated-time duration.
+  // Cross-route: same job to BOTH routes once, to compare estimate vs stated-time duration.
   for (const c of crossRouteCases) {
     if (aborted) break;
     tick(c.id);
@@ -530,9 +514,7 @@ async function collectRaw(
 }
 
 /**
- * Turns raw runs into reported checks across the three families: context
- * (hard, gates the exit code), reproducibility (soft, reported), and drift
- * (info-only).
+ * Turns raw runs into checks: context (hard), reproducibility (soft) and drift (info).
  * @param ctx - Live context used to build expectations.
  * @param raw - Collected raw runs.
  * @returns Ordered check results.
@@ -542,8 +524,7 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
   const inc = ctx.incrementMins;
 
   for (const r of raw) {
-    // Errored case: surface as a hard fail so it can't pass silently, then
-    // skip the family checks (there are no durations to evaluate).
+    // Errored case: hard fail, then skip the family checks.
     if (r.error) {
       out.push({
         id: r.id,
@@ -600,16 +581,11 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
               : `durationMins=${first} (canonical ${canonical})`,
         });
       } else {
-        // Two things the raw canonical misses. The route caps durationMins at the
-        // longest-billable-day ceiling, so a 12h or 19h stated session legitimately comes
-        // back capped. And the collector stores an absent durationMins as -1 to keep
-        // `durations` a number[], so a canonical null compares against that sentinel, not
-        // against null. No minimum or increment applies - durationMins is worked minutes,
-        // and the billing floor lands on task qty instead.
+        // The route caps durationMins at the day ceiling, and an absent value is stored as -1.
+        // No minimum or increment applies: durationMins is worked minutes.
         const expected = canonical === null ? -1 : Math.min(canonical, ctx.maxJobMins);
         /**
-         * Renders a measured duration for the report, spelling out the -1
-         * sentinel the collector uses for an absent durationMins.
+         * Renders a measured duration, spelling out the -1 "absent" sentinel.
          * @param v - Minutes, or -1 when the route reported no duration.
          * @returns Human-readable value for the check detail.
          */
@@ -628,8 +604,7 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
       }
     }
 
-    // Travel: destination and noTravelCharge are one decision, so both are
-    // asserted together and a contradiction between them fails outright.
+    // Travel: destination and noTravelCharge are asserted together.
     if (r.kind === "travel" && r.travel) {
       const t = r.travel;
       const dest = t.gotDestination;
@@ -648,8 +623,7 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
       const storesDetail = want
         ? `, storeRuns ${JSON.stringify(got)} (want ${want.length ? want.map((w) => `"${w}"`).join(", ") : "none"})`
         : "";
-      // The invariant is independent of what this case expected: naming a
-      // destination and then refusing to charge it is always wrong.
+      // Naming a destination then refusing to charge it is always wrong.
       const contradiction = dest !== null && t.gotNoTravelCharge === true;
       const wantDest = t.wantDestination === null ? "null" : `containing "${t.wantDestination}"`;
       out.push({
@@ -663,8 +637,7 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
       });
     }
 
-    // Cross-route (report-only): public benchmark estimate vs admin stated-time
-    // duration for the same job, with the canonical stated total for reference.
+    // Cross-route (report-only): estimate vs stated-time duration, plus the canonical total.
     if (r.kind === "cross-route") {
       const canonical = calcSessionMins(r.input ?? "");
       const stated =
@@ -698,9 +671,8 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
       });
     }
 
-    // Family 2: reproducibility across runs (skip cross-route and draft, which run once).
-    // Only deterministic exact-parse cases hold a zero-spread bar; model-estimated
-    // cases get the lenient increment-based tolerance.
+    // Family 2: reproducibility. Exact-parse cases need zero spread; model estimates get
+    // an increment-based tolerance.
     if (r.kind !== "cross-route" && r.kind !== "draft") {
       const sp = spread(r.durations);
       const tol = r.kind === "parse" && r.expectMode !== "info" ? 0 : 2 * inc;
@@ -800,11 +772,8 @@ function printReport(checks: CheckResult[]): void {
     const artifact = path.join(dir, `run-${started.replace(/[:.]/g, "-")}.json`);
     fs.writeFileSync(artifact, JSON.stringify({ started, runs, checks, raw }, null, 2));
 
-    // The deterministic asserts gate the exit code: context (stated-time exactness,
-    // min-billable floor, increment) and travel (which single trip the job bills) are
-    // branch decisions with one right answer, not model taste; draft rules are INVARIANTs
-    // in the prompt, so breaking one is a bug, not a style call. Reproducibility is soft -
-    // a hosted LLM is never bit-for-bit reproducible, so a spread warns, never fails.
+    // Context, travel and draft INVARIANTs have one right answer, so they gate the exit code.
+    // Reproducibility only warns: a hosted LLM is never bit-for-bit reproducible.
     const hardFailed = checks.filter(
       (c) =>
         c.status === "fail" &&
@@ -817,9 +786,7 @@ function printReport(checks: CheckResult[]): void {
       `\n${completed.length}/${raw.length} cases completed, ~${calls} paid calls. Artifact: ${artifact}`,
     );
     if (aborted) {
-      // Name what actually failed. Guessing "rate limited or out of quota" sent
-      // an operator hunting through OpenAI billing when the real causes were a
-      // stale dev server and another project holding port 3000.
+      // Name what actually failed rather than guessing at the cause.
       const errors = raw.map((r) => r.error ?? "").filter(Boolean);
       /**
        * Whether any recorded case error mentions a given marker.
@@ -855,9 +822,8 @@ function printReport(checks: CheckResult[]): void {
     );
     process.exit(hardFailed.length === 0 ? 0 : 1);
   } catch (err) {
-    // Print the client's diagnostic (route, status, hint) as one clean line, no stack
-    // trace, then exit non-zero. Catching here also avoids the unhandled-rejection
-    // teardown that trips a libuv assertion on Windows.
+    // Print the diagnostic as one line and exit non-zero; catching also avoids a libuv
+    // assertion on Windows from an unhandled rejection.
     const message = err instanceof Error ? err.message : String(err);
     console.error(`\n\x1b[31m✗ eval run failed\x1b[0m\n  ${message}\n`);
     process.exit(1);

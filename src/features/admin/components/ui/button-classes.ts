@@ -1,7 +1,6 @@
 // src/features/admin/components/ui/button-classes.ts
-// Class strings behind AdminButton, so a native anchor or a button that needs its own ref
-// and ARIA can wear the exact AdminButton look. Kept out of the "use client" AdminButton
-// module so server components can call it too.
+// AdminButton class strings for anchors and custom buttons; kept out of the client module
+// so server components can use them.
 
 import { cn } from "@/shared/lib/cn";
 
@@ -52,8 +51,8 @@ function sizeClasses(size: AdminButtonSize): string {
 /**
  * The full AdminButton class string for a variant and size, before any caller className.
  * @param options - Look to build.
- * @param options.variant - Button variant; defaults to primary, as on AdminButton.
- * @param options.size - Button size; defaults to sm, as on AdminButton.
+ * @param options.variant - Button variant (default primary).
+ * @param options.size - Button size (default sm).
  * @returns Class string.
  */
 export function adminButtonClass({

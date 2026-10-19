@@ -1,9 +1,6 @@
 // src/features/mailing/lib/unsubscribe-token.ts
-// Signed opt-out tokens: the mailing-list unsubscribe link and the review-ask "stop asking
-// me" link. The token is the contact id plus an HMAC of it, so nothing is stored per
-// contact and nobody can opt someone else out by guessing an id. Each kind signs its own
-// purpose prefix, so one kind of token is never accepted as the other. Rotating
-// UNSUBSCRIBE_SECRET breaks every link already sent.
+// Signed opt-out tokens (unsubscribe and "stop asking me"): contact id plus an HMAC of a
+// purpose prefix and the id. Rotating UNSUBSCRIBE_SECRET breaks every link already sent.
 
 import { createHmac, timingSafeEqual } from "crypto";
 
@@ -11,18 +8,14 @@ import { createHmac, timingSafeEqual } from "crypto";
 const CONTACT_ID_RE = /^[a-f0-9]{24}$/;
 
 /**
- * The secret, or null when unset. Mailing sends refuse to run without it, since
- * a marketing email with no working unsubscribe link breaks the NZ spam act.
+ * The secret, or null when unset. Mailing sends refuse to run without it (NZ spam act).
  * @returns The trimmed secret or null.
  */
 export function unsubscribeSecret(): string | null {
   return process.env.UNSUBSCRIBE_SECRET?.trim() || null;
 }
 
-/**
- * What a token opts out of. The value is the signed prefix, so "unsubscribe" must stay
- * exactly as it is or every mailing link already sent stops working.
- */
+/** What a token opts out of; the signed prefix, so renaming one breaks sent links. */
 type TokenPurpose = "unsubscribe" | "review-asks";
 
 /**

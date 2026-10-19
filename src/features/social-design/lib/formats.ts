@@ -1,7 +1,6 @@
 // src/features/social-design/lib/formats.ts
-// Every picture size the post maker can export, with the guides drawn over each one.
-// Core sizes cover the composer's apps; extras are banners and profile pictures that
-// the build-icons script also makes.
+// Every exportable picture size with its guides. Core sizes cover the composer's apps; extras
+// are banners and profile pictures.
 
 /** Key of one export size. */
 export type FormatKey =
@@ -16,10 +15,7 @@ export type FormatKey =
   | "youtube"
   | "profile";
 
-/**
- * The part of a picture an app always shows, as fractions of each side cut off.
- * `circle` marks a profile picture that apps crop to the inscribed circle.
- */
+/** An app's always-shown area as fractions cut per side; `circle` marks a circle-cropped profile picture. */
 export interface SafeZone {
   top: number;
   right: number;

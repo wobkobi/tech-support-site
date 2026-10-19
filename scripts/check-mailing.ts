@@ -1,9 +1,6 @@
 // scripts/check-mailing.ts
-// Mailing-list logic that has to be right before anything reaches a customer: the
-// renderer's escaping and formatting rules, placeholder filling, the image allow-list,
-// unsubscribe token signing, recipient selection, batch chunking, template switching, the
-// editor's Add menu and the quiet-hours window that holds list sends until morning. Pure
-// logic, no database and no network.
+// Mailing-list logic that must be right before anything reaches a customer: rendering,
+// placeholders, tokens, recipients, templates, blocks and quiet hours. No DB, no network.
 // Run with: npm test -- mailing
 
 import { fillBlocks, readDraft, type AiDraft } from "@/features/mailing/lib/ai-draft";
@@ -41,8 +38,7 @@ import { nextSendTime, type QuietHours } from "@/shared/lib/quiet-hours";
 import { nzWallClockUtc } from "@/shared/lib/timezone-utils";
 import { expect, finish } from "./lib/harness.js";
 
-// The token helpers read the secret on each call, so setting it here still takes
-// effect despite import hoisting.
+// Read per call, so this survives import hoisting
 process.env.UNSUBSCRIBE_SECRET = "check-mailing-fixture-secret";
 
 const BLOB_IMAGE = "https://abc123.public.blob.vercel-storage.com/mailing/image-x1.jpg";
@@ -895,8 +891,7 @@ function checkBlocks(): void {
     );
   });
 
-  // A paragraph right above a standalone line is closed by it, so this checks the
-  // paragraph and the line don't end up sharing an id.
+  // A paragraph closed by a standalone line must not share its id
   const idBody = "Para\n# H\nMore\n[Go](https://example.test)\n> q\n\n- a";
   const ids = parseBlocks(idBody).map((b) => b.id);
   expect("parsed block ids are unique", new Set(ids).size === ids.length, ids.join(","));

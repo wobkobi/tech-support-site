@@ -1,9 +1,7 @@
 "use client";
 // src/features/reviews/components/admin/use-send-review-ask.tsx
-// One dialog for hand-sending a review ask to someone already in the book, shared by the
-// "Who you can ask" list and the link history. Email shows the exact email before it
-// goes; a text is composed server-side and copied, since there's no SMS provider. Both
-// send with `resend`, so someone asked before gets the ask again under the same link.
+// Shared dialog for hand-sending a review ask: email previews before sending, a text is
+// composed server-side to copy (no SMS provider). Both pass `resend` to reuse the link.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Modal } from "@/features/admin/components/ui/Modal";

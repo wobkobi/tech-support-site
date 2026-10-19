@@ -1,8 +1,6 @@
 // src/features/social-design/components/use-doc-history.ts
-// The editor's design with undo and redo. Each edit runs once against the latest
-// design (held in a ref, so quick edits in a row never read a stale copy) and the
-// result is pushed onto the undo stack. Edits sharing a tag within 1.5s merge into one
-// step, so typing a word is one undo, not one per letter.
+// Design state with undo and redo. Edits run against a ref so quick edits never read a stale
+// copy; edits sharing a tag within 1.5s merge into one undo step.
 
 import type { DesignDoc } from "@/features/social-design/lib/doc";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
@@ -36,8 +34,7 @@ interface Stacks {
 /**
  * Design state with undo and redo.
  * @param initial - Design as loaded.
- * @param normalise - Runs after every edit, undo and redo (text re-measuring); must
- *   return the same object when it changes nothing.
+ * @param normalise - Runs after every edit, undo and redo; must return the same object when unchanged.
  * @returns History controls.
  */
 export function useDocHistory(

@@ -1,7 +1,6 @@
 "use client";
 // src/features/business/components/calculator/DraftRestoredBanner.tsx
-// Banner shown when the calculator reloads a saved draft, with a Discard action that
-// resets the form.
+// Banner shown when the calculator reloads a saved draft, with a Discard action.
 
 import { timeAgo } from "@/features/business/lib/calculator-draft";
 import type React from "react";
@@ -13,9 +12,7 @@ interface Props {
 }
 
 /**
- * "Draft restored" banner. It sits above the calculator grid so Discard is in
- * view without scrolling on a phone, where cached values otherwise look like a
- * mystery pre-filled form.
+ * "Draft restored" banner, above the grid so Discard is in view on a phone.
  * @param props - Component props.
  * @param props.draftRestoredAt - When the restored draft was last edited.
  * @param props.mountedAt - When the calculator mounted, the "now" for the relative time.

@@ -1,8 +1,6 @@
 // src/features/social/lib/google-business.ts
-// Publishes posts to the Google Business Profile and takes them down again, through the
-// v4 localPosts API (posting never moved to the newer per-area APIs). Auth is the same
-// OAuth refresh token as Calendar, Contacts and Sheets; it needs the business.manage
-// scope, which scripts/reauth-google.ts asks for.
+// Publishes to and deletes from the Google Business Profile via the v4 localPosts API, using the
+// shared Google OAuth refresh token with the business.manage scope.
 
 import { withRetry } from "@/features/business/lib/google-retry";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
@@ -44,10 +42,8 @@ interface GaxiosLike {
 }
 
 /**
- * Turns a Google API failure into something the operator can act on. invalid_grant
- * comes from refreshing the token (revoked, or the account's password changed);
- * PERMISSION_DENIED with a scope message means the token predates business.manage;
- * SERVICE_DISABLED means the API isn't switched on in the Cloud project.
+ * Turns a Google API failure into an actionable error: invalid_grant (token revoked),
+ * PERMISSION_DENIED scope (token predates business.manage), SERVICE_DISABLED (API off).
  * @param error - What the request threw.
  * @returns A readable error.
  */
@@ -97,8 +93,7 @@ interface LocalPost {
 }
 
 /**
- * Posts to the Business Profile. Not retried: a timeout after Google has accepted the
- * post would post it twice, so a failure is left for the operator's Retry.
+ * Posts to the Business Profile. Not retried: a timeout after acceptance would double-post.
  * @param input - Filled text, picture, link and Google settings.
  * @returns The post's resource name and its link in Google search.
  */
@@ -118,8 +113,7 @@ async function publish(input: PublishInput): Promise<PublishResult> {
 
 export const google: PlatformAdapter = {
   /**
-   * Env vars posting to the Business Profile still needs. The OAuth client vars are
-   * shared with Calendar and already required, so only the refresh token is listed.
+   * Env vars still needed; only the refresh token, as the shared OAuth client vars are required.
    * @returns Missing variable names.
    */
   missingEnv() {
@@ -132,8 +126,7 @@ export const google: PlatformAdapter = {
   },
   publish,
   /**
-   * Deletes a post by its resource name. A 404 counts as already deleted, but only for
-   * a post under this location, so a mistyped id can't pass as done.
+   * Deletes a post. A 404 counts as deleted only for a post under this location.
    * @param name - "accounts/{a}/locations/{l}/localPosts/{p}" saved when it was posted.
    */
   async remove(name) {
@@ -147,9 +140,8 @@ export const google: PlatformAdapter = {
     }
   },
   /**
-   * Reads the location's name, then lists one post through the v4 API, so a token
-   * without the scope and a switched-off posting API both show up here before a post
-   * fails on them.
+   * Reads the location name and lists one post, so a missing scope or disabled API shows up
+   * before a post fails.
    * @returns The business name, or the reason the check failed.
    */
   async checkConnection() {

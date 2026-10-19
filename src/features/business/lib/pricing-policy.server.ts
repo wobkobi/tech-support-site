@@ -1,7 +1,5 @@
 // src/features/business/lib/pricing-policy.server.ts
-// Server-only helpers that need Prisma access. Kept separate from pricing-policy.ts so
-// the client-safe module stays importable everywhere without dragging Prisma into the
-// browser bundle.
+// Server-only pricing helpers that need Prisma, kept out of the client-safe pricing-policy.ts.
 
 import { formatMoneyCompact } from "@/features/business/lib/business-format";
 import {
@@ -27,9 +25,8 @@ import "server-only";
 export const RATE_CONFIG_TAG = "rate-config";
 
 /**
- * RateConfig snapshot as stored in the data cache. `unstable_cache` JSON
- * round-trips its value, so `updatedAt` is normalised to an ISO string up
- * front - the shape is then identical on cache hit and miss.
+ * RateConfig snapshot as cached. `updatedAt` is an ISO string so the shape survives
+ * `unstable_cache`'s JSON round trip.
  */
 export interface CachedRateRow {
   label: string;
@@ -43,10 +40,8 @@ export interface CachedRateRow {
 }
 
 /**
- * Cached RateConfig rows for the public pages and the public rates API.
- * Tagged with {@link RATE_CONFIG_TAG}; the admin rate routes bust the tag on
- * every write. No time-based revalidate: the root layout reads the rates, and an
- * unstable_cache timer becomes every public page's ISR interval.
+ * Cached RateConfig rows, busted via {@link RATE_CONFIG_TAG} on every admin write. No timed
+ * revalidate: the root layout reads this, so a timer would become every page's ISR interval.
  * @returns Rate rows ordered by label, Dates flattened to ISO strings.
  */
 export const getRateRows = unstable_cache(
@@ -68,10 +63,8 @@ export const getRateRows = unstable_cache(
 );
 
 /**
- * Live policy bundle, resolved from the settings panel (defaults + DB override).
- * Server-only because it reads the settings store; client code receives the
- * resolved values as props. {@link GST_RATE} stays a legislated constant.
- * Wrapped in React `cache` so repeat calls within one request dedupe.
+ * Live policy bundle from the settings panel, deduped per request. {@link GST_RATE} stays a
+ * legislated constant; client code receives these values as props.
  * @returns The current policy values the operator has configured.
  */
 export const getPolicy = cache(async (): Promise<Policy> => {
@@ -100,10 +93,8 @@ export const getPolicy = cache(async (): Promise<Policy> => {
 interface PublicModifier {
   label: string;
   /**
-   * How the modifier reaches the rate. A "delta" changes the task's own $/hr,
-   * so a promo discounts the modified figure; an "uplift" is a surcharge on
-   * full labour, which a promo does not touch. They combine differently and
-   * the pricing page has to tell them apart.
+   * A "delta" changes the task's own $/hr (a promo discounts it); an "uplift" is a surcharge
+   * on full labour that a promo doesn't touch.
    */
   kind: "delta" | "uplift";
   /** Effective $/hr after applying the modifier to the base hourly rate. */
@@ -138,12 +129,8 @@ const MODIFIER_DESCRIPTIONS: Record<string, string> = {
 };
 
 /**
- * Public pricing snapshot for the pricing + FAQ pages and the layout JSON-LD.
- * Reads the tag-cached rate rows ({@link getRateRows}) alongside the cached
- * settings, and dedupes repeat calls within one request via React `cache`
- * (layout + generateMetadata + page body all call it). The base rate falls
- * back to the hardcoded $65 default when no hourly row exists; the travel
- * rate comes from the pricing settings.
+ * Public pricing snapshot for the pricing + FAQ pages and the layout JSON-LD, from
+ * {@link getRateRows} and settings, deduped per request.
  * @returns Live pricing snapshot.
  */
 export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
@@ -154,13 +141,10 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
     rows.find((r) => r.ratePerHour !== null && r.unit === "hour")?.ratePerHour ??
     FALLBACK_BASE_RATE;
 
-  // Travel rate is a pricing setting, not a rate row - the operator edits it
-  // in Settings > Pricing and it can't drift via the calculator's rate panel.
+  // A pricing setting, not a rate row, so the calculator's rate panel can't change it.
   const travelRatePerHour = pricing.travelRatePerHour;
 
-  // Business rate = base + the Business modifier row's delta. The row is
-  // deliberately absent from the consumer accordion allowlist below; only the
-  // /business page renders this figure.
+  // Base + the Business row's delta; only /business shows it, not the accordion below.
   const businessDelta =
     rows.find((r) => r.label === "Business" && r.unit === "modifier")?.hourlyDelta ??
     FALLBACK_BUSINESS_DELTA;
@@ -182,12 +166,8 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
         description: MODIFIER_DESCRIPTIONS[row.label] ?? "",
       });
     } else if (row.label === "Public Holiday") {
-      // The uplift shown comes from the pricing settings (what getPolicy charges), NOT the
-      // RateConfig percentDelta, so the displayed % can't drift from the charged one. The
-      // row only has to exist to surface the modifier on the accordion.
-      // Described in dollars of FULL labour, not as a percent: under a promo the
-      // billed rate is the discounted headline + this amount, so "+$25 = $90"
-      // adds up next to a $65 headline where "+25%" would read as 25% of $65.
+      // Uplift from the pricing settings (what is charged), not the row's percentDelta.
+      // Shown in dollars of full labour so it adds up beside a promo-discounted headline.
       const uplift = pricing.publicHolidayUplift;
       const upliftPerHour = roundCents(baseRate * uplift);
       modifiers.push({
@@ -199,8 +179,7 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
       });
     }
   }
-  // Weekend is a pricing setting with no rate row, so it's added after the rows and
-  // described the same way as the holiday uplift.
+  // Weekend has no rate row; described like the holiday uplift.
   if (pricing.weekendUplift > 0) {
     const upliftPerHour = roundCents(baseRate * pricing.weekendUplift);
     modifiers.push({
@@ -212,9 +191,7 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
     });
   }
 
-  // Latest mtime across rows; powers the "Rates last updated on {date}" footer.
-  // Rows carry ISO strings (cache serialisation), which compare correctly
-  // lexicographically; rebuild the Date at the end so PublicPricing keeps its shape.
+  // Latest mtime for the "Rates last updated" footer; ISO strings compare lexicographically.
   const isoMax = rows.reduce<string | null>((max, r) => {
     if (!r.updatedAt) return max;
     if (!max) return r.updatedAt;
@@ -230,9 +207,7 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
   };
 });
 
-// Cached Holidays instances: nationwide for public holidays, Auckland queried separately
-// for the regional anniversary day. date-holidays computes algorithmically, so one
-// instance serves every year.
+// Nationwide and Auckland (anniversary day) instances; algorithmic, so one serves every year.
 const hdNz = new Holidays("NZ");
 const hdAuckland = new Holidays("NZ", "AUK");
 
@@ -259,9 +234,7 @@ function matchInHolidayList(
 }
 
 /**
- * Returns the `date-holidays` match for an NZ-local YYYY-MM-DD, or null.
- * Checks the nationwide instance first; falls back to the Auckland-regional
- * instance for the anniversary day.
+ * Returns the `date-holidays` match for an NZ-local YYYY-MM-DD, nationwide first, then Auckland.
  * @param key - NZ-local YYYY-MM-DD date string.
  * @returns `{ name, region }` or null.
  */
@@ -275,10 +248,8 @@ function holidayFromPackage(key: string): { name: string; region: string } | nul
 }
 
 /**
- * Looks up the public holiday occurring on the given date (NZ-local). Reads
- * the `PublicHoliday` table first; falls back to algorithmic computation via
- * `date-holidays` when no row matches or the table is unreachable. Only
- * nationwide ("NZ") and the operator's home region are returned.
+ * Looks up the NZ or home-region public holiday on a date (NZ-local), from the `PublicHoliday`
+ * table, falling back to `date-holidays` when no row matches or the table is unreachable.
  * @param d - Booking timestamp (UTC); compared against the NZ-local date key.
  * @returns `{ name, region }` of the holiday, or null.
  */
@@ -299,10 +270,8 @@ export async function lookupPublicHoliday(
 }
 
 /**
- * Batch variant of {@link lookupPublicHoliday}: one `PublicHoliday` read
- * covers every date key, with the algorithmic `date-holidays` fallback
- * filling any key the table doesn't cover. Used by the admin schedule, which
- * spans a multi-week window and would otherwise pay one DB round-trip per day.
+ * Batch variant of {@link lookupPublicHoliday}: one table read for every key, with the
+ * `date-holidays` fallback filling gaps.
  * @param keys - NZ-local YYYY-MM-DD date strings.
  * @returns Map from date key to `{ name, region }`; non-holiday keys are absent.
  */
@@ -332,9 +301,8 @@ export async function lookupPublicHolidaysForKeys(
 }
 
 /**
- * Attaches each booking day's labour surcharge (public holiday or weekend) from the
- * live pricing settings, through the same {@link dateSurcharge} rule invoices bill
- * with, so the booking form names it and its estimate prices it.
+ * Attaches each booking day's labour surcharge via {@link dateSurcharge}, the same rule
+ * invoices bill with.
  * @param days - Bookable days keyed by NZ-local date.
  * @returns The same days, each with `surcharge` set (null when none applies).
  */

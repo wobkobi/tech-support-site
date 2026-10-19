@@ -1,7 +1,5 @@
 // src/features/social-design/components/canvas/use-image.ts
-// Image loading for the canvas, shared by every layer that draws the same file. Every
-// image loads with crossOrigin="anonymous": Blob answers with an open CORS header, so
-// drawing it leaves the canvas exportable.
+// Shared canvas image loading. crossOrigin="anonymous" plus Blob's open CORS keeps the canvas exportable.
 
 import { useEffect, useState } from "react";
 

@@ -1,7 +1,6 @@
 // src/app/api/business/assets/[id]/route.ts
-// Admin single-asset endpoint. PUT is a full replace: the whole body is validated with
-// parseAssetBody and every column is written, so a cleared field clears. DELETE removes
-// the asset; a linked expense then counts as an ordinary expense again.
+// Admin single-asset endpoint. PUT is a full replace, so a cleared field clears; DELETE
+// returns a linked expense to an ordinary expense.
 
 import { expenseLinkProblem } from "@/features/business/lib/asset-links.server";
 import { parseAssetBody } from "@/features/business/lib/assets";
@@ -40,8 +39,7 @@ export async function PUT(
   const existing = await prisma.asset.findUnique({ where: { id }, select: { expenseId: true } });
   if (!existing) return noStore(errorResponse("Asset not found", 404));
 
-  // Only a new or changed link is checked, so an asset whose expense row has since been
-  // deleted still saves its other edits.
+  // Only a changed link is checked, so an asset with a since-deleted expense still saves.
   if (parsed.data.expenseId && parsed.data.expenseId !== existing.expenseId) {
     const problem = await expenseLinkProblem(parsed.data.expenseId, id);
     if (problem) return noStore(errorResponse(problem.error, problem.status));

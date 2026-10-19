@@ -1,10 +1,7 @@
 "use client";
 // src/features/social-design/components/canvas/DesignCanvas.tsx
-// The post maker's artboard: one size of the design drawn with Konva, with selection,
-// drag, resize and rotate handles, snapping guides, a marquee, zoom and pan, rulers,
-// grid and guides, app-crop boxes, and in-place text editing. The design itself lives
-// in the editor; this reports finished moves back as new geometry. Several can show at
-// once (the all-sizes view), each drawing one size of the same design.
+// The post maker's Konva artboard for one size: selection, handles, snapping, zoom, rulers and
+// in-place text editing. Reports finished moves back to the editor as new geometry.
 
 import { LayerVisual, layerTransform } from "@/features/social-design/components/canvas/LayerNode";
 import type { AppCrop } from "@/features/social-design/lib/app-crops";
@@ -81,8 +78,7 @@ function overlayBox(
 }
 
 /**
- * Picks the ruler step: the smallest round number of picture pixels that leaves at
- * least 50 screen pixels between labelled ticks.
+ * Picks the smallest round ruler step leaving at least 50 screen pixels between labels.
  * @param scale - Current zoom.
  * @returns Step in picture pixels.
  */
@@ -104,8 +100,7 @@ function rulerStep(scale: number): number {
  * @param props.showGuides - Whether to draw margins and the safe area.
  * @param props.showRulers - Whether to draw rulers.
  * @param props.crops - App-crop boxes to outline, or none.
- * @param props.compact - A small cell in the all-sizes grid: less padding, and the
- *   mouse wheel scrolls the page instead of the canvas.
+ * @param props.compact - Small all-sizes cell: less padding, wheel scrolls the page.
  * @param props.onSelect - Picks layers; `additive` toggles them into the selection.
  * @param props.onGeometry - A move, resize or rotate finished.
  * @param props.onText - In-place text editing finished with new words.
@@ -383,9 +378,8 @@ export function DesignCanvas({
   }
 
   /**
-   * Snaps a dragged layer to the picture's edges and centre lines, the margin guides,
-   * the safe area's edges, and other layers' edges and centres, whichever is nearest
-   * within a few screen pixels, and records the lines it snapped to for drawing.
+   * Snaps a dragged layer to the nearest edge, centre, margin, safe-area or layer line within
+   * a few screen pixels, and records the lines hit for drawing.
    * @param e - Konva drag event.
    */
   function onDragMove(e: Konva.KonvaEventObject<DragEvent>): void {
@@ -449,9 +443,7 @@ export function DesignCanvas({
   }
 
   /**
-   * While a text box is dragged wider or narrower by a side handle, re-wrap its words
-   * at the new width instead of stretching them: fold the handle's scale back into the
-   * box width on the spot.
+   * Re-wraps a text box dragged by a side handle at the new width instead of stretching it.
    */
   function onTransform(): void {
     const tr = trRef.current;

@@ -1,7 +1,5 @@
 // src/app/api/admin/contacts/sync/route.ts
-// Admin API route for the manual full two-way Google Contacts sync. Shares
-// runContactsSync with the cron; the button force-pushes every contact (full mode) rather
-// than just the changed ones.
+// Manual full two-way Google Contacts sync (runContactsSync in full mode).
 
 import { CONTACTS_SYNC_LOCK_KEY, runContactsSync } from "@/features/contacts/lib/contacts-sync";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -11,8 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/admin/contacts/sync
- * Full two-way sync: dedup/merge locally, push every contact to Google, then pull
- * Google contacts back in. Requires an admin session (cookie or X-Admin-Secret header).
+ * Full two-way sync: dedup locally, push every contact to Google, then pull back.
  * @param request - Incoming request.
  * @returns JSON with importedCount and syncedCount on success, or error on failure.
  */
@@ -24,23 +21,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const { pushed, imported, alreadyRunning } = await runContactsSync({ full: true });
     if (alreadyRunning) {
-      // 409, not 200: the button's local state resets on navigate-away, so without this
-      // a second sync could race the merge passes that hard-delete duplicate contacts.
+      // 409 so a second sync can't race the merge passes.
       return errorResponse("A contact sync is already running. Give it a minute.", 409);
     }
     return NextResponse.json({ ok: true, importedCount: imported, syncedCount: pushed });
   } catch (error) {
     console.error("[api/admin/contacts/sync] Error:", error);
-    // Generic message to the client; the OAuth / Google detail stays in the server log
-    // so a transient failure can't leak the integration internals.
+    // Generic message to the client; Google detail stays in the server log.
     return errorResponse("Contact sync failed.", 500);
   }
 }
 
 /**
  * GET /api/admin/contacts/sync
- * Whether a sync is currently running, so the admin button can show real state
- * instead of a flag that resets whenever the operator navigates away and back.
+ * Whether a sync is running, so the button shows real state.
  * @param request - Incoming request.
  * @returns JSON `{ ok, running }`.
  */

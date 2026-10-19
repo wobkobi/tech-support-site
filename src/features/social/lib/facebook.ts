@@ -1,8 +1,6 @@
 // src/features/social/lib/facebook.ts
-// Publishes to the business Facebook Page, and takes posts down again. A post with a
-// picture goes to /photos, which takes no link field, so the link is added to the end
-// of the caption; a text post goes to /feed with the link attached as a preview card.
-// Deleting needs no permission beyond pages_manage_posts, which posting already uses.
+// Publishes to and deletes from the Facebook Page. Picture posts go to /photos, which takes no
+// link field, so the link ends the caption; text posts go to /feed with a link card.
 
 import type { PlatformAdapter, PublishInput, PublishResult } from "@/features/social/lib/adapter";
 import { deleteObject, graph, metaConfig } from "@/features/social/lib/meta-graph";
@@ -18,8 +16,7 @@ function pageId(): string {
 }
 
 /**
- * Looks up a post's public link. A failure here doesn't undo the post, so it
- * comes back as null rather than throwing.
+ * Looks up a post's public link; null on failure, since the post itself already went up.
  * @param postId - Page post id ("{page}_{post}").
  * @returns The permalink, or null.
  */
@@ -72,8 +69,7 @@ export const facebook: PlatformAdapter = {
   },
   publish,
   /**
-   * Deletes a Page post. Page post ids are "{page}_{post}", so a post from a different
-   * Page never counts as already deleted.
+   * Deletes a Page post. Ids are "{page}_{post}", so another Page's post never counts as deleted.
    * @param postId - Page post id saved when it was posted.
    */
   async remove(postId) {
@@ -85,9 +81,7 @@ export const facebook: PlatformAdapter = {
     });
   },
   /**
-   * Proves the token is this Page's own token. `/me` answers as whoever the token
-   * belongs to, so a user token (which can read the Page but not post as it) comes
-   * back with the person's id instead of the Page's.
+   * Proves the token is this Page's own: `/me` on a user token answers with the person's id.
    * @returns The Page name, or the reason the check failed.
    */
   async checkConnection() {

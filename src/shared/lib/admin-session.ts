@@ -1,9 +1,6 @@
 // src/shared/lib/admin-session.ts
-// Signed session-cookie helpers for the admin panel. Uses the Web Crypto API so the same
-// helpers work in both Node (server components, API routes) and Edge (Next.js proxy). The
-// cookie value is `<payloadB64Url>.<sigB64Url>` where the signature is an HMAC-SHA256 of
-// the payload signed with `ADMIN_SECRET`. Rotating the secret invalidates every session -
-// the desired behaviour.
+// Signed admin session cookies via Web Crypto, so they work in Node and Edge. Value is
+// `<payloadB64Url>.<sigB64Url>`, HMAC-SHA256 with `ADMIN_SECRET`; rotating it ends every session.
 
 /** Cookie name for the admin session. */
 export const ADMIN_SESSION_COOKIE = "__admin_session";
@@ -46,8 +43,7 @@ function b64UrlToBytes(input: string): Uint8Array {
 }
 
 /**
- * Constant-time byte equality. Web Crypto has no `timingSafeEqual` so a
- * manual XOR-then-OR loop is the portable substitute.
+ * Constant-time byte equality via XOR-then-OR, since Web Crypto has no `timingSafeEqual`.
  * @param a - First byte sequence.
  * @param b - Second byte sequence.
  * @returns True when bytes are equal in length and content.
@@ -60,8 +56,7 @@ function timingSafeEqualBytes(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 /**
- * Imports the secret as an HMAC-SHA256 key. Done per-call rather than cached
- * because Edge runtime instances may be cold/recycled aggressively.
+ * Imports the secret as an HMAC-SHA256 key, per call since Edge instances recycle aggressively.
  * @param secret - Shared secret (typically `process.env.ADMIN_SECRET`).
  * @returns CryptoKey suitable for `crypto.subtle.sign` / `verify`.
  */
@@ -76,9 +71,8 @@ async function importHmacKey(secret: string): Promise<CryptoKey> {
 }
 
 /**
- * Mints a signed session-cookie value valid for {@link ADMIN_SESSION_MAX_AGE_SECONDS}.
- * Signs with `process.env.ADMIN_SECRET` (no separate signing key - rotating
- * the admin secret intentionally invalidates every session).
+ * Mints a session-cookie value valid for {@link ADMIN_SESSION_MAX_AGE_SECONDS}, signed with
+ * `ADMIN_SECRET`.
  * @returns Cookie value `<payload>.<sig>` ready to set on `Set-Cookie`.
  */
 export async function createSessionCookieValue(): Promise<string> {
@@ -102,9 +96,8 @@ export async function createSessionCookieValue(): Promise<string> {
 }
 
 /**
- * Verifies a session-cookie value: parses, recomputes the HMAC, compares in
- * constant time, then checks the expiry. Returns false for any malformed,
- * tampered, or expired input. Never throws.
+ * Verifies a session-cookie value (HMAC in constant time, then expiry). False for anything
+ * malformed, tampered or expired; never throws.
  * @param cookieValue - Raw cookie value (`<payload>.<sig>`), or null/undefined.
  * @returns True when the session is genuine and unexpired.
  */

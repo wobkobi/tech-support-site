@@ -1,9 +1,6 @@
 // src/app/api/admin/contacts/merge/route.ts
-// Admin API to merge two Contact records into one. Reviews on the secondary contact are
-// reassigned to the primary, the primary's blank fields are filled from the secondary,
-// and the secondary is soft-deleted (its Google contact removed best-effort). Used to
-// collapse the duplicate a person creates by booking under two different emails, which
-// nothing merges automatically.
+// Admin API to merge a duplicate Contact into another: reviews move, blanks fill, and the
+// secondary is soft-deleted (its Google contact removed best-effort).
 
 import { deleteContactFromGoogle } from "@/features/contacts/lib/google-contacts";
 import { optOutRepointOps } from "@/features/reviews/lib/review-ask-opt-out";
@@ -25,7 +22,6 @@ interface MergeBody {
 /**
  * POST /api/admin/contacts/merge
  * Merges the secondary contact into the primary and soft-deletes the secondary.
- * Requires an admin session (cookie or X-Admin-Secret header).
  * @param request - Incoming request with primaryId and secondaryId.
  * @returns JSON { ok: true } on success, or an error response.
  */
@@ -46,9 +42,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Cannot merge a contact into itself.", 400);
   }
 
-  // Both sides must be live: merging into a soft-deleted primary (a dedupe self-heal, or
-  // another tab, between load and click) would move the secondary's reviews onto a hidden
-  // contact that matchReviewsToContacts can never resurface.
+  // Both sides must be live, or reviews move onto a hidden contact.
   const [primary, secondary] = await Promise.all([
     prisma.contact.findFirst({ where: { id: primaryId, deletedAt: null } }),
     prisma.contact.findFirst({ where: { id: secondaryId, deletedAt: null } }),
@@ -57,8 +51,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Contact not found.", 404);
   }
 
-  // Fill only the primary's blanks from the secondary; the primary keeps its own
-  // non-blank values and its reviewToken (moved reviews resolve by contactId).
+  // Fill only the primary's blanks; it keeps its reviewToken.
   const data: {
     phone?: string;
     email?: string;
@@ -84,9 +77,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!primary.company && secondary.company) data.company = secondary.company;
   if (!primary.reviewToken && secondary.reviewToken) data.reviewToken = secondary.reviewToken;
   if (!primary.siteNotes && secondary.siteNotes) data.siteNotes = secondary.siteNotes;
-  // Retainer arrangement survives a merge: when only the secondary is the
-  // retainer client, its whole arrangement moves over as a unit (gated on the
-  // primary's tier so a partial mix of two arrangements can't result).
+  // A secondary-only retainer moves over whole, never mixed with the primary's.
   if (!primary.retainerTier && secondary.retainerTier) {
     data.retainerTier = secondary.retainerTier;
     if (secondary.retainerPrice !== null) data.retainerPrice = secondary.retainerPrice;
@@ -95,9 +86,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (secondary.retainerNotes !== null) data.retainerNotes = secondary.retainerNotes;
   }
 
-  // Fold every email both contacts know into altEmails (minus the surviving
-  // primary address). This is what stops the pair re-splitting: a future booking
-  // or review under the secondary's email now resolves back to this one contact.
+  // Fold every email into altEmails so the pair can't re-split.
   const survivingPrimaryEmail = normaliseEmailOrNull(data.email ?? primary.email);
   const alts = new Set<string>();
   for (const e of [secondary.email, ...secondary.altEmails, ...primary.altEmails]) {
@@ -107,8 +96,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   data.altEmails = { set: [...alts] };
 
-  // Same folding for phone numbers, keyed on the canonical form so a domestic
-  // and E.164 spelling of one number don't produce a phantom alt.
+  // Same for phones, keyed on the canonical form.
   const survivingPrimaryPhone = normaliseContactPhone(data.phone ?? primary.phone);
   const altPhones = new Set<string>();
   for (const p of [secondary.phone, ...secondary.altPhones, ...primary.altPhones]) {
@@ -117,11 +105,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   data.altPhones = { set: [...altPhones] };
 
-  // Carry the review-link history across. It is not a blank-fill like the rest:
-  // the later ask is the one the send cooldown and the "already asked" picker
-  // gate must see, so the newer timestamp wins and brings its own mode. Dropping
-  // this loses the ask entirely, because the row holding it is soft-deleted
-  // below, and an invoice-era reviewer then resurfaces as "Legacy".
+  // Review-link history: the newer ask wins (with its mode), since the cooldown reads it.
   if (
     secondary.reviewLinkSentAt &&
     (!primary.reviewLinkSentAt || secondary.reviewLinkSentAt > primary.reviewLinkSentAt)
@@ -134,9 +118,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     data.reviewLinkSubmittedAt = secondary.reviewLinkSubmittedAt;
   }
 
-  // Fold review tokens the same way so links already sent under the secondary's
-  // token keep working (the /review page, submission verify, and review matcher
-  // all accept a contact's primary OR alt tokens).
+  // Fold review tokens too, so links already sent keep working.
   const survivingToken = data.reviewToken ?? primary.reviewToken ?? null;
   const altTokens = new Set<string>();
   for (const t of [
@@ -163,9 +145,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Failed to merge contacts.", 500);
   }
 
-  // Best-effort: remove the now-defunct secondary from Google Contacts - but
-  // never when both rows point at the SAME Google contact (import artefacts do),
-  // as that would delete the keeper's Google entry.
+  // Best-effort Google removal, skipped when both rows share one Google contact.
   if (secondary.googleContactId && secondary.googleContactId !== primary.googleContactId) {
     await deleteContactFromGoogle(secondary.googleContactId);
   }

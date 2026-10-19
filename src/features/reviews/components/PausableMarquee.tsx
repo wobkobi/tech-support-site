@@ -1,8 +1,7 @@
 "use client";
 // src/features/reviews/components/PausableMarquee.tsx
-// Visible pause control for the reviews carousel. Hover and focus already hold the
-// scroll, but neither is available to someone reading on a phone, and moving content
-// that runs past five seconds needs a way to stop it (WCAG 2.2.2).
+// Visible pause control for the reviews carousel: phone readers have no hover or focus
+// pause, and WCAG 2.2.2 needs one for motion past five seconds.
 
 import type React from "react";
 import { useState } from "react";
@@ -31,8 +30,7 @@ export function PausableMarquee({
       <div className="mt-2 flex justify-end motion-reduce:hidden">
         <button
           type="button"
-          // The label flips instead of using aria-pressed, which would announce
-          // both a state and a changed name.
+          // Flip the label, not aria-pressed, to avoid announcing both state and name.
           onClick={() => setPaused((p) => !p)}
           className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-base font-semibold text-russian-violet transition-colors hover:bg-russian-violet/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet"
         >

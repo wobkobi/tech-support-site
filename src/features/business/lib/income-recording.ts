@@ -1,8 +1,6 @@
 // src/features/business/lib/income-recording.ts
-// Shared income-entry writer: creates the IncomeEntry, mirrors it to the per-FY Cashbook
-// sheet keyed by the entry's own id (a deterministic Sync ID, so a retried append reuses
-// the row instead of doubling it), and persists the returned sheetRowKey. Extracted from
-// POST /api/business/income so the invoice /pay route reuses exactly the same write path.
+// Shared income-entry writer for the income route and invoice /pay: creates the IncomeEntry
+// and mirrors it to the per-FY Cashbook sheet, keyed by the entry id.
 
 import {
   appendRowWithSyncId,
@@ -41,11 +39,8 @@ export interface RecordIncomeResult {
 }
 
 /**
- * Creates an income entry and best-effort mirrors it to the Cashbook sheet. The
- * DB write always succeeds independently of the sheet; a sheet failure sets
- * `sheetSyncWarning` and leaves `sheetRowKey` null (the cron self-heal appends
- * it later). The sheet row is keyed by the entry id so a retried append reuses
- * the row rather than doubling it.
+ * Creates an income entry and best-effort mirrors it to the Cashbook sheet. A sheet failure
+ * sets `sheetSyncWarning`; the cron self-heal appends it later.
  * @param data - Validated income data.
  * @returns The created entry, its sheet row key, and a sync-warning flag.
  */
@@ -62,9 +57,7 @@ export async function recordIncome(data: RecordIncomeInput): Promise<RecordIncom
     },
   });
 
-  // Synchronous append so the row lands before the response - Vercel can terminate the
-  // function before a fire-and-forget promise resolves. Failures are swallowed (the DB
-  // entry stands, the cron self-heal re-appends) but surfaced via sheetSyncWarning.
+  // Await the append: Vercel can kill the function before a fire-and-forget resolves.
   let sheetRowKey: string | null = null;
   let sheetSyncWarning = false;
   try {

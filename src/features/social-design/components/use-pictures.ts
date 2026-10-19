@@ -1,7 +1,6 @@
 // src/features/social-design/components/use-pictures.ts
-// A design's stored pictures in the editor: whether they match the design, redrawing
-// and storing the out-of-date sizes one at a time (a failed size is retried alone), and
-// handing them to a social post.
+// A design's stored pictures: staleness, redrawing out-of-date sizes one at a time, and handing
+// them to a social post.
 
 import { callApi } from "@/features/mailing/lib/api-client";
 import {
@@ -38,8 +37,7 @@ export interface Pictures {
   progress: PictureProgress | null;
   failed: PictureFailure[];
   /**
-   * Saves the design, then draws and stores the out-of-date sizes, or only those given.
-   * Resolves true when every size it tried was stored.
+   * Saves, then draws and stores out-of-date (or given) sizes; true when all stored.
    */
   update: (only?: FormatKey[]) => Promise<boolean>;
   exportPicture: (request: PictureRequest) => Promise<Blob>;
@@ -51,7 +49,7 @@ export interface Pictures {
  * Stored pictures for the open design.
  * @param options - Hook options.
  * @param options.designId - Design id.
- * @param options.doc - Design as shown (a deferred copy is fine: it only drives the state).
+ * @param options.doc - Design as shown (a deferred copy is fine).
  * @param options.current - Reads the latest design, for what gets drawn.
  * @param options.bound - Live values for contact and promo layers.
  * @param options.family - Exo's font-family list, or null until loaded.

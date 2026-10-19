@@ -1,8 +1,7 @@
 "use client";
 // src/features/social-design/components/DesignList.tsx
-// The post maker's home: start a design (blank or from a template), and the designs
-// and templates made so far, each with open, rename, duplicate and delete. Your
-// designs filter by kind once there's more than one kind to pick from.
+// The post maker's home: start a design (blank or from a template) and manage the
+// designs and templates made so far.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
@@ -343,8 +342,7 @@ function DesignGrid({
         >
           <Link
             href={`/admin/social/design/${r.id}`}
-            // The 4:5 export fills a 4:5 box; with nothing exported a short strip
-            // keeps the list compact.
+            // 4:5 box for the export; a short strip when nothing is exported.
             className={cn(
               "flex items-center justify-center bg-seasalt-100",
               r.thumbnailUrl ? "aspect-4/5" : "h-24",
@@ -397,8 +395,7 @@ function DesignGrid({
                 {KIND_LABEL[r.kind]} · {r.formatCount} sizes · {formatDateShort(r.updatedAt)}
               </p>
             </div>
-            {/* Each button names its design in screen-reader text, not aria-label: React writes
-                text content escaped, and an attribute built from a typed name trips CodeQL. */}
+            {/* Screen-reader text, not aria-label: a typed name in an attribute trips CodeQL. */}
             <div className={cn("flex shrink-0 gap-1", editing?.id === r.id && "hidden")}>
               <AdminButton
                 variant="ghost"

@@ -1,6 +1,5 @@
 // src/features/admin/lib/schedule-types.tsx
-// Shared types, styles, and formatters used by both the desktop week grid and the mobile
-// day-agenda view.
+// Shared types, styles and formatters for the week grid and day agenda.
 
 import { cn } from "@/shared/lib/cn";
 import { NZ_TZ, dateKeyParts } from "@/shared/lib/timezone-utils";
@@ -10,12 +9,7 @@ export type WeekViewKind = "booking" | "car" | "personal" | "travel";
 
 export type BookingStatus = "held" | "confirmed" | "cancelled" | "completed";
 
-/**
- * Booking-row fields joined to a calendar event by `calendarEventId`. Present
- * only on events where `kind === "booking"` and a matching Booking row was
- * found. Drives the tap-to-expand details + long-press quick actions in the
- * mobile day agenda.
- */
+/** Booking-row fields joined to a booking event by `calendarEventId`, when a row exists. */
 export interface WeekEventBooking {
   id: string;
   cancelToken: string;
@@ -34,12 +28,7 @@ export interface WeekEvent {
   startAt: string;
   endAt: string;
   location: string | null;
-  /**
-   * Google Calendar "open in Calendar" URL, set only for booking-calendar events
-   * so a booking added straight into Google Calendar (no in-app record) can still
-   * be opened there on click. Null for car/personal (not openable); bookings that
-   * have a DB row open their in-app detail page instead.
-   */
+  /** Google Calendar URL for booking-calendar events without an in-app record; else null. */
   htmlLink?: string | null;
   isAllDay: boolean;
   /** Populated for `kind === "booking"` events. Optional otherwise. */
@@ -50,10 +39,8 @@ export interface WeekEvent {
 export const OPTIMISTIC_BUSY_PREFIX = "optimistic-busy-";
 
 /**
- * Placeholder all-day "Busy" event for a day the operator just blocked, shown
- * instantly before the real Google Calendar event exists. Its id carries
- * {@link OPTIMISTIC_BUSY_PREFIX} so real-event lookups (e.g. the block button's
- * unblock target) can exclude it.
+ * Placeholder all-day "Busy" event for a just-blocked day; its id carries
+ * {@link OPTIMISTIC_BUSY_PREFIX} so real-event lookups can exclude it.
  * @param dayKey - NZ YYYY-MM-DD for the blocked day.
  * @returns A synthetic all-day booking-kind event covering that day.
  */
@@ -70,9 +57,8 @@ export function optimisticBusyEvent(dayKey: string): WeekEvent {
 }
 
 /**
- * Returns the YYYY-MM-DD key for the Monday of the NZ week containing the
- * given NZ date key. Pure UTC date-part math so DST + offset edges can't
- * shift the result.
+ * Monday's NZ date key for the week containing `dayKey`. Pure UTC date maths, so DST
+ * can't shift it.
  * @param dayKey - Any NZ YYYY-MM-DD.
  * @returns Monday-of-week NZ date key.
  */

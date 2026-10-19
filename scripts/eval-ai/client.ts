@@ -1,7 +1,6 @@
 // scripts/eval-ai/client.ts
-// Thin HTTP client for the AI routes. Sends the admin secret on all of them:
-// parse-job and both drafts (mailing and post maker) require it for auth, and estimate-duration uses it
-// to trigger the dev-only rate-limit bypass so the harness can batch calls.
+// Thin HTTP client for the AI routes. Sends the admin secret everywhere: auth for most,
+// the dev-only rate-limit bypass for estimate-duration.
 
 import type { AiDraft } from "@/features/mailing/lib/ai-draft";
 import type { DesignDraft, DraftRoom } from "@/features/social-design/lib/ai-draft";
@@ -41,8 +40,7 @@ export interface ParseJobResult {
 }
 
 /**
- * Maps an HTTP status from one of the AI routes to an actionable hint, so a
- * failed run tells the operator what to check rather than dumping a raw status.
+ * Maps an AI route's HTTP status to an actionable hint.
  * @param status - HTTP status code the route responded with.
  * @returns A one-line diagnostic hint.
  */
@@ -67,12 +65,8 @@ const RATE_LIMIT_RETRIES = 5;
 const RATE_LIMIT_BASE_DELAY_MS = 5_000;
 
 /**
- * POSTs JSON and throws a diagnostic Error on a network failure, any non-ok
- * response, or an `{ ok: false }` body. An upstream OpenAI rate limit (429
- * with `retryable: true`) is retried with exponential backoff first, so one
- * throttled call doesn't abort a paid multi-case run. The thrown message
- * names the route, the status, and a hint for what to check - it is meant to
- * be printed to the operator verbatim, without a stack trace.
+ * POSTs JSON, retrying a retryable 429 with backoff, and throws a printable diagnostic
+ * Error on a network failure, non-ok response or `{ ok: false }` body.
  * @param url - Absolute route URL.
  * @param body - JSON request body.
  * @param adminSecret - Value sent as the `x-admin-secret` header.
@@ -88,8 +82,7 @@ async function postJson<T>(url: string, body: unknown, adminSecret: string): Pro
         body: JSON.stringify(body),
       });
     } catch (cause) {
-      // fetch rejects only on a network-level failure (server down, bad host,
-      // socket reset) - turn that into a clear "is the server up?" message.
+      // fetch rejects only on a network-level failure.
       const reason = cause instanceof Error ? cause.message : String(cause);
       throw new Error(
         `Could not reach the dev server at ${url} (${reason}). Is \`npm run dev\` running and serving that URL? Pass --url=<addr> if it is on another port.`,
@@ -100,16 +93,11 @@ async function postJson<T>(url: string, body: unknown, adminSecret: string): Pro
       retryable?: boolean;
       retryAfterMs?: number;
     } | null;
-    // Upstream OpenAI rate limit: hold off and retry. The route passes OpenAI's
-    // own reset time through as retryAfterMs - prefer it, since the limit that
-    // bites here is tokens-per-minute and only OpenAI knows when that window
-    // reopens. Doubling from 5s is the fallback when no hint came back, and it
-    // burns its early retries failing again against a window measured in minutes.
+    // Upstream rate limit: prefer OpenAI's retryAfterMs (the TPM window); else double from 5s.
     if (res.status === 429 && json?.retryable === true && attempt < RATE_LIMIT_RETRIES) {
       const hinted =
         typeof json.retryAfterMs === "number" && json.retryAfterMs > 0 ? json.retryAfterMs : null;
-      // A second past the stated reset, so a clock skew of a few ms does not
-      // spend a whole retry landing back in the same closed window.
+      // A second past the reset, to absorb clock skew.
       const delayMs = hinted !== null ? hinted + 1_000 : RATE_LIMIT_BASE_DELAY_MS * 2 ** attempt;
       console.log(
         `    AI rate limited - waiting ${Math.round(delayMs / 1000)}s${

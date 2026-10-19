@@ -1,8 +1,7 @@
 "use client";
 // src/features/contacts/components/ContactsAdminView.tsx
-// Client wrapper for the contacts page. Surfaces name/phone conflicts for one-click
-// resolution and drives the Google Contacts sync (import + push) with a confirmation step
-// and result message.
+// Client wrapper for the contacts page: name/phone conflict resolution and the Google
+// Contacts sync.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
@@ -48,14 +47,12 @@ export function ContactsAdminView({
   const [checkingAddresses, setCheckingAddresses] = useState(false);
   const [addressResult, setAddressResult] = useState<string | null>(null);
 
-  // `syncing` is component state, so navigating away and back resets it mid-run - that is
-  // how a second sync gets fired into the middle of the first. Ask the server on mount,
-  // then poll until it finishes so the button tracks reality.
+  // Local `syncing` resets on navigation, so ask the server on mount and poll until done,
+  // or a second sync could fire mid-run.
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    // Only refresh on a running > finished transition. Refreshing whenever the
-    // server simply reports "not running" would fire on every page load.
+    // Refresh only on a running > finished transition, not on every page load.
     let sawRunning = false;
 
     /**
@@ -169,8 +166,7 @@ export function ContactsAdminView({
           body: JSON.stringify(body),
         });
         if (!res.ok) throw new Error(`resolve failed (${res.status})`);
-        // Drop the row only once the write has landed. Clearing it regardless
-        // hid failures: the conflict left the screen but was never resolved.
+        // Drop the row only once the write has landed, so failures stay visible.
         setConflicts((prev) => prev.filter((c) => c.sourceId !== conflict.sourceId));
         toast("Conflict resolved.", { tone: "success" });
         router.refresh();
@@ -186,10 +182,8 @@ export function ContactsAdminView({
   }, []);
 
   return (
-    // The list's seven-column table needs about 60rem, so the sync rail only sits beside
-    // it on screens 1800px and wider. Below that, from lg, the left column dissolves into
-    // the grid (contents) and the list is ordered last, so the conflicts panel still leads,
-    // then the rail's two cards share a row, then the list. Phones keep the rail under it.
+    // The table needs ~60rem, so the rail sits beside it only from 1800px. From lg the
+    // left column dissolves (contents): conflicts, then the rail's two cards, then the list.
     <div className="grid grid-cols-1 items-start gap-6 min-[1800px]:grid-cols-[minmax(0,1fr)_20rem]">
       {/* Left column: conflicts + contact list */}
       <div className="flex min-w-0 flex-col gap-6 lg:max-[1800px]:contents">

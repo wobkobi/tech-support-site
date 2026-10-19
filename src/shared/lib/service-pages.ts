@@ -1,7 +1,5 @@
 // src/shared/lib/service-pages.ts
-// Content for the /services/<slug> detail pages, keyed by the SERVICE_AREAS slugs.
-// Only categories listed here get a page; the rest stay as /services#<slug> anchors,
-// and serviceHref() is the one place that decides which a link should use.
+// Content for /services/<slug> pages; unlisted categories stay /services#<slug> anchors, decided by serviceHref().
 
 import { SERVICE_AREAS } from "@/shared/lib/service-areas";
 
@@ -224,8 +222,7 @@ export const SERVICE_PAGE_SLUGS: ReadonlyArray<ServicePageSlug> = SERVICE_AREAS.
 ).filter(hasServicePage);
 
 /**
- * Whether a service category has a detail page. Own keys only, so a prototype key
- * like "toString" can't pass as a page.
+ * Whether a category has a detail page; own keys only, so "toString" can't pass.
  * @param slug - A SERVICE_AREAS slug or a route param.
  * @returns True when {@link SERVICE_PAGES} has content for it.
  */
@@ -234,8 +231,7 @@ export function hasServicePage(slug: string): slug is ServicePageSlug {
 }
 
 /**
- * Where a link to a service category should go: its own page when it has one,
- * otherwise its card on /services.
+ * Where a service category link goes: its own page if it has one, else its /services card.
  * @param slug - A SERVICE_AREAS slug.
  * @returns `/services/<slug>` or `/services#<slug>`.
  */

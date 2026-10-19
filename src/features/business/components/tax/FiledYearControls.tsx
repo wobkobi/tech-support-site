@@ -1,8 +1,7 @@
 "use client";
 // src/features/business/components/tax/FiledYearControls.tsx
-// Filed status for one financial year on the Tax page: a "Filed on <date>" pill with an
-// Unfile action, or a "Mark as filed" action. Both confirm first, POST to the tax-years
-// route, then refresh the page so it switches between saved and live figures.
+// Filed status for one FY on the Tax page: a "Filed on <date>" pill with Unfile, or "Mark
+// as filed". Both confirm, POST to the tax-years route, then refresh the page.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
@@ -26,8 +25,8 @@ interface FiledYearControlsProps {
 }
 
 /**
- * Reads the route's JSON reply. A reply that isn't JSON (a proxy or server error page)
- * reads as a failure with no message, so the caller's fallback text shows.
+ * Reads the route's JSON reply. A non-JSON reply (proxy error page) reads as a failure
+ * with no message.
  * @param res - The fetch response.
  * @returns The `ok` flag and any error message.
  */
@@ -65,9 +64,8 @@ export function FiledYearControls({
   const filed = filedAtIso !== null;
 
   /**
-   * Sends the file or unfile action, then reloads the page's figures. A 409 means another
-   * tab already changed the status (or the year hasn't ended), so the page reloads to show
-   * where things stand.
+   * Sends the file or unfile action, then reloads the page's figures. A 409 (another tab
+   * changed the status, or the year hasn't ended) also reloads.
    */
   async function submit(): Promise<void> {
     if (busy) return;

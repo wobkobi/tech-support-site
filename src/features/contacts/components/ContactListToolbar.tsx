@@ -1,8 +1,7 @@
 "use client";
 // src/features/contacts/components/ContactListToolbar.tsx
-// Toolbar for the admin contacts list: search and Export CSV, then the filter chips,
-// Clear and the sort select. Presentation only - the list owns every value and setter and
-// syncs them to the URL.
+// Search, export, filter chips and sort for the admin contacts list. Presentation only;
+// the list owns the state and syncs it to the URL.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";

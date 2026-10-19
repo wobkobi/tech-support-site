@@ -1,8 +1,7 @@
 "use client";
 // src/features/admin/components/settings/SettingsFooter.tsx
-// Guardrail banners plus the save/reset bar, composed into the one footer every settings
-// tab ends with. Reads straight off the form api so a tab cannot render the save bar
-// while forgetting the banners that explain why a save was refused.
+// Guardrail banners plus the save/reset bar, as one footer so no tab renders the save bar
+// without the banners that explain a refused save.
 
 import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import type { SettingsFormApi } from "@/features/admin/components/settings/useSettingsForm";
@@ -11,13 +10,9 @@ import type { SettingsGroup } from "@/shared/lib/settings/types";
 import type React from "react";
 
 /**
- * Footer for a settings tab: BLOCK banner, WARN banner with its confirm action,
- * and the save/reset bar.
- *
- * The guardrails are computed across the whole settings object rather than per
- * group, so any tab can be handed a warning raised by another group's config. A
- * tab that renders the save bar without the WARN banner goes silently
- * unsaveable when that happens - the save returns a 409 and nothing explains it.
+ * Footer for a settings tab: BLOCK banner, WARN banner with its confirm action, and the
+ * save/reset bar. Guardrails span every group, so any tab can get another group's WARN
+ * (a 409 on save); without the banner the tab would be silently unsaveable.
  * @param props - Component props.
  * @param props.form - The tab's form api from useSettingsForm.
  * @returns The footer element.
@@ -52,8 +47,7 @@ export function SettingsFooter<G extends SettingsGroup>({
               <li key={w}>{w}</li>
             ))}
           </ul>
-          {/* Amber tint, not the coquelicot primary: this overrides a warning, and the
-              save bar's Save stays the one primary on the tab. */}
+          {/* Amber tint so the save bar's Save stays the tab's one primary. */}
           <AdminButton
             variant="secondary"
             onClick={() => void form.save(true)}
