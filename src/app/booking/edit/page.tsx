@@ -10,6 +10,7 @@ import {
   TIME_OF_DAY_OPTIONS,
   buildAvailableDays,
   parseBookingNotes,
+  type AvailabilityConfig,
   type BookableDay,
   type JobDuration,
   type TimeOfDay,
@@ -53,11 +54,14 @@ function getNZHour(date: Date): number {
 /**
  * Fetch available days excluding the booking being edited.
  * @param excludeBookingId - The booking being edited (freed up for re-selection).
+ * @param config - Live availability settings.
  * @returns Array of bookable days.
  */
-async function getAvailableDays(excludeBookingId: string): Promise<BookableDay[]> {
+async function getAvailableDays(
+  excludeBookingId: string,
+  config: AvailabilityConfig,
+): Promise<BookableDay[]> {
   const now = new Date();
-  const { config } = await getAvailabilityConfig();
   const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
   const [existing, cachedEvents] = await Promise.all([
@@ -124,10 +128,17 @@ export default async function EditBookingPage({
 
   if (!booking || booking.status === "cancelled") notFound();
 
+  // Load in parallel; the day list starts once the config is in (blocked bookings
+  // waste one lookup, which is rare).
+  const [{ pricing }, identity, { config: availabilityConfig }] = await Promise.all([
+    getSettings(),
+    getIdentity(),
+    getAvailabilityConfig(),
+  ]);
+  const availableDaysPromise = getAvailableDays(booking.id, availabilityConfig);
   // Mirror the POST route's reschedule gate (api/booking/edit/route.ts) so the
   // customer learns they can't change this booking BEFORE filling the form in,
   // instead of getting a rejection after submitting. 0 / null means "rule off".
-  const [{ pricing }, identity] = await Promise.all([getSettings(), getIdentity()]);
   const { reschedule } = pricing;
   const hoursUntilStart = (booking.startAt.getTime() - new Date().getTime()) / 3_600_000;
   const cutoffBlocked = reschedule.cutoffHours > 0 && hoursUntilStart < reschedule.cutoffHours;
@@ -169,9 +180,7 @@ export default async function EditBookingPage({
     accessNotes: booking.accessNotes ?? "",
   };
 
-  // Load availability for rescheduling
-  const availableDays = await getAvailableDays(booking.id);
-  const { config: availabilityConfig } = await getAvailabilityConfig();
+  const availableDays = await availableDaysPromise;
 
   // Ensure the current booking's day appears even if it has no other slots
   const hasCurrentDay = availableDays.some((d) => d.dateKey === dateKey);
