@@ -34,7 +34,6 @@ export async function PATCH(
     transportMode?: string;
     customOrigin?: string | null;
     customTravelBackDestination?: string | null;
-    ignored?: boolean;
   };
 
   const rawMode = body.transportMode;
@@ -46,9 +45,8 @@ export async function PATCH(
   const hasMode = mode !== undefined;
   const hasOrigin = "customOrigin" in body;
   const hasBackDest = "customTravelBackDestination" in body;
-  const hasIgnored = typeof body.ignored === "boolean";
 
-  if (!hasMode && !hasOrigin && !hasBackDest && !hasIgnored) {
+  if (!hasMode && !hasOrigin && !hasBackDest) {
     return errorResponse("Nothing to update", 400);
   }
 
@@ -66,7 +64,6 @@ export async function PATCH(
         ...(hasBackDest && {
           customTravelBackDestination: body.customTravelBackDestination ?? null,
         }),
-        ...(hasIgnored && { ignored: body.ignored }),
         // Clear stale minutes; the recompute below refills them.
         rawTravelMinutes: null,
         roundedMinutes: null,
@@ -74,26 +71,6 @@ export async function PATCH(
         roundedBackMinutes: null,
       },
     });
-
-    // Ignoring purges the cache entry now so the booking page unblocks; the cron repopulates on un-ignore.
-    if (hasIgnored && body.ignored === true) {
-      try {
-        await prisma.calendarEventCache.deleteMany({
-          where: { eventId: block.sourceEventId, calendarEmail: block.calendarEmail },
-        });
-        // Also purge the travel-before:/travel-after: rows, which the cron skips once ignored.
-        const syntheticIds = [block.beforeEventId, block.afterEventId].filter(
-          (eventId): eventId is string => eventId !== null,
-        );
-        if (syntheticIds.length > 0) {
-          await prisma.calendarEventCache.deleteMany({
-            where: { eventId: { in: syntheticIds } },
-          });
-        }
-      } catch (err) {
-        console.error("[travel/[id]] Failed to purge cache entry on ignore:", err);
-      }
-    }
 
     // Transport mode cascades to the series; customOrigin stays per-instance.
     if (hasMode && mode !== undefined && block.recurringEventId) {
@@ -128,15 +105,13 @@ export async function PATCH(
       });
     }
 
-    // Refill the minutes now; an ignored-only toggle skips repricing.
+    // Refill the minutes now.
     let travel: RecomputedTravel | null = null;
-    if (hasMode || hasOrigin || hasBackDest) {
-      try {
-        travel = await recomputeTravelBlock(id);
-      } catch (err) {
-        // The field change saved; leave minutes blank for a retry.
-        console.error("[travel/[id]] Immediate recompute failed:", err);
-      }
+    try {
+      travel = await recomputeTravelBlock(id);
+    } catch (err) {
+      // The field change saved; leave minutes blank for a retry.
+      console.error("[travel/[id]] Immediate recompute failed:", err);
     }
 
     return NextResponse.json({ ok: true, travel });

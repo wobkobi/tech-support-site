@@ -43,11 +43,16 @@ interface WeekViewProps {
   lockHours: number;
 }
 
+// Default visible window; the week widens past it to fit any timed event (see visibleHourRange).
 const DAY_START_HOUR = 6;
 const DAY_END_HOUR = 22;
 const PX_PER_MINUTE = 1.1;
-const DAY_HOURS = DAY_END_HOUR - DAY_START_HOUR;
-const DAY_HEIGHT_PX = DAY_HOURS * 60 * PX_PER_MINUTE;
+
+/** Visible hour window shared by every column in the week. */
+interface HourRange {
+  startHour: number;
+  endHour: number;
+}
 
 /**
  * Renders the week schedule grid and the manual-booking modal trigger.
@@ -86,7 +91,7 @@ export function WeekView({
     return () => clearInterval(id);
   }, []);
   const nowKey = nzDateKey(new Date(nowMs));
-  const nowOffsetMin = minuteOfDay(new Date(nowMs).toISOString());
+  const nowMinute = nzMinuteOfDay(new Date(nowMs).toISOString());
 
   // Monday keys for the prev/next/Today buttons.
   const { prevWeekKey, nextWeekKey, todayWeekKey } = useMemo(() => {
@@ -176,9 +181,14 @@ export function WeekView({
     return arr;
   }, [weekStartIso, events, optimisticBlock]);
 
+  const range = useMemo(() => visibleHourRange(days.flatMap((d) => d.timedEvents)), [days]);
+  const dayHours = range.endHour - range.startHour;
+  const dayHeightPx = dayHours * 60 * PX_PER_MINUTE;
+  const nowOffsetMin = nowMinute - range.startHour * 60;
+
   const hours = useMemo(
-    () => Array.from({ length: DAY_HOURS + 1 }, (_, i) => DAY_START_HOUR + i),
-    [],
+    () => Array.from({ length: dayHours + 1 }, (_, i) => range.startHour + i),
+    [range.startHour, dayHours],
   );
 
   // Merge consecutive-day all-day events into spanning bars. Column 1 is the gutter,
@@ -267,9 +277,9 @@ export function WeekView({
   function handleColumnClick(event: React.MouseEvent<HTMLDivElement>, dayKey: string): void {
     const rect = event.currentTarget.getBoundingClientRect();
     const y = event.clientY - rect.top;
-    const minuteOfDay = Math.max(0, Math.min(DAY_HOURS * 60 - 60, y / PX_PER_MINUTE));
+    const minuteOfDay = Math.max(0, Math.min(dayHours * 60 - 60, y / PX_PER_MINUTE));
     const rounded = Math.round(minuteOfDay / 15) * 15;
-    const hour = DAY_START_HOUR + Math.floor(rounded / 60);
+    const hour = range.startHour + Math.floor(rounded / 60);
     const minute = rounded % 60;
     const [y2, m, d] = dateKeyParts(dayKey);
     const startAt = nzWallClockUtc(y2, m, d, hour, minute);
@@ -400,7 +410,7 @@ export function WeekView({
             {/* Grid body */}
             <div
               className="relative grid grid-cols-[64px_repeat(7,1fr)]"
-              style={{ height: `${DAY_HEIGHT_PX}px` }}
+              style={{ height: `${dayHeightPx}px` }}
             >
               {/* Time gutter. 11px stays: the -6px label offset below centres each label on its hour line at this size. */}
               <div className="relative border-r border-admin-border">
@@ -423,10 +433,11 @@ export function WeekView({
                 <DayColumn
                   key={day.key}
                   day={day}
+                  range={range}
                   onClick={(e) => handleColumnClick(e, day.key)}
                   onOpenBooking={(id) => router.push(`/admin/bookings/${id}`)}
                   nowLineTop={
-                    day.key === nowKey && nowOffsetMin >= 0 && nowOffsetMin <= DAY_HOURS * 60
+                    day.key === nowKey && nowOffsetMin >= 0 && nowOffsetMin <= dayHours * 60
                       ? nowOffsetMin * PX_PER_MINUTE
                       : null
                   }
@@ -437,7 +448,7 @@ export function WeekView({
             {/* Legend */}
             <div className="flex flex-wrap items-center gap-3 border-t border-admin-border px-4 py-3 text-sm text-admin-muted">
               <LegendDot kind="booking" label="Booking" />
-              <LegendDot kind="car" label="No car (Car cal)" />
+              <LegendDot kind="work" label="Work" />
               <LegendDot kind="personal" label="Personal" />
               <LegendDot kind="travel" label="Travel" />
               <span className="ml-auto text-admin-faint">
@@ -461,6 +472,7 @@ export function WeekView({
 
 interface DayColumnProps {
   day: { key: string; timedEvents: WeekEvent[] };
+  range: HourRange;
   onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   onOpenBooking: (bookingId: string) => void;
   /** Pixel offset of the current-time line, or null when today isn't this column. */
@@ -471,6 +483,7 @@ interface DayColumnProps {
  * Renders one day column. Background click opens the booking modal; a card opens its booking.
  * @param props - Component props.
  * @param props.day - Day bucket with the day key and its events.
+ * @param props.range - Visible hour window shared across the week.
  * @param props.onClick - Click handler forwarded from the parent week view.
  * @param props.onOpenBooking - Opens a booking's detail page by id (on click).
  * @param props.nowLineTop - Current-time line offset in px, or null if not today.
@@ -478,10 +491,14 @@ interface DayColumnProps {
  */
 function DayColumn({
   day,
+  range,
   onClick,
   onOpenBooking,
   nowLineTop,
 }: DayColumnProps): React.ReactElement {
+  const dayHours = range.endHour - range.startHour;
+  const rangeStartMin = range.startHour * 60;
+  const rangeEndMin = range.endHour * 60;
   return (
     <div
       role="button"
@@ -490,10 +507,10 @@ function DayColumn({
       className={cn(
         "relative cursor-pointer border-r border-admin-border last:border-r-0 hover:bg-admin-bg/40",
       )}
-      style={{ height: `${DAY_HEIGHT_PX}px` }}
+      style={{ height: `${dayHours * 60 * PX_PER_MINUTE}px` }}
     >
       {/* Hour grid lines */}
-      {Array.from({ length: DAY_HOURS }).map((_, i) => (
+      {Array.from({ length: dayHours }).map((_, i) => (
         <div
           key={i}
           className="pointer-events-none absolute right-0 left-0 border-t border-admin-border"
@@ -502,10 +519,11 @@ function DayColumn({
       ))}
 
       {day.timedEvents.map((ev) => {
-        const top = minuteOfDay(ev.startAt) * PX_PER_MINUTE;
-        const durationMin =
-          (new Date(ev.endAt).getTime() - new Date(ev.startAt).getTime()) / 60_000;
-        const height = Math.max(18, durationMin * PX_PER_MINUTE);
+        // Clamp to the grid so a cross-midnight event stops at the column's bottom edge.
+        const startMin = nzMinuteOfDay(ev.startAt);
+        const endMin = Math.min(rangeEndMin, startMin + eventMinutes(ev));
+        const top = (startMin - rangeStartMin) * PX_PER_MINUTE;
+        const height = Math.max(18, (endMin - startMin) * PX_PER_MINUTE);
         // Single click (double-clicks fail on pixel drift). With a DB row > detail page,
         // else > Google Calendar. Always stopPropagation so the add modal never fires.
         const bookingId = ev.kind === "booking" ? ev.booking?.id : undefined;
@@ -553,11 +571,38 @@ function DayColumn({
 }
 
 /**
+ * Widens the default 6am-10pm window to the whole hours that fit every timed event,
+ * so a late gig or the travel home after it stays inside the grid. Ends cap at midnight.
+ * @param timedEvents - Timed events across the visible week.
+ * @returns Start and end hour (0-24) for every column.
+ */
+function visibleHourRange(timedEvents: WeekEvent[]): HourRange {
+  let startHour = DAY_START_HOUR;
+  let endHour = DAY_END_HOUR;
+  for (const ev of timedEvents) {
+    const startMin = nzMinuteOfDay(ev.startAt);
+    const endMin = Math.min(24 * 60, startMin + eventMinutes(ev));
+    startHour = Math.min(startHour, Math.floor(startMin / 60));
+    endHour = Math.max(endHour, Math.ceil(endMin / 60));
+  }
+  return { startHour, endHour };
+}
+
+/**
+ * Returns an event's length in minutes.
+ * @param ev - Timed event.
+ * @returns Minutes between start and end.
+ */
+function eventMinutes(ev: WeekEvent): number {
+  return (new Date(ev.endAt).getTime() - new Date(ev.startAt).getTime()) / 60_000;
+}
+
+/**
  * Returns the NZ wall-clock minute-of-day for an ISO timestamp.
  * @param iso - ISO 8601 timestamp.
- * @returns Minute-of-day relative to the grid's DAY_START_HOUR.
+ * @returns Minutes since NZ midnight.
  */
-function minuteOfDay(iso: string): number {
+function nzMinuteOfDay(iso: string): number {
   const parts = new Intl.DateTimeFormat("en-NZ", {
     timeZone: NZ_TZ,
     hour: "2-digit",
@@ -566,5 +611,6 @@ function minuteOfDay(iso: string): number {
   }).formatToParts(new Date(iso));
   const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
   const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
-  return (hour - DAY_START_HOUR) * 60 + minute;
+  // hour12:false can render midnight as "24" in some engines.
+  return (hour % 24) * 60 + minute;
 }

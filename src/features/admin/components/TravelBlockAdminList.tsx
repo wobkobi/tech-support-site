@@ -4,7 +4,6 @@
 // transport mode selector and custom origin override.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card } from "@/features/admin/components/ui/Card";
 import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
@@ -42,10 +41,6 @@ export interface TravelBlockRow {
    * event was chained (no time to go home in between).
    */
   travelBackSuppressed: boolean;
-  /** True when admin has marked this Car event as "I have the car that day". */
-  ignored: boolean;
-  /** True when the source event lives on the Car calendar. */
-  isCarEvent: boolean;
   createdAt: string;
 }
 
@@ -180,33 +175,6 @@ export function TravelBlockAdminList({
   }
 
   /**
-   * Toggles the "ignored" flag on a Car-cal event so the booking page stops
-   * treating it as a no-car window and the travel-to-home block is dropped.
-   * @param id - TravelBlock id.
-   * @param next - Desired ignored state.
-   */
-  async function setIgnored(id: string, next: boolean): Promise<void> {
-    setSaving(id);
-    try {
-      const res = await fetch(`/api/admin/travel/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ignored: next }),
-      });
-      if (!res.ok) {
-        toast("Couldn't update the ignore flag - try again.", { tone: "error" });
-        return;
-      }
-      setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ignored: next } : b)));
-      toast(next ? "Event ignored for travel." : "Event back in travel.", { tone: "success" });
-    } catch {
-      toast("Network error - the change wasn't saved.", { tone: "error" });
-    } finally {
-      setSaving(null);
-    }
-  }
-
-  /**
    * Saves a custom origin override (or clears it when null).
    * @param id - TravelBlock id.
    * @param customOrigin - New origin address, or null to clear.
@@ -268,11 +236,7 @@ export function TravelBlockAdminList({
           const isPast = new Date(b.eventEndAt) < new Date();
 
           return (
-            <Card
-              key={b.id}
-              padding="none"
-              className={cn("p-4", b.ignored && "bg-admin-bg/60 opacity-70")}
-            >
+            <Card key={b.id} padding="none" className="p-4">
               <div className="flex flex-col gap-2">
                 {/* Header: event identity */}
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -282,21 +246,6 @@ export function TravelBlockAdminList({
                   <StatusPill tone="neutral" className="shrink-0">
                     {calendarLabels[b.calendarEmail] ?? b.calendarEmail}
                   </StatusPill>
-                  {b.ignored && (
-                    <StatusPill tone="warning" className="shrink-0">
-                      Ignored - I have the car
-                    </StatusPill>
-                  )}
-                  {b.isCarEvent && (
-                    <div className="ml-auto shrink-0">
-                      <AdminCheckbox
-                        label="Ignore (I have the car)"
-                        checked={b.ignored}
-                        disabled={isSaving}
-                        onChange={(checked) => void setIgnored(b.id, checked)}
-                      />
-                    </div>
-                  )}
                 </div>
 
                 {/* Event time */}

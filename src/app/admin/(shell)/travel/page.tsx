@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 export default async function AdminTravelPage(): Promise<React.ReactElement> {
   await requireAdminAuth();
 
-  const carCalId = process.env.CAR_CALENDAR_ID ?? process.env.WORK_CALENDAR_ID;
+  const workCalId = process.env.WORK_CALENDAR_ID ?? process.env.CAR_CALENDAR_ID;
 
   const travelBlocks = await prisma.travelBlock.findMany({
     orderBy: { eventStartAt: "asc" },
@@ -49,7 +49,6 @@ export default async function AdminTravelPage(): Promise<React.ReactElement> {
       detectedOrigin: true,
       destination: true,
       travelBackSuppressed: true,
-      ignored: true,
       createdAt: true,
     },
   });
@@ -92,14 +91,12 @@ export default async function AdminTravelPage(): Promise<React.ReactElement> {
       ? (travelCacheMap.get(b.afterEventId)?.toISOString() ?? null)
       : null,
     travelBackSuppressed: b.travelBackSuppressed,
-    ignored: b.ignored,
-    isCarEvent: carCalId ? b.calendarEmail === carCalId : false,
     createdAt: b.createdAt.toISOString(),
   }));
 
   const calendarLabels: Record<string, string> = {};
   if (process.env.BOOKING_CALENDAR_ID) calendarLabels[process.env.BOOKING_CALENDAR_ID] = "Bookings";
-  if (carCalId) calendarLabels[carCalId] = "Car";
+  if (workCalId) calendarLabels[workCalId] = "Work";
   if (process.env.PERSONAL_CALENDAR_ID)
     calendarLabels[process.env.PERSONAL_CALENDAR_ID] = "Personal";
 

@@ -30,8 +30,8 @@ export function getBookingCalendarId(): string {
 function fetchAccessibleCalendarIds(): string[] {
   const ids = [
     process.env.BOOKING_CALENDAR_ID,
-    // Car calendar; the Work env name is still accepted as a fallback.
-    process.env.CAR_CALENDAR_ID ?? process.env.WORK_CALENDAR_ID,
+    // Work calendar; CAR_CALENDAR_ID is accepted as an alternative env name.
+    process.env.WORK_CALENDAR_ID ?? process.env.CAR_CALENDAR_ID,
     process.env.PERSONAL_CALENDAR_ID,
   ].filter((id): id is string => Boolean(id));
   return ids.length > 0 ? ids : ["primary"];

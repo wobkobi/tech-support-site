@@ -62,7 +62,7 @@ export default async function AdminSchedulePage({
   const bufferEndIso = bufferEndDate.toISOString();
 
   const bookingCalId = process.env.BOOKING_CALENDAR_ID ?? "";
-  const carCalId = process.env.CAR_CALENDAR_ID ?? process.env.WORK_CALENDAR_ID ?? "";
+  const workCalId = process.env.WORK_CALENDAR_ID ?? process.env.CAR_CALENDAR_ID ?? "";
   const personalCalId = process.env.PERSONAL_CALENDAR_ID ?? "";
 
   // All calendars across the buffer; travel blocks are queried separately.
@@ -98,7 +98,7 @@ export default async function AdminSchedulePage({
    */
   function kindForCalendar(calendarEmail: string): WeekViewKind {
     if (calendarEmail === bookingCalId) return "booking";
-    if (calendarEmail === carCalId) return "car";
+    if (calendarEmail === workCalId) return "work";
     if (calendarEmail === personalCalId) return "personal";
     return "personal";
   }
@@ -139,7 +139,7 @@ export default async function AdminSchedulePage({
       startAt: e.start,
       endAt: e.end,
       location: e.location ?? null,
-      // Booking events without a DB row open via this link; car/personal aren't openable.
+      // Booking events without a DB row open via this link; work/personal aren't openable.
       htmlLink: kind === "booking" ? (e.htmlLink ?? null) : null,
       // All-day events arrive as 24h timed events; treat >= 23h as a banner item.
       isAllDay: durationMs >= 23 * 60 * 60 * 1000,

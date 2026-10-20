@@ -451,7 +451,7 @@ export function DayAgendaView({
 
       <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-admin-muted">
         <LegendDot kind="booking" label="Booking" />
-        <LegendDot kind="car" label="No car" />
+        <LegendDot kind="work" label="Work" />
         <LegendDot kind="personal" label="Personal" />
         <LegendDot kind="travel" label="Travel" />
       </div>
