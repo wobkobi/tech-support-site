@@ -303,6 +303,19 @@ export default async function RootLayout({
         },
       })),
     },
+    // Points scanners and AI agents at the online booking flow, which no widget detector recognises.
+    potentialAction: {
+      "@type": "ReserveAction",
+      name: "Book an appointment",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${siteUrl}/booking`,
+        actionPlatform: [
+          "https://schema.org/DesktopWebPlatform",
+          "https://schema.org/MobileWebPlatform",
+        ],
+      },
+    },
     // Business profiles only; personal ones live on the Person entity on /about.
     sameAs: [GOOGLE_BUSINESS_PROFILE_URL, FACEBOOK_PAGE_URL, INSTAGRAM_URL],
   };

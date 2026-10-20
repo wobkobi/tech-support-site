@@ -61,7 +61,7 @@ export default async function ContactPage(): Promise<React.ReactElement> {
 
       <Section aria-label="Ways to reach me">
         <RuledGrid cols={2}>
-          <RuledBlock title="Call or text">
+          <RuledBlock title="Call or text" as="h2">
             <a
               href={identity.phoneTel}
               className="block py-2 text-2xl font-extrabold text-russian-violet hover:text-coquelicot-700"
@@ -70,7 +70,7 @@ export default async function ContactPage(): Promise<React.ReactElement> {
             </a>
             <p className="text-seasalt-700">The quickest way to reach me.</p>
           </RuledBlock>
-          <RuledBlock title="Email">
+          <RuledBlock title="Email" as="h2">
             <a
               href={`mailto:${identity.email}`}
               className="block py-2 text-xl font-extrabold break-all text-russian-violet hover:text-coquelicot-700 sm:text-2xl"
