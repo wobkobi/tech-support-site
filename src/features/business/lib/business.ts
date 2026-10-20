@@ -14,6 +14,7 @@ import {
   GST_REGISTERED,
   MIN_BILLABLE_MINS,
 } from "@/features/business/lib/pricing-policy";
+import { lockedDeltaShift, type LockedDelta } from "@/features/business/lib/promo-locked-rates";
 import { promoForSpend, type PromoTierValues } from "@/features/business/lib/promo-tiers";
 import {
   collapseToWindow,
@@ -310,6 +311,8 @@ export interface JobPromo {
   minSpend?: number | null;
   /** Spend bands; when non-empty they supply the discount instead of the values above. */
   tiers?: PromoTierValues[];
+  /** Modifier deltas saved when the promo was created; a flat promo prices modified lines with these. */
+  lockedDeltas?: LockedDelta[];
 }
 
 /** A date-based labour surcharge as {@link jobToLineItems} prints it. */
@@ -452,12 +455,18 @@ function jobPromoBreakdown(
     const hourCuts = job.tasks.map((t) => {
       if (!isDiscounted(t)) return 0;
       if (cut == null) return Math.max(0, t.unitPrice - flat);
-      // Floor the hour at the promo price for the line's tags (live rate less the cut).
-      // E.g. at an old $75 Standard the full $35 cut would bill $40/hr, under the $65 promised.
-      // A "No base" row floors at the promo price itself.
+      // Floor the hour at the promo price for the line's tags: live rate less the cut, with
+      // its modifiers at their locked deltas. E.g. at an old $75 Standard the full $35 cut
+      // would bill $40/hr, under the $65 promised. A "No base" row floors at the promo price.
       const live =
         rates && t.baseRateId ? effectiveHourlyRate(rates, t.baseRateId, t.modifierIds) : 0;
-      if (live > 0) return Math.min(cut, Math.max(0, t.unitPrice - Math.max(0, live - cut)));
+      if (live > 0) {
+        const mods = (t.modifierIds ?? [])
+          .map((id) => rates!.find((r) => r.id === id))
+          .filter((m): m is RateConfig => !!m);
+        const promoPrice = Math.max(0, live + lockedDeltaShift(promo.lockedDeltas, mods) - cut);
+        return Math.min(Math.max(0, live - promoPrice), Math.max(0, t.unitPrice - promoPrice));
+      }
       return t.baseRateId == null ? Math.min(cut, Math.max(0, t.unitPrice - flat)) : cut;
     });
     const byTask = job.tasks.map((t, i) => Math.min(lineTotals[i]!, t.qty * hourCuts[i]!));

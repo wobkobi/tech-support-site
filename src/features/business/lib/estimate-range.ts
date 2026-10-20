@@ -11,18 +11,28 @@ interface RemoteRateLike {
 }
 
 /**
- * Remote-meeting delta ($/hr, normally negative): the first hourly modifier whose label
- * contains "remote" (case-insensitive), so renames survive. 0 for in-person or none found.
+ * The modifiers a meeting mode applies: the first hourly modifier whose label contains
+ * "remote" (case-insensitive, so renames survive) for a remote meeting, else none.
+ * @param rates - Live public rate rows.
+ * @param meeting - Meeting mode; only the literal "remote" applies (in-person spellings vary).
+ * @returns The remote modifier in a one-item list, or empty when not applicable.
+ */
+export function meetingModifiers<T extends RemoteRateLike>(rates: T[], meeting: string): T[] {
+  if (meeting !== "remote") return [];
+  const remote = rates.find(
+    (r) => r.hourlyDelta !== null && r.label.toLowerCase().includes("remote"),
+  );
+  return remote ? [remote] : [];
+}
+
+/**
+ * Remote-meeting delta ($/hr, normally negative), from {@link meetingModifiers}.
  * @param rates - Live public rate rows.
  * @param meeting - Meeting mode; only the literal "remote" applies (in-person spellings vary).
  * @returns The remote modifier's hourlyDelta, or 0 when not applicable.
  */
 export function remoteRateDelta(rates: RemoteRateLike[], meeting: string): number {
-  if (meeting !== "remote") return 0;
-  const remote = rates.find(
-    (r) => r.hourlyDelta !== null && r.label.toLowerCase().includes("remote"),
-  );
-  return remote?.hourlyDelta ?? 0;
+  return meetingModifiers(rates, meeting)[0]?.hourlyDelta ?? 0;
 }
 
 /** Low-end floor as a fraction of straight-time cost, so a wide band never advertises half the rate. */

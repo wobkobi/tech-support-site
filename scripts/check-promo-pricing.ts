@@ -848,6 +848,62 @@ function main(): void {
     holidayRate - CUT,
   );
 
+  // ---- Locked deltas ----
+  // "Lock in current rates" set at $65 Standard / At home -$15, read after rates moved to
+  // $100 / -$30: at-home bills the old $50, not $70 less the $35 Standard cut.
+
+  const LOCKED = {
+    ...promo("flat_hourly", 65),
+    lockedDeltas: [{ label: "At home", hourlyDelta: -15 }],
+  };
+  const MOVED_RATES = [
+    { id: "base", label: "Standard", ratePerHour: 100, hourlyDelta: null, percentDelta: null },
+    { id: "home", label: "At home", ratePerHour: null, hourlyDelta: -30, percentDelta: null },
+    { id: "remote", label: "Remote", ratePerHour: null, hourlyDelta: -10, percentDelta: null },
+  ] as unknown as RateConfig[];
+  const homeJob = job(70, false);
+  homeJob.tasks = [
+    { ...homeJob.tasks[0]!, modifierIds: ["home"], qty: 0.75, lineTotal: 52.5 },
+    { ...homeJob.tasks[0]!, modifierIds: ["home"], qty: 125 / 60, lineTotal: 145.83 },
+  ];
+  expectEqual(
+    "an at-home job bills the locked $50, not $35",
+    computeJobPromoDiscount(homeJob, LOCKED, 0, BIZ, undefined, 100, MOVED_RATES),
+    56.66,
+  );
+  const remoteJob = job(90, false);
+  remoteJob.tasks[0]!.modifierIds = ["remote"];
+  expectEqual(
+    "a modifier with no locked delta keeps the plain Standard cut",
+    computeJobPromoDiscount(remoteJob, LOCKED, 0, BIZ, undefined, 100, MOVED_RATES),
+    35,
+  );
+  expectEqual(
+    "a Standard line still bills the flat rate",
+    computeJobPromoDiscount(job(100, false), LOCKED, 0, BIZ, undefined, 100, MOVED_RATES),
+    35,
+  );
+  expectEqual(
+    "the rate helper prices a locked modifier at flat plus its old delta",
+    applyPromoToHourlyRate(70, LOCKED, 100, [{ label: "At home", hourlyDelta: -30 }]),
+    50,
+  );
+  expectEqual(
+    "the pricing page matches the locked at-home rate case-insensitively",
+    promoModifierRate(100, 70, "delta", LOCKED, "at home"),
+    50,
+  );
+  expectEqual(
+    "a locked delta never raises the rate",
+    applyPromoToHourlyRate(
+      70,
+      { ...LOCKED, lockedDeltas: [{ label: "At home", hourlyDelta: 30 }] },
+      100,
+      [{ label: "At home", hourlyDelta: -30 }],
+    ),
+    70,
+  );
+
   // ---- The rate card ----
   // /pricing and /faq have no job total, so spend-gated promos are named but never priced.
 

@@ -6,8 +6,13 @@ import AddressAutocomplete from "@/features/booking/components/AddressAutocomple
 import { BOOKING_FIELD_LIMITS } from "@/features/booking/lib/booking";
 import { FIELD_INPUT } from "@/features/booking/lib/form-styles";
 import { PromoCodeField } from "@/features/business/components/PromoCodeField";
-import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
+import {
+  meetingModifiers,
+  priceRangeFor,
+  remoteRateDelta,
+} from "@/features/business/lib/estimate-range";
 import { calcTravelCharge, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
+import type { LiveDelta } from "@/features/business/lib/promo-locked-rates";
 import {
   applyPromoToHourlyRate,
   applyPromoToQuote,
@@ -73,6 +78,8 @@ interface QuoteInputs {
   fullRate: number;
   /** Undiscounted Standard $/hr, which a flat promo replaces. */
   baseRate: number;
+  /** The $/hr modifiers in `fullRate`, whose locked deltas a flat promo prices with. */
+  modifiers: LiveDelta[];
   /** AI-estimated labour minutes. */
   estimatedMins: number;
   /** AI confidence, which sets the band width. */
@@ -154,7 +161,12 @@ function buildPriceRange(
   // Undiscounted first: spend thresholds judge it, and it doubles as the "before" figure.
   const undiscounted = buildVisitRange(inputs.fullRate);
   const promo = promoForSpend(resolvedPromo, undiscounted.low + undiscounted.travel);
-  const promoRate = applyPromoToHourlyRate(inputs.fullRate, promo, inputs.baseRate);
+  const promoRate = applyPromoToHourlyRate(
+    inputs.fullRate,
+    promo,
+    inputs.baseRate,
+    inputs.modifiers,
+  );
   const promoApplied = promoRate < inputs.fullRate;
 
   // Quote-level promos (fixed amount, free travel) apply here; rate-based ones already did.
@@ -437,6 +449,7 @@ export function PricingWizard({
     const inputs: QuoteInputs = {
       fullRate,
       baseRate: baseStandard,
+      modifiers: meetingModifiers(rates, meeting),
       estimatedMins,
       confidence,
       tasks,

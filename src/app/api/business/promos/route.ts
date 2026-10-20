@@ -2,6 +2,7 @@
 // Admin promo collection endpoint: GET lists promos, POST validates and creates one and
 // revalidates the active-promo cache tag.
 
+import { snapshotDeltas } from "@/features/business/lib/promo-locked-rates";
 import {
   resolveDiscountType,
   validateDiscount,
@@ -114,8 +115,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("that code is already used by another promo", 409);
   }
 
+  // Saved for every type so a promo switched to flat later still keeps today's gaps.
+  const rates = await prisma.rateConfig.findMany({
+    select: { label: true, unit: true, hourlyDelta: true },
+  });
   const promo = await prisma.promo.create({
     data: {
+      lockedDeltas: snapshotDeltas(rates),
       title: body.title!,
       description: body.description ?? null,
       startAt: parseDate(body.startAt)!,

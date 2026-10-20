@@ -337,6 +337,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
         onSubmit={(e) => void handleSubmit(e)}
         onCancel={resetForm}
         rates={rates}
+        lockedDeltas={promos.find((p) => p.id === editingId)?.lockedDeltas}
       />
 
       {/* Overlap warning */}

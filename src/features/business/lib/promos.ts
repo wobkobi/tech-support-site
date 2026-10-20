@@ -2,6 +2,11 @@
 // Active-promo lookup + helpers, cached until admin writes or the publish cron's
 // refreshPromoCacheAtBoundary (promos.server.ts, since client components import this) bust the tag.
 
+import {
+  lockedDeltaShift,
+  type LiveDelta,
+  type LockedDelta,
+} from "@/features/business/lib/promo-locked-rates";
 import { promoForSpend, type PromoTierValues } from "@/features/business/lib/promo-tiers";
 import { roundCents } from "@/shared/lib/money";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
@@ -73,6 +78,8 @@ export interface ActivePromo {
   activeToMinute: number | null;
   /** New-customers-only or capped per customer: priced only once the customer is known. */
   customerLimited?: boolean;
+  /** Modifier deltas saved at creation, so a flat promo keeps those gaps after rates change. */
+  lockedDeltas?: LockedDelta[];
 }
 
 /** The parts of a priced job a promo can act on after the band is built. */
@@ -148,6 +155,7 @@ function toActivePromo(row: Promo): ActivePromo {
     activeFromMinute: row.activeFromMinute,
     activeToMinute: row.activeToMinute,
     customerLimited: row.newCustomersOnly || row.perCustomerLimit != null,
+    lockedDeltas: row.lockedDeltas.map((d) => ({ label: d.label, hourlyDelta: d.hourlyDelta })),
   };
 }
 
@@ -551,17 +559,20 @@ export async function isPromoCodeTaken(code: string | null, excludeId?: string):
 }
 
 /**
- * Applies a promo to one hourly rate. Percent multiplies; a flat promo sets Standard and moves
- * every other home rate down by the same dollars, so pass Standard as `baseRate` for a modified rate.
+ * Applies a promo to one hourly rate. Percent multiplies; a flat promo sets Standard and prices
+ * every other home rate at Standard plus its modifiers' deltas as they stood when the promo was
+ * created, so pass Standard as `baseRate` and the modifiers for a modified rate.
  * @param rate - Pre-promo $/hr.
  * @param promo - Active promo or null.
  * @param baseRate - The undiscounted Standard rate the flat promo replaces; defaults to `rate`.
+ * @param modifiers - The live $/hr modifiers making up `rate`, empty for Standard.
  * @returns Effective $/hr.
  */
 export function applyPromoToHourlyRate(
   rate: number,
   promo: ActivePromo | null,
   baseRate: number = rate,
+  modifiers: readonly LiveDelta[] = [],
 ): number {
   if (!promo) return rate;
   // fixed_amount and free_travel act on the priced quote, not the rate.
@@ -569,9 +580,10 @@ export function applyPromoToHourlyRate(
     return rate;
   }
   if (promo.flatHourlyRate !== null) {
-    // Never raise the price: the cut and the discounted rate both floor at zero.
+    // Never raise the price: the cut floors at zero and the result stays at or under `rate`.
     const cut = Math.max(0, baseRate - promo.flatHourlyRate);
-    return roundCents(Math.max(0, rate - cut));
+    const promoRate = rate + lockedDeltaShift(promo.lockedDeltas, modifiers) - cut;
+    return roundCents(Math.min(rate, Math.max(0, promoRate)));
   }
   if (promo.percentDiscount !== null) {
     const factor = Math.max(0, 1 - promo.percentDiscount);
@@ -654,6 +666,7 @@ export function promoTravelFactor(promo: ActivePromo | null): number {
  * @param modifierRate - The modifier's rate before any promo.
  * @param kind - Whether the modifier changes the rate or adds a surcharge.
  * @param promo - Active promo, or null.
+ * @param label - The modifier's label, which looks up the delta a flat promo locked in.
  * @returns The rate actually charged.
  */
 export function promoModifierRate(
@@ -661,11 +674,13 @@ export function promoModifierRate(
   modifierRate: number,
   kind: "delta" | "uplift",
   promo: ActivePromo | null,
+  label?: string,
 ): number {
   if (!promo) return modifierRate;
   // A flat promo cuts per hour off Standard, so it needs the Standard rate.
   if (kind === "delta" && promo.flatHourlyRate !== null) {
-    return applyPromoToHourlyRate(modifierRate, promo, baseRate);
+    const modifiers = label ? [{ label, hourlyDelta: modifierRate - baseRate }] : [];
+    return applyPromoToHourlyRate(modifierRate, promo, baseRate, modifiers);
   }
   if (kind === "delta") return promoDisplayRate(modifierRate, promo);
   const discountPerHour = baseRate - promoDisplayRate(baseRate, promo);

@@ -20,6 +20,7 @@ import {
   type FormState,
   type PromoType,
 } from "@/features/business/lib/promo-form";
+import type { LockedDelta } from "@/features/business/lib/promo-locked-rates";
 import { summariseForBanner } from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";
 import React, { useId } from "react";
@@ -50,6 +51,8 @@ interface PromoFormProps {
   onCancel: () => void;
   /** Live rates the price preview discounts. */
   rates: PromoPreviewRates;
+  /** The edited promo's saved modifier deltas; undefined for a new promo, which saves today's. */
+  lockedDeltas?: LockedDelta[];
 }
 
 /**
@@ -67,6 +70,7 @@ interface PromoFormProps {
  * @param props.onSubmit - Saves the form.
  * @param props.onCancel - Clears the form and leaves edit mode.
  * @param props.rates - Live rates for the price preview.
+ * @param props.lockedDeltas - The edited promo's saved modifier deltas, for the price preview.
  * @returns The form card.
  */
 export function PromoForm({
@@ -82,6 +86,7 @@ export function PromoForm({
   onSubmit,
   onCancel,
   rates,
+  lockedDeltas,
 }: PromoFormProps): React.ReactElement {
   const id = useId();
 
@@ -251,7 +256,9 @@ export function PromoForm({
 
         {(() => {
           const preview = previewPromo(form);
-          return preview ? <PromoPricePreview promo={preview} rates={rates} /> : null;
+          return preview ? (
+            <PromoPricePreview promo={{ ...preview, lockedDeltas }} rates={rates} />
+          ) : null;
         })()}
 
         <div className="flex gap-2">
