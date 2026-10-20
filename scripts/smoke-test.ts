@@ -74,6 +74,10 @@ interface RemoteAuth {
  */
 const PAGE_OVERRIDES: Record<string, { name?: string; ignoreErrors?: string[] }> = {
   "/": { name: "Home" },
+  "/areas": {
+    name: "Areas",
+    ignoreErrors: ["maps.googleapis.com", "google.maps.places.Autocomplete"],
+  },
   "/booking/cancel": {
     // With no token the page renders "Missing cancel token." without any fetch.
     name: "Booking Cancel (no token)",

@@ -96,6 +96,7 @@ export async function GET(): Promise<Response> {
     ),
     `- [Small business IT](${siteUrl}/business): IT support for small offices`,
     `- [Pricing](${siteUrl}/pricing): hourly rates, travel and any current offers`,
+    `- [Areas and travel](${siteUrl}/areas): suburbs covered and what travel costs`,
     `- [Book](${siteUrl}/booking): pick a time online`,
     `- [FAQ](${siteUrl}/faq): common questions about visits, remote help and payment`,
     `- [About](${siteUrl}/about): who does the work`,

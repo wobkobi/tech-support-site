@@ -5,11 +5,12 @@ import { ClosingCta } from "@/shared/components/ClosingCta";
 import { PageHead } from "@/shared/components/PageHead";
 import { PageShell } from "@/shared/components/PageLayout";
 import { RuledBlock, RuledGrid } from "@/shared/components/RuledGrid";
-import { Section, SectionHeading } from "@/shared/components/Section";
+import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { pageOpenGraph } from "@/shared/lib/open-graph";
 import type { Metadata } from "next";
+import Link from "next/link";
 import type React from "react";
 
 /**
@@ -86,7 +87,13 @@ export default async function ContactPage(): Promise<React.ReactElement> {
 
       <Section tone="grey" aria-labelledby="area-heading">
         <SectionHeading title="Service area" id="area-heading" />
-        <p>On-site visits across Auckland.</p>
+        <p>
+          On-site visits across Auckland.{" "}
+          <Link href="/areas" className={TEXT_LINK}>
+            See the areas I cover and what travel costs
+          </Link>
+          .
+        </p>
         <p className="mt-3">
           A lot of software and account problems I can sort out remotely, so there&apos;s no travel
           to pay for.

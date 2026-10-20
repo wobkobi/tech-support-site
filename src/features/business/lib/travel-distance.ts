@@ -3,6 +3,31 @@
 // at its own departure time. Never throws; returns a discriminated status.
 
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { getPacificAucklandOffset, nzDateParts } from "@/shared/lib/timezone-utils";
+
+/**
+ * The next weekday at `hour` NZ time, so a slot-less quote uses realistic traffic. Shared by
+ * the public travel-time route and the /areas suburb figures, so both price the same moment.
+ * @param hour - NZ-local hour to price against.
+ * @param now - Reference time (defaults to now).
+ * @returns A UTC Date for that NZ-local moment.
+ */
+export function representativeDepartureTime(hour: number, now: Date = new Date()): Date {
+  const [y, m, d] = nzDateParts(now);
+
+  // UTC-midnight cursor from the NZ date, so day-of-week is NZ's, not the server's.
+  const cursor = new Date(Date.UTC(y, m - 1, d));
+  cursor.setUTCDate(cursor.getUTCDate() + 1);
+  while (cursor.getUTCDay() === 0 || cursor.getUTCDay() === 6) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  const yy = cursor.getUTCFullYear();
+  const mm = cursor.getUTCMonth() + 1;
+  const dd = cursor.getUTCDate();
+  const offset = getPacificAucklandOffset(yy, mm, dd);
+  return new Date(Date.UTC(yy, mm - 1, dd, hour - offset, 0, 0));
+}
 
 interface DistanceMatrixElement {
   status: string;

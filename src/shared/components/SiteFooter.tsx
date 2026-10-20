@@ -30,6 +30,7 @@ const SERVICE_LINKS: ReadonlyArray<{ label: string; href: string }> = [
 const COMPANY_LINKS: ReadonlyArray<{ label: string; href: string }> = [
   { label: "About", href: "/about" },
   { label: "Pricing", href: "/pricing" },
+  { label: "Areas & travel", href: "/areas" },
   { label: "Reviews", href: "/reviews" },
   { label: "FAQ", href: "/faq" },
   { label: "Privacy", href: "/privacy" },

@@ -19,6 +19,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...SERVICE_PAGE_SLUGS.map((slug) => `/services/${slug}`),
     "/business",
     "/pricing",
+    "/areas",
     "/booking",
     "/about",
     "/contact",
