@@ -29,6 +29,7 @@ import {
 import type { AutoTripResult } from "@/features/business/lib/trips";
 import { autoLogJobTrip } from "@/features/business/lib/trips.server";
 import { parseAmount, parseDate, parseObjectId } from "@/features/business/lib/validation";
+import { attachEmailIfMissing } from "@/features/contacts/lib/find-or-create";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -291,6 +292,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Billed with no promo discount, so the booking-time redemption went unused.
     await releaseBookingRedemptions(billedBookingId);
   }
+
+  // A contact picked with no email (e.g. phone-only from Google) takes the billed address.
+  await attachEmailIfMissing(invoice.contactId, invoice.clientEmail);
 
   // Invoicing means the job happened; a quote's booking completes on conversion.
   if (!isQuote) {

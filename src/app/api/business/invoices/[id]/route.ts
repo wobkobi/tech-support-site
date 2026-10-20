@@ -16,6 +16,7 @@ import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { releaseInvoiceRedemptions } from "@/features/business/lib/promo-redemption";
 import { parseAmount, parseDate, parseObjectId } from "@/features/business/lib/validation";
 import type { LineItem } from "@/features/business/types/business";
+import { attachEmailIfMissing } from "@/features/contacts/lib/find-or-create";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
@@ -269,6 +270,7 @@ export async function PATCH(
     // The redemption was settled before the contact existed; link it so per-customer
     // limits bind. Clearing the contact never unlinks it.
     if (contactId) {
+      await attachEmailIfMissing(contactId, invoice.clientEmail);
       await prisma.promoRedemption
         .updateMany({ where: { invoiceId: id }, data: { contactId } })
         .catch((err: unknown) => {

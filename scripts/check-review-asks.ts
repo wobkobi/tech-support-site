@@ -213,8 +213,13 @@ function main(): void {
     "sam@example.com",
   );
   expectEqual(
-    "contact with no email",
-    pickReviewAskAddress("x@y.z", { email: null, altEmails: [] }),
+    "contact with no email takes the invoice address",
+    pickReviewAskAddress("X@y.z ", { email: null, altEmails: [] }),
+    "x@y.z",
+  );
+  expectEqual(
+    "neither has an email",
+    pickReviewAskAddress("", { email: null, altEmails: [] }),
     null,
   );
 

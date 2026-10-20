@@ -155,20 +155,25 @@ export async function loadReviewAskCandidates(
     for (const a of contactAddresses(c)) if (!contactByAddress.has(a)) contactByAddress.set(a, c);
   }
 
-  const resolved = invoices.map((inv) => ({
-    inv,
-    contact:
+  const resolved = invoices.map((inv) => {
+    const contact =
       (inv.contactId ? contactById.get(inv.contactId) : undefined) ??
       contactByAddress.get(normaliseEmail(inv.clientEmail)) ??
-      null,
-  }));
+      null;
+    const address = contact ? pickReviewAskAddress(inv.clientEmail, contact) : null;
+    // The picked address joins the match set: for a contact with no email it's the invoice's.
+    const addresses = contact
+      ? [...new Set([...contactAddresses(contact), ...(address ? [address] : [])])]
+      : [];
+    return { inv, contact, address, addresses };
+  });
 
   // Opt-outs and earlier asks, matched on every address the contact has plus its id
   const people = [
     ...new Map(resolved.flatMap((r) => (r.contact ? [[r.contact.id, r.contact]] : []))).values(),
   ];
   const peopleIds = people.map((p) => p.id);
-  const peopleAddresses = [...new Set(people.flatMap((p) => contactAddresses(p)))];
+  const peopleAddresses = [...new Set(resolved.flatMap((r) => r.addresses))];
 
   const [mailingOptOuts, reviewOptOuts, askedInvoices, askedBookings] = await Promise.all([
     prisma.emailOptOut.findMany({
@@ -232,11 +237,9 @@ export async function loadReviewAskCandidates(
   };
 
   const candidates: ReviewAskCandidate[] = [];
-  for (const { inv, contact } of resolved) {
+  for (const { inv, contact, address, addresses } of resolved) {
     const clockStart = reviewAskClockStart(inv);
     if (!clockStart) continue;
-    const addresses = contact ? contactAddresses(contact) : [];
-    const address = contact ? pickReviewAskAddress(inv.clientEmail, contact) : null;
     const decision = decideReviewAsk(
       {
         status: inv.status,
@@ -308,8 +311,9 @@ export async function forecastInvoiceReviewAsk(
   const contact = await findInvoiceContact(invoice);
   if (!contact) return { ...info, skip: "no_contact" };
 
-  const addresses = contactAddresses(contact);
-  const [state, queuedInvoices] = await Promise.all([
+  const address = pickReviewAskAddress(invoice.clientEmail, contact);
+  const addresses = [...new Set([...contactAddresses(contact), ...(address ? [address] : [])])];
+  const [state, queuedInvoices, addressOptOuts] = await Promise.all([
     contactReviewAskState(contact.id),
     prisma.invoice.findMany({
       where: {
@@ -329,7 +333,15 @@ export async function forecastInvoiceReviewAsk(
       },
       select: { status: true, sentAt: true, paidAt: true },
     }),
+    // contactReviewAskState only knows the contact's own addresses; check the picked one too.
+    address
+      ? Promise.all([
+          prisma.reviewAskOptOut.count({ where: { email: address } }),
+          prisma.emailOptOut.count({ where: { email: address } }),
+        ])
+      : [0, 0],
   ]);
+  const [reviewOptOutRows, mailingOptOutRows] = addressOptOuts;
 
   // Play queued asks forward in due order; each that clears the gap becomes the latest.
   // An overdue one counts from now (it goes out next run).
@@ -356,9 +368,9 @@ export async function forecastInvoiceReviewAsk(
       status: "SENT",
       clockStart: invoice.sentAt ?? now,
       hasContact: true,
-      address: pickReviewAskAddress(invoice.clientEmail, contact),
-      reviewOptOut: state.blockedBy === "review_opt_out",
-      mailingOptOut: state.blockedBy === "mailing_opt_out",
+      address,
+      reviewOptOut: state.blockedBy === "review_opt_out" || reviewOptOutRows > 0,
+      mailingOptOut: state.blockedBy === "mailing_opt_out" || mailingOptOutRows > 0,
       lastAskedAt: lastAsk,
     },
     timing,

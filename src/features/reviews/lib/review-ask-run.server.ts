@@ -4,6 +4,7 @@
 
 import { ensureContactReviewToken } from "@/features/business/lib/contact-review-token";
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
+import { attachEmailIfMissing } from "@/features/contacts/lib/find-or-create";
 import { sendReviewAsk } from "@/features/reviews/lib/email-review-ask";
 import {
   loadReviewAskCandidates,
@@ -161,6 +162,9 @@ async function sendOne(
     });
     return "skipped";
   }
+
+  // The ask's opt-out links act on the contact's addresses, so it must hold this one.
+  if (contactAddresses(contact).length === 0) await attachEmailIfMissing(contact.id, address);
 
   const reviewToken = contact.reviewToken ?? (await ensureContactReviewToken(contact.id));
   if (!reviewToken) {
