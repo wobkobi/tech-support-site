@@ -5,11 +5,12 @@ import { ClosingCta } from "@/shared/components/ClosingCta";
 import { PageHead } from "@/shared/components/PageHead";
 import { PageShell } from "@/shared/components/PageLayout";
 import { RuledBlock, RuledGrid } from "@/shared/components/RuledGrid";
-import { Section, SectionHeading } from "@/shared/components/Section";
+import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { pageOpenGraph } from "@/shared/lib/open-graph";
 import type { Metadata } from "next";
+import Link from "next/link";
 import type React from "react";
 
 /**
@@ -61,7 +62,7 @@ export default async function ContactPage(): Promise<React.ReactElement> {
 
       <Section aria-label="Ways to reach me">
         <RuledGrid cols={2}>
-          <RuledBlock title="Call or text">
+          <RuledBlock title="Call or text" as="h2">
             <a
               href={identity.phoneTel}
               className="block py-2 text-2xl font-extrabold text-russian-violet hover:text-coquelicot-700"
@@ -70,7 +71,7 @@ export default async function ContactPage(): Promise<React.ReactElement> {
             </a>
             <p className="text-seasalt-700">The quickest way to reach me.</p>
           </RuledBlock>
-          <RuledBlock title="Email">
+          <RuledBlock title="Email" as="h2">
             <a
               href={`mailto:${identity.email}`}
               className="block py-2 text-xl font-extrabold break-all text-russian-violet hover:text-coquelicot-700 sm:text-2xl"
@@ -86,7 +87,13 @@ export default async function ContactPage(): Promise<React.ReactElement> {
 
       <Section tone="grey" aria-labelledby="area-heading">
         <SectionHeading title="Service area" id="area-heading" />
-        <p>On-site visits across Auckland.</p>
+        <p>
+          On-site visits across Auckland.{" "}
+          <Link href="/areas" className={TEXT_LINK}>
+            See the areas I cover and what travel costs
+          </Link>
+          .
+        </p>
         <p className="mt-3">
           A lot of software and account problems I can sort out remotely, so there&apos;s no travel
           to pay for.

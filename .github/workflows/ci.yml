@@ -26,10 +26,12 @@ jobs:
     # against an empty database on the runner rather than the real one:
     # Dependabot runs get no secrets, and no pull request's code sees the
     # production connection string. Every setting falls back to its default.
-    # The container goes away with the job.
+    # The container goes away with the job. Pinned to 7.0: MongoDB 8.0+ crashes on
+    # start under Linux kernel 6.19+ (SERVER-121912, its TCMalloc breaks the rseq
+    # ABI), which the ubuntu24 runner image ships from 20261018.
     services:
       mongo:
-        image: mongo:8
+        image: mongo:7.0
         ports:
           - 27017:27017
 

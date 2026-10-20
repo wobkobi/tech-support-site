@@ -116,17 +116,21 @@ export function contactAddresses(contact: ReviewAskContactAddresses): string[] {
 
 /**
  * The invoice's address when it belongs to the contact, else the contact's primary
- * (invoices can carry a company accounts or stale address).
+ * (invoices can carry a company accounts or stale address). A contact with no address on
+ * file has nothing to prefer, so the invoice's address is used as is.
  * @param clientEmail - Invoice.clientEmail.
  * @param contact - The resolved contact.
- * @returns Normalised address, or null when the contact has none.
+ * @returns Normalised address, or null when neither the invoice nor the contact has one.
  */
 export function pickReviewAskAddress(
   clientEmail: string | null | undefined,
   contact: ReviewAskContactAddresses,
 ): string | null {
   const invoiceAddress = normaliseEmail(clientEmail);
-  if (invoiceAddress && contactAddresses(contact).includes(invoiceAddress)) return invoiceAddress;
+  const addresses = contactAddresses(contact);
+  if (invoiceAddress && (addresses.length === 0 || addresses.includes(invoiceAddress))) {
+    return invoiceAddress;
+  }
   return normaliseEmail(contact.email) || null;
 }
 

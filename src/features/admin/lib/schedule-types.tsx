@@ -5,7 +5,7 @@ import { cn } from "@/shared/lib/cn";
 import { NZ_TZ, dateKeyParts } from "@/shared/lib/timezone-utils";
 import type React from "react";
 
-export type WeekViewKind = "booking" | "car" | "personal" | "travel";
+export type WeekViewKind = "booking" | "work" | "personal" | "travel";
 
 export type BookingStatus = "held" | "confirmed" | "cancelled" | "completed";
 
@@ -76,7 +76,7 @@ export function mondayOf(dayKey: string): string {
 /** Tailwind classes per event kind. Keep colours in sync with the legend. */
 export const KIND_STYLES: Record<WeekViewKind, string> = {
   booking: "bg-russian-violet/90 text-white border-russian-violet ring-1 ring-white/10",
-  car: "bg-red-100 text-red-900 border-red-300",
+  work: "bg-sky-100 text-sky-900 border-sky-300",
   personal: "bg-admin-border text-admin-text-secondary border-admin-border-strong",
   travel: "bg-amber-100 text-amber-900 border-amber-300",
 };
@@ -84,7 +84,7 @@ export const KIND_STYLES: Record<WeekViewKind, string> = {
 /** Solid background colour for the left accent bar on agenda cards. */
 export const KIND_BAR_BG: Record<WeekViewKind, string> = {
   booking: "bg-russian-violet",
-  car: "bg-red-400",
+  work: "bg-sky-400",
   personal: "bg-admin-border-strong",
   travel: "bg-amber-400",
 };
@@ -116,7 +116,7 @@ export function LegendDot({ kind, label }: LegendDotProps): React.ReactElement {
  * @returns Display label like "9am", "12pm", "5pm".
  */
 export function formatHour(hour: number): string {
-  if (hour === 0) return "12am";
+  if (hour === 0 || hour === 24) return "12am";
   if (hour === 12) return "12pm";
   if (hour < 12) return `${hour}am`;
   return `${hour - 12}pm`;

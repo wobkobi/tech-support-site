@@ -624,6 +624,7 @@ export function CalculatorView({
     saveInvoiceError,
     pendingInvoiceId,
     pendingExistingName,
+    pendingExistingDetail,
     savingIncome,
     incomeError,
     handleSaveInvoice,
@@ -750,6 +751,7 @@ export function CalculatorView({
           email={clientEmail}
           googleContactId={pickedContactGoogleId}
           existingContactName={pendingExistingName}
+          existingContactDetail={pendingExistingDetail}
           onClose={(contactDbId) => void handleAddContactClose(contactDbId)}
         />
       )}

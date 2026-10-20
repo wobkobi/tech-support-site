@@ -32,9 +32,10 @@ export function RuledGrid({
 }
 
 /**
- * One block with a 3px moonstone rule on top and an h3.
+ * One block with a 3px moonstone rule on top and a heading (h3 by default).
  * @param props - Component props.
- * @param props.title - The h3 text.
+ * @param props.title - The heading text.
+ * @param props.as - Heading level; h2 when the section has no h2 of its own, so the outline skips no level.
  * @param props.id - Anchor id (scroll margin clears the sticky header).
  * @param props.className - Extra classes.
  * @param props.children - Block body.
@@ -42,11 +43,13 @@ export function RuledGrid({
  */
 export function RuledBlock({
   title,
+  as: Heading = "h3",
   id,
   className,
   children,
 }: {
   title: React.ReactNode;
+  as?: "h2" | "h3";
   id?: string;
   className?: string;
   children?: React.ReactNode;
@@ -56,7 +59,7 @@ export function RuledBlock({
       id={id}
       className={cn("border-t-[3px] border-moonstone-500 pt-3", id && "scroll-mt-28", className)}
     >
-      <h3 className="mb-2 text-[1.1875rem] font-extrabold sm:text-xl">{title}</h3>
+      <Heading className="mb-2 text-[1.1875rem] font-extrabold sm:text-xl">{title}</Heading>
       {children}
     </div>
   );

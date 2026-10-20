@@ -12,6 +12,7 @@ import type { GoogleContact } from "@/features/business/types/business";
 import { filterContacts } from "@/features/contacts/lib/contact-search";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { cn } from "@/shared/lib/cn";
+import { formatNZPhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useMemo, useRef, useState } from "react";
 
@@ -84,6 +85,20 @@ export function ClientPickerSection({
     if (!searching || !focused || !clientName.trim()) return [];
     return filterContacts(contacts, clientName).slice(0, MAX_SUGGESTIONS);
   }, [searching, focused, clientName, contacts]);
+
+  // Names held by more than one contact: those suggestions also show the phone, so two
+  // "Mary"s with no email or company never look identical.
+  const sharedNames = useMemo(() => {
+    const seen = new Set<string>();
+    const shared = new Set<string>();
+    for (const c of contacts) {
+      const key = c.name.trim().toLowerCase();
+      if (!key) continue;
+      if (seen.has(key)) shared.add(key);
+      seen.add(key);
+    }
+    return shared;
+  }, [contacts]);
 
   /**
    * Commits a suggestion, cancelling the pending blur-close so the click lands.
@@ -196,6 +211,11 @@ export function ClientPickerSection({
                     <span className="ml-2 text-sm text-admin-muted">{c.email}</span>
                   )}
                   {c.company && <span className="ml-2 text-sm text-admin-muted">{c.company}</span>}
+                  {c.phone && sharedNames.has(c.name.trim().toLowerCase()) && (
+                    <span className="ml-2 text-sm text-admin-muted">
+                      {formatNZPhone(c.phone.replace(/^\+64/, "0"))}
+                    </span>
+                  )}
                 </button>
               );
             })}

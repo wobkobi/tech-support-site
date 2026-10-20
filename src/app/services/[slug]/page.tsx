@@ -150,6 +150,17 @@ export default async function ServiceDetailPage({
     },
   };
 
+  // Mirrors the visible "Questions people ask" list; voice and AI search read FAQ markup.
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: page.faqs.map(({ q, a }) => ({
+      "@type": "Question",
+      name: q,
+      acceptedAnswer: { "@type": "Answer", text: a },
+    })),
+  };
+
   return (
     <PageShell>
       <PixelEvent event="ViewContent" />
@@ -157,6 +168,11 @@ export default async function ServiceDetailPage({
         id="ld-service"
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd) }}
+      />
+      <script
+        id="ld-faq"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
       <PageHead
         crumbs={[

@@ -1,6 +1,7 @@
 // src/app/api/business/invoices/[id]/send-email/route.ts
 // Emails an invoice: flips a draft to SENT and stamps sentAt (starting the review-ask
-// clock). A changed send-to address replaces the invoice's and the contact's email.
+// clock). A changed send-to address replaces the invoice's and the contact's email; an
+// unchanged one fills a linked contact that has no email.
 
 import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
 import {
@@ -8,6 +9,7 @@ import {
   toInvoiceEmailPayload,
 } from "@/features/business/lib/invoice-email-request";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
+import { attachEmailIfMissing } from "@/features/contacts/lib/find-or-create";
 import { sendInvoiceEmail } from "@/features/reviews/lib/email-invoice";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -154,6 +156,8 @@ export async function POST(
 
   if (newEmail) {
     await promoteContactEmail(invoice.contactId, invoice.clientEmail, newEmail);
+  } else {
+    await attachEmailIfMissing(invoice.contactId, invoice.clientEmail);
   }
 
   // updatedAt covers SENT rows that predate the sentAt column.

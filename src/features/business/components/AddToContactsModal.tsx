@@ -28,6 +28,8 @@ interface AddToContactsModalProps {
   googleContactId?: string | null;
   /** Contact linked to `googleContactId` that lacks this email; when set, offer to add it there. */
   existingContactName?: string | null;
+  /** That contact's phone and street, so a same-named person can be told apart. */
+  existingContactDetail?: string | null;
   /** Called on every close with the saved Contact id (for FK backfill), or null. */
   onClose: (contactDbId?: string | null) => void;
 }
@@ -42,6 +44,7 @@ interface AddToContactsModalProps {
  * @param props.phone - Optional phone number (E.164 or local format).
  * @param props.googleContactId - Optional Google People API resource name.
  * @param props.existingContactName - Existing contact that lacks this email, if any.
+ * @param props.existingContactDetail - That contact's phone and street, if known.
  * @param props.onClose - Called whenever the modal closes.
  * @returns Modal element.
  */
@@ -52,6 +55,7 @@ export function AddToContactsModal({
   phone,
   googleContactId,
   existingContactName,
+  existingContactDetail,
   onClose,
 }: AddToContactsModalProps): React.ReactElement {
   // A business-looking addressed-to name with no known company is the company
@@ -117,12 +121,18 @@ export function AddToContactsModal({
     >
       <div className="space-y-3 text-sm text-admin-text">
         {existingContactName ? (
-          <p>
-            <span className="font-semibold">{existingContactName}</span>
-            {
-              " is in your contacts but doesn't have this email. Add it so you can send review links and pre-fill future invoices?"
-            }
-          </p>
+          <>
+            <p>
+              <span className="font-semibold">{existingContactName}</span>
+              {existingContactDetail && ` (${existingContactDetail})`}
+              {
+                " is in your contacts but doesn't have this email. Add it so you can send review links and pre-fill future invoices?"
+              }
+            </p>
+            <p className="text-admin-muted">
+              {`If this is a different ${existingContactName}, choose Not now and the invoice won't be linked to this contact.`}
+            </p>
+          </>
         ) : (
           <>
             <p>

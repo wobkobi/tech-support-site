@@ -13,8 +13,11 @@ import { NextRequest, NextResponse } from "next/server";
  * GET /api/admin/contacts/check?email=...&googleContactId=...
  * Looks up a contact by email (case-insensitive; invalid gives exists=false), falling back
  * to Google, then to a `googleContactId` match for `existingContactId` and `linkedContactId`.
+ * The existing contact's phone and address come back too, so the popup can show which of two
+ * same-named people the email would go onto.
  * @param request - Incoming request.
- * @returns JSON { ok, exists, contactId, linkedContactId, existingContactId?, existingContactName? }.
+ * @returns JSON { ok, exists, contactId, linkedContactId, existingContactId?, existingContactName?,
+ *   existingContactPhone?, existingContactAddress? }.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
@@ -31,7 +34,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     ? await prisma.contact.findFirst({
         where: { googleContactId, deletedAt: null },
         orderBy: { createdAt: "asc" },
-        select: { id: true, name: true },
+        select: { id: true, name: true, phone: true, address: true },
       })
     : null;
   const linkedContactId = linked?.id ?? null;
@@ -64,5 +67,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     linkedContactId,
     existingContactId: linkedContactId,
     existingContactName: linked?.name ?? null,
+    existingContactPhone: linked?.phone ?? null,
+    existingContactAddress: linked?.address ?? null,
   });
 }

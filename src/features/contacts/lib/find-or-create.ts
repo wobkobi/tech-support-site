@@ -109,6 +109,49 @@ export async function findOrCreateContactByEmail(
 }
 
 /**
+ * Gives a live contact with no email the address it was billed or emailed at. Skipped when
+ * another live contact already owns the address, so no duplicate is created. Best-effort.
+ * @param contactId - Contact to fill, or null when the invoice isn't linked.
+ * @param email - Address to attach (normalised internally).
+ * @returns True when the email was written.
+ */
+export async function attachEmailIfMissing(
+  contactId: string | null | undefined,
+  email: string | null | undefined,
+): Promise<boolean> {
+  const normalisedEmail = normaliseEmail(email);
+  if (!contactId || !normalisedEmail) return false;
+  try {
+    const contact = await prisma.contact.findFirst({
+      where: { id: contactId, deletedAt: null },
+      select: { email: true },
+    });
+    // Emptiness in JS for the same absent-key reason as the phone match above.
+    if (!contact || contact.email?.trim()) return false;
+    const owner = await prisma.contact.findFirst({
+      where: {
+        id: { not: contactId },
+        deletedAt: null,
+        OR: [
+          { email: { equals: normalisedEmail, mode: "insensitive" } },
+          { altEmails: { has: normalisedEmail } },
+        ],
+      },
+      select: { id: true },
+    });
+    if (owner) return false;
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: { email: normalisedEmail },
+    });
+    return true;
+  } catch (err) {
+    console.error(`[contacts] Could not attach ${normalisedEmail} to contact ${contactId}:`, err);
+    return false;
+  }
+}
+
+/**
  * Finds a live Contact by phone (normalised to E.164), creating one with `seed` if none exists.
  * @param phone - Phone number to match on (normalised internally).
  * @param seed - Fields used if a new row is created.

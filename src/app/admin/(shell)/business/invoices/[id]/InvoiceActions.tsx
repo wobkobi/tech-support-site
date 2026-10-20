@@ -367,7 +367,10 @@ export function InvoiceActions({
               busy={converting}
               className="max-lg:flex-1"
             >
-              Convert<span className="max-sm:hidden"> to invoice</span>
+              {/* One span, so the button's flex gap can't widen the word space. */}
+              <span>
+                Convert<span className="max-sm:hidden"> to invoice</span>
+              </span>
             </AdminButton>
           )}
           {!isVoided && (
@@ -377,10 +380,12 @@ export function InvoiceActions({
               aria-label={!clientEmail ? "Add a client email to enable sending" : undefined}
               className={cn(showPhoneBar && "max-lg:flex-1")}
             >
-              {/* Short labels on phones, where two of these share the bar. The button's
-                  flex gap supplies the word space. */}
-              {alreadySent ? "Re-send" : "Send"}
-              <span className="max-sm:hidden">to client</span>
+              {/* Short labels on phones, where two of these share the bar. One span, so
+                  the button's flex gap can't widen the word space. */}
+              <span>
+                {alreadySent ? "Re-send" : "Send"}
+                <span className="max-sm:hidden"> to client</span>
+              </span>
             </AdminButton>
           )}
         </div>

@@ -17,7 +17,7 @@ calls the endpoints over HTTPS on a schedule. Every job is a plain `GET` route u
      (dotenv-expand expands `$VAR` even inside single quotes).
    - `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` / `GOOGLE_OAUTH_REDIRECT_URI` /
      `GOOGLE_OAUTH_REFRESH_TOKEN` - Google OAuth for the calendar, sheets and contacts jobs.
-   - `BOOKING_CALENDAR_ID`, `CAR_CALENDAR_ID`, `WORK_CALENDAR_ID`, `PERSONAL_CALENDAR_ID`,
+   - `BOOKING_CALENDAR_ID`, `WORK_CALENDAR_ID` (or `CAR_CALENDAR_ID`), `PERSONAL_CALENDAR_ID`,
      `HOME_ADDRESS` - calendar cache refresh.
    - `GOOGLE_SHEET_ID`, `GOOGLE_BUSINESS_SHEETS_FOLDER_ID` - sheets sync and subscription recording.
    - `RESEND_API_KEY`, `EMAIL_FROM`, `ADMIN_EMAIL` - booking reminder, invoice reminder, review ask

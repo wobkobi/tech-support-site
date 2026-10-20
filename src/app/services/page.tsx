@@ -237,7 +237,11 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
         </div>
         <p className="mt-5">
           These are just some of them - I cover all of Auckland. If your suburb isn&apos;t listed,
-          I&apos;m still more than happy to help!
+          I&apos;m still more than happy to help!{" "}
+          <Link href="/areas#travel" className={TEXT_LINK}>
+            Check what travel costs to your suburb
+          </Link>
+          .
         </p>
       </Section>
 

@@ -233,63 +233,37 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     },
   });
 
-  // Ignored TravelBlocks mark Car events meaning "I have the car that day": skip them in the
-  // cache and travel blocks.
-  const ignoredRows = await prisma.travelBlock.findMany({
-    where: { ignored: true },
-    select: { sourceEventId: true, calendarEmail: true },
-  });
-  const ignoredKeys = new Set(ignoredRows.map((r) => `${r.sourceEventId}|${r.calendarEmail}`));
-
-  // Purge cache entries for newly ignored events so the toggle applies without the 30-min TTL.
-  if (ignoredKeys.size > 0) {
-    try {
-      await prisma.calendarEventCache.deleteMany({
-        where: {
-          OR: ignoredRows.map((r) => ({
-            eventId: r.sourceEventId,
-            calendarEmail: r.calendarEmail,
-          })),
-        },
-      });
-    } catch (err) {
-      console.error("[refreshCalendarCache] Failed to purge ignored cache entries:", err);
-    }
-  }
-
   // 30-min TTL over a 15-min cron: one missed run won't push booking onto the live API.
   const cacheExpiry = new Date(now.getTime() + 30 * 60 * 1000);
-  const upsertPromises = rawEvents
-    .filter((event) => !ignoredKeys.has(`${event.id}|${event.calendarEmail}`))
-    .map((event) =>
-      prisma.calendarEventCache.upsert({
-        where: {
-          eventId_calendarEmail: {
-            eventId: event.id,
-            calendarEmail: event.calendarEmail,
-          },
-        },
-        create: {
+  const upsertPromises = rawEvents.map((event) =>
+    prisma.calendarEventCache.upsert({
+      where: {
+        eventId_calendarEmail: {
           eventId: event.id,
           calendarEmail: event.calendarEmail,
-          startAt: new Date(event.start),
-          endAt: new Date(event.end),
-          fetchedAt: now,
-          expiresAt: cacheExpiry,
         },
-        update: {
-          startAt: new Date(event.start),
-          endAt: new Date(event.end),
-          fetchedAt: now,
-          expiresAt: cacheExpiry,
-        },
-      }),
-    );
+      },
+      create: {
+        eventId: event.id,
+        calendarEmail: event.calendarEmail,
+        startAt: new Date(event.start),
+        endAt: new Date(event.end),
+        fetchedAt: now,
+        expiresAt: cacheExpiry,
+      },
+      update: {
+        startAt: new Date(event.start),
+        endAt: new Date(event.end),
+        fetchedAt: now,
+        expiresAt: cacheExpiry,
+      },
+    }),
+  );
 
   await Promise.all(upsertPromises);
 
   console.log(
-    `[refreshCalendarCache] Cached ${upsertPromises.length} events (${ignoredKeys.size} ignored), deleted ${deleteResult.count} expired entries`,
+    `[refreshCalendarCache] Cached ${upsertPromises.length} events, deleted ${deleteResult.count} expired entries`,
   );
 
   // Travel blocks. Origin is the base address setting, else the HOME_ADDRESS env.
@@ -300,23 +274,12 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   }
 
   const bookingCalId = getBookingCalendarId();
-  // WORK_CALENDAR_ID is the fallback name for CAR_CALENDAR_ID.
-  const carCalId = process.env.CAR_CALENDAR_ID ?? process.env.WORK_CALENDAR_ID ?? "";
   const isDev = process.env.NODE_ENV === "development";
-
-  // Car events are home > event > home and excluded from others' origin/chaining, but stay
-  // in calendarEventCache so booking is blocked during them.
-  const travelRelevantEvents = carCalId
-    ? rawEvents.filter((e) => e.calendarEmail !== carCalId)
-    : rawEvents;
 
   if (isDev) {
     console.log(`[travel] HOME_ADDRESS: ${homeAddress}`);
     console.log(`[travel] BOOKING_CALENDAR_ID: ${bookingCalId}`);
     console.log(`[travel] Total raw events: ${rawEvents.length}`);
-    console.log(
-      `[travel] Events available as smart-origin / chaining candidates: ${travelRelevantEvents.length}`,
-    );
     for (const e of rawEvents) {
       console.log(
         `[travel]   event id=${e.id} cal=${e.calendarEmail} start=${e.start} location=${e.location ?? "(none)"}`,
@@ -370,7 +333,6 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   const blockByKey = new Map(
     existingBlocks.map((b) => [`${b.sourceEventId}|${b.calendarEmail}`, b]),
   );
-  // Stale cleanup uses the full event set, so Car events' own blocks survive while present.
   const currentEventKeys = new Set(rawEvents.map((e) => `${e.id}|${e.calendarEmail}`));
 
   // Per-series transport mode, outliving TravelBlock cleanup so new instances inherit it.
@@ -390,17 +352,8 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     const key = `${event.id}|${event.calendarEmail}`;
     const existing = blockByKey.get(key);
 
-    // Ignored ("I have the car that day"): leave the block as-is and skip all writes.
-    if (ignoredKeys.has(key)) {
-      if (isDev) console.log(`[travel] Skipping ignored event "${event.summary}"`);
-      continue;
-    }
-
     const eventStart = new Date(event.start);
     const eventEnd = new Date(event.end);
-
-    // Car events: always home > venue > home, no smart origin, chaining or overrides.
-    const isCarEvent = carCalId !== "" && event.calendarEmail === carCalId;
 
     // Synthetic cache IDs - never written to Google Calendar
     const beforeId = `travel-before:${event.id}`;
@@ -412,15 +365,13 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       ? new Date(eventEnd.getTime() + scheduling.travelBackDepartureBufferMin * 60 * 1000)
       : eventEnd;
 
-    // Origin: the preceding event's location within the lookahead, else home (always for Car).
-    const detectedOrigin = isCarEvent
-      ? homeAddress
-      : findSmartOrigin(
-          travelRelevantEvents,
-          event,
-          homeAddress,
-          scheduling.smartOriginLookaheadHours,
-        );
+    // Origin: the preceding event's location within the lookahead, else home.
+    const detectedOrigin = findSmartOrigin(
+      rawEvents,
+      event,
+      homeAddress,
+      scheduling.smartOriginLookaheadHours,
+    );
     // customOrigin (user override) takes precedence over auto-detection
     const effectiveOrigin = existing?.customOrigin ?? detectedOrigin;
 
@@ -429,11 +380,10 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     const hasCustomBackDestination = existing?.customTravelBackDestination != null;
 
     // Chaining candidate, stored on the block so later runs see it move. Skipped with a
-    // custom back destination or on a Car event.
-    const chained =
-      hasCustomBackDestination || isCarEvent
-        ? null
-        : findNextChainedEvent(travelRelevantEvents, event, departureForBack, new Set<string>());
+    // custom back destination.
+    const chained = hasCustomBackDestination
+      ? null
+      : findNextChainedEvent(rawEvents, event, departureForBack, new Set<string>());
     const currentChainedId = chained?.event.id ?? null;
     const currentChainedStart = chained?.startAt ?? null;
 
@@ -613,7 +563,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       continue;
     }
 
-    // Destination: the location field, else the title; the actual venue even for Car events.
+    // Destination: the location field, else the title.
     const eventLocation = (event.location ?? event.summary)!;
 
     // Mode precedence: per-instance override > series preference > default "driving".
