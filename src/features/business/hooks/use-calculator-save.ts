@@ -28,12 +28,27 @@ import type {
   TaskTemplate,
 } from "@/features/business/types/business";
 import { roundCents } from "@/shared/lib/money";
+import { formatNZPhone } from "@/shared/lib/normalise-phone";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
 
 /** The income method a cash job records under. */
 const CASH: (typeof INCOME_METHODS)[number] = "Cash";
+
+/**
+ * Short "021 281 6644, 71 Moa Road" tag that tells two same-named contacts apart.
+ * @param phone - The contact's stored phone, usually E.164.
+ * @param address - The contact's stored address; only the part before the first comma shows.
+ * @returns The tag, or null when the contact has neither.
+ */
+function contactDetail(phone?: string | null, address?: string | null): string | null {
+  const parts = [
+    phone?.trim() ? formatNZPhone(phone.trim().replace(/^\+64/, "0")) : null,
+    address?.split(",")[0]?.trim() || null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
 
 /** Calculator state the save paths read. */
 interface UseCalculatorSaveArgs {
@@ -80,6 +95,8 @@ interface UseCalculatorSave {
   pendingInvoiceId: string | null;
   /** Name of an existing contact missing the typed email, or null. */
   pendingExistingName: string | null;
+  /** That contact's phone and street, so the popup shows which person it is. */
+  pendingExistingDetail: string | null;
   savingIncome: boolean;
   incomeError: string | null;
   handleSaveInvoice: (send?: boolean, quote?: boolean) => Promise<void>;
@@ -142,8 +159,9 @@ export function useCalculatorSave({
   // Existing contact (matched by Google link) lacking the typed email, so the popup
   // offers to add the email.
   const [pendingExistingName, setPendingExistingName] = useState<string | null>(null);
-  // That contact's id, so the invoice still links to it when the operator declines.
-  const [pendingExistingId, setPendingExistingId] = useState<string | null>(null);
+  const [pendingExistingDetail, setPendingExistingDetail] = useState<string | null>(null);
+  // The popup interrupted a "Save & send", so closing it carries on to the send preview.
+  const [pendingSend, setPendingSend] = useState(false);
   const [savingIncome, setSavingIncome] = useState(false);
   const [incomeError, setIncomeError] = useState<string | null>(null);
   // Income rows already in, so a retry after a half-saved split posts only the missing one.
@@ -231,22 +249,21 @@ export function useCalculatorSave({
   }
 
   /**
-   * Closes the add-to-contacts modal after a direct save, best-effort linking the invoice
-   * to the contact before navigating to the detail page.
-   * @param contactDbId - Contact the modal created or updated, or null on dismiss / failure
-   *   (an already-known contact missing the email is linked instead).
+   * Closes the add-to-contacts modal after a save, best-effort linking the invoice to the
+   * contact before navigating to the detail page (and its send preview after a Save & send).
+   * @param contactDbId - Contact the modal created or updated, or null on dismiss / failure.
+   *   Declining leaves the invoice unlinked: the picked contact may be a different person
+   *   with the same name, and linking would let their contact pick up this email.
    */
   async function handleAddContactClose(contactDbId?: string | null): Promise<void> {
     const invoiceId = pendingInvoiceId;
     if (!invoiceId) return;
     setPendingInvoiceId(null);
-    // Declining to add the email still links the invoice to the contact it belongs to.
-    const linkId = contactDbId ?? pendingExistingId;
-    if (linkId) {
-      await linkInvoiceToContact(invoiceId, linkId);
+    if (contactDbId) {
+      await linkInvoiceToContact(invoiceId, contactDbId);
     }
     clearDraft();
-    router.push(`/admin/business/invoices/${invoiceId}`);
+    router.push(`/admin/business/invoices/${invoiceId}${pendingSend ? "?send=1" : ""}`);
   }
 
   // Paid in cash wins over the box; an amount covering the total is a full payment.
@@ -295,12 +312,14 @@ export function useCalculatorSave({
     setSaveSendMode(false);
     setSaveQuoteMode(false);
     setPendingInvoiceId(null);
+    setPendingSend(false);
   }
 
   /**
    * Direct save: POSTs the calculator state to the invoices API and navigates to the
    * detail page. Backdating and custom numbers are done by editing the saved DRAFT.
-   * @param send - "Save & send": skip the add-to-contacts gate and open `?send=1`.
+   * @param send - "Save & send": open `?send=1`, skipping the add-to-contacts gate for a
+   *   brand-new client (the send preview has its own prompt) but not for a picked contact.
    * @param quote - "Save as quote": saves as a QUOTE with a Q- number and 30-day validity.
    */
   async function handleSaveInvoice(send = false, quote = false): Promise<void> {
@@ -435,6 +454,8 @@ export function useCalculatorSave({
             linkedContactId?: string | null;
             existingContactId?: string | null;
             existingContactName?: string | null;
+            existingContactPhone?: string | null;
+            existingContactAddress?: string | null;
           };
           if (checkRes.ok) {
             // Found by Google link, so a changed email can't aim the rename at someone else.
@@ -444,14 +465,17 @@ export function useCalculatorSave({
             const existingId = checkData.existingContactId ?? null;
             if (checkData.contactId) {
               await linkInvoiceToContact(invoiceId, checkData.contactId);
-            } else if (existingId && send) {
-              // Already a contact, just without this email: link now to avoid a duplicate.
-              await linkInvoiceToContact(invoiceId, existingId);
-            } else if (checkData.exists === false && !send) {
+            } else if (checkData.exists === false && (!send || existingId)) {
               // Unknown email: defer nav so handleAddContactClose can create and link the
-              // contact. "Save & send" skips this; the send flow has its own prompt.
-              setPendingExistingId(existingId);
+              // contact. A picked contact is never linked without asking, Save & send
+              // included - picking the wrong same-named person would hand them this email.
               setPendingExistingName(checkData.existingContactName ?? null);
+              setPendingExistingDetail(
+                existingId
+                  ? contactDetail(checkData.existingContactPhone, checkData.existingContactAddress)
+                  : null,
+              );
+              setPendingSend(send);
               setPendingInvoiceId(invoiceId);
               setSavingInvoice(false);
               return;
@@ -553,6 +577,7 @@ export function useCalculatorSave({
     saveInvoiceError,
     pendingInvoiceId,
     pendingExistingName,
+    pendingExistingDetail,
     savingIncome,
     incomeError,
     handleSaveInvoice,

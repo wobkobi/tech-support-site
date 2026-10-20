@@ -199,6 +199,35 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
 }
 
 /**
+ * Whether two contacts are linked to different Google contacts. Google keeps them as two
+ * people, so a shared email or mobile is a mistake to fix by hand, not a duplicate: auto-merging
+ * would fold one person's details into the other and push them to the wrong Google contact.
+ * @param a - One contact.
+ * @param b - The other contact.
+ * @returns True when both have a Google link and the links differ.
+ */
+function separateInGoogle(a: MergeableContact, b: MergeableContact): boolean {
+  return !!a.googleContactId && !!b.googleContactId && a.googleContactId !== b.googleContactId;
+}
+
+/**
+ * Logs a pair the email or mobile pass left unmerged because Google keeps them apart.
+ * @param keeper - The row that would have survived.
+ * @param dup - The row that would have been merged away.
+ * @param shared - What the two rows share, for the log line.
+ */
+function warnSeparateInGoogle(
+  keeper: MergeableContact,
+  dup: MergeableContact,
+  shared: string,
+): void {
+  console.warn(
+    `[contacts/maintenance] not merging ${dup.id} into ${keeper.id}: they share ${shared} but ` +
+      "are separate Google contacts. Merge them by hand if they're the same person.",
+  );
+}
+
+/**
  * Merges live contacts sharing a googleContactId (the strongest duplicate signal) into the oldest.
  * @returns The number of duplicate contacts merged away.
  */
@@ -233,7 +262,7 @@ export async function mergeDuplicateGoogleContacts(): Promise<number> {
 
 /**
  * Merges live contacts sharing a case-insensitive email into the oldest, which carries
- * the original reviewToken and history.
+ * the original reviewToken and history. Rows linked to different Google contacts are skipped.
  * @returns The number of duplicate contacts merged away.
  */
 export async function mergeDuplicateEmailContacts(): Promise<number> {
@@ -256,6 +285,10 @@ export async function mergeDuplicateEmailContacts(): Promise<number> {
     const [keeper, ...dupes] = rows;
     if (!keeper) continue;
     for (const dup of dupes) {
+      if (separateInGoogle(keeper, dup)) {
+        warnSeparateInGoogle(keeper, dup, "an email");
+        continue;
+      }
       if (await foldContactInto(keeper, dup)) merged++;
     }
   }
@@ -267,7 +300,8 @@ export async function mergeDuplicateEmailContacts(): Promise<number> {
 
 /**
  * Merges contacts sharing a mobile: phone-only rows fold into the email-bearing one, else
- * the oldest. Runs before backfill so the post-merge set is accurate.
+ * the oldest. Rows linked to different Google contacts are skipped. Runs before backfill so
+ * the post-merge set is accurate.
  * @returns The set of contact ids that were merged away (deleted).
  */
 export async function mergePhoneOnlyContacts(): Promise<Set<string>> {
@@ -302,6 +336,10 @@ export async function mergePhoneOnlyContacts(): Promise<Set<string>> {
     for (const dup of dupes) {
       // Two mobiles put a person in two buckets; skip a pair already merged away.
       if (deletedIds.has(keeper.id) || deletedIds.has(dup.id)) continue;
+      if (separateInGoogle(keeper, dup)) {
+        warnSeparateInGoogle(keeper, dup, "a mobile");
+        continue;
+      }
       if (await foldContactInto(keeper, dup)) deletedIds.add(dup.id);
     }
   }
