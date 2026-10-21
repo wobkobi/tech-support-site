@@ -334,7 +334,9 @@ function DesignGrid({
   }
 
   return (
-    <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    // items-start: each card is as tall as its own picture, so a landscape design isn't
+    // stretched to a portrait neighbour's height.
+    <ul className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {rows.map((r) => (
         <li
           key={r.id}
@@ -342,15 +344,15 @@ function DesignGrid({
         >
           <Link
             href={`/admin/social/design/${r.id}`}
-            // 4:5 box for the export; a short strip when nothing is exported.
+            // The export at its own shape; a short strip when nothing is exported.
             className={cn(
-              "flex items-center justify-center bg-seasalt-100",
-              r.thumbnailUrl ? "aspect-4/5" : "h-24",
+              "bg-seasalt-100",
+              r.thumbnailUrl ? "block" : "flex h-24 items-center justify-center",
             )}
           >
             {r.thumbnailUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- Blob thumbnail at a fixed small size; next/image adds nothing here.
-              <img src={r.thumbnailUrl} alt="" className="size-full object-contain" />
+              // eslint-disable-next-line @next/next/no-img-element -- Blob thumbnail of unknown size, which next/image needs up front.
+              <img src={r.thumbnailUrl} alt="" className="h-auto w-full" />
             ) : (
               <span className="text-sm text-admin-muted">Not exported yet</span>
             )}

@@ -6,6 +6,7 @@
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
+import { StickyList } from "@/features/admin/components/ui/StickyList";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
@@ -522,38 +523,42 @@ export function ContactAdminList({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {mergeSourceId && (
-        <ContactMergeBanner source={mergeSource} onCancel={() => setMergeSourceId(null)} />
-      )}
-
-      <ContactListToolbar
-        query={query}
-        setQuery={setQuery}
-        exporting={exporting}
-        onExport={() => void exportContacts()}
-        syncFilter={syncFilter}
-        setSyncFilter={setSyncFilter}
-        reviewedOnly={reviewedOnly}
-        setReviewedOnly={setReviewedOnly}
-        retainerOnly={retainerOnly}
-        setRetainerOnly={setRetainerOnly}
-        noEmail={noEmail}
-        setNoEmail={setNoEmail}
-        noPhone={noPhone}
-        setNoPhone={setNoPhone}
-        anyFilter={anyFilter}
-        onClearFilters={() => {
-          setSyncFilter("all");
-          setReviewedOnly(false);
-          setRetainerOnly(false);
-          setNoEmail(false);
-          setNoPhone(false);
-        }}
-        sort={sort}
-        setSort={setSort}
-      />
-
+    <StickyList
+      toolbar={
+        // The merge banner pins with the toolbar, so it stays in view while picking a row.
+        <div className="flex flex-col gap-6 pb-6 lg:gap-3 lg:pb-4">
+          {mergeSourceId && (
+            <ContactMergeBanner source={mergeSource} onCancel={() => setMergeSourceId(null)} />
+          )}
+          <ContactListToolbar
+            query={query}
+            setQuery={setQuery}
+            exporting={exporting}
+            onExport={() => void exportContacts()}
+            syncFilter={syncFilter}
+            setSyncFilter={setSyncFilter}
+            reviewedOnly={reviewedOnly}
+            setReviewedOnly={setReviewedOnly}
+            retainerOnly={retainerOnly}
+            setRetainerOnly={setRetainerOnly}
+            noEmail={noEmail}
+            setNoEmail={setNoEmail}
+            noPhone={noPhone}
+            setNoPhone={setNoPhone}
+            anyFilter={anyFilter}
+            onClearFilters={() => {
+              setSyncFilter("all");
+              setReviewedOnly(false);
+              setRetainerOnly(false);
+              setNoEmail(false);
+              setNoPhone(false);
+            }}
+            sort={sort}
+            setSort={setSort}
+          />
+        </div>
+      }
+    >
       <ContactMergeDialog
         source={mergeSource}
         target={mergeTarget}
@@ -562,51 +567,53 @@ export function ContactAdminList({
         onCancel={() => setMergeTargetId(null)}
       />
 
-      {/* New contacts - added in the last 7 days */}
-      {newContacts.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <h3 className={cn(SECTION_HEADING_CLS, "flex items-center gap-2 text-admin-text")}>
-            New
-            <StatusPill tone="info">{newContacts.length}</StatusPill>
-          </h3>
-          {renderGroup(newContacts)}
-        </section>
-      )}
+      <div className="flex flex-col gap-6">
+        {/* New contacts - added in the last 7 days */}
+        {newContacts.length > 0 && (
+          <section className="flex flex-col gap-3">
+            <h3 className={cn(SECTION_HEADING_CLS, "flex items-center gap-2 text-admin-text")}>
+              New
+              <StatusPill tone="info">{newContacts.length}</StatusPill>
+            </h3>
+            {renderGroup(newContacts)}
+          </section>
+        )}
 
-      {/* Unsynced contacts - shown prominently */}
-      {unsynced.length > 0 ? (
-        <section className="flex flex-col gap-3">
-          <h3 className={cn(SECTION_HEADING_CLS, "text-russian-violet")}>
-            Needs syncing ({unsynced.length})
-          </h3>
-          {renderGroup(unsynced)}
-        </section>
-      ) : (
-        <p className="text-sm text-admin-muted">All contacts are synced to Google.</p>
-      )}
+        {/* Unsynced contacts - shown prominently */}
+        {unsynced.length > 0 ? (
+          <section className="flex flex-col gap-3">
+            <h3 className={cn(SECTION_HEADING_CLS, "text-russian-violet")}>
+              Needs syncing ({unsynced.length})
+            </h3>
+            {renderGroup(unsynced)}
+          </section>
+        ) : (
+          <p className="text-sm text-admin-muted">All contacts are synced to Google.</p>
+        )}
 
-      {/* Synced contacts - collapsible */}
-      {synced.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <button
-            type="button"
-            onClick={() => setSyncedOpen((o) => !o)}
-            aria-expanded={syncedOpen}
-            className="flex items-center gap-2 self-start text-left"
-          >
-            <span className={cn(SECTION_HEADING_CLS, "text-admin-muted")}>
-              Synced contacts ({synced.length})
-            </span>
-            <span className="text-sm text-admin-muted">{syncedOpen ? "▲" : "▼"}</span>
-          </button>
-          {syncedOpen && (
-            <div className="flex flex-col gap-3">
-              {renderGroup(syncedPager.visible)}
-              <ShowMoreButton pager={syncedPager} noun={["contact", "contacts"]} />
-            </div>
-          )}
-        </section>
-      )}
-    </div>
+        {/* Synced contacts - collapsible */}
+        {synced.length > 0 && (
+          <section className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => setSyncedOpen((o) => !o)}
+              aria-expanded={syncedOpen}
+              className="flex items-center gap-2 self-start text-left"
+            >
+              <span className={cn(SECTION_HEADING_CLS, "text-admin-muted")}>
+                Synced contacts ({synced.length})
+              </span>
+              <span className="text-sm text-admin-muted">{syncedOpen ? "▲" : "▼"}</span>
+            </button>
+            {syncedOpen && (
+              <div className="flex flex-col gap-3">
+                {renderGroup(syncedPager.visible)}
+                <ShowMoreButton pager={syncedPager} noun={["contact", "contacts"]} />
+              </div>
+            )}
+          </section>
+        )}
+      </div>
+    </StickyList>
   );
 }

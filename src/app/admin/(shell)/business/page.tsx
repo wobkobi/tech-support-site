@@ -7,6 +7,7 @@ import { incomeExpenseSeries } from "@/features/admin/components/charts/series";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminTabs } from "@/features/admin/components/ui/AdminTabs";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
+import { StickyRail } from "@/features/admin/components/ui/StickyRail";
 import {
   BusinessDashboardCards,
   type ExpenseRow,
@@ -274,7 +275,15 @@ export default async function BusinessPage({
 
   return (
     <>
-      <PageHeader title="Business" />
+      <PageHeader
+        title="Business"
+        // Outline so none reads as primary.
+        actions={links.map((l) => (
+          <AdminButton key={l.label} href={l.href} variant="outline">
+            {l.label}
+          </AdminButton>
+        ))}
+      />
 
       {/* FY scope selector: links, so `?fy=` stays the source of truth. */}
       <AdminTabs
@@ -310,41 +319,35 @@ export default async function BusinessPage({
         taxHref={taxHref}
       />
 
-      <BarChart
-        // Remount per scope so hover, focus and the tab stop don't carry over.
-        key={scope.key}
-        title={
-          scope.isAllTime ? "Income vs expenses by financial year" : "Income vs expenses by month"
-        }
-        description={scope.label}
-        series={incomeExpenseSeries(gst.registered)}
-        groups={chartGroups}
-        groupHeading={scope.isAllTime ? "Financial year" : "Month"}
-        differenceLabel="Profit"
-        emptyText="No income or expenses recorded in this period."
-        className="mb-8"
-      />
+      {/* Chart beside a pinned tax + import column from xl; stacked below it. */}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_26rem] xl:items-start">
+        <BarChart
+          // Remount per scope so hover, focus and the tab stop don't carry over.
+          key={scope.key}
+          title={
+            scope.isAllTime ? "Income vs expenses by financial year" : "Income vs expenses by month"
+          }
+          description={scope.label}
+          series={incomeExpenseSeries(gst.registered)}
+          groups={chartGroups}
+          groupHeading={scope.isAllTime ? "Financial year" : "Month"}
+          differenceLabel="Profit"
+          emptyText="No income or expenses recorded in this period."
+        />
 
-      <TaxSummaryCard
-        scopeLabel={scope.label}
-        isAllTime={scope.isAllTime}
-        estimate={taxEstimate}
-        targets={taxTargets}
-        gst={gstRollup}
-        gstRegisteredFrom={gst.registeredFrom}
-        href={taxHref}
-      />
-
-      {/* Action links: stacked on mobile, side by side from sm; outline so none reads as primary. */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        {links.map((l) => (
-          <AdminButton key={l.label} href={l.href} variant="outline" className="w-full sm:w-auto">
-            {l.label}
-          </AdminButton>
-        ))}
+        <StickyRail className="flex flex-col gap-6">
+          <TaxSummaryCard
+            scopeLabel={scope.label}
+            isAllTime={scope.isAllTime}
+            estimate={taxEstimate}
+            targets={taxTargets}
+            gst={gstRollup}
+            gstRegisteredFrom={gst.registeredFrom}
+            href={taxHref}
+          />
+          <SheetImportButton />
+        </StickyRail>
       </div>
-
-      <SheetImportButton />
     </>
   );
 }

@@ -9,6 +9,7 @@ import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { ADMIN_INPUT_CLS, ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { FieldError } from "@/features/admin/components/ui/FieldError";
+import { StickyActionBar } from "@/features/admin/components/ui/StickyActionBar";
 import { useUnsavedChangesWarning } from "@/features/admin/hooks/use-unsaved-changes-warning";
 import {
   checkContactFields,
@@ -360,11 +361,11 @@ export function InvoiceForm({
         </p>
       )}
 
-      <div className="flex justify-end">
+      <StickyActionBar variant="page">
         <AdminButton type="submit" busy={busy}>
           {submitLabel}
         </AdminButton>
-      </div>
+      </StickyActionBar>
     </form>
   );
 }

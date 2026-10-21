@@ -101,76 +101,73 @@ export default async function AdminPriceEstimatesPage({
         ))}
       </StatStrip>
 
-      <Card padding="none">
-        <div className="p-4 sm:p-6">
-          {logs.length === 0 ? (
-            <EmptyState title="No price estimates logged yet." />
-          ) : (
-            <ul className="divide-y divide-admin-border">
-              {logs.map((log) => (
-                <li key={log.id} className="py-4">
-                  <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="flex items-center gap-2 text-sm text-admin-faint">
-                      {formatDateTimeShort(log.createdAt.toISOString())}
-                      {log.environment !== "production" && (
-                        <StatusPill tone="critical">{log.environment}</StatusPill>
-                      )}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2 text-sm">
-                      <StatusPill tone={log.aiCategory === "complex" ? "critical" : "info"}>
-                        {log.aiCategory}
-                      </StatusPill>
-                      <span className="text-admin-muted">
-                        {formatMins(log.aiEstimatedMins)} at ${log.hourlyRate.toFixed(0)}/hr
-                      </span>
-                      <span className="font-bold text-russian-violet">
-                        ${log.priceLow} - ${log.priceHigh}
-                      </span>
-                    </div>
-                  </div>
-
-                  <p className="mb-2 text-sm whitespace-pre-wrap text-admin-text">
-                    {log.description}
+      <Card>
+        {logs.length === 0 ? (
+          <EmptyState title="No price estimates logged yet." />
+        ) : (
+          <ul className="divide-y divide-admin-border">
+            {logs.map((log) => (
+              <li key={log.id} className="py-4 first:pt-0 last:pb-0">
+                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="flex items-center gap-2 text-sm text-admin-faint">
+                    {formatDateTimeShort(log.createdAt.toISOString())}
+                    {log.environment !== "production" && (
+                      <StatusPill tone="critical">{log.environment}</StatusPill>
+                    )}
                   </p>
-
-                  {log.aiExplanation && (
-                    <p className="mb-2 text-sm text-admin-muted italic">AI: {log.aiExplanation}</p>
-                  )}
-
-                  {log.aiTasks.length > 0 && (
-                    <div className="mb-2 flex flex-wrap gap-1.5">
-                      {log.aiTasks.map((task, i) => (
-                        <span
-                          key={`${log.id}-task-${i}`}
-                          className="rounded-md bg-admin-bg px-2 py-0.5 text-sm text-admin-muted"
-                        >
-                          {task.label}: {formatMins(task.mins)}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-admin-faint">
-                    {log.address && (
-                      <span>
-                        <span className="font-medium text-admin-muted">Address:</span> {log.address}
-                        {log.travelMins != null && log.travelMins > 0
-                          ? ` (${formatMins(log.travelMins)} drive)`
-                          : ""}
-                      </span>
-                    )}
-                    {log.promoLabel && (
-                      <span>
-                        <span className="font-medium text-admin-muted">Promo:</span>{" "}
-                        {log.promoLabel}
-                      </span>
-                    )}
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <StatusPill tone={log.aiCategory === "complex" ? "critical" : "info"}>
+                      {log.aiCategory}
+                    </StatusPill>
+                    <span className="text-admin-muted">
+                      {formatMins(log.aiEstimatedMins)} at ${log.hourlyRate.toFixed(0)}/hr
+                    </span>
+                    <span className="font-bold text-russian-violet">
+                      ${log.priceLow} - ${log.priceHigh}
+                    </span>
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                </div>
+
+                <p className="mb-2 text-sm whitespace-pre-wrap text-admin-text">
+                  {log.description}
+                </p>
+
+                {log.aiExplanation && (
+                  <p className="mb-2 text-sm text-admin-muted italic">AI: {log.aiExplanation}</p>
+                )}
+
+                {log.aiTasks.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {log.aiTasks.map((task, i) => (
+                      <span
+                        key={`${log.id}-task-${i}`}
+                        className="rounded-md bg-admin-bg px-2 py-0.5 text-sm text-admin-muted"
+                      >
+                        {task.label}: {formatMins(task.mins)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-admin-faint">
+                  {log.address && (
+                    <span>
+                      <span className="font-medium text-admin-muted">Address:</span> {log.address}
+                      {log.travelMins != null && log.travelMins > 0
+                        ? ` (${formatMins(log.travelMins)} drive)`
+                        : ""}
+                    </span>
+                  )}
+                  {log.promoLabel && (
+                    <span>
+                      <span className="font-medium text-admin-muted">Promo:</span> {log.promoLabel}
+                    </span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
     </>
   );

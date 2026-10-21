@@ -26,7 +26,7 @@ export function DashboardAlerts({
 }): React.ReactElement | null {
   if (overdueCount === 0 && heldCount === 0) return null;
   return (
-    <div className="mb-6 grid gap-3 sm:grid-cols-2">
+    <div className="mb-6 grid grid-cols-[repeat(auto-fit,minmax(min(18rem,100%),1fr))] gap-3">
       {overdueCount > 0 && (
         <Notice tone="warn" onGrey>
           <Link href="/admin/business/invoices?status=overdue" className={ALERT_LINK_CLS}>

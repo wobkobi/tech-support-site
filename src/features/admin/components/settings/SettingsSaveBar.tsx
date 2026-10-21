@@ -4,6 +4,7 @@
 // controls that cause them, so a cancelled confirm just reverts that switch.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { StickyActionBar } from "@/features/admin/components/ui/StickyActionBar";
 import type React from "react";
 
 /** Props for {@link SettingsSaveBar}. */
@@ -38,11 +39,8 @@ export function SettingsSaveBar({
   onReset,
 }: SettingsSaveBarProps): React.ReactElement {
   return (
-    // Sticky + full-bleed so the actions stay reachable on long tabs.
-    <div
-      data-phone-bar="sticky"
-      className="sticky bottom-0 z-10 -mx-4 mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-admin-border bg-admin-surface/95 px-4 py-2.5 backdrop-blur sm:-mx-5 sm:px-5"
-    >
+    // Pinned at every width so the actions stay reachable on long tabs.
+    <StickyActionBar stickOnPhone>
       <AdminButton variant="primary" busy={saving} disabled={!dirty || saving} onClick={onSave}>
         Save changes
       </AdminButton>
@@ -55,6 +53,6 @@ export function SettingsSaveBar({
       {!dirty && savedAt && (
         <span className="basis-full text-sm font-medium text-green-700 sm:basis-auto">Saved</span>
       )}
-    </div>
+    </StickyActionBar>
   );
 }

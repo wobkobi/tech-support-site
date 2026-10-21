@@ -83,7 +83,9 @@ interface CardHeaderProps {
 
 /**
  * Title / description / actions row for a {@link Card}. As the first child it runs edge
- * to edge via negative margins; elsewhere it just keeps the rule.
+ * to edge via negative margins; elsewhere it just keeps the rule. As the last child too
+ * (a card whose body is closed or empty) it drops the rule and the card's bottom padding,
+ * so the card is just the header bar instead of a header over an empty strip.
  * @param props - Component props.
  * @param props.title - Header title.
  * @param props.description - Optional supporting description.
@@ -100,7 +102,7 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "-mx-(--card-pad,0px) mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-admin-border px-(--card-pad-x,0px) py-3.5 first:-mt-(--card-pad,0px)",
+        "-mx-(--card-pad,0px) mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-admin-border px-(--card-pad-x,0px) py-3.5 first:-mt-(--card-pad,0px) last:-mb-(--card-pad,0px) last:border-b-0",
         className,
       )}
     >

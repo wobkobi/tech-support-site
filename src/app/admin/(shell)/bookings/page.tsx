@@ -2,7 +2,6 @@
 // Admin bookings list: the latest 1000 bookings, list columns only, rendered by the
 // filterable BookingAdminList.
 
-import { Card } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import type { PageQuery } from "@/features/admin/hooks/use-query-sync";
 import {
@@ -81,9 +80,7 @@ export default async function AdminBookingsPage({
   return (
     <>
       <PageHeader title="Bookings" description="Search, filter, and manage customer bookings." />
-      <Card flushOnPhone className="sm:p-6">
-        <BookingAdminList bookings={bookingRows} query={query} />
-      </Card>
+      <BookingAdminList bookings={bookingRows} query={query} />
     </>
   );
 }

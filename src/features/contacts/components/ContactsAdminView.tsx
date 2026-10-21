@@ -1,24 +1,35 @@
 "use client";
 // src/features/contacts/components/ContactsAdminView.tsx
-// Client wrapper for the contacts page: name/phone conflict resolution and the Google
-// Contacts sync.
+// Client side of the contacts page: the header with the Google Contacts sync and address
+// check, name/phone conflict resolution, and the contact list.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { Card } from "@/features/admin/components/ui/Card";
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import type { PageQuery } from "@/features/admin/hooks/use-query-sync";
 import type { ConflictEntry } from "@/features/contacts/lib/maintenance";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ContactAdminList } from "./ContactAdminList";
 import type { ContactRow } from "./ContactCard";
 
 /** Small uppercase label above each conflict's pick buttons. */
 const CONFLICT_LABEL_CLS = "text-sm font-semibold tracking-wide text-admin-muted uppercase";
 
+/** What Check all addresses does, for the button's tooltip (the check runs on one click). */
+const ADDRESS_CHECK_NOTE =
+  "Re-checks every stored address and flags the ones that don't match a single Auckland address. Takes a while - one lookup per contact.";
+
 interface ContactsAdminViewProps {
+  /** Page title. */
+  title: string;
+  /** Line under the title. */
+  description: React.ReactNode;
+  /** Totals and notices shown under the header, above the conflicts and list. */
+  summary?: React.ReactNode;
   initialConflicts: ConflictEntry[];
   contacts: ContactRow[];
   /** The page's searchParams, the list's starting filters. */
@@ -27,13 +38,20 @@ interface ContactsAdminViewProps {
 
 /**
  * Client wrapper for the contacts page handling conflict resolution and Google sync state.
+ * Draws the page header so the sync and address check buttons can sit in it.
  * @param props - Component props.
+ * @param props.title - Page title.
+ * @param props.description - Line under the title.
+ * @param props.summary - Totals and notices shown under the header.
  * @param props.initialConflicts - Conflicts pre-computed by enrichContactsFromBookings on page load.
  * @param props.contacts - All contact rows to display.
  * @param props.query - The page's searchParams, the list's starting filters.
  * @returns Contacts admin view element.
  */
 export function ContactsAdminView({
+  title,
+  description,
+  summary,
   initialConflicts,
   contacts,
   query,
@@ -46,6 +64,11 @@ export function ContactsAdminView({
   const [syncConfirmPending, setSyncConfirmPending] = useState(false);
   const [checkingAddresses, setCheckingAddresses] = useState(false);
   const [addressResult, setAddressResult] = useState<string | null>(null);
+  const confirmRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (syncConfirmPending) confirmRef.current?.focus();
+  }, [syncConfirmPending]);
 
   // Local `syncing` resets on navigation, so ask the server on mount and poll until done,
   // or a second sync could fire mid-run.
@@ -181,13 +204,38 @@ export function ContactsAdminView({
     setConflicts((prev) => prev.filter((c) => c.sourceId !== sourceId));
   }, []);
 
+  const showStatus =
+    syncConfirmPending || syncing || checkingAddresses || !!syncResult || !!addressResult;
+
   return (
-    // The table needs ~60rem, so the rail sits beside it only from 1800px. From lg the
-    // left column dissolves (contents): conflicts, then the rail's two cards, then the list.
-    <div className="grid grid-cols-1 items-start gap-6 min-[1800px]:grid-cols-[minmax(0,1fr)_20rem]">
-      {/* Left column: conflicts + contact list */}
-      <div className="flex min-w-0 flex-col gap-6 lg:max-[1800px]:contents">
-        {/* Conflicts */}
+    <>
+      <PageHeader
+        title={title}
+        description={description}
+        actions={
+          <>
+            <AdminButton
+              variant="secondary"
+              onClick={() => setSyncConfirmPending(true)}
+              disabled={syncing || syncConfirmPending}
+              title={`${syncedCount} synced · ${unsyncedCount} not yet in Google`}
+            >
+              {syncing ? "Syncing…" : "Sync with Google Contacts"}
+            </AdminButton>
+            <AdminButton
+              variant="secondary"
+              onClick={() => void runAddressCheck()}
+              disabled={checkingAddresses}
+              title={ADDRESS_CHECK_NOTE}
+            >
+              {checkingAddresses ? "Checking…" : "Check all addresses"}
+            </AdminButton>
+          </>
+        }
+      />
+      {summary}
+
+      <div className="flex flex-col gap-6">
         {conflicts.length > 0 && (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 sm:p-5">
             <p className="mb-3 text-sm font-bold text-amber-900">
@@ -270,78 +318,58 @@ export function ContactsAdminView({
           </div>
         )}
 
-        {/* Contact list */}
-        <Card flushOnPhone className="min-w-0 lg:max-[1800px]:order-last">
+        {/* Header button work in progress or just done; hidden while idle. */}
+        {showStatus && (
+          <Card padding="sm" className="flex flex-col gap-3 text-sm">
+            {syncConfirmPending && (
+              // Focused on open: the panel can sit well below the header button that opened it.
+              <div ref={confirmRef} tabIndex={-1}>
+                <p className="mb-2 font-bold text-admin-text">Confirm sync with Google?</p>
+                <ul className="mb-3 space-y-1 text-admin-text-secondary">
+                  <li>• {unsyncedCount} contacts will be created in Google Contacts</li>
+                  <li>
+                    • {syncedCount} contacts will have their email, phone, and address pushed to
+                    Google
+                  </li>
+                  <li>• Google contacts not in your local DB will be imported</li>
+                </ul>
+                <div className="flex gap-2">
+                  <AdminButton variant="outline" onClick={() => void runSync()}>
+                    Confirm
+                  </AdminButton>
+                  <AdminButton variant="secondary" onClick={() => setSyncConfirmPending(false)}>
+                    Cancel
+                  </AdminButton>
+                </div>
+              </div>
+            )}
+            <div className="flex flex-col gap-1 text-admin-muted empty:hidden">
+              {syncing && <p>Syncing with Google Contacts…</p>}
+              {syncResult && (
+                <p>
+                  <span className="font-semibold text-admin-text">Google Contacts sync:</span>{" "}
+                  {syncResult}
+                </p>
+              )}
+              {checkingAddresses && (
+                <p>Checking addresses… This takes a while - one lookup per contact.</p>
+              )}
+              {addressResult && (
+                <p>
+                  <span className="font-semibold text-admin-text">Address check:</span>{" "}
+                  {addressResult}
+                </p>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {/* The card frames the phone cards up to lg. From lg the tables carry their own
+            borders, so the list sits straight on the page like the other admin lists. */}
+        <Card flushOnPhone className="min-w-0 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0">
           <ContactAdminList contacts={contacts} query={query} />
         </Card>
       </div>
-      {/* end left column */}
-
-      {/* Right column: Google sync. top-22 clears the 56px top bar. */}
-      <div className="grid grid-cols-1 items-start gap-4 min-[1800px]:sticky min-[1800px]:top-22 lg:max-[1800px]:grid-cols-2">
-        <Card>
-          <CardHeader
-            className="mb-3"
-            title="Google Contacts sync"
-            description={`${syncedCount} synced · ${unsyncedCount} not yet in Google`}
-          />
-          <AdminButton
-            variant="outline"
-            onClick={() => setSyncConfirmPending(true)}
-            disabled={syncing || syncConfirmPending}
-            className="w-full"
-          >
-            {syncing ? "Syncing…" : "Sync with Google Contacts"}
-          </AdminButton>
-
-          {syncConfirmPending && (
-            <div className="mt-4 rounded-lg border border-admin-border bg-admin-bg p-4">
-              <p className="mb-2 text-sm font-bold text-admin-text">Confirm sync with Google?</p>
-              <ul className="mb-3 space-y-1 text-sm text-admin-text-secondary">
-                <li>• {unsyncedCount} contacts will be created in Google Contacts</li>
-                <li>
-                  • {syncedCount} contacts will have their email, phone, and address pushed to
-                  Google
-                </li>
-                <li>• Google contacts not in your local DB will be imported</li>
-              </ul>
-              <div className="flex gap-2">
-                <AdminButton variant="outline" onClick={() => void runSync()}>
-                  Confirm
-                </AdminButton>
-                <AdminButton variant="secondary" onClick={() => setSyncConfirmPending(false)}>
-                  Cancel
-                </AdminButton>
-              </div>
-            </div>
-          )}
-
-          {syncResult && <p className="mt-3 text-sm text-admin-muted">{syncResult}</p>}
-        </Card>
-
-        <Card>
-          <CardHeader
-            className="mb-3"
-            title="Address check"
-            description={
-              <>
-                Re-checks every stored address and flags the ones that don&apos;t match a single
-                Auckland address. Takes a while - one lookup per contact.
-              </>
-            }
-          />
-          <AdminButton
-            variant="outline"
-            onClick={() => void runAddressCheck()}
-            disabled={checkingAddresses}
-            className="w-full"
-          >
-            {checkingAddresses ? "Checking…" : "Check all addresses"}
-          </AdminButton>
-          {addressResult && <p className="mt-3 text-sm text-admin-muted">{addressResult}</p>}
-        </Card>
-      </div>
-      {/* end right column */}
-    </div>
+    </>
   );
 }

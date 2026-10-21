@@ -11,6 +11,7 @@ import {
 } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { SettingsWithPreview } from "@/features/admin/components/settings/SettingsWithPreview";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
@@ -57,287 +58,293 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
 
   return (
     <SettingsTabBody changed={form.changedPaths}>
-      <div className="divide-y divide-admin-border">
-        <ToggleField
-          id="gstRegistered"
-          meta={m.gstRegistered}
-          value={draft.gstRegistered}
-          customised={draft.gstRegistered !== defaults.gstRegistered}
-          onChange={setGst}
-        />
-        {draft.gstRegistered && (
-          <TextField
-            id="gstRegisteredFrom"
-            meta={m.gstRegisteredFrom}
-            type="date"
-            value={draft.gstRegisteredFrom}
-            error={fieldErrors.gstRegisteredFrom}
-            customised={draft.gstRegisteredFrom !== defaults.gstRegisteredFrom}
-            onChange={(v) => setTop({ gstRegisteredFrom: v })}
+      <SettingsWithPreview preview={<PricingPreview config={draft} />}>
+        <div className="divide-y divide-admin-border">
+          <ToggleField
+            id="gstRegistered"
+            meta={m.gstRegistered}
+            value={draft.gstRegistered}
+            customised={draft.gstRegistered !== defaults.gstRegistered}
+            onChange={setGst}
           />
-        )}
-        <NumberField
-          id="minBillableMins"
-          meta={m.minBillableMins}
-          value={draft.minBillableMins}
-          min={0}
-          error={fieldErrors.minBillableMins}
-          customised={draft.minBillableMins !== defaults.minBillableMins}
-          onChange={(v) => setTop({ minBillableMins: v ?? 0 })}
-        />
-        <NumberField
-          id="billingIncrementMins"
-          meta={m.billingIncrementMins}
-          value={draft.billingIncrementMins}
-          min={1}
-          max={60}
-          error={fieldErrors.billingIncrementMins}
-          customised={draft.billingIncrementMins !== defaults.billingIncrementMins}
-          onChange={(v) => setTop({ billingIncrementMins: v ?? 1 })}
-        />
-        <NumberField
-          id="shortTaskMins"
-          meta={m.shortTaskMins}
-          value={draft.shortTaskMins}
-          min={1}
-          max={240}
-          error={fieldErrors.shortTaskMins}
-          customised={draft.shortTaskMins !== defaults.shortTaskMins}
-          onChange={(v) => setTop({ shortTaskMins: v ?? 1 })}
-        />
-        <NumberField
-          id="minTaskMins"
-          meta={m.minTaskMins}
-          value={draft.minTaskMins}
-          min={1}
-          max={240}
-          error={fieldErrors.minTaskMins}
-          customised={draft.minTaskMins !== defaults.minTaskMins}
-          onChange={(v) => setTop({ minTaskMins: v ?? 1 })}
-        />
-        <NumberField
-          id="maxJobMins"
-          meta={m.maxJobMins}
-          value={draft.maxJobMins}
-          min={60}
-          max={1440}
-          step={30}
-          error={fieldErrors.maxJobMins}
-          customised={draft.maxJobMins !== defaults.maxJobMins}
-          onChange={(v) => setTop({ maxJobMins: v ?? 60 })}
-        />
-        <NumberField
-          id="publicHolidayUplift"
-          meta={m.publicHolidayUplift}
-          // Stored as a fraction; shown + edited as a whole percent for readability.
-          value={Math.round(draft.publicHolidayUplift * 100)}
-          min={0}
-          step={1}
-          error={fieldErrors.publicHolidayUplift}
-          customised={draft.publicHolidayUplift !== defaults.publicHolidayUplift}
-          onChange={(v) => setTop({ publicHolidayUplift: (v ?? 0) / 100 })}
-        />
-        <NumberField
-          id="weekendUplift"
-          meta={m.weekendUplift}
-          value={Math.round(draft.weekendUplift * 100)}
-          min={0}
-          step={1}
-          error={fieldErrors.weekendUplift}
-          customised={draft.weekendUplift !== defaults.weekendUplift}
-          onChange={(v) => setTop({ weekendUplift: (v ?? 0) / 100 })}
-        />
-        <NumberField
-          id="minTravelCharge"
-          meta={m.minTravelCharge}
-          value={draft.minTravelCharge}
-          min={0}
-          error={fieldErrors.minTravelCharge}
-          customised={draft.minTravelCharge !== defaults.minTravelCharge}
-          onChange={(v) => setTop({ minTravelCharge: v ?? 0 })}
-        />
-        <NumberField
-          id="travelRatePerHour"
-          meta={m.travelRatePerHour}
-          value={draft.travelRatePerHour}
-          min={0}
-          error={fieldErrors.travelRatePerHour}
-          customised={draft.travelRatePerHour !== defaults.travelRatePerHour}
-          onChange={(v) => setTop({ travelRatePerHour: v ?? 0 })}
-        />
-        <NumberField
-          id="unsuccessfulWorkFactor"
-          meta={m.unsuccessfulWorkFactor}
-          // Stored as a fraction; shown + edited as a whole percent for readability.
-          value={Math.round(draft.unsuccessfulWorkFactor * 100)}
-          min={0}
-          max={100}
-          step={1}
-          error={fieldErrors.unsuccessfulWorkFactor}
-          customised={draft.unsuccessfulWorkFactor !== defaults.unsuccessfulWorkFactor}
-          onChange={(v) => setTop({ unsuccessfulWorkFactor: (v ?? 0) / 100 })}
-        />
-        <NumberField
-          id="noFixFreeMins"
-          meta={m.noFixFreeMins}
-          value={draft.noFixFreeMins}
-          min={0}
-          max={480}
-          step={5}
-          minutesHint
-          error={fieldErrors.noFixFreeMins}
-          customised={draft.noFixFreeMins !== defaults.noFixFreeMins}
-          onChange={(v) => setTop({ noFixFreeMins: v ?? 0 })}
-        />
-        <NumberField
-          id="workmanshipWindowDays"
-          meta={m.workmanshipWindowDays}
-          value={draft.workmanshipWindowDays}
-          min={0}
-          step={1}
-          error={fieldErrors.workmanshipWindowDays}
-          customised={draft.workmanshipWindowDays !== defaults.workmanshipWindowDays}
-          onChange={(v) => setTop({ workmanshipWindowDays: v ?? 0 })}
-        />
-        <NumberField
-          id="mergeSuggestGapMins"
-          meta={m.mergeSuggestGapMins}
-          value={draft.mergeSuggestGapMins}
-          min={0}
-          max={720}
-          minutesHint
-          error={fieldErrors.mergeSuggestGapMins}
-          customised={draft.mergeSuggestGapMins !== defaults.mergeSuggestGapMins}
-          onChange={(v) => setTop({ mergeSuggestGapMins: v ?? 0 })}
-        />
-      </div>
+          {draft.gstRegistered && (
+            <TextField
+              id="gstRegisteredFrom"
+              meta={m.gstRegisteredFrom}
+              type="date"
+              value={draft.gstRegisteredFrom}
+              error={fieldErrors.gstRegisteredFrom}
+              customised={draft.gstRegisteredFrom !== defaults.gstRegisteredFrom}
+              onChange={(v) => setTop({ gstRegisteredFrom: v })}
+            />
+          )}
+          <NumberField
+            id="minBillableMins"
+            meta={m.minBillableMins}
+            value={draft.minBillableMins}
+            min={0}
+            error={fieldErrors.minBillableMins}
+            customised={draft.minBillableMins !== defaults.minBillableMins}
+            onChange={(v) => setTop({ minBillableMins: v ?? 0 })}
+          />
+          <NumberField
+            id="billingIncrementMins"
+            meta={m.billingIncrementMins}
+            value={draft.billingIncrementMins}
+            min={1}
+            max={60}
+            error={fieldErrors.billingIncrementMins}
+            customised={draft.billingIncrementMins !== defaults.billingIncrementMins}
+            onChange={(v) => setTop({ billingIncrementMins: v ?? 1 })}
+          />
+          <NumberField
+            id="shortTaskMins"
+            meta={m.shortTaskMins}
+            value={draft.shortTaskMins}
+            min={1}
+            max={240}
+            error={fieldErrors.shortTaskMins}
+            customised={draft.shortTaskMins !== defaults.shortTaskMins}
+            onChange={(v) => setTop({ shortTaskMins: v ?? 1 })}
+          />
+          <NumberField
+            id="minTaskMins"
+            meta={m.minTaskMins}
+            value={draft.minTaskMins}
+            min={1}
+            max={240}
+            error={fieldErrors.minTaskMins}
+            customised={draft.minTaskMins !== defaults.minTaskMins}
+            onChange={(v) => setTop({ minTaskMins: v ?? 1 })}
+          />
+          <NumberField
+            id="maxJobMins"
+            meta={m.maxJobMins}
+            value={draft.maxJobMins}
+            min={60}
+            max={1440}
+            step={30}
+            error={fieldErrors.maxJobMins}
+            customised={draft.maxJobMins !== defaults.maxJobMins}
+            onChange={(v) => setTop({ maxJobMins: v ?? 60 })}
+          />
+          <NumberField
+            id="publicHolidayUplift"
+            meta={m.publicHolidayUplift}
+            // Stored as a fraction; shown + edited as a whole percent for readability.
+            value={Math.round(draft.publicHolidayUplift * 100)}
+            min={0}
+            step={1}
+            error={fieldErrors.publicHolidayUplift}
+            customised={draft.publicHolidayUplift !== defaults.publicHolidayUplift}
+            onChange={(v) => setTop({ publicHolidayUplift: (v ?? 0) / 100 })}
+          />
+          <NumberField
+            id="weekendUplift"
+            meta={m.weekendUplift}
+            value={Math.round(draft.weekendUplift * 100)}
+            min={0}
+            step={1}
+            error={fieldErrors.weekendUplift}
+            customised={draft.weekendUplift !== defaults.weekendUplift}
+            onChange={(v) => setTop({ weekendUplift: (v ?? 0) / 100 })}
+          />
+          <NumberField
+            id="minTravelCharge"
+            meta={m.minTravelCharge}
+            value={draft.minTravelCharge}
+            min={0}
+            error={fieldErrors.minTravelCharge}
+            customised={draft.minTravelCharge !== defaults.minTravelCharge}
+            onChange={(v) => setTop({ minTravelCharge: v ?? 0 })}
+          />
+          <NumberField
+            id="travelRatePerHour"
+            meta={m.travelRatePerHour}
+            value={draft.travelRatePerHour}
+            min={0}
+            error={fieldErrors.travelRatePerHour}
+            customised={draft.travelRatePerHour !== defaults.travelRatePerHour}
+            onChange={(v) => setTop({ travelRatePerHour: v ?? 0 })}
+          />
+          <NumberField
+            id="unsuccessfulWorkFactor"
+            meta={m.unsuccessfulWorkFactor}
+            // Stored as a fraction; shown + edited as a whole percent for readability.
+            value={Math.round(draft.unsuccessfulWorkFactor * 100)}
+            min={0}
+            max={100}
+            step={1}
+            error={fieldErrors.unsuccessfulWorkFactor}
+            customised={draft.unsuccessfulWorkFactor !== defaults.unsuccessfulWorkFactor}
+            onChange={(v) => setTop({ unsuccessfulWorkFactor: (v ?? 0) / 100 })}
+          />
+          <NumberField
+            id="noFixFreeMins"
+            meta={m.noFixFreeMins}
+            value={draft.noFixFreeMins}
+            min={0}
+            max={480}
+            step={5}
+            minutesHint
+            error={fieldErrors.noFixFreeMins}
+            customised={draft.noFixFreeMins !== defaults.noFixFreeMins}
+            onChange={(v) => setTop({ noFixFreeMins: v ?? 0 })}
+          />
+          <NumberField
+            id="workmanshipWindowDays"
+            meta={m.workmanshipWindowDays}
+            value={draft.workmanshipWindowDays}
+            min={0}
+            step={1}
+            error={fieldErrors.workmanshipWindowDays}
+            customised={draft.workmanshipWindowDays !== defaults.workmanshipWindowDays}
+            onChange={(v) => setTop({ workmanshipWindowDays: v ?? 0 })}
+          />
+          <NumberField
+            id="mergeSuggestGapMins"
+            meta={m.mergeSuggestGapMins}
+            value={draft.mergeSuggestGapMins}
+            min={0}
+            max={720}
+            minutesHint
+            error={fieldErrors.mergeSuggestGapMins}
+            customised={draft.mergeSuggestGapMins !== defaults.mergeSuggestGapMins}
+            onChange={(v) => setTop({ mergeSuggestGapMins: v ?? 0 })}
+          />
+        </div>
 
-      <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Cancellation</h3>
-      <div className="divide-y divide-admin-border">
-        <NumberField
-          id="freeNoticeHours"
-          meta={m["cancellation.freeNoticeHours"]}
-          value={draft.cancellation.freeNoticeHours}
-          min={0}
-          error={fieldErrors["cancellation.freeNoticeHours"]}
-          customised={draft.cancellation.freeNoticeHours !== defaults.cancellation.freeNoticeHours}
-          onChange={(v) =>
-            setDraft((p) => ({
-              ...p,
-              cancellation: { ...p.cancellation, freeNoticeHours: v ?? 0 },
-            }))
-          }
-        />
-        <NumberField
-          id="travelChargeHours"
-          meta={m["cancellation.travelChargeHours"]}
-          value={draft.cancellation.travelChargeHours}
-          min={0}
-          error={fieldErrors["cancellation.travelChargeHours"]}
-          customised={
-            draft.cancellation.travelChargeHours !== defaults.cancellation.travelChargeHours
-          }
-          onChange={(v) =>
-            setDraft((p) => ({
-              ...p,
-              cancellation: { ...p.cancellation, travelChargeHours: v ?? 0 },
-            }))
-          }
-        />
-        <NumberField
-          id="callOutFee"
-          meta={m["cancellation.callOutFee"]}
-          value={draft.cancellation.callOutFee}
-          min={0}
-          error={fieldErrors["cancellation.callOutFee"]}
-          customised={draft.cancellation.callOutFee !== defaults.cancellation.callOutFee}
-          onChange={(v) =>
-            setDraft((p) => ({ ...p, cancellation: { ...p.cancellation, callOutFee: v ?? 0 } }))
-          }
-        />
-        <NumberField
-          id="fullCallOutFee"
-          meta={m["cancellation.fullCallOutFee"]}
-          value={draft.cancellation.fullCallOutFee}
-          min={0}
-          error={fieldErrors["cancellation.fullCallOutFee"]}
-          customised={draft.cancellation.fullCallOutFee !== defaults.cancellation.fullCallOutFee}
-          onChange={(v) =>
-            setDraft((p) => ({ ...p, cancellation: { ...p.cancellation, fullCallOutFee: v ?? 0 } }))
-          }
-        />
-        <NumberField
-          id="remoteFreeNoticeHours"
-          meta={m["cancellation.remoteFreeNoticeHours"]}
-          value={draft.cancellation.remoteFreeNoticeHours}
-          min={0}
-          error={fieldErrors["cancellation.remoteFreeNoticeHours"]}
-          customised={
-            draft.cancellation.remoteFreeNoticeHours !== defaults.cancellation.remoteFreeNoticeHours
-          }
-          onChange={(v) =>
-            setDraft((p) => ({
-              ...p,
-              cancellation: { ...p.cancellation, remoteFreeNoticeHours: v ?? 0 },
-            }))
-          }
-        />
-        <NumberField
-          id="remoteFee"
-          meta={m["cancellation.remoteFee"]}
-          value={draft.cancellation.remoteFee}
-          min={0}
-          error={fieldErrors["cancellation.remoteFee"]}
-          customised={draft.cancellation.remoteFee !== defaults.cancellation.remoteFee}
-          onChange={(v) =>
-            setDraft((p) => ({ ...p, cancellation: { ...p.cancellation, remoteFee: v ?? 0 } }))
-          }
-        />
-        <ToggleField
-          id="autoSendCancellationInvoice"
-          meta={m["cancellation.autoSendCancellationInvoice"]}
-          value={draft.cancellation.autoSendCancellationInvoice}
-          customised={
-            draft.cancellation.autoSendCancellationInvoice !==
-            defaults.cancellation.autoSendCancellationInvoice
-          }
-          onChange={(v) =>
-            setDraft((p) => ({
-              ...p,
-              cancellation: { ...p.cancellation, autoSendCancellationInvoice: v },
-            }))
-          }
-        />
-      </div>
+        <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Cancellation</h3>
+        <div className="divide-y divide-admin-border">
+          <NumberField
+            id="freeNoticeHours"
+            meta={m["cancellation.freeNoticeHours"]}
+            value={draft.cancellation.freeNoticeHours}
+            min={0}
+            error={fieldErrors["cancellation.freeNoticeHours"]}
+            customised={
+              draft.cancellation.freeNoticeHours !== defaults.cancellation.freeNoticeHours
+            }
+            onChange={(v) =>
+              setDraft((p) => ({
+                ...p,
+                cancellation: { ...p.cancellation, freeNoticeHours: v ?? 0 },
+              }))
+            }
+          />
+          <NumberField
+            id="travelChargeHours"
+            meta={m["cancellation.travelChargeHours"]}
+            value={draft.cancellation.travelChargeHours}
+            min={0}
+            error={fieldErrors["cancellation.travelChargeHours"]}
+            customised={
+              draft.cancellation.travelChargeHours !== defaults.cancellation.travelChargeHours
+            }
+            onChange={(v) =>
+              setDraft((p) => ({
+                ...p,
+                cancellation: { ...p.cancellation, travelChargeHours: v ?? 0 },
+              }))
+            }
+          />
+          <NumberField
+            id="callOutFee"
+            meta={m["cancellation.callOutFee"]}
+            value={draft.cancellation.callOutFee}
+            min={0}
+            error={fieldErrors["cancellation.callOutFee"]}
+            customised={draft.cancellation.callOutFee !== defaults.cancellation.callOutFee}
+            onChange={(v) =>
+              setDraft((p) => ({ ...p, cancellation: { ...p.cancellation, callOutFee: v ?? 0 } }))
+            }
+          />
+          <NumberField
+            id="fullCallOutFee"
+            meta={m["cancellation.fullCallOutFee"]}
+            value={draft.cancellation.fullCallOutFee}
+            min={0}
+            error={fieldErrors["cancellation.fullCallOutFee"]}
+            customised={draft.cancellation.fullCallOutFee !== defaults.cancellation.fullCallOutFee}
+            onChange={(v) =>
+              setDraft((p) => ({
+                ...p,
+                cancellation: { ...p.cancellation, fullCallOutFee: v ?? 0 },
+              }))
+            }
+          />
+          <NumberField
+            id="remoteFreeNoticeHours"
+            meta={m["cancellation.remoteFreeNoticeHours"]}
+            value={draft.cancellation.remoteFreeNoticeHours}
+            min={0}
+            error={fieldErrors["cancellation.remoteFreeNoticeHours"]}
+            customised={
+              draft.cancellation.remoteFreeNoticeHours !==
+              defaults.cancellation.remoteFreeNoticeHours
+            }
+            onChange={(v) =>
+              setDraft((p) => ({
+                ...p,
+                cancellation: { ...p.cancellation, remoteFreeNoticeHours: v ?? 0 },
+              }))
+            }
+          />
+          <NumberField
+            id="remoteFee"
+            meta={m["cancellation.remoteFee"]}
+            value={draft.cancellation.remoteFee}
+            min={0}
+            error={fieldErrors["cancellation.remoteFee"]}
+            customised={draft.cancellation.remoteFee !== defaults.cancellation.remoteFee}
+            onChange={(v) =>
+              setDraft((p) => ({ ...p, cancellation: { ...p.cancellation, remoteFee: v ?? 0 } }))
+            }
+          />
+          <ToggleField
+            id="autoSendCancellationInvoice"
+            meta={m["cancellation.autoSendCancellationInvoice"]}
+            value={draft.cancellation.autoSendCancellationInvoice}
+            customised={
+              draft.cancellation.autoSendCancellationInvoice !==
+              defaults.cancellation.autoSendCancellationInvoice
+            }
+            onChange={(v) =>
+              setDraft((p) => ({
+                ...p,
+                cancellation: { ...p.cancellation, autoSendCancellationInvoice: v },
+              }))
+            }
+          />
+        </div>
 
-      <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Reschedule</h3>
-      <div className="divide-y divide-admin-border">
-        <NumberField
-          id="reschedule.cutoffHours"
-          meta={m["reschedule.cutoffHours"]}
-          value={draft.reschedule.cutoffHours}
-          min={0}
-          error={fieldErrors["reschedule.cutoffHours"]}
-          customised={draft.reschedule.cutoffHours !== defaults.reschedule.cutoffHours}
-          onChange={(v) =>
-            setDraft((p) => ({ ...p, reschedule: { ...p.reschedule, cutoffHours: v ?? 0 } }))
-          }
-        />
-        <NumberField
-          id="maxReschedules"
-          meta={m["reschedule.maxReschedules"]}
-          value={draft.reschedule.maxReschedules}
-          nullable
-          min={0}
-          error={fieldErrors["reschedule.maxReschedules"]}
-          customised={draft.reschedule.maxReschedules !== defaults.reschedule.maxReschedules}
-          onChange={(v) =>
-            setDraft((p) => ({ ...p, reschedule: { ...p.reschedule, maxReschedules: v } }))
-          }
-        />
-      </div>
-
-      <PricingPreview config={draft} />
+        <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Reschedule</h3>
+        <div className="divide-y divide-admin-border">
+          <NumberField
+            id="reschedule.cutoffHours"
+            meta={m["reschedule.cutoffHours"]}
+            value={draft.reschedule.cutoffHours}
+            min={0}
+            error={fieldErrors["reschedule.cutoffHours"]}
+            customised={draft.reschedule.cutoffHours !== defaults.reschedule.cutoffHours}
+            onChange={(v) =>
+              setDraft((p) => ({ ...p, reschedule: { ...p.reschedule, cutoffHours: v ?? 0 } }))
+            }
+          />
+          <NumberField
+            id="maxReschedules"
+            meta={m["reschedule.maxReschedules"]}
+            value={draft.reschedule.maxReschedules}
+            nullable
+            min={0}
+            error={fieldErrors["reschedule.maxReschedules"]}
+            customised={draft.reschedule.maxReschedules !== defaults.reschedule.maxReschedules}
+            onChange={(v) =>
+              setDraft((p) => ({ ...p, reschedule: { ...p.reschedule, maxReschedules: v } }))
+            }
+          />
+        </div>
+      </SettingsWithPreview>
 
       <SettingsFooter form={form} />
 

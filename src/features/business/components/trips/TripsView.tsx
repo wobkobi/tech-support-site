@@ -452,36 +452,39 @@ export function TripsView({
         )}
       </div>
 
-      {beforeVehicleKm > 0 && firstKmDay && (
-        <Notice onGrey className="mb-6">
-          {formatKm(beforeVehicleKm)} logged before your kilometre-rate car went into service on{" "}
-          {formatDateShort(firstKmDay)}. Those trips were in a car that isn&apos;t on the asset
-          register, so they aren&apos;t claimed at km rates. Fuel you paid for then counts as an
-          expense instead.
-        </Notice>
-      )}
+      {/* Side by side on desktop; a lone last notice (odd count) takes the full row. */}
+      <div className="mb-6 grid gap-6 lg:grid-cols-2 lg:[&>:last-child:nth-child(odd)]:col-span-2">
+        {beforeVehicleKm > 0 && firstKmDay && (
+          <Notice onGrey>
+            {formatKm(beforeVehicleKm)} logged before your kilometre-rate car went into service on{" "}
+            {formatDateShort(firstKmDay)}. Those trips were in a car that isn&apos;t on the asset
+            register, so they aren&apos;t claimed at km rates. Fuel you paid for then counts as an
+            expense instead.
+          </Notice>
+        )}
 
-      {noVehicleKm > 0 && (
-        <Notice tone="warn" onGrey className="mb-6">
-          {formatKm(noVehicleKm)} logged on days with no kilometre-rate vehicle on the asset
-          register. Add the vehicle on the{" "}
-          <Link
-            href="/admin/business/assets"
-            className="font-bold text-russian-violet underline underline-offset-2"
-          >
-            Assets page
-          </Link>{" "}
-          to claim them.
-        </Notice>
-      )}
+        {noVehicleKm > 0 && (
+          <Notice tone="warn" onGrey>
+            {formatKm(noVehicleKm)} logged on days with no kilometre-rate vehicle on the asset
+            register. Add the vehicle on the{" "}
+            <Link
+              href="/admin/business/assets"
+              className="font-bold text-russian-violet underline underline-offset-2"
+            >
+              Assets page
+            </Link>{" "}
+            to claim them.
+          </Notice>
+        )}
 
-      <Notice onGrey className="mb-6">
-        IRD {fuelLabel} rates for {fyLabel}: {formatNZD(rates.tier1)}/km for the business share of
-        the car&apos;s first {KM_TIER1_LIMIT.toLocaleString("en-NZ")} km in the year, then{" "}
-        {formatNZD(rates.tier2)}
-        /km. The rate covers fuel, wear and depreciation, so Fuel expenses come out of the tax
-        figures for the days the car is on km rates, and only trips on those days earn the rate.
-      </Notice>
+        <Notice onGrey>
+          IRD {fuelLabel} rates for {fyLabel}: {formatNZD(rates.tier1)}/km for the business share of
+          the car&apos;s first {KM_TIER1_LIMIT.toLocaleString("en-NZ")} km in the year, then{" "}
+          {formatNZD(rates.tier2)}
+          /km. The rate covers fuel, wear and depreciation, so Fuel expenses come out of the tax
+          figures for the days the car is on km rates, and only trips on those days earn the rate.
+        </Notice>
+      </div>
 
       {/* Jobs-list adds have no dialog, so warn here. A one-day span on the FY's first day
           keys it to this year alone. */}

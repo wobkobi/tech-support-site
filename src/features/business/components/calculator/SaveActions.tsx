@@ -1,207 +1,114 @@
 "use client";
 // src/features/business/components/calculator/SaveActions.tsx
-// The calculator's "Paid in cash" tick, the Already paid box, its save buttons (invoice,
-// save & send, quote, income entry) and the error banners from the last failed save.
+// The calculator's "Paid in cash" tick, the Already paid box and the error banners from the
+// last failed save, with the right column's copy of the save buttons under them.
 
-import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { savePaymentState } from "@/features/business/components/calculator/SaveButtons";
 import { AlreadyPaidField } from "@/features/business/components/invoice/AlreadyPaidField";
-import {
-  alreadyPaidAmount,
-  type AlreadyPaidState,
-} from "@/features/business/lib/already-paid-input";
+import type { AlreadyPaidState } from "@/features/business/lib/already-paid-input";
 import type React from "react";
 
 interface Props {
   incomeError: string | null;
   saveInvoiceError: string | null;
-  savingInvoice: boolean;
-  saveSendMode: boolean;
-  saveQuoteMode: boolean;
   quoteMode: boolean;
-  savingIncome: boolean;
-  parsing: boolean;
-  subtotal: number;
   total: number;
   paidCash: boolean;
   onPaidCashChange: (paid: boolean) => void;
   alreadyPaid: AlreadyPaidState;
   onAlreadyPaidChange: (next: AlreadyPaidState) => void;
-  onSaveInvoice: (send: boolean, quote?: boolean) => void;
-  onSaveIncome: () => void;
+  /** The column's save buttons, shown under the payment boxes. */
+  buttons: React.ReactNode;
 }
 
 /**
- * Save buttons for the calculator. Only the in-flight save's button shows
- * "Saving...", driven by the send/quote mode flags.
+ * Payment boxes and save errors for the calculator's right column. The errors hide on lg+,
+ * where the bottom save bar holds the buttons and shows them beside those.
  * @param props - Component props.
  * @param props.incomeError - Last income-save failure, or null.
  * @param props.saveInvoiceError - Last invoice-save failure or validation message, or null.
- * @param props.savingInvoice - True while an invoice/quote save is in flight.
- * @param props.saveSendMode - True when the in-flight save is a "Save & send".
- * @param props.saveQuoteMode - True when the in-flight save is a "Save as quote".
- * @param props.quoteMode - Opened from "New quote": Save quote leads, with Save as invoice
- * instead under it, and the payment boxes, Save & send and the income save are left out.
- * @param props.savingIncome - True while an income save is in flight.
- * @param props.parsing - True while an AI parse is in flight (blocks invoice saves).
- * @param props.subtotal - Job subtotal; zero disables the income save.
- * @param props.total - Job total after discounts; an Already paid amount covering it saves as paid.
+ * @param props.quoteMode - Opened from "New quote": no payment boxes, so the block is phone-only.
+ * @param props.total - Job total after discounts; an Already paid amount over it blocks saves.
  * @param props.paidCash - Whether "Paid in cash" is ticked.
  * @param props.onPaidCashChange - Ticks or unticks "Paid in cash".
  * @param props.alreadyPaid - Already paid amount and method.
  * @param props.onAlreadyPaidChange - Updates the Already paid box.
- * @param props.onSaveInvoice - Saves as an invoice (send = open send step, quote = save as quote).
- * @param props.onSaveIncome - Saves the job as an income entry.
+ * @param props.buttons - The column's save buttons.
  * @returns Save actions element.
  */
 export function SaveActions({
   incomeError,
   saveInvoiceError,
-  savingInvoice,
-  saveSendMode,
-  saveQuoteMode,
   quoteMode,
-  savingIncome,
-  parsing,
-  subtotal,
   total,
   paidCash,
   onPaidCashChange,
   alreadyPaid,
   onAlreadyPaidChange,
-  onSaveInvoice,
-  onSaveIncome,
+  buttons,
 }: Props): React.ReactElement {
-  // An Already paid amount that covers the total is a full payment, saved like the tick.
-  const prepaid = paidCash ? 0 : alreadyPaidAmount(alreadyPaid);
-  const paidInFull = paidCash || (total > 0 && prepaid >= total);
-  // More than the total means the job or the amount is wrong, and saving would book the
-  // extra as paid against nothing. A quote ignores Already paid, so it can still save.
-  const overpaid = Math.round((prepaid - total) * 100) > 0;
+  const { overpaid } = savePaymentState(total, paidCash, alreadyPaid);
   if (quoteMode) {
+    // Only the error and the buttons, which the save bar shows on lg+.
     return (
-      <div className="space-y-2">
+      <div className="space-y-2 lg:hidden">
         {saveInvoiceError && (
           <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
             {saveInvoiceError}
           </p>
         )}
-        <AdminButton
-          variant="primary"
-          className="w-full"
-          onClick={() => onSaveInvoice(false, true)}
-          disabled={savingInvoice || parsing}
-          suppressHydrationWarning
-          title="Save as a Q-numbered quote - convert it to an invoice once the client accepts."
-        >
-          {savingInvoice && saveQuoteMode ? "Saving..." : "Save quote"}
-        </AdminButton>
-        <AdminButton
-          variant="outline"
-          className="w-full"
-          onClick={() => onSaveInvoice(false)}
-          disabled={savingInvoice || parsing || overpaid}
-          suppressHydrationWarning
-        >
-          {savingInvoice && !saveQuoteMode ? "Saving..." : "Save as invoice instead"}
-        </AdminButton>
+        {buttons}
       </div>
     );
   }
   return (
     <div className="space-y-2">
       {incomeError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 lg:hidden">
           {incomeError}
         </div>
       )}
       {saveInvoiceError && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 lg:hidden">
           {saveInvoiceError}
         </p>
       )}
-      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-admin-border bg-admin-surface px-3 py-2.5 text-sm font-medium text-admin-text">
-        <input
-          type="checkbox"
-          checked={paidCash}
-          onChange={(e) => onPaidCashChange(e.target.checked)}
-          className="h-4 w-4 accent-russian-violet"
-        />
-        Paid in cash
-      </label>
-      {paidCash ? (
-        <p className="text-sm text-admin-muted">
-          Saving an invoice marks it paid in cash on the job date and adds it to income. A quote
-          stays unpaid.
-        </p>
-      ) : (
-        <Card padding="sm" className="text-admin-text">
-          <AlreadyPaidField
-            value={alreadyPaid}
-            onChange={onAlreadyPaidChange}
-            total={total}
-            inputClassName={ADMIN_INPUT_CLS}
-            coversNote="Covers the total, so the invoice saves as paid."
+      {/* One payment card: the tick, then either what it means or the Already paid box. */}
+      <Card padding="sm" className="space-y-3 text-admin-text">
+        <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-admin-text">
+          <input
+            type="checkbox"
+            checked={paidCash}
+            onChange={(e) => onPaidCashChange(e.target.checked)}
+            className="h-4 w-4 accent-russian-violet"
           />
-        </Card>
-      )}
+          Paid in cash
+        </label>
+        {paidCash ? (
+          <p className="text-sm text-admin-muted">
+            Saving an invoice marks it paid in cash on the job date and adds it to income. A quote
+            stays unpaid.
+          </p>
+        ) : (
+          <div className="border-t border-admin-border pt-3">
+            <AlreadyPaidField
+              value={alreadyPaid}
+              onChange={onAlreadyPaidChange}
+              total={total}
+              inputClassName={ADMIN_INPUT_CLS}
+              coversNote="Covers the total, so the invoice saves as paid."
+            />
+          </div>
+        )}
+      </Card>
       {overpaid && (
         <p className="text-sm text-coquelicot-700">
           Fix the job or the Already paid amount to save an invoice.
         </p>
       )}
-      <AdminButton
-        variant="primary"
-        className="w-full"
-        onClick={() => onSaveInvoice(false)}
-        disabled={savingInvoice || parsing || overpaid}
-        suppressHydrationWarning
-      >
-        {savingInvoice && !saveSendMode && !saveQuoteMode
-          ? "Saving..."
-          : paidInFull
-            ? "Save paid invoice"
-            : "Save invoice"}
-      </AdminButton>
-      <AdminButton
-        variant="outline"
-        className="w-full"
-        onClick={() => onSaveInvoice(true)}
-        disabled={savingInvoice || parsing || overpaid}
-        suppressHydrationWarning
-        title="Save the invoice and jump straight to the send-to-client step."
-      >
-        {savingInvoice && saveSendMode
-          ? "Saving..."
-          : paidInFull
-            ? "Save paid & send"
-            : "Save & send"}
-      </AdminButton>
-      <AdminButton
-        variant="outline"
-        className="w-full"
-        onClick={() => onSaveInvoice(false, true)}
-        disabled={savingInvoice || parsing}
-        suppressHydrationWarning
-        title="Save as a Q-numbered quote - convert it to an invoice once the client accepts."
-      >
-        {savingInvoice && saveQuoteMode ? "Saving..." : "Save as quote"}
-      </AdminButton>
-      <AdminButton
-        variant="secondary"
-        className="w-full"
-        onClick={onSaveIncome}
-        suppressHydrationWarning
-        disabled={savingIncome || subtotal === 0 || savingInvoice || overpaid}
-        title="For jobs handled outside the invoice flow."
-      >
-        {savingIncome
-          ? "Saving..."
-          : paidCash
-            ? "Save as cash income entry"
-            : "Save as income entry"}
-      </AdminButton>
+      {buttons}
     </div>
   );
 }

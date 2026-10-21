@@ -34,8 +34,8 @@ export function EstimatorPreview({
     <Card className="mt-8">
       <p className={ADMIN_EYEBROW_CLS}>Worked example</p>
       <p className="mt-1 text-sm text-admin-muted">
-        A {SAMPLE_MINS / 60}-hour job at ${SAMPLE_RATE}/hr, priced at each confidence level with the
-        settings above. Illustrative only.
+        A {SAMPLE_MINS / 60}-hour job at ${SAMPLE_RATE}/hr, priced at each confidence level with
+        these settings. Illustrative only.
       </p>
       <div className="mt-3 grid grid-cols-3 gap-2">
         {CONFIDENCE.map(({ key, label }) => {

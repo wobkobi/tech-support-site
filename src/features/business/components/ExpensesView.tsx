@@ -10,6 +10,7 @@ import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { lastCardSpan, StatStrip } from "@/features/admin/components/ui/StatStrip";
+import { StickyList } from "@/features/admin/components/ui/StickyList";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import { BreakdownModal, type BreakdownData } from "@/features/business/components/BreakdownModal";
@@ -498,88 +499,94 @@ export function ExpensesView({
         previewGst={previewGst}
       />
 
-      <LedgerListToolbar
-        search={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Supplier or description"
-        fyKey={fyKey}
-        onFyChange={setFyKey}
-        financialYears={financialYears}
-        categoryFilter={categoryFilter}
-        onCategoryChange={setCategoryFilter}
-        categoryOptions={categoryOptions}
-        methodFilter={methodFilter}
-        onMethodChange={setMethodFilter}
-        methodOptions={methodOptions}
-        fromDate={fromDate}
-        onFromChange={setFromDate}
-        toDate={toDate}
-        onToChange={setToDate}
-        missingReceiptOnly={missingReceiptOnly}
-        onMissingReceiptChange={setMissingReceiptOnly}
-        anyFilterActive={anyFilterActive}
-        onClear={() => {
-          setSearch("");
-          setFyKey("all");
-          setMethodFilter("all");
-          setCategoryFilter("all");
-          setFromDate("");
-          setToDate("");
-          setMissingReceiptOnly(false);
-        }}
-      />
+      <StickyList
+        toolbar={
+          <LedgerListToolbar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Supplier or description"
+            fyKey={fyKey}
+            onFyChange={setFyKey}
+            financialYears={financialYears}
+            categoryFilter={categoryFilter}
+            onCategoryChange={setCategoryFilter}
+            categoryOptions={categoryOptions}
+            methodFilter={methodFilter}
+            onMethodChange={setMethodFilter}
+            methodOptions={methodOptions}
+            fromDate={fromDate}
+            onFromChange={setFromDate}
+            toDate={toDate}
+            onToChange={setToDate}
+            missingReceiptOnly={missingReceiptOnly}
+            onMissingReceiptChange={setMissingReceiptOnly}
+            anyFilterActive={anyFilterActive}
+            onClear={() => {
+              setSearch("");
+              setFyKey("all");
+              setMethodFilter("all");
+              setCategoryFilter("all");
+              setFromDate("");
+              setToDate("");
+              setMissingReceiptOnly(false);
+            }}
+          />
+        }
+      >
+        {/* Loading and empty states render once for every width; the rows split into phone
+            cards and the desktop table. */}
+        {loading ? (
+          <Card>
+            <p className="text-sm text-admin-muted">Loading...</p>
+          </Card>
+        ) : sorted.length === 0 ? (
+          <Card padding="none">
+            <EmptyState
+              title={
+                entries.length > 0
+                  ? "No entries match your filters."
+                  : loadError
+                    ? "Expenses didn't load."
+                    : "No expense entries yet."
+              }
+            />
+          </Card>
+        ) : (
+          <>
+            <ExpensesListCards
+              rows={pager.visible}
+              recurringGroups={recurringGroups}
+              subscribedKeys={subscribedKeys}
+              canMigrate={canMigrate}
+              gst={gst}
+              assetThreshold={assetThreshold}
+              linkedSet={linkedSet}
+              onMigrate={setMigrateTarget}
+              onEdit={startEdit}
+              onDelete={setConfirmDeleteId}
+            />
+            <ExpensesListTable
+              rows={pager.visible}
+              recurringGroups={recurringGroups}
+              subscribedKeys={subscribedKeys}
+              canMigrate={canMigrate}
+              gst={gst}
+              assetThreshold={assetThreshold}
+              linkedSet={linkedSet}
+              onMigrate={setMigrateTarget}
+              onEdit={startEdit}
+              onDelete={setConfirmDeleteId}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
+          </>
+        )}
 
-      {/* Loading and empty states render once for every width; the rows split into phone
-          cards and the desktop table. */}
-      {loading ? (
-        <Card>
-          <p className="text-sm text-admin-muted">Loading...</p>
-        </Card>
-      ) : sorted.length === 0 ? (
-        <Card padding="none">
-          <EmptyState
-            title={
-              entries.length > 0
-                ? "No entries match your filters."
-                : loadError
-                  ? "Expenses didn't load."
-                  : "No expense entries yet."
-            }
-          />
-        </Card>
-      ) : (
-        <>
-          <ExpensesListCards
-            rows={pager.visible}
-            recurringGroups={recurringGroups}
-            subscribedKeys={subscribedKeys}
-            canMigrate={canMigrate}
-            gst={gst}
-            assetThreshold={assetThreshold}
-            linkedSet={linkedSet}
-            onMigrate={setMigrateTarget}
-            onEdit={startEdit}
-            onDelete={setConfirmDeleteId}
-          />
-          <ExpensesListTable
-            rows={pager.visible}
-            recurringGroups={recurringGroups}
-            subscribedKeys={subscribedKeys}
-            canMigrate={canMigrate}
-            gst={gst}
-            assetThreshold={assetThreshold}
-            linkedSet={linkedSet}
-            onMigrate={setMigrateTarget}
-            onEdit={startEdit}
-            onDelete={setConfirmDeleteId}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={toggleSort}
-          />
-        </>
-      )}
-
-      {!loading && <ShowMoreButton pager={pager} noun={["expense", "expenses"]} className="mt-3" />}
+        {!loading && (
+          <ShowMoreButton pager={pager} noun={["expense", "expenses"]} className="mt-3" />
+        )}
+      </StickyList>
 
       <ConfirmDialog
         open={confirmDeleteId !== null}
