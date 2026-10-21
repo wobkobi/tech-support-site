@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from "next/server";
  * @param kindGuide - What this kind of email is for.
  * @param promoLine - Whether a promo is running, and which placeholders describe it.
  * @param buttonLine - Where the email's button already goes, if anywhere.
+ * @param pictureLine - Whether to pick a picture look, and how.
  * @returns The prompt.
  */
 function systemPrompt(
@@ -27,6 +28,7 @@ function systemPrompt(
   kindGuide: string,
   promoLine: string,
   buttonLine: string,
+  pictureLine: string,
 ): string {
   const placeholders = PLACEHOLDERS.map((p) => `- {${p.key}}: ${p.help}`).join("\n");
   return `You write a first draft of an email to a small tech help business's mailing list: past customers, many of them older and not technical. The operator reads and edits every draft before it goes anywhere.
@@ -64,16 +66,20 @@ LAYOUT
 BUTTON
 ${buttonLine}
 
+PICTURE
+${pictureLine}
+
 OUTPUT
 Return only a JSON object with exactly these keys:
-{"subject": string, "preheader": string, "heading": string, "paragraphs": string[], "bullets": string[], "buttonText": string, "buttonUrl": string}
+{"subject": string, "preheader": string, "heading": string, "paragraphs": string[], "bullets": string[], "buttonText": string, "buttonUrl": string, "picture": string}
 Paragraphs and bullets are plain text: you may use **bold** for a few words, but no other markup, no headings and no links.`;
 }
 
 /**
  * POST /api/admin/mailing/ai-draft
- * Body: `{ brief, kind, promoId, buttonUrl }`: brief up to {@link BRIEF_MAX} chars, a
- * {@link DRAFT_KINDS} key, the linked promo or null, the first button's link or "".
+ * Body: `{ brief, kind, promoId, buttonUrl, picture }`: brief up to {@link BRIEF_MAX} chars, a
+ * {@link DRAFT_KINDS} key, the linked promo or null, the first button's link or "", and whether
+ * to pick a picture look for the email.
  * @param request - Incoming request.
  * @returns JSON `{ draft }`, a 429 with a retry hint when the AI provider is rate limited, or an error.
  */
@@ -84,6 +90,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     kind?: unknown;
     promoId?: unknown;
     buttonUrl?: unknown;
+    picture?: unknown;
   } | null;
   if (!body || typeof body !== "object") return errorResponse("Invalid request body", 400);
 
@@ -98,6 +105,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // The fill keeps an existing button's link, so the words must describe it.
   const buttonUrl =
     typeof body.buttonUrl === "string" && body.buttonUrl.length <= 300 ? body.buttonUrl.trim() : "";
+  const wantsPicture = body.picture === true;
 
   if (!aiConfigured()) return errorResponse("No AI API key is set.", 503);
 
@@ -113,12 +121,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const promoLine = promo
       ? `A promo is running: ${promo.summary}. Is the email about this promo?\n- YES: refer to it with {promoOffer} and {promoEnds} (or {promo} for the whole line) rather than writing its figures, so the email stays right if the promo changes.\n- NO: don't mention it.`
       : "No promo is running. INVARIANT: never mention a deal, discount or promo, and never use {promo}, {promoOffer} or {promoEnds}.";
+    // Asked in order, so scam signs get "scam" and a promo listing what it covers stays "promo".
+    const pictureLine = wantsPicture
+      ? [
+          "A picture can go near the top of the email, made from the brief. Pick the look that fits, or none:",
+          `- Does the email warn about a scam?\n  - YES: "picture" is "scam".\n  - NO: carry on.`,
+          ...(promo
+            ? [
+                `- Is it about the promo that's running?\n  - YES: "picture" is "promo".\n  - NO: carry on.`,
+              ]
+            : []),
+          `- Does it give the reader a tip, steps or signs to follow?\n  - YES: "picture" is "tip".\n  - NO: carry on.`,
+          `- Does it share news: a new service, area, hours or a change?\n  - YES: "picture" is "announcement".\n  - NO: "picture" is "". A check-in, a thank-you or a general catch-up reads better without one.`,
+        ].join("\n")
+      : `No picture this time: "picture" is "".`;
 
     // One attempt inside the function budget; a 429 goes back as retryable instead.
     const { text: raw } = await jsonCompletion({
       feature: "mailing-draft",
       openAiModel: "gpt-4.1",
-      system: [systemPrompt(who, kind.guide, promoLine, buttonLine)],
+      system: [systemPrompt(who, kind.guide, promoLine, buttonLine, pictureLine)],
       user: `--- USER DATA ---\n${brief}\n--- END USER DATA ---`,
       maxTokens: 1200,
       temperature: 0.7,
@@ -128,6 +150,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const draft = readDraft(JSON.parse(raw));
     if (!draft) return errorResponse("The draft came back empty. Try saying a bit more.", 422);
     if (buttonUrl || !targets.some((t) => t.url === draft.buttonUrl)) draft.buttonUrl = "";
+    // The promo look draws the live promo, so it needs one running.
+    if (!wantsPicture || (draft.picture === "promo" && !promo)) draft.picture = "";
     return okResponse({ draft });
   } catch (err) {
     console.error("[mailing/ai-draft] failed:", err);

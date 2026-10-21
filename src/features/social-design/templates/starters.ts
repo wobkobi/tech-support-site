@@ -2,6 +2,7 @@
 // The four starter templates in house style, laid out by hand per core size. Sample words are
 // placeholders so no review is made up; line breaks are explicit so line counts are known.
 
+import type { PictureKind } from "@/features/mailing/lib/ai-draft";
 import { LOGOS, TEXT_PRESETS, type TextPreset } from "@/features/social-design/lib/brand";
 import type { DesignKind } from "@/features/social-design/lib/design-row";
 import {
@@ -145,9 +146,10 @@ const PRICE_ON_CARD = "coquelicot-600";
 
 /**
  * Announcement: photo, headline, a line or two and the wordmark; wide sizes put the photo beside.
+ * @param withPhoto - False drops the photo frame, for a picture drawn with no photo to put in it.
  * @returns Template.
  */
-function announcement(): StarterTemplate {
+function announcement(withPhoto = true): StarterTemplate {
   const under = base();
   const photo = layer({ kind: "photo-frame" });
   const logo = layer({ kind: "logo", variant: "wordmark" });
@@ -159,8 +161,17 @@ function announcement(): StarterTemplate {
     "support",
   );
 
-  const doc = assemble(under, [photo, logo, headline, support], (f) => {
+  const content = withPhoto ? [photo, logo, headline, support] : [logo, headline, support];
+  const doc = assemble(under, content, (f) => {
     const { w, h } = f.inner;
+    if (!withPhoto) {
+      return col(
+        36 * f.k,
+        logoBox(logo.id, 340 * f.k, WORDMARK),
+        textBox(headline.id, 2, fs("headline", f), 1.05, w),
+        textBox(support.id, 2, fs("support", f), 1.3, w),
+      );
+    }
     if (f.wide) {
       const photoW = Math.round(w * 0.44);
       const gap = 48 * f.k;
@@ -320,4 +331,24 @@ function promo(ctx: StarterContext): StarterTemplate {
  */
 export function starterTemplates(ctx: StarterContext): StarterTemplate[] {
   return [announcement(), review(), tip(), promo(ctx)];
+}
+
+/**
+ * A starter for a picture drafted alongside an email. Built fresh rather than copied from the
+ * stored templates, since an email picture has no photo to fill a frame with.
+ * @param kind - Which look.
+ * @param ctx - Live addresses.
+ * @returns Template.
+ */
+export function emailPictureStarter(kind: PictureKind, ctx: StarterContext): StarterTemplate {
+  if (kind === "promo") return promo(ctx);
+  if (kind === "announcement") return announcement(false);
+  const t = tip();
+  if (kind === "tip") return t;
+  const layers = t.doc.layers.map((l): Layer => {
+    if (l.type === "icon") return { ...l, icon: "FaShieldHalved" };
+    if (l.type === "text" && l.name === "Tip label") return { ...l, text: "SCAM WARNING" };
+    return l;
+  });
+  return { ...t, name: "Scam warning", doc: { ...t.doc, layers } };
 }

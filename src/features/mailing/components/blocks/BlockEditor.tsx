@@ -11,7 +11,7 @@ import { AddBlockMenu } from "@/features/mailing/components/blocks/AddBlockMenu"
 import { BlockCard, type BlockCardShared } from "@/features/mailing/components/blocks/BlockCard";
 import { DraftDialog } from "@/features/mailing/components/blocks/DraftDialog";
 import { useBlockHistory } from "@/features/mailing/components/blocks/useBlockHistory";
-import { fillBlocks } from "@/features/mailing/lib/ai-draft";
+import { fillBlocks, placePicture } from "@/features/mailing/lib/ai-draft";
 import {
   emptyBlock,
   newBlockId,
@@ -295,14 +295,19 @@ export function BlockEditor({
         <DraftDialog
           promoId={draft.promoId}
           buttonUrl={blocks.find((b) => b.type === "button")?.url ?? ""}
+          canPicture={canUpload}
           onClose={() => setDrafting(false)}
-          onDraft={(result, withSubject) => {
+          onDraft={(result, withSubject, picture) => {
             setDrafting(false);
-            apply(fillBlocks(blocks, result));
+            const filled = fillBlocks(blocks, result);
+            apply(picture ? placePicture(filled, picture) : filled);
             if (withSubject) draft.onSubject(result.subject, result.preheader);
-            toast("Draft added. Read it through and make it yours; Undo takes it back.", {
-              tone: "success",
-            });
+            toast(
+              picture
+                ? "Draft added with a picture. Read it through and make it yours; Undo takes it back. The picture's design is in Post maker if you want to change it."
+                : "Draft added. Read it through and make it yours; Undo takes it back.",
+              { tone: "success" },
+            );
           }}
         />
       )}

@@ -1,7 +1,8 @@
 "use client";
 // src/features/mailing/components/blocks/DraftDialog.tsx
-// "Draft with AI": a one-line brief and the kind of email in, a draft out. The block
-// editor fills the draft into its blocks as one undo step; nothing is saved or sent here.
+// "Draft with AI": a one-line brief and the kind of email in, a draft out. When the draft says
+// a picture fits, a post maker design is made and drawn for it before the dialog hands over.
+// The block editor fills it all in as one undo step; nothing is sent here.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -10,10 +11,26 @@ import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { ADMIN_CHECKBOX_CLS } from "@/features/admin/components/ui/field-classes";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import type { DraftedPicture, PictureJob } from "@/features/mailing/components/blocks/DraftPicture";
 import { BRIEF_MAX, DRAFT_KINDS, type AiDraft } from "@/features/mailing/lib/ai-draft";
 import { callApi } from "@/features/mailing/lib/api-client";
+import dynamic from "next/dynamic";
 import type React from "react";
-import { useId, useState } from "react";
+import { useCallback, useId, useState } from "react";
+
+// Konva has no server build, and most drafts never need it.
+const DraftPicture = dynamic(
+  () => import("@/features/mailing/components/blocks/DraftPicture").then((m) => m.DraftPicture),
+  { ssr: false },
+);
+
+/** Which part of the draft is being written. */
+type Step = "email" | "picture";
+
+const STEP_LABEL: Record<Step, string> = {
+  email: "Writing the email...",
+  picture: "Making a picture to go with it...",
+};
 
 /**
  * The draft dialog.
@@ -21,44 +38,95 @@ import { useId, useState } from "react";
  * @param props.promoId - The email's linked promo, so the draft knows which promo it's about.
  * @param props.buttonUrl - Where the email's first button goes ("" for none), so the
  *   drafted button words match the link they keep.
+ * @param props.canPicture - Whether pictures can be stored, so a draft may come with one.
  * @param props.onClose - Dismisses it.
- * @param props.onDraft - Called with the draft and whether to replace the subject and preview text.
+ * @param props.onDraft - Called with the draft, whether to replace the subject and preview text,
+ *   and the picture made for it (null for none).
  * @returns The dialog.
  */
 export function DraftDialog({
   promoId,
   buttonUrl,
+  canPicture,
   onClose,
   onDraft,
 }: {
   promoId: string | null;
   buttonUrl: string;
+  canPicture: boolean;
   onClose: () => void;
-  onDraft: (draft: AiDraft, withSubject: boolean) => void;
+  onDraft: (draft: AiDraft, withSubject: boolean, picture: DraftedPicture | null) => void;
 }): React.ReactElement {
   const id = useId();
   const { toast } = useToast();
   const [kind, setKind] = useState(DRAFT_KINDS[0]!.key);
   const [brief, setBrief] = useState("");
   const [withSubject, setWithSubject] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [withPicture, setWithPicture] = useState(true);
+  const [step, setStep] = useState<Step | null>(null);
+  const [job, setJob] = useState<(PictureJob & { draft: AiDraft }) | null>(null);
+  const busy = step !== null;
 
-  /** Asks for the draft and hands it over. */
+  /**
+   * Hands the email over without its picture, saying why.
+   * @param draft - The email draft.
+   * @param why - What went wrong with the picture.
+   */
+  const withoutPicture = useCallback(
+    (draft: AiDraft, why: string) => {
+      toast(`The email is drafted, but the picture couldn't be made: ${why}`, { tone: "error" });
+      onDraft(draft, withSubject, null);
+    },
+    [toast, onDraft, withSubject],
+  );
+
+  /** Asks for the draft, then its picture when one fits, and hands them over. */
   async function write(): Promise<void> {
-    setBusy(true);
+    setStep("email");
     const res = await callApi<{ draft: AiDraft }>("/api/admin/mailing/ai-draft", "POST", {
       brief,
       kind,
       promoId,
       buttonUrl,
+      picture: canPicture && withPicture,
     });
-    setBusy(false);
     if (!res.ok) {
+      setStep(null);
       toast(res.error, { tone: "error" });
       return;
     }
-    onDraft(res.draft, withSubject);
+    const { draft } = res;
+    if (!draft.picture) {
+      onDraft(draft, withSubject, null);
+      return;
+    }
+    setStep("picture");
+    const pic = await callApi<PictureJob>("/api/admin/mailing/ai-picture", "POST", {
+      brief,
+      kind: draft.picture,
+      name: draft.heading || draft.subject,
+    });
+    if (!pic.ok) {
+      withoutPicture(draft, pic.error);
+      return;
+    }
+    // DraftPicture draws and stores it, then calls back.
+    setJob({ ...pic, draft });
   }
+
+  const onPictureDone = useCallback(
+    (picture: DraftedPicture) => {
+      if (job) onDraft(job.draft, withSubject, picture);
+    },
+    [job, onDraft, withSubject],
+  );
+  const onPictureFail = useCallback(
+    (message: string) => {
+      if (!job) return;
+      withoutPicture(job.draft, `${message} Its design "${job.design.name}" is in Post maker.`);
+    },
+    [job, withoutPicture],
+  );
 
   return (
     <Modal
@@ -113,7 +181,25 @@ export function DraftDialog({
             Also write the subject and preview text (Undo doesn&apos;t bring the old ones back)
           </span>
         </label>
+        {canPicture && (
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className={ADMIN_CHECKBOX_CLS}
+              checked={withPicture}
+              onChange={(e) => setWithPicture(e.target.checked)}
+            />
+            <span>
+              Make a picture if it fits (a tip, scam warning, promo or news). It&apos;s saved in
+              Post maker too, so you can change it there.
+            </span>
+          </label>
+        )}
+        <p aria-live="polite" className="min-h-5 text-sm text-admin-muted">
+          {step ? STEP_LABEL[step] : ""}
+        </p>
       </div>
+      {job && <DraftPicture job={job} onDone={onPictureDone} onFail={onPictureFail} />}
     </Modal>
   );
 }

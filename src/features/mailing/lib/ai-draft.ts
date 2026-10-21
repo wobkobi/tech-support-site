@@ -3,6 +3,7 @@
 // the block list. Pure and client-safe.
 
 import { emptyBlock, type Block } from "@/features/mailing/lib/blocks";
+import { isRenderUrl } from "@/features/social-design/lib/pictures";
 
 /** A kind of email the draft dialog offers, with a line steering the model. */
 export interface DraftKind {
@@ -51,6 +52,19 @@ export const DRAFT_KINDS: readonly DraftKind[] = [
 /** The longest brief the dialog accepts. */
 export const BRIEF_MAX = 500;
 
+/** Looks a picture drafted with the email can take; "scam" is the tip look with a warning label. */
+export const PICTURE_KINDS = ["tip", "scam", "promo", "announcement"] as const;
+export type PictureKind = (typeof PICTURE_KINDS)[number];
+
+/**
+ * Whether a value is a {@link PictureKind}.
+ * @param value - Raw value.
+ * @returns True for a known look.
+ */
+export function isPictureKind(value: unknown): value is PictureKind {
+  return (PICTURE_KINDS as readonly unknown[]).includes(value);
+}
+
 /** What the route returns: the parts the editor fills in. */
 export interface AiDraft {
   subject: string;
@@ -61,6 +75,8 @@ export interface AiDraft {
   buttonText: string;
   /** Link for a button that has none yet (one of the editor's choices), or "". */
   buttonUrl: string;
+  /** The picture look that suits the email, or "" when it doesn't want one or none was asked for. */
+  picture: PictureKind | "";
 }
 
 /**
@@ -119,6 +135,7 @@ export function readDraft(raw: unknown): AiDraft | null {
     bullets: list(r.bullets, 8, 200),
     buttonText: text(r.buttonText, 40),
     buttonUrl: text(r.buttonUrl, 300),
+    picture: isPictureKind(r.picture) ? r.picture : "",
   };
   return draft.paragraphs.length > 0 || draft.heading ? draft : null;
 }
@@ -202,5 +219,35 @@ export function fillBlocks(blocks: readonly Block[], draft: AiDraft): Block[] {
     }
   }
 
+  return out;
+}
+
+/**
+ * Puts a drafted picture under the heading (else the greeting). A picture block that's empty
+ * or holds a design picture is reused, so drafting again swaps the picture rather than adding
+ * another; a photo the operator put in is left alone.
+ * @param blocks - The blocks.
+ * @param picture - The picture.
+ * @param picture.url - Its address.
+ * @param picture.alt - Its description.
+ * @returns The new blocks.
+ */
+export function placePicture(
+  blocks: readonly Block[],
+  picture: { url: string; alt: string },
+): Block[] {
+  const out = [...blocks];
+  const reuse = out.findIndex(
+    (b) => b.type === "picture" && (!b.url.trim() || isRenderUrl(b.url.trim())),
+  );
+  const existing = reuse >= 0 ? out[reuse] : null;
+  if (existing?.type === "picture") {
+    out[reuse] = { ...existing, url: picture.url, alt: picture.alt };
+    return out;
+  }
+  const heading = out.findIndex((b) => b.type === "heading");
+  // findIndex's -1 for no greeting puts the picture first.
+  const at = heading >= 0 ? heading + 1 : out.findIndex(isGreeting) + 1;
+  out.splice(at, 0, { ...emptyBlock("picture"), url: picture.url, alt: picture.alt } as Block);
   return out;
 }
