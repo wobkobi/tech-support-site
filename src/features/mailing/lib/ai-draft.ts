@@ -12,8 +12,8 @@ export interface DraftKind {
   guide: string;
 }
 
-/** Kinds in dialog order; the first is the default. */
-export const DRAFT_KINDS: readonly DraftKind[] = [
+/** The kinds the operator can pick by hand. */
+const PICKED_KINDS: readonly DraftKind[] = [
   {
     key: "general",
     label: "General update",
@@ -49,11 +49,28 @@ export const DRAFT_KINDS: readonly DraftKind[] = [
   },
 ];
 
+/** "Let AI decide": the model works the kind out from the brief, using the same guides. */
+const AUTO_KIND: DraftKind = {
+  key: "auto",
+  label: "Let AI decide",
+  guide: [
+    "Which kind of email is the brief closest to? Write it the way that kind says:",
+    ...PICKED_KINDS.map((k) => `- ${k.label}: ${k.guide}`),
+    "- None of them fits: write it as a General update.",
+  ].join("\n"),
+};
+
+/** Kinds in dialog order; the first is the default. */
+export const DRAFT_KINDS: readonly DraftKind[] = [AUTO_KIND, ...PICKED_KINDS];
+
 /** The longest brief the dialog accepts. */
 export const BRIEF_MAX = 500;
 
-/** Looks a picture drafted with the email can take; "scam" is the tip look with a warning label. */
-export const PICTURE_KINDS = ["tip", "scam", "promo", "announcement"] as const;
+/**
+ * Looks a picture drafted with the email can take; "scam" is the tip look with a warning label,
+ * "thanks" the announcement look led by the thank-you.
+ */
+export const PICTURE_KINDS = ["thanks", "tip", "scam", "promo", "announcement"] as const;
 export type PictureKind = (typeof PICTURE_KINDS)[number];
 
 /**
@@ -77,6 +94,14 @@ export interface AiDraft {
   buttonUrl: string;
   /** The picture look that suits the email, or "" when it doesn't want one or none was asked for. */
   picture: PictureKind | "";
+}
+
+/** A saved Post maker picture the draft picked instead of making a new one. */
+export interface ReusedPicture {
+  url: string;
+  alt: string;
+  /** The design's name, to say which one went in. */
+  name: string;
 }
 
 /**
@@ -225,7 +250,9 @@ export function fillBlocks(blocks: readonly Block[], draft: AiDraft): Block[] {
 /**
  * Puts a drafted picture under the heading (else the greeting). A picture block that's empty
  * or holds a design picture is reused, so drafting again swaps the picture rather than adding
- * another; a photo the operator put in is left alone.
+ * another; a photo the operator put in is left alone. When the picture lands right under the
+ * email's main heading, that heading is dropped: the picture's headline says the email's point
+ * bigger, so the two read as a double. A section heading over a picture further down stays.
  * @param blocks - The blocks.
  * @param picture - The picture.
  * @param picture.url - Its address.
@@ -237,17 +264,30 @@ export function placePicture(
   picture: { url: string; alt: string },
 ): Block[] {
   const out = [...blocks];
-  const reuse = out.findIndex(
+  let at = out.findIndex(
     (b) => b.type === "picture" && (!b.url.trim() || isRenderUrl(b.url.trim())),
   );
-  const existing = reuse >= 0 ? out[reuse] : null;
+  const existing = at >= 0 ? out[at] : null;
   if (existing?.type === "picture") {
-    out[reuse] = { ...existing, url: picture.url, alt: picture.alt };
-    return out;
+    out[at] = { ...existing, url: picture.url, alt: picture.alt };
+  } else {
+    const heading = out.findIndex((b) => b.type === "heading");
+    // findIndex's -1 for no greeting puts the picture first.
+    at = heading >= 0 ? heading + 1 : out.findIndex(isGreeting) + 1;
+    out.splice(at, 0, { ...emptyBlock("picture"), url: picture.url, alt: picture.alt } as Block);
   }
-  const heading = out.findIndex((b) => b.type === "heading");
-  // findIndex's -1 for no greeting puts the picture first.
-  const at = heading >= 0 ? heading + 1 : out.findIndex(isGreeting) + 1;
-  out.splice(at, 0, { ...emptyBlock("picture"), url: picture.url, alt: picture.alt } as Block);
+  if (at > 0 && out.findIndex((b) => b.type === "heading") === at - 1) out.splice(at - 1, 1);
   return out;
+}
+
+/**
+ * Takes out the picture an earlier draft put in, for a draft that comes without one, so its old
+ * words don't sit with the new text. A picture the operator changed since has another address,
+ * so it stays.
+ * @param blocks - The blocks.
+ * @param url - The earlier draft's picture, or null for none.
+ * @returns The new blocks.
+ */
+export function dropPicture(blocks: readonly Block[], url: string | null): Block[] {
+  return blocks.filter((b) => !url || b.type !== "picture" || b.url.trim() !== url);
 }

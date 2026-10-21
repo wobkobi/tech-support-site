@@ -42,6 +42,7 @@ export async function promoWording(
       offer: describePromoOffer(promo),
       ends: formatPromoEnd(promo.endAt),
       restriction: describeRecurringWindow(promo),
+      about: [promo.title, promo.description].filter(Boolean).join(" - "),
     },
     linkedPromoLive: true,
   };
@@ -62,13 +63,23 @@ export async function loadSharedRenderParts(promoId: string | null): Promise<Sha
 }
 
 /**
+ * Sender for mailing-list emails: MAILING_FROM, else EMAIL_FROM. A separate address means a
+ * reader who blocks the list or reports it as spam still gets booking emails and replies, which
+ * come from EMAIL_FROM.
+ * @returns The From value, or undefined when neither is set.
+ */
+export function mailingFrom(): string | undefined {
+  return process.env.MAILING_FROM?.trim() || process.env.EMAIL_FROM?.trim() || undefined;
+}
+
+/**
  * Env vars a real send needs that are missing. Sending is refused while any is.
  * @returns Missing var names, empty when sending can go ahead.
  */
 export function missingSendEnv(): string[] {
   const missing: string[] = [];
   if (!process.env.RESEND_API_KEY?.trim()) missing.push("RESEND_API_KEY");
-  if (!process.env.EMAIL_FROM?.trim()) missing.push("EMAIL_FROM");
+  if (!mailingFrom()) missing.push("EMAIL_FROM");
   if (!unsubscribeSecret()) missing.push("UNSUBSCRIBE_SECRET");
   return missing;
 }

@@ -11,7 +11,7 @@ import { AddBlockMenu } from "@/features/mailing/components/blocks/AddBlockMenu"
 import { BlockCard, type BlockCardShared } from "@/features/mailing/components/blocks/BlockCard";
 import { DraftDialog } from "@/features/mailing/components/blocks/DraftDialog";
 import { useBlockHistory } from "@/features/mailing/components/blocks/useBlockHistory";
-import { fillBlocks, placePicture } from "@/features/mailing/lib/ai-draft";
+import { dropPicture, fillBlocks, placePicture } from "@/features/mailing/lib/ai-draft";
 import {
   emptyBlock,
   newBlockId,
@@ -59,7 +59,7 @@ interface FocusTarget {
  * @param props.insertGroups - The Add menu for Text blocks.
  * @param props.promo - Today's promo wording, for the promo card.
  * @param props.linkTargets - Pages buttons and pictures can link to.
- * @param props.draft - Linked promo and subject callback for "Draft with AI"; null when OpenAI isn't set up.
+ * @param props.draft - The email, linked promo and subject callback for "Draft with AI"; null when OpenAI isn't set up.
  * @returns The editor.
  */
 export function BlockEditor({
@@ -80,6 +80,7 @@ export function BlockEditor({
   promo: PromoWording | null;
   linkTargets: LinkTarget[];
   draft?: {
+    campaignId: string;
     promoId: string | null;
     onSubject: (subject: string, preheader: string) => void;
   } | null;
@@ -293,19 +294,22 @@ export function BlockEditor({
 
       {draft && drafting && (
         <DraftDialog
+          campaignId={draft.campaignId}
           promoId={draft.promoId}
           buttonUrl={blocks.find((b) => b.type === "button")?.url ?? ""}
           canPicture={canUpload}
           onClose={() => setDrafting(false)}
-          onDraft={(result, withSubject, picture) => {
+          onDraft={(result, withSubject, picture, stale) => {
             setDrafting(false);
             const filled = fillBlocks(blocks, result);
-            apply(picture ? placePicture(filled, picture) : filled);
+            apply(picture ? placePicture(filled, picture) : dropPicture(filled, stale));
             if (withSubject) draft.onSubject(result.subject, result.preheader);
             toast(
-              picture
-                ? "Draft added with a picture. Read it through and make it yours; Undo takes it back. The picture's design is in Post maker if you want to change it."
-                : "Draft added. Read it through and make it yours; Undo takes it back.",
+              picture?.reusedFrom
+                ? `Draft added with your "${picture.reusedFrom}" picture from Post maker. Read it through and make it yours; Undo takes it back.`
+                : picture
+                  ? "Draft added with a picture. Read it through and make it yours; Undo takes it back. The picture's design is in Post maker if you want to change it."
+                  : "Draft added. Read it through and make it yours; Undo takes it back.",
               { tone: "success" },
             );
           }}

@@ -134,6 +134,9 @@ export const FORMAT_KEYS = Object.keys(FORMATS) as FormatKey[];
 /** Sizes a new design starts with. */
 export const CORE_FORMATS: FormatKey[] = FORMAT_KEYS.filter((k) => FORMATS[k].group === "core");
 
+/** The size an email picture is drawn at: wide, so it doesn't push the words off a phone screen. */
+export const EMAIL_PICTURE_FORMAT: FormatKey = "landscape";
+
 /**
  * Whether a string is a known format key.
  * @param value - Raw value.

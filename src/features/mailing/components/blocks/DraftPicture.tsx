@@ -4,6 +4,7 @@
 // draws its Landscape size off screen and stores it. Loaded only when a draft wants a picture,
 // so the canvas code stays out of the mail editor until then.
 
+import type { DraftDesign } from "@/features/mailing/components/blocks/draft-brief";
 import { callApi } from "@/features/mailing/lib/api-client";
 import { usePictureExporter } from "@/features/social-design/components/canvas/export";
 import { exoFamily, loadExo } from "@/features/social-design/components/canvas/fonts";
@@ -12,13 +13,10 @@ import { fillDraft, type DesignDraft } from "@/features/social-design/lib/ai-dra
 import type { DesignRow, RenderRow } from "@/features/social-design/lib/design-row";
 import { docHash, type BoundValues, type DesignDoc } from "@/features/social-design/lib/doc";
 import { makeRoom } from "@/features/social-design/lib/editor-ops";
-import type { FormatKey } from "@/features/social-design/lib/formats";
+import { EMAIL_PICTURE_FORMAT } from "@/features/social-design/lib/formats";
 import { autoAltText } from "@/features/social-design/lib/pictures";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-
-/** The size an email shows: wide, so it doesn't push the words off a phone screen. */
-const EMAIL_FORMAT: FormatKey = "landscape";
 
 /** What the ai-picture route hands back. */
 export interface PictureJob {
@@ -33,6 +31,8 @@ export interface PictureJob {
 export interface DraftedPicture {
   url: string;
   alt: string;
+  /** The design it was drawn from, for the next draft to draw over. */
+  design: DraftDesign;
 }
 
 /**
@@ -87,22 +87,27 @@ export function DraftPicture({
       if (!saved.ok) throw new Error(saved.error);
       const blob = await exportPicture({
         doc,
-        format: EMAIL_FORMAT,
+        format: EMAIL_PICTURE_FORMAT,
         scale: 1,
         type: "image/jpeg",
       });
       const form = new FormData();
-      form.append("format", EMAIL_FORMAT);
+      form.append("format", EMAIL_PICTURE_FORMAT);
       // Matches the saved design, so the picker and Post maker see the picture as current.
       form.append("docHash", docHash(doc, bound));
-      form.append("file", blob, `${EMAIL_FORMAT}.jpg`);
+      form.append("file", blob, `${EMAIL_PICTURE_FORMAT}.jpg`);
       const stored = await callApi<{ render: RenderRow }>(
         `/api/admin/social/designs/${design.id}/renders`,
         "POST",
         form,
       );
       if (!stored.ok) throw new Error(stored.error);
-      return { url: stored.render.url, alt: autoAltText(doc) };
+      // Storing the picture leaves updatedAt alone, so this is how the draft left the design.
+      return {
+        url: stored.render.url,
+        alt: autoAltText(doc),
+        design: { id: design.id, updatedAt: saved.updatedAt },
+      };
     })().then(onDone, (error: unknown) =>
       onFail(error instanceof Error ? error.message : "The picture couldn't be drawn."),
     );

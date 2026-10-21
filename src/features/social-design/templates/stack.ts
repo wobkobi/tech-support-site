@@ -29,6 +29,8 @@ export interface Frame {
   key: FormatKey;
   /** Scale against a 1080px-wide portrait post. */
   k: number;
+  /** Extra scale on the words and logo (not the gaps), for a size seen smaller than a feed shows it. */
+  boost: number;
   /** Two columns side by side rather than one stacked column. */
   wide: boolean;
   /** Card padding. */
@@ -64,15 +66,17 @@ function cardArea(key: FormatKey): { x1: number; y1: number; x2: number; y2: num
 /**
  * Frame for a size.
  * @param key - Size.
+ * @param boost - Extra scale on the words and logo.
  * @returns Scale, column mode and the card's inner room.
  */
-export function frameFor(key: FormatKey): Frame {
+export function frameFor(key: FormatKey, boost = 1): Frame {
   const k = SCALE[key] ?? 1;
   const a = cardArea(key);
   const pad = Math.round(64 * k);
   return {
     key,
     k,
+    boost,
     wide: FORMATS[key].width / FORMATS[key].height > 1.25,
     pad,
     minFont: Math.ceil((MIN_TEXT_PX * FORMATS[key].width) / 1080),

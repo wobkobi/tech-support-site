@@ -13,6 +13,7 @@ import {
   LOGO_FULL,
   LOGO_MARK,
   LOGO_PROFILE,
+  LOGO_WORDMARK,
   QR_CODE_SPECS,
   SOCIAL_SPECS,
 } from "./config.js";
@@ -36,7 +37,7 @@ import {
  */
 async function preflight(): Promise<void> {
   console.log("🔍 Checking source files...");
-  const required = [LOGO_MARK, LOGO_FULL, LOGO_PROFILE, BACKDROP];
+  const required = [LOGO_MARK, LOGO_FULL, LOGO_WORDMARK, LOGO_PROFILE, BACKDROP];
 
   for (const file of required) {
     try {

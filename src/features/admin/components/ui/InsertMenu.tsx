@@ -89,6 +89,9 @@ export function InsertMenu({
   useEffect(() => {
     if (!open) return;
     searchRef.current?.focus();
+    // Inside a box that scrolls on its own (the mail editor's card on wide screens) the menu can
+    // open past the bottom edge, so bring the list into view.
+    menuRef.current?.scrollIntoView({ block: "nearest" });
     /**
      * Closes the menu when a click lands outside it.
      * @param e - The pointer event.

@@ -113,6 +113,10 @@ non-blank in each Vercel environment.
 - **Recommended** (a missing one degrades a feature, never fatal): the Google OAuth quartet,
   `BOOKING_CALENDAR_ID`, `RESEND_API_KEY`, `EMAIL_FROM`, `ADMIN_EMAIL`, `OPENAI_API_KEY`,
   `GOOGLE_MAPS_SERVER_KEY`, `HOME_ADDRESS`, `GOOGLE_SHEET_ID`, `GOOGLE_BUSINESS_SHEETS_FOLDER_ID`.
+- **Optional:** `MAILING_FROM` - sender for mailing-list emails, like
+  `Harrison at To The Point Tech <news@tothepoint.co.nz>`; falls back to `EMAIL_FROM`. A separate
+  address means a reader who blocks the list or reports it as spam still gets booking emails. Any
+  address on the domain verified in Resend works; replies go to `ADMIN_EMAIL`.
 
 **The `$`-expansion trap:** locally, `.env.local` runs through dotenv-expand, which expands `$VAR`
 inside every value (single-quoted included). A value containing `$` must be single-quoted with the

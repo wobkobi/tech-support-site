@@ -413,6 +413,8 @@ export interface DraftCase {
   buttonUrl: string;
   /** Patterns the draft must not contain, each with the reason, on top of the shared rules. */
   forbid?: { pattern: RegExp; why: string }[];
+  /** True when the brief asks for steps, so the draft must list them as bullet points. */
+  wantBullets?: boolean;
 }
 
 // Mailing drafts: one per kind with a rule worth guarding, plus an injection.
@@ -450,6 +452,22 @@ export const DRAFT_CASES: DraftCase[] = [
     kind: "checking-in",
     brief: "Haven't heard from some of you in a while, see if anyone needs a hand before winter",
     buttonUrl: "https://www.tothepoint.co.nz/booking",
+  },
+  {
+    // The operator's own wording; the short heading slipped into "our mailing list".
+    id: "draft-mailing-list-no-we",
+    kind: "announcement",
+    brief:
+      "Announcing the mailing list. The main point being is to thank everyone who has used me in the past for their service and requesting them to review me on Google. Pricing update coming at the end of the month",
+    buttonUrl: "",
+  },
+  {
+    // "Let AI decide" has to spot a tip in a short brief and list its steps.
+    id: "draft-auto-tip",
+    kind: "auto",
+    brief: "Printer stopped printing after the latest Windows update, how to get it going again",
+    buttonUrl: "",
+    wantBullets: true,
   },
   {
     id: "draft-injection",
@@ -524,6 +542,15 @@ export const POST_DRAFT_CASES: PostDraftCase[] = [
     room: REVIEW_ROOM,
     paidAd: false,
     refused: true,
+  },
+  {
+    // A 30-character headline is where "our" crept in for "my".
+    id: "post-mailing-list-no-we",
+    kind: "announcement",
+    brief:
+      "Announcing the mailing list. The main point being is to thank everyone who has used me in the past for their service and requesting them to review me on Google. Pricing update coming at the end of the month",
+    room: HEADLINE_ROOM,
+    paidAd: false,
   },
   {
     id: "post-paid-ad-no-contact",

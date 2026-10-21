@@ -72,13 +72,54 @@ export function spread(values: number[]): number {
 }
 
 /**
+ * "We", "us" or "our": the business is one person, so its words only ever say "I". Case is
+ * matched by hand so "US" the country passes.
+ */
+const PLURAL_RE = /\b(?:[Ww]e(?:'re|'ll|'ve|'d)?|[Uu]s|[Oo]urs?|[Oo]urselves)\b/;
+
+/**
+ * Whether the writing says "we", "us" or "our" outside quote marks: a scam text quoted in a
+ * warning ("we couldn't deliver your parcel") is someone else's words. A single-quoted span
+ * opens after a space or bracket and closes before one or before punctuation, so the
+ * apostrophes in "I'm" and "couldn't" don't count as quote marks.
+ * @param text - The words to check.
+ * @returns True when the business speaks in the plural.
+ */
+function saysWe(text: string): boolean {
+  return PLURAL_RE.test(
+    text
+      .replace(/["“][^"”\n]*["”]/g, "")
+      .replace(/(^|[\s(])['‘][^\n]*?['’](?=[\s.,!?;:)]|$)/gm, "$1"),
+  );
+}
+
+/**
+ * Digit runs the writing made up: in neither the brief nor the business facts the writer was
+ * given. Facts match whole runs, so "31" doesn't pass on the "1237" in a phone number.
+ * @param text - The words to check, placeholders already removed.
+ * @param brief - The brief.
+ * @param facts - The /llms.txt facts, or "" for none.
+ * @returns The made-up runs.
+ */
+function inventedFigures(text: string, brief: string, facts: string): string[] {
+  const known = new Set(facts.match(/\d+/g) ?? []);
+  const runs = new Set(text.match(/\d+/g) ?? []);
+  return [...runs].filter((n) => !brief.includes(n) && !known.has(n));
+}
+
+/**
  * What a mailing draft got wrong. Hard problems break a prompt INVARIANT; soft ones are
  * quick style fixes (curly quotes, a long subject or button).
  * @param draft - The draft the route returned.
  * @param brief - The brief it was written from.
+ * @param facts - The business facts the writer was given (/llms.txt), or "" for none.
  * @returns The hard and soft problems, empty when it's clean.
  */
-export function draftProblems(draft: AiDraft, brief: string): { hard: string[]; soft: string[] } {
+export function draftProblems(
+  draft: AiDraft,
+  brief: string,
+  facts = "",
+): { hard: string[]; soft: string[] } {
   const hard: string[] = [];
   const soft: string[] = [];
   const all = [
@@ -91,10 +132,10 @@ export function draftProblems(draft: AiDraft, brief: string): { hard: string[]; 
   ].join("\n");
 
   if (/[\u2013\u2014]/.test(all)) hard.push("has an em or en dash");
-  // Every digit run outside a {placeholder} has to come from the brief.
-  const figures = all.replace(/\{\w+\}/g, "").match(/\d+/g) ?? [];
-  const invented = [...new Set(figures)].filter((n) => !brief.includes(n));
-  if (invented.length > 0) hard.push(`figures not in the brief: ${invented.join(", ")}`);
+  if (saysWe(all)) hard.push('says "we", "us" or "our"');
+  // Every digit run outside a {placeholder} has to come from the brief or the facts.
+  const invented = inventedFigures(all.replace(/\{\w+\}/g, ""), brief, facts);
+  if (invented.length > 0) hard.push(`figures not in the brief or facts: ${invented.join(", ")}`);
   if (draft.paragraphs.length === 0) hard.push("no paragraphs");
   if (/^(hi|hello|hey|kia ora|dear)\b/i.test(draft.paragraphs[0] ?? "")) {
     hard.push("opens with a greeting");
@@ -122,6 +163,7 @@ const CONTACT_RE = /\b0\d[\d ]{6,}\d\b|@|\bwww\.|https?:\/\/|\.co\.nz\b/i;
  * @param brief - The brief it was written from.
  * @param room - What the design had room for.
  * @param paidAd - Whether the design was a paid ad.
+ * @param facts - The business facts the writer was given (/llms.txt), or "" for none.
  * @returns The hard and soft problems, empty when it's clean.
  */
 export function postDraftProblems(
@@ -129,6 +171,7 @@ export function postDraftProblems(
   brief: string,
   room: DraftRoom,
   paidAd: boolean,
+  facts = "",
 ): { hard: string[]; soft: string[] } {
   const hard: string[] = [];
   const soft: string[] = [];
@@ -136,9 +179,12 @@ export function postDraftProblems(
   const all = [picture, draft.quote, draft.name, draft.caption].join("\n");
 
   if (/[\u2013\u2014]/.test(all)) hard.push("has an em or en dash");
-  const figures = picture.match(/\d+/g) ?? [];
-  const invented = [...new Set(figures)].filter((n) => !brief.includes(n));
-  if (invented.length > 0) hard.push(`picture figures not in the brief: ${invented.join(", ")}`);
+  // The quote is the customer's words, where "we" is theirs to say.
+  if (saysWe([picture, draft.caption].join("\n"))) hard.push('says "we", "us" or "our"');
+  const invented = inventedFigures(picture, brief, facts);
+  if (invented.length > 0) {
+    hard.push(`picture figures not in the brief or facts: ${invented.join(", ")}`);
+  }
   if (CONTACT_RE.test(picture)) hard.push("contact details on the picture");
   if (paidAd && CONTACT_RE.test(draft.caption)) hard.push("contact details in a paid ad's words");
   if (/\b(tap|click) (here|to|below)\b|\blearn more\b|\blink in bio\b/i.test(picture)) {

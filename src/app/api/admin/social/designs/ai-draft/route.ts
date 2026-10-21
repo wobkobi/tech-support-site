@@ -50,6 +50,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       room,
       paidAd,
       review: kind.key === "review",
+      inEmail: false,
     });
     // A review post needs real customer words; with none, refuse rather than invent one.
     if (kind.key === "review" && (!draft || (room.quote && !draft.quote))) {

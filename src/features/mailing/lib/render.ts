@@ -57,6 +57,8 @@ export interface PromoWording {
   ends: string;
   /** Weekday or time-of-day limit, like "weekdays" or "Tuesdays 9am to 5pm"; null when none. */
   restriction?: string | null;
+  /** The promo's own title and description, so the AI writers know what it's for. */
+  about?: string;
 }
 
 /** Everything the renderer needs beyond the content and the recipient. */
@@ -377,13 +379,13 @@ function blockHtml(
  * @param content - Subject, preheader and body as the operator wrote them.
  * @param recipient - Who this copy is for.
  * @param ctx - Brand, signature, promo wording and unsubscribe link.
- * @returns The filled subject, the full HTML document and its plain-text part.
+ * @returns The filled subject and preview text, the full HTML document and its plain-text part.
  */
 export function renderCampaign(
   content: CampaignContent,
   recipient: CampaignRecipient,
   ctx: RenderContext,
-): { subject: string; html: string; text: string } {
+): { subject: string; preheader: string; html: string; text: string } {
   const values = placeholderValues(recipient, ctx.promo);
   const subject = fillText(content.subject, values).trim();
   const preheader = content.preheader ? fillText(content.preheader, values).trim() : "";
@@ -403,7 +405,7 @@ ${footer}
 `);
   // The hidden preheader would otherwise lead the text part.
   const text = htmlToText(html.replace(preheaderHtml, ""));
-  return { subject, html, text };
+  return { subject, preheader, html, text };
 }
 
 /**
