@@ -737,6 +737,11 @@ type PromoTier {
   travelPercent   Float?
 }
 
+type PromoLockedDelta {
+  label       String
+  hourlyDelta Float
+}
+
 model Promo {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   title       String
@@ -782,6 +787,11 @@ model Promo {
   // lands higher simply earns more at invoice time. Advertising the high band
   // would promise a discount the job may not reach.
   tiers PromoTier[]
+
+  // Every $/hr modifier's delta when the promo was created. A flat promo prices
+  // a modified rate at its flat Standard plus these, so "lock in current rates"
+  // still bills the old At home rate after the deltas change. Keyed by label.
+  lockedDeltas PromoLockedDelta[]
 
   // Eligibility limits. Null means no limit.
   //

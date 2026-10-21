@@ -293,13 +293,24 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     <strong>{mod.label}</strong> ({mod.deltaDescription} ={" "}
                     <PromoPrice
                       discounted={
-                        promoModifierRate(baseRate, mod.effectiveRate, mod.kind, pricedPromo) !==
-                        mod.effectiveRate
+                        promoModifierRate(
+                          baseRate,
+                          mod.effectiveRate,
+                          mod.kind,
+                          pricedPromo,
+                          mod.label,
+                        ) !== mod.effectiveRate
                       }
                       className="font-bold"
                     >
                       {formatMoneyCompact(
-                        promoModifierRate(baseRate, mod.effectiveRate, mod.kind, pricedPromo),
+                        promoModifierRate(
+                          baseRate,
+                          mod.effectiveRate,
+                          mod.kind,
+                          pricedPromo,
+                          mod.label,
+                        ),
                       )}
                       /hr
                     </PromoPrice>

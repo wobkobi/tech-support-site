@@ -62,6 +62,8 @@ export interface PromoRow {
   activeToMinute: number | null;
   /** The overlap warning's tie-break must match the query's, so it needs this. */
   createdAt: string;
+  /** Modifier deltas saved at creation, which a flat promo prices modified rates with. */
+  lockedDeltas: { label: string; hourlyDelta: number }[];
 }
 
 /**
@@ -117,6 +119,7 @@ export default async function AdminPromosPage(): Promise<React.ReactElement> {
     activeFromMinute: p.activeFromMinute,
     activeToMinute: p.activeToMinute,
     createdAt: p.createdAt.toISOString(),
+    lockedDeltas: p.lockedDeltas.map((d) => ({ label: d.label, hourlyDelta: d.hourlyDelta })),
   }));
 
   return (

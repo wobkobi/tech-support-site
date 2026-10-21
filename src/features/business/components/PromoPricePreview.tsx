@@ -94,7 +94,9 @@ export function PromoPricePreview({
       label: mod.label,
       now: mod.effectiveRate,
       suffix: "/hr",
-      after: promos.map((p) => promoModifierRate(rates.baseRate, mod.effectiveRate, mod.kind, p)),
+      after: promos.map((p) =>
+        promoModifierRate(rates.baseRate, mod.effectiveRate, mod.kind, p, mod.label),
+      ),
     })),
     {
       label: "Business",

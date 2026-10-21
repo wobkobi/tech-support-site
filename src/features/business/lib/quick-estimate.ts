@@ -2,7 +2,11 @@
 // Client-safe one-shot estimate for the booking form, using the /pricing wizard's endpoints
 // and priceRangeFor so they stay in sync; logs it for the booking snapshot.
 
-import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
+import {
+  meetingModifiers,
+  priceRangeFor,
+  remoteRateDelta,
+} from "@/features/business/lib/estimate-range";
 import { calcTravelCharge, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
 import {
   applyPromoToHourlyRate,
@@ -200,7 +204,12 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
   const surchargeHigh = Math.ceil(undiscounted.high * uplift);
   const promo = promoForSpend(dateGated, undiscounted.low + surchargeLow + rawTravel);
 
-  const promoRate = applyPromoToHourlyRate(fullRate, promo, baseStandard);
+  const promoRate = applyPromoToHourlyRate(
+    fullRate,
+    promo,
+    baseStandard,
+    meetingModifiers(rates, meeting),
+  );
   const band = priceRangeFor(
     effectiveMins,
     promoRate,
