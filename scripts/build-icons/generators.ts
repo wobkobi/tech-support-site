@@ -16,6 +16,7 @@ import {
   LOGO_FULL,
   LOGO_MARK,
   LOGO_PROFILE,
+  LOGO_WORDMARK,
   PALETTE,
   QR_CODE_SPECS,
   SOCIAL_SPECS,
@@ -266,16 +267,18 @@ export async function buildAdditionalAssets(): Promise<void> {
 
   const logoMarkBuffer = await fs.readFile(LOGO_MARK);
   const logoFullBuffer = await fs.readFile(LOGO_FULL);
+  const logoWordmarkBuffer = await fs.readFile(LOGO_WORDMARK);
 
-  for (const { name, width, height, type, format, plate, plateRadius } of ADDITIONAL_ASSETS) {
+  for (const spec of ADDITIONAL_ASSETS) {
+    const { name, width, height, type, format, plate, plateRadius } = spec;
     let output: Sharp;
 
     if (type === "logo-only") {
-      // Full wordmark, transparent unless the spec asks for a plate. A plate
-      // needs more inset than the bleed-to-edge transparent version, or the
-      // wordmark runs into the corner radius.
+      // Full logo or wordmark, transparent unless the spec asks for a plate. A
+      // plate needs more inset than the bleed-to-edge transparent version, or
+      // the wordmark runs into the corner radius.
       const inset = plate ? 0.86 : 0.95;
-      const logo = await sharp(logoFullBuffer)
+      const logo = await sharp(spec.logo === "wordmark" ? logoWordmarkBuffer : logoFullBuffer)
         .resize({
           width: Math.round(width * inset),
           height: Math.round(height * inset),

@@ -15,7 +15,8 @@ export const PALETTE = {
 /* ---------- Source Files ---------- */
 
 export const LOGO_MARK = "public/source/logo.svg"; // Square logo mark (441x441)
-export const LOGO_FULL = "public/source/logo-full.svg"; // Full wordmark (2000x673)
+export const LOGO_FULL = "public/source/logo-full.svg"; // Wordmark and tagline (2000x674)
+export const LOGO_WORDMARK = "public/source/logo-wordmark.svg"; // Wordmark, no tagline (2000x674)
 export const LOGO_PROFILE = "public/source/profile.svg"; // Profile picture logo (542x542)
 export const BACKDROP = "public/source/backdrop.jpg"; // Background image
 
@@ -273,12 +274,25 @@ export interface AdditionalAsset {
   plate?: string;
   /** Corner radius in pixels for {@link AdditionalAsset.plate}. Ignored without it. */
   plateRadius?: number;
+  /** Which logo a "logo-only" asset draws: with the tagline (default) or the wordmark alone. */
+  logo?: "full" | "wordmark";
 }
 
 // Never delete public/assets/email-signature-400x135.png: delivered emails still hotlink it
 export const ADDITIONAL_ASSETS: AdditionalAsset[] = [
-  // Email signature: white plate for dark-mode clients; 280px (2x the 140px display) so a
-  // pasted signature fits an iPhone compose viewport
+  // Email signatures: white plate for dark-mode clients; 280px so a pasted signature fits an
+  // iPhone compose viewport. The site's emails show it at 140px, where the tagline is too
+  // small to read, so they use the wordmark. Keep the full one: sent emails hotlink it.
+  {
+    name: "email-signature-wordmark-280x95",
+    width: 280,
+    height: 95,
+    type: "logo-only",
+    format: "png",
+    plate: "#ffffff",
+    plateRadius: 10,
+    logo: "wordmark",
+  },
   {
     name: "email-signature-280x95",
     width: 280,

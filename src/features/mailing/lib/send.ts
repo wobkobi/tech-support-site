@@ -6,6 +6,7 @@
 import { audienceOf } from "@/features/mailing/lib/audience";
 import {
   loadSharedRenderParts,
+  mailingFrom,
   missingSendEnv,
   oneClickUnsubscribeUrl,
   unsubscribePageUrl,
@@ -113,7 +114,7 @@ async function ensureSendRows(campaign: Campaign): Promise<number> {
  * @param parts - Shared render parts.
  */
 async function deliverPending(campaign: Campaign, parts: SharedRenderParts): Promise<void> {
-  const from = process.env.EMAIL_FROM!;
+  const from = mailingFrom()!;
   const replyTo = process.env.ADMIN_EMAIL?.trim() || undefined;
   const content = contentOf(campaign);
   const tracking = { siteUrl: getSiteUrl(), campaign: campaignTag(campaign.subject) };
@@ -392,7 +393,7 @@ export async function sendTestEmail(
   promoId: string | null,
 ): Promise<SendResult> {
   const to = process.env.ADMIN_EMAIL?.trim();
-  const from = process.env.EMAIL_FROM?.trim();
+  const from = mailingFrom();
   if (!to || !from || !process.env.RESEND_API_KEY?.trim()) {
     return {
       ok: false,

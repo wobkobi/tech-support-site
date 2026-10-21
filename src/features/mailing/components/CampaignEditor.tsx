@@ -28,7 +28,12 @@ import { AUDIENCE_OPTIONS, type CampaignAudience } from "@/features/mailing/lib/
 import type { CampaignRow } from "@/features/mailing/lib/campaign-row";
 import type { LinkTarget } from "@/features/mailing/lib/insertables";
 import type { PromoWording } from "@/features/mailing/lib/render";
-import { matchTemplate, switchTemplate, type Template } from "@/features/mailing/lib/templates";
+import {
+  BLANK_TEMPLATE_ID,
+  matchTemplate,
+  switchTemplate,
+  type Template,
+} from "@/features/mailing/lib/templates";
 import type { QuietHours } from "@/shared/lib/quiet-hours";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -207,19 +212,17 @@ export function CampaignEditor({
   useEffect(() => {
     const seq = ++previewSeq.current;
     const timer = setTimeout(() => {
-      void callApi<{ html: string; subject: string; problems: string[] }>(
-        "/api/admin/mailing/preview",
-        "POST",
-        {
-          subject: content.subject,
-          preheader: content.preheader || null,
-          body: content.body,
-          promoId,
-          audience,
-        },
-      ).then((res) => {
+      void callApi<CampaignPreview>("/api/admin/mailing/preview", "POST", {
+        subject: content.subject,
+        preheader: content.preheader || null,
+        body: content.body,
+        promoId,
+        audience,
+      }).then((res) => {
         if (seq !== previewSeq.current) return;
-        if (res.ok) setPreview({ html: res.html, subject: res.subject, problems: res.problems });
+        if (!res.ok) return;
+        const { html, subject, from, inboxLine, problems } = res;
+        setPreview({ html, subject, from, inboxLine, problems });
       });
     }, PREVIEW_MS);
     return () => clearTimeout(timer);
@@ -417,8 +420,36 @@ export function CampaignEditor({
       )}
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <Card>
+        {/* On wide screens the editor stays in view and scrolls on its own while the page scrolls
+            the full-length preview. Its height leaves room for the top bar and the send bar. */}
+        <Card className="xl:sticky xl:top-16 xl:max-h-[calc(100dvh-12.5rem)] xl:self-start xl:overflow-y-auto">
           <div className="flex flex-col gap-4">
+            {editable && templates.length > 0 && (
+              <AdminField
+                label="Template"
+                htmlFor={`${fieldId}-template`}
+                hint={
+                  <>Fields you&apos;ve changed stay as they are; the rest follow the template.</>
+                }
+              >
+                <AdminSelect
+                  id={`${fieldId}-template`}
+                  value={templateId ?? ""}
+                  onChange={(e) => applyTemplate(e.target.value)}
+                >
+                  {templateId === null && (
+                    <option value="" disabled>
+                      Pick a template
+                    </option>
+                  )}
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.id === BLANK_TEMPLATE_ID ? "Blank" : t.name}
+                    </option>
+                  ))}
+                </AdminSelect>
+              </AdminField>
+            )}
             <AdminField
               label={initial.isPreset ? "Preset name" : "Name (only you see this)"}
               htmlFor={`${fieldId}-name`}
@@ -515,7 +546,11 @@ export function CampaignEditor({
                   insertGroups={insertGroups}
                   promo={promo}
                   linkTargets={linkTargets}
-                  draft={canDraft ? { promoId, onSubject: applyDraftSubject } : null}
+                  draft={
+                    canDraft
+                      ? { campaignId: initial.id, promoId, onSubject: applyDraftSubject }
+                      : null
+                  }
                 />
               ) : (
                 <>
@@ -630,15 +665,7 @@ export function CampaignEditor({
           </div>
         </Card>
 
-        <CampaignPreviewCard
-          preview={preview}
-          width={width}
-          onWidth={setWidth}
-          showTemplates={editable && templates.length > 0}
-          templates={templates}
-          templateId={templateId}
-          onTemplate={applyTemplate}
-        />
+        <CampaignPreviewCard preview={preview} width={width} onWidth={setWidth} />
       </div>
 
       {editable && (

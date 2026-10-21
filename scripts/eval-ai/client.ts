@@ -158,6 +158,18 @@ export async function callParseJob(
 }
 
 /**
+ * Reads /llms.txt: the business facts the AI writers are given, so figures from them aren't
+ * counted as made up.
+ * @param baseUrl - Server base URL (no trailing slash).
+ * @returns The facts text.
+ */
+export async function fetchFacts(baseUrl: string): Promise<string> {
+  const res = await fetch(`${baseUrl}/llms.txt`);
+  if (!res.ok) throw new Error(`/llms.txt returned ${res.status}`);
+  return res.text();
+}
+
+/**
  * Calls the admin mailing ai-draft route.
  * @param baseUrl - Server base URL (no trailing slash).
  * @param adminSecret - Admin secret for auth.

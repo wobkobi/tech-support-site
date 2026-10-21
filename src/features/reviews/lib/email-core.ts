@@ -166,7 +166,7 @@ export async function buildEmailSignature(siteUrl: string): Promise<string> {
   return `
     <div style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e8e8e8">
       <a href="${siteUrl}" style="display:inline-block;margin-bottom:8px">
-        <img src="${siteUrl}/assets/email-signature-280x95.png" alt="${escapeHtml(brandName(identity))}" width="140" style="display:block;border:0;height:auto" />
+        <img src="${siteUrl}/assets/email-signature-wordmark-280x95.png" alt="${escapeHtml(brandName(identity))}" width="140" style="display:block;border:0;height:auto" />
       </a>
       ${lines}
     </div>`;
@@ -174,7 +174,9 @@ export async function buildEmailSignature(siteUrl: string): Promise<string> {
 
 /**
  * Wraps body HTML in the notification email shell (560px card). Pinned to light scheme:
- * the navy logo mark vanishes on an auto-inverted dark card.
+ * the navy logo mark vanishes on an auto-inverted dark card. On a phone the padding shrinks so
+ * the words and pictures get about 330px of a 375px screen rather than 260px; the rules need
+ * !important to beat the inline padding, which mail apps without media queries keep.
  * @param bodyHtml - Inner HTML for the card.
  * @returns A complete HTML document.
  */
@@ -182,9 +184,9 @@ export function renderNotificationEmail(bodyHtml: string): string {
   return `
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></head>
-<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><style>@media (max-width:600px){.email-shell{padding:8px!important}.email-card{padding:20px 16px!important}}</style></head>
+<body class="email-shell" style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
+  <div class="email-card" style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
 ${bodyHtml}
   </div>
 </body>

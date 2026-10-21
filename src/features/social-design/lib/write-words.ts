@@ -2,13 +2,14 @@
 // Asks the model for a design's words from a brief, for the post maker's Draft with AI and the
 // picture an email draft makes. Server-only; review quotes only ever come from the brief.
 
+import { promoWording } from "@/features/mailing/lib/context";
 import {
   HEADLINE_TARGET,
   readDesignDraft,
   type DesignDraft,
   type DraftRoom,
 } from "@/features/social-design/lib/ai-draft";
-import { loadBoundValues } from "@/features/social-design/lib/load-bound";
+import { loadBusinessFacts, type BusinessFacts } from "@/shared/lib/ai/business-facts";
 import { jsonCompletion } from "@/shared/lib/ai/json-completion";
 import { voiceRules } from "@/shared/lib/ai/voice-rules";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -42,31 +43,48 @@ function roomLines(room: DraftRoom): string {
 }
 
 /**
+ * Where an email's picture differs from a social post's: its readers are already on the
+ * mailing list, and it carries the email's main point rather than the post kind's.
+ */
+const IN_EMAIL = `IN AN EMAIL
+This picture goes at the top of an email to past customers, who are already on the mailing list. Where THIS POST and these lines differ, these lines win.
+- Does the brief say what the email's main point is (like "the main point is...")?
+  - YES: the headline says that point (a thank-you thanks them).
+  - NO: the headline says what most of the brief is about.
+- INVARIANT: a thank-you holds no details you weren't told: no "over the years", no particular jobs.
+- INVARIANT: the picture words never ask the reader to join, sign up, subscribe or follow: they already get these emails.
+- The post words ("caption") are still for Facebook and Instagram.`;
+
+/**
  * The system prompt; live values come in as arguments.
  * @param who - Who is writing.
+ * @param facts - The business's live facts.
  * @param kindGuide - What this kind of post is for.
  * @param room - What the picture has room for.
  * @param promoLine - Whether a promo is running and how to treat it.
  * @param paidAd - Whether the design is a paid ad.
  * @param bookingUrl - The booking page address.
  * @param review - Whether this is a review post.
+ * @param inEmail - Whether the picture goes in a mailing list email.
  * @returns The prompt.
  */
 function systemPrompt(
   who: string,
+  facts: BusinessFacts,
   kindGuide: string,
   room: DraftRoom,
   promoLine: string,
   paidAd: boolean,
   bookingUrl: string,
   review: boolean,
+  inEmail: boolean,
 ): string {
   return `You write the words for one social media picture for a small tech help business, and the post words that go with it on Facebook and Instagram. Readers are locals, many of them older and not technical. The operator reads and edits everything before it is posted.
 
-${voiceRules(who)}
+${voiceRules(who, facts)}
 
 THIS POST
-${kindGuide}
+${kindGuide}${inEmail ? `\n\n${IN_EMAIL}` : ""}
 
 ON THE PICTURE
 People scroll past in a second, so the picture carries very few words: what each part says must make sense at a glance.
@@ -88,7 +106,7 @@ POST WORDS ("caption")
   - NO: carry on.
 ${
   paidAd
-    ? `- This is a paid ad. INVARIANT: no phone number, email address or web address in the post words either, even when the brief gives one - a number or address in the brief is for the ad's button and contact layers, never copied into words. Never write "link in bio" or "click below", and never say how to get in touch: the ad's own button does that job.`
+    ? `- This is a paid ad. INVARIANT: no phone number, email address or web address in the post words either, even when the brief or BUSINESS FACTS gives one - a number or address there is for the ad's button and contact layers, never copied into words. Never write "link in bio" or "click below", and never say how to get in touch: the ad's own button does that job.`
     : `- Does the post ask people to get in touch or book?\n  - YES: the last sentence says they can book at ${bookingUrl}, written exactly like that.\n  - NO: no address.`
 }
 
@@ -112,6 +130,7 @@ Plain text only: no markup, no bold, no headings.`;
  * @param options.room - What the design has room for.
  * @param options.paidAd - Whether the design is a paid ad.
  * @param options.review - Whether this is a review post.
+ * @param options.inEmail - Whether the picture goes in a mailing list email.
  * @returns The draft, or null when it came back empty.
  */
 export async function writeDesignWords({
@@ -120,26 +139,44 @@ export async function writeDesignWords({
   room,
   paidAd,
   review,
+  inEmail,
 }: {
   brief: string;
   guide: string;
   room: DraftRoom;
   paidAd: boolean;
   review: boolean;
+  inEmail: boolean;
 }): Promise<DesignDraft | null> {
-  const [settings, bound] = await Promise.all([getSettings(), loadBoundValues()]);
+  const [settings, { promo }, facts] = await Promise.all([
+    getSettings(),
+    promoWording(null),
+    loadBusinessFacts(),
+  ]);
   const { name, company, location } = settings.identity;
   const who = `${name}, who runs ${company}${location ? ` in ${location}` : ""}`;
   // Promo layers draw figures live, so picture words never repeat them; post words may.
-  const promoLine = bound.promoSummary
-    ? `A promo is running: ${bound.promoSummary}. Is this post about it?\n- YES: INVARIANT: the picture words never give its figures (the promo layers show them); say what the deal is good for. The post words may give the offer and end date exactly as written in this line, which counts as given like the brief.\n- NO: don't mention it.`
+  const promoLine = promo
+    ? `A promo is running: ${promo.summary}.${promo.about ? ` In its own words: "${promo.about}".` : ""} When it ends, the standard rates in BUSINESS FACTS apply. Is this post about it, or about a price change its own words describe?\n- YES: INVARIANT: the picture words never give its figures or end date (the promo layers show them); say what the deal is good for. The post words may give the offer and end date exactly as written in this line, which counts as given like the brief.\n- NO: don't mention it.`
     : "No promo is running. INVARIANT: never mention a deal, discount or promo.";
 
   // One attempt inside the function budget; a 429 goes back as retryable instead.
   const { text } = await jsonCompletion({
     feature: "post-draft",
     openAiModel: "gpt-4.1",
-    system: [systemPrompt(who, guide, room, promoLine, paidAd, `${getSiteUrl()}/booking`, review)],
+    system: [
+      systemPrompt(
+        who,
+        facts,
+        guide,
+        room,
+        promoLine,
+        paidAd,
+        `${getSiteUrl()}/booking`,
+        review,
+        inEmail,
+      ),
+    ],
     user: `--- USER DATA ---\n${brief}\n--- END USER DATA ---`,
     maxTokens: 800,
     temperature: 0.7,

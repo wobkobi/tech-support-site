@@ -68,6 +68,7 @@ const SAMPLE_DRAFT = {
   bullets: [],
   buttonText: "Book a time",
   buttonUrl: "",
+  picture: "" as const,
 };
 
 /** A post maker draft that breaks no rule, and the room it was written for. */
@@ -140,6 +141,18 @@ function runSelfTest(): number {
       want: 1,
     },
     {
+      name: "figure from the business facts is fine",
+      got: draftProblems({ ...SAMPLE_DRAFT, paragraphs: ["It's $65."] }, "", "- Rate: $65/hr").hard
+        .length,
+      want: 0,
+    },
+    {
+      name: "facts match whole numbers only",
+      got: draftProblems({ ...SAMPLE_DRAFT, paragraphs: ["By the 31st."] }, "", "Phone: 021 1237")
+        .hard.length,
+      want: 1,
+    },
+    {
       name: "placeholder digits don't count",
       got: draftProblems({ ...SAMPLE_DRAFT, paragraphs: ["{promoOffer}"] }, "").hard.length,
       want: 0,
@@ -148,6 +161,25 @@ function runSelfTest(): number {
       name: "greeting in the first paragraph is a hard problem",
       got: draftProblems({ ...SAMPLE_DRAFT, paragraphs: ["Hi there, news."] }, "").hard.length,
       want: 1,
+    },
+    {
+      name: '"our" in a heading is a hard problem',
+      got: draftProblems({ ...SAMPLE_DRAFT, heading: "Our mailing list" }, "").hard.length,
+      want: 1,
+    },
+    {
+      name: '"we" in a quoted scam text is fine',
+      got: draftProblems(
+        { ...SAMPLE_DRAFT, bullets: ['Texts saying "we couldn\'t deliver your parcel"'] },
+        "",
+      ).hard.length,
+      want: 0,
+    },
+    {
+      name: '"US" the country is fine',
+      got: draftProblems({ ...SAMPLE_DRAFT, paragraphs: ["Calls from US numbers."] }, "").hard
+        .length,
+      want: 0,
     },
     {
       name: "curly quote is soft only",
@@ -178,6 +210,40 @@ function runSelfTest(): number {
         true,
       ).hard.length,
       want: 1,
+    },
+    {
+      name: '"our" on the picture is a hard problem',
+      got: postDraftProblems(
+        { ...SAMPLE_POST, headline: "New: our mailing list" },
+        "",
+        SAMPLE_ROOM,
+        false,
+      ).hard.length,
+      want: 1,
+    },
+    {
+      name: '"we" in a single-quoted scam text is fine',
+      got: draftProblems(
+        { ...SAMPLE_DRAFT, bullets: ["Texts saying 'we couldn't deliver your parcel'."] },
+        "",
+      ).hard.length,
+      want: 0,
+    },
+    {
+      name: '"our" after an apostrophe is still a hard problem',
+      got: draftProblems({ ...SAMPLE_DRAFT, paragraphs: ["I'm here and it's our list."] }, "").hard
+        .length,
+      want: 1,
+    },
+    {
+      name: '"we" in a customer\'s quote is fine',
+      got: postDraftProblems(
+        { ...SAMPLE_POST, quote: "We were stuck" },
+        "We were stuck",
+        SAMPLE_ROOM,
+        false,
+      ).hard.length,
+      want: 0,
     },
     {
       name: "a quote not in the brief is a hard problem",
@@ -271,7 +337,8 @@ async function collectRaw(
   only: string[],
 ): Promise<{ ctx: LiveContext; raw: RawRun[]; aborted: boolean }> {
   const { loadLiveContext } = await import("./context");
-  const { callEstimate, callParseJob, callMailingDraft, callPostDraft } = await import("./client");
+  const { callEstimate, callParseJob, callMailingDraft, callPostDraft, fetchFacts } =
+    await import("./client");
   const {
     PARSE_CASES,
     ESTIMATE_CASES,
@@ -423,19 +490,24 @@ async function collectRaw(
     });
   }
 
+  // Fetched on the first draft case, before its paid call, so runs without one don't need it.
+  let facts: string | undefined;
+
   // Mailing drafts run once each.
   for (const c of draftCases) {
     if (aborted) break;
     tick(c.id);
     await tryCase(c.id, "draft", async () => {
+      facts ??= await fetchFacts(url);
       const draft = await callMailingDraft(url, adminSecret, {
         brief: c.brief,
         kind: c.kind,
         buttonUrl: c.buttonUrl,
       });
-      const { hard, soft } = draftProblems(draft, c.brief);
+      const { hard, soft } = draftProblems(draft, c.brief, facts);
       const text = JSON.stringify(draft);
       for (const f of c.forbid ?? []) if (f.pattern.test(text)) hard.push(f.why);
+      if (c.wantBullets && draft.bullets.length === 0) hard.push("steps not listed as bullets");
       raw.push({
         id: c.id,
         kind: "draft",
@@ -452,6 +524,7 @@ async function collectRaw(
     if (aborted) break;
     tick(c.id);
     await tryCase(c.id, "draft", async () => {
+      facts ??= await fetchFacts(url);
       const draft = await callPostDraft(url, adminSecret, {
         brief: c.brief,
         kind: c.kind,
@@ -472,7 +545,7 @@ async function collectRaw(
         });
         return;
       }
-      const { hard, soft } = postDraftProblems(draft, c.brief, c.room, c.paidAd);
+      const { hard, soft } = postDraftProblems(draft, c.brief, c.room, c.paidAd, facts);
       if (c.refused) hard.push("wrote a review post with no review words in the brief");
       if (c.quote === "filled" && !draft.quote) hard.push("no quote from real review words");
       if (c.quote === "empty" && (draft.quote || draft.name)) {
