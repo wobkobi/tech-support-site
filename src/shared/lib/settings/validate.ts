@@ -7,6 +7,9 @@ import { parseDateKey } from "@/shared/lib/date-format";
 import { MAX_BRAND_HASHTAGS, parseHashtags } from "@/shared/lib/hashtags";
 import {
   HASHTAGS_DEFAULT_LABELS,
+  QUEUE_FILL_DAYS_RANGE,
+  SLOT_MINUTE_RANGE,
+  SLOT_MINUTE_STEP,
   VEHICLE_FUEL_LABELS,
   WATERMARK_CORNER_LABELS,
   WATERMARK_LOGO_LABELS,
@@ -484,7 +487,7 @@ export const BRAND_TEXT_MAX = {
 
 /**
  * Validates the social group: the brand profile's text lengths, hashtag list and two Write
- * with AI defaults, and the logo choices and ranges for photos.
+ * with AI defaults, the logo choices and ranges for photos, and the schedule fill settings.
  * @param s - Proposed social settings.
  * @returns List of field errors (empty when valid).
  */
@@ -537,6 +540,24 @@ function validateSocial(s: SocialSettings): FieldError[] {
     errors.push({
       field: "watermark.opacity",
       message: `How solid must be ${WATERMARK_OPACITY_RANGE.min}-${WATERMARK_OPACITY_RANGE.max}%.`,
+    });
+
+  const q = s.schedules;
+  if (
+    !inRange(q?.fillDays, QUEUE_FILL_DAYS_RANGE.min, QUEUE_FILL_DAYS_RANGE.max) ||
+    !Number.isInteger(q.fillDays)
+  )
+    errors.push({
+      field: "schedules.fillDays",
+      message: `Must be a whole number of days, ${QUEUE_FILL_DAYS_RANGE.min}-${QUEUE_FILL_DAYS_RANGE.max}.`,
+    });
+  if (
+    !inRange(q?.defaultMinute, SLOT_MINUTE_RANGE.min, SLOT_MINUTE_RANGE.max) ||
+    q.defaultMinute % SLOT_MINUTE_STEP !== 0
+  )
+    errors.push({
+      field: "schedules.defaultMinute",
+      message: "Pick one of the listed times.",
     });
   return errors;
 }

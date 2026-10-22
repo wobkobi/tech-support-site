@@ -6,6 +6,7 @@ import { librarySummary } from "@/features/social/lib/library";
 import { loadContentRows, postedSince } from "@/features/social/lib/postings.server";
 import { listTags } from "@/features/social/lib/tags.server";
 import { requireAdminAuth } from "@/shared/lib/auth";
+import { prisma } from "@/shared/lib/prisma";
 import { nzDateParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import type React from "react";
@@ -25,10 +26,21 @@ export default async function AdminSocialContentPage(): Promise<React.ReactEleme
   await requireAdminAuth();
   const now = new Date();
   const [year, month] = nzDateParts(now);
-  const [rows, tags] = await Promise.all([loadContentRows(now), listTags()]);
+  const [rows, tags, schedules] = await Promise.all([
+    loadContentRows(now),
+    listTags(),
+    prisma.socialQueue.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+  ]);
   const posted = await postedSince(
     rows.map((r) => r.item.id),
     nzMidnightUtc(year, month, 1),
   );
-  return <ContentLibraryView rows={rows} tags={tags} summary={librarySummary(rows, posted, now)} />;
+  return (
+    <ContentLibraryView
+      rows={rows}
+      tags={tags}
+      summary={librarySummary(rows, posted, now)}
+      schedules={schedules}
+    />
+  );
 }

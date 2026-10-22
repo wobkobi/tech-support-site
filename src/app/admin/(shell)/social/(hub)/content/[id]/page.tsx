@@ -1,6 +1,6 @@
 // src/app/admin/(shell)/social/(hub)/content/[id]/page.tsx
-// Admin page for one content item: the composer in content mode, with its recycling, postings
-// and any lined-up posting that won't go out.
+// Admin page for one content item: the composer in content mode, with its recycling, schedules,
+// postings and any lined-up posting that won't go out.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
@@ -14,6 +14,7 @@ import { loadOpenPost } from "@/features/social/lib/open-post";
 import { toPostRow } from "@/features/social/lib/post-row";
 import { NO_STATS } from "@/features/social/lib/postings-core";
 import { contentStats, postingProblems } from "@/features/social/lib/postings.server";
+import { loadItemQueues } from "@/features/social/lib/queues.server";
 import { listTags } from "@/features/social/lib/tags.server";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -61,12 +62,13 @@ export default async function AdminSocialContentItemPage({
     );
   }
 
-  const [open, postings, stats, problems, tags] = await Promise.all([
+  const [open, postings, stats, problems, tags, schedules] = await Promise.all([
     loadOpenPost(item),
     prisma.socialPost.findMany({ where: { sourceId: item.id }, orderBy: { id: "desc" } }),
     contentStats([item.id]),
     postingProblems(item),
     listTags(),
+    loadItemQueues(item.id),
   ]);
   return (
     <ContentItemView
@@ -75,6 +77,7 @@ export default async function AdminSocialContentItemPage({
         stats: toStatsRow(stats.get(item.id) ?? NO_STATS),
         postings: postings.map(toPostRow),
         problems,
+        schedules,
       }}
       tags={tags}
     />

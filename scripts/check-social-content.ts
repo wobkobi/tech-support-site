@@ -63,6 +63,7 @@ function item(over: Partial<SocialPost> = {}): SocialPost {
     expiresAt: null,
     maxPosts: null,
     starterKey: null,
+    queueId: null,
     targets,
     googleType: "STANDARD",
     googleCta: null,

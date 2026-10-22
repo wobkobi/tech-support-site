@@ -272,7 +272,8 @@ export const DEFAULT_SETTINGS: Settings = {
 
   // Brand profile for the AI writers. Blank fields add nothing to the prompts; the voice
   // rules and live business facts already cover the basics. The logo starts off, so photos
-  // upload as they are until it's switched on.
+  // upload as they are until it's switched on. Schedules line up two weeks ahead, and a new
+  // time slot starts at 9:00am.
   social: {
     brand: {
       notes: "",
@@ -289,6 +290,10 @@ export const DEFAULT_SETTINGS: Settings = {
       corner: "bottom-right",
       size: 14,
       opacity: 85,
+    },
+    schedules: {
+      fillDays: 14,
+      defaultMinute: 540,
     },
   },
 };

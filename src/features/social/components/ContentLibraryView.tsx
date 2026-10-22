@@ -66,16 +66,19 @@ type BulkAction = "tag" | "untag" | "recycle-on" | "recycle-off" | "delete";
  * @param props.rows - Every content item, last edited first.
  * @param props.tags - Every tag, A to Z.
  * @param props.summary - The figures across the top.
+ * @param props.schedules - Every schedule, A to Z, for the schedule filter.
  * @returns Library element.
  */
 export function ContentLibraryView({
   rows,
   tags,
   summary,
+  schedules,
 }: {
   rows: ContentListRow[];
   tags: SocialTagRow[];
   summary: LibrarySummary;
+  schedules: { id: string; name: string }[];
 }): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -299,6 +302,23 @@ export function ContentLibraryView({
             </option>
           ))}
         </AdminSelect>
+        {schedules.length > 0 && (
+          <AdminSelect
+            aria-label="Schedule"
+            value={filter.schedule}
+            onChange={(e) => narrow({ schedule: e.target.value })}
+            className="h-10 w-auto"
+          >
+            <option value="any">In a schedule or not</option>
+            <option value="in">In a schedule</option>
+            <option value="none">In no schedule</option>
+            {schedules.map((s) => (
+              <option key={s.id} value={s.id}>
+                In {s.name}
+              </option>
+            ))}
+          </AdminSelect>
+        )}
         {isFiltered(filter) && (
           <AdminButton variant="ghost" onClick={() => setFilter(NO_FILTER)} className="h-9 px-2.5">
             Clear

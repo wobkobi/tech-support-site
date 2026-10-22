@@ -1247,7 +1247,11 @@ function brand(over: Partial<BrandProfile> = {}): BrandProfile {
  * @returns The settings.
  */
 function social(over: Partial<BrandProfile> = {}): SocialSettings {
-  return { brand: brand(over), watermark: DEFAULT_SETTINGS.social.watermark };
+  return {
+    brand: brand(over),
+    watermark: DEFAULT_SETTINGS.social.watermark,
+    schedules: DEFAULT_SETTINGS.social.schedules,
+  };
 }
 
 /**
@@ -1257,6 +1261,31 @@ function social(over: Partial<BrandProfile> = {}): SocialSettings {
  */
 function socialErrors(over: Partial<BrandProfile>): string[] {
   return validateGroup("social", social(over)).map((e) => e.field);
+}
+
+/** The schedules settings: how far ahead to fill and where new times start. */
+function checkScheduleSettings(): void {
+  /**
+   * The field paths the social settings fail on with the schedules changed.
+   * @param over - Schedules fields to change from the defaults.
+   * @returns Failing field paths.
+   */
+  const errors = (over: Partial<SocialSettings["schedules"]>): string[] =>
+    validateGroup("social", {
+      ...social(),
+      schedules: { ...DEFAULT_SETTINGS.social.schedules, ...over },
+    }).map((e) => e.field);
+  expectEqual("schedules: the defaults pass", errors({}), []);
+  expectEqual("schedules: 2 days ahead fails", errors({ fillDays: 2 }), ["schedules.fillDays"]);
+  expectEqual("schedules: 61 days ahead fails", errors({ fillDays: 61 }), ["schedules.fillDays"]);
+  expectEqual("schedules: part days fail", errors({ fillDays: 7.5 }), ["schedules.fillDays"]);
+  expectEqual("schedules: 5am passes", errors({ defaultMinute: 300 }), []);
+  expectEqual("schedules: 4:45am fails", errors({ defaultMinute: 285 }), [
+    "schedules.defaultMinute",
+  ]);
+  expectEqual("schedules: off the 15s fails", errors({ defaultMinute: 541 }), [
+    "schedules.defaultMinute",
+  ]);
 }
 
 /** Brand hashtags, the settings validator and the THE BUSINESS prompt block. */
@@ -1566,6 +1595,7 @@ function main(): void {
   checkWatermark();
   checkInsertables();
   checkBrandProfile();
+  checkScheduleSettings();
   checkCaptionAi();
   finish();
 }

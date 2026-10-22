@@ -31,6 +31,8 @@ export interface LibraryFilter {
   /** Active items can still go out; finished ones have run their course. */
   state: "any" | "active" | "finished";
   platform: SocialPlatformKey | "any";
+  /** In any schedule ("in"), in none ("none"), or in the one with this id. */
+  schedule: "any" | "in" | "none" | (string & {});
 }
 
 export const NO_FILTER: LibraryFilter = {
@@ -40,6 +42,7 @@ export const NO_FILTER: LibraryFilter = {
   recycling: "any",
   state: "any",
   platform: "any",
+  schedule: "any",
 };
 
 /**
@@ -63,7 +66,8 @@ export function isFiltered(filter: LibraryFilter): boolean {
     filter.picture !== "any" ||
     filter.recycling !== "any" ||
     filter.state !== "any" ||
-    filter.platform !== "any"
+    filter.platform !== "any" ||
+    filter.schedule !== "any"
   );
 }
 
@@ -95,6 +99,11 @@ function passes(
     filter.platform !== "any" &&
     !item.targets.some((t) => t.platform === filter.platform && t.enabled)
   ) {
+    return false;
+  }
+  if (filter.schedule === "in" && row.queueIds.length === 0) return false;
+  if (filter.schedule === "none" && row.queueIds.length > 0) return false;
+  if (!["any", "in", "none"].includes(filter.schedule) && !row.queueIds.includes(filter.schedule)) {
     return false;
   }
   if (words.length === 0) return true;

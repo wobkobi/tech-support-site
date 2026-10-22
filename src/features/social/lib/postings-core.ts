@@ -150,12 +150,14 @@ export function postingContent(
 
 /**
  * Everything a new posting is made with: {@link postingContent}, the item's tags, the link back,
- * and draft or scheduled. The email link and its skip stay on the item.
+ * draft or scheduled, and the schedule that lined it up. The email link and its skip stay on the
+ * item.
  * @param item - The content item.
  * @param opts - How it goes out.
  * @param opts.captionIndex - The caption it uses.
  * @param opts.scheduledAt - When it goes out, or null for a draft posted straight away.
  * @param opts.platforms - Apps to post to, when fewer than the item's.
+ * @param opts.queueId - The schedule filling a slot with it, if any.
  * @returns Fields for the create.
  */
 export function postingFields(
@@ -164,15 +166,17 @@ export function postingFields(
     captionIndex: number;
     scheduledAt: Date | null;
     platforms?: readonly SocialPlatformKey[];
+    queueId?: string;
   },
 ): ReturnType<typeof postingContent> &
-  Pick<SocialPost, "tagIds" | "sourceId" | "status" | "scheduledAt"> {
+  Pick<SocialPost, "tagIds" | "sourceId" | "status" | "scheduledAt" | "queueId"> {
   return {
     ...postingContent(item, opts.captionIndex, opts.platforms),
     tagIds: item.tagIds,
     sourceId: item.id,
     status: opts.scheduledAt ? "scheduled" : "draft",
     scheduledAt: opts.scheduledAt,
+    queueId: opts.queueId ?? null,
   };
 }
 

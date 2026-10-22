@@ -1,7 +1,8 @@
 "use client";
 // src/features/admin/components/settings/SocialTab.tsx
 // Editor for the social group: the brand profile every AI writer reads, the defaults for Write
-// with AI's hashtag and emoji choices, and the logo on photos, beside a sample post and photo.
+// with AI's hashtag and emoji choices, the logo on photos, and how schedules line up posts,
+// beside a sample post and photo.
 
 import {
   FieldShell,
@@ -19,10 +20,12 @@ import { WatermarkPreview } from "@/features/admin/components/settings/Watermark
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
+import { minuteLabel, slotMinutes } from "@/features/social/lib/queue-slots";
 import { cn } from "@/shared/lib/cn";
 import { formatHashtags, parseHashtags } from "@/shared/lib/hashtags";
 import {
   HASHTAGS_DEFAULT_LABELS,
+  QUEUE_FILL_DAYS_RANGE,
   SOCIAL_FIELD_META,
   WATERMARK_CORNER_LABELS,
   WATERMARK_LOGO_LABELS,
@@ -32,6 +35,7 @@ import {
 import type {
   BrandProfile,
   HashtagsDefault,
+  ScheduleSettings,
   SocialSettings,
   WatermarkCorner,
   WatermarkLogo,
@@ -61,6 +65,8 @@ export function SocialTab({ initial, defaults }: Props): React.ReactElement {
   const base = defaults.brand;
   const mark = draft.watermark;
   const baseMark = defaults.watermark;
+  const sched = draft.schedules;
+  const baseSched = defaults.schedules;
   const m = SOCIAL_FIELD_META;
   const tags = parseHashtags(brand.hashtags).tags;
   const tagsError = fieldErrors["brand.hashtags"];
@@ -79,6 +85,14 @@ export function SocialTab({ initial, defaults }: Props): React.ReactElement {
    */
   const setMark = (patch: Partial<WatermarkSettings>): void => {
     setDraft((p) => ({ ...p, watermark: { ...p.watermark, ...patch } }));
+  };
+
+  /**
+   * Merges a patch into the schedules draft.
+   * @param patch - Partial schedule fields.
+   */
+  const setSched = (patch: Partial<ScheduleSettings>): void => {
+    setDraft((p) => ({ ...p, schedules: { ...p.schedules, ...patch } }));
   };
 
   return (
@@ -224,6 +238,40 @@ export function SocialTab({ initial, defaults }: Props): React.ReactElement {
             customised={mark.opacity !== baseMark.opacity}
             onChange={(v) => setMark({ opacity: v ?? baseMark.opacity })}
           />
+        </div>
+
+        <h3 className={cn("mt-6", ADMIN_EYEBROW_CLS)}>Schedules</h3>
+        <div className="divide-y divide-admin-border">
+          <NumberField
+            id="schedules.fillDays"
+            meta={m["schedules.fillDays"]}
+            value={sched.fillDays}
+            min={QUEUE_FILL_DAYS_RANGE.min}
+            max={QUEUE_FILL_DAYS_RANGE.max}
+            step={1}
+            error={fieldErrors["schedules.fillDays"]}
+            customised={sched.fillDays !== baseSched.fillDays}
+            onChange={(v) => setSched({ fillDays: v ?? baseSched.fillDays })}
+          />
+          <FieldShell
+            id="schedules.defaultMinute"
+            meta={m["schedules.defaultMinute"]}
+            error={fieldErrors["schedules.defaultMinute"]}
+            customised={sched.defaultMinute !== baseSched.defaultMinute}
+          >
+            <AdminSelect
+              id="schedules.defaultMinute"
+              value={sched.defaultMinute}
+              onChange={(e) => setSched({ defaultMinute: Number(e.target.value) })}
+              className="sm:w-48"
+            >
+              {slotMinutes().map((min) => (
+                <option key={min} value={min}>
+                  {minuteLabel(min)}
+                </option>
+              ))}
+            </AdminSelect>
+          </FieldShell>
         </div>
       </SettingsWithPreview>
 

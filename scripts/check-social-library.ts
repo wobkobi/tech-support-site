@@ -219,6 +219,7 @@ function row(item: Partial<SocialPostRow>, over: Partial<ContentListRow> = {}): 
     stats: { count: 0, lastPostedAt: null, nextAt: null },
     spent: false,
     linedUp: 0,
+    queueIds: [],
     ...over,
   };
 }
@@ -243,6 +244,7 @@ const ROWS: ContentListRow[] = [
     {
       createdAt: "2026-10-03T00:00:00.000Z",
       stats: { count: 4, lastPostedAt: "2026-10-10T00:00:00.000Z", nextAt: null },
+      queueIds: ["q1"],
     },
   ),
   row(
@@ -266,7 +268,7 @@ const ROWS: ContentListRow[] = [
   ),
   row(
     { id: "c", name: "Updates", body: "Say yes", recycle: true, tagIds: [TIPS, SCAMS] },
-    { createdAt: "2026-10-02T00:00:00.000Z" },
+    { createdAt: "2026-10-02T00:00:00.000Z", queueIds: ["q1", "q2"] },
   ),
 ];
 
@@ -304,6 +306,10 @@ function checkFilters(): void {
   expectEqual("can still go out", ids({ state: "active" }), ["a", "c"]);
   expectEqual("on Facebook", ids({ platform: "facebook" }), ["a", "c"]);
   expectEqual("on Instagram", ids({ platform: "instagram" }), ["b"]);
+  expectEqual("in a schedule", ids({ schedule: "in" }), ["a", "c"]);
+  expectEqual("in no schedule", ids({ schedule: "none" }), ["b"]);
+  expectEqual("in one schedule", ids({ schedule: "q2" }), ["c"]);
+  expect("a schedule filter is filtered", isFiltered({ ...NO_FILTER, schedule: "q1" }));
 
   expectEqual("newest first", ids({}, "newest"), ["a", "c", "b"]);
   expectEqual("oldest first", ids({}, "oldest"), ["b", "c", "a"]);

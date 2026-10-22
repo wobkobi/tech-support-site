@@ -1,6 +1,6 @@
 // src/features/social/lib/content-row.ts
-// Plain-data content item shapes for the server > client boundary: the item and how often it
-// has gone out.
+// Plain-data content item shapes for the server > client boundary: the item, how often it has
+// gone out, and the schedules it's in.
 
 import { toPostRow, type SocialPostRow } from "@/features/social/lib/post-row";
 import { isSpent, type ContentStats } from "@/features/social/lib/postings-core";
@@ -23,6 +23,8 @@ export interface ContentListRow {
   spent: boolean;
   /** Lined-up postings still following it, which go when it's deleted. */
   linedUp: number;
+  /** The schedules it's in. */
+  queueIds: string[];
 }
 
 /**
@@ -43,6 +45,7 @@ export function toStatsRow(stats: ContentStats): ContentStatsRow {
  * @param item - Item as stored.
  * @param stats - Its stats.
  * @param linedUp - Its lined-up postings still following it.
+ * @param queueIds - The schedules it's in.
  * @param now - The time to judge spent at.
  * @returns The library row.
  */
@@ -50,6 +53,7 @@ export function toContentRow(
   item: SocialPost,
   stats: ContentStats,
   linedUp: number,
+  queueIds: string[],
   now: Date,
 ): ContentListRow {
   return {
@@ -58,5 +62,6 @@ export function toContentRow(
     stats: toStatsRow(stats),
     spent: isSpent(item, stats, now),
     linedUp,
+    queueIds,
   };
 }

@@ -15,6 +15,7 @@ import { writePostMeta } from "@/features/social/lib/post-meta.server";
 import { toPostRow } from "@/features/social/lib/post-row";
 import { deleteLinedUpPostings, syncPostings } from "@/features/social/lib/postings.server";
 import { takeDownPost } from "@/features/social/lib/publish";
+import { dropFromQueues, skipQueueSlot } from "@/features/social/lib/queue-fill.server";
 import { knownTagIds } from "@/features/social/lib/tags.server";
 import { takeDownDue } from "@/features/social/lib/targets";
 import { PLATFORM_LABEL } from "@/features/social/lib/validate";
@@ -166,6 +167,10 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
         select: { imageUrl: true, isContent: true, targets: { select: { imageUrl: true } } },
       });
   const postingPictures = pictures?.isContent ? await deleteLinedUpPostings(id) : [];
+  const slot = await prisma.socialPost.findUnique({
+    where: { id },
+    select: { queueId: true, status: true, scheduledAt: true },
+  });
   // Status guard in the delete itself, so a post that just went out stays.
   const deleted = await prisma.socialPost.deleteMany({
     where: keepOnline
@@ -178,6 +183,11 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
       409,
     );
   }
+  // A schedule's lined-up posting deleted by hand leaves its slot empty instead of refilled.
+  if (slot?.queueId && slot.status === "scheduled" && slot.scheduledAt) {
+    await skipQueueSlot(slot.queueId, slot.scheduledAt);
+  }
+  if (pictures?.isContent) await dropFromQueues([id]);
   // Post maker pictures only this post used go too. Kept when the post stays online.
   if (pictures) {
     await deleteUnusedPictures([

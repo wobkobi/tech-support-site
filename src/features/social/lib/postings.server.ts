@@ -24,6 +24,8 @@ import {
   scheduleProblems,
   type PublishOutcome,
 } from "@/features/social/lib/publish";
+import { dropFromQueues } from "@/features/social/lib/queue-fill.server";
+import type { SocialPlatformKey } from "@/features/social/lib/validate";
 import { prisma } from "@/shared/lib/prisma";
 import type { SocialPost } from "@prisma/client";
 
@@ -41,6 +43,24 @@ export type PostingResult =
 
 /** Statuses a posting can still be changed in. */
 const NOT_OUT = ["draft", "scheduled"] as const;
+
+/**
+ * The apps each schedule posts to, so a schedule's postings keep to them when they follow
+ * their item again.
+ * @param queueIds - Schedule ids, nulls skipped.
+ * @returns Apps by schedule id; a deleted schedule is left out.
+ */
+async function queuePlatforms(
+  queueIds: (string | null)[],
+): Promise<Map<string, SocialPlatformKey[]>> {
+  const ids = [...new Set(queueIds.filter((id): id is string => id !== null))];
+  if (ids.length === 0) return new Map();
+  const queues = await prisma.socialQueue.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, platforms: true },
+  });
+  return new Map(queues.map((q) => [q.id, q.platforms]));
+}
 
 /**
  * How often each content item has gone out, when last, and when it next goes.
@@ -89,7 +109,7 @@ export async function loadContentRows(now: Date): Promise<ContentListRow[]> {
     orderBy: { updatedAt: "desc" },
   });
   const ids = items.map((i) => i.id);
-  const [stats, lined] = await Promise.all([
+  const [stats, lined, queues] = await Promise.all([
     contentStats(ids),
     ids.length === 0
       ? []
@@ -98,10 +118,17 @@ export async function loadContentRows(now: Date): Promise<ContentListRow[]> {
           where: { sourceId: { in: ids }, status: { in: [...NOT_OUT] }, ...NOT_DETACHED },
           _count: { _all: true },
         }),
+    prisma.socialQueue.findMany({ select: { id: true, itemIds: true } }),
   ]);
   const linedUp = new Map(lined.map((row) => [row.sourceId, row._count._all]));
   return items.map((i) =>
-    toContentRow(i, stats.get(i.id) ?? NO_STATS, linedUp.get(i.id) ?? 0, now),
+    toContentRow(
+      i,
+      stats.get(i.id) ?? NO_STATS,
+      linedUp.get(i.id) ?? 0,
+      queues.filter((q) => q.itemIds.includes(i.id)).map((q) => q.id),
+      now,
+    ),
   );
 }
 
@@ -119,8 +146,9 @@ export async function postedSince(ids: string[], from: Date): Promise<number> {
 }
 
 /**
- * Deletes content items with their lined-up postings, then any Post maker pictures only they
- * used. Postings already out, and hand-edited ones, stay as ordinary posts.
+ * Deletes content items with their lined-up postings, takes them out of every schedule, then
+ * deletes any Post maker pictures only they used. Postings already out, and hand-edited ones,
+ * stay as ordinary posts.
  * @param ids - Content item ids; ids that aren't content items are left alone.
  * @returns How many items were deleted.
  */
@@ -137,6 +165,7 @@ export async function deleteContentItems(ids: string[]): Promise<number> {
     deleted += (await prisma.socialPost.deleteMany({ where: { id: item.id, ...IS_CONTENT } }))
       .count;
   }
+  await dropFromQueues(items.map((i) => i.id));
   await deleteUnusedPictures(pictures);
   return deleted;
 }
@@ -204,8 +233,9 @@ export async function createPosting(
 
 /**
  * Copies a content item's latest words, picture and settings to its postings that haven't gone
- * out and weren't edited by hand. Each keeps its caption, or caption 1 if that one went. The
- * status guard in each write leaves a posting alone that just started going out.
+ * out and weren't edited by hand. Each keeps its caption, or caption 1 if that one went, and a
+ * schedule's posting keeps to the schedule's apps. The status guard in each write leaves a
+ * posting alone that just started going out.
  * @param item - The content item as just saved.
  * @returns Scheduled postings that now can't go out, with why.
  */
@@ -217,15 +247,21 @@ export async function syncPostings(item: SocialPost): Promise<PostingProblem[]> 
       status: true,
       scheduledAt: true,
       captionIndex: true,
+      queueId: true,
       imageUrl: true,
       targets: { select: { imageUrl: true } },
     },
   });
   const captions = captionsOf(item);
+  const platforms = await queuePlatforms(postings.map((p) => p.queueId));
   const problems: PostingProblem[] = [];
   const replaced: (string | null)[] = [];
   for (const p of postings) {
-    const data = postingContent(item, clampCaption(captions, p.captionIndex));
+    const data = postingContent(
+      item,
+      clampCaption(captions, p.captionIndex),
+      p.queueId ? platforms.get(p.queueId) : undefined,
+    );
     const updated = await prisma.socialPost.updateMany({
       where: { id: p.id, status: p.status, ...NOT_DETACHED },
       data,
@@ -276,7 +312,12 @@ export async function relinkPosting(
     where: { id: posting.sourceId, ...IS_CONTENT },
   });
   if (!item) return { ok: false, error: "Its content item has been deleted.", status: 404 };
-  const data = postingContent(item, clampCaption(captionsOf(item), posting.captionIndex));
+  const platforms = await queuePlatforms([posting.queueId]);
+  const data = postingContent(
+    item,
+    clampCaption(captionsOf(item), posting.captionIndex),
+    posting.queueId ? platforms.get(posting.queueId) : undefined,
+  );
   const updated = await prisma.socialPost.updateMany({
     where: { id, status: { in: [...NOT_OUT] } },
     data: { ...data, detached: false },

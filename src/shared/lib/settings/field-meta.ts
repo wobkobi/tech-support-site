@@ -62,7 +62,7 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
   social: {
     title: "Social & brand",
     blurb:
-      "What the AI writers should know about you beyond the website, the defaults for Write with AI, and the logo on your photos.",
+      "What the AI writers should know about you beyond the website, the defaults for Write with AI, the logo on your photos, and how far ahead schedules line up posts.",
   },
 };
 
@@ -272,6 +272,16 @@ export const WATERMARK_CORNER_LABELS: Record<WatermarkCorner, string> = {
 };
 
 /** The logo size and solidity ranges, as percentages. */
+/** Days ahead a schedule can line up postings. */
+export const QUEUE_FILL_DAYS_RANGE = { min: 3, max: 60 } as const;
+/**
+ * Earliest and latest time slot, in minutes after NZ midnight (5:00am to 11:45pm). Keeping clear
+ * of 2-3am means no slot falls in the hour daylight saving skips or repeats.
+ */
+export const SLOT_MINUTE_RANGE = { min: 300, max: 1425 } as const;
+/** Time slots move in 15-minute steps. */
+export const SLOT_MINUTE_STEP = 15;
+
 export const WATERMARK_SIZE_RANGE = { min: 8, max: 30 } as const;
 export const WATERMARK_OPACITY_RANGE = { min: 40, max: 100 } as const;
 
@@ -333,6 +343,15 @@ export const SOCIAL_FIELD_META = {
     title: "How solid",
     description: `${WATERMARK_OPACITY_RANGE.max}% is fully solid; lower lets the photo show through (${WATERMARK_OPACITY_RANGE.min}% at least).`,
     unit: "%",
+  },
+  "schedules.fillDays": {
+    title: "Line up posts ahead",
+    description: `How many days ahead each schedule fills its time slots (${QUEUE_FILL_DAYS_RANGE.min}-${QUEUE_FILL_DAYS_RANGE.max}). Lined-up posts show in Posts, and changes to their content item reach them until they go out.`,
+    unit: "days",
+  },
+  "schedules.defaultMinute": {
+    title: "New time slots start at",
+    description: "The time a new slot in a schedule starts at. You can change each one after.",
   },
 } satisfies Record<string, FieldMeta>;
 

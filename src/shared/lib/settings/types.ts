@@ -357,9 +357,18 @@ export interface WatermarkSettings {
   opacity: number;
 }
 
+/** How far ahead schedules line up postings, and where a new time slot starts. */
+export interface ScheduleSettings {
+  /** Days ahead each schedule lines up its postings. */
+  fillDays: number;
+  /** Minutes after NZ midnight a new time slot starts at, in 15-minute steps. */
+  defaultMinute: number;
+}
+
 export interface SocialSettings {
   brand: BrandProfile;
   watermark: WatermarkSettings;
+  schedules: ScheduleSettings;
 }
 
 export interface Settings {

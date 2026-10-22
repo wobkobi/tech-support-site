@@ -21,6 +21,7 @@ import {
 import { CaptionsField } from "@/features/social/components/CaptionsField";
 import { ContentPostings } from "@/features/social/components/ContentPostings";
 import { ContentRecycling } from "@/features/social/components/ContentRecycling";
+import { ContentSchedules } from "@/features/social/components/ContentSchedules";
 import type { PreviewPost } from "@/features/social/components/PlatformPreview";
 import { PostActionBar } from "@/features/social/components/PostActionBar";
 import { PostEmailPanel } from "@/features/social/components/PostEmailPanel";
@@ -38,6 +39,7 @@ import { liveOn, type Connection } from "@/features/social/lib/post-display";
 import type { SocialPostRow, SocialTargetRow } from "@/features/social/lib/post-row";
 import { MAX_CAPTIONS, clampCaption, spentReason } from "@/features/social/lib/postings-core";
 import type { PostingProblem } from "@/features/social/lib/postings.server";
+import type { ItemQueue } from "@/features/social/lib/queues";
 import type { SocialTagRow, TagColour } from "@/features/social/lib/tags";
 import { postBrief } from "@/features/social/lib/to-email";
 import {
@@ -117,11 +119,15 @@ interface Content {
   maxPosts: number | null;
 }
 
-/** A content item's extras: how often it has gone out, its postings, and lined-up problems. */
+/**
+ * A content item's extras: how often it has gone out, its postings, lined-up problems, and the
+ * schedules it's in.
+ */
 export interface ContentItemInfo {
   stats: ContentStatsRow;
   postings: SocialPostRow[];
   problems: PostingProblem[];
+  schedules: ItemQueue[];
 }
 
 /** The editable fields, for the form card in PostWriteForm. */
@@ -1284,6 +1290,11 @@ export function PostComposer({
                 onChange={(patch) => setContent((c) => ({ ...c, ...patch }))}
                 stats={contentItem.stats}
                 spent={spent}
+              />
+              <ContentSchedules
+                itemId={initial.id}
+                schedules={contentItem.schedules}
+                recycle={content.recycle}
               />
               <ContentPostings postings={contentItem.postings} />
             </div>

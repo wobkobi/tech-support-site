@@ -35,6 +35,7 @@ export function copyPostFields(
   | "expiresAt"
   | "maxPosts"
   | "starterKey"
+  | "queueId"
   | "createdAt"
   | "updatedAt"
 > {

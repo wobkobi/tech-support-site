@@ -1,9 +1,11 @@
 // src/app/api/admin/social/[id]/schedule/route.ts
-// Schedules a draft for the publish-scheduled cron, or cancels back to a draft. Quiet hours don't apply.
+// Schedules a draft for the publish-scheduled cron, or cancels back to a draft. Quiet hours don't
+// apply. Cancelling a schedule's posting takes it out of the schedule and leaves its slot empty.
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import { NOT_CONTENT } from "@/features/social/lib/filters";
 import { scheduleProblems } from "@/features/social/lib/publish";
+import { skipQueueSlot } from "@/features/social/lib/queue-fill.server";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -61,12 +63,17 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
   const id = parseObjectId((await params).id);
   if (!id) return errorResponse("Post not found.", 404);
+  const post = await prisma.socialPost.findUnique({
+    where: { id },
+    select: { queueId: true, scheduledAt: true },
+  });
   const updated = await prisma.socialPost.updateMany({
     where: { id, status: "scheduled" },
-    data: { status: "draft", scheduledAt: null },
+    data: { status: "draft", scheduledAt: null, queueId: null },
   });
   if (updated.count === 0) {
     return errorResponse("It isn't scheduled any more - it may have just started posting.", 409);
   }
+  if (post?.queueId && post.scheduledAt) await skipQueueSlot(post.queueId, post.scheduledAt);
   return okResponse();
 }

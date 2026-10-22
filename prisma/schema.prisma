@@ -1222,6 +1222,8 @@ model SocialPost {
   maxPosts     Int?
   // The starter content item this came from, so importing the starter set again skips it.
   starterKey   String?
+  // The schedule that lined this posting up, so its time slot counts as filled.
+  queueId      String?   @db.ObjectId
 
   // One per platform, always all three; written as a whole array because Prisma
   // rejects composite writes with undeclared fields.
@@ -1248,6 +1250,40 @@ model SocialPost {
   @@index([campaignId])
   @@index([isContent, updatedAt])
   @@index([sourceId, status])
+  @@index([queueId, scheduledAt])
+}
+
+// How a schedule picks the next content item for a time slot.
+enum SocialQueueOrder {
+  oldest_first
+  in_order
+  shuffle
+}
+
+// A weekly time slot: a weekday (0 = Sunday) and minutes since NZ midnight.
+type QueueSlot {
+  weekday Int
+  minute  Int
+}
+
+// A schedule: weekly time slots that the publish-scheduled cron fills with postings from its
+// content items. A missing slot posting with a time in skipped was taken off by hand, so the
+// filler leaves that slot empty.
+model SocialQueue {
+  id         String           @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  // Swatch key from src/features/social/lib/tags.ts.
+  colour     String
+  paused     Boolean          @default(false)
+  platforms  SocialPlatform[]
+  slots      QueueSlot[]
+  order      SocialQueueOrder @default(oldest_first)
+  // Days between two postings of the same item.
+  minGapDays Int              @default(14)
+  itemIds    String[]         @default([]) @db.ObjectId
+  skipped    DateTime[]       @default([])
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 }
 
 // A label for sorting social posts. key is the name lowercased, so "Tips" and "tips" are one tag;
