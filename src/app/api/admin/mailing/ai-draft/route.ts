@@ -16,6 +16,7 @@ import {
   type DesignPictures,
 } from "@/features/social-design/lib/email-pictures";
 import { aiRateLimitResponse } from "@/shared/lib/ai-rate-limit";
+import { brandRules } from "@/shared/lib/ai/brand-rules";
 import { loadBusinessFacts, type BusinessFacts } from "@/shared/lib/ai/business-facts";
 import { aiConfigured, isAiRateLimitError, jsonCompletion } from "@/shared/lib/ai/json-completion";
 import { voiceRules } from "@/shared/lib/ai/voice-rules";
@@ -53,6 +54,7 @@ async function savedPictures(ownDesign: string | null): Promise<SavedPicture[]> 
  * The system prompt; live values come in as arguments.
  * @param who - Who is writing.
  * @param facts - The business's live facts.
+ * @param brand - The brand profile's THE BUSINESS block, or "".
  * @param kindGuide - What this kind of email is for.
  * @param promoLine - Whether a promo is running, and which placeholders describe it.
  * @param buttonLine - Where the email's button already goes, if anywhere.
@@ -62,6 +64,7 @@ async function savedPictures(ownDesign: string | null): Promise<SavedPicture[]> 
 function systemPrompt(
   who: string,
   facts: BusinessFacts,
+  brand: string,
   kindGuide: string,
   promoLine: string,
   buttonLine: string,
@@ -70,7 +73,7 @@ function systemPrompt(
   const placeholders = PLACEHOLDERS.map((p) => `- {${p.key}}: ${p.help}`).join("\n");
   return `You write a first draft of an email to a small tech help business's mailing list: past customers, many of them older and not technical. The operator reads and edits every draft before it goes anywhere.
 
-${voiceRules(who, facts)}
+${voiceRules(who, facts)}${brand ? `\n\n${brand}` : ""}
 
 THIS EMAIL
 ${kindGuide}
@@ -204,7 +207,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { text: raw } = await jsonCompletion({
       feature: "mailing-draft",
       openAiModel: "gpt-4.1",
-      system: [systemPrompt(who, facts, kind.guide, promoLine, buttonLine, pictureLine)],
+      system: [
+        systemPrompt(
+          who,
+          facts,
+          brandRules(settings.social.brand),
+          kind.guide,
+          promoLine,
+          buttonLine,
+          pictureLine,
+        ),
+      ],
       user: `--- USER DATA ---\n${brief}\n--- END USER DATA ---`,
       maxTokens: 1200,
       temperature: 0.7,

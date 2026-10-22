@@ -22,7 +22,7 @@ import {
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useId } from "react";
-import { FaChevronDown, FaPalette } from "react-icons/fa6";
+import { FaArrowRotateLeft, FaChevronDown, FaPalette, FaWandMagicSparkles } from "react-icons/fa6";
 
 /**
  * Form card for one post.
@@ -47,9 +47,12 @@ import { FaChevronDown, FaPalette } from "react-icons/fa6";
  * @param props.onPickPicture - Opens the file picker for the post's picture or one app's own.
  * @param props.onFile - Uploads a picked picture.
  * @param props.enabled - Apps the post goes to.
- * @param props.overridesOpen - Whether "Different text for one app" starts open.
+ * @param props.overridesOpen - Whether "Different text for one app" is open.
+ * @param props.onOverridesOpen - Called when it's opened or closed by hand.
  * @param props.design - Post maker design the picture came from, or null.
  * @param props.onDesign - Saves and opens the post maker for this post.
+ * @param props.onWriteWithAi - Opens Write with AI; null when no AI key is set.
+ * @param props.onUndoAi - Takes back Write with AI's last change; null when there's none to undo.
  * @returns Form card element.
  */
 export function PostWriteForm({
@@ -74,8 +77,11 @@ export function PostWriteForm({
   onFile,
   enabled,
   overridesOpen,
+  onOverridesOpen,
   design,
   onDesign,
+  onWriteWithAi,
+  onUndoAi,
 }: {
   content: PostContent;
   setContent: React.Dispatch<React.SetStateAction<PostContent>>;
@@ -98,8 +104,11 @@ export function PostWriteForm({
   onFile: (file: File) => void;
   enabled: SocialPlatformKey[];
   overridesOpen: boolean;
+  onOverridesOpen: (open: boolean) => void;
   design: PostDesign | null;
   onDesign: () => void;
+  onWriteWithAi: (() => void) | null;
+  onUndoAi: (() => void) | null;
 }): React.ReactElement {
   const fieldId = useId();
   return (
@@ -169,11 +178,18 @@ export function PostWriteForm({
               Post
             </label>
             {editable && (
-              <InsertMenu
-                groups={insertGroups}
-                onInsert={(text, line) => insertAt("body", text, line)}
-                align="right"
-              />
+              <div className="flex items-center gap-2">
+                {onWriteWithAi && (
+                  <AdminButton size="xs" variant="secondary" onClick={onWriteWithAi}>
+                    <FaWandMagicSparkles aria-hidden /> Write with AI
+                  </AdminButton>
+                )}
+                <InsertMenu
+                  groups={insertGroups}
+                  onInsert={(text, line) => insertAt("body", text, line)}
+                  align="right"
+                />
+              </div>
             )}
           </div>
           <AdminTextarea
@@ -186,10 +202,16 @@ export function PostWriteForm({
             className="leading-relaxed"
           />
           <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm">
-            <span className="text-admin-muted">
-              Plain text: **bold** shows as typed. Add has links, contact details, symbols and promo
-              wording.
-            </span>
+            {onUndoAi ? (
+              <AdminButton size="xs" variant="ghost" onClick={onUndoAi}>
+                <FaArrowRotateLeft aria-hidden /> Undo Write with AI
+              </AdminButton>
+            ) : (
+              <span className="text-admin-muted">
+                Plain text: **bold** shows as typed. Add has links, contact details, symbols and
+                promo wording.
+              </span>
+            )}
             <span
               className={cn(
                 "ml-auto shrink-0 tabular-nums",
@@ -440,7 +462,11 @@ export function PostWriteForm({
         )}
 
         {enabled.length > 0 && (
-          <details className="group rounded-lg border border-admin-border" open={overridesOpen}>
+          <details
+            className="group rounded-lg border border-admin-border"
+            open={overridesOpen}
+            onToggle={(e) => onOverridesOpen(e.currentTarget.open)}
+          >
             <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-sm font-bold text-admin-text">
               Different text for one app
               <FaChevronDown

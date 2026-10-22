@@ -323,6 +323,7 @@ export function SocialView({
             missingEnv={open.missingEnv}
             details={open.details}
             design={open.design}
+            captionAi={open.captionAi}
             onSaved={onSaved}
             saveRef={saveOpen}
           />

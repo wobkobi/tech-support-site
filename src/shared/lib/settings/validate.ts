@@ -4,7 +4,8 @@
 
 import type { IetcConfig, TaxBracket } from "@/features/business/lib/tax/types";
 import { parseDateKey } from "@/shared/lib/date-format";
-import { VEHICLE_FUEL_LABELS } from "@/shared/lib/settings/field-meta";
+import { MAX_BRAND_HASHTAGS, parseHashtags } from "@/shared/lib/hashtags";
+import { HASHTAGS_DEFAULT_LABELS, VEHICLE_FUEL_LABELS } from "@/shared/lib/settings/field-meta";
 import type {
   AvailabilitySettings,
   CommsSettings,
@@ -15,6 +16,7 @@ import type {
   SchedulingSettings,
   Settings,
   SettingsGroup,
+  SocialSettings,
   TaxSettings,
 } from "@/shared/lib/settings/types";
 import { DAY_NAMES, WEEKDAYS } from "@/shared/lib/timezone-utils";
@@ -465,6 +467,55 @@ function validateReviews(r: ReviewsSettings): FieldError[] {
   return errors;
 }
 
+/** Longest each brand profile text may be, so the prompts it feeds stay a sensible size. */
+export const BRAND_TEXT_MAX = {
+  notes: 1500,
+  audience: 300,
+  tone: 300,
+  avoid: 500,
+} as const;
+
+/**
+ * Validates the social group's brand profile: text lengths, the hashtag list and the two
+ * Write with AI defaults.
+ * @param s - Proposed social settings.
+ * @returns List of field errors (empty when valid).
+ */
+function validateSocial(s: SocialSettings): FieldError[] {
+  const errors: FieldError[] = [];
+  const b = s.brand;
+  for (const [key, max] of Object.entries(BRAND_TEXT_MAX) as [
+    keyof typeof BRAND_TEXT_MAX,
+    number,
+  ][]) {
+    const value = b?.[key];
+    const field = `brand.${key}`;
+    if (typeof value !== "string") errors.push({ field, message: "Must be text or blank." });
+    else if (value.length > max)
+      errors.push({ field, message: `Keep it under ${max} characters (now ${value.length}).` });
+  }
+  if (typeof b?.hashtags !== "string") {
+    errors.push({ field: "brand.hashtags", message: "Must be text or blank." });
+  } else {
+    const { tags, bad } = parseHashtags(b.hashtags);
+    if (bad.length > 0)
+      errors.push({
+        field: "brand.hashtags",
+        message: `A hashtag can only hold letters, numbers and _ (check ${bad.join(" ")}).`,
+      });
+    else if (tags.length > MAX_BRAND_HASHTAGS)
+      errors.push({
+        field: "brand.hashtags",
+        message: `Keep it to ${MAX_BRAND_HASHTAGS} hashtags (now ${tags.length}).`,
+      });
+  }
+  if (typeof b?.hashtagsOn !== "string" || !Object.hasOwn(HASHTAGS_DEFAULT_LABELS, b.hashtagsOn))
+    errors.push({ field: "brand.hashtagsOn", message: "Pick one of the listed choices." });
+  if (typeof b?.emojiOn !== "boolean")
+    errors.push({ field: "brand.emojiOn", message: "Must be on or off." });
+  return errors;
+}
+
 /** Placeholders the email signature accepts; keep in step with `signaturePlaceholders` in the email layer. */
 const SIGNATURE_PLACEHOLDERS = ["name", "company", "phone", "email", "website", "location"];
 
@@ -597,6 +648,8 @@ export function validateGroup<G extends SettingsGroup>(group: G, value: Settings
       return validateTax(value as TaxSettings);
     case "scheduling":
       return validateScheduling(value as SchedulingSettings);
+    case "social":
+      return validateSocial(value as SocialSettings);
     default:
       return [];
   }

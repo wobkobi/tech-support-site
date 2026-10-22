@@ -33,6 +33,7 @@ const TAB_KEYS = new Set<string>([
   "comms",
   "scheduling",
   "reviews",
+  "social",
 ]);
 
 /**
@@ -91,6 +92,8 @@ export default async function SettingsPage({
         taxDefaults={DEFAULT_SETTINGS.tax}
         scheduling={settings.scheduling}
         schedulingDefaults={DEFAULT_SETTINGS.scheduling}
+        social={settings.social}
+        socialDefaults={DEFAULT_SETTINGS.social}
       />
     </>
   );

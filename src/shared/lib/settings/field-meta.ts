@@ -3,7 +3,8 @@
 // validators so help text and rules never drift.
 
 import type { VehicleFuel } from "@/features/business/lib/tax/types";
-import type { SettingsGroup } from "@/shared/lib/settings/types";
+import { MAX_BRAND_HASHTAGS } from "@/shared/lib/hashtags";
+import type { HashtagsDefault, SettingsGroup } from "@/shared/lib/settings/types";
 
 /** Display metadata for one editable field, keyed by its dotted path in a group. */
 export interface FieldMeta {
@@ -52,6 +53,11 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
     title: "Reviews & reputation",
     blurb:
       "Homepage review count, auto-approval, the Google review link, and when the automatic review ask goes out.",
+  },
+  social: {
+    title: "Social & brand",
+    blurb:
+      "What the AI writers should know about you beyond the website, and the defaults for Write with AI.",
   },
 };
 
@@ -234,6 +240,51 @@ export const REVIEWS_FIELD_META = {
       "Don't ask the same person again within this many days, even if they get another invoice.",
     unit: "days",
     off: "Set 0 to ask after every invoice.",
+  },
+} satisfies Record<string, FieldMeta>;
+
+/** Labels for when Write with AI's Hashtags tickbox starts ticked. */
+export const HASHTAGS_DEFAULT_LABELS: Record<HashtagsDefault, string> = {
+  never: "Never",
+  instagram: "When the post goes to Instagram",
+  always: "Always",
+};
+
+/** Field metadata for the social group, keyed by dotted path. */
+export const SOCIAL_FIELD_META = {
+  "brand.notes": {
+    title: "About you",
+    description:
+      "Anything about you or the business the website doesn't say, like how long you've been fixing computers or what you enjoy most. Your hours, area, rates and services already come from these settings.",
+  },
+  "brand.audience": {
+    title: "Who it's for",
+    description:
+      "Who your posts and emails are written for, like 'retired people around Point Chevalier'.",
+  },
+  "brand.tone": {
+    title: "How it should sound",
+    description:
+      "Anything on top of the house voice (plain, friendly, first person), like 'a bit of dry humour'.",
+  },
+  "brand.avoid": {
+    title: "Never mention",
+    description:
+      "Words or topics the AI must never use, separated by commas, like 'cheap, Apple repairs'.",
+  },
+  "brand.hashtags": {
+    title: "Your hashtags",
+    description: `Up to ${MAX_BRAND_HASHTAGS} hashtags, separated by spaces or commas. Write with AI puts these first when it adds hashtags.`,
+  },
+  "brand.hashtagsOn": {
+    title: "Add hashtags",
+    description:
+      "When Write with AI's Hashtags tickbox starts ticked. You can still change it for each post, and words just for Google never get hashtags.",
+  },
+  "brand.emojiOn": {
+    title: "Add emoji",
+    description:
+      "Whether Write with AI's Emoji tickbox starts ticked. When it's on, a post gets one or two at most.",
   },
 } satisfies Record<string, FieldMeta>;
 
@@ -685,4 +736,5 @@ export const FIELD_META_BY_GROUP: Record<SettingsGroup, Record<string, FieldMeta
   comms: COMMS_FIELD_META,
   scheduling: SCHEDULING_FIELD_META,
   reviews: REVIEWS_FIELD_META,
+  social: SOCIAL_FIELD_META,
 };

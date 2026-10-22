@@ -12,6 +12,10 @@ import { useToast } from "@/features/admin/components/ui/Toast";
 import type { InsertDetails } from "@/features/admin/lib/insertables";
 import { callApi } from "@/features/mailing/lib/api-client";
 import type { PromoWording } from "@/features/mailing/lib/render";
+import {
+  CaptionAiDialog,
+  type CaptionPlacement,
+} from "@/features/social/components/CaptionAiDialog";
 import type { PreviewPost } from "@/features/social/components/PlatformPreview";
 import { PostActionBar } from "@/features/social/components/PostActionBar";
 import { PostPaneTabs } from "@/features/social/components/PostPaneTabs";
@@ -19,7 +23,7 @@ import { PostPreviewPanel } from "@/features/social/components/PostPreviewPanel"
 import { PostStatusBanner } from "@/features/social/components/PostStatusBanner";
 import { PostWriteForm } from "@/features/social/components/PostWriteForm";
 import { insertableGroups } from "@/features/social/lib/insertables";
-import type { PostDesign } from "@/features/social/lib/open-post";
+import type { CaptionAiSetup, PostDesign } from "@/features/social/lib/open-post";
 import { liveOn, type Connection } from "@/features/social/lib/post-display";
 import type { SocialPostRow, SocialTargetRow } from "@/features/social/lib/post-row";
 import {
@@ -87,6 +91,24 @@ interface Content {
 export type PostContent = Content;
 
 type SaveState = "saved" | "unsaved" | "saving" | "error";
+
+/** The post's words and each app's own words, which Write with AI can change. */
+interface Words {
+  body: string;
+  overrides: Record<string, string>;
+}
+
+/**
+ * The words part of the content.
+ * @param c - Content.
+ * @returns The post's words and each app's own.
+ */
+function wordsOf(c: Content): Words {
+  return {
+    body: c.body,
+    overrides: Object.fromEntries(c.targets.map((t) => [t.platform, t.textOverride])),
+  };
+}
 
 /**
  * The composer's editable shape for a stored post.
@@ -162,6 +184,7 @@ function diff(now: Content, saved: Content): Record<string, unknown> {
  * @param props.missingEnv - Per platform, env vars it still needs.
  * @param props.details - Site address and contact details for the Add menu.
  * @param props.design - Post maker design the picture came from, or null.
+ * @param props.captionAi - Write with AI's starting choices; null hides it.
  * @param props.onSaved - Called with the name and text after each successful save.
  * @param props.saveRef - Filled with a save-pending-edits function, used before another post opens.
  * @returns Composer element.
@@ -174,6 +197,7 @@ export function PostComposer({
   missingEnv,
   details,
   design,
+  captionAi,
   onSaved,
   saveRef,
 }: {
@@ -184,6 +208,7 @@ export function PostComposer({
   missingEnv: Record<SocialPlatformKey, string[]>;
   details: InsertDetails;
   design: PostDesign | null;
+  captionAi: CaptionAiSetup | null;
   onSaved?: (saved: { name: string; body: string }) => void;
   saveRef?: React.RefObject<(() => Promise<boolean>) | null>;
 }): React.ReactElement {
@@ -216,6 +241,13 @@ export function PostComposer({
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const overrideRefs = useRef<Partial<Record<SocialPlatformKey, HTMLTextAreaElement | null>>>({});
   const scheduleFieldId = useId();
+  const [writingWithAi, setWritingWithAi] = useState(false);
+  // The words before and after Write with AI's last change; Undo shows while they're untouched.
+  const [aiUndo, setAiUndo] = useState<{ before: Words; after: Words } | null>(null);
+  // "Different text for one app": open when an app has its own text, and when Write with AI adds some.
+  const [overridesShown, setOverridesShown] = useState(() =>
+    initial.targets.some((t) => t.textOverride),
+  );
 
   // The previews show the real Page name and username once the connection check
   // answers; until then (or if it fails) they use placeholders.
@@ -596,8 +628,80 @@ export function PostComposer({
     };
   }
 
-  // Only decides the starting state; React leaves the toggle alone after that.
-  const overridesOpen = initial.targets.some((t) => t.textOverride);
+  const canUndoAi =
+    aiUndo !== null && JSON.stringify(wordsOf(content)) === JSON.stringify(aiUndo.after);
+
+  /**
+   * Puts a Write with AI option in the post, keeping the words before it for Undo.
+   * @param text - The option.
+   * @param where - Over the post, under it, or as one app's own text.
+   */
+  function placeCaption(text: string, where: CaptionPlacement): void {
+    const next: Content =
+      where === "replace"
+        ? { ...content, body: text }
+        : where === "add"
+          ? {
+              ...content,
+              body: content.body.trim() ? `${content.body.trimEnd()}\n\n${text}` : text,
+            }
+          : {
+              ...content,
+              targets: content.targets.map((t) =>
+                t.platform === where ? { ...t, textOverride: text } : t,
+              ),
+            };
+    setAiUndo({ before: wordsOf(content), after: wordsOf(next) });
+    setContent(next);
+    if (where !== "replace" && where !== "add") setOverridesShown(true);
+    toast(
+      where === "replace" || where === "add"
+        ? "Added to the post. Undo under it takes it back."
+        : `Added as ${PLATFORM_LABEL[where]}'s own text. Undo under the post takes it back.`,
+      { tone: "success" },
+    );
+  }
+
+  /** Puts back the words from before Write with AI's last change. */
+  function undoCaption(): void {
+    if (!aiUndo) return;
+    const { before } = aiUndo;
+    setContent((c) => ({
+      ...c,
+      body: before.body,
+      targets: c.targets.map((t) => ({ ...t, textOverride: before.overrides[t.platform] ?? "" })),
+    }));
+    setAiUndo(null);
+  }
+
+  /**
+   * Problems a Write with AI option would add that the post doesn't have now.
+   * @param text - The option.
+   * @param only - The app it would be the own text of, or null for the post's words.
+   * @returns Messages, each naming its app.
+   */
+  function issuesFor(text: string, only: SocialPlatformKey | null): string[] {
+    const next = validatePost(
+      only
+        ? {
+            ...draft,
+            targets: draft.targets.map((t) =>
+              t.platform === only ? { ...t, textOverride: text } : t,
+            ),
+          }
+        : { ...draft, body: text },
+      promo !== null,
+    );
+    const had = new Set(
+      SOCIAL_PLATFORMS.flatMap((p) => (issues[p] ?? []).map((i) => `${p}:${i.message}`)),
+    );
+    return SOCIAL_PLATFORMS.flatMap((p) =>
+      (next[p] ?? [])
+        .filter((i) => !had.has(`${p}:${i.message}`))
+        .map((i) => `${PLATFORM_LABEL[p]}: ${i.message}`),
+    );
+  }
+
   const shownPreview = enabled.includes(previewOn) ? previewOn : (enabled[0] ?? null);
   const readyMessage =
     setupMissing.length > 0
@@ -686,9 +790,12 @@ export function PostComposer({
             onPickPicture={pickPicture}
             onFile={(file) => void addImage(file)}
             enabled={enabled}
-            overridesOpen={overridesOpen}
+            overridesOpen={overridesShown}
+            onOverridesOpen={setOverridesShown}
             design={design}
             onDesign={() => void openDesign()}
+            onWriteWithAi={captionAi ? () => setWritingWithAi(true) : null}
+            onUndoAi={canUndoAi ? undoCaption : null}
           />
         </div>
 
@@ -708,6 +815,18 @@ export function PostComposer({
         <div data-phone-bar="sticky" className="sticky bottom-0 z-10 xl:hidden">
           {actionBar}
         </div>
+      )}
+
+      {writingWithAi && captionAi && (
+        <CaptionAiDialog
+          setup={captionAi}
+          textOf={(only) => (only ? textFor(draft, only) : content.body)}
+          enabled={enabled}
+          promoId={promoId}
+          issuesFor={issuesFor}
+          onUse={placeCaption}
+          onClose={() => setWritingWithAi(false)}
+        />
       )}
 
       <ConfirmDialog

@@ -269,6 +269,20 @@ export const DEFAULT_SETTINGS: Settings = {
     reviewAskDelayDays: 2,
     reviewAskGapDays: 30,
   },
+
+  // Brand profile for the AI writers. Blank fields add nothing to the prompts; the voice
+  // rules and live business facts already cover the basics.
+  social: {
+    brand: {
+      notes: "",
+      audience: "",
+      tone: "",
+      avoid: "",
+      hashtags: "",
+      hashtagsOn: "instagram",
+      emojiOn: false,
+    },
+  },
 };
 
 /**

@@ -220,3 +220,23 @@ export async function callPostDraft(
     throw error;
   }
 }
+
+/**
+ * Calls the admin Write with AI route for a post's words.
+ * @param baseUrl - Server base URL (no trailing slash).
+ * @param adminSecret - Admin secret for auth.
+ * @param body - The caption request, as the composer's dialog sends it.
+ * @returns The options.
+ */
+export async function callCaption(
+  baseUrl: string,
+  adminSecret: string,
+  body: Record<string, unknown>,
+): Promise<string[]> {
+  const json = await postJson<{ ok: true; captions: string[] }>(
+    `${baseUrl}/api/admin/social/caption-ai`,
+    body,
+    adminSecret,
+  );
+  return json.captions;
+}

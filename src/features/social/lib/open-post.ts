@@ -9,9 +9,11 @@ import { loadBoundValues } from "@/features/social-design/lib/load-bound";
 import { PLATFORMS } from "@/features/social/lib/platforms";
 import { toPostRow, type SocialPostRow } from "@/features/social/lib/post-row";
 import { SOCIAL_PLATFORMS, type SocialPlatformKey } from "@/features/social/lib/validate";
+import { aiConfigured } from "@/shared/lib/ai/json-completion";
 import { canUploadImages } from "@/shared/lib/image-upload";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import type { HashtagsDefault } from "@/shared/lib/settings/types";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { SocialPost } from "@prisma/client";
 
@@ -20,6 +22,12 @@ export interface PostDesign {
   id: string;
   /** The picture no longer matches the design: the design or its live values changed, or it was swapped. */
   stale: boolean;
+}
+
+/** Write with AI's starting choices, from the brand profile. */
+export interface CaptionAiSetup {
+  hashtags: HashtagsDefault;
+  emoji: boolean;
 }
 
 /** Everything the composer needs for one post. */
@@ -31,6 +39,8 @@ export interface OpenPost {
   missingEnv: Record<SocialPlatformKey, string[]>;
   details: InsertDetails;
   design: PostDesign | null;
+  /** Null when no AI key is set, which hides Write with AI. */
+  captionAi: CaptionAiSetup | null;
 }
 
 /**
@@ -57,7 +67,7 @@ async function linkedDesign(post: SocialPost): Promise<PostDesign | null> {
  * @returns Composer data.
  */
 export async function loadOpenPost(post: SocialPost): Promise<OpenPost> {
-  const [{ promo }, linked, { identity }, design] = await Promise.all([
+  const [{ promo }, linked, { identity, social }, design] = await Promise.all([
     promoWording(post.promoId),
     post.promoId
       ? prisma.promo.findUnique({ where: { id: post.promoId }, select: { title: true } })
@@ -75,5 +85,8 @@ export async function loadOpenPost(post: SocialPost): Promise<OpenPost> {
     ) as Record<SocialPlatformKey, string[]>,
     details: insertDetailsOf(identity, getSiteUrl()),
     design,
+    captionAi: aiConfigured()
+      ? { hashtags: social.brand.hashtagsOn, emoji: social.brand.emojiOn }
+      : null,
   };
 }

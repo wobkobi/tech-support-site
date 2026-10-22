@@ -1,10 +1,11 @@
 // scripts/eval-ai/context.ts
-// Reads live pricing context so expectations track current settings. Uses the pure
+// Reads live pricing and brand context so expectations track current settings. Uses the pure
 // resolveSettings, since getSettings throws outside a Next.js request.
 
+import { inWindowWhere } from "@/features/business/lib/promos";
 import { prisma } from "@/shared/lib/prisma";
 import { resolveSettings, SETTINGS_KEY_PREFIX } from "@/shared/lib/settings/get-settings";
-import type { Settings, SettingsGroup } from "@/shared/lib/settings/types";
+import type { BrandProfile, Settings, SettingsGroup } from "@/shared/lib/settings/types";
 
 /** Live values the harness derives expectations from. */
 export interface LiveContext {
@@ -20,6 +21,10 @@ export interface LiveContext {
     isDefault: boolean;
   }[];
   templates: { device: string | null; action: string | null }[];
+  /** The brand profile the caption writer reads. */
+  brand: BrandProfile;
+  /** Whether an automatic promo is running, which the caption writer's PROMO section follows. */
+  promoRunning: boolean;
 }
 
 /**
@@ -44,14 +49,15 @@ async function loadSettingsUncached(): Promise<Settings> {
 }
 
 /**
- * Loads the live pricing context from settings and the database.
- * @returns The current benchmarks, pricing floors, rates, and templates.
+ * Loads the live pricing and brand context from settings and the database.
+ * @returns The current benchmarks, pricing floors, rates, templates, brand profile and promo state.
  */
 export async function loadLiveContext(): Promise<LiveContext> {
-  const [settings, rates, templates] = await Promise.all([
+  const [settings, rates, templates, promos] = await Promise.all([
     loadSettingsUncached(),
     prisma.rateConfig.findMany({ orderBy: { label: "asc" } }),
     prisma.taskTemplate.findMany(),
+    prisma.promo.count({ where: inWindowWhere("automatic", new Date()) }),
   ]);
   return {
     benchmarks: settings.estimator.benchmarks,
@@ -66,5 +72,7 @@ export async function loadLiveContext(): Promise<LiveContext> {
       isDefault: r.isDefault,
     })),
     templates: templates.map((t) => ({ device: t.device, action: t.action })),
+    brand: settings.social.brand,
+    promoRunning: promos > 0,
   };
 }

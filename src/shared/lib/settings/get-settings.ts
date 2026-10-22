@@ -1,7 +1,9 @@
 // src/shared/lib/settings/get-settings.ts
-// Server-only typed settings: defaults plus DB overrides, maxAdvanceDays clamped. Cached by tag,
-// busted on save. No time-based revalidate: the root layout reads this, so a timer would become
-// every public page's ISR interval. A row edited straight in the DB needs a settings save.
+// Server-only typed settings: defaults plus DB overrides, maxAdvanceDays clamped. The stored rows
+// are cached by tag, busted on save, and merged over the defaults on every read, so a group added
+// in code is filled in even when the cache predates it. No time-based revalidate: the root layout
+// reads this, so a timer would become every public page's ISR interval. A row edited straight in
+// the DB needs a settings save.
 
 import { prisma } from "@/shared/lib/prisma";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
@@ -69,19 +71,22 @@ function sanitiseSettings(s: Settings): Settings {
  */
 export function resolveSettings(overrides: Partial<Record<SettingsGroup, unknown>>): Settings {
   // Build into a plain record (deepMerge preserves each group's default type),
-  // then assert to Settings once every group has been populated.
+  // then assert to Settings once every group has been populated. The defaults are cloned
+  // because deepMerge returns the base as-is for a group with no row, and callers (and
+  // sanitiseSettings) may write to the result.
   const merged: Record<string, unknown> = {};
   for (const group of GROUPS) {
-    merged[group] = deepMerge(DEFAULT_SETTINGS[group], overrides[group]);
+    merged[group] = deepMerge(structuredClone(DEFAULT_SETTINGS[group]), overrides[group]);
   }
   return sanitiseSettings(merged as unknown as Settings);
 }
 
 /**
- * Loads and merges `settings:*` rows; a row with bad JSON falls back to its group default.
- * @returns Resolved settings.
+ * Loads the `settings:*` rows as per-group overrides; a row with bad JSON is left out, so its
+ * group falls back to the default.
+ * @returns The parsed overrides keyed by group.
  */
-async function loadSettings(): Promise<Settings> {
+async function loadOverrides(): Promise<Partial<Record<SettingsGroup, unknown>>> {
   const rows = await prisma.setting.findMany({
     where: { key: { startsWith: SETTINGS_KEY_PREFIX } },
   });
@@ -94,14 +99,19 @@ async function loadSettings(): Promise<Settings> {
       // Leave the group on its default if the stored JSON is unparseable.
     }
   }
-  return resolveSettings(overrides);
+  return overrides;
 }
 
-/**
- * Cached settings accessor; every settings write busts the tag.
- * @returns Resolved settings (defaults + DB overrides).
- */
-export const getSettings = unstable_cache(loadSettings, ["settings"], {
+/** The stored overrides, cached until a settings write busts the tag. */
+const cachedOverrides = unstable_cache(loadOverrides, ["settings-overrides"], {
   tags: [SETTINGS_TAG],
   revalidate: false,
 });
+
+/**
+ * Settings accessor: the cached rows merged over the current defaults.
+ * @returns Resolved settings (defaults + DB overrides).
+ */
+export async function getSettings(): Promise<Settings> {
+  return resolveSettings(await cachedOverrides());
+}

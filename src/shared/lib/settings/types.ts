@@ -315,6 +315,34 @@ export interface ReviewsSettings {
   reviewAskGapDays: number;
 }
 
+/** Which apps Write with AI adds hashtags for unless the post says otherwise. */
+export type HashtagsDefault = "never" | "instagram" | "always";
+
+/** What every AI writer should know about the business, and Write with AI's starting choices. */
+export interface BrandProfile {
+  /**
+   * Anything about the business the website doesn't already say. Hours, area, rates and
+   * services reach every AI writer from the live settings, so they don't belong here.
+   */
+  notes: string;
+  /** Who the posts and emails are written for. */
+  audience: string;
+  /** How the writing should sound, on top of the house voice. */
+  tone: string;
+  /** Words or topics the AI writers must never use. */
+  avoid: string;
+  /** Brand hashtags as typed; `parseHashtags` reads them. */
+  hashtags: string;
+  /** When Write with AI's Hashtags tickbox starts ticked. */
+  hashtagsOn: HashtagsDefault;
+  /** Whether Write with AI's Emoji tickbox starts ticked. */
+  emojiOn: boolean;
+}
+
+export interface SocialSettings {
+  brand: BrandProfile;
+}
+
 export interface Settings {
   availability: AvailabilitySettings;
   pricing: PricingSettings;
@@ -324,6 +352,7 @@ export interface Settings {
   comms: CommsSettings;
   scheduling: SchedulingSettings;
   reviews: ReviewsSettings;
+  social: SocialSettings;
 }
 
 /** One of the top-level settings groups (also the `settings:<group>` key suffix). */
