@@ -8,8 +8,10 @@ import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { dateLabel, firstLine } from "@/features/social/components/social-list-helpers";
+import { TagChipRow } from "@/features/social/components/TagPicker";
 import { POST_STATUS_PILL } from "@/features/social/lib/post-display";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
+import type { SocialTagRow } from "@/features/social/lib/tags";
 import { PLATFORM_LABEL } from "@/features/social/lib/validate";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -19,6 +21,8 @@ import { FaChevronDown } from "react-icons/fa6";
  * Posted fold.
  * @param props - Component props.
  * @param props.posted - Finished posts, newest first.
+ * @param props.tagsById - Every tag, by id.
+ * @param props.emptyText - What to say when there are no posts to list.
  * @param props.open - Whether the fold is open.
  * @param props.onToggle - Records the fold's new open state.
  * @param props.openId - Id of the post open in the composer.
@@ -28,6 +32,8 @@ import { FaChevronDown } from "react-icons/fa6";
  */
 export function SocialPostedList({
   posted,
+  tagsById,
+  emptyText,
   open,
   onToggle,
   openId,
@@ -35,6 +41,8 @@ export function SocialPostedList({
   onOpen,
 }: {
   posted: SocialPostRow[];
+  tagsById: ReadonlyMap<string, SocialTagRow>;
+  emptyText: string;
   open: boolean;
   onToggle: (open: boolean) => void;
   openId: string | null;
@@ -60,13 +68,14 @@ export function SocialPostedList({
         />
       </summary>
       {posted.length === 0 ? (
-        <EmptyState title="Nothing posted yet." className="border-t border-admin-border" />
+        <EmptyState title={emptyText} className="border-t border-admin-border" />
       ) : (
         <ul className="flex flex-col divide-y divide-admin-border border-t border-admin-border">
           {posted.map((row) => (
             <PostedRow
               key={row.id}
               row={row}
+              tagsById={tagsById}
               current={row.id === openId}
               busy={isBusy(row.id)}
               onOpen={() => onOpen(row.id)}
@@ -83,6 +92,7 @@ export function SocialPostedList({
  * copies, and a button to open it for take-down, retry or duplicating.
  * @param props - Component props.
  * @param props.row - Post row.
+ * @param props.tagsById - Every tag, by id.
  * @param props.current - Whether it's open in the composer.
  * @param props.busy - Whether it's being opened.
  * @param props.onOpen - Opens it in the composer.
@@ -90,11 +100,13 @@ export function SocialPostedList({
  */
 function PostedRow({
   row,
+  tagsById,
   current,
   busy,
   onOpen,
 }: {
   row: SocialPostRow;
+  tagsById: ReadonlyMap<string, SocialTagRow>;
   current: boolean;
   busy: boolean;
   onOpen: () => void;
@@ -112,6 +124,7 @@ function PostedRow({
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold text-admin-text">{row.name || "Untitled"}</span>
           <StatusPill tone={pill.tone}>{pill.label}</StatusPill>
+          <TagChipRow ids={row.tagIds} tagsById={tagsById} />
         </div>
         <p className="truncate text-sm text-admin-text-secondary">
           {firstLine(row.body) || <span className="italic">No text</span>}

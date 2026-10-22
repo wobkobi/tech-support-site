@@ -5,7 +5,14 @@
 import type { IetcConfig, TaxBracket } from "@/features/business/lib/tax/types";
 import { parseDateKey } from "@/shared/lib/date-format";
 import { MAX_BRAND_HASHTAGS, parseHashtags } from "@/shared/lib/hashtags";
-import { HASHTAGS_DEFAULT_LABELS, VEHICLE_FUEL_LABELS } from "@/shared/lib/settings/field-meta";
+import {
+  HASHTAGS_DEFAULT_LABELS,
+  VEHICLE_FUEL_LABELS,
+  WATERMARK_CORNER_LABELS,
+  WATERMARK_LOGO_LABELS,
+  WATERMARK_OPACITY_RANGE,
+  WATERMARK_SIZE_RANGE,
+} from "@/shared/lib/settings/field-meta";
 import type {
   AvailabilitySettings,
   CommsSettings,
@@ -476,8 +483,8 @@ export const BRAND_TEXT_MAX = {
 } as const;
 
 /**
- * Validates the social group's brand profile: text lengths, the hashtag list and the two
- * Write with AI defaults.
+ * Validates the social group: the brand profile's text lengths, hashtag list and two Write
+ * with AI defaults, and the logo choices and ranges for photos.
  * @param s - Proposed social settings.
  * @returns List of field errors (empty when valid).
  */
@@ -513,6 +520,24 @@ function validateSocial(s: SocialSettings): FieldError[] {
     errors.push({ field: "brand.hashtagsOn", message: "Pick one of the listed choices." });
   if (typeof b?.emojiOn !== "boolean")
     errors.push({ field: "brand.emojiOn", message: "Must be on or off." });
+
+  const w = s.watermark;
+  if (typeof w?.on !== "boolean")
+    errors.push({ field: "watermark.on", message: "Must be on or off." });
+  if (typeof w?.logo !== "string" || !Object.hasOwn(WATERMARK_LOGO_LABELS, w.logo))
+    errors.push({ field: "watermark.logo", message: "Pick one of the listed logos." });
+  if (typeof w?.corner !== "string" || !Object.hasOwn(WATERMARK_CORNER_LABELS, w.corner))
+    errors.push({ field: "watermark.corner", message: "Pick one of the listed corners." });
+  if (!inRange(w?.size, WATERMARK_SIZE_RANGE.min, WATERMARK_SIZE_RANGE.max))
+    errors.push({
+      field: "watermark.size",
+      message: `Size must be ${WATERMARK_SIZE_RANGE.min}-${WATERMARK_SIZE_RANGE.max}%.`,
+    });
+  if (!inRange(w?.opacity, WATERMARK_OPACITY_RANGE.min, WATERMARK_OPACITY_RANGE.max))
+    errors.push({
+      field: "watermark.opacity",
+      message: `How solid must be ${WATERMARK_OPACITY_RANGE.min}-${WATERMARK_OPACITY_RANGE.max}%.`,
+    });
   return errors;
 }
 

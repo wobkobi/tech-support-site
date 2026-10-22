@@ -4,13 +4,20 @@
 
 import type { GooglePostCta, GooglePostType } from "@/features/social/lib/validate";
 
-/** Google-only post settings; the other adapters ignore them. Dates are YYYY-MM-DD. */
+/**
+ * Google-only post settings; the other adapters ignore them. Dates are YYYY-MM-DD, times NZ
+ * "HH:MM" (null for an all-day event).
+ */
 export interface GoogleFields {
   type: GooglePostType;
   cta: GooglePostCta | null;
+  /** The button's own link; null to use the post's Link. */
+  url: string | null;
   title: string | null;
   start: string | null;
   end: string | null;
+  startTime: string | null;
+  endTime: string | null;
   couponCode: string | null;
 }
 

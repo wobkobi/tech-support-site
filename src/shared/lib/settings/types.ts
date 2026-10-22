@@ -339,8 +339,27 @@ export interface BrandProfile {
   emojiOn: boolean;
 }
 
+/** Logo artwork "Add my logo" can put on a photo: the Post maker's logo choices. */
+export type WatermarkLogo = "mark" | "profile" | "wordmark" | "full";
+
+/** The corner of a photo the logo sits in. */
+export type WatermarkCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+/** "Add my logo" for photos uploaded in the post composer. */
+export interface WatermarkSettings {
+  /** Whether a new photo gets the logo as it uploads. Each photo's toggle can still change it. */
+  on: boolean;
+  logo: WatermarkLogo;
+  corner: WatermarkCorner;
+  /** Logo size as a percentage of the photo's shorter edge. */
+  size: number;
+  /** How solid the logo and its white backing are, as a percentage. */
+  opacity: number;
+}
+
 export interface SocialSettings {
   brand: BrandProfile;
+  watermark: WatermarkSettings;
 }
 
 export interface Settings {

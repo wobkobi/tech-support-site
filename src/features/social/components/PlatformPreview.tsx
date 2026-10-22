@@ -292,8 +292,38 @@ function offerDay(key: string): string {
 }
 
 /**
+ * An HH:MM time as Google prints it, like "9:30am".
+ * @param time - 24-hour time.
+ * @returns Short time.
+ */
+function clockTime(time: string): string {
+  const [h = 0, m = 0] = time.split(":").map(Number);
+  const hour = h % 12 === 0 ? 12 : h % 12;
+  return `${hour}:${String(m).padStart(2, "0")}${h < 12 ? "am" : "pm"}`;
+}
+
+/**
+ * When an event runs, as Google prints it under the title.
+ * @param google - The post's Google fields.
+ * @returns Like "14 Oct, 9:30am - 5:00pm" or "14 Oct - 17 Oct".
+ */
+function eventWhen(google: GoogleFields): string {
+  if (!google.start || !google.end) return "Pick the event dates";
+  const sameDay = google.start === google.end;
+  if (!google.startTime || !google.endTime) {
+    return sameDay ? offerDay(google.start) : `${offerDay(google.start)} - ${offerDay(google.end)}`;
+  }
+  const from = `${offerDay(google.start)}, ${clockTime(google.startTime)}`;
+  const to = sameDay
+    ? clockTime(google.endTime)
+    : `${offerDay(google.end)}, ${clockTime(google.endTime)}`;
+  return `${from} - ${to}`;
+}
+
+/**
  * A Business Profile post as shown under Updates. Offers show title, dates, code and "Redeem
- * online" as published; updates show a button only when it will be sent.
+ * online" as published; events show title and when; updates and events show a button only when
+ * it will be sent.
  * @param props - Component props.
  * @param props.post - Filled post content.
  * @param props.businessName - The profile's business name.
@@ -307,9 +337,12 @@ export function GooglePreview({
   businessName: string;
 }): React.ReactElement {
   const { google } = post;
-  const offer = google.type === "OFFER" || google.type === "EVENT";
+  const offer = google.type === "OFFER";
+  const event = google.type === "EVENT";
+  const link = google.url ?? post.linkUrl;
+  // Call now rings the profile's number, so it needs no link, but Google won't put it on an event.
   const button =
-    !offer && google.cta && (google.cta === "CALL" || post.linkUrl)
+    !offer && google.cta && (google.cta === "CALL" ? !event : link)
       ? GOOGLE_CTA_LABEL[google.cta]
       : null;
 
@@ -346,6 +379,12 @@ export function GooglePreview({
                 ? `${offerDay(google.start)} - ${offerDay(google.end)}`
                 : "Pick the offer dates"}
             </p>
+          </div>
+        )}
+        {event && (
+          <div>
+            <p className="text-[18px] leading-6 font-medium">{google.title || "Event title"}</p>
+            <p className="text-[13px] leading-5 text-[#70757a]">{eventWhen(google)}</p>
           </div>
         )}
         {post.text && (

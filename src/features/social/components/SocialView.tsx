@@ -16,9 +16,12 @@ import { SocialConnections } from "@/features/social/components/SocialConnection
 import { SocialInProgress } from "@/features/social/components/SocialInProgress";
 import { SocialPostedList } from "@/features/social/components/SocialPostedList";
 import { SocialStartSection } from "@/features/social/components/SocialStartSection";
+import { SocialTagFilter } from "@/features/social/components/SocialTagFilter";
+import { TagManager, type TagUse } from "@/features/social/components/TagManager";
 import type { OpenPost } from "@/features/social/lib/open-post";
 import { liveOn, type Connection } from "@/features/social/lib/post-display";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
+import { byTagName, type SocialTagRow } from "@/features/social/lib/tags";
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState, useTransition } from "react";
@@ -32,16 +35,19 @@ const IN_PROGRESS = new Set(["draft", "scheduled", "posting", "partial", "failed
  * @param props.initial - Every post and preset, newest first.
  * @param props.open - The post open in the composer, or null.
  * @param props.openMissing - Whether the address named a post that no longer exists.
+ * @param props.tags - Every tag, A to Z.
  * @returns Social view element.
  */
 export function SocialView({
   initial,
   open,
   openMissing,
+  tags,
 }: {
   initial: SocialPostRow[];
   open: OpenPost | null;
   openMissing: boolean;
+  tags: SocialTagRow[];
 }): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -53,6 +59,15 @@ export function SocialView({
     setShownInitial(initial);
     setRows(initial);
   }
+  const [tagList, setTagList] = useState(tags);
+  const [shownTags, setShownTags] = useState(tags);
+  if (tags !== shownTags) {
+    setShownTags(tags);
+    setTagList(tags);
+  }
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [managingTags, setManagingTags] = useState(false);
+  const tagsById = new Map(tagList.map((t) => [t.id, t]));
   const [busyId, setBusyId] = useState<string | null>(null);
   const [opening, startOpening] = useTransition();
   // Which button started the post now loading, so it keeps its spinner until the
@@ -91,10 +106,14 @@ export function SocialView({
   // The list arrives newest first; presets read oldest first so the starter set keeps
   // its order and new ones join the end.
   const presets = rows.filter((r) => r.isPreset).reverse();
-  const inProgress = rows.filter((r) => !r.isPreset && IN_PROGRESS.has(r.status));
-  const posted = rows
-    .filter((r) => !r.isPreset && !IN_PROGRESS.has(r.status))
+  const shownPosts = rows.filter(
+    (r) => !r.isPreset && (tagFilter === null || r.tagIds.includes(tagFilter)),
+  );
+  const inProgress = shownPosts.filter((r) => IN_PROGRESS.has(r.status));
+  const posted = shownPosts
+    .filter((r) => !IN_PROGRESS.has(r.status))
     .sort((a, b) => (b.postedAt ?? b.updatedAt).localeCompare(a.postedAt ?? a.updatedAt));
+  const filterName = tagFilter ? tagsById.get(tagFilter)?.name : undefined;
   const [historyOpen, setHistoryOpen] = useState(
     open !== null && !open.post.isPreset && !IN_PROGRESS.has(open.post.status),
   );
@@ -280,13 +299,51 @@ export function SocialView({
     }
   }
 
+  /**
+   * Where a tag is used, counted from the list so it stays right as tags change.
+   * @param id - Tag id.
+   * @returns Its post and preset counts.
+   */
+  function usageOf(id: string): TagUse {
+    const carrying = rows.filter((r) => r.tagIds.includes(id));
+    const presetCount = carrying.filter((r) => r.isPreset).length;
+    return { posts: carrying.length - presetCount, presets: presetCount };
+  }
+
+  /**
+   * Puts a renamed or recoloured tag back in the list, keeping it A to Z.
+   * @param tag - The tag as saved.
+   */
+  function putTag(tag: SocialTagRow): void {
+    setTagList((prev) => [...prev.filter((t) => t.id !== tag.id), tag].sort(byTagName));
+  }
+
+  /**
+   * Drops a deleted tag from the list, every post and the filter.
+   * @param id - Deleted tag's id.
+   */
+  function dropTag(id: string): void {
+    setTagList((prev) => prev.filter((t) => t.id !== id));
+    setRows((prev) =>
+      prev.map((r) =>
+        r.tagIds.includes(id) ? { ...r, tagIds: r.tagIds.filter((t) => t !== id) } : r,
+      ),
+    );
+    setTagFilter((f) => (f === id ? null : f));
+  }
+
   // Stable, so the composer's autosave isn't reset every time the list re-renders.
   const onSaved = useCallback(
-    (saved: { name: string; body: string }) => {
+    (saved: Partial<Pick<SocialPostRow, "name" | "body" | "tagIds">>) => {
       setRows((prev) => prev.map((r) => (r.id === openId ? { ...r, ...saved } : r)));
     },
     [openId],
   );
+  const onTagCreated = useCallback((tag: SocialTagRow) => {
+    setTagList((prev) =>
+      prev.some((t) => t.id === tag.id) ? prev : [...prev, tag].sort(byTagName),
+    );
+  }, []);
   const onDraftEmail = useCallback(
     (afterPublish: boolean) => {
       if (openId) setEmailStep({ postId: openId, afterPublish });
@@ -310,9 +367,20 @@ export function SocialView({
         onOpenPost={(id) => void openPost(id)}
       />
 
+      {tagList.length > 0 && (
+        <SocialTagFilter
+          tags={tagList}
+          countOf={(id) => usageOf(id).posts}
+          value={tagFilter}
+          onChange={setTagFilter}
+          onManage={() => setManagingTags(true)}
+        />
+      )}
+
       {inProgress.length > 0 && (
         <SocialInProgress
           rows={inProgress}
+          tagsById={tagsById}
           openId={openId}
           isBusy={isBusy}
           onOpen={(id) => void openPost(id)}
@@ -348,6 +416,9 @@ export function SocialView({
             design={open.design}
             captionAi={open.captionAi}
             email={open.email}
+            watermark={open.watermark}
+            tags={tagList}
+            onTagCreated={onTagCreated}
             onDraftEmail={onDraftEmail}
             onSaved={onSaved}
             saveRef={saveOpen}
@@ -361,6 +432,10 @@ export function SocialView({
 
       <SocialPostedList
         posted={posted}
+        tagsById={tagsById}
+        emptyText={
+          filterName ? `Nothing posted with the ${filterName} tag.` : "Nothing posted yet."
+        }
         open={historyOpen}
         onToggle={setHistoryOpen}
         openId={openId}
@@ -373,6 +448,15 @@ export function SocialView({
         error={connectionsError}
         checking={busyId === "connections"}
         onCheck={() => void checkConnections()}
+      />
+
+      <TagManager
+        open={managingTags}
+        onClose={() => setManagingTags(false)}
+        tags={tagList}
+        usageOf={usageOf}
+        onChanged={putTag}
+        onDeleted={dropTag}
       />
 
       {showEmailStep && (

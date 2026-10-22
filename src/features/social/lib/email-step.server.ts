@@ -6,6 +6,7 @@ import { docHash, parseDesignDoc, type BoundValues } from "@/features/social-des
 import { EMAIL_PICTURE_FORMAT } from "@/features/social-design/lib/formats";
 import { loadBoundValues } from "@/features/social-design/lib/load-bound";
 import { autoAltText } from "@/features/social-design/lib/pictures";
+import { writePostMeta } from "@/features/social/lib/post-meta.server";
 import { emailFromPost, postBrief } from "@/features/social/lib/to-email";
 import { isBlobImageUrl } from "@/shared/lib/blob-image";
 import { prisma } from "@/shared/lib/prisma";
@@ -35,12 +36,6 @@ export interface PostEmail {
 export type DraftEmailResult =
   | { ok: true; campaignId: string; brief: string }
   | { ok: false; status: 400 | 404 | 409; error: string };
-
-/** The fields Email this too writes on a post. */
-interface EmailFields {
-  campaignId?: string | null;
-  emailSkipped?: boolean;
-}
 
 /**
  * A design's wide picture for email, when it still matches the design and the live contact and
@@ -78,31 +73,6 @@ export async function loadPostEmail(post: SocialPost): Promise<PostEmail | null>
     sentAt: campaign.sentAt?.toISOString() ?? null,
     fromEmail: campaign.createdAt <= post.createdAt,
   };
-}
-
-/**
- * Writes a post's email fields without bumping updatedAt, which would remount the open composer
- * and drop its unsaved edits. Written conditionally on updatedAt and re-read on a race.
- * @param id - Post id.
- * @param change - Given the stored post, the fields to write, or null to refuse.
- * @returns "done", "refused" when change said no, or "missing" when the post is gone.
- */
-async function writeEmailFields(
-  id: string,
-  change: (post: SocialPost) => EmailFields | null,
-): Promise<"done" | "refused" | "missing"> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const post = await prisma.socialPost.findUnique({ where: { id } });
-    if (!post) return "missing";
-    const data = change(post);
-    if (!data) return "refused";
-    const result = await prisma.socialPost.updateMany({
-      where: { id, updatedAt: post.updatedAt },
-      data: { ...data, updatedAt: post.updatedAt },
-    });
-    if (result.count > 0) return "done";
-  }
-  throw new Error(`Post ${id} kept changing while its email link was written.`);
 }
 
 /**
@@ -181,7 +151,7 @@ export async function draftEmailForPost(
 
   // Only the link seen above may be replaced: a deleted email's, or none.
   const seen = post.campaignId;
-  const outcome = await writeEmailFields(id, (p) =>
+  const outcome = await writePostMeta(id, (p) =>
     p.campaignId && p.campaignId !== seen ? null : { campaignId: created.id },
   );
   if (outcome !== "done") {
@@ -200,7 +170,7 @@ export async function draftEmailForPost(
  * @returns False when the post is gone.
  */
 export async function setEmailSkipped(id: string, skipped: boolean): Promise<boolean> {
-  return (await writeEmailFields(id, () => ({ emailSkipped: skipped }))) === "done";
+  return (await writePostMeta(id, () => ({ emailSkipped: skipped }))) === "done";
 }
 
 /**
@@ -209,5 +179,5 @@ export async function setEmailSkipped(id: string, skipped: boolean): Promise<boo
  * @returns False when the post is gone.
  */
 export async function unlinkPostEmail(id: string): Promise<boolean> {
-  return (await writeEmailFields(id, () => ({ campaignId: null }))) === "done";
+  return (await writePostMeta(id, () => ({ campaignId: null }))) === "done";
 }

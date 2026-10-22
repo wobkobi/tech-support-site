@@ -16,13 +16,19 @@ import { nzDateKey } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * GET /api/admin/social - every post and preset, newest first.
+ * GET /api/admin/social - every post and preset, newest first; `?tag=<id>` for one tag's.
  * @param request - Incoming request.
  * @returns JSON `{ posts }`.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
-  const rows = await prisma.socialPost.findMany({ orderBy: { updatedAt: "desc" } });
+  const rawTag = request.nextUrl.searchParams.get("tag");
+  const tag = rawTag === null ? null : parseObjectId(rawTag);
+  if (rawTag !== null && !tag) return errorResponse("tag isn't a valid id.", 400);
+  const rows = await prisma.socialPost.findMany({
+    where: tag ? { tagIds: { has: tag } } : {},
+    orderBy: { updatedAt: "desc" },
+  });
   return okResponse({ posts: rows.map(toPostRow) });
 }
 
@@ -64,7 +70,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // Starting a draft from a preset keeps its name; any other copy says it's one.
       const name = source.isPreset && !asPreset ? source.name : `${source.name} (copy)`;
       // Toggles, per-platform text and pictures, and crop OKs carry over; past
-      // outcomes don't.
+      // outcomes and the email link don't.
       const targets = defaultTargets().map((t) => {
         const from = source.targets.find((s) => s.platform === t.platform);
         return from
@@ -76,6 +82,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               imageAlt: from.imageAlt,
               imageWidth: from.imageWidth,
               imageHeight: from.imageHeight,
+              imageOriginalUrl: from.imageOriginalUrl,
               cropApprovedFor: from.cropApprovedFor,
             }
           : t;
@@ -88,15 +95,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           imageAlt: source.imageAlt,
           imageWidth: source.imageWidth,
           imageHeight: source.imageHeight,
+          imageOriginalUrl: source.imageOriginalUrl,
           linkUrl: source.linkUrl,
+          tagIds: source.tagIds,
           promoId: source.promoId,
           isPreset: asPreset,
           targets,
           googleType: source.googleType,
           googleCta: source.googleCta,
+          googleUrl: source.googleUrl,
           googleTitle: source.googleTitle,
           offerStart: source.offerStart,
           offerEnd: source.offerEnd,
+          eventStartTime: source.eventStartTime,
+          eventEndTime: source.eventEndTime,
           couponCode: source.couponCode,
         },
       });

@@ -4,7 +4,12 @@
 
 import type { VehicleFuel } from "@/features/business/lib/tax/types";
 import { MAX_BRAND_HASHTAGS } from "@/shared/lib/hashtags";
-import type { HashtagsDefault, SettingsGroup } from "@/shared/lib/settings/types";
+import type {
+  HashtagsDefault,
+  SettingsGroup,
+  WatermarkCorner,
+  WatermarkLogo,
+} from "@/shared/lib/settings/types";
 
 /** Display metadata for one editable field, keyed by its dotted path in a group. */
 export interface FieldMeta {
@@ -57,7 +62,7 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
   social: {
     title: "Social & brand",
     blurb:
-      "What the AI writers should know about you beyond the website, and the defaults for Write with AI.",
+      "What the AI writers should know about you beyond the website, the defaults for Write with AI, and the logo on your photos.",
   },
 };
 
@@ -250,6 +255,26 @@ export const HASHTAGS_DEFAULT_LABELS: Record<HashtagsDefault, string> = {
   always: "Always",
 };
 
+/** Labels for the logo artwork "Add my logo" can use. */
+export const WATERMARK_LOGO_LABELS: Record<WatermarkLogo, string> = {
+  mark: "Mark",
+  profile: "Mark with accent",
+  wordmark: "Wordmark",
+  full: "Wordmark and tagline",
+};
+
+/** Labels for the corner the logo sits in. */
+export const WATERMARK_CORNER_LABELS: Record<WatermarkCorner, string> = {
+  "top-left": "Top left",
+  "top-right": "Top right",
+  "bottom-left": "Bottom left",
+  "bottom-right": "Bottom right",
+};
+
+/** The logo size and solidity ranges, as percentages. */
+export const WATERMARK_SIZE_RANGE = { min: 8, max: 30 } as const;
+export const WATERMARK_OPACITY_RANGE = { min: 40, max: 100 } as const;
+
 /** Field metadata for the social group, keyed by dotted path. */
 export const SOCIAL_FIELD_META = {
   "brand.notes": {
@@ -285,6 +310,29 @@ export const SOCIAL_FIELD_META = {
     title: "Add emoji",
     description:
       "Whether Write with AI's Emoji tickbox starts ticked. When it's on, a post gets one or two at most.",
+  },
+  "watermark.on": {
+    title: "Add my logo to new photos",
+    description:
+      "Puts your logo in a corner of each photo you upload in a post. Each photo has its own Add my logo switch, so you can still take it off. Post maker pictures never get it.",
+  },
+  "watermark.logo": {
+    title: "Logo",
+    description: "Which logo goes on. It sits on a white backing so it shows up on any photo.",
+  },
+  "watermark.corner": {
+    title: "Corner",
+    description: "Where the logo sits. Pick the corner your photos usually leave clear.",
+  },
+  "watermark.size": {
+    title: "Size",
+    description: `How big the logo is, as a share of the photo's shorter side (${WATERMARK_SIZE_RANGE.min}-${WATERMARK_SIZE_RANGE.max}%).`,
+    unit: "%",
+  },
+  "watermark.opacity": {
+    title: "How solid",
+    description: `${WATERMARK_OPACITY_RANGE.max}% is fully solid; lower lets the photo show through (${WATERMARK_OPACITY_RANGE.min}% at least).`,
+    unit: "%",
   },
 } satisfies Record<string, FieldMeta>;
 

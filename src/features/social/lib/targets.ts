@@ -11,6 +11,7 @@ export interface TargetState {
   imageWidth: number | null;
   imageHeight: number | null;
   cropApprovedFor: string | null;
+  imageOriginalUrl: string | null;
   status: "pending" | "posted" | "failed" | "skipped" | "removed";
   externalId: string | null;
   permalink: string | null;
@@ -36,6 +37,7 @@ export function defaultTargets(): TargetState[] {
     imageWidth: null,
     imageHeight: null,
     cropApprovedFor: null,
+    imageOriginalUrl: null,
     status: "pending",
     externalId: null,
     permalink: null,

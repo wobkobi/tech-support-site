@@ -1,7 +1,8 @@
 // scripts/check-social.ts
-// Social posting logic: platform validators, Google post body, promo placeholders, email to
-// post and post to email, JPEG size reader, status roll-up, take-downs, PATCH parsing, the brand
-// profile and Write with AI's request and reply reading. Pure logic, no DB.
+// Social posting logic: platform validators, emoji counting, Google posts and events, promo
+// placeholders, email to post and post to email, JPEG size reader, status roll-up, take-downs,
+// PATCH parsing, tags, the logo's placement, the brand profile and Write with AI's request and
+// reply reading. Pure logic, no DB.
 // Run with: npm test -- social
 
 import { BRIEF_MAX, POST_SOURCE_MAX } from "@/features/mailing/lib/ai-draft";
@@ -15,6 +16,7 @@ import { postFromEmail } from "@/features/social/lib/from-email";
 import { googlePostBody } from "@/features/social/lib/google-post";
 import { insertableGroups } from "@/features/social/lib/insertables";
 import { mergeTargets, parsePostPatch } from "@/features/social/lib/parse";
+import { byTagName, nextTagColour, tagKey, tagName } from "@/features/social/lib/tags";
 import {
   applyTakeDown,
   defaultTargets,
@@ -35,6 +37,7 @@ import {
 } from "@/features/social/lib/to-email";
 import {
   blockingIssues,
+  charCount,
   cropOf,
   fillPromo,
   pictureFor,
@@ -43,6 +46,7 @@ import {
   validatePost,
   type PostDraft,
 } from "@/features/social/lib/validate";
+import { watermarkBox } from "@/features/social/lib/watermark";
 import { avoidList, brandRules } from "@/shared/lib/ai/brand-rules";
 import { formatHashtags, parseHashtags } from "@/shared/lib/hashtags";
 import { jpegSize } from "@/shared/lib/jpeg-size";
@@ -175,7 +179,7 @@ function checkValidators(): void {
   );
   expect(
     "instagram: over 2,200 characters blocks",
-    errorsFor(draft({ body: "a".repeat(2_201) }), "instagram").some((m) => m.includes("2200")),
+    errorsFor(draft({ body: "a".repeat(2_201) }), "instagram").some((m) => m.includes("2,200")),
   );
   const tags = Array.from({ length: 31 }, (_, i) => `#tag${i}`).join(" ");
   expect(
@@ -267,6 +271,23 @@ function offerDraft(over: Partial<PostDraft> = {}): PostDraft {
   });
 }
 
+/**
+ * A one-day Google event with times, with any fields overridden.
+ * @param over - Fields to change.
+ * @returns The draft.
+ */
+function eventDraft(over: Partial<PostDraft> = {}): PostDraft {
+  return googleDraft({
+    googleType: "EVENT",
+    googleTitle: "Phone help morning",
+    offerStart: "2026-11-07",
+    offerEnd: "2026-11-07",
+    eventStartTime: "09:30",
+    eventEndTime: "12:00",
+    ...over,
+  });
+}
+
 /** Google rules and the localPosts body. */
 function checkGoogle(): void {
   console.log("Google");
@@ -345,7 +366,15 @@ function checkGoogle(): void {
     imageAlt: null,
     linkUrl: "https://example.co.nz/booking",
   };
-  const noGoogle = { title: null, start: null, end: null, couponCode: null };
+  const noGoogle = {
+    url: null,
+    title: null,
+    start: null,
+    end: null,
+    startTime: null,
+    endTime: null,
+    couponCode: null,
+  };
   const update = googlePostBody({
     ...base,
     google: { type: "STANDARD", cta: "BOOK", ...noGoogle },
@@ -368,6 +397,7 @@ function checkGoogle(): void {
   const offerBody = googlePostBody({
     ...base,
     google: {
+      ...noGoogle,
       type: "OFFER",
       cta: "BOOK",
       title: "Spring special",
@@ -390,6 +420,218 @@ function checkGoogle(): void {
         }) &&
       offerBody.offer?.couponCode === "SPRING" &&
       offerBody.offer.redeemOnlineUrl === base.linkUrl,
+  );
+  const ownLink = googlePostBody({
+    ...base,
+    google: { ...noGoogle, type: "STANDARD", cta: "SIGN_UP", url: "https://example.co.nz/list" },
+  });
+  expect(
+    "body: the Google button link beats the post's Link",
+    ownLink.callToAction?.actionType === "SIGN_UP" &&
+      ownLink.callToAction.url === "https://example.co.nz/list",
+  );
+  const eventGoogle = {
+    ...noGoogle,
+    type: "EVENT" as const,
+    cta: "BOOK" as const,
+    title: "Phone help morning",
+    start: "2026-11-07",
+    end: "2026-11-08",
+  };
+  const timed = googlePostBody({
+    ...base,
+    google: { ...eventGoogle, startTime: "09:30", endTime: "16:45" },
+  });
+  expect(
+    "body: a timed event sends its times, title and a button with the Link",
+    timed.topicType === "EVENT" &&
+      timed.event?.title === "Phone help morning" &&
+      JSON.stringify(timed.event.schedule) ===
+        JSON.stringify({
+          startDate: { year: 2026, month: 11, day: 7 },
+          startTime: { hours: 9, minutes: 30 },
+          endDate: { year: 2026, month: 11, day: 8 },
+          endTime: { hours: 16, minutes: 45 },
+        }) &&
+      timed.callToAction?.actionType === "BOOK" &&
+      timed.callToAction.url === base.linkUrl &&
+      timed.offer === undefined,
+  );
+  const allDay = googlePostBody({ ...base, google: eventGoogle });
+  expect(
+    "body: an all-day event runs 00:00 to 23:59",
+    JSON.stringify(allDay.event?.schedule.startTime) === JSON.stringify({ hours: 0, minutes: 0 }) &&
+      JSON.stringify(allDay.event?.schedule.endTime) === JSON.stringify({ hours: 23, minutes: 59 }),
+  );
+  const ringEvent = googlePostBody({ ...base, google: { ...eventGoogle, cta: "CALL" } });
+  expect("body: an event never sends Call now", ringEvent.callToAction === undefined);
+}
+
+/** Google events: title, dates, times both or neither, and which buttons they take. */
+function checkGoogleEvent(): void {
+  console.log("Google events");
+  expect("event: a full timed event passes", errorsFor(eventDraft(), "google").length === 0);
+  expect(
+    "event: all day (no times) passes",
+    errorsFor(eventDraft({ eventStartTime: null, eventEndTime: null }), "google").length === 0,
+  );
+  expect(
+    "event: no title blocks",
+    errorsFor(eventDraft({ googleTitle: "" }), "google").includes("A Google event needs a title."),
+  );
+  expect(
+    "event: no end date blocks",
+    errorsFor(eventDraft({ offerEnd: null }), "google").some((m) => m.includes("start and an end")),
+  );
+  expect(
+    "event: ending the day before it starts blocks",
+    errorsFor(eventDraft({ offerEnd: "2026-11-06" }), "google").some((m) =>
+      m.includes("ends before it starts"),
+    ),
+  );
+  expect(
+    "event: one time without the other blocks",
+    errorsFor(eventDraft({ eventEndTime: null }), "google").some((m) => m.includes("All day")),
+  );
+  expect(
+    "event: a same-day end time before the start blocks",
+    errorsFor(eventDraft({ eventEndTime: "09:00" }), "google").some((m) =>
+      m.includes("ends before it starts"),
+    ),
+  );
+  expect(
+    "event: an earlier end time is fine across two days",
+    errorsFor(eventDraft({ offerEnd: "2026-11-08", eventEndTime: "09:00" }), "google").length === 0,
+  );
+  expect(
+    "event: a bad time blocks",
+    errorsFor(eventDraft({ eventStartTime: "9.30" }), "google").some((m) => m.includes("09:30")),
+  );
+  expect(
+    "event: Call now blocks",
+    errorsFor(eventDraft({ googleCta: "CALL" }), "google").some((m) => m.includes("Call now")),
+  );
+  expect(
+    "event: Sign up with no link blocks",
+    errorsFor(eventDraft({ googleCta: "SIGN_UP" }), "google").some((m) =>
+      m.includes("needs a link"),
+    ),
+  );
+  expect(
+    "event: Sign up with only the Google button link passes",
+    errorsFor(eventDraft({ googleCta: "SIGN_UP", googleUrl: "https://example.co.nz" }), "google")
+      .length === 0,
+  );
+  const unusedLink = validatePost(googleDraft({ googleUrl: "https://example.co.nz" }), true);
+  expect(
+    "google: a button link with no button warns but doesn't block",
+    (unusedLink.google ?? []).some((i) => i.level === "warning") &&
+      !(unusedLink.google ?? []).some((i) => i.level === "error"),
+  );
+}
+
+/** Lengths as the apps count them. */
+function checkCharCount(): void {
+  console.log("Emoji counting");
+  expectEqual("count: plain text is its length", charCount("Book a visit."), 13);
+  expectEqual("count: a heart counts two", charCount("❤"), 2);
+  expectEqual("count: a heart with its colour mark counts two", charCount("❤️"), 2);
+  expectEqual("count: a face counts two", charCount("😀"), 2);
+  expect("count: a family counts every unit", charCount("👨‍👩‍👧‍👦") >= 8);
+  expectEqual("count: a flag counts four", charCount("🇳🇿"), 4);
+  expectEqual("count: the copyright sign counts one", charCount("©"), 1);
+  expectEqual("count: an accented letter counts one", charCount("café"), 4);
+  expect(
+    "count: Instagram's limit counts emoji as two",
+    errorsFor(draft({ body: "a".repeat(2_199) + "😀" }), "instagram").some((m) =>
+      m.includes("2,200"),
+    ),
+  );
+}
+
+/** Tag names, keys, colours and order. */
+function checkTags(): void {
+  console.log("Tags");
+  expectEqual("tag: # and extra spaces come off", tagName("  ##Tech   tips "), "Tech tips");
+  expectEqual("tag: names match in any case", tagKey("#Tech Tips"), tagKey("tech  tips"));
+  expect("tag: different names don't match", tagKey("Tips") !== tagKey("Tip"));
+  expectEqual("tag: the first colour goes first", nextTagColour([]), "violet");
+  expectEqual("tag: the next unused colour", nextTagColour(["violet", "teal"]), "orange");
+  expectEqual(
+    "tag: once every colour is used it goes round again",
+    nextTagColour(["violet", "teal", "orange", "yellow", "blue", "grey", "violet"]),
+    "teal",
+  );
+  expectEqual(
+    "tag: A to Z ignoring case and accents",
+    [{ name: "scams" }, { name: "Éclair" }, { name: "apps" }].sort(byTagName).map((t) => t.name),
+    ["apps", "Éclair", "scams"],
+  );
+}
+
+/** Where Add my logo puts the logo. */
+function checkWatermark(): void {
+  console.log("Watermark");
+  const box = watermarkBox(1200, 800, { logo: "mark", corner: "bottom-right", size: 14 });
+  const side = 800 * 0.14;
+  const gap = 800 * 0.03;
+  expect(
+    "logo: a square mark is size% of the shorter side",
+    Math.abs(box.logo.w - side) < 0.01 && Math.abs(box.logo.h - side) < 0.01,
+  );
+  expect(
+    "logo: bottom right sits the gap in from both edges",
+    Math.abs(box.plate.x + box.plate.w - (1200 - gap)) < 0.01 &&
+      Math.abs(box.plate.y + box.plate.h - (800 - gap)) < 0.01,
+  );
+  expect(
+    "logo: the logo sits inside its backing",
+    box.logo.x > box.plate.x &&
+      box.logo.y > box.plate.y &&
+      box.logo.x + box.logo.w < box.plate.x + box.plate.w &&
+      box.logo.y + box.logo.h < box.plate.y + box.plate.h,
+  );
+  const topLeft = watermarkBox(1200, 800, { logo: "mark", corner: "top-left", size: 14 });
+  expect(
+    "logo: top left sits the gap in from the top and left",
+    Math.abs(topLeft.plate.x - gap) < 0.01 && Math.abs(topLeft.plate.y - gap) < 0.01,
+  );
+  const wide = watermarkBox(1200, 800, { logo: "wordmark", corner: "top-right", size: 14 });
+  expect(
+    "logo: the wordmark covers the same area as the mark",
+    Math.abs(wide.logo.w * wide.logo.h - side * side) < 0.01 && wide.logo.w > wide.logo.h,
+  );
+  const small = watermarkBox(200, 150, { logo: "mark", corner: "bottom-left", size: 8 });
+  expectEqual("logo: never under 48px", small.logo.w, 48);
+  const tiny = watermarkBox(100, 100, { logo: "mark", corner: "bottom-left", size: 8 });
+  expectEqual("logo: never over 40% of a tiny photo", tiny.logo.w, 40);
+
+  /**
+   * The field paths the social settings fail on with the watermark changed.
+   * @param over - Watermark fields to change from the defaults.
+   * @returns Failing field paths.
+   */
+  const settings = (over: Partial<SocialSettings["watermark"]>): string[] =>
+    validateGroup("social", {
+      ...social(),
+      watermark: { ...DEFAULT_SETTINGS.social.watermark, ...over },
+    }).map((e) => e.field);
+  expectEqual("logo settings: the defaults pass", settings({}), []);
+  expectEqual("logo settings: size 31 fails", settings({ size: 31 }), ["watermark.size"]);
+  expectEqual("logo settings: size 7 fails", settings({ size: 7 }), ["watermark.size"]);
+  expectEqual("logo settings: opacity 39 fails", settings({ opacity: 39 }), ["watermark.opacity"]);
+  expectEqual(
+    "logo settings: an unknown logo and corner fail",
+    settings({
+      logo: "shield" as SocialSettings["watermark"]["logo"],
+      corner: "middle" as SocialSettings["watermark"]["corner"],
+    }),
+    ["watermark.logo", "watermark.corner"],
+  );
+  expectEqual(
+    "logo settings: on must be true or false",
+    settings({ on: "yes" as unknown as boolean }),
+    ["watermark.on"],
   );
 }
 
@@ -880,7 +1122,60 @@ function checkParse(): void {
       offer.patch.offerEnd === null,
   );
   expect("unknown Google type is refused", "error" in parsePostPatch({ googleType: "ALERT" }));
-  expect("unknown Google button is refused", "error" in parsePostPatch({ googleCta: "SHOP" }));
+  expect("unknown Google button is refused", "error" in parsePostPatch({ googleCta: "ALERT" }));
+  const event = parsePostPatch({
+    googleType: "EVENT",
+    googleCta: "SIGN_UP",
+    googleUrl: "https://example.co.nz/list",
+    eventStartTime: "09:30",
+    eventEndTime: "",
+  });
+  expect(
+    "Google event fields parse, a blank time clears",
+    !("error" in event) &&
+      event.patch.googleType === "EVENT" &&
+      event.patch.googleCta === "SIGN_UP" &&
+      event.patch.googleUrl === "https://example.co.nz/list" &&
+      event.patch.eventStartTime === "09:30" &&
+      event.patch.eventEndTime === null,
+    JSON.stringify(event),
+  );
+  expect("a 24:00 event time is refused", "error" in parsePostPatch({ eventStartTime: "24:00" }));
+  expect("a 9:30 event time is refused", "error" in parsePostPatch({ eventStartTime: "9:30" }));
+  expect(
+    "a javascript: button link is refused",
+    "error" in parsePostPatch({ googleUrl: "javascript:alert(1)" }),
+  );
+  const id = "6537a1f0c2d4e5f6a7b8c9d0";
+  const tagged = parsePostPatch({ tagIds: [id, id] });
+  expect(
+    "tags parse and repeats drop",
+    !("error" in tagged) && JSON.stringify(tagged.patch.tagIds) === JSON.stringify([id]),
+  );
+  expect("a bad tag id is refused", "error" in parsePostPatch({ tagIds: ["nope"] }));
+  expect("tags must be a list", "error" in parsePostPatch({ tagIds: id }));
+  expect(
+    "21 tags are refused",
+    "error" in
+      parsePostPatch({
+        tagIds: Array.from({ length: 21 }, (_, i) => id.slice(0, -2) + String(i).padStart(2, "0")),
+      }),
+  );
+  expect(
+    "a plain copy from another host is refused",
+    "error" in parsePostPatch({ imageOriginalUrl: "https://evil.example/a.jpg" }),
+  );
+  const marked = parsePostPatch({
+    imageOriginalUrl: BLOB,
+    targets: [{ platform: "facebook", imageOriginalUrl: BLOB }],
+  });
+  expect(
+    "a plain copy parses on the post and an app",
+    !("error" in marked) &&
+      marked.patch.imageOriginalUrl === BLOB &&
+      marked.targets?.[0]?.imageOriginalUrl === BLOB,
+    JSON.stringify(marked),
+  );
   expect("31 February is refused", "error" in parsePostPatch({ offerEnd: "2026-02-31" }));
   expect("bad promoId is refused", "error" in parsePostPatch({ promoId: "nope" }));
 
@@ -952,7 +1247,7 @@ function brand(over: Partial<BrandProfile> = {}): BrandProfile {
  * @returns The settings.
  */
 function social(over: Partial<BrandProfile> = {}): SocialSettings {
-  return { brand: brand(over) };
+  return { brand: brand(over), watermark: DEFAULT_SETTINGS.social.watermark };
 }
 
 /**
@@ -1256,7 +1551,9 @@ function checkToEmail(): void {
 /** Runs every group and exits non-zero on any failure. */
 function main(): void {
   checkValidators();
+  checkCharCount();
   checkGoogle();
+  checkGoogleEvent();
   checkPictures();
   checkFilling();
   checkFromEmail();
@@ -1265,6 +1562,8 @@ function main(): void {
   checkTargets();
   checkTakeDown();
   checkParse();
+  checkTags();
+  checkWatermark();
   checkInsertables();
   checkBrandProfile();
   checkCaptionAi();

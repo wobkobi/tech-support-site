@@ -30,6 +30,7 @@ import {
   GOOGLE_MAX_CHARS,
   INSTAGRAM_MAX_CHARS,
   PLATFORM_LABEL,
+  charCount,
   type SocialPlatformKey,
 } from "@/features/social/lib/validate";
 import { cn } from "@/shared/lib/cn";
@@ -328,7 +329,8 @@ export function CaptionAiDialog({
             {options.map((text, i) => {
               const problems = issuesFor(text, optionsFor);
               const max = maxChars(optionsFor, enabled);
-              const tooLong = text.length > max;
+              const count = charCount(text);
+              const tooLong = count > max;
               return (
                 <div
                   key={`${i}-${text.slice(0, 20)}`}
@@ -343,7 +345,7 @@ export function CaptionAiDialog({
                       tooLong ? "text-red-700" : "text-admin-muted",
                     )}
                   >
-                    {text.length.toLocaleString()} / {max.toLocaleString()} characters
+                    {count.toLocaleString()} / {max.toLocaleString()} characters
                   </p>
                   {problems.length > 0 && (
                     <ul className="list-disc pl-5 text-sm text-amber-800">

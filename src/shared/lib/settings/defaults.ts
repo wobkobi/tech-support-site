@@ -271,7 +271,8 @@ export const DEFAULT_SETTINGS: Settings = {
   },
 
   // Brand profile for the AI writers. Blank fields add nothing to the prompts; the voice
-  // rules and live business facts already cover the basics.
+  // rules and live business facts already cover the basics. The logo starts off, so photos
+  // upload as they are until it's switched on.
   social: {
     brand: {
       notes: "",
@@ -281,6 +282,13 @@ export const DEFAULT_SETTINGS: Settings = {
       hashtags: "",
       hashtagsOn: "instagram",
       emojiOn: false,
+    },
+    watermark: {
+      on: false,
+      logo: "mark",
+      corner: "bottom-right",
+      size: 14,
+      opacity: 85,
     },
   },
 };

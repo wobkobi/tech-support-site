@@ -1,12 +1,14 @@
 // src/app/api/admin/social/[id]/route.ts
-// One social post. PATCH is a sparse update of drafts and presets only; DELETE can take the
-// post down from its platforms first.
+// One social post. PATCH is a sparse update of drafts and presets only, apart from tags, which
+// any post can change; DELETE can take the post down from its platforms first.
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import { deleteUnusedPictures } from "@/features/social-design/lib/picture-store";
 import { mergeTargets, parsePostPatch } from "@/features/social/lib/parse";
+import { writePostMeta } from "@/features/social/lib/post-meta.server";
 import { toPostRow } from "@/features/social/lib/post-row";
 import { takeDownPost } from "@/features/social/lib/publish";
+import { knownTagIds } from "@/features/social/lib/tags.server";
 import { takeDownDue } from "@/features/social/lib/targets";
 import { PLATFORM_LABEL } from "@/features/social/lib/validate";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
@@ -36,7 +38,8 @@ export async function GET(request: NextRequest, { params }: Ctx): Promise<NextRe
 }
 
 /**
- * PATCH /api/admin/social/[id] - edits a draft or preset.
+ * PATCH /api/admin/social/[id] - edits a draft or preset. A patch of only `tagIds` works on a
+ * post in any state and isn't counted as an edit, so updatedAt stays.
  * @param request - Incoming request with the changed fields.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the post id.
@@ -49,6 +52,18 @@ export async function PATCH(request: NextRequest, { params }: Ctx): Promise<Next
 
   const parsed = parsePostPatch(await request.json().catch(() => null));
   if ("error" in parsed) return errorResponse(parsed.error, 400);
+  // Tags that were deleted meanwhile drop out.
+  if (parsed.patch.tagIds) parsed.patch.tagIds = await knownTagIds(parsed.patch.tagIds);
+
+  const keys = Object.keys(parsed.patch);
+  if (!parsed.targets && keys.length === 1 && parsed.patch.tagIds) {
+    const tagIds = parsed.patch.tagIds;
+    if ((await writePostMeta(id, () => ({ tagIds }))) === "missing") {
+      return errorResponse("Post not found.", 404);
+    }
+    const post = await prisma.socialPost.findUniqueOrThrow({ where: { id } });
+    return okResponse({ post: toPostRow(post) });
+  }
 
   const editable = { id, OR: [{ isPreset: true }, { status: "draft" as const }] };
   let targets = undefined;

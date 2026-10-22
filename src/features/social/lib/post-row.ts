@@ -17,6 +17,8 @@ export interface SocialTargetRow {
   imageAlt: string | null;
   imageWidth: number | null;
   imageHeight: number | null;
+  /** The picture before the logo went on, when it has one. */
+  imageOriginalUrl: string | null;
   cropApprovedFor: string | null;
   status: "pending" | "posted" | "failed" | "skipped" | "removed";
   permalink: string | null;
@@ -34,7 +36,10 @@ export interface SocialPostRow {
   imageAlt: string | null;
   imageWidth: number | null;
   imageHeight: number | null;
+  /** The picture before the logo went on, when it has one. */
+  imageOriginalUrl: string | null;
   linkUrl: string | null;
+  tagIds: string[];
   isPreset: boolean;
   status: SocialPostStatus;
   scheduledAt: string | null;
@@ -44,10 +49,15 @@ export interface SocialPostRow {
   targets: SocialTargetRow[];
   googleType: GooglePostType;
   googleCta: GooglePostCta | null;
+  /** Where Google's button goes, when it isn't the Link. */
+  googleUrl: string | null;
   googleTitle: string | null;
-  /** Offer dates as YYYY-MM-DD. */
+  /** Offer and event dates as YYYY-MM-DD. */
   offerStart: string | null;
   offerEnd: string | null;
+  /** Event times as NZ "HH:MM", or null for all day. */
+  eventStartTime: string | null;
+  eventEndTime: string | null;
   couponCode: string | null;
   updatedAt: string;
 }
@@ -66,7 +76,9 @@ export function toPostRow(p: SocialPost): SocialPostRow {
     imageAlt: p.imageAlt,
     imageWidth: p.imageWidth,
     imageHeight: p.imageHeight,
+    imageOriginalUrl: p.imageOriginalUrl,
     linkUrl: p.linkUrl,
+    tagIds: p.tagIds ?? [],
     isPreset: p.isPreset,
     status: p.status,
     scheduledAt: p.scheduledAt?.toISOString() ?? null,
@@ -81,6 +93,7 @@ export function toPostRow(p: SocialPost): SocialPostRow {
       imageAlt: t.imageAlt,
       imageWidth: t.imageWidth,
       imageHeight: t.imageHeight,
+      imageOriginalUrl: t.imageOriginalUrl,
       cropApprovedFor: t.cropApprovedFor,
       status: t.status,
       permalink: t.permalink,
@@ -90,9 +103,12 @@ export function toPostRow(p: SocialPost): SocialPostRow {
     })),
     googleType: p.googleType,
     googleCta: p.googleCta,
+    googleUrl: p.googleUrl,
     googleTitle: p.googleTitle,
     offerStart: dateKey(p.offerStart),
     offerEnd: dateKey(p.offerEnd),
+    eventStartTime: p.eventStartTime,
+    eventEndTime: p.eventEndTime,
     couponCode: p.couponCode,
     updatedAt: p.updatedAt.toISOString(),
   };

@@ -1129,33 +1129,39 @@ enum GooglePostType {
   EVENT
 }
 
-// Google post button. CALL dials the profile's phone number, so it takes no URL.
+// Google post button. CALL dials the profile's phone number, so it takes no URL; the rest go
+// to the post's Google button link, or its Link. SHOP shows as "Buy".
 enum GooglePostCta {
   BOOK
-  CALL
+  ORDER
+  SHOP
   LEARN_MORE
+  SIGN_UP
+  CALL
 }
 
 // One platform's copy of a social post and how publishing it went.
 type SocialTarget {
-  platform        SocialPlatform
-  enabled         Boolean            @default(true)
+  platform         SocialPlatform
+  enabled          Boolean            @default(true)
   // Replaces the shared body on this platform only.
-  textOverride    String?
+  textOverride     String?
   // Replaces the shared picture on this platform only, for one that fits its shape.
-  imageUrl        String?
-  imageAlt        String?
-  imageWidth      Int?
-  imageHeight     Int?
+  imageUrl         String?
+  imageAlt         String?
+  imageWidth       Int?
+  imageHeight      Int?
   // The picture URL the operator agreed this platform may cut off. Tied to the URL so
   // a new picture needs a new OK.
-  cropApprovedFor String?
-  status          SocialTargetStatus @default(pending)
-  externalId      String?
-  permalink       String?
-  error           String?
-  postedAt        DateTime?
-  removedAt       DateTime?
+  cropApprovedFor  String?
+  // The upload before "Add my logo" marked imageUrl; null when no logo was added.
+  imageOriginalUrl String?
+  status           SocialTargetStatus @default(pending)
+  externalId       String?
+  permalink        String?
+  error            String?
+  postedAt         DateTime?
+  removedAt        DateTime?
 }
 
 // A post the operator writes once in /admin/social and publishes to Facebook,
@@ -1167,12 +1173,17 @@ model SocialPost {
   name String
   body String
 
-  imageUrl    String?
-  imageAlt    String?
+  imageUrl         String?
+  imageAlt         String?
   // Pixel size of the stored image, for Instagram's aspect-ratio and width rules.
-  imageWidth  Int?
-  imageHeight Int?
-  linkUrl     String?
+  imageWidth       Int?
+  imageHeight      Int?
+  // The upload before "Add my logo" marked imageUrl; null when no logo was added.
+  imageOriginalUrl String?
+  linkUrl          String?
+
+  // SocialTag ids, for sorting posts; only the admin sees them.
+  tagIds String[] @default([]) @db.ObjectId
 
   isPreset  Boolean @default(false)
   // Stable handle for a starter preset the code looks up by role.
@@ -1197,13 +1208,18 @@ model SocialPost {
   // rejects composite writes with undeclared fields.
   targets SocialTarget[]
 
-  googleType  GooglePostType @default(STANDARD)
-  googleCta   GooglePostCta?
+  googleType     GooglePostType @default(STANDARD)
+  googleCta      GooglePostCta?
+  // Where Google's button goes when it shouldn't be the Link.
+  googleUrl      String?
   // Title and dates for OFFER and EVENT posts.
-  googleTitle String?
-  offerStart  DateTime?
-  offerEnd    DateTime?
-  couponCode  String?
+  googleTitle    String?
+  offerStart     DateTime?
+  offerEnd       DateTime?
+  // An EVENT's start and end as NZ "HH:MM"; null for an all-day event.
+  eventStartTime String?
+  eventEndTime   String?
+  couponCode     String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1211,6 +1227,17 @@ model SocialPost {
   @@index([isPreset, status])
   @@index([status, scheduledAt])
   @@index([campaignId])
+}
+
+// A label for sorting social posts. key is the name lowercased, so "Tips" and "tips" are one tag;
+// colour is a swatch key from src/features/social/lib/tags.ts.
+model SocialTag {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  key       String   @unique
+  colour    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // One exported size of a post maker design. docHash is the design's fingerprint when it

@@ -17,12 +17,16 @@ export const PLATFORM_LABEL: Record<SocialPlatformKey, string> = {
 /** Google post kinds, mirroring the GooglePostType enum. */
 export type GooglePostType = "STANDARD" | "OFFER" | "EVENT";
 /** Google post buttons, mirroring the GooglePostCta enum. */
-export type GooglePostCta = "BOOK" | "CALL" | "LEARN_MORE";
+export type GooglePostCta = "BOOK" | "ORDER" | "SHOP" | "LEARN_MORE" | "SIGN_UP" | "CALL";
 
+/** Google's button wording, in the order the composer lists them. */
 export const GOOGLE_CTA_LABEL: Record<GooglePostCta, string> = {
   BOOK: "Book",
-  CALL: "Call now",
+  ORDER: "Order online",
+  SHOP: "Buy",
   LEARN_MORE: "Learn more",
+  SIGN_UP: "Sign up",
+  CALL: "Call now",
 };
 
 /**
@@ -52,9 +56,14 @@ export interface PostDraft {
   targets: DraftTarget[];
   googleType?: GooglePostType;
   googleCta?: GooglePostCta | null;
+  /** Where Google's button goes instead of the Link. */
+  googleUrl?: string | null;
   googleTitle?: string | null;
   offerStart?: Date | string | null;
   offerEnd?: Date | string | null;
+  /** An event's NZ "HH:MM" times; both empty for all day. */
+  eventStartTime?: string | null;
+  eventEndTime?: string | null;
 }
 
 /** One finding. Errors block publishing; warnings only inform. */
@@ -82,6 +91,44 @@ const MENTION_RE = /(?:^|\s)@[\w.]+/g;
 const PHONE_CANDIDATE_RE = /\+?\(?\d[\d\s()-]{5,}\d/g;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
+/** A 24-hour "HH:MM" time. */
+export const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+// An emoji character, apart from the copyright, registered and trademark signs, which apps
+// count as one like any letter.
+const EMOJI_CHAR_RE = /(?![©®™])[\p{Extended_Pictographic}\p{Regional_Indicator}]/u;
+const GRAPHEMES =
+  typeof Intl.Segmenter === "function"
+    ? new Intl.Segmenter("en", { granularity: "grapheme" })
+    : null;
+
+/**
+ * Length as the apps count it: each emoji counts at least two, and a character built from
+ * several code units (an emoji family, an accent typed separately) counts every unit.
+ * @param text - Text to measure.
+ * @returns The count to hold against an app's limit.
+ */
+export function charCount(text: string): number {
+  if (!GRAPHEMES) return text.length;
+  let count = 0;
+  for (const { segment } of GRAPHEMES.segment(text)) {
+    count += Math.max(segment.length, EMOJI_CHAR_RE.test(segment) ? 2 : 1);
+  }
+  return count;
+}
+
+/**
+ * Where Google's button goes: its own link when one is set, otherwise the post's Link.
+ * @param post - The post's links.
+ * @param post.googleUrl - Google's own button link, if any.
+ * @param post.linkUrl - The post's Link, if any.
+ * @returns The address, or null when there's neither.
+ */
+export function googleButtonUrl(post: {
+  googleUrl?: string | null;
+  linkUrl: string | null;
+}): string | null {
+  return post.googleUrl?.trim() || post.linkUrl || null;
+}
 
 /**
  * Whether text holds a phone number: 7 to 15 digits in one run (NZ landlines, mobiles, 0800, +64).
@@ -288,7 +335,7 @@ function facebookIssues(text: string, post: PostDraft): Issue[] {
   if (!text.trim() && !pictureFor(post, "facebook")) {
     issues.push({ level: "error", message: "Add some text or a picture." });
   }
-  if (text.length > FACEBOOK_MAX_CHARS) {
+  if (charCount(text) > FACEBOOK_MAX_CHARS) {
     issues.push({ level: "error", message: `Facebook allows ${FACEBOOK_MAX_CHARS} characters.` });
   }
   return [...issues, ...cropIssues("facebook", post)];
@@ -332,8 +379,11 @@ function instagramIssues(text: string, post: PostDraft): Issue[] {
       }
     }
   }
-  if (text.length > INSTAGRAM_MAX_CHARS) {
-    issues.push({ level: "error", message: `Instagram allows ${INSTAGRAM_MAX_CHARS} characters.` });
+  if (charCount(text) > INSTAGRAM_MAX_CHARS) {
+    issues.push({
+      level: "error",
+      message: `Instagram allows ${INSTAGRAM_MAX_CHARS.toLocaleString("en-NZ")} characters.`,
+    });
   }
   if ((text.match(HASHTAG_RE) ?? []).length > INSTAGRAM_MAX_HASHTAGS) {
     issues.push({
@@ -357,17 +407,93 @@ function instagramIssues(text: string, post: PostDraft): Issue[] {
 }
 
 /**
+ * An offer's or event's title and dates, and an event's times: both or neither.
+ * @param post - The post.
+ * @param what - "offer" or "event", for the messages.
+ * @returns Issues found.
+ */
+function datedIssues(post: PostDraft, what: "offer" | "event"): Issue[] {
+  const issues: Issue[] = [];
+  if (!post.googleTitle?.trim()) {
+    issues.push({ level: "error", message: `A Google ${what} needs a title.` });
+  }
+  const start = dateKey(post.offerStart);
+  const end = dateKey(post.offerEnd);
+  if (!start || !end) {
+    issues.push({ level: "error", message: `A Google ${what} needs a start and an end date.` });
+  } else if (start > end) {
+    issues.push({ level: "error", message: `The Google ${what} ends before it starts.` });
+  }
+  if (what === "offer") return issues;
+
+  const from = post.eventStartTime?.trim() || null;
+  const to = post.eventEndTime?.trim() || null;
+  if (Boolean(from) !== Boolean(to)) {
+    issues.push({
+      level: "error",
+      message: "Give the Google event a start and an end time, or tick All day.",
+    });
+  } else if (from && to) {
+    if (!TIME_RE.test(from) || !TIME_RE.test(to)) {
+      issues.push({ level: "error", message: "Event times must be like 09:30." });
+    } else if (start && start === end && from >= to) {
+      issues.push({ level: "error", message: "The Google event ends before it starts." });
+    }
+  }
+  return issues;
+}
+
+/**
+ * Google's button on an update or event: one that opens a page needs a link, and an event
+ * can't ring. A Link with no button that uses it is left off, so that only warns.
+ * @param post - The post.
+ * @returns Issues found.
+ */
+function buttonIssues(post: PostDraft): Issue[] {
+  const issues: Issue[] = [];
+  const cta = post.googleCta ?? null;
+  const event = post.googleType === "EVENT";
+  if (cta === "CALL" && event) {
+    issues.push({
+      level: "error",
+      message: "A Google event can't have a Call now button. Pick another button or none.",
+    });
+  } else if (cta && cta !== "CALL" && !googleButtonUrl(post)) {
+    issues.push({
+      level: "error",
+      message: `Google's ${GOOGLE_CTA_LABEL[cta]} button needs a link. Fill in the Link or the Google button link.`,
+    });
+  }
+  const opensPage = cta !== null && cta !== "CALL";
+  if (post.linkUrl && !post.googleUrl?.trim() && !opensPage) {
+    issues.push({
+      level: "warning",
+      message:
+        "Google only shows a link as a button, so the link is left off there. Pick a button under Google options to use it.",
+    });
+  }
+  if (post.googleUrl?.trim() && !opensPage) {
+    issues.push({
+      level: "warning",
+      message: "The Google button link is only used with a button that opens a page.",
+    });
+  }
+  return issues;
+}
+
+/**
  * Google rules: within the length limit, no phone numbers or emails in the text (Google removes
- * those posts), and an offer's title and dates. Shape is checked by {@link cropIssues}.
+ * those posts), an offer's or event's title and dates, and the button. Shape is checked by
+ * {@link cropIssues}.
  * @param text - Unfilled text.
  * @param post - The post.
  * @returns Issues found.
  */
 function googleIssues(text: string, post: PostDraft): Issue[] {
   const issues: Issue[] = [];
-  const offer = post.googleType === "OFFER" || post.googleType === "EVENT";
+  const type = post.googleType ?? "STANDARD";
   if (!text.trim()) issues.push({ level: "error", message: "Google needs some text." });
-  if (text.length > GOOGLE_MAX_CHARS) {
+  if (charCount(text) > GOOGLE_MAX_CHARS) {
     issues.push({
       level: "error",
       message: `Google allows ${GOOGLE_MAX_CHARS.toLocaleString("en-NZ")} characters.`,
@@ -376,9 +502,10 @@ function googleIssues(text: string, post: PostDraft): Issue[] {
   if (hasPhoneNumber(text)) {
     issues.push({
       level: "error",
-      message: offer
-        ? "Google doesn't allow phone numbers in a post. Give Google its own text without it."
-        : "Google doesn't allow phone numbers in a post. Give Google its own text without it, and use the Call now button instead.",
+      message:
+        type === "STANDARD"
+          ? "Google doesn't allow phone numbers in a post. Give Google its own text without it, and use the Call now button instead."
+          : "Google doesn't allow phone numbers in a post. Give Google its own text without it.",
     });
   }
   if (EMAIL_RE.test(text)) {
@@ -389,35 +516,10 @@ function googleIssues(text: string, post: PostDraft): Issue[] {
     });
   }
 
-  if (offer) {
-    if (!post.googleTitle?.trim()) {
-      issues.push({ level: "error", message: "A Google offer needs a title." });
-    }
-    const start = dateKey(post.offerStart);
-    const end = dateKey(post.offerEnd);
-    if (!start || !end) {
-      issues.push({ level: "error", message: "A Google offer needs a start and an end date." });
-    } else if (start > end) {
-      issues.push({ level: "error", message: "The Google offer ends before it starts." });
-    }
-    return issues;
-  }
-
-  const cta = post.googleCta ?? null;
-  if ((cta === "BOOK" || cta === "LEARN_MORE") && !post.linkUrl) {
-    issues.push({
-      level: "error",
-      message: `Google's ${GOOGLE_CTA_LABEL[cta]} button needs a link. Fill in the Link.`,
-    });
-  }
-  if (post.linkUrl && (cta === null || cta === "CALL")) {
-    issues.push({
-      level: "warning",
-      message:
-        "Google only shows a link as a button, so the link is left off there. Pick Book or Learn more under Google options to use it.",
-    });
-  }
-  return issues;
+  // An offer's Link is its "Redeem online" link and it has no button.
+  if (type === "OFFER") return [...issues, ...datedIssues(post, "offer")];
+  if (type === "EVENT") issues.push(...datedIssues(post, "event"));
+  return [...issues, ...buttonIssues(post)];
 }
 
 /**

@@ -3,11 +3,17 @@
 // script covers it; google-business.ts sends it.
 
 import type { PublishInput } from "@/features/social/lib/adapter";
+import type { GooglePostCta } from "@/features/social/lib/validate";
 
 interface DateParts {
   year: number;
   month: number;
   day: number;
+}
+
+interface TimeParts {
+  hours: number;
+  minutes: number;
 }
 
 /** The localPosts fields this site writes (v4 LocalPost). */
@@ -16,14 +22,14 @@ export interface GoogleLocalPostBody {
   topicType: "STANDARD" | "OFFER" | "EVENT";
   summary: string;
   media?: { mediaFormat: "PHOTO"; sourceUrl: string }[];
-  callToAction?: { actionType: "BOOK" | "CALL" | "LEARN_MORE"; url?: string };
+  callToAction?: { actionType: GooglePostCta; url?: string };
   event?: {
     title: string;
     schedule: {
       startDate: DateParts;
-      startTime: { hours: number; minutes: number };
+      startTime: TimeParts;
       endDate: DateParts;
-      endTime: { hours: number; minutes: number };
+      endTime: TimeParts;
     };
   };
   offer?: { couponCode?: string; redeemOnlineUrl?: string };
@@ -40,9 +46,21 @@ function dateParts(key: string): DateParts {
 }
 
 /**
- * The localPosts body. Offers carry title and a whole-day schedule (TimeInterval needs every
- * field) and their link as redeemOnlineUrl, since callToAction is ignored on offers. Updates
- * send a link only with Book or Learn more; CALL takes no URL.
+ * Splits "HH:MM" into Google's TimeOfDay message.
+ * @param time - 24-hour time.
+ * @returns Hours and minutes.
+ */
+function timeParts(time: string): TimeParts {
+  const [hours, minutes] = time.split(":").map(Number);
+  return { hours: hours!, minutes: minutes! };
+}
+
+/**
+ * The localPosts body. Offers and events carry a title and schedule (TimeInterval needs every
+ * field, so a whole day runs 00:00 to 23:59); Google reads the times in the profile's own time
+ * zone, so NZ times go as they are. Offers send their link as redeemOnlineUrl, since
+ * callToAction is ignored on them. Updates and events send a button: CALL takes no URL (and an
+ * event can't ring), the rest go to the Google button link or the post's Link.
  * @param input - Filled text, picture, link and Google settings.
  * @returns Request body.
  */
@@ -57,30 +75,34 @@ export function googlePostBody(input: PublishInput): GoogleLocalPostBody {
 
   if (google.type === "OFFER" || google.type === "EVENT") {
     if (!google.title || !google.start || !google.end) {
-      throw new Error("A Google offer needs a title and both dates.");
+      const what = google.type === "OFFER" ? "offer" : "event";
+      throw new Error(`A Google ${what} needs a title and both dates.`);
     }
+    const timed = google.type === "EVENT" && google.startTime && google.endTime;
     body.event = {
       title: google.title,
       schedule: {
         startDate: dateParts(google.start),
-        startTime: { hours: 0, minutes: 0 },
+        startTime: timed ? timeParts(google.startTime!) : { hours: 0, minutes: 0 },
         endDate: dateParts(google.end),
-        endTime: { hours: 23, minutes: 59 },
+        endTime: timed ? timeParts(google.endTime!) : { hours: 23, minutes: 59 },
       },
     };
-    if (google.type === "OFFER") {
-      const offer = {
-        ...(google.couponCode ? { couponCode: google.couponCode } : {}),
-        ...(input.linkUrl ? { redeemOnlineUrl: input.linkUrl } : {}),
-      };
-      if (Object.keys(offer).length > 0) body.offer = offer;
-    }
+  }
+  if (google.type === "OFFER") {
+    const offer = {
+      ...(google.couponCode ? { couponCode: google.couponCode } : {}),
+      ...(input.linkUrl ? { redeemOnlineUrl: input.linkUrl } : {}),
+    };
+    if (Object.keys(offer).length > 0) body.offer = offer;
     return body;
   }
 
-  if (google.cta === "CALL") body.callToAction = { actionType: "CALL" };
-  else if (google.cta && input.linkUrl) {
-    body.callToAction = { actionType: google.cta, url: input.linkUrl };
+  const url = google.url || input.linkUrl;
+  if (google.cta === "CALL") {
+    if (google.type === "STANDARD") body.callToAction = { actionType: "CALL" };
+  } else if (google.cta && url) {
+    body.callToAction = { actionType: google.cta, url };
   }
   return body;
 }

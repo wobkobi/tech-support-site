@@ -3,6 +3,7 @@
 // The composer's form card. The composer owns every value and handler; this only lays them out.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
@@ -10,19 +11,55 @@ import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { InsertMenu, type InsertGroup } from "@/features/admin/components/ui/InsertMenu";
+import { isRenderUrl } from "@/features/social-design/lib/pictures";
 import type { PostContent } from "@/features/social/components/PostComposer";
+import { TagPicker } from "@/features/social/components/TagPicker";
 import type { PostDesign } from "@/features/social/lib/open-post";
+import type { SocialTagRow, TagColour } from "@/features/social/lib/tags";
 import {
+  GOOGLE_CTA_LABEL,
   PLATFORM_LABEL,
   SOCIAL_PLATFORMS,
+  charCount,
   cropOf,
   pictureFor,
+  type GooglePostCta,
+  type GooglePostType,
   type SocialPlatformKey,
 } from "@/features/social/lib/validate";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useId } from "react";
 import { FaArrowRotateLeft, FaChevronDown, FaPalette, FaWandMagicSparkles } from "react-icons/fa6";
+
+/** Google's post kinds, as the radio buttons name them. */
+const GOOGLE_KINDS: readonly [GooglePostType, string][] = [
+  ["STANDARD", "Update"],
+  ["OFFER", "Offer"],
+  ["EVENT", "Event"],
+];
+
+/** Google's buttons in the order the menu lists them; Call now can't go on an event. */
+const GOOGLE_BUTTONS: readonly GooglePostCta[] = [
+  "BOOK",
+  "ORDER",
+  "SHOP",
+  "LEARN_MORE",
+  "SIGN_UP",
+  "CALL",
+];
+
+/** The times an event gets when All day is unticked. */
+const EVENT_DEFAULT_TIMES = { start: "09:00", end: "17:00" } as const;
+
+/**
+ * Whether a picture is a photo that Add my logo can mark, rather than a Post maker picture.
+ * @param url - Picture address.
+ * @returns True for an uploaded photo.
+ */
+function takesLogo(url: string): boolean {
+  return !isRenderUrl(url);
+}
 
 /**
  * Form card for one post.
@@ -53,6 +90,11 @@ import { FaArrowRotateLeft, FaChevronDown, FaPalette, FaWandMagicSparkles } from
  * @param props.onDesign - Saves and opens the post maker for this post.
  * @param props.onWriteWithAi - Opens Write with AI; null when no AI key is set.
  * @param props.onUndoAi - Takes back Write with AI's last change; null when there's none to undo.
+ * @param props.onLogo - Adds the logo to a photo or takes it off.
+ * @param props.tags - Every tag there is.
+ * @param props.tagIds - Ids of the post's tags.
+ * @param props.onTagsChange - Saves the post's new tags.
+ * @param props.onCreateTag - Adds a tag from the picker.
  * @returns Form card element.
  */
 export function PostWriteForm({
@@ -82,6 +124,11 @@ export function PostWriteForm({
   onDesign,
   onWriteWithAi,
   onUndoAi,
+  onLogo,
+  tags,
+  tagIds,
+  onTagsChange,
+  onCreateTag,
 }: {
   content: PostContent;
   setContent: React.Dispatch<React.SetStateAction<PostContent>>;
@@ -109,8 +156,16 @@ export function PostWriteForm({
   onDesign: () => void;
   onWriteWithAi: (() => void) | null;
   onUndoAi: (() => void) | null;
+  onLogo: (forWhat: "main" | SocialPlatformKey, on: boolean) => void;
+  tags: SocialTagRow[];
+  tagIds: string[];
+  onTagsChange: (ids: string[]) => void;
+  onCreateTag: (name: string, colour: TagColour) => Promise<SocialTagRow | null>;
 }): React.ReactElement {
   const fieldId = useId();
+  const bodyCount = charCount(content.body);
+  const event = content.googleType === "EVENT";
+  const allDay = !content.eventStartTime && !content.eventEndTime;
   return (
     <Card>
       <div className="flex flex-col gap-5">
@@ -126,6 +181,8 @@ export function PostWriteForm({
             maxLength={120}
           />
         </AdminField>
+
+        <TagPicker tags={tags} value={tagIds} onChange={onTagsChange} onCreate={onCreateTag} />
 
         {promoId && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm">
@@ -208,19 +265,17 @@ export function PostWriteForm({
               </AdminButton>
             ) : (
               <span className="text-admin-muted">
-                Plain text: **bold** shows as typed. Add has links, contact details, symbols and
-                promo wording.
+                Plain text: **bold** shows as typed. Emoji count as two, as the apps count them. Add
+                has links, contact details, symbols and promo wording.
               </span>
             )}
             <span
               className={cn(
                 "ml-auto shrink-0 tabular-nums",
-                strictest !== null && content.body.length > strictest
-                  ? "text-red-700"
-                  : "text-admin-muted",
+                strictest !== null && bodyCount > strictest ? "text-red-700" : "text-admin-muted",
               )}
             >
-              {content.body.length.toLocaleString()}
+              {bodyCount.toLocaleString()}
               {strictest !== null && ` / ${strictest.toLocaleString()}`}
             </span>
           </div>
@@ -275,7 +330,7 @@ export function PostWriteForm({
                   />
                 </AdminField>
                 {editable && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <AdminButton
                       size="xs"
                       variant="secondary"
@@ -292,6 +347,7 @@ export function PostWriteForm({
                         setContent((c) => ({
                           ...c,
                           imageUrl: null,
+                          imageOriginalUrl: null,
                           imageWidth: null,
                           imageHeight: null,
                         }))
@@ -299,6 +355,15 @@ export function PostWriteForm({
                     >
                       Remove
                     </AdminButton>
+                    {takesLogo(content.imageUrl) && (
+                      <AdminCheckbox
+                        checked={content.imageOriginalUrl !== null}
+                        onChange={(on) => onLogo("main", on)}
+                        label="Add my logo"
+                        disabled={pictureBusy !== null || (!canUpload && !content.imageOriginalUrl)}
+                        className="ml-1"
+                      />
+                    )}
                   </div>
                 )}
               </div>
@@ -329,7 +394,9 @@ export function PostWriteForm({
               editable={editable}
               canUpload={canUpload}
               busy={pictureBusy === p}
+              anyBusy={pictureBusy !== null}
               onPick={() => onPickPicture(p)}
+              onLogo={(on) => onLogo(p, on)}
             />
           ))}
           <input
@@ -359,16 +426,8 @@ export function PostWriteForm({
           <fieldset className="flex flex-col gap-4 rounded-lg border border-admin-border px-3 py-3">
             <legend className="px-1 text-sm font-bold text-admin-text">Google options</legend>
             <div role="radiogroup" aria-label="Google post type" className="flex flex-wrap gap-2">
-              {(
-                [
-                  ["STANDARD", "Update"],
-                  ["OFFER", "Offer"],
-                ] as const
-              ).map(([type, label]) => {
-                const checked =
-                  type === "STANDARD"
-                    ? content.googleType === "STANDARD"
-                    : content.googleType !== "STANDARD";
+              {GOOGLE_KINDS.map(([type, label]) => {
+                const checked = content.googleType === type;
                 return (
                   <label
                     key={type}
@@ -385,7 +444,14 @@ export function PostWriteForm({
                       name={`${fieldId}-google-type`}
                       checked={checked}
                       disabled={!editable}
-                      onChange={() => setContent((c) => ({ ...c, googleType: type }))}
+                      onChange={() =>
+                        setContent((c) => ({
+                          ...c,
+                          googleType: type,
+                          // Call now can't go on an event.
+                          googleCta: type === "EVENT" && c.googleCta === "CALL" ? "" : c.googleCta,
+                        }))
+                      }
                       className="size-4 accent-russian-violet"
                     />
                     {label}
@@ -394,28 +460,12 @@ export function PostWriteForm({
               })}
             </div>
 
-            {content.googleType === "STANDARD" ? (
-              <AdminField label="Button" htmlFor={`${fieldId}-google-cta`}>
-                <AdminSelect
-                  id={`${fieldId}-google-cta`}
-                  value={content.googleCta}
-                  onChange={(e) =>
-                    setContent((c) => ({
-                      ...c,
-                      googleCta: e.target.value as PostContent["googleCta"],
-                    }))
-                  }
-                  disabled={!editable}
-                >
-                  <option value="">No button</option>
-                  <option value="BOOK">Book (goes to the Link)</option>
-                  <option value="CALL">Call now (rings your profile&apos;s number)</option>
-                  <option value="LEARN_MORE">Learn more (goes to the Link)</option>
-                </AdminSelect>
-              </AdminField>
-            ) : (
+            {content.googleType !== "STANDARD" && (
               <>
-                <AdminField label="Offer title" htmlFor={`${fieldId}-google-title`}>
+                <AdminField
+                  label={event ? "Event title" : "Offer title"}
+                  htmlFor={`${fieldId}-google-title`}
+                >
                   <AdminInput
                     id={`${fieldId}-google-title`}
                     value={content.googleTitle}
@@ -434,7 +484,7 @@ export function PostWriteForm({
                       disabled={!editable}
                     />
                   </AdminField>
-                  <AdminField label="Last day" htmlFor={`${fieldId}-offer-end`}>
+                  <AdminField label={event ? "Ends" : "Last day"} htmlFor={`${fieldId}-offer-end`}>
                     <AdminInput
                       id={`${fieldId}-offer-end`}
                       type="date"
@@ -444,6 +494,60 @@ export function PostWriteForm({
                     />
                   </AdminField>
                 </div>
+              </>
+            )}
+
+            {event && (
+              <>
+                <AdminCheckbox
+                  checked={allDay}
+                  onChange={(on) =>
+                    setContent((c) => ({
+                      ...c,
+                      eventStartTime: on ? "" : EVENT_DEFAULT_TIMES.start,
+                      eventEndTime: on ? "" : EVENT_DEFAULT_TIMES.end,
+                    }))
+                  }
+                  label="All day"
+                  disabled={!editable}
+                />
+                {!allDay && (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <AdminField label="Starts at" htmlFor={`${fieldId}-event-start-time`}>
+                      <AdminInput
+                        id={`${fieldId}-event-start-time`}
+                        type="time"
+                        step={300}
+                        value={content.eventStartTime}
+                        onChange={(e) =>
+                          setContent((c) => ({ ...c, eventStartTime: e.target.value }))
+                        }
+                        disabled={!editable}
+                      />
+                    </AdminField>
+                    <AdminField label="Ends at" htmlFor={`${fieldId}-event-end-time`}>
+                      <AdminInput
+                        id={`${fieldId}-event-end-time`}
+                        type="time"
+                        step={300}
+                        value={content.eventEndTime}
+                        onChange={(e) =>
+                          setContent((c) => ({ ...c, eventEndTime: e.target.value }))
+                        }
+                        disabled={!editable}
+                      />
+                    </AdminField>
+                  </div>
+                )}
+                <p className="text-sm text-admin-muted">
+                  New Zealand time. On a multi-day event the start time is on the first day and the
+                  end time on the last.
+                </p>
+              </>
+            )}
+
+            {content.googleType === "OFFER" && (
+              <>
                 <AdminField label="Coupon code (optional)" htmlFor={`${fieldId}-coupon`}>
                   <AdminInput
                     id={`${fieldId}-coupon`}
@@ -456,6 +560,48 @@ export function PostWriteForm({
                 <p className="text-sm text-admin-muted">
                   The Link above becomes the offer&apos;s &quot;Redeem online&quot; link.
                 </p>
+              </>
+            )}
+
+            {content.googleType !== "OFFER" && (
+              <>
+                <AdminField label="Button" htmlFor={`${fieldId}-google-cta`}>
+                  <AdminSelect
+                    id={`${fieldId}-google-cta`}
+                    value={content.googleCta}
+                    onChange={(e) =>
+                      setContent((c) => ({
+                        ...c,
+                        googleCta: e.target.value as PostContent["googleCta"],
+                      }))
+                    }
+                    disabled={!editable}
+                  >
+                    <option value="">No button</option>
+                    {GOOGLE_BUTTONS.filter((b) => !(event && b === "CALL")).map((b) => (
+                      <option key={b} value={b}>
+                        {b === "CALL"
+                          ? `${GOOGLE_CTA_LABEL[b]} (rings your profile's number)`
+                          : GOOGLE_CTA_LABEL[b]}
+                      </option>
+                    ))}
+                  </AdminSelect>
+                </AdminField>
+                {content.googleCta !== "" && content.googleCta !== "CALL" && (
+                  <AdminField
+                    label="Google button link (optional)"
+                    htmlFor={`${fieldId}-google-url`}
+                  >
+                    <AdminInput
+                      id={`${fieldId}-google-url`}
+                      value={content.googleUrl}
+                      onChange={(e) => setContent((c) => ({ ...c, googleUrl: e.target.value }))}
+                      disabled={!editable}
+                      placeholder="Leave empty to use the Link above"
+                      inputMode="url"
+                    />
+                  </AdminField>
+                )}
               </>
             )}
           </fieldset>
@@ -532,7 +678,9 @@ const FIT_WORDS: Record<SocialPlatformKey, string> = {
  * @param props.editable - Whether the post can still be changed.
  * @param props.canUpload - Whether image uploads are configured.
  * @param props.busy - Whether this app's picture is uploading.
+ * @param props.anyBusy - Whether any picture is uploading.
  * @param props.onPick - Opens the file picker for this app's picture.
+ * @param props.onLogo - Adds the logo to this app's own photo or takes it off.
  * @returns Row element, or null.
  */
 function AppPicture({
@@ -542,7 +690,9 @@ function AppPicture({
   editable,
   canUpload,
   busy,
+  anyBusy,
   onPick,
+  onLogo,
 }: {
   platform: SocialPlatformKey;
   content: PostContent;
@@ -550,7 +700,9 @@ function AppPicture({
   editable: boolean;
   canUpload: boolean;
   busy: boolean;
+  anyBusy: boolean;
   onPick: () => void;
+  onLogo: (on: boolean) => void;
 }): React.ReactElement | null {
   const fieldId = useId();
   const target = content.targets.find((t) => t.platform === platform);
@@ -588,7 +740,7 @@ function AppPicture({
               />
             </AdminField>
             {editable && (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <AdminButton
                   size="xs"
                   variant="secondary"
@@ -607,11 +759,21 @@ function AppPicture({
                       imageAlt: "",
                       imageWidth: null,
                       imageHeight: null,
+                      imageOriginalUrl: null,
                     })
                   }
                 >
                   Use the main picture
                 </AdminButton>
+                {takesLogo(target.imageUrl) && (
+                  <AdminCheckbox
+                    checked={target.imageOriginalUrl !== null}
+                    onChange={onLogo}
+                    label="Add my logo"
+                    disabled={anyBusy || (!canUpload && !target.imageOriginalUrl)}
+                    className="ml-1"
+                  />
+                )}
               </div>
             )}
           </div>

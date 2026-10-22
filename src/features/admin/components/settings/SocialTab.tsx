@@ -1,10 +1,11 @@
 "use client";
 // src/features/admin/components/settings/SocialTab.tsx
-// Editor for the social group: the brand profile every AI writer reads, and the defaults
-// for Write with AI's hashtag and emoji choices, beside a sample post.
+// Editor for the social group: the brand profile every AI writer reads, the defaults for Write
+// with AI's hashtag and emoji choices, and the logo on photos, beside a sample post and photo.
 
 import {
   FieldShell,
+  NumberField,
   SettingsTabBody,
   TextField,
   ToggleField,
@@ -14,13 +15,28 @@ import { SettingsHistory } from "@/features/admin/components/settings/SettingsHi
 import { SettingsWithPreview } from "@/features/admin/components/settings/SettingsWithPreview";
 import { SocialPreview } from "@/features/admin/components/settings/SocialPreview";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
+import { WatermarkPreview } from "@/features/admin/components/settings/WatermarkPreview";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
 import { cn } from "@/shared/lib/cn";
 import { formatHashtags, parseHashtags } from "@/shared/lib/hashtags";
-import { HASHTAGS_DEFAULT_LABELS, SOCIAL_FIELD_META } from "@/shared/lib/settings/field-meta";
-import type { BrandProfile, HashtagsDefault, SocialSettings } from "@/shared/lib/settings/types";
+import {
+  HASHTAGS_DEFAULT_LABELS,
+  SOCIAL_FIELD_META,
+  WATERMARK_CORNER_LABELS,
+  WATERMARK_LOGO_LABELS,
+  WATERMARK_OPACITY_RANGE,
+  WATERMARK_SIZE_RANGE,
+} from "@/shared/lib/settings/field-meta";
+import type {
+  BrandProfile,
+  HashtagsDefault,
+  SocialSettings,
+  WatermarkCorner,
+  WatermarkLogo,
+  WatermarkSettings,
+} from "@/shared/lib/settings/types";
 import type React from "react";
 
 interface Props {
@@ -43,6 +59,8 @@ export function SocialTab({ initial, defaults }: Props): React.ReactElement {
   const { draft, setDraft, fieldErrors } = form;
   const brand = draft.brand;
   const base = defaults.brand;
+  const mark = draft.watermark;
+  const baseMark = defaults.watermark;
   const m = SOCIAL_FIELD_META;
   const tags = parseHashtags(brand.hashtags).tags;
   const tagsError = fieldErrors["brand.hashtags"];
@@ -55,9 +73,24 @@ export function SocialTab({ initial, defaults }: Props): React.ReactElement {
     setDraft((p) => ({ ...p, brand: { ...p.brand, ...patch } }));
   };
 
+  /**
+   * Merges a patch into the watermark draft.
+   * @param patch - Partial watermark fields.
+   */
+  const setMark = (patch: Partial<WatermarkSettings>): void => {
+    setDraft((p) => ({ ...p, watermark: { ...p.watermark, ...patch } }));
+  };
+
   return (
     <SettingsTabBody changed={form.changedPaths}>
-      <SettingsWithPreview preview={<SocialPreview brand={brand} />}>
+      <SettingsWithPreview
+        preview={
+          <div className="mt-8 flex flex-col gap-4">
+            <SocialPreview brand={brand} />
+            <WatermarkPreview watermark={mark} />
+          </div>
+        }
+      >
         <h3 className={cn("mt-4", ADMIN_EYEBROW_CLS)}>Brand profile</h3>
         <div className="divide-y divide-admin-border">
           {TEXT_FIELDS.map((key) => (
@@ -119,6 +152,77 @@ export function SocialTab({ initial, defaults }: Props): React.ReactElement {
             value={brand.emojiOn}
             customised={brand.emojiOn !== base.emojiOn}
             onChange={(v) => set({ emojiOn: v })}
+          />
+        </div>
+
+        <h3 className={cn("mt-6", ADMIN_EYEBROW_CLS)}>Your logo on photos</h3>
+        <div className="divide-y divide-admin-border">
+          <ToggleField
+            id="watermark.on"
+            meta={m["watermark.on"]}
+            value={mark.on}
+            customised={mark.on !== baseMark.on}
+            onChange={(v) => setMark({ on: v })}
+          />
+          <FieldShell
+            id="watermark.logo"
+            meta={m["watermark.logo"]}
+            error={fieldErrors["watermark.logo"]}
+            customised={mark.logo !== baseMark.logo}
+          >
+            <AdminSelect
+              id="watermark.logo"
+              value={mark.logo}
+              onChange={(e) => setMark({ logo: e.target.value as WatermarkLogo })}
+              className="sm:w-80"
+            >
+              {(Object.keys(WATERMARK_LOGO_LABELS) as WatermarkLogo[]).map((key) => (
+                <option key={key} value={key}>
+                  {WATERMARK_LOGO_LABELS[key]}
+                </option>
+              ))}
+            </AdminSelect>
+          </FieldShell>
+          <FieldShell
+            id="watermark.corner"
+            meta={m["watermark.corner"]}
+            error={fieldErrors["watermark.corner"]}
+            customised={mark.corner !== baseMark.corner}
+          >
+            <AdminSelect
+              id="watermark.corner"
+              value={mark.corner}
+              onChange={(e) => setMark({ corner: e.target.value as WatermarkCorner })}
+              className="sm:w-80"
+            >
+              {(Object.keys(WATERMARK_CORNER_LABELS) as WatermarkCorner[]).map((key) => (
+                <option key={key} value={key}>
+                  {WATERMARK_CORNER_LABELS[key]}
+                </option>
+              ))}
+            </AdminSelect>
+          </FieldShell>
+          <NumberField
+            id="watermark.size"
+            meta={m["watermark.size"]}
+            value={mark.size}
+            min={WATERMARK_SIZE_RANGE.min}
+            max={WATERMARK_SIZE_RANGE.max}
+            step={1}
+            error={fieldErrors["watermark.size"]}
+            customised={mark.size !== baseMark.size}
+            onChange={(v) => setMark({ size: v ?? baseMark.size })}
+          />
+          <NumberField
+            id="watermark.opacity"
+            meta={m["watermark.opacity"]}
+            value={mark.opacity}
+            min={WATERMARK_OPACITY_RANGE.min}
+            max={WATERMARK_OPACITY_RANGE.max}
+            step={5}
+            error={fieldErrors["watermark.opacity"]}
+            customised={mark.opacity !== baseMark.opacity}
+            onChange={(v) => setMark({ opacity: v ?? baseMark.opacity })}
           />
         </div>
       </SettingsWithPreview>

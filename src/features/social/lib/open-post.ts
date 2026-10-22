@@ -19,7 +19,7 @@ import { aiConfigured } from "@/shared/lib/ai/json-completion";
 import { canUploadImages } from "@/shared/lib/image-upload";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
-import type { HashtagsDefault } from "@/shared/lib/settings/types";
+import type { HashtagsDefault, WatermarkSettings } from "@/shared/lib/settings/types";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { SocialPost } from "@prisma/client";
 
@@ -53,6 +53,8 @@ export interface OpenPost {
   emailSkipped: boolean;
   /** The linked design's current wide picture, which Email this too can open with. */
   emailPicture: EmailPicture | null;
+  /** How Add my logo marks a photo, and whether new uploads get it. */
+  watermark: WatermarkSettings;
 }
 
 /**
@@ -115,5 +117,6 @@ export async function loadOpenPost(post: SocialPost): Promise<OpenPost> {
     email,
     emailSkipped: post.emailSkipped === true,
     emailPicture,
+    watermark: social.watermark,
   };
 }

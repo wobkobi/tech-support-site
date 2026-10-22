@@ -8,6 +8,7 @@ import { SocialView } from "@/features/social/components/SocialView";
 import { loadOpenPost } from "@/features/social/lib/open-post";
 import { toPostRow } from "@/features/social/lib/post-row";
 import { ensureStarterPostPresets } from "@/features/social/lib/presets";
+import { listTags } from "@/features/social/lib/tags.server";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
@@ -38,7 +39,10 @@ export default async function AdminSocialPage({
   const { post: wanted } = await searchParams;
   const openId = typeof wanted === "string" ? parseObjectId(wanted) : null;
   // Newest first by id, which grows with creation time and ignores edits.
-  const posts = await prisma.socialPost.findMany({ orderBy: { id: "desc" } });
+  const [posts, tags] = await Promise.all([
+    prisma.socialPost.findMany({ orderBy: { id: "desc" } }),
+    listTags(),
+  ]);
   const found = openId ? posts.find((p) => p.id === openId) : undefined;
   const open = found ? await loadOpenPost(found) : null;
 
@@ -55,6 +59,7 @@ export default async function AdminSocialPage({
       />
       <SocialView
         initial={posts.map(toPostRow)}
+        tags={tags}
         open={open}
         openMissing={typeof wanted === "string" && !found}
       />

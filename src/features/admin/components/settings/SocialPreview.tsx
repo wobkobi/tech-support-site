@@ -37,7 +37,7 @@ export function SocialPreview({ brand }: { brand: BrandProfile }): React.ReactEl
   const withTags = hashtagsOnByDefault(brand.hashtagsOn, ["facebook", "instagram"]);
 
   return (
-    <Card className="mt-8 bg-admin-bg">
+    <Card className="bg-admin-bg">
       <h3 className={ADMIN_EYEBROW_CLS}>Sample post</h3>
       <p className="mt-1 text-sm text-admin-muted">
         A post for Facebook and Instagram as Write with AI starts it. The words are made up; yours

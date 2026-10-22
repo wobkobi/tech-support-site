@@ -3,9 +3,12 @@
 // outcomes are never overwritten.
 
 import { parseObjectId } from "@/features/business/lib/validation";
+import { MAX_POST_TAGS } from "@/features/social/lib/tags";
 import type { TargetState } from "@/features/social/lib/targets";
 import {
+  GOOGLE_CTA_LABEL,
   SOCIAL_PLATFORMS,
+  TIME_RE,
   type GooglePostCta,
   type GooglePostType,
 } from "@/features/social/lib/validate";
@@ -24,18 +27,23 @@ export interface PostPatch {
   imageAlt?: string | null;
   imageWidth?: number | null;
   imageHeight?: number | null;
+  imageOriginalUrl?: string | null;
   linkUrl?: string | null;
+  tagIds?: string[];
   promoId?: string | null;
   googleType?: GooglePostType;
   googleCta?: GooglePostCta | null;
+  googleUrl?: string | null;
   googleTitle?: string | null;
   offerStart?: Date | null;
   offerEnd?: Date | null;
+  eventStartTime?: string | null;
+  eventEndTime?: string | null;
   couponCode?: string | null;
 }
 
 const GOOGLE_TYPES: readonly string[] = ["STANDARD", "OFFER", "EVENT"];
-const GOOGLE_CTAS: readonly string[] = ["BOOK", "CALL", "LEARN_MORE"];
+const GOOGLE_CTAS: readonly string[] = Object.keys(GOOGLE_CTA_LABEL);
 const MAX_GOOGLE_TITLE = 100;
 const MAX_COUPON = 50;
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -58,6 +66,38 @@ function optionalDay(value: unknown, label: string): Date | null | { error: stri
   return day;
 }
 
+/**
+ * Checks an optional 24-hour "HH:MM" time, where null or blank clears it.
+ * @param value - Raw value.
+ * @param label - Field name for the error.
+ * @returns The time or null, or an error message.
+ */
+function optionalTime(value: unknown, label: string): string | null | { error: string } {
+  if (value === null || value === "") return null;
+  if (typeof value !== "string" || !TIME_RE.test(value)) {
+    return { error: `${label} must be a time like 09:30.` };
+  }
+  return value;
+}
+
+/**
+ * Checks a post's tag list: ids only, repeats dropped, at most {@link MAX_POST_TAGS}.
+ * @param value - Raw value.
+ * @returns The ids, or an error message.
+ */
+function parseTagIds(value: unknown): string[] | { error: string } {
+  if (!Array.isArray(value)) return { error: "tagIds must be a list." };
+  const ids: string[] = [];
+  for (const raw of value) {
+    const id = parseObjectId(raw);
+    if (!id) return { error: "A tag id isn't valid." };
+    if (!ids.includes(id)) ids.push(id);
+  }
+  if (ids.length > MAX_POST_TAGS)
+    return { error: `A post can have ${MAX_POST_TAGS} tags at most.` };
+  return ids;
+}
+
 /** A target edit from the composer: the toggle, own text, own picture and crop OK. */
 export interface TargetEdit {
   platform: string;
@@ -67,6 +107,7 @@ export interface TargetEdit {
   imageAlt?: string | null;
   imageWidth?: number | null;
   imageHeight?: number | null;
+  imageOriginalUrl?: string | null;
   cropApprovedFor?: string | null;
 }
 
@@ -167,12 +208,27 @@ export function parsePostPatch(
   if (body.imageHeight !== undefined) {
     checks.push(["imageHeight", optionalPixels(body.imageHeight, "Picture height")]);
   }
+  if (body.imageOriginalUrl !== undefined) {
+    checks.push([
+      "imageOriginalUrl",
+      optionalUrl(body.imageOriginalUrl, "Picture without the logo", BLOB_IMAGE_HOST_SUFFIX),
+    ]);
+  }
   if (body.linkUrl !== undefined) checks.push(["linkUrl", optionalUrl(body.linkUrl, "Link")]);
+  if (body.googleUrl !== undefined) {
+    checks.push(["googleUrl", optionalUrl(body.googleUrl, "Google button link")]);
+  }
   if (body.googleTitle !== undefined) {
     checks.push(["googleTitle", optionalText(body.googleTitle, "Offer title", MAX_GOOGLE_TITLE)]);
   }
   if (body.couponCode !== undefined) {
     checks.push(["couponCode", optionalText(body.couponCode, "Coupon code", MAX_COUPON)]);
+  }
+  if (body.eventStartTime !== undefined) {
+    checks.push(["eventStartTime", optionalTime(body.eventStartTime, "Event start")]);
+  }
+  if (body.eventEndTime !== undefined) {
+    checks.push(["eventEndTime", optionalTime(body.eventEndTime, "Event end")]);
   }
   for (const [key, v] of checks) {
     if (v !== null && typeof v === "object") return v;
@@ -198,6 +254,11 @@ export function parsePostPatch(
     else if (typeof body.googleCta !== "string" || !GOOGLE_CTAS.includes(body.googleCta)) {
       return { error: "Unknown Google button." };
     } else patch.googleCta = body.googleCta as GooglePostCta;
+  }
+  if (body.tagIds !== undefined) {
+    const ids = parseTagIds(body.tagIds);
+    if (!Array.isArray(ids)) return ids;
+    patch.tagIds = ids;
   }
   if (body.promoId !== undefined) {
     if (body.promoId === null) patch.promoId = null;
@@ -244,6 +305,12 @@ export function parsePostPatch(
       if (t.imageHeight !== undefined) {
         pictureChecks.push(["imageHeight", optionalPixels(t.imageHeight, "Picture height")]);
       }
+      if (t.imageOriginalUrl !== undefined) {
+        pictureChecks.push([
+          "imageOriginalUrl",
+          optionalUrl(t.imageOriginalUrl, "Picture without the logo", BLOB_IMAGE_HOST_SUFFIX),
+        ]);
+      }
       // Only ever compared with a picture URL, so it needs no host check of its own.
       if (t.cropApprovedFor !== undefined) {
         pictureChecks.push(["cropApprovedFor", optionalText(t.cropApprovedFor, "OK", MAX_URL)]);
@@ -265,6 +332,7 @@ const TARGET_EDIT_FIELDS = [
   "imageAlt",
   "imageWidth",
   "imageHeight",
+  "imageOriginalUrl",
   "cropApprovedFor",
 ] as const;
 

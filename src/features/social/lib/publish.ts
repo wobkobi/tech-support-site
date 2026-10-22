@@ -136,9 +136,12 @@ async function runPending(
         google: {
           type: post.googleType,
           cta: post.googleCta,
+          url: post.googleUrl,
           title: post.googleTitle,
           start: dateKey(post.offerStart),
           end: dateKey(post.offerEnd),
+          startTime: post.eventStartTime,
+          endTime: post.eventEndTime,
           couponCode: post.couponCode,
         },
       }),

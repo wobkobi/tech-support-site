@@ -29,6 +29,7 @@ import { insertableGroups } from "@/features/social/lib/insertables";
 import type { CaptionAiSetup, PostDesign } from "@/features/social/lib/open-post";
 import { liveOn, type Connection } from "@/features/social/lib/post-display";
 import type { SocialPostRow, SocialTargetRow } from "@/features/social/lib/post-row";
+import type { SocialTagRow, TagColour } from "@/features/social/lib/tags";
 import { postBrief } from "@/features/social/lib/to-email";
 import {
   FACEBOOK_MAX_CHARS,
@@ -45,9 +46,11 @@ import {
   type GooglePostType,
   type SocialPlatformKey,
 } from "@/features/social/lib/validate";
+import { watermarkImage } from "@/features/social/lib/watermark";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { shrinkImage } from "@/shared/lib/resize-image";
+import type { WatermarkSettings } from "@/shared/lib/settings/types";
 import { fromNzInputValue, toNzInputValue } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
@@ -68,6 +71,8 @@ interface Content {
   imageAlt: string;
   imageWidth: number | null;
   imageHeight: number | null;
+  /** The picture before Add my logo marked it; null when it has no logo. */
+  imageOriginalUrl: string | null;
   linkUrl: string;
   targets: {
     platform: string;
@@ -78,16 +83,22 @@ interface Content {
     imageAlt: string;
     imageWidth: number | null;
     imageHeight: number | null;
+    imageOriginalUrl: string | null;
     /** The picture URL the operator OK'd this platform cutting off. */
     cropApprovedFor: string | null;
   }[];
   googleType: GooglePostType;
   /** Empty for no button. */
   googleCta: GooglePostCta | "";
+  /** Empty to send the button to the Link. */
+  googleUrl: string;
   googleTitle: string;
   /** YYYY-MM-DD, empty when unset. */
   offerStart: string;
   offerEnd: string;
+  /** An event's "HH:MM" times, both empty for all day. */
+  eventStartTime: string;
+  eventEndTime: string;
   couponCode: string;
 }
 
@@ -127,6 +138,7 @@ function contentOf(p: SocialPostRow): Content {
     imageAlt: p.imageAlt ?? "",
     imageWidth: p.imageWidth,
     imageHeight: p.imageHeight,
+    imageOriginalUrl: p.imageOriginalUrl,
     linkUrl: p.linkUrl ?? "",
     targets: p.targets.map((t) => ({
       platform: t.platform,
@@ -136,13 +148,17 @@ function contentOf(p: SocialPostRow): Content {
       imageAlt: t.imageAlt ?? "",
       imageWidth: t.imageWidth,
       imageHeight: t.imageHeight,
+      imageOriginalUrl: t.imageOriginalUrl,
       cropApprovedFor: t.cropApprovedFor,
     })),
     googleType: p.googleType,
     googleCta: p.googleCta ?? "",
+    googleUrl: p.googleUrl ?? "",
     googleTitle: p.googleTitle ?? "",
     offerStart: p.offerStart ?? "",
     offerEnd: p.offerEnd ?? "",
+    eventStartTime: p.eventStartTime ?? "",
+    eventEndTime: p.eventEndTime ?? "",
     couponCode: p.couponCode ?? "",
   };
 }
@@ -162,13 +178,21 @@ function diff(now: Content, saved: Content): Record<string, unknown> {
     out.imageWidth = now.imageWidth;
     out.imageHeight = now.imageHeight;
   }
+  if (now.imageOriginalUrl !== saved.imageOriginalUrl) {
+    out.imageOriginalUrl = now.imageOriginalUrl;
+  }
   if (now.imageAlt !== saved.imageAlt) out.imageAlt = now.imageAlt || null;
   if (now.linkUrl !== saved.linkUrl) out.linkUrl = now.linkUrl.trim() || null;
   if (now.googleType !== saved.googleType) out.googleType = now.googleType;
   if (now.googleCta !== saved.googleCta) out.googleCta = now.googleCta || null;
+  if (now.googleUrl !== saved.googleUrl) out.googleUrl = now.googleUrl.trim() || null;
   if (now.googleTitle !== saved.googleTitle) out.googleTitle = now.googleTitle || null;
   if (now.offerStart !== saved.offerStart) out.offerStart = now.offerStart || null;
   if (now.offerEnd !== saved.offerEnd) out.offerEnd = now.offerEnd || null;
+  if (now.eventStartTime !== saved.eventStartTime) {
+    out.eventStartTime = now.eventStartTime || null;
+  }
+  if (now.eventEndTime !== saved.eventEndTime) out.eventEndTime = now.eventEndTime || null;
   if (now.couponCode !== saved.couponCode) out.couponCode = now.couponCode || null;
   if (JSON.stringify(now.targets) !== JSON.stringify(saved.targets)) {
     out.targets = now.targets
@@ -190,8 +214,11 @@ function diff(now: Content, saved: Content): Record<string, unknown> {
  * @param props.design - Post maker design the picture came from, or null.
  * @param props.captionAi - Write with AI's starting choices; null hides it.
  * @param props.email - The email linked to the post, or null.
+ * @param props.watermark - How Add my logo marks a photo, and whether new uploads get it.
+ * @param props.tags - Every tag there is.
+ * @param props.onTagCreated - Called with a tag the picker added.
  * @param props.onDraftEmail - Opens Email this too, by hand or after publishing.
- * @param props.onSaved - Called with the name and text after each successful save.
+ * @param props.onSaved - Called with the name, text or tags after each successful save.
  * @param props.saveRef - Filled with a save-pending-edits function, used before another post opens.
  * @returns Composer element.
  */
@@ -205,6 +232,9 @@ export function PostComposer({
   design,
   captionAi,
   email,
+  watermark,
+  tags,
+  onTagCreated,
   onDraftEmail,
   onSaved,
   saveRef,
@@ -218,8 +248,11 @@ export function PostComposer({
   design: PostDesign | null;
   captionAi: CaptionAiSetup | null;
   email: PostEmail | null;
+  watermark: WatermarkSettings;
+  tags: SocialTagRow[];
+  onTagCreated?: (tag: SocialTagRow) => void;
   onDraftEmail?: (afterPublish: boolean) => void;
-  onSaved?: (saved: { name: string; body: string }) => void;
+  onSaved?: (saved: Partial<Pick<SocialPostRow, "name" | "body" | "tagIds">>) => void;
   saveRef?: React.RefObject<(() => Promise<boolean>) | null>;
 }): React.ReactElement {
   const router = useRouter();
@@ -258,6 +291,12 @@ export function PostComposer({
   const [overridesShown, setOverridesShown] = useState(() =>
     initial.targets.some((t) => t.textOverride),
   );
+  // Tags save straight away, on any post, outside autosave.
+  const [tagIds, setTagIds] = useState(initial.tagIds);
+  const savedTags = useRef(initial.tagIds);
+  const tagSaving = useRef<Promise<void>>(Promise.resolve());
+  // A slot whose photo couldn't be read back for the logo, so its next upload gets it.
+  const logoNext = useRef<"main" | SocialPlatformKey | null>(null);
 
   // The previews show the real Page name and username once the connection check
   // answers; until then (or if it fails) they use placeholders.
@@ -412,35 +451,97 @@ export function PostComposer({
   }
 
   /**
+   * Uploads a picture file.
+   * @param file - JPEG to upload.
+   * @returns Its address, or null after showing the error.
+   */
+  async function upload(file: File): Promise<string | null> {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await callApi<{ url: string }>("/api/admin/social/upload", "POST", form);
+    if (res.ok) return res.url;
+    toast(res.error, { tone: "error" });
+    return null;
+  }
+
+  /**
+   * Puts a picture in the post's slot or one app's. When only the logo changed the shape is the
+   * same, so a crop OK given to the old picture moves to the new one.
+   * @param forWhat - "main" or the app.
+   * @param next - The new picture.
+   * @param next.url - Its address.
+   * @param next.originalUrl - The picture before the logo, or null when it has none.
+   * @param next.width - Pixel width.
+   * @param next.height - Pixel height.
+   * @param sameShape - Whether it's the same photo with the logo added or taken off.
+   */
+  function placePicture(
+    forWhat: "main" | SocialPlatformKey,
+    next: { url: string; originalUrl: string | null; width: number | null; height: number | null },
+    sameShape: boolean,
+  ): void {
+    setContent((c) => {
+      const old =
+        forWhat === "main"
+          ? c.imageUrl
+          : (c.targets.find((t) => t.platform === forWhat)?.imageUrl ?? null);
+      const targets = c.targets.map((t) => {
+        const own = t.platform === forWhat;
+        // The main picture's crop OKs live on the apps that show it: those with no own picture.
+        const showsIt = own || (forWhat === "main" && !t.imageUrl);
+        const moved = sameShape && old !== null && showsIt && t.cropApprovedFor === old;
+        const crop = moved ? { cropApprovedFor: next.url } : {};
+        if (!own) return { ...t, ...crop };
+        return {
+          ...t,
+          ...crop,
+          imageUrl: next.url,
+          imageOriginalUrl: next.originalUrl,
+          imageWidth: next.width,
+          imageHeight: next.height,
+        };
+      });
+      return forWhat === "main"
+        ? {
+            ...c,
+            targets,
+            imageUrl: next.url,
+            imageOriginalUrl: next.originalUrl,
+            imageWidth: next.width,
+            imageHeight: next.height,
+          }
+        : { ...c, targets };
+    });
+  }
+
+  /**
    * Shrinks and uploads a picture for the post or the platform picked via {@link pickPicture}.
+   * With Add my logo on, both copies go up: the marked one shows, and the plain one is kept so
+   * the logo can come off again.
    * @param file - Picked image.
    */
   async function addImage(file: File): Promise<void> {
     const forWhat = uploadFor.current;
+    const withLogo = watermark.on || logoNext.current === forWhat;
     setBusy(`image:${forWhat}`);
     try {
       const small = await shrinkImage(file);
-      const form = new FormData();
-      form.append("file", small.file);
-      const res = await callApi<{ url: string }>("/api/admin/social/upload", "POST", form);
-      if (!res.ok) {
-        toast(res.error, { tone: "error" });
-        return;
-      }
-      if (forWhat === "main") {
-        setContent((c) => ({
-          ...c,
-          imageUrl: res.url,
-          imageWidth: small.width,
-          imageHeight: small.height,
-        }));
-      } else {
-        setTarget(forWhat, {
-          imageUrl: res.url,
-          imageWidth: small.width,
-          imageHeight: small.height,
-        });
-      }
+      const marked = withLogo ? await watermarkImage(small.file, watermark) : null;
+      const plain = await upload(small.file);
+      if (!plain) return;
+      const shown = marked ? await upload(marked.file) : plain;
+      if (!shown) return;
+      if (logoNext.current === forWhat) logoNext.current = null;
+      placePicture(
+        forWhat,
+        {
+          url: shown,
+          originalUrl: marked ? plain : null,
+          width: small.width,
+          height: small.height,
+        },
+        false,
+      );
     } catch (error) {
       toast(error instanceof Error ? error.message : "Couldn't add the picture.", {
         tone: "error",
@@ -449,6 +550,84 @@ export function PostComposer({
       setBusy(null);
       if (fileRef.current) fileRef.current.value = "";
     }
+  }
+
+  /**
+   * Adds the logo to a picture already in the post, or takes it off by going back to the plain
+   * copy. When the browser can't read the photo back, its next upload gets the logo instead.
+   * @param forWhat - "main" or the app whose own picture it is.
+   * @param on - Whether the logo should be on.
+   */
+  async function setLogo(forWhat: "main" | SocialPlatformKey, on: boolean): Promise<void> {
+    const slot = forWhat === "main" ? content : content.targets.find((t) => t.platform === forWhat);
+    if (!slot?.imageUrl) return;
+    const size = { width: slot.imageWidth, height: slot.imageHeight };
+    if (!on) {
+      if (slot.imageOriginalUrl) {
+        placePicture(forWhat, { url: slot.imageOriginalUrl, originalUrl: null, ...size }, true);
+      }
+      return;
+    }
+    if (slot.imageOriginalUrl) return;
+    const plain = slot.imageUrl;
+    setBusy(`image:${forWhat}`);
+    try {
+      const marked = await watermarkImage(plain, watermark);
+      const shown = await upload(marked.file);
+      if (shown) {
+        placePicture(
+          forWhat,
+          { url: shown, originalUrl: plain, width: marked.width, height: marked.height },
+          true,
+        );
+      }
+    } catch {
+      logoNext.current = forWhat;
+      toast(
+        "Couldn't read this picture to add the logo. Pick it again with Replace and the logo goes on as it uploads.",
+        { tone: "error" },
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * Saves the post's tags straight away. Saves run one after another, so the last pick wins; a
+   * failed one puts back what was last saved.
+   * @param ids - The post's new tag ids.
+   */
+  function changeTags(ids: string[]): void {
+    setTagIds(ids);
+    tagSaving.current = tagSaving.current.then(async () => {
+      const res = await callApi(`/api/admin/social/${initial.id}`, "PATCH", { tagIds: ids });
+      if (!res.ok) {
+        toast(res.error, { tone: "error" });
+        setTagIds(savedTags.current);
+        return;
+      }
+      savedTags.current = ids;
+      onSaved?.({ tagIds: ids });
+    });
+  }
+
+  /**
+   * Adds a tag from the picker, or gets the one that already has the name.
+   * @param name - Name as typed.
+   * @param colour - Swatch picked for it.
+   * @returns The tag, or null after showing the error.
+   */
+  async function createTag(name: string, colour: TagColour): Promise<SocialTagRow | null> {
+    const res = await callApi<{ tag: SocialTagRow }>("/api/admin/social/tags", "POST", {
+      name,
+      colour,
+    });
+    if (!res.ok) {
+      toast(res.error, { tone: "error" });
+      return null;
+    }
+    onTagCreated?.(res.tag);
+    return res.tag;
   }
 
   /** Saves, then opens Email this too. */
@@ -630,9 +809,12 @@ export function PostComposer({
     targets: content.targets,
     googleType: content.googleType,
     googleCta: content.googleCta || null,
+    googleUrl: content.googleUrl.trim() || null,
     googleTitle: content.googleTitle,
     offerStart: content.offerStart,
     offerEnd: content.offerEnd,
+    eventStartTime: content.eventStartTime || null,
+    eventEndTime: content.eventEndTime || null,
   };
   const issues = validatePost(draft, promo !== null);
   const blocked = blockingIssues(issues);
@@ -671,9 +853,12 @@ export function PostComposer({
       google: {
         type: content.googleType,
         cta: content.googleCta || null,
+        url: draft.googleUrl,
         title: content.googleTitle.trim(),
         start: content.offerStart || null,
         end: content.offerEnd || null,
+        startTime: draft.eventStartTime,
+        endTime: draft.eventEndTime,
         couponCode: content.couponCode.trim() || null,
       },
     };
@@ -847,6 +1032,11 @@ export function PostComposer({
             onDesign={() => void openDesign()}
             onWriteWithAi={captionAi ? () => setWritingWithAi(true) : null}
             onUndoAi={canUndoAi ? undoCaption : null}
+            onLogo={(forWhat, on) => void setLogo(forWhat, on)}
+            tags={tags}
+            tagIds={tagIds}
+            onTagsChange={changeTags}
+            onCreateTag={createTag}
           />
           {!initial.isPreset && (
             <div className="mt-6">
