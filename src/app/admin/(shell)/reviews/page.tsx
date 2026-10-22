@@ -6,6 +6,7 @@ import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatStrip } from "@/features/admin/components/ui/StatStrip";
+import { StickyRail } from "@/features/admin/components/ui/StickyRail";
 import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewApprovalList";
 import {
   ReviewAskPeople,
@@ -450,7 +451,7 @@ export default async function AdminReviewsPage({
         />
       </StatStrip>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
         <div className="flex flex-col gap-6 lg:col-span-2">
           <Card>
             <CardHeader title="Automatic asks" />
@@ -469,14 +470,6 @@ export default async function AdminReviewsPage({
             <ReviewAskPeople people={askPeople} gapDays={reviewSettings.reviewAskGapDays} />
           </Card>
 
-          <Card>
-            <CardHeader title="Send to someone new" />
-            <SendReviewLinkForm
-              prefill={prefillContact ?? undefined}
-              defaultOpen={prefillContact !== null}
-            />
-          </Card>
-
           {linkHistory.length > 0 && (
             <Card>
               <CardHeader title="Link history" />
@@ -485,7 +478,7 @@ export default async function AdminReviewsPage({
           )}
         </div>
 
-        <div className="flex flex-col gap-6">
+        <StickyRail className="flex flex-col gap-6">
           <Card flushOnPhone>
             <CardHeader
               title="Reviews on your site"
@@ -499,7 +492,16 @@ export default async function AdminReviewsPage({
               initialStatus="pending"
             />
           </Card>
-        </div>
+
+          {/* A one-link card until opened, so it sits in the rail rather than taking a row. */}
+          <Card>
+            <CardHeader title="Send to someone new" />
+            <SendReviewLinkForm
+              prefill={prefillContact ?? undefined}
+              defaultOpen={prefillContact !== null}
+            />
+          </Card>
+        </StickyRail>
       </div>
     </>
   );

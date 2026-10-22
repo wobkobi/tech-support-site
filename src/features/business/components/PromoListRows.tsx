@@ -5,7 +5,9 @@
 import type { PromoRow } from "@/app/admin/(shell)/promos/page";
 import {
   ROW_CLS,
+  STICKY_THEAD_CLS,
   TABLE_CLS,
+  TABLE_SCROLL_CLS,
   TBODY_CLS,
   TD_CLS,
   TH_CLS,
@@ -199,9 +201,9 @@ export function PromoListRows({
   return (
     <>
       {/* Desktop: table */}
-      <Card padding="none" className="hidden overflow-x-auto sm:block">
+      <Card padding="none" className={cn("hidden sm:block", TABLE_SCROLL_CLS)}>
         <table className={TABLE_CLS}>
-          <thead className={THEAD_CLS}>
+          <thead className={cn(THEAD_CLS, STICKY_THEAD_CLS)}>
             <tr>
               <th className={TH_CLS}>Title</th>
               <th className={TH_CLS}>Period</th>

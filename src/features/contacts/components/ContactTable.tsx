@@ -1,12 +1,15 @@
 "use client";
 // src/features/contacts/components/ContactTable.tsx
 // Desktop (lg+) table for one contacts section; rows take ContactCard props and open
-// editors and panels in an expanding row. The actions cell is pinned right.
+// editors and panels in an expanding row. The actions cell is pinned right, and from xl
+// the column names pin under the list's toolbar.
 
 import {
   PINNED_CELL_CLS,
   ROW_CLS,
+  STICKY_THEAD_CLS,
   TABLE_CLS,
+  TABLE_SCROLL_CLS,
   TBODY_CLS,
   TD_CLS,
   TH_CLS,
@@ -100,14 +103,17 @@ function ContactTableRow({
         </td>
         <td className={CELL_CLS}>
           {c.email ? (
-            <a href={`mailto:${c.email}`} className={cn("text-sm break-all", ADMIN_LINK_CLS)}>
-              {c.email}
+            // wrap-anywhere only breaks a word that can't fit, and the <wbr> offers the
+            // @ first, so a long address splits into its two halves instead of mid-word.
+            <a href={`mailto:${c.email}`} className={cn("text-sm wrap-anywhere", ADMIN_LINK_CLS)}>
+              {c.email.split("@")[0]}@<wbr />
+              {c.email.split("@").slice(1).join("@")}
             </a>
           ) : (
             <span className="text-sm text-admin-muted italic">No email</span>
           )}
           {c.altEmails.length > 0 && (
-            <p className="text-sm break-all text-admin-muted">also: {c.altEmails.join(", ")}</p>
+            <p className="text-sm wrap-anywhere text-admin-muted">also: {c.altEmails.join(", ")}</p>
           )}
         </td>
         <td className={CELL_CLS}>
@@ -203,19 +209,25 @@ export function ContactTable({
 }): React.ReactElement {
   return (
     // @container: the full-width rows size themselves to this box with cqw units.
-    <div className="@container hidden overflow-x-auto rounded-lg border border-admin-border lg:block">
-      {/* Fixed layout lines sections up; Address takes the spare width. */}
+    <div
+      className={cn(
+        "@container hidden rounded-lg border border-admin-border lg:block",
+        TABLE_SCROLL_CLS,
+      )}
+    >
+      {/* Fixed layout lines sections up; Address takes the spare width. Name and Email widen
+          on 2xl, where Address still has room for a full street address. */}
       <table className={cn(TABLE_CLS, "min-w-232 table-fixed")}>
         <colgroup>
-          <col className="w-36" />
-          <col className="w-44" />
+          <col className="w-36 2xl:w-48" />
+          <col className="w-44 2xl:w-64" />
           <col className="w-34" />
           <col />
           <col className="w-24" />
           <col className="w-24" />
           <col className="w-44" />
         </colgroup>
-        <thead className={THEAD_CLS}>
+        <thead className={cn(THEAD_CLS, STICKY_THEAD_CLS)}>
           <tr>
             <th className={HEAD_CLS}>Name</th>
             <th className={HEAD_CLS}>Email</th>

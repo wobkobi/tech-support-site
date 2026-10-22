@@ -125,7 +125,7 @@ export function EditInvoiceView({
   }
 
   return (
-    <div className="max-w-7xl lg:grid lg:grid-cols-[minmax(20rem,1fr)_minmax(24rem,36rem)] lg:items-start lg:gap-8">
+    <div className="lg:grid lg:grid-cols-[minmax(20rem,1fr)_minmax(24rem,36rem)] lg:items-start lg:gap-6">
       <div className="min-w-0">
         <InvoiceForm
           initial={initial}

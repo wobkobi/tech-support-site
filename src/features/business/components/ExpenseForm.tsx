@@ -92,7 +92,8 @@ export function ExpenseForm({
       )}
     >
       <CardHeader title={editingId ? "Edit expense" : "Add expense"} />
-      <div className="grid gap-3 sm:grid-cols-2">
+      {/* From xl the eight fields fill two rows of four; the receipt tickbox takes a line below. */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AdminField label="Date" htmlFor="exp-date" required>
           <AdminInput
             id="exp-date"

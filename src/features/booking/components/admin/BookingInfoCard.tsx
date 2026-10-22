@@ -174,60 +174,63 @@ export function BookingInfoCard({
   if (!editing) {
     return (
       <div className="flex flex-col gap-3">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           <h2 className="text-base font-bold text-admin-text">Customer</h2>
-          <AdminButton variant="ghost" onClick={() => setEditing(true)}>
+          <AdminButton variant="ghost" onClick={() => setEditing(true)} className="-my-2">
             Edit
           </AdminButton>
         </div>
-        <Row label="Name">{name}</Row>
-        <Row label="Email">
-          <a href={`mailto:${email}`} className={ADMIN_LINK_CLS}>
-            {email}
-          </a>
-        </Row>
-        <Row label="Phone">
-          {phone ? (
-            <a href={`tel:${phone}`} className={ADMIN_LINK_CLS}>
-              {phone}
-            </a>
-          ) : (
-            <span className="text-admin-faint">Not provided</span>
-          )}
-        </Row>
-        {initialAddress && (
-          <Row label="Address">
-            {initialAddress}{" "}
-            <a
-              href={mapsSearchUrl(initialAddress)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(ADMIN_LINK_CLS, "whitespace-nowrap")}
-            >
-              Maps ↗
+        <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
+          <Row label="Name">{name}</Row>
+          <Row label="Email">
+            <a href={`mailto:${email}`} className={ADMIN_LINK_CLS}>
+              {email}
             </a>
           </Row>
-        )}
-        <Row label="Notes">
-          {parsed.userNotes ? (
-            <span className="whitespace-pre-wrap">{parsed.userNotes}</span>
-          ) : (
-            <span className="text-admin-faint">None</span>
-          )}
-        </Row>
-        {accessNotes && (
-          <Row label="Visit notes">
-            <span className="whitespace-pre-wrap">{accessNotes}</span>
+          <Row label="Phone">
+            {phone ? (
+              <a href={`tel:${phone}`} className={ADMIN_LINK_CLS}>
+                {phone}
+              </a>
+            ) : (
+              <span className="text-admin-faint">Not provided</span>
+            )}
           </Row>
-        )}
+          {initialAddress && (
+            <Row label="Address">
+              {initialAddress}{" "}
+              <a
+                href={mapsSearchUrl(initialAddress)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(ADMIN_LINK_CLS, "whitespace-nowrap")}
+              >
+                Maps ↗
+              </a>
+            </Row>
+          )}
+          <Row label="Notes">
+            {parsed.userNotes ? (
+              <span className="whitespace-pre-wrap">{parsed.userNotes}</span>
+            ) : (
+              <span className="text-admin-faint">None</span>
+            )}
+          </Row>
+          {accessNotes && (
+            <Row label="Visit notes">
+              <span className="whitespace-pre-wrap">{accessNotes}</span>
+            </Row>
+          )}
+        </div>
       </div>
     );
   }
 
+  // Six tracks on xl: name, email and phone take two each, then the notes half each.
   return (
-    <div className="flex flex-col gap-3">
-      <h2 className="text-base font-bold text-admin-text">Edit customer</h2>
-      <AdminField label="Name" htmlFor={fieldIds.name}>
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <h2 className="col-span-full text-base font-bold text-admin-text">Edit customer</h2>
+      <AdminField label="Name" htmlFor={fieldIds.name} className="xl:col-span-2">
         <AdminInput
           id={fieldIds.name}
           className={cn(errors.name && "border-coquelicot-500/60")}
@@ -240,7 +243,7 @@ export function BookingInfoCard({
         />
         <FieldError id={`${fieldIds.name}-error`} message={errors.name} />
       </AdminField>
-      <AdminField label="Email" htmlFor={fieldIds.email}>
+      <AdminField label="Email" htmlFor={fieldIds.email} className="xl:col-span-2">
         <EmailInput
           id={fieldIds.email}
           value={form.email}
@@ -252,7 +255,7 @@ export function BookingInfoCard({
           disabled={saving}
         />
       </AdminField>
-      <AdminField label="Phone" htmlFor={fieldIds.phone}>
+      <AdminField label="Phone" htmlFor={fieldIds.phone} className="xl:col-span-2">
         <PhoneInput
           id={fieldIds.phone}
           value={form.phone}
@@ -264,7 +267,7 @@ export function BookingInfoCard({
           disabled={saving}
         />
       </AdminField>
-      <AdminField label="Address" htmlFor={`edit-address-${id}`}>
+      <AdminField label="Address" htmlFor={`edit-address-${id}`} className="col-span-full">
         <AddressAutocomplete
           id={`edit-address-${id}`}
           value={form.address}
@@ -273,7 +276,7 @@ export function BookingInfoCard({
           inputClassName={ADMIN_INPUT_CLS}
         />
       </AdminField>
-      <AdminField label="Notes" htmlFor={`edit-notes-${id}`}>
+      <AdminField label="Notes" htmlFor={`edit-notes-${id}`} className="xl:col-span-3">
         <AdminTextarea
           id={`edit-notes-${id}`}
           className="min-h-25"
@@ -282,7 +285,7 @@ export function BookingInfoCard({
           disabled={saving}
         />
       </AdminField>
-      <AdminField label="Visit notes" htmlFor={`edit-access-notes-${id}`}>
+      <AdminField label="Visit notes" htmlFor={`edit-access-notes-${id}`} className="xl:col-span-3">
         <AdminTextarea
           id={`edit-access-notes-${id}`}
           className="min-h-20"
@@ -292,7 +295,7 @@ export function BookingInfoCard({
           disabled={saving}
         />
       </AdminField>
-      <div className="flex flex-wrap gap-2">
+      <div className="col-span-full flex flex-wrap gap-2">
         <AdminButton onClick={() => void save()} busy={saving}>
           Save changes
         </AdminButton>

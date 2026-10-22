@@ -218,13 +218,15 @@ export function TravelBlockAdminList({
 
   if (blocks.length === 0) {
     return (
-      <EmptyState title="No travel blocks yet. Run the calendar cache cron to generate them." />
+      <Card padding="none" flushOnPhone>
+        <EmptyState title="No travel blocks yet. Run the calendar cache cron to generate them." />
+      </Card>
     );
   }
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[repeat(auto-fill,minmax(32rem,1fr))]">
         {blocks.map((b) => {
           const currentMode = (b.transportMode ?? "driving") as TransportMode;
           const isSaving = saving === b.id;

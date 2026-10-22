@@ -5,6 +5,7 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { StickyActionBar } from "@/features/admin/components/ui/StickyActionBar";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
 import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
@@ -21,6 +22,7 @@ import { PhoneTotalBar } from "@/features/business/components/calculator/PhoneTo
 import { ReissueBanner } from "@/features/business/components/calculator/ReissueBanner";
 
 import { SaveActions } from "@/features/business/components/calculator/SaveActions";
+import { SaveButtons } from "@/features/business/components/calculator/SaveButtons";
 import { TaskTimeWarning } from "@/features/business/components/calculator/TaskTimeWarning";
 import { TasksSection } from "@/features/business/components/calculator/TasksSection";
 import { TravelSection } from "@/features/business/components/calculator/TravelSection";
@@ -36,6 +38,7 @@ import {
 } from "@/features/business/lib/already-paid-input";
 import {
   calcJobTotal,
+  formatNZD,
   isTripDrive,
   jobToLineItems,
   timeDiffMins,
@@ -741,6 +744,20 @@ export function CalculatorView({
     setLookingUpTravel(false);
   }
 
+  // Shared by both copies of the save buttons: the right column's below lg, the bar's on lg+.
+  const saveButtonProps = {
+    savingInvoice,
+    saveSendMode,
+    saveQuoteMode,
+    quoteMode,
+    savingIncome,
+    parsing,
+    subtotal: totals.subtotal,
+    total: totals.total,
+    paidCash,
+    alreadyPaid,
+  };
+
   return (
     <>
       {pendingInvoiceId && (
@@ -979,11 +996,10 @@ export function CalculatorView({
           )}
         </div>
 
-        {/* RIGHT column - live invoice preview (replaces the legacy Summary
-            panel - same totals, just inside the actual invoice layout). */}
+        {/* RIGHT column - client, payment and the live invoice preview. */}
         <div ref={finishRef} className="min-w-0 space-y-4">
-          {/* Client - moved above the preview so it stays in reach without
-              scrolling past the full A4-sized invoice render. */}
+          {/* Client above the preview, so it stays in reach without scrolling
+              past the full A4-sized invoice render. */}
           <ClientPickerSection
             clientName={clientName}
             onClientNameChange={setClientName}
@@ -1020,28 +1036,28 @@ export function CalculatorView({
             }}
           />
 
-          {/* Actions */}
+          {/* Payment boxes, then the phone copy of the save buttons. */}
           <SaveActions
             incomeError={incomeError}
             saveInvoiceError={saveInvoiceError}
-            savingInvoice={savingInvoice}
-            saveSendMode={saveSendMode}
-            saveQuoteMode={saveQuoteMode}
             quoteMode={quoteMode}
-            savingIncome={savingIncome}
-            parsing={parsing}
-            subtotal={totals.subtotal}
             total={totals.total}
             paidCash={paidCash}
             onPaidCashChange={setPaidCash}
             alreadyPaid={alreadyPaid}
             onAlreadyPaidChange={setAlreadyPaid}
-            onSaveInvoice={(send, quote) => void handleSaveInvoice(send, quote)}
-            onSaveIncome={() => void handleSaveIncome()}
+            buttons={
+              <SaveButtons
+                {...saveButtonProps}
+                onSaveInvoice={(send, quote) => void handleSaveInvoice(send, quote)}
+                onSaveIncome={() => void handleSaveIncome()}
+                className="lg:hidden"
+              />
+            }
           />
 
-          {/* Invoice preview - below the CTAs so the Save invoice button is
-              always reachable without scrolling past the full A4 render. */}
+          {/* Invoice preview - below the save buttons, so on phones they stay
+              reachable without scrolling past the full A4 render. */}
           <InvoicePreviewPanel
             identity={identity}
             number="DRAFT"
@@ -1072,6 +1088,25 @@ export function CalculatorView({
           finishRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
         }
       />
+
+      {/* Desktop save bar, pinned under the whole calculator. The column's errors hide
+          on lg+, so a failed save shows here, by the button that was pressed. */}
+      <StickyActionBar variant="page" className="hidden lg:flex">
+        {!quoteMode && incomeError && (
+          <p className="basis-full text-sm text-red-700">{incomeError}</p>
+        )}
+        {saveInvoiceError && <p className="basis-full text-sm text-red-700">{saveInvoiceError}</p>}
+        <SaveButtons
+          {...saveButtonProps}
+          onSaveInvoice={(send, quote) => void handleSaveInvoice(send, quote)}
+          onSaveIncome={() => void handleSaveIncome()}
+          inline
+        />
+        <p className="ml-auto text-sm text-admin-text-secondary">
+          Total{" "}
+          <span className="text-lg font-bold text-russian-violet">{formatNZD(totals.total)}</span>
+        </p>
+      </StickyActionBar>
     </>
   );
 }

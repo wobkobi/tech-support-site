@@ -83,7 +83,7 @@ export function SheetImportButton(): React.ReactElement {
   }
 
   return (
-    <Card className="mt-6">
+    <Card>
       <CardHeader title="Import from Google Sheets" className="mb-3" />
 
       {error && <p className="mb-3 text-sm text-coquelicot-500">{error}</p>}

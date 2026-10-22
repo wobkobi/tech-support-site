@@ -1,7 +1,6 @@
 // src/app/admin/(shell)/mailing/[id]/page.tsx
 // Admin editor for one mailing-list email or preset, with its recipients, presets and send setup.
 
-import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { insertDetailsOf } from "@/features/admin/lib/insertables";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { CampaignEditor, type SendRow } from "@/features/mailing/components/CampaignEditor";
@@ -93,31 +92,26 @@ export default async function AdminMailingEditPage({
   const row = toCampaignRow(campaign);
 
   return (
-    <>
-      <PageHeader
-        title={campaign.name}
-        breadcrumbs={[{ label: "Mailing list", href: "/admin/mailing" }, { label: campaign.name }]}
-      />
-      {/* Keyed on status and last save so router.refresh() remounts with fresh state. */}
-      <CampaignEditor
-        key={`${row.status}-${row.updatedAt}`}
-        initial={row}
-        sends={sends}
-        insertGroups={emailInsertGroups(
-          insertDetailsOf(identity, getSiteUrl()),
-          wording.promo,
-          reviews.googleReviewUrl,
-        )}
-        missingEnv={missingSendEnv()}
-        canUpload={canUploadImages()}
-        quiet={quietHoursOf(comms)}
-        promoTitle={promo?.title ?? null}
-        templates={templates}
-        promo={wording.promo}
-        linkTargets={emailLinkTargets(getSiteUrl(), reviews.googleReviewUrl)}
-        canDraft={aiConfigured()}
-        adminEmail={process.env.ADMIN_EMAIL?.trim() || null}
-      />
-    </>
+    // Keyed on status and last save so router.refresh() remounts with fresh state. The
+    // editor draws the page header too, since its Share to social button saves first.
+    <CampaignEditor
+      key={`${row.status}-${row.updatedAt}`}
+      initial={row}
+      sends={sends}
+      insertGroups={emailInsertGroups(
+        insertDetailsOf(identity, getSiteUrl()),
+        wording.promo,
+        reviews.googleReviewUrl,
+      )}
+      missingEnv={missingSendEnv()}
+      canUpload={canUploadImages()}
+      quiet={quietHoursOf(comms)}
+      promoTitle={promo?.title ?? null}
+      templates={templates}
+      promo={wording.promo}
+      linkTargets={emailLinkTargets(getSiteUrl(), reviews.googleReviewUrl)}
+      canDraft={aiConfigured()}
+      adminEmail={process.env.ADMIN_EMAIL?.trim() || null}
+    />
   );
 }

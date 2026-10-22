@@ -3,10 +3,11 @@
 // the booking, then linked records and settings in parallel (Server-Timing instrumented).
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
-import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
+import { ADMIN_LINK_CLS, ADMIN_META_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { InfoRow } from "@/features/admin/components/ui/InfoRow";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
+import { StickyRail } from "@/features/admin/components/ui/StickyRail";
 import { BookingActions } from "@/features/booking/components/admin/BookingActions";
 import { BookingInfoCard } from "@/features/booking/components/admin/BookingInfoCard";
 import { BookingTimeline } from "@/features/booking/components/admin/BookingTimeline";
@@ -55,6 +56,28 @@ function Chip({ children }: { children: React.ReactNode }): React.ReactElement {
     <span className="rounded-full border border-admin-border bg-admin-surface px-2.5 py-0.5 text-sm font-semibold text-admin-text-secondary">
       {children}
     </span>
+  );
+}
+
+/**
+ * A label-over-value fact in the price snapshot grid, laid out like the Customer and Times cards.
+ * @param props - Component props.
+ * @param props.label - Fact label.
+ * @param props.children - Fact value.
+ * @returns The fact element.
+ */
+function Fact({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className={ADMIN_META_LABEL_CLS}>{label}</dt>
+      <dd className="text-sm text-admin-text">{children}</dd>
+    </div>
   );
 }
 
@@ -203,96 +226,95 @@ export default async function BookingDetailPage({
                 title="Price snapshot"
                 description="What the customer saw / the rates locked in at booking."
               />
-              <dl className="space-y-1.5 text-sm">
+              <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 {booking.quotedLowAtBooking != null && booking.quotedHighAtBooking != null && (
-                  <InfoRow label="Quoted">
+                  <Fact label="Quoted">
                     {formatQuotedRange(
                       booking.quotedLowAtBooking,
                       booking.quotedHighAtBooking,
                       booking.quotedTravelAtBooking,
                     )}
-                  </InfoRow>
+                  </Fact>
                 )}
-                {promoSummary && <InfoRow label="Promo">{promoSummary}</InfoRow>}
+                {promoSummary && <Fact label="Promo">{promoSummary}</Fact>}
                 {booking.baseRateAtBooking != null && (
-                  <InfoRow label="Base rate">{formatNZD(booking.baseRateAtBooking)}/hr</InfoRow>
+                  <Fact label="Base rate">{formatNZD(booking.baseRateAtBooking)}/hr</Fact>
                 )}
                 {booking.complexRateAtBooking != null && (
-                  <InfoRow label="Complex rate">
-                    {formatNZD(booking.complexRateAtBooking)}/hr
-                  </InfoRow>
+                  <Fact label="Complex rate">{formatNZD(booking.complexRateAtBooking)}/hr</Fact>
                 )}
                 {booking.travelRatePerHourAtBooking != null && (
-                  <InfoRow label="Travel rate">
+                  <Fact label="Travel rate">
                     {formatNZD(booking.travelRatePerHourAtBooking)}/hr
-                  </InfoRow>
+                  </Fact>
                 )}
                 {booking.travelMinsAtBooking != null && (
-                  <InfoRow label="Travel time">
+                  <Fact label="Travel time">
                     {formatMins(booking.travelMinsAtBooking)} there
                     {booking.travelMinsBackAtBooking != null
                       ? ` · ${formatMins(booking.travelMinsBackAtBooking)} back`
                       : ""}
-                  </InfoRow>
+                  </Fact>
                 )}
                 {booking.publicHolidayName && (
-                  <InfoRow label="Public holiday">{booking.publicHolidayName}</InfoRow>
-                )}
-                {booking.quotedDescriptionAtBooking && (
-                  <div className="mt-3 border-t border-admin-border pt-3">
-                    <span className="text-admin-muted">They asked</span>
-                    <p className="mt-1 whitespace-pre-wrap text-admin-text italic">
-                      &ldquo;{booking.quotedDescriptionAtBooking}&rdquo;
-                    </p>
-                  </div>
-                )}
-                {booking.quotedMinsAtBooking != null && (
-                  <div className="mt-2">
-                    <span className="text-admin-muted">AI read it as</span>
-                    <p className="mt-1 text-admin-text">
-                      {formatMins(booking.quotedMinsAtBooking)}
-                      {booking.quotedCategoryAtBooking
-                        ? ` · ${booking.quotedCategoryAtBooking}`
-                        : ""}
-                    </p>
-                    {booking.quotedTasksAtBooking.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {booking.quotedTasksAtBooking.map((task, i) => (
-                          <span
-                            key={`quoted-task-${i}`}
-                            className="rounded-md bg-admin-bg px-2 py-0.5 text-sm text-admin-muted"
-                          >
-                            {task.label}: {formatMins(task.mins)}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <Fact label="Public holiday">{booking.publicHolidayName}</Fact>
                 )}
               </dl>
+              {(booking.quotedDescriptionAtBooking || booking.quotedMinsAtBooking != null) && (
+                <div className="mt-4 grid gap-x-6 gap-y-3 border-t border-admin-border pt-4 text-sm lg:grid-cols-2">
+                  {booking.quotedDescriptionAtBooking && (
+                    <div>
+                      <span className="text-admin-muted">They asked</span>
+                      <p className="mt-1 whitespace-pre-wrap text-admin-text italic">
+                        &ldquo;{booking.quotedDescriptionAtBooking}&rdquo;
+                      </p>
+                    </div>
+                  )}
+                  {booking.quotedMinsAtBooking != null && (
+                    <div>
+                      <span className="text-admin-muted">AI read it as</span>
+                      <p className="mt-1 text-admin-text">
+                        {formatMins(booking.quotedMinsAtBooking)}
+                        {booking.quotedCategoryAtBooking
+                          ? ` · ${booking.quotedCategoryAtBooking}`
+                          : ""}
+                      </p>
+                      {booking.quotedTasksAtBooking.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {booking.quotedTasksAtBooking.map((task, i) => (
+                            <span
+                              key={`quoted-task-${i}`}
+                              className="rounded-md bg-admin-bg px-2 py-0.5 text-sm text-admin-muted"
+                            >
+                              {task.label}: {formatMins(task.mins)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </Card>
           )}
         </div>
 
         {/* Right: context rail - actions, timeline, linked records. */}
-        <div className="mt-4 space-y-4 lg:mt-0">
-          <Card>
-            <CardHeader title="Actions" />
-            <BookingActions
-              id={booking.id}
-              status={booking.status}
-              startAt={booking.startAt.toISOString()}
-              endAt={booking.endAt.toISOString()}
-              lockHours={settings.scheduling.pastEditLockHours}
-              calendarEventId={booking.calendarEventId}
-              phone={booking.phone || null}
-              address={meetingType === "remote" ? null : booking.address || null}
-              invoiceId={liveInvoice?.id ?? null}
-              cancelToken={booking.cancelToken}
-              reviewAlreadySent={booking.reviewSentAt != null}
-              isTest={isTest}
-            />
-          </Card>
+        <StickyRail className="mt-4 space-y-4 lg:mt-0">
+          <BookingActions
+            id={booking.id}
+            status={booking.status}
+            startAt={booking.startAt.toISOString()}
+            endAt={booking.endAt.toISOString()}
+            lockHours={settings.scheduling.pastEditLockHours}
+            calendarEventId={booking.calendarEventId}
+            phone={booking.phone || null}
+            address={meetingType === "remote" ? null : booking.address || null}
+            invoiceId={liveInvoice?.id ?? null}
+            cancelToken={booking.cancelToken}
+            reviewAlreadySent={booking.reviewSentAt != null}
+            isTest={isTest}
+          />
 
           <Card>
             <CardHeader title="Timeline" />
@@ -322,9 +344,9 @@ export default async function BookingDetailPage({
                   <span className="text-admin-faint">Not linked</span>
                 )}
               </InfoRow>
-              <div>
-                <span className="text-admin-muted">Invoices</span>
-                {invoices.length > 0 ? (
+              {invoices.length > 0 ? (
+                <div>
+                  <span className="text-admin-muted">Invoices</span>
                   <ul className="mt-1 space-y-1">
                     {invoices.map((inv) => (
                       <li key={inv.id} className="flex items-center justify-between gap-2">
@@ -341,10 +363,12 @@ export default async function BookingDetailPage({
                       </li>
                     ))}
                   </ul>
-                ) : (
-                  <span className="ml-2 text-admin-faint">None</span>
-                )}
-              </div>
+                </div>
+              ) : (
+                <InfoRow label="Invoices">
+                  <span className="text-admin-faint">None</span>
+                </InfoRow>
+              )}
               <InfoRow label="Review">
                 {review ? (
                   <Link href="/admin/reviews" className={ADMIN_LINK_CLS}>
@@ -367,7 +391,7 @@ export default async function BookingDetailPage({
               </InfoRow>
             </dl>
           </Card>
-        </div>
+        </StickyRail>
       </div>
     </div>
   );

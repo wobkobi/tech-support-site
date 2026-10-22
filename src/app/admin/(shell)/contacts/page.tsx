@@ -2,7 +2,6 @@
 // Admin contacts hub: booking and Google-sync conflicts plus the contact list. Heavy
 // dedup and merge passes run on the cron, not per load.
 
-import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import type { PageQuery } from "@/features/admin/hooks/use-query-sync";
@@ -116,13 +115,8 @@ export default async function AdminContactsPage({
   const openConflicts = pendingConflictsCount + initialConflicts.length;
   const reviewCovered = contactRows.filter((c) => c.reviews.length > 0).length;
 
-  return (
+  const summary = (
     <>
-      <PageHeader
-        title="Contacts"
-        description="Everyone who has booked, been invoiced, or reviewed."
-      />
-
       <StatStrip label="Contact totals" className="mb-6 grid-cols-2 lg:grid-cols-4">
         <StatCard label="Contacts" value={allContacts.length} />
         <StatCard
@@ -153,7 +147,18 @@ export default async function AdminContactsPage({
           <span className="font-semibold">Review &amp; resolve →</span>
         </Link>
       )}
-      <ContactsAdminView initialConflicts={initialConflicts} contacts={contactRows} query={query} />
     </>
+  );
+
+  // The view draws the header itself, so its sync and address check buttons sit in it.
+  return (
+    <ContactsAdminView
+      title="Contacts"
+      description="Everyone who has booked, been invoiced, or reviewed."
+      summary={summary}
+      initialConflicts={initialConflicts}
+      contacts={contactRows}
+      query={query}
+    />
   );
 }

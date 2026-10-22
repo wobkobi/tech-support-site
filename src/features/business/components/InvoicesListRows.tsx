@@ -5,7 +5,9 @@
 import {
   PINNED_CELL_CLS,
   ROW_CLS,
+  STICKY_THEAD_CLS,
   TABLE_CLS,
+  TABLE_SCROLL_CLS,
   TBODY_CLS,
   TD_CLS,
   TH_CLS,
@@ -167,9 +169,9 @@ export function InvoicesListTable({
   onPay: (inv: Invoice) => void;
 }): React.ReactElement {
   return (
-    <Card padding="none" className="hidden overflow-x-auto lg:block">
+    <Card padding="none" className={cn("hidden lg:block", TABLE_SCROLL_CLS)}>
       <table className={TABLE_CLS}>
-        <thead className={THEAD_CLS}>
+        <thead className={cn(THEAD_CLS, STICKY_THEAD_CLS)}>
           <tr>
             {COLUMNS.map((col) => (
               <SortableTh

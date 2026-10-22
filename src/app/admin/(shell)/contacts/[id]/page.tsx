@@ -9,6 +9,7 @@ import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
+import { StickyRail } from "@/features/admin/components/ui/StickyRail";
 import { formatNZD } from "@/features/business/lib/business";
 import { ContactDetailActions } from "@/features/contacts/components/ContactDetailActions";
 import { loadContact360 } from "@/features/contacts/lib/contact-360";
@@ -139,14 +140,14 @@ export default async function ContactDetailPage({
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-6">
         {/* Left: interaction timeline */}
         <Card padding="none">
-          <div className="p-4 sm:p-5">
-            <CardHeader
-              title="Timeline"
-              description="Bookings, invoices, payments, and reviews, newest first."
-            />
-          </div>
+          {/* No bottom margin: the header's rule doubles as the list's top edge. */}
+          <CardHeader
+            title="Timeline"
+            description="Bookings, invoices, payments, and reviews, newest first."
+            className="mb-0"
+          />
           {timeline.length === 0 ? (
-            <EmptyState title="Nothing linked to this contact yet." className="pt-2" />
+            <EmptyState title="Nothing linked to this contact yet." />
           ) : (
             <ul className="divide-y divide-admin-border">
               {timeline.map((e, i) => {
@@ -190,7 +191,7 @@ export default async function ContactDetailPage({
         </Card>
 
         {/* Right rail: fields + status */}
-        <div className="mt-6 flex flex-col gap-4 lg:mt-0">
+        <StickyRail className="mt-6 flex flex-col gap-4 lg:mt-0">
           <Card>
             <CardHeader title="Details" />
             <dl className="space-y-2 text-sm">
@@ -274,7 +275,7 @@ export default async function ContactDetailPage({
               </InfoRow>
             </dl>
           </Card>
-        </div>
+        </StickyRail>
       </div>
     </>
   );

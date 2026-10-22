@@ -51,7 +51,7 @@ export function TaxSummaryCard({
   href,
 }: TaxSummaryCardProps): React.ReactElement {
   return (
-    <Card className="mb-8">
+    <Card>
       <CardHeader
         title="Tax to set aside"
         description={isAllTime ? `${scopeLabel}: every financial year added up` : scopeLabel}

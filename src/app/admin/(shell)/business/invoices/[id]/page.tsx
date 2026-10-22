@@ -6,6 +6,7 @@ import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { InfoRow } from "@/features/admin/components/ui/InfoRow";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
+import { StickyRail } from "@/features/admin/components/ui/StickyRail";
 import { InvoiceStatusBadge } from "@/features/business/components/invoice/InvoiceStatusBadge";
 import { InvoiceTimeline } from "@/features/business/components/invoice/InvoiceTimeline";
 import {
@@ -565,11 +566,11 @@ export default async function InvoiceViewPage({
         </div>
 
         {/* Right: context rail - streams in via Suspense from batch 2. */}
-        <div className="mt-6 lg:mt-0 print:hidden">
+        <StickyRail className="mt-6 lg:mt-0 print:hidden">
           <Suspense fallback={<RailSkeleton />}>
             <InvoiceRail invoice={invoice} incomeEntries={incomeEntries} />
           </Suspense>
-        </div>
+        </StickyRail>
       </div>
     </div>
   );

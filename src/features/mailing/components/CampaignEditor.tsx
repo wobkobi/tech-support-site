@@ -12,6 +12,7 @@ import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { InsertMenu, type InsertGroup } from "@/features/admin/components/ui/InsertMenu";
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { BlockEditor } from "@/features/mailing/components/blocks/BlockEditor";
 import { useBodyMode } from "@/features/mailing/components/blocks/useBodyMode";
@@ -77,7 +78,7 @@ const SNIPPETS: { label: string; title: string; before: string; after: string; l
   ];
 
 /**
- * Mailing email editor.
+ * Mailing email editor, with its page header (title, breadcrumbs, Share to social).
  * @param props - Component props.
  * @param props.initial - The email as saved.
  * @param props.sends - Per-recipient results, for an email that has gone out.
@@ -399,6 +400,25 @@ export function CampaignEditor({
 
   return (
     <div className="flex flex-col gap-6">
+      {/* The header lives here because Share to social saves the editor's unsaved text first.
+          No bottom margin: the column gap spaces it. */}
+      <PageHeader
+        className="mb-0"
+        title={initial.name}
+        breadcrumbs={[{ label: "Mailing list", href: "/admin/mailing" }, { label: initial.name }]}
+        actions={
+          !initial.isPreset && (
+            <AdminButton
+              size="sm"
+              variant="secondary"
+              busy={busy === "share"}
+              onClick={() => void shareToSocial()}
+            >
+              Share to social
+            </AdminButton>
+          )
+        }
+      />
       <CampaignStatusBanner
         campaign={initial}
         busy={busy}
@@ -406,20 +426,9 @@ export function CampaignEditor({
         onRefresh={() => router.refresh()}
       />
 
-      {!initial.isPreset && (
-        <div className="flex justify-end">
-          <AdminButton
-            size="sm"
-            variant="secondary"
-            busy={busy === "share"}
-            onClick={() => void shareToSocial()}
-          >
-            Share to social
-          </AdminButton>
-        </div>
-      )}
-
-      <div className="grid gap-6 xl:grid-cols-2">
+      {/* grid-cols-1 (a 0 minimum) so the preview's one-line inbox row can't widen the
+          column past the screen below xl. */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         {/* On wide screens the editor stays in view and scrolls on its own while the page scrolls
             the full-length preview. Its height leaves room for the top bar and the send bar. */}
         <Card className="xl:sticky xl:top-16 xl:max-h-[calc(100dvh-12.5rem)] xl:self-start xl:overflow-y-auto">

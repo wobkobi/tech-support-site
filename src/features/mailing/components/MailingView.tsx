@@ -313,7 +313,9 @@ export function MailingView({
                 const pill = STATUS_PILL[row.status];
                 return (
                   <tr key={row.id} className={ROW_CLS}>
-                    <td className={cn(TD_CLS, "max-w-0 align-top")}>
+                    {/* max-w-0 lets the subject truncate; w-1/2 hands this column the spare
+                        width so it truncates late rather than beside an empty Date column. */}
+                    <td className={cn(TD_CLS, "w-1/2 max-w-0 align-top")}>
                       <Link
                         href={`/admin/mailing/${row.id}`}
                         className={cn("text-sm", ADMIN_LINK_CLS)}

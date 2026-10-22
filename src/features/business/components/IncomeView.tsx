@@ -14,6 +14,7 @@ import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatStrip } from "@/features/admin/components/ui/StatStrip";
+import { StickyList } from "@/features/admin/components/ui/StickyList";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import {
@@ -282,7 +283,7 @@ export function IncomeView(): React.ReactElement {
         )}
       >
         <CardHeader title={editingId ? "Edit income" : "Add income"} />
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <AdminField label="Date" htmlFor="inc-date" required>
             <AdminInput
               id="inc-date"
@@ -359,59 +360,67 @@ export function IncomeView(): React.ReactElement {
         </div>
       </form>
 
-      <LedgerListToolbar
-        search={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Customer or description"
-        fyKey={fyKey}
-        onFyChange={setFyKey}
-        financialYears={financialYears}
-        methodFilter={methodFilter}
-        onMethodChange={setMethodFilter}
-        methodOptions={methodOptions}
-        fromDate={fromDate}
-        onFromChange={setFromDate}
-        toDate={toDate}
-        onToChange={setToDate}
-        anyFilterActive={anyFilterActive}
-        onClear={() => {
-          setSearch("");
-          setFyKey("all");
-          setFromDate("");
-          setToDate("");
-          setMethodFilter("all");
-        }}
-      />
-
-      {/* Loading and empty states render once for every width; the rows split into phone
-          cards and the desktop table. */}
-      {loading ? (
-        <Card>
-          <p className="text-sm text-admin-muted">Loading...</p>
-        </Card>
-      ) : sorted.length === 0 ? (
-        <Card padding="none">
-          <EmptyState
-            title={
-              entries.length === 0 ? "No income entries yet." : "No entries match your filters."
-            }
+      <StickyList
+        toolbar={
+          <LedgerListToolbar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Customer or description"
+            fyKey={fyKey}
+            onFyChange={setFyKey}
+            financialYears={financialYears}
+            methodFilter={methodFilter}
+            onMethodChange={setMethodFilter}
+            methodOptions={methodOptions}
+            fromDate={fromDate}
+            onFromChange={setFromDate}
+            toDate={toDate}
+            onToChange={setToDate}
+            anyFilterActive={anyFilterActive}
+            onClear={() => {
+              setSearch("");
+              setFyKey("all");
+              setFromDate("");
+              setToDate("");
+              setMethodFilter("all");
+            }}
           />
-        </Card>
-      ) : (
-        <>
-          <IncomeListCards rows={pager.visible} onEdit={startEdit} onDelete={setConfirmDeleteId} />
-          <IncomeListTable
-            rows={pager.visible}
-            onEdit={startEdit}
-            onDelete={setConfirmDeleteId}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={toggleSort}
-          />
-        </>
-      )}
+        }
+      >
+        {/* Loading and empty states render once for every width; the rows split into phone
+            cards and the desktop table. */}
+        {loading ? (
+          <Card>
+            <p className="text-sm text-admin-muted">Loading...</p>
+          </Card>
+        ) : sorted.length === 0 ? (
+          <Card padding="none">
+            <EmptyState
+              title={
+                entries.length === 0 ? "No income entries yet." : "No entries match your filters."
+              }
+            />
+          </Card>
+        ) : (
+          <>
+            <IncomeListCards
+              rows={pager.visible}
+              onEdit={startEdit}
+              onDelete={setConfirmDeleteId}
+            />
+            <IncomeListTable
+              rows={pager.visible}
+              onEdit={startEdit}
+              onDelete={setConfirmDeleteId}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
+          </>
+        )}
 
-      {!loading && <ShowMoreButton pager={pager} noun={["entry", "entries"]} className="mt-3" />}
+        {!loading && <ShowMoreButton pager={pager} noun={["entry", "entries"]} className="mt-3" />}
+      </StickyList>
 
       <ConfirmDialog
         open={confirmDeleteId !== null}

@@ -57,7 +57,7 @@ export function AvailabilityPreview({ config }: Props): React.ReactElement {
   }, [config]);
 
   return (
-    <Card className="mt-6 bg-admin-bg">
+    <Card className="@container mt-6 bg-admin-bg">
       <h3 className={ADMIN_EYEBROW_CLS}>Live preview</h3>
 
       {!config.acceptingBookings && (
@@ -66,9 +66,9 @@ export function AvailabilityPreview({ config }: Props): React.ReactElement {
         </p>
       )}
 
-      {/* 14px hours don't fit a seventh-width cell on phones, so two columns there and
-          all seven from md, where each cell has room. */}
-      <div className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-4 md:grid-cols-7">
+      {/* Sized by the card, not the screen, since it also sits in the narrow settings rail:
+          the hours don't fit a seventh-width cell until the card is about 42rem wide. */}
+      <div className="mt-3 grid grid-cols-2 gap-1 @xs:grid-cols-4 @2xl:grid-cols-7">
         {DAY_ORDER.map(({ index, name }) => {
           const d = config.schedule[index];
           const open = d.enabled;

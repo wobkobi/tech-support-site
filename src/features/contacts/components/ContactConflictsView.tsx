@@ -98,12 +98,12 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
           Pick the value to keep. It&apos;s saved here and pushed back to Google Contacts.
         </p>
       </div>
-      <ul className="flex flex-col gap-3">
+      <ul className="grid gap-3 xl:grid-cols-2">
         {rows.map((c) => {
           const isResolving = resolving === c.id;
           return (
             <li key={c.id}>
-              <Card>
+              <Card className="h-full">
                 <div className="mb-3 flex items-baseline justify-between gap-3">
                   <div className="min-w-0">
                     <Link

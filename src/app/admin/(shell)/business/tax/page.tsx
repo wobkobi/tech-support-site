@@ -7,6 +7,7 @@ import { AdminTabs } from "@/features/admin/components/ui/AdminTabs";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
+import { StickyRail } from "@/features/admin/components/ui/StickyRail";
 import { AccountantNotes } from "@/features/business/components/tax/AccountantNotes";
 import { AccountantSummary } from "@/features/business/components/tax/AccountantSummary";
 import { DeductionsBreakdown } from "@/features/business/components/tax/DeductionsBreakdown";
@@ -168,7 +169,7 @@ export default async function TaxPage({
         className="mb-6 lg:hidden"
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <div className="mb-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
         <div className="flex min-w-0 flex-col gap-6 lg:col-span-8">
           <DeductionsBreakdown result={result} gst={input.gst} filed={filed} />
           <IncomeTaxWorkings
@@ -177,35 +178,8 @@ export default async function TaxPage({
             accRate={input.year.accRate ?? input.settings.acc}
             filed={filed}
           />
-          <HomeOfficeForm
-            // Remount per FY so a half-typed draft never carries into another year.
-            key={fyKey}
-            fyKey={fyKey}
-            fyLabel={selected.label}
-            filed={filed}
-            initial={{
-              officeSqm: record?.officeSqm ?? null,
-              houseSqm: record?.houseSqm ?? null,
-              sqmRate: record?.sqmRate ?? null,
-              kmTier1: record?.kmTier1 ?? null,
-              kmTier2: record?.kmTier2 ?? null,
-              totalVehicleKm: record?.totalVehicleKm ?? null,
-              accRate: record?.accRate ?? null,
-              mortgageInterestOrRent: record?.mortgageInterestOrRent ?? null,
-              rates: record?.rates ?? null,
-            }}
-            defaults={{
-              sqmRate: irdDefaults.sqmRate,
-              kmTier1: kmDefaults.tier1,
-              kmTier2: kmDefaults.tier2,
-              accRate: input.settings.acc,
-            }}
-            fuel={fuelLabel(input.settings.vehicleFuel)}
-            claim={result.homeOffice}
-            businessKm={result.km.businessKm}
-          />
         </div>
-        <div className="flex min-w-0 flex-col gap-6 lg:col-span-4">
+        <StickyRail className="flex flex-col gap-6 lg:col-span-4">
           <SetAsideCard
             result={result}
             targets={targets}
@@ -223,8 +197,39 @@ export default async function TaxPage({
             />
           </Card>
           <AccountantNotes />
-        </div>
+        </StickyRail>
       </div>
+
+      {/* Full width under the grid, so its fields pack three across and the side column
+          stays level with the workings. */}
+      <HomeOfficeForm
+        className="mb-6"
+        // Remount per FY so a half-typed draft never carries into another year.
+        key={fyKey}
+        fyKey={fyKey}
+        fyLabel={selected.label}
+        filed={filed}
+        initial={{
+          officeSqm: record?.officeSqm ?? null,
+          houseSqm: record?.houseSqm ?? null,
+          sqmRate: record?.sqmRate ?? null,
+          kmTier1: record?.kmTier1 ?? null,
+          kmTier2: record?.kmTier2 ?? null,
+          totalVehicleKm: record?.totalVehicleKm ?? null,
+          accRate: record?.accRate ?? null,
+          mortgageInterestOrRent: record?.mortgageInterestOrRent ?? null,
+          rates: record?.rates ?? null,
+        }}
+        defaults={{
+          sqmRate: irdDefaults.sqmRate,
+          kmTier1: kmDefaults.tier1,
+          kmTier2: kmDefaults.tier2,
+          accRate: input.settings.acc,
+        }}
+        fuel={fuelLabel(input.settings.vehicleFuel)}
+        claim={result.homeOffice}
+        businessKm={result.km.businessKm}
+      />
 
       <AccountantSummary
         view={view.shown}

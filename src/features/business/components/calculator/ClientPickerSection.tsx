@@ -169,79 +169,88 @@ export function ClientPickerSection({
           })}
         </div>
       )}
-      <div className="relative">
-        <AdminInput
-          type="text"
-          placeholder="Name"
-          value={clientName}
-          onChange={(e) => {
-            // A hand edit becomes Custom; picking Name again restores the contact's name.
-            if (!searching && addressMode !== "custom") onAddressModeChange("custom");
-            onClientNameChange(e.target.value);
-            setHighlight(0);
-          }}
-          onFocus={() => setFocused(true)}
-          // Close-on-blur deferred so a click on a suggestion still fires.
-          onBlur={() => {
-            blurTimerRef.current = setTimeout(() => setFocused(false), 150);
-          }}
-          onKeyDown={onKeyDown}
-        />
-        {suggestions.length > 0 && (
-          <div className="absolute top-full right-0 left-0 z-20 mt-1 overflow-hidden rounded-md border border-admin-border bg-admin-surface shadow-lg">
-            {suggestions.map((c, i) => {
-              const active = i === highlight;
-              return (
-                <button
-                  key={c.id || `${c.name}-${c.email}-${i}`}
-                  type="button"
-                  // onMouseDown beats the input's onBlur, so the pick lands first.
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    pick(c);
-                  }}
-                  onMouseEnter={() => setHighlight(i)}
-                  className={cn(
-                    "block w-full border-b border-admin-border px-3 py-2 text-left text-sm last:border-b-0",
-                    active ? "bg-russian-violet/10" : "hover:bg-admin-bg",
-                  )}
-                >
-                  <span className="font-medium text-admin-text">{c.name || c.email}</span>
-                  {c.email && c.name && (
-                    <span className="ml-2 text-sm text-admin-muted">{c.email}</span>
-                  )}
-                  {c.company && <span className="ml-2 text-sm text-admin-muted">{c.company}</span>}
-                  {c.phone && sharedNames.has(c.name.trim().toLowerCase()) && (
-                    <span className="ml-2 text-sm text-admin-muted">
-                      {formatNZPhone(c.phone.replace(/^\+64/, "0"))}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-      {renameOffer && (
-        <label className="flex cursor-pointer items-start gap-2 text-sm text-admin-text-secondary">
-          <input
-            type="checkbox"
-            checked={renameContact}
-            onChange={(e) => onRenameContactChange(e.target.checked)}
-            className={ADMIN_CHECKBOX_CLS}
+      {/* Name and email side by side on 2xl; the rename tick keeps its place after the name
+          in the DOM but drops to a row of its own under both. */}
+      <div className="grid gap-3 2xl:grid-cols-2">
+        <div className="relative">
+          <AdminInput
+            type="text"
+            placeholder="Name"
+            value={clientName}
+            onChange={(e) => {
+              // A hand edit becomes Custom; picking Name again restores the contact's name.
+              if (!searching && addressMode !== "custom") onAddressModeChange("custom");
+              onClientNameChange(e.target.value);
+              setHighlight(0);
+            }}
+            onFocus={() => setFocused(true)}
+            // Close-on-blur deferred so a click on a suggestion still fires.
+            onBlur={() => {
+              blurTimerRef.current = setTimeout(() => setFocused(false), 150);
+            }}
+            onKeyDown={onKeyDown}
           />
-          <span>
-            Also change the contact from {pickedContactName} to {renameOffer} when the invoice saves
-          </span>
-        </label>
-      )}
-      <EmailInput
-        id="calculator-client-email"
-        placeholder="Email"
-        value={clientEmail}
-        onChange={onClientEmailChange}
-        className={ADMIN_INPUT_CLS}
-      />
+          {suggestions.length > 0 && (
+            <div className="absolute top-full right-0 left-0 z-20 mt-1 overflow-hidden rounded-md border border-admin-border bg-admin-surface shadow-lg">
+              {suggestions.map((c, i) => {
+                const active = i === highlight;
+                return (
+                  <button
+                    key={c.id || `${c.name}-${c.email}-${i}`}
+                    type="button"
+                    // onMouseDown beats the input's onBlur, so the pick lands first.
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      pick(c);
+                    }}
+                    onMouseEnter={() => setHighlight(i)}
+                    className={cn(
+                      "block w-full border-b border-admin-border px-3 py-2 text-left text-sm last:border-b-0",
+                      active ? "bg-russian-violet/10" : "hover:bg-admin-bg",
+                    )}
+                  >
+                    <span className="font-medium text-admin-text">{c.name || c.email}</span>
+                    {c.email && c.name && (
+                      <span className="ml-2 text-sm text-admin-muted">{c.email}</span>
+                    )}
+                    {c.company && (
+                      <span className="ml-2 text-sm text-admin-muted">{c.company}</span>
+                    )}
+                    {c.phone && sharedNames.has(c.name.trim().toLowerCase()) && (
+                      <span className="ml-2 text-sm text-admin-muted">
+                        {formatNZPhone(c.phone.replace(/^\+64/, "0"))}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        {renameOffer && (
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-admin-text-secondary 2xl:col-span-2 2xl:row-start-2">
+            <input
+              type="checkbox"
+              checked={renameContact}
+              onChange={(e) => onRenameContactChange(e.target.checked)}
+              className={ADMIN_CHECKBOX_CLS}
+            />
+            <span>
+              Also change the contact from {pickedContactName} to {renameOffer} when the invoice
+              saves
+            </span>
+          </label>
+        )}
+        <div className="2xl:col-start-2 2xl:row-start-1">
+          <EmailInput
+            id="calculator-client-email"
+            placeholder="Email"
+            value={clientEmail}
+            onChange={onClientEmailChange}
+            className={ADMIN_INPUT_CLS}
+          />
+        </div>
+      </div>
     </Card>
   );
 }

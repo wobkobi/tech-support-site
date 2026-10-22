@@ -5,6 +5,7 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import { mapsSearchUrl } from "@/features/booking/lib/booking";
@@ -86,7 +87,9 @@ const CONFIRM_COPY: Record<
 };
 
 /**
- * Renders the booking lifecycle action buttons + their confirm dialogs.
+ * Renders the Actions card with the booking lifecycle buttons + their confirm dialogs. The
+ * card is left out when no button applies (a cancelled booking with no invoice), but the
+ * phone bar still renders.
  * @param props - Component props.
  * @param props.id - Booking id.
  * @param props.status - Booking lifecycle status.
@@ -144,6 +147,8 @@ export function BookingActions({
   // Directions only matter while the visit is still ahead.
   const mapsHref = isOpen && address ? mapsSearchUrl(address) : null;
   const showPhoneBar = phone != null || mapsHref != null || isConfirmed || isCompleted;
+  // Every button below needs one of these; a cancelled booking usually has none.
+  const hasButtons = isOpen || isCompleted || invoiceHref != null || isTest;
 
   /** Opens the complete dialog. */
   function openComplete(): void {
@@ -225,78 +230,83 @@ export function BookingActions({
 
   return (
     <>
-      <div className="flex flex-col gap-2">
-        {isConfirmed && (
-          <AdminButton variant="secondary" onClick={openComplete} disabled={busy}>
-            Mark completed
-          </AdminButton>
-        )}
-        {invoiceHref ? (
-          <AdminButton variant="secondary" href={invoiceHref}>
-            View invoice
-          </AdminButton>
-        ) : (
-          billHref && (
-            <AdminButton variant="secondary" href={billHref}>
-              Bill in calculator
-            </AdminButton>
-          )
-        )}
-        {isConfirmed && isPast && (
-          <AdminButton
-            variant="secondary"
-            onClick={() => {
-              setDraftInvoice(true);
-              setConfirm("noshow");
-            }}
-            disabled={busy || isEditLocked}
-          >
-            Mark no-show
-          </AdminButton>
-        )}
-        {(isConfirmed || isCompleted) && (
-          <AdminButton variant="secondary" onClick={() => setConfirm("review")} disabled={busy}>
-            {reviewAlreadySent ? "Resend review email" : "Send review email"}
-          </AdminButton>
-        )}
-        {isOpen && isFuture && (
-          <AdminButton
-            variant="secondary"
-            href={`/booking/edit?token=${cancelToken}`}
-            prefetch={false}
-          >
-            Reschedule ↗
-          </AdminButton>
-        )}
-        {isOpen && (
-          <>
-            <AdminButton
-              variant="secondary"
-              onClick={() => setConfirm("cancel-operator")}
-              disabled={busy || isEditLocked}
-            >
-              Cancel - my call
-            </AdminButton>
-            <AdminButton
-              variant="danger"
-              onClick={() => setConfirm("cancel-onbehalf")}
-              disabled={busy || isEditLocked}
-            >
-              Cancel - for customer
-            </AdminButton>
-            {isEditLocked && (
-              <p className="text-sm text-admin-muted">
-                Cancelling locks {lockHours}h after a booking ends. Completing stays open.
-              </p>
+      {hasButtons && (
+        <Card>
+          <CardHeader title="Actions" />
+          <div className="flex flex-col gap-2">
+            {isConfirmed && (
+              <AdminButton variant="secondary" onClick={openComplete} disabled={busy}>
+                Mark completed
+              </AdminButton>
             )}
-          </>
-        )}
-        {isTest && (
-          <AdminButton variant="danger" onClick={() => setConfirm("delete")} disabled={busy}>
-            Delete booking
-          </AdminButton>
-        )}
-      </div>
+            {invoiceHref ? (
+              <AdminButton variant="secondary" href={invoiceHref}>
+                View invoice
+              </AdminButton>
+            ) : (
+              billHref && (
+                <AdminButton variant="secondary" href={billHref}>
+                  Bill in calculator
+                </AdminButton>
+              )
+            )}
+            {isConfirmed && isPast && (
+              <AdminButton
+                variant="secondary"
+                onClick={() => {
+                  setDraftInvoice(true);
+                  setConfirm("noshow");
+                }}
+                disabled={busy || isEditLocked}
+              >
+                Mark no-show
+              </AdminButton>
+            )}
+            {(isConfirmed || isCompleted) && (
+              <AdminButton variant="secondary" onClick={() => setConfirm("review")} disabled={busy}>
+                {reviewAlreadySent ? "Resend review email" : "Send review email"}
+              </AdminButton>
+            )}
+            {isOpen && isFuture && (
+              <AdminButton
+                variant="secondary"
+                href={`/booking/edit?token=${cancelToken}`}
+                prefetch={false}
+              >
+                Reschedule ↗
+              </AdminButton>
+            )}
+            {isOpen && (
+              <>
+                <AdminButton
+                  variant="secondary"
+                  onClick={() => setConfirm("cancel-operator")}
+                  disabled={busy || isEditLocked}
+                >
+                  Cancel - my call
+                </AdminButton>
+                <AdminButton
+                  variant="danger"
+                  onClick={() => setConfirm("cancel-onbehalf")}
+                  disabled={busy || isEditLocked}
+                >
+                  Cancel - for customer
+                </AdminButton>
+                {isEditLocked && (
+                  <p className="text-sm text-admin-muted">
+                    Cancelling locks {lockHours}h after a booking ends. Completing stays open.
+                  </p>
+                )}
+              </>
+            )}
+            {isTest && (
+              <AdminButton variant="danger" onClick={() => setConfirm("delete")} disabled={busy}>
+                Delete booking
+              </AdminButton>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Phone bar. The page reserves room under it (see globals.css). */}
       {showPhoneBar && (
