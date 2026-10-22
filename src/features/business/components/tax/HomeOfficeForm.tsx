@@ -64,6 +64,7 @@ interface HomeOfficeFormProps {
   claim: { officePct: number; sqmPart: number; proportionalPart: number; amount: number };
   /** Business km the FY's km claim counts, for the total km sanity check. */
   businessKm: number;
+  className?: string;
 }
 
 /** The Tier 1 km limit as the hint prints it, e.g. "14,000". */
@@ -264,6 +265,7 @@ function accFields(defaults: RateDefaults): FieldSpec[] {
  * @param props.fuel - Readable vehicle fuel type for the km rate hints.
  * @param props.claim - Home office claim the estimate worked out from the saved values.
  * @param props.businessKm - Business km the FY's km claim counts.
+ * @param props.className - Extra classes on the card.
  * @returns The card.
  */
 export function HomeOfficeForm({
@@ -275,6 +277,7 @@ export function HomeOfficeForm({
   fuel,
   claim,
   businessKm,
+  className,
 }: HomeOfficeFormProps): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -379,7 +382,7 @@ export function HomeOfficeForm({
   const kmWarning = totalKmWarning(draft.totalVehicleKm, businessKm);
 
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader
         title="Home office, car and ACC"
         description={`${fyLabel}. The office is claimed on IRD's square-metre rate, plus its share of mortgage interest or rent and rates. The car is claimed on IRD's kilometre rates. ACC is worked out on this year's levy rate.`}
@@ -396,7 +399,7 @@ export function HomeOfficeForm({
           rate.
         </p>
         <h3 className="mb-3 text-base font-semibold text-admin-text">Home office</h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {homeFields(defaults).map((spec) => renderField(spec))}
         </div>
 
@@ -411,16 +414,22 @@ export function HomeOfficeForm({
           </p>
         </div>
 
-        <h3 className="mt-6 mb-3 text-base font-semibold text-admin-text">Car</h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {carFields(defaults, fuel).map((spec) =>
-            renderField(spec, spec.key === "totalVehicleKm" ? kmWarning : undefined),
-          )}
-        </div>
-
-        <h3 className="mt-6 mb-3 text-base font-semibold text-admin-text">ACC</h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {accFields(defaults).map((spec) => renderField(spec))}
+        {/* Car's three fields and ACC's one share a row of four on 2xl. */}
+        <div className="mt-6 grid gap-x-4 gap-y-6 2xl:grid-cols-4">
+          <section className="2xl:col-span-3">
+            <h3 className="mb-3 text-base font-semibold text-admin-text">Car</h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {carFields(defaults, fuel).map((spec) =>
+                renderField(spec, spec.key === "totalVehicleKm" ? kmWarning : undefined),
+              )}
+            </div>
+          </section>
+          <section>
+            <h3 className="mb-3 text-base font-semibold text-admin-text">ACC</h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-1">
+              {accFields(defaults).map((spec) => renderField(spec))}
+            </div>
+          </section>
         </div>
 
         {!filed && (

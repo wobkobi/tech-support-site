@@ -112,7 +112,12 @@ non-blank in each Vercel environment.
   `ADMIN_SECRET`, `CRON_SECRET`.
 - **Recommended** (a missing one degrades a feature, never fatal): the Google OAuth quartet,
   `BOOKING_CALENDAR_ID`, `RESEND_API_KEY`, `EMAIL_FROM`, `ADMIN_EMAIL`, `OPENAI_API_KEY`,
-  `GOOGLE_MAPS_SERVER_KEY`, `HOME_ADDRESS`, `GOOGLE_SHEET_ID`, `GOOGLE_BUSINESS_SHEETS_FOLDER_ID`.
+  `GOOGLE_MAPS_SERVER_KEY`, `HOME_ADDRESS`, `GOOGLE_SHEET_ID`, `GOOGLE_BUSINESS_SHEETS_FOLDER_ID`,
+  and for Social `META_PAGE_ID`, `META_PAGE_ACCESS_TOKEN`, `INSTAGRAM_ACCOUNT_ID`,
+  `GOOGLE_BUSINESS_ACCOUNT_ID`, `GOOGLE_BUSINESS_LOCATION_ID` (see Social connections below).
+- **Optional:** `META_APP_ID` and `META_APP_SECRET` - let Social read the Meta token's permissions
+  as the app. Without them the Page token inspects itself, which works while the token does; with
+  them, a dead token still shows why.
 - **Optional:** `MAILING_FROM` - sender for mailing-list emails, like
   `Harrison at To The Point Tech <news@tothepoint.co.nz>`; falls back to `EMAIL_FROM`. A separate
   address means a reader who blocks the list or reports it as spam still gets booking emails. Any
@@ -122,3 +127,85 @@ non-blank in each Vercel environment.
 inside every value (single-quoted included). A value containing `$` must be single-quoted with the
 `$` escaped as `\$` (e.g. `CRON_SECRET`, `SMTP_PASS`) or it silently expands to empty. On Vercel,
 set the literal value. A blanked var surfaces by name in `/api/health` and in the fail-fast asserts.
+
+## Social connections
+
+Social > Overview shows whether each app connects and what each can do. Facebook and Instagram go by
+the Meta token's permissions (`debug_token`); Google goes by a read against each Business Profile
+API. Both are cached for 10 minutes; Check again asks straight away.
+
+**A Meta token that doesn't run out:** a System User token, swapped for the Page's own token.
+
+1. Meta Business Suite > Settings > Users > System users > Add, with the Admin role.
+2. Assign it the Page and the Instagram account, with full control.
+3. Generate a token for the app, set to never expire, with the permissions the Overview's "Make a
+   Meta token that doesn't run out" step lists (posting, take-downs, stats, comments, cover photo
+   and messages).
+4. In the Graph API Explorer, with that token, get `{META_PAGE_ID}?fields=access_token`.
+5. Set the result as `META_PAGE_ACCESS_TOKEN` on Vercel and in `.env.local`, redeploy, then press
+   Check again.
+
+The Overview warns when the token stops working, or when it or its data access ends within 14 days.
+
+**Probe:** `npm run probe:meta` makes GET calls only and prints what the token can read: its
+permissions and dates, Page, post and Instagram stats under each metric name, whether comments come
+back with who wrote them, and the Instagram posting quota.
+
+**State on 2026-10-22** (Page token for the "To the Point Posting" app, never runs out, data access
+until 3 Jan 2027):
+
+- Posting and take-downs work on all three apps.
+- Post views are `post_media_view`; `post_media_views` and `post_impressions` are rejected as
+  invalid metrics. Page insights answer but return no figures without `read_insights`.
+- Instagram stats and Facebook comments need `instagram_manage_insights`, `read_insights`,
+  `pages_read_user_content` and `pages_manage_engagement`, which the token doesn't have yet.
+- Google posts and reviews answer; the **Business Profile Performance API is switched off** in
+  Google Cloud and needs turning on before Google stats work.
+- Live mode: not checked yet. Whether posts made through the API show to the public, and whether
+  comments from people without a role on the app come back with who wrote them, decide if the app
+  needs Live mode (and App Review) before the comments inbox.
+
+**Media (several pictures, reels, stories, cover photos):**
+
+- Videos go from the browser straight to the Blob store, past Vercel's 4.5 MB request limit, using a
+  token from `/api/admin/social/video-upload`. That token only allows MP4 or MOV up to 250 MB under
+  `social/video/`, plus JPEG cover frames. It needs `BLOB_READ_WRITE_TOKEN`; `onUploadCompleted`
+  isn't used, so local uploads work.
+- Meta fetches each video from its Blob address, so the store must stay public.
+- Make a story and the reel cover frame draw stored files into a canvas. That needs the Blob store
+  to keep sending `Access-Control-Allow-Origin: *`, which it did on 2026-10-22.
+- A video the apps are still processing carries across publish-cron passes, checked again 4 minutes
+  after each. Instagram drops an upload still unfinished after 24 hours, and that app fails with a
+  Retry.
+- Stories and cover photos can't be taken down from the site.
+- A cover photo needs `pages_manage_metadata`.
+- Not yet tried on the real accounts: a carousel, a reel, a story and a cover photo.
+
+**Stats (Social > Analytics, each post's Stats card):**
+
+- Read by the `/api/cron/sync-social` job (see CRON.md); register it on cron-job.org after the
+  deploy that adds it.
+- Facebook figures need `read_insights` and Instagram's need `instagram_manage_insights`. Without
+  them the page says which permission is missing. Instagram's likes and comments still come from the
+  post itself; a Facebook post's reactions and comments need `pages_read_user_content` too.
+- Google figures need the Business Profile Performance API turned on in Google Cloud. Google gives
+  no figures for single posts, only for the profile, and runs about 3 days behind.
+- Facebook gives no figures for stories, and a cover photo has none.
+- Facebook's day runs on Pacific time, so its daily figures don't line up exactly with NZ days.
+- Check one post and one day against Meta Business Suite and the Business Profile dashboard once the
+  permissions are in.
+
+**Comments and reviews (Social > Inbox):**
+
+- Read by `/api/cron/sync-social` every 30 minutes (see CRON.md), or straight away with Check now.
+- Google reviews need nothing more: they're read and answered through the Business Profile API with
+  the existing `business.manage` scope. A reply replaces any earlier one, and only our reply can be
+  deleted, never the review.
+- Facebook comments need `pages_read_user_content` to read and `pages_manage_engagement` to reply,
+  hide or delete. Instagram's need `instagram_basic` and `instagram_manage_comments`. Until the
+  token has them, the Inbox names the permission Meta asked for and the other apps carry on.
+- A comment that comes back without its writer (a Development mode app only sees people with a role
+  on it) shows as "Someone". If every comment comes back like that once the permissions are in, the
+  app needs Live mode.
+- Suggest a reply uses the AI writers' provider (feature `social-reply`) with the live business
+  facts; nothing is ever sent without pressing Send.

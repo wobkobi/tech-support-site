@@ -1,8 +1,9 @@
 // src/features/social/lib/post-row.ts
 // Plain-data social post shape for the server > client boundary and the social API.
 
+import { formatOf, type MediaItem, type SocialFormatKey } from "@/features/social/lib/media";
 import { dateKey, type GooglePostCta, type GooglePostType } from "@/features/social/lib/validate";
-import type { SocialPost } from "@prisma/client";
+import type { SocialMedia, SocialPost } from "@prisma/client";
 
 /** Post lifecycle, mirroring the SocialPostStatus enum. */
 export type SocialPostStatus =
@@ -17,6 +18,8 @@ export interface SocialTargetRow {
   imageAlt: string | null;
   imageWidth: number | null;
   imageHeight: number | null;
+  /** The picture before the logo went on, when it has one. */
+  imageOriginalUrl: string | null;
   cropApprovedFor: string | null;
   status: "pending" | "posted" | "failed" | "skipped" | "removed";
   permalink: string | null;
@@ -30,11 +33,18 @@ export interface SocialPostRow {
   id: string;
   name: string;
   body: string;
+  format: SocialFormatKey;
   imageUrl: string | null;
   imageAlt: string | null;
   imageWidth: number | null;
   imageHeight: number | null;
+  /** The picture before the logo went on, when it has one. */
+  imageOriginalUrl: string | null;
+  /** Pictures 2 onwards. */
+  moreImages: MediaItem[];
+  video: MediaItem | null;
   linkUrl: string | null;
+  tagIds: string[];
   isPreset: boolean;
   status: SocialPostStatus;
   scheduledAt: string | null;
@@ -44,12 +54,48 @@ export interface SocialPostRow {
   targets: SocialTargetRow[];
   googleType: GooglePostType;
   googleCta: GooglePostCta | null;
+  /** Where Google's button goes, when it isn't the Link. */
+  googleUrl: string | null;
   googleTitle: string | null;
-  /** Offer dates as YYYY-MM-DD. */
+  /** Offer and event dates as YYYY-MM-DD. */
   offerStart: string | null;
   offerEnd: string | null;
+  /** Event times as NZ "HH:MM", or null for all day. */
+  eventStartTime: string | null;
+  eventEndTime: string | null;
   couponCode: string | null;
+  /** A content item: a library post that goes out as postings. */
+  isContent: boolean;
+  /** A posting's content item, the caption it used, and whether it was edited by hand. */
+  sourceId: string | null;
+  captionIndex: number | null;
+  detached: boolean;
+  /** A content item's other captions; body is caption 1. */
+  altCaptions: string[];
+  nextCaption: number | null;
+  recycle: boolean;
+  /** A content item's last day to post as YYYY-MM-DD, or null. */
+  expiresAt: string | null;
+  maxPosts: number | null;
   updatedAt: string;
+}
+
+/**
+ * Maps a stored picture or video to its plain shape.
+ * @param m - As stored.
+ * @returns The plain shape.
+ */
+export function toMediaItem(m: SocialMedia): MediaItem {
+  return {
+    kind: m.kind,
+    url: m.url,
+    alt: m.alt,
+    width: m.width,
+    height: m.height,
+    durationMs: m.durationMs,
+    sizeBytes: m.sizeBytes,
+    coverUrl: m.coverUrl,
+  };
 }
 
 /**
@@ -62,11 +108,16 @@ export function toPostRow(p: SocialPost): SocialPostRow {
     id: p.id,
     name: p.name,
     body: p.body,
+    format: formatOf(p.format),
     imageUrl: p.imageUrl,
     imageAlt: p.imageAlt,
     imageWidth: p.imageWidth,
     imageHeight: p.imageHeight,
+    imageOriginalUrl: p.imageOriginalUrl,
+    moreImages: (p.moreImages ?? []).map(toMediaItem),
+    video: p.video ? toMediaItem(p.video) : null,
     linkUrl: p.linkUrl,
+    tagIds: p.tagIds ?? [],
     isPreset: p.isPreset,
     status: p.status,
     scheduledAt: p.scheduledAt?.toISOString() ?? null,
@@ -81,6 +132,7 @@ export function toPostRow(p: SocialPost): SocialPostRow {
       imageAlt: t.imageAlt,
       imageWidth: t.imageWidth,
       imageHeight: t.imageHeight,
+      imageOriginalUrl: t.imageOriginalUrl,
       cropApprovedFor: t.cropApprovedFor,
       status: t.status,
       permalink: t.permalink,
@@ -90,10 +142,22 @@ export function toPostRow(p: SocialPost): SocialPostRow {
     })),
     googleType: p.googleType,
     googleCta: p.googleCta,
+    googleUrl: p.googleUrl,
     googleTitle: p.googleTitle,
     offerStart: dateKey(p.offerStart),
     offerEnd: dateKey(p.offerEnd),
+    eventStartTime: p.eventStartTime,
+    eventEndTime: p.eventEndTime,
     couponCode: p.couponCode,
+    isContent: p.isContent === true,
+    sourceId: p.sourceId,
+    captionIndex: p.captionIndex,
+    detached: p.detached === true,
+    altCaptions: p.altCaptions ?? [],
+    nextCaption: p.nextCaption,
+    recycle: p.recycle === true,
+    expiresAt: dateKey(p.expiresAt),
+    maxPosts: p.maxPosts,
     updatedAt: p.updatedAt.toISOString(),
   };
 }

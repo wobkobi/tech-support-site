@@ -10,6 +10,9 @@ import {
   type DesignDraft,
   type DraftRoom,
 } from "@/features/social-design/lib/ai-draft";
+import type { CaptionRequest } from "@/features/social/lib/caption-ai";
+import { firstName, REPLY_MAX, type ReplyRequest } from "@/features/social/lib/inbox/map";
+import { GOOGLE_MAX_CHARS } from "@/features/social/lib/validate";
 
 /** Grouping for a reported check. */
 type CheckFamily = "context" | "reproducibility" | "drift" | "cross-route" | "travel" | "draft";
@@ -202,5 +205,189 @@ export function postDraftProblems(
   if (length > HEADLINE_TARGET) soft.push(`headline is ${length} characters`);
   if (/[\u2018\u2019\u201c\u201d]/.test(all)) soft.push("curly quotes");
   if (/#\w/.test(draft.caption)) soft.push("hashtags");
+  return { hard, soft };
+}
+
+/** A hashtag: # then letters, numbers or _, not inside a word or an HTML entity. */
+const HASHTAG_RE = /(?<![\p{L}\p{N}_&])#[\p{L}\p{N}_]+/gu;
+/** One emoji (any pictograph, so a skin tone or joiner sequence counts once per symbol). */
+const EMOJI_RE = /\p{Extended_Pictographic}/gu;
+/** An NZ phone number or an email address, which a Google post must never carry. */
+const PHONE_RE = /\b0\d[\d ]{6,}\d\b/;
+const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.]+/;
+
+/**
+ * Lowercased hashtags in the order they appear.
+ * @param text - The words to read.
+ * @returns The hashtags, # included.
+ */
+function hashtagsIn(text: string): string[] {
+  return (text.match(HASHTAG_RE) ?? []).map((t) => t.toLowerCase());
+}
+
+/**
+ * What a set of Write with AI options got wrong. Hard problems break a prompt INVARIANT;
+ * soft ones are style. Option problems are prefixed with the option number when there are
+ * several. In a rewrite, hashtags and emoji are measured against the post's own words.
+ * @param captions - The options the route returned.
+ * @param req - The request as the route parsed it.
+ * @param facts - The business facts the writer was given (/llms.txt), or "" for none.
+ * @param brand - The live brand profile's hashtags (no #) and Never mention words.
+ * @param brand.tags - Brand hashtags, which must open the hashtag line.
+ * @param brand.avoid - Words or topics that must never appear.
+ * @returns The hard and soft problems, empty when it's clean.
+ */
+export function captionProblems(
+  captions: string[],
+  req: CaptionRequest,
+  facts: string,
+  brand: { tags: string[]; avoid: string[] },
+): { hard: string[]; soft: string[] } {
+  const hard: string[] = [];
+  const soft: string[] = [];
+  if (captions.length !== req.count) {
+    hard.push(`${captions.length} option(s), wanted ${req.count}`);
+  }
+  const rewrite = req.mode === "rewrite";
+  const writesEnding = !rewrite || req.action === "cta";
+  const writesTags = rewrite ? req.action === "hashtags" : req.hashtags;
+  const briefTags = new Set(hashtagsIn(req.brief));
+  const briefEmoji = rewrite ? (req.brief.match(EMOJI_RE) ?? []).length : 0;
+  const maxEmoji = briefEmoji + (req.emoji && req.action !== "fix" ? 2 : 0);
+  const brandTags = brand.tags.map((t) => `#${t.toLowerCase()}`);
+  const google = req.platforms.includes("google");
+
+  captions.forEach((text, i) => {
+    const bad: string[] = [];
+    const style: string[] = [];
+    const tags = hashtagsIn(text);
+
+    if (/[\u2013\u2014]/.test(text)) bad.push("has an em or en dash");
+    if (saysWe(text)) bad.push('says "we", "us" or "our"');
+    if (/\*\*|^#+ /m.test(text)) bad.push("has markup");
+    // Digit runs outside placeholders and hashtags come from the brief or the facts.
+    const invented = inventedFigures(
+      text.replace(/\{\w+\}/g, "").replace(HASHTAG_RE, ""),
+      req.brief,
+      facts,
+    );
+    if (invented.length > 0) bad.push(`figures not in the brief or facts: ${invented.join(", ")}`);
+
+    if (writesTags) {
+      if (tags.length === 0) bad.push("no hashtags");
+      if (tags.length > 10) bad.push(`${tags.length} hashtags, at most 10`);
+      if (brandTags.length > 0 && brandTags.some((t, n) => tags[n] !== t)) {
+        bad.push("brand hashtags don't open the hashtag line");
+      }
+    } else {
+      const added = tags.filter((t) => !briefTags.has(t));
+      if (added.length > 0) bad.push(`hashtags it shouldn't add: ${added.join(" ")}`);
+    }
+
+    const emoji = (text.match(EMOJI_RE) ?? []).length;
+    if (emoji > maxEmoji) bad.push(`${emoji} emoji, at most ${maxEmoji}`);
+    if (req.action === "fix" && emoji < briefEmoji) style.push("dropped an emoji");
+
+    if (google && (PHONE_RE.test(text) || EMAIL_RE.test(text))) {
+      bad.push("phone or email in words for Google");
+    }
+    if (google && text.length > GOOGLE_MAX_CHARS) {
+      bad.push(`${text.length} characters, Google takes ${GOOGLE_MAX_CHARS}`);
+    }
+    if (req.platforms.includes("instagram") && /link in bio|click the link|tap below/i.test(text)) {
+      bad.push("points to a link Instagram can't tap");
+    }
+    if (writesEnding && req.ending === "book") {
+      const links = (text.match(/\/booking\b/g) ?? []).length;
+      if (links !== 1) bad.push(`booking link appears ${links} times, wanted once`);
+    }
+    if (writesEnding && req.ending === "call" && !google && !PHONE_RE.test(text)) {
+      bad.push("call ending with no phone number");
+    }
+    // "In any form", so a plain substring: "cheap" also catches "cheaper".
+    const lower = text.toLowerCase();
+    for (const word of brand.avoid) {
+      if (lower.includes(word.toLowerCase())) bad.push(`says "${word}" (Never mention)`);
+    }
+
+    const at = captions.length > 1 ? `option ${i + 1}: ` : "";
+    hard.push(...bad.map((p) => at + p));
+    soft.push(...style.map((p) => at + p));
+  });
+
+  // Options should take different angles, so two opening the same way is worth a look.
+  const openings = captions.map((c) => c.toLowerCase().split(/\s+/).slice(0, 3).join(" "));
+  if (new Set(openings).size < openings.length) soft.push("options open the same way");
+  return { hard, soft };
+}
+
+/** Words that give money back or knock money off, which a review reply must never offer. */
+const MONEY_BACK_RE = /\brefund|\bdiscount|\bmoney back|\bfree of charge|\bfor free\b|\bcompensat/i;
+
+/**
+ * What a Suggest a reply answer got wrong. Hard problems break a prompt INVARIANT; soft ones are
+ * style. Spam must come back as `hide` with no words; anything else as words to send.
+ * @param got - The suggestion the route returned.
+ * @param got.reply - The words.
+ * @param got.hide - Whether it says to hide the message.
+ * @param req - The request as the route parsed it.
+ * @param facts - The business facts the writer was given (/llms.txt).
+ * @param opts - What the case expects.
+ * @param opts.wantHide - It's spam: the answer must say hide.
+ * @param opts.allowHide - Hide is a fair answer as well as words.
+ * @returns The hard and soft problems, empty when it's clean.
+ */
+export function replyProblems(
+  got: { reply: string; hide: boolean },
+  req: ReplyRequest,
+  facts: string,
+  opts: { wantHide?: boolean; allowHide?: boolean } = {},
+): { hard: string[]; soft: string[] } {
+  const hard: string[] = [];
+  const soft: string[] = [];
+  const text = got.reply;
+  if (opts.wantHide) {
+    if (!got.hide) hard.push("spam not marked to hide");
+    if (text) soft.push("spam came back with words as well");
+    return { hard, soft };
+  }
+  if (got.hide && !opts.allowHide) hard.push("marked to hide, but it isn't spam");
+  if (!text) {
+    if (!got.hide) hard.push("no words came back");
+    return { hard, soft };
+  }
+
+  if (/[–—]/.test(text)) hard.push("has an em or en dash");
+  if (saysWe(text)) hard.push('says "we", "us" or "our"');
+  if (/\*\*|^#+ /m.test(text)) hard.push("has markup");
+  if (hashtagsIn(text).length > 0) hard.push("has hashtags");
+  if ((text.match(EMOJI_RE) ?? []).length > 0) hard.push("has emoji");
+  if (text.length > REPLY_MAX[req.platform]) {
+    hard.push(`${text.length} characters, ${req.platform} takes ${REPLY_MAX[req.platform]}`);
+  }
+  const said = [req.text, req.postText ?? "", ...req.earlier.map((m) => m.text)].join("\n");
+  const invented = inventedFigures(text, said, facts);
+  if (invented.length > 0) hard.push(`figures not in the thread or facts: ${invented.join(", ")}`);
+  if (req.platform === "instagram" && /https?:\/\/|\bwww\.|\.co\.nz\b/i.test(text)) {
+    hard.push("a link Instagram can't tap");
+  }
+
+  // A sentence ends at . ! or ? followed by a space or the end.
+  const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => s.trim()).length;
+  const most = req.kind === "review" ? 4 : 2;
+  if (sentences > most + 1) hard.push(`${sentences} sentences, at most ${most}`);
+  else if (sentences > most) soft.push(`${sentences} sentences, at most ${most}`);
+  if (req.kind === "review" && sentences < 2) soft.push("one sentence for a review");
+
+  if (req.kind === "review" && req.rating !== null) {
+    const name = firstName("google", req.author);
+    if (req.rating >= 4 && name && !text.includes(name)) hard.push(`doesn't thank ${name} by name`);
+    if (req.rating <= 3) {
+      if (!/sorry|apolog/i.test(text)) hard.push("doesn't apologise");
+      if (!PHONE_RE.test(text)) hard.push("doesn't give the phone number");
+    }
+    if (MONEY_BACK_RE.test(text)) hard.push("offers money back or a discount");
+  }
+  if (/[‘’“”]/.test(text)) soft.push("curly quotes");
   return { hard, soft };
 }

@@ -66,6 +66,12 @@ export const DRAFT_KINDS: readonly DraftKind[] = [AUTO_KIND, ...PICKED_KINDS];
 /** The longest brief the dialog accepts. */
 export const BRIEF_MAX = 500;
 
+/** The longest brief when it's a social post being turned into an email (Email this too). */
+export const POST_SOURCE_MAX = 3000;
+
+/** Where a brief came from: the operator's own words, or a social post to turn into an email. */
+export type DraftSource = "brief" | "post";
+
 /**
  * Looks a picture drafted with the email can take; "scam" is the tip look with a warning label,
  * "thanks" the announcement look led by the thank-you.

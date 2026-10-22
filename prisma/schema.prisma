@@ -1129,33 +1129,70 @@ enum GooglePostType {
   EVENT
 }
 
-// Google post button. CALL dials the profile's phone number, so it takes no URL.
+// Google post button. CALL dials the profile's phone number, so it takes no URL; the rest go
+// to the post's Google button link, or its Link. SHOP shows as "Buy".
 enum GooglePostCta {
   BOOK
-  CALL
+  ORDER
+  SHOP
   LEARN_MORE
+  SIGN_UP
+  CALL
+}
+
+// What a post is on Facebook and Instagram. feed is an ordinary post (one picture, several, or
+// none); reel and story need a video or picture of their own; cover changes the Facebook Page's
+// cover photo. Google only takes feed posts.
+enum SocialFormat {
+  feed
+  reel
+  story
+  cover
+}
+
+enum SocialMediaKind {
+  image
+  video
+}
+
+// A picture after the first, or a post's video. Sizes are pixels; coverUrl is a video's cover frame.
+type SocialMedia {
+  kind       SocialMediaKind
+  url        String
+  alt        String?
+  width      Int?
+  height     Int?
+  durationMs Int?
+  sizeBytes  Int?
+  coverUrl   String?
 }
 
 // One platform's copy of a social post and how publishing it went.
 type SocialTarget {
-  platform        SocialPlatform
-  enabled         Boolean            @default(true)
+  platform           SocialPlatform
+  enabled            Boolean            @default(true)
   // Replaces the shared body on this platform only.
-  textOverride    String?
+  textOverride       String?
   // Replaces the shared picture on this platform only, for one that fits its shape.
-  imageUrl        String?
-  imageAlt        String?
-  imageWidth      Int?
-  imageHeight     Int?
+  imageUrl           String?
+  imageAlt           String?
+  imageWidth         Int?
+  imageHeight        Int?
   // The picture URL the operator agreed this platform may cut off. Tied to the URL so
   // a new picture needs a new OK.
-  cropApprovedFor String?
-  status          SocialTargetStatus @default(pending)
-  externalId      String?
-  permalink       String?
-  error           String?
-  postedAt        DateTime?
-  removedAt       DateTime?
+  cropApprovedFor    String?
+  // The upload before "Add my logo" marked imageUrl; null when no logo was added.
+  imageOriginalUrl   String?
+  status             SocialTargetStatus @default(pending)
+  externalId         String?
+  permalink          String?
+  error              String?
+  postedAt           DateTime?
+  removedAt          DateTime?
+  // What the platform is still processing (an Instagram container, a Facebook video), so a
+  // resumed run checks it instead of uploading again. Instagram drops containers after 24 hours.
+  containerId        String?
+  containerCreatedAt DateTime?
 }
 
 // A post the operator writes once in /admin/social and publishes to Facebook,
@@ -1167,12 +1204,23 @@ model SocialPost {
   name String
   body String
 
-  imageUrl    String?
-  imageAlt    String?
+  // Null is feed.
+  format           SocialFormat?
+  // Picture 1; moreImages holds pictures 2 to 10 of a feed post.
+  imageUrl         String?
+  imageAlt         String?
   // Pixel size of the stored image, for Instagram's aspect-ratio and width rules.
-  imageWidth  Int?
-  imageHeight Int?
-  linkUrl     String?
+  imageWidth       Int?
+  imageHeight      Int?
+  // The upload before "Add my logo" marked imageUrl; null when no logo was added.
+  imageOriginalUrl String?
+  moreImages       SocialMedia[]
+  // A reel's video, or a story's when it isn't a picture.
+  video            SocialMedia?
+  linkUrl          String?
+
+  // SocialTag ids, for sorting posts; only the admin sees them.
+  tagIds String[] @default([]) @db.ObjectId
 
   isPreset  Boolean @default(false)
   // Stable handle for a starter preset the code looks up by role.
@@ -1185,29 +1233,239 @@ model SocialPost {
   // "posting" well past this died mid-way, and the cron resumes its pending targets;
   // one still "removing" can be claimed again by pressing Take down.
   postingStartedAt DateTime?
+  // A platform is still processing a video or container: the cron checks on it from this time.
+  resumeAfter      DateTime?
 
   // Promo the post advertises; publishing is blocked once it ends.
-  promoId    String? @db.ObjectId
-  // Mailing-list email the post was shared from.
-  campaignId String? @db.ObjectId
+  promoId      String?  @db.ObjectId
+  // The email linked to this post: the one it was shared from, or the draft Email this too made.
+  campaignId   String?  @db.ObjectId
+  // Email this too was turned down for this post, so publishing doesn't offer it again.
+  emailSkipped Boolean?
+
+  // A content item: a library post that never goes out itself. Each time it goes out, a
+  // posting is made: a full post copied from it, with sourceId pointing back.
+  isContent    Boolean?
+  // A posting's content item, and which of its captions it used (0 is body).
+  sourceId     String?   @db.ObjectId
+  captionIndex Int?
+  // The posting was edited by hand, so changes to its content item no longer reach it.
+  detached     Boolean?
+  // A content item's other captions; body is caption 1.
+  altCaptions  String[]  @default([])
+  // The caption the content item's next posting uses.
+  nextCaption  Int?
+  // Recycling: post the item more than once, stopping at expiresAt or after maxPosts postings.
+  recycle      Boolean?
+  expiresAt    DateTime?
+  maxPosts     Int?
+  // The starter content item this came from, so importing the starter set again skips it.
+  starterKey   String?
+  // The schedule that lined this posting up, so its time slot counts as filled.
+  queueId      String?   @db.ObjectId
 
   // One per platform, always all three; written as a whole array because Prisma
   // rejects composite writes with undeclared fields.
   targets SocialTarget[]
 
-  googleType  GooglePostType @default(STANDARD)
-  googleCta   GooglePostCta?
+  googleType     GooglePostType @default(STANDARD)
+  googleCta      GooglePostCta?
+  // Where Google's button goes when it shouldn't be the Link.
+  googleUrl      String?
   // Title and dates for OFFER and EVENT posts.
-  googleTitle String?
-  offerStart  DateTime?
-  offerEnd    DateTime?
-  couponCode  String?
+  googleTitle    String?
+  offerStart     DateTime?
+  offerEnd       DateTime?
+  // An EVENT's start and end as NZ "HH:MM"; null for an all-day event.
+  eventStartTime String?
+  eventEndTime   String?
+  couponCode     String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([isPreset, status])
   @@index([status, scheduledAt])
+  @@index([campaignId])
+  @@index([isContent, updatedAt])
+  @@index([sourceId, status])
+  @@index([queueId, scheduledAt])
+}
+
+// How a schedule picks the next content item for a time slot.
+enum SocialQueueOrder {
+  oldest_first
+  in_order
+  shuffle
+}
+
+// A weekly time slot: a weekday (0 = Sunday) and minutes since NZ midnight.
+type QueueSlot {
+  weekday Int
+  minute  Int
+}
+
+// A schedule: weekly time slots that the publish-scheduled cron fills with postings from its
+// content items. A missing slot posting with a time in skipped was taken off by hand, so the
+// filler leaves that slot empty.
+model SocialQueue {
+  id         String           @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  // Swatch key from src/features/social/lib/tags.ts.
+  colour     String
+  paused     Boolean          @default(false)
+  platforms  SocialPlatform[]
+  slots      QueueSlot[]
+  order      SocialQueueOrder @default(oldest_first)
+  // Days between two postings of the same item.
+  minGapDays Int              @default(14)
+  itemIds    String[]         @default([]) @db.ObjectId
+  skipped    DateTime[]       @default([])
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+}
+
+// A label for sorting social posts. key is the name lowercased, so "Tips" and "tips" are one tag;
+// colour is a swatch key from src/features/social/lib/tags.ts.
+model SocialTag {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  key       String   @unique
+  colour    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// One reading of a published post's figures on one app, taken at a set age so posts compare
+// like for like. Kept apart from SocialPost so a stats sync never touches the post. Filled by
+// src/features/social/lib/insights/sync.server.ts.
+model SocialInsight {
+  id          String         @id @default(auto()) @map("_id") @db.ObjectId
+  postId      String         @db.ObjectId
+  platform    SocialPlatform
+  // The age this reading stands for: 1, 24, 72, 168 or 672 hours (1, 6 or 23 for a story).
+  ageHours    Int
+  takenAt     DateTime
+  views       Int?
+  reach       Int?
+  likes       Int?
+  comments    Int?
+  shares      Int?
+  saves       Int?
+  clicks      Int?
+  engagements Int?
+  // Any other figure the app gave, under its own name.
+  extra       Json?
+
+  @@unique([postId, platform, ageHours])
+}
+
+// A published post's latest figures on one app.
+model SocialPostStats {
+  id           String         @id @default(auto()) @map("_id") @db.ObjectId
+  postId       String         @db.ObjectId
+  platform     SocialPlatform
+  postedAt     DateTime
+  views        Int?
+  reach        Int?
+  likes        Int?
+  comments     Int?
+  shares       Int?
+  saves        Int?
+  clicks       Int?
+  engagements  Int?
+  extra        Json?
+  // Why some figures didn't come back (a permission the token lacks); null when they all did.
+  unavailable  String?
+  // The ages already kept as SocialInsight readings.
+  capturedAges Int[]          @default([])
+  syncedAt     DateTime
+
+  @@unique([postId, platform])
+  @@index([postedAt])
+}
+
+// One app's figures for the whole account on one day. day is YYYY-MM-DD: the NZ day for
+// Instagram and Google, Facebook's own day (US Pacific) for Facebook. Null is a figure the app
+// didn't give.
+model SocialAccountDay {
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  platform      SocialPlatform
+  day           String
+  views         Int?
+  reach         Int?
+  engagements   Int?
+  follows       Int?
+  unfollows     Int?
+  clicks        Int?
+  // Google only: profile views from Search and Maps, and what people did on the profile.
+  searchViews   Int?
+  mapsViews     Int?
+  calls         Int?
+  websiteClicks Int?
+  directions    Int?
+  conversations Int?
+  bookings      Int?
+  syncedAt      DateTime
+
+  @@unique([platform, day])
+}
+
+enum SocialCommentKind {
+  comment
+  reply
+  review
+}
+
+// A comment on one of the Page's Facebook posts or Instagram media, a reply in its thread, or a
+// Google review (our reply to it is a reply row). The top-level row of a thread carries its inbox
+// state; replies point at it through threadExternalId. Every optional field is written as an
+// explicit null, so `{ field: null }` filters match. Filled by
+// src/features/social/lib/inbox/sync.server.ts.
+model SocialComment {
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  platform         SocialPlatform
+  kind             SocialCommentKind
+  // The app's own id: a Facebook or Instagram comment id, or the review's resource name. Our
+  // reply to a review is the review's name plus "/reply".
+  externalId       String
+  // The top-level comment or review a reply belongs to; null on a top-level row.
+  threadExternalId String?
+  // The post or media a Facebook or Instagram comment is on.
+  objectExternalId String?
+  // Our post, when the comment is on one made here.
+  postId           String?           @db.ObjectId
+  // The post's words, picture and link as the app gave them, on top-level rows, so a thread can
+  // show a post that wasn't made here.
+  objectText       String?
+  objectImageUrl   String?
+  objectUrl        String?
+  // Null when the app doesn't say who wrote it.
+  authorName       String?
+  authorId         String?
+  fromUs           Boolean           @default(false)
+  text             String
+  // Google's stars, 1 to 5.
+  rating           Int?
+  postedAt         DateTime
+  // When a review's writer last changed it.
+  editedAt         DateTime?
+  hidden           Boolean?
+  // Inbox state, kept on top-level rows only.
+  lastActivityAt   DateTime?
+  needsReply       Boolean?
+  repliedAt        DateTime?
+  readAt           DateTime?
+  archivedAt       DateTime?
+  // When the app said it no longer exists.
+  goneAt           DateTime?
+  syncedAt         DateTime
+  createdAt        DateTime          @default(now())
+
+  @@unique([platform, externalId])
+  @@index([threadExternalId])
+  @@index([objectExternalId])
+  @@index([lastActivityAt])
 }
 
 // One exported size of a post maker design. docHash is the design's fingerprint when it

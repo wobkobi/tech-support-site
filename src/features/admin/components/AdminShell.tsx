@@ -117,9 +117,10 @@ export function AdminShell({ initialCollapsed, children }: AdminShellProps): Rea
           onOpenDrawer={openDrawer}
           menuButtonRef={menuButtonRef}
         />
-        {/* Skip link targets #main; pb-28 clears the phone bottom bar. */}
+        {/* Skip link targets #main; pb-28 clears the phone bottom bar. Pages run the full
+            width beside the sidebar, however wide the screen. */}
         <main id="main" className="px-4 pt-5 pb-28 sm:px-6 lg:pt-8 lg:pb-10 print:p-0">
-          <div className="mx-auto w-full max-w-328 print:max-w-none">{children}</div>
+          {children}
         </main>
       </div>
       <AdminTabBar

@@ -41,7 +41,7 @@ export function ExpensesPageView({
         assetThreshold={assetThreshold}
         linkedExpenseIds={linkedExpenseIds}
       />
-      <div className="mt-10">
+      <div className="mt-6">
         <SubscriptionsView reloadKey={subsReloadKey} />
       </div>
     </>

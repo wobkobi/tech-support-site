@@ -3,8 +3,10 @@
 // "In progress" chips on the Social page: drafts, scheduled posts and posts stuck partway,
 // each opening in the composer.
 
-import { chipStatus, firstLine } from "@/features/social/components/social-list-helpers";
+import { chipStatus, summaryLine } from "@/features/social/components/social-list-helpers";
+import { TagChipRow } from "@/features/social/components/TagPicker";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
+import type { SocialTagRow } from "@/features/social/lib/tags";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
@@ -12,6 +14,7 @@ import type React from "react";
  * In-progress list.
  * @param props - Component props.
  * @param props.rows - Unfinished posts.
+ * @param props.tagsById - Every tag, by id.
  * @param props.openId - Id of the post open in the composer.
  * @param props.isBusy - Whether a post is being loaded.
  * @param props.onOpen - Opens a post in the composer.
@@ -19,11 +22,13 @@ import type React from "react";
  */
 export function SocialInProgress({
   rows,
+  tagsById,
   openId,
   isBusy,
   onOpen,
 }: {
   rows: SocialPostRow[];
+  tagsById: ReadonlyMap<string, SocialTagRow>;
   openId: string | null;
   isBusy: (key: string) => boolean;
   onOpen: (id: string) => void;
@@ -56,9 +61,14 @@ export function SocialInProgress({
                   {r.name || "Untitled"}
                 </span>
                 <span className="w-full truncate text-sm text-admin-text-secondary">
-                  {firstLine(r.body) || <span className="italic">No text yet</span>}
+                  {summaryLine(r) || <span className="italic">No text yet</span>}
                 </span>
                 <span className={cn("text-sm", status.className)}>{status.text}</span>
+                {r.tagIds.length > 0 && (
+                  <span className="mt-1 w-full">
+                    <TagChipRow ids={r.tagIds} tagsById={tagsById} />
+                  </span>
+                )}
               </button>
             </li>
           );

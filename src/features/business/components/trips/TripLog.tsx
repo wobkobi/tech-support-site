@@ -5,7 +5,9 @@
 
 import {
   ROW_CLS,
+  STICKY_THEAD_CLS,
   TABLE_CLS,
+  TABLE_SCROLL_CLS,
   TBODY_CLS,
   TD_CLS,
   TH_CLS,
@@ -153,18 +155,18 @@ export function TripLog({
 }: TripLogProps): React.ReactElement {
   return (
     <Card padding="none">
-      <div className="px-4 pt-4 sm:px-5 sm:pt-5">
-        <CardHeader
-          title="Trip log"
-          description="Business trips this year. Km is the whole round trip."
-          actions={
-            <AdminButton onClick={onAdd}>
-              <FaPlus aria-hidden />
-              Add trip
-            </AdminButton>
-          }
-        />
-      </div>
+      {/* No bottom margin: the header's rule doubles as the table's top edge. */}
+      <CardHeader
+        title="Trip log"
+        description="Business trips this year. Km is the whole round trip."
+        actions={
+          <AdminButton onClick={onAdd}>
+            <FaPlus aria-hidden />
+            Add trip
+          </AdminButton>
+        }
+        className="mb-0"
+      />
       {trips.length === 0 ? (
         <EmptyState
           title={`No trips logged for ${fyLabel}`}
@@ -172,10 +174,10 @@ export function TripLog({
         />
       ) : (
         <>
-          <div className="hidden overflow-x-auto border-t border-admin-border md:block">
+          <div className={cn("hidden md:block", TABLE_SCROLL_CLS)}>
             <table className={TABLE_CLS}>
               <caption className="sr-only">Trips in {fyLabel}</caption>
-              <thead className={THEAD_CLS}>
+              <thead className={cn(THEAD_CLS, STICKY_THEAD_CLS)}>
                 <tr>
                   <th scope="col" className={TH_CLS}>
                     Date
@@ -198,8 +200,12 @@ export function TripLog({
                     <td className={TD_CLS}>
                       <p className="font-semibold text-admin-text">{t.purpose}</p>
                       <Destination trip={t} />
-                      <TripTags trip={t} unclaimed={unclaimed.get(t.id)} className="mt-1.5" />
-                      {t.notes && <p className="mt-0.5 text-sm text-admin-muted">{t.notes}</p>}
+                      {(t.bookingId || unclaimed.has(t.id) || t.notes) && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                          <TripTags trip={t} unclaimed={unclaimed.get(t.id)} />
+                          {t.notes && <p className="text-sm text-admin-muted">{t.notes}</p>}
+                        </div>
+                      )}
                     </td>
                     <td className={cn(TD_CLS, "text-right whitespace-nowrap tabular-nums")}>
                       {formatKm(t.km)}
@@ -223,7 +229,7 @@ export function TripLog({
               </tfoot>
             </table>
           </div>
-          <ul className="divide-y divide-admin-border border-t border-admin-border md:hidden">
+          <ul className="divide-y divide-admin-border md:hidden">
             {trips.map((t) => (
               <li key={t.id} className="px-4 py-3">
                 <div className="flex items-start justify-between gap-3">

@@ -4,10 +4,13 @@
 // light-mode layout and "See more" fold so the operator sees where a long post cuts.
 
 import type { GoogleFields } from "@/features/social/lib/adapter";
+import type { SocialFormatKey } from "@/features/social/lib/media";
 import { GOOGLE_CTA_LABEL, shownRatio } from "@/features/social/lib/validate";
 import { cn } from "@/shared/lib/cn";
 import React, { useState } from "react";
 import {
+  FaChevronLeft,
+  FaChevronRight,
   FaEarthAmericas,
   FaEllipsis,
   FaRegBookmark,
@@ -19,10 +22,10 @@ import {
 } from "react-icons/fa6";
 
 /** Same profile picture both accounts use. */
-const AVATAR_SRC = "/instagram-profile-320.jpg";
+export const AVATAR_SRC = "/instagram-profile-320.jpg";
 
 // The apps render in the device's system font, not the admin's.
-const SYSTEM_FONT: React.CSSProperties = {
+export const SYSTEM_FONT: React.CSSProperties = {
   fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
 };
 
@@ -39,13 +42,57 @@ const URL_RE = /https?:\/\/\S+/u;
 
 /** The parts of a post the previews need. */
 export interface PreviewPost {
+  format: SocialFormatKey;
   text: string;
   imageUrl: string | null;
   imageAlt: string;
   imageWidth: number | null;
   imageHeight: number | null;
+  /** Pictures 2 onwards of an ordinary post. */
+  moreImages: { url: string; alt: string }[];
+  /** A reel's or story's video. */
+  video: { url: string; coverUrl: string | null } | null;
   linkUrl: string | null;
   google: GoogleFields;
+}
+
+/**
+ * Facebook's grid for a post with several pictures: two side by side, three as one big and two
+ * small, four or more as a two-by-two with the rest counted on the last.
+ * @param props - Component props.
+ * @param props.pictures - Every picture, first first.
+ * @returns Grid element.
+ */
+function FacebookGrid({
+  pictures,
+}: {
+  pictures: { url: string; alt: string }[];
+}): React.ReactElement {
+  const shown = pictures.slice(0, 4);
+  const extra = pictures.length - shown.length;
+  return (
+    <div
+      className={cn(
+        "grid aspect-square w-full gap-0.5 bg-white",
+        shown.length === 2 ? "grid-cols-2" : "grid-cols-2 grid-rows-2",
+      )}
+    >
+      {shown.map((p, i) => (
+        <div
+          key={`${i}-${p.url}`}
+          className={cn("relative bg-[#f0f2f5]", shown.length === 3 && i === 0 && "col-span-2")}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={p.url} alt={p.alt} className="absolute inset-0 size-full object-cover" />
+          {extra > 0 && i === shown.length - 1 && (
+            <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-[28px] font-semibold text-white">
+              +{extra}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /**
@@ -119,6 +166,9 @@ export function FacebookPreview({
   pageName: string;
 }): React.ReactElement {
   const [open, setOpen] = useState(false);
+  const pictures = post.imageUrl
+    ? [{ url: post.imageUrl, alt: post.imageAlt }, ...post.moreImages]
+    : [];
   const caption =
     post.imageUrl && post.linkUrl
       ? `${post.text}${post.text ? "\n\n" : ""}${post.linkUrl}`
@@ -174,14 +224,18 @@ export function FacebookPreview({
         <div className="h-3" />
       )}
 
-      {post.imageUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={post.imageUrl}
-          alt={post.imageAlt}
-          style={{ aspectRatio: shownRatio("facebook", post.imageWidth, post.imageHeight) }}
-          className="w-full bg-[#f0f2f5] object-cover"
-        />
+      {pictures.length > 1 ? (
+        <FacebookGrid pictures={pictures} />
+      ) : (
+        post.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={post.imageUrl}
+            alt={post.imageAlt}
+            style={{ aspectRatio: shownRatio("facebook", post.imageWidth, post.imageHeight) }}
+            className="w-full bg-[#f0f2f5] object-cover"
+          />
+        )
       )}
       {!post.imageUrl && post.linkUrl && (
         <div className="border-y border-[#ced0d4] bg-[#f0f2f5] px-4 py-2.5">
@@ -224,8 +278,15 @@ export function InstagramPreview({
   username: string;
 }): React.ReactElement {
   const [open, setOpen] = useState(false);
+  const [at, setAt] = useState(0);
   const { head, cut } = foldText(post.text, INSTAGRAM_FOLD);
+  // Every picture in a set shows at picture 1's shape.
   const ratio = shownRatio("instagram", post.imageWidth, post.imageHeight);
+  const pictures = post.imageUrl
+    ? [{ url: post.imageUrl, alt: post.imageAlt }, ...post.moreImages]
+    : [];
+  const index = Math.min(at, Math.max(pictures.length - 1, 0));
+  const picture = pictures[index];
 
   return (
     <article
@@ -241,10 +302,37 @@ export function InstagramPreview({
         <FaEllipsis aria-hidden className="size-5" />
       </header>
 
-      {post.imageUrl ? (
-        <div style={{ aspectRatio: ratio }} className="w-full bg-[#efefef]">
+      {picture ? (
+        <div style={{ aspectRatio: ratio }} className="relative w-full bg-[#efefef]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={post.imageUrl} alt={post.imageAlt} className="size-full object-cover" />
+          <img src={picture.url} alt={picture.alt} className="size-full object-cover" />
+          {pictures.length > 1 && (
+            <>
+              <span className="absolute top-3 right-3 rounded-full bg-black/70 px-2 py-0.5 text-[12px] text-white">
+                {index + 1}/{pictures.length}
+              </span>
+              {index > 0 && (
+                <button
+                  type="button"
+                  aria-label="Previous picture"
+                  onClick={() => setAt(index - 1)}
+                  className="absolute top-1/2 left-2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-black"
+                >
+                  <FaChevronLeft aria-hidden className="size-3" />
+                </button>
+              )}
+              {index < pictures.length - 1 && (
+                <button
+                  type="button"
+                  aria-label="Next picture"
+                  onClick={() => setAt(index + 1)}
+                  className="absolute top-1/2 right-2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-black"
+                >
+                  <FaChevronRight aria-hidden className="size-3" />
+                </button>
+              )}
+            </>
+          )}
         </div>
       ) : (
         <div className="flex aspect-square w-full items-center justify-center bg-[#efefef] px-6 text-center text-[14px] text-[#737373]">
@@ -252,10 +340,23 @@ export function InstagramPreview({
         </div>
       )}
 
-      <div className="flex items-center gap-4 px-3 pt-3 text-[24px]">
+      <div className="relative flex items-center gap-4 px-3 pt-3 text-[24px]">
         <FaRegHeart aria-hidden />
         <FaRegComment aria-hidden className="-scale-x-100" />
         <FaRegPaperPlane aria-hidden />
+        {pictures.length > 1 && (
+          <span aria-hidden className="absolute left-1/2 flex -translate-x-1/2 gap-1">
+            {pictures.map((p, i) => (
+              <span
+                key={`${i}-${p.url}`}
+                className={cn(
+                  "size-1.5 rounded-full",
+                  i === index ? "bg-[#0095f6]" : "bg-[#c7c7c7]",
+                )}
+              />
+            ))}
+          </span>
+        )}
         <FaRegBookmark aria-hidden className="ml-auto" />
       </div>
 
@@ -292,8 +393,38 @@ function offerDay(key: string): string {
 }
 
 /**
+ * An HH:MM time as Google prints it, like "9:30am".
+ * @param time - 24-hour time.
+ * @returns Short time.
+ */
+function clockTime(time: string): string {
+  const [h = 0, m = 0] = time.split(":").map(Number);
+  const hour = h % 12 === 0 ? 12 : h % 12;
+  return `${hour}:${String(m).padStart(2, "0")}${h < 12 ? "am" : "pm"}`;
+}
+
+/**
+ * When an event runs, as Google prints it under the title.
+ * @param google - The post's Google fields.
+ * @returns Like "14 Oct, 9:30am - 5:00pm" or "14 Oct - 17 Oct".
+ */
+function eventWhen(google: GoogleFields): string {
+  if (!google.start || !google.end) return "Pick the event dates";
+  const sameDay = google.start === google.end;
+  if (!google.startTime || !google.endTime) {
+    return sameDay ? offerDay(google.start) : `${offerDay(google.start)} - ${offerDay(google.end)}`;
+  }
+  const from = `${offerDay(google.start)}, ${clockTime(google.startTime)}`;
+  const to = sameDay
+    ? clockTime(google.endTime)
+    : `${offerDay(google.end)}, ${clockTime(google.endTime)}`;
+  return `${from} - ${to}`;
+}
+
+/**
  * A Business Profile post as shown under Updates. Offers show title, dates, code and "Redeem
- * online" as published; updates show a button only when it will be sent.
+ * online" as published; events show title and when; updates and events show a button only when
+ * it will be sent.
  * @param props - Component props.
  * @param props.post - Filled post content.
  * @param props.businessName - The profile's business name.
@@ -307,9 +438,12 @@ export function GooglePreview({
   businessName: string;
 }): React.ReactElement {
   const { google } = post;
-  const offer = google.type === "OFFER" || google.type === "EVENT";
+  const offer = google.type === "OFFER";
+  const event = google.type === "EVENT";
+  const link = google.url ?? post.linkUrl;
+  // Call now rings the profile's number, so it needs no link, but Google won't put it on an event.
   const button =
-    !offer && google.cta && (google.cta === "CALL" || post.linkUrl)
+    !offer && google.cta && (google.cta === "CALL" ? !event : link)
       ? GOOGLE_CTA_LABEL[google.cta]
       : null;
 
@@ -346,6 +480,12 @@ export function GooglePreview({
                 ? `${offerDay(google.start)} - ${offerDay(google.end)}`
                 : "Pick the offer dates"}
             </p>
+          </div>
+        )}
+        {event && (
+          <div>
+            <p className="text-[18px] leading-6 font-medium">{google.title || "Event title"}</p>
+            <p className="text-[13px] leading-5 text-[#70757a]">{eventWhen(google)}</p>
           </div>
         )}
         {post.text && (

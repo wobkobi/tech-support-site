@@ -14,7 +14,7 @@ export type ApiResult<T> = ({ ok: true } & T) | { ok: false; error: string };
  */
 export async function callApi<T = Record<string, never>>(
   url: string,
-  method: "GET" | "POST" | "PATCH" | "DELETE" = "GET",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" = "GET",
   body?: Record<string, unknown> | FormData,
 ): Promise<ApiResult<T>> {
   try {

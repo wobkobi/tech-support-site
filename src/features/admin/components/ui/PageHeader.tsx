@@ -80,7 +80,7 @@ export function PageHeader({
             {title}
           </h1>
           {description && (
-            <p className="mt-1 max-w-3xl text-[0.9375rem] text-admin-muted">{description}</p>
+            <p className="mt-1 max-w-4xl text-[0.9375rem] text-admin-muted">{description}</p>
           )}
         </div>
         {/* No shrink-0: once the row wraps below the title it must be able to

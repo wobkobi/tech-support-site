@@ -46,7 +46,7 @@ export default async function AdminPostMakerPage({
       <PageHeader
         title="Post maker"
         description="Design a picture once and get every size, ready for each app."
-        breadcrumbs={[{ label: "Social posts", href: "/admin/social" }, { label: "Post maker" }]}
+        breadcrumbs={[{ label: "Social", href: "/admin/social" }, { label: "Post maker" }]}
       />
       <DesignList initial={designs.map(toDesignSummary)} forPost={forPost} />
     </>

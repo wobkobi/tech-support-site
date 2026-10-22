@@ -14,6 +14,8 @@ const cspProd =
   // www.google.co.nz: the Google Ads audiences pixel loads from the visitor's
   // country domain, which the *.google.com wildcard does not cover.
   "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com https://maps.googleapis.com https://maps.gstatic.com https://*.google.com https://*.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://googleads.g.doubleclick.net https://ad.doubleclick.net https://www.googleadservices.com https://www.google.co.nz https://www.facebook.com; " +
+  // Social reels and stories play from the Blob store in the composer.
+  "media-src 'self' blob: https://*.public.blob.vercel-storage.com; " +
   "font-src 'self' data: https://fonts.gstatic.com; " +
   // analytics.google.com (apex) and www.google.com are both required: gtag posts
   // GA4 hits to the bare analytics.google.com host, which the *.analytics.google.com
@@ -24,7 +26,8 @@ const cspProd =
   // Thryv's tag (ThryvTag.tsx) fetches its per-business config from tags.tiqcdn.com,
   // and for visitors from a Thryv ad asks the trayapp.io host for a call-tracking
   // number, then loads the swap script from web-2-tel.com.
-  "connect-src 'self' https://maps.googleapis.com https://places.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.google.com https://www.google.co.nz https://googleads.g.doubleclick.net https://stats.g.doubleclick.net https://ad.doubleclick.net https://www.googleadservices.com https://connect.facebook.net https://www.facebook.com https://tags.tiqcdn.com https://41767fe0-4cd6-4b7a-8464-cb287fbe8150.trayapp.io https://*.web-2-tel.com; " +
+  // vercel.com: the composer uploads videos straight to Blob through its API.
+  "connect-src 'self' https://maps.googleapis.com https://places.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.google.com https://www.google.co.nz https://googleads.g.doubleclick.net https://stats.g.doubleclick.net https://ad.doubleclick.net https://www.googleadservices.com https://connect.facebook.net https://www.facebook.com https://tags.tiqcdn.com https://41767fe0-4cd6-4b7a-8464-cb287fbe8150.trayapp.io https://*.web-2-tel.com https://vercel.com; " +
   "worker-src 'self' blob:; " +
   "manifest-src 'self'; " +
   "object-src 'none'; " +
@@ -37,8 +40,9 @@ const cspDev =
   "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://maps.googleapis.com https://maps.gstatic.com https://va.vercel-scripts.com https://www.googletagmanager.com https://googleads.g.doubleclick.net https://connect.facebook.net https://tags.tiqcdn.com http://tags.tiqcdn.com https://*.web-2-tel.com; " +
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
   "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com https://tothepoint.co.nz https://www.tothepoint.co.nz https://maps.googleapis.com https://maps.gstatic.com https://*.google.com https://*.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://googleads.g.doubleclick.net https://ad.doubleclick.net https://www.googleadservices.com https://www.google.co.nz https://www.facebook.com; " +
+  "media-src 'self' blob: https://*.public.blob.vercel-storage.com; " +
   "font-src 'self' data: https://fonts.gstatic.com; " +
-  "connect-src 'self' ws: http://localhost:3000 http://127.0.0.1:3000 https://maps.googleapis.com https://places.googleapis.com https://va.vercel-scripts.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.google.com https://www.google.co.nz https://googleads.g.doubleclick.net https://stats.g.doubleclick.net https://ad.doubleclick.net https://www.googleadservices.com https://connect.facebook.net https://www.facebook.com https://tags.tiqcdn.com https://41767fe0-4cd6-4b7a-8464-cb287fbe8150.trayapp.io https://*.web-2-tel.com; " +
+  "connect-src 'self' ws: http://localhost:3000 http://127.0.0.1:3000 https://maps.googleapis.com https://places.googleapis.com https://va.vercel-scripts.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.google.com https://www.google.co.nz https://googleads.g.doubleclick.net https://stats.g.doubleclick.net https://ad.doubleclick.net https://www.googleadservices.com https://connect.facebook.net https://www.facebook.com https://tags.tiqcdn.com https://41767fe0-4cd6-4b7a-8464-cb287fbe8150.trayapp.io https://*.web-2-tel.com https://vercel.com; " +
   "worker-src 'self' blob:; " +
   "object-src 'none'; " +
   "frame-ancestors 'none'; " +

@@ -5,7 +5,8 @@
 import { parseObjectId } from "@/features/business/lib/validation";
 import { DESIGN_KINDS, toDesignRow, toKind } from "@/features/social-design/lib/design-row";
 import { MAX_DOC_BYTES, parseDesignDoc } from "@/features/social-design/lib/doc";
-import { deleteUnusedPictures } from "@/features/social-design/lib/picture-store";
+import { loadBoundValues } from "@/features/social-design/lib/load-bound";
+import { deleteUnusedMedia } from "@/features/social-design/lib/picture-store";
 import { snapshotBeforeSave } from "@/features/social-design/lib/versions";
 import { errorResponse, isRecordNotFound, noStore, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -21,19 +22,23 @@ interface Ctx {
 }
 
 /**
- * GET /api/admin/social/designs/[id]
+ * GET /api/admin/social/designs/[id] - the design and the live values its contact and promo
+ * layers show, so a picture can be drawn from it outside the Post maker.
  * @param request - Incoming request.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the design id.
- * @returns JSON `{ design }`.
+ * @returns JSON `{ design, bound }`.
  */
 export async function GET(request: NextRequest, { params }: Ctx): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
   const id = parseObjectId((await params).id);
   if (!id) return errorResponse("Design not found.", 404);
-  const design = await prisma.socialDesign.findUnique({ where: { id } });
+  const [design, bound] = await Promise.all([
+    prisma.socialDesign.findUnique({ where: { id } }),
+    loadBoundValues(),
+  ]);
   if (!design) return errorResponse("Design not found.", 404);
-  return noStore(okResponse({ design: toDesignRow(design) }));
+  return noStore(okResponse({ design: toDesignRow(design), bound }));
 }
 
 /**
@@ -130,6 +135,6 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
     if (isRecordNotFound(error)) return errorResponse("Design not found.", 404);
     throw error;
   }
-  await deleteUnusedPictures(renders.map((r) => r.url));
+  await deleteUnusedMedia(renders.map((r) => r.url));
   return okResponse();
 }

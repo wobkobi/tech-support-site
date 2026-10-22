@@ -6,12 +6,22 @@ import { promoWording } from "@/features/mailing/lib/context";
 import type { PromoWording } from "@/features/mailing/lib/render";
 import { docHash, parseDesignDoc } from "@/features/social-design/lib/doc";
 import { loadBoundValues } from "@/features/social-design/lib/load-bound";
+import {
+  designEmailPicture,
+  loadPostEmail,
+  type EmailPicture,
+  type PostEmail,
+} from "@/features/social/lib/email-step.server";
+import { IS_CONTENT } from "@/features/social/lib/filters";
+import { loadPostStats, type PostStatsView } from "@/features/social/lib/insights/analytics.server";
 import { PLATFORMS } from "@/features/social/lib/platforms";
 import { toPostRow, type SocialPostRow } from "@/features/social/lib/post-row";
 import { SOCIAL_PLATFORMS, type SocialPlatformKey } from "@/features/social/lib/validate";
+import { aiConfigured } from "@/shared/lib/ai/json-completion";
 import { canUploadImages } from "@/shared/lib/image-upload";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import type { HashtagsDefault, WatermarkSettings } from "@/shared/lib/settings/types";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { SocialPost } from "@prisma/client";
 
@@ -20,6 +30,18 @@ export interface PostDesign {
   id: string;
   /** The picture no longer matches the design: the design or its live values changed, or it was swapped. */
   stale: boolean;
+}
+
+/** Write with AI's starting choices, from the brand profile. */
+export interface CaptionAiSetup {
+  hashtags: HashtagsDefault;
+  emoji: boolean;
+}
+
+/** The content item a posting was made from. */
+export interface PostingSource {
+  id: string;
+  name: string;
 }
 
 /** Everything the composer needs for one post. */
@@ -31,24 +53,48 @@ export interface OpenPost {
   missingEnv: Record<SocialPlatformKey, string[]>;
   details: InsertDetails;
   design: PostDesign | null;
+  /** Null when no AI key is set, which hides Write with AI. */
+  captionAi: CaptionAiSetup | null;
+  /** The email linked to the post, either way round. */
+  email: PostEmail | null;
+  /** Email this too was turned down, so publishing doesn't offer it. */
+  emailSkipped: boolean;
+  /** The linked design's current wide picture, which Email this too can open with. */
+  emailPicture: EmailPicture | null;
+  /** How Add my logo marks a photo, and whether new uploads get it. */
+  watermark: WatermarkSettings;
+  /** The content item a posting came from; null for other posts, or once the item is deleted. */
+  source: PostingSource | null;
+  /** Its figures once it has gone out, for the Stats card; null before. */
+  stats: PostStatsView | null;
 }
 
 /**
- * The design last linked to a post, and whether the post still shows its pictures.
+ * The design last linked to a post, whether the post still shows its pictures, and its wide
+ * picture for email.
  * @param post - Post as stored.
- * @returns Linked design, or null.
+ * @returns Linked design and email picture, each null when there's none.
  */
-async function linkedDesign(post: SocialPost): Promise<PostDesign | null> {
+async function linkedDesign(
+  post: SocialPost,
+): Promise<{ design: PostDesign | null; emailPicture: EmailPicture | null }> {
   const design = await prisma.socialDesign.findFirst({
     where: { postId: post.id, isTemplate: false },
     orderBy: { updatedAt: "desc" },
   });
-  if (!design) return null;
+  if (!design) return { design: null, emailPicture: null };
   const parsed = parseDesignDoc(design.doc);
-  if ("error" in parsed) return { id: design.id, stale: true };
-  const hash = docHash(parsed.doc, await loadBoundValues());
+  if ("error" in parsed) return { design: { id: design.id, stale: true }, emailPicture: null };
+  const bound = await loadBoundValues();
+  const hash = docHash(parsed.doc, bound);
   const feed = design.renders.find((r) => r.format === "feed-4x5");
-  return { id: design.id, stale: !feed || feed.docHash !== hash || post.imageUrl !== feed.url };
+  return {
+    design: {
+      id: design.id,
+      stale: !feed || feed.docHash !== hash || post.imageUrl !== feed.url,
+    },
+    emailPicture: designEmailPicture(design, bound),
+  };
 }
 
 /**
@@ -57,14 +103,23 @@ async function linkedDesign(post: SocialPost): Promise<PostDesign | null> {
  * @returns Composer data.
  */
 export async function loadOpenPost(post: SocialPost): Promise<OpenPost> {
-  const [{ promo }, linked, { identity }, design] = await Promise.all([
-    promoWording(post.promoId),
-    post.promoId
-      ? prisma.promo.findUnique({ where: { id: post.promoId }, select: { title: true } })
-      : Promise.resolve(null),
-    getSettings(),
-    linkedDesign(post),
-  ]);
+  const [{ promo }, linked, { identity, social }, { design, emailPicture }, email, source, stats] =
+    await Promise.all([
+      promoWording(post.promoId),
+      post.promoId
+        ? prisma.promo.findUnique({ where: { id: post.promoId }, select: { title: true } })
+        : Promise.resolve(null),
+      getSettings(),
+      linkedDesign(post),
+      loadPostEmail(post),
+      post.sourceId
+        ? prisma.socialPost.findFirst({
+            where: { id: post.sourceId, ...IS_CONTENT },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve(null),
+      post.isContent ? Promise.resolve(null) : loadPostStats(new Date(), post),
+    ]);
   return {
     post: toPostRow(post),
     promo,
@@ -75,5 +130,14 @@ export async function loadOpenPost(post: SocialPost): Promise<OpenPost> {
     ) as Record<SocialPlatformKey, string[]>,
     details: insertDetailsOf(identity, getSiteUrl()),
     design,
+    captionAi: aiConfigured()
+      ? { hashtags: social.brand.hashtagsOn, emoji: social.brand.emojiOn }
+      : null,
+    email,
+    emailSkipped: post.emailSkipped === true,
+    emailPicture,
+    watermark: social.watermark,
+    source,
+    stats,
   };
 }

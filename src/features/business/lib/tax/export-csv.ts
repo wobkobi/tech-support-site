@@ -9,14 +9,9 @@ import {
   type TaxYearSnapshot,
 } from "@/features/business/lib/tax/snapshot";
 import type { AssetYearRow } from "@/features/business/lib/tax/types";
+import { CSV_BOM, CSV_EOL, csvText } from "@/shared/lib/csv";
 import { formatDateSlash } from "@/shared/lib/date-format";
 import { nzDateParts } from "@/shared/lib/timezone-utils";
-
-/** Line ending spreadsheet apps expect in a CSV. */
-const EOL = "\r\n";
-
-/** UTF-8 byte-order mark, so Excel reads the file as UTF-8 rather than the system code page. */
-const BOM = "\uFEFF";
 
 /** Summary rows: figure path in the result, label, and the return box it goes in. */
 const SUMMARY_ROWS: ReadonlyArray<{ path: string; label: string; box: string }> = [
@@ -65,18 +60,6 @@ const ASSET_HEADERS = [
   "Loss on disposal",
   "Km-rate vehicle",
 ] as const;
-
-/**
- * Quotes a text cell, prefixing an apostrophe when it starts with =, +, -, @, tab or CR
- * so a spreadsheet doesn't run it as a formula.
- * @param value - Cell text.
- * @returns The quoted cell.
- */
-export function csvText(value: string | null | undefined): string {
-  let str = value ?? "";
-  if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
-  return `"${str.replace(/"/g, '""')}"`;
-}
 
 /**
  * Money cell: cents, unquoted, so the spreadsheet reads a number.
@@ -303,5 +286,5 @@ export function buildTaxCsv(
   lines.push(line(csvText("Proportional part"), csvMoney(result.homeOffice.proportionalPart)));
   lines.push(line(csvText("Home office claim"), csvMoney(result.homeOffice.amount)));
 
-  return BOM + lines.join(EOL) + EOL;
+  return CSV_BOM + lines.join(CSV_EOL) + CSV_EOL;
 }

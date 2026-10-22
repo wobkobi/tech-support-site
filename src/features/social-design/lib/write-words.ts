@@ -9,6 +9,7 @@ import {
   type DesignDraft,
   type DraftRoom,
 } from "@/features/social-design/lib/ai-draft";
+import { brandRules } from "@/shared/lib/ai/brand-rules";
 import { loadBusinessFacts, type BusinessFacts } from "@/shared/lib/ai/business-facts";
 import { jsonCompletion } from "@/shared/lib/ai/json-completion";
 import { voiceRules } from "@/shared/lib/ai/voice-rules";
@@ -59,6 +60,7 @@ This picture goes at the top of an email to past customers, who are already on t
  * The system prompt; live values come in as arguments.
  * @param who - Who is writing.
  * @param facts - The business's live facts.
+ * @param brand - The brand profile's THE BUSINESS block, or "".
  * @param kindGuide - What this kind of post is for.
  * @param room - What the picture has room for.
  * @param promoLine - Whether a promo is running and how to treat it.
@@ -71,6 +73,7 @@ This picture goes at the top of an email to past customers, who are already on t
 function systemPrompt(
   who: string,
   facts: BusinessFacts,
+  brand: string,
   kindGuide: string,
   room: DraftRoom,
   promoLine: string,
@@ -81,7 +84,7 @@ function systemPrompt(
 ): string {
   return `You write the words for one social media picture for a small tech help business, and the post words that go with it on Facebook and Instagram. Readers are locals, many of them older and not technical. The operator reads and edits everything before it is posted.
 
-${voiceRules(who, facts)}
+${voiceRules(who, facts)}${brand ? `\n\n${brand}` : ""}
 
 THIS POST
 ${kindGuide}${inEmail ? `\n\n${IN_EMAIL}` : ""}
@@ -168,6 +171,7 @@ export async function writeDesignWords({
       systemPrompt(
         who,
         facts,
+        brandRules(settings.social.brand),
         guide,
         room,
         promoLine,

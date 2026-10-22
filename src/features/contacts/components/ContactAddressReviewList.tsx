@@ -92,7 +92,7 @@ function AddressReviewCard({ row, onDone }: AddressReviewCardProps): React.React
   }
 
   return (
-    <Card>
+    <Card className="h-full">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <div className="min-w-0">
           <Link
@@ -214,7 +214,7 @@ export function ContactAddressReviewList({
           stored exactly as they were typed.
         </p>
       </div>
-      <ul className="flex flex-col gap-3">
+      <ul className="grid gap-3 xl:grid-cols-2">
         {rows.map((row) => (
           <li key={row.contactId}>
             <AddressReviewCard

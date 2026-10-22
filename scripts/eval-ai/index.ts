@@ -9,14 +9,20 @@
 
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import { calcSessionMins } from "@/features/business/lib/time-parse";
+import { parseCaptionRequest, type CaptionRequest } from "@/features/social/lib/caption-ai";
+import { parseReplyRequest, type ReplyRequest } from "@/features/social/lib/inbox/map";
+import { avoidList } from "@/shared/lib/ai/brand-rules";
+import { parseHashtags } from "@/shared/lib/hashtags";
 import {
-  type CheckResult,
+  captionProblems,
   draftProblems,
   estimateTolerance,
   expectedEstimateMins,
   postDraftProblems,
+  replyProblems,
   spread,
   withinTolerance,
+  type CheckResult,
 } from "./assert";
 import type { LiveContext } from "./context";
 
@@ -53,6 +59,8 @@ interface RawRun {
   };
   /** Draft cases: what broke the shared rules (hard, soft) and the case's own forbid list. */
   draftCheck?: { hard: string[]; soft: string[] };
+  /** Set when live data can't exercise the case (no Never mention words); reported as a skip. */
+  skip?: string;
   durations: number[];
   first: unknown;
   /** Set when the case could not complete; reported as a hard fail, no checks run. */
@@ -81,6 +89,43 @@ const SAMPLE_POST = {
   caption: "I'm now coming out to Titirangi.",
 };
 const SAMPLE_ROOM = { headline: true, support: true, bullets: 0, quote: false, name: false };
+
+/**
+ * A parsed caption request for the self-test: one option for Facebook with every switch off,
+ * unless `over` sets it.
+ * @param over - Request fields to set.
+ * @returns The request.
+ */
+function sampleCaptionReq(over: Record<string, unknown> = {}): CaptionRequest {
+  const req = parseCaptionRequest({
+    brief: "Home visits in Titirangi",
+    count: 1,
+    platforms: ["facebook"],
+    ...over,
+  });
+  if ("error" in req) throw new Error(req.error);
+  return req;
+}
+const NO_BRAND = { tags: [], avoid: [] };
+
+/**
+ * A parsed reply request for the self-test: a 5-star Google review from Mary Smith, unless
+ * `over` sets otherwise.
+ * @param over - Request fields to set.
+ * @returns The request.
+ */
+function sampleReplyReq(over: Record<string, unknown> = {}): ReplyRequest {
+  const req = parseReplyRequest({
+    platform: "google",
+    kind: "review",
+    rating: 5,
+    author: "Mary Smith",
+    text: "Sorted my email out, thanks.",
+    ...over,
+  });
+  if ("error" in req) throw new Error(req.error);
+  return req;
+}
 
 /**
  * Runs the network-free pure-logic checks and reports pass/fail.
@@ -255,6 +300,104 @@ function runSelfTest(): number {
       ).hard.length,
       want: 1,
     },
+    {
+      name: "clean caption has no problems",
+      got: captionProblems(["I'm now visiting Titirangi."], sampleCaptionReq(), "", NO_BRAND).hard
+        .length,
+      want: 0,
+    },
+    {
+      name: "a hashtag with hashtags off is a hard problem",
+      got: captionProblems(
+        ["I'm now visiting Titirangi.\n\n#Titirangi"],
+        sampleCaptionReq(),
+        "",
+        NO_BRAND,
+      ).hard.length,
+      want: 1,
+    },
+    {
+      name: "brand hashtags that don't come first are a hard problem",
+      got: captionProblems(
+        ["I'm now visiting Titirangi.\n\n#Titirangi #AucklandTech"],
+        sampleCaptionReq({ hashtags: true }),
+        "",
+        { tags: ["AucklandTech"], avoid: [] },
+      ).hard.length,
+      want: 1,
+    },
+    {
+      name: "a phone number in words for Google is a hard problem",
+      got: captionProblems(
+        ["Give me a call on 021 123 4567."],
+        sampleCaptionReq({ brief: "Call me on 021 123 4567", platforms: ["google"] }),
+        "",
+        NO_BRAND,
+      ).hard.length,
+      want: 1,
+    },
+    {
+      name: "the booking link twice is a hard problem",
+      got: captionProblems(
+        ["Book at https://example.nz/booking or https://example.nz/booking."],
+        sampleCaptionReq({ ending: "book" }),
+        "",
+        NO_BRAND,
+      ).hard.length,
+      want: 1,
+    },
+    {
+      name: "a clean review thanks is clean",
+      got: replyProblems(
+        { reply: "Thanks so much Mary. I'm glad the email is working again.", hide: false },
+        sampleReplyReq(),
+        "",
+      ).hard.length,
+      want: 0,
+    },
+    {
+      name: "a 5-star thanks without their name is a hard problem",
+      got: replyProblems(
+        { reply: "Thanks so much. Glad it's working again.", hide: false },
+        sampleReplyReq(),
+        "",
+      ).hard.length,
+      want: 1,
+    },
+    {
+      name: "a low-star reply with no apology or phone is two hard problems",
+      got: replyProblems(
+        { reply: "Thanks for the feedback, Peter. I'll do better.", hide: false },
+        sampleReplyReq({ rating: 2, author: "Peter Jones" }),
+        "",
+      ).hard.length,
+      want: 2,
+    },
+    {
+      name: "spam with no hide is a hard problem",
+      got: replyProblems({ reply: "", hide: false }, sampleReplyReq(), "", { wantHide: true }).hard
+        .length,
+      want: 1,
+    },
+    {
+      name: "a link on Instagram is a hard problem",
+      got: replyProblems(
+        { reply: "Yes I do. Book at www.example.co.nz.", hide: false },
+        sampleReplyReq({ platform: "instagram", kind: "comment", rating: null, author: null }),
+        "",
+      ).hard.length,
+      want: 1,
+    },
+    {
+      name: "a fix that keeps the post's emoji and hashtags is clean",
+      got: captionProblems(
+        ["I'm here 🙂 #Titirangi"],
+        sampleCaptionReq({ mode: "rewrite", action: "fix", brief: "Im here 🙂 #Titirangi" }),
+        "",
+        NO_BRAND,
+      ).hard.length,
+      want: 0,
+    },
   ];
   let failed = 0;
   for (const c of cases) {
@@ -337,15 +480,26 @@ async function collectRaw(
   only: string[],
 ): Promise<{ ctx: LiveContext; raw: RawRun[]; aborted: boolean }> {
   const { loadLiveContext } = await import("./context");
-  const { callEstimate, callParseJob, callMailingDraft, callPostDraft, fetchFacts } =
-    await import("./client");
+  const {
+    callCaption,
+    callEstimate,
+    callParseJob,
+    callMailingDraft,
+    callPostDraft,
+    callReplySuggest,
+    fetchFacts,
+  } = await import("./client");
   const {
     PARSE_CASES,
     ESTIMATE_CASES,
     CROSS_ROUTE_CASES,
     TRAVEL_CASES,
     DRAFT_CASES,
+    EMAIL_FROM_POST_CASES,
     POST_DRAFT_CASES,
+    CAPTION_CASES,
+    REPLY_CASES,
+    DEAL_RE,
   } = await import("./cases");
 
   process.stdout.write("Loading live context (settings, rates, templates)...\n");
@@ -363,8 +517,10 @@ async function collectRaw(
   const parseCases = PARSE_CASES.filter((c) => keep(c.id));
   const travelCases = TRAVEL_CASES.filter((c) => keep(c.id));
   const crossRouteCases = CROSS_ROUTE_CASES.filter((c) => keep(c.id));
-  const draftCases = DRAFT_CASES.filter((c) => keep(c.id));
+  const draftCases = [...DRAFT_CASES, ...EMAIL_FROM_POST_CASES].filter((c) => keep(c.id));
   const postDraftCases = POST_DRAFT_CASES.filter((c) => keep(c.id));
+  const captionCases = CAPTION_CASES.filter((c) => keep(c.id));
+  const replyCases = REPLY_CASES.filter((c) => keep(c.id));
 
   const total =
     benchmarks.length +
@@ -373,7 +529,9 @@ async function collectRaw(
     crossRouteCases.length +
     travelCases.length +
     draftCases.length +
-    postDraftCases.length;
+    postDraftCases.length +
+    captionCases.length +
+    replyCases.length;
   console.log(
     `Running ${total} cases x ${runs} run(s) = ${total * runs} paid calls. This takes a few minutes.\n`,
   );
@@ -503,11 +661,18 @@ async function collectRaw(
         brief: c.brief,
         kind: c.kind,
         buttonUrl: c.buttonUrl,
+        source: c.source,
       });
       const { hard, soft } = draftProblems(draft, c.brief, facts);
       const text = JSON.stringify(draft);
       for (const f of c.forbid ?? []) if (f.pattern.test(text)) hard.push(f.why);
       if (c.wantBullets && draft.bullets.length === 0) hard.push("steps not listed as bullets");
+      for (const fact of c.mustInclude ?? []) {
+        if (!text.includes(fact)) hard.push(`dropped "${fact}" from the post`);
+      }
+      if (c.buttonLike && !c.buttonLike.test(draft.buttonText)) {
+        hard.push(`button "${draft.buttonText}" doesn't match ${c.buttonLike}`);
+      }
       raw.push({
         id: c.id,
         kind: "draft",
@@ -564,6 +729,101 @@ async function collectRaw(
     });
   }
 
+  // Write with AI runs once per case, checked against the live brand profile and promo.
+  const brand = {
+    tags: parseHashtags(ctx.brand.hashtags).tags,
+    avoid: avoidList(ctx.brand.avoid),
+  };
+  for (const c of captionCases) {
+    if (aborted) break;
+    tick(c.id);
+    if (c.avoidBait && brand.avoid.length === 0) {
+      raw.push({
+        id: c.id,
+        kind: "draft",
+        input: c.request.brief,
+        durations: [],
+        first: null,
+        skip: "the brand profile has no Never mention words to test",
+      });
+      continue;
+    }
+    await tryCase(c.id, "draft", async () => {
+      facts ??= await fetchFacts(url);
+      const body = {
+        mode: "write",
+        kind: "general",
+        length: "medium",
+        hashtags: false,
+        emoji: false,
+        ending: "none",
+        platforms: ["facebook", "instagram"],
+        count: 2,
+        promoId: null,
+        ...c.request,
+        brief: c.avoidBait ? `${c.request.brief} Mention ${brand.avoid[0]} too.` : c.request.brief,
+      };
+      const req = parseCaptionRequest(body);
+      if ("error" in req) throw new Error(`bad case request: ${req.error}`);
+      const captions = await callCaption(url, adminSecret, body);
+      const { hard, soft } = captionProblems(captions, req, facts, brand);
+      const all = captions.join("\n---\n");
+      for (const k of c.keep ?? [])
+        if (!captions.every((t) => t.includes(k))) hard.push(`lost "${k}"`);
+      for (const f of c.forbid ?? []) if (f.pattern.test(all)) hard.push(f.why);
+      if (c.promoCheck && ctx.promoRunning && !captions.every((t) => t.includes("{promoOffer}"))) {
+        hard.push("a promo is running but {promoOffer} isn't used");
+      }
+      if (c.promoCheck && !ctx.promoRunning && DEAL_RE.test(all)) {
+        hard.push("no promo is running but it mentions a deal");
+      }
+      if (c.wantRate) {
+        const rate = facts.match(/Standard rate: NZ\$([\d.]+) per hour/)?.[1];
+        if (!rate) hard.push("BUSINESS FACTS has no standard rate");
+        else if (!captions.every((t) => t.includes(`$${rate}`))) {
+          hard.push(`doesn't quote the standard rate ($${rate})`);
+        }
+      }
+      raw.push({
+        id: c.id,
+        kind: "draft",
+        input: body.brief,
+        durations: [],
+        first: { captions },
+        draftCheck: { hard, soft },
+      });
+    });
+  }
+
+  // Suggest a reply runs once per case, checked against the live business facts.
+  for (const c of replyCases) {
+    if (aborted) break;
+    tick(c.id);
+    await tryCase(c.id, "draft", async () => {
+      facts ??= await fetchFacts(url);
+      const req = parseReplyRequest(c.request);
+      if ("error" in req) throw new Error(`bad case request: ${req.error}`);
+      const got = await callReplySuggest(url, adminSecret, c.request);
+      const { hard, soft } = replyProblems(got, req, facts, c);
+      for (const w of c.want ?? []) if (!w.pattern.test(got.reply)) hard.push(w.why);
+      for (const f of c.forbid ?? []) if (f.pattern.test(got.reply)) hard.push(f.why);
+      if (c.wantRate) {
+        const rate = facts.match(/Standard rate: NZ\$([\d.]+) per hour/)?.[1];
+        if (!rate) hard.push("BUSINESS FACTS has no standard rate");
+        else if (!got.reply.includes(`$${rate}`))
+          hard.push(`doesn't quote the standard rate ($${rate})`);
+      }
+      raw.push({
+        id: c.id,
+        kind: "draft",
+        input: req.text || `${req.rating} stars, no words`,
+        durations: [],
+        first: { captions: [got.hide ? `(hide) ${got.reply}` : got.reply] },
+        draftCheck: { hard, soft },
+      });
+    });
+  }
+
   // Cross-route: same job to BOTH routes once, to compare estimate vs stated-time duration.
   for (const c of crossRouteCases) {
     if (aborted) break;
@@ -597,6 +857,16 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
   const inc = ctx.incrementMins;
 
   for (const r of raw) {
+    if (r.skip) {
+      out.push({
+        id: r.id,
+        family: "draft",
+        label: `draft ${r.id}`,
+        status: "skip",
+        detail: r.skip,
+      });
+      continue;
+    }
     // Errored case: hard fail, then skip the family checks.
     if (r.error) {
       out.push({
@@ -731,16 +1001,24 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
     // Draft: the shared rules plus the case's forbid list are hard; style is info.
     if (r.kind === "draft" && r.draftCheck) {
       const { hard, soft } = r.draftCheck;
-      const draft = r.first as { subject?: string; headline?: string; quote?: string };
+      const draft = r.first as {
+        subject?: string;
+        headline?: string;
+        quote?: string;
+        captions?: string[];
+      };
+      // A caption shows its first line, which is all that fits on one report line.
+      const shown =
+        draft.subject ??
+        (draft.headline || draft.quote || draft.captions?.[0]?.split("\n")[0]?.slice(0, 80));
       out.push({
         id: r.id,
         family: "draft",
         label: `draft ${r.id}`,
         status: hard.length === 0 ? "pass" : "fail",
         detail:
-          (hard.length === 0
-            ? `"${draft.subject ?? (draft.headline || draft.quote) ?? ""}"`
-            : hard.join("; ")) + (soft.length > 0 ? ` (style: ${soft.join(", ")})` : ""),
+          (hard.length === 0 ? `"${shown ?? ""}"` : hard.join("; ")) +
+          (soft.length > 0 ? ` (style: ${soft.join(", ")})` : ""),
       });
     }
 

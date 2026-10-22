@@ -86,31 +86,31 @@ export function TripSuggestions({
   const busy = addingAll || addingId !== null;
   return (
     <Card padding="none" className={className}>
-      <div className="px-4 pt-4 sm:px-5 sm:pt-5">
-        <CardHeader
-          title="Jobs without a trip"
-          description={`Completed jobs ${yearPhrase} with no trip logged. Each job is one round trip: get the km from Google or type it, then add it.`}
-          actions={
-            suggestions.length > 0 ? (
-              <AdminButton
-                variant="outline"
-                onClick={onAddAll}
-                busy={addingAll}
-                disabled={addingId !== null}
-              >
-                Add all
-              </AdminButton>
-            ) : undefined
-          }
-        />
-      </div>
+      {/* No bottom margin: the header's rule doubles as the first row's top edge. */}
+      <CardHeader
+        title="Jobs without a trip"
+        description={`Completed jobs ${yearPhrase} with no trip logged. Each job is one round trip: get the km from Google or type it, then add it.`}
+        actions={
+          suggestions.length > 0 ? (
+            <AdminButton
+              variant="outline"
+              onClick={onAddAll}
+              busy={addingAll}
+              disabled={addingId !== null}
+            >
+              Add all
+            </AdminButton>
+          ) : undefined
+        }
+        className="mb-0"
+      />
       {suggestions.length === 0 ? (
         <EmptyState
           title="No jobs waiting"
           body={`Every completed job ${yearPhrase} has a trip logged.`}
         />
       ) : (
-        <ul className="divide-y divide-admin-border border-t border-admin-border">
+        <ul className="divide-y divide-admin-border">
           {suggestions.map((s) => {
             const inputId = `trip-km-${s.bookingId}`;
             const hint = hintFor(s);

@@ -17,11 +17,11 @@ import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
-import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
+import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { SubscribersPanel } from "@/features/mailing/components/SubscribersPanel";
 import { callApi } from "@/features/mailing/lib/api-client";
-import type { CampaignRow, CampaignStatus } from "@/features/mailing/lib/campaign-row";
+import { CAMPAIGN_STATUS_PILL, type CampaignRow } from "@/features/mailing/lib/campaign-row";
 import type { Recipient } from "@/features/mailing/lib/recipients";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
@@ -38,14 +38,6 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "sent", label: "Sent" },
   { key: "presets", label: "Presets" },
 ];
-
-const STATUS_PILL: Record<CampaignStatus, { tone: StatusTone; label: string }> = {
-  draft: { tone: "neutral", label: "Draft" },
-  scheduled: { tone: "info", label: "Scheduled" },
-  sending: { tone: "warning", label: "Sending" },
-  sent: { tone: "success", label: "Sent" },
-  failed: { tone: "critical", label: "Failed" },
-};
 
 /**
  * Which tab a campaign belongs on.
@@ -268,7 +260,7 @@ export function MailingView({
           {/* Phones: one stacked row per email. */}
           <ul className="flex flex-col divide-y divide-admin-border md:hidden">
             {visible.map((row) => {
-              const pill = STATUS_PILL[row.status];
+              const pill = CAMPAIGN_STATUS_PILL[row.status];
               return (
                 <li
                   key={row.id}
@@ -310,10 +302,12 @@ export function MailingView({
             </thead>
             <tbody className={TBODY_CLS}>
               {visible.map((row) => {
-                const pill = STATUS_PILL[row.status];
+                const pill = CAMPAIGN_STATUS_PILL[row.status];
                 return (
                   <tr key={row.id} className={ROW_CLS}>
-                    <td className={cn(TD_CLS, "max-w-0 align-top")}>
+                    {/* max-w-0 lets the subject truncate; w-1/2 hands this column the spare
+                        width so it truncates late rather than beside an empty Date column. */}
+                    <td className={cn(TD_CLS, "w-1/2 max-w-0 align-top")}>
                       <Link
                         href={`/admin/mailing/${row.id}`}
                         className={cn("text-sm", ADMIN_LINK_CLS)}

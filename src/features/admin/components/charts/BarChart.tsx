@@ -1,9 +1,13 @@
 "use client";
 // src/features/admin/components/charts/BarChart.tsx
-// Grouped column chart for money series in plain HTML; each group is a button that shows a
-// readout, with a "Show as table" twin.
+// Grouped column chart for money or count series in plain HTML; each group is a button that
+// shows a readout, with a "Show as table" twin.
 
-import { formatAxisDollars, niceScale } from "@/features/admin/components/charts/chart-scale";
+import {
+  formatAxisDollars,
+  formatCount,
+  niceScale,
+} from "@/features/admin/components/charts/chart-scale";
 import type { ChartSeries } from "@/features/admin/components/charts/series";
 import {
   TABLE_CLS,
@@ -42,6 +46,8 @@ interface BarChartProps {
   differenceLabel?: string;
   /** Shown in place of the plot when every value is zero. */
   emptyText: string;
+  /** Dollars (the default) or plain counts like views. */
+  format?: "money" | "count";
   className?: string;
 }
 
@@ -59,6 +65,7 @@ const PLOT_H = "h-56";
  * @param props.groupHeading - Table heading for the group column.
  * @param props.differenceLabel - Label for the first-minus-second row, when wanted.
  * @param props.emptyText - Text shown when every value is zero.
+ * @param props.format - Dollars or plain counts.
  * @param props.className - Extra classes on the card.
  * @returns The chart card.
  */
@@ -70,8 +77,12 @@ export function BarChart({
   groupHeading,
   differenceLabel,
   emptyText,
+  format = "money",
   className,
 }: BarChartProps): React.ReactElement {
+  const money = format === "money";
+  const formatValue = money ? formatNZD : formatCount;
+  const formatTick = money ? formatAxisDollars : formatCount;
   const titleId = useId();
   const plotRef = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState<number | null>(null);
@@ -100,9 +111,9 @@ export function BarChart({
 
   const totals = series.map((_, si) => groups.reduce((sum, g) => sum + (g.values[si] ?? 0), 0));
   const max = Math.max(0, ...groups.flatMap((g) => g.values));
-  const scale = niceScale(max);
+  const scale = niceScale(max, 6, money ? 0.01 : 1);
   const isEmpty = groups.every((g) => g.values.every((v) => v === 0));
-  const widestTick = formatAxisDollars(scale.top);
+  const widestTick = formatTick(scale.top);
 
   /**
    * First series minus second, for the difference row.
@@ -117,8 +128,8 @@ export function BarChart({
    * @returns The readout text.
    */
   const readout = (g: BarGroup): string => {
-    const parts = series.map((s, si) => `${s.label} ${formatNZD(g.values[si] ?? 0)}`);
-    if (differenceLabel) parts.push(`${differenceLabel} ${formatNZD(difference(g.values))}`);
+    const parts = series.map((s, si) => `${s.label} ${formatValue(g.values[si] ?? 0)}`);
+    if (differenceLabel) parts.push(`${differenceLabel} ${formatValue(difference(g.values))}`);
     return `${g.label}: ${parts.join(", ")}`;
   };
 
@@ -168,7 +179,7 @@ export function BarChart({
                   className={cn("h-3 w-3 shrink-0 rounded-sm", s.fillClass)}
                 />
                 {s.label}
-                <span className="font-bold text-admin-text">{formatNZD(totals[si] ?? 0)}</span>
+                <span className="font-bold text-admin-text">{formatValue(totals[si] ?? 0)}</span>
               </li>
             ))}
           </ul>
@@ -188,7 +199,7 @@ export function BarChart({
                 className="absolute right-0 translate-y-1/2 text-sm whitespace-nowrap text-admin-muted tabular-nums"
                 style={{ bottom: `${(t / scale.top) * 100}%` }}
               >
-                {formatAxisDollars(t)}
+                {formatTick(t)}
               </span>
             ))}
           </div>
@@ -283,7 +294,7 @@ export function BarChart({
                           className={cn("h-0.5 w-3 shrink-0 rounded-full", s.fillClass)}
                         />
                         <span className="font-bold text-admin-text tabular-nums">
-                          {formatNZD(activeGroup.values[si] ?? 0)}
+                          {formatValue(activeGroup.values[si] ?? 0)}
                         </span>
                         <span className="text-admin-text-secondary">{s.label}</span>
                       </li>
@@ -292,7 +303,7 @@ export function BarChart({
                       <li className="mt-1 flex items-center gap-2 border-t border-admin-border pt-1 text-sm">
                         <span aria-hidden="true" className="w-3 shrink-0" />
                         <span className="font-bold text-admin-text tabular-nums">
-                          {formatNZD(difference(activeGroup.values))}
+                          {formatValue(difference(activeGroup.values))}
                         </span>
                         <span className="text-admin-text-secondary">{differenceLabel}</span>
                       </li>
@@ -352,12 +363,12 @@ export function BarChart({
                     </th>
                     {series.map((s, si) => (
                       <td key={s.key} className={cn(TD_CLS, "text-right tabular-nums")}>
-                        {formatNZD(g.values[si] ?? 0)}
+                        {formatValue(g.values[si] ?? 0)}
                       </td>
                     ))}
                     {differenceLabel && (
                       <td className={cn(TD_CLS, "text-right tabular-nums")}>
-                        {formatNZD(difference(g.values))}
+                        {formatValue(difference(g.values))}
                       </td>
                     )}
                   </tr>
@@ -370,12 +381,12 @@ export function BarChart({
                   </th>
                   {series.map((s, si) => (
                     <td key={s.key} className={cn(TD_CLS, "text-right font-bold tabular-nums")}>
-                      {formatNZD(totals[si] ?? 0)}
+                      {formatValue(totals[si] ?? 0)}
                     </td>
                   ))}
                   {differenceLabel && (
                     <td className={cn(TD_CLS, "text-right font-bold tabular-nums")}>
-                      {formatNZD((totals[0] ?? 0) - (totals[1] ?? 0))}
+                      {formatValue((totals[0] ?? 0) - (totals[1] ?? 0))}
                     </td>
                   )}
                 </tr>

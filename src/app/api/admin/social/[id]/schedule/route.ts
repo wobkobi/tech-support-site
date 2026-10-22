@@ -1,8 +1,13 @@
 // src/app/api/admin/social/[id]/schedule/route.ts
-// Schedules a draft for the publish-scheduled cron, or cancels back to a draft. Quiet hours don't apply.
+// Schedules a draft for the publish-scheduled cron, moves a scheduled post to another time (or
+// swaps two), or cancels back to a draft. Quiet hours don't apply. Cancelling or moving a
+// schedule's posting leaves its slot empty.
 
 import { parseObjectId } from "@/features/business/lib/validation";
+import { movePost, swapPosts, type MoveResult } from "@/features/social/lib/calendar-moves.server";
+import { NOT_CONTENT } from "@/features/social/lib/filters";
 import { scheduleProblems } from "@/features/social/lib/publish";
+import { skipQueueSlot } from "@/features/social/lib/queue-fill.server";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -35,15 +40,51 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
 
   const post = await prisma.socialPost.findUnique({ where: { id } });
   if (!post || post.isPreset) return errorResponse("Post not found.", 404);
+  if (post.isContent) {
+    return errorResponse("A content item is scheduled as a posting, from its own page.", 400);
+  }
   const problem = scheduleProblems(post);
   if (problem) return errorResponse(problem.error, problem.status);
 
   const updated = await prisma.socialPost.updateMany({
-    where: { id, isPreset: false, status: "draft" },
+    where: { id, isPreset: false, status: "draft", ...NOT_CONTENT },
     data: { status: "scheduled", scheduledAt: when },
   });
   if (updated.count === 0) return errorResponse("Only a draft can be scheduled.", 409);
   return okResponse({ scheduledAt: when.toISOString() });
+}
+
+/**
+ * PUT /api/admin/social/[id]/schedule
+ * Body: `{ scheduledAt: ISO string }` to move a scheduled post, or `{ swapWith: post id }` to
+ * swap its time with another scheduled post's.
+ * @param request - Incoming request.
+ * @param ctx - Route context.
+ * @param ctx.params - Route params with the post id.
+ * @returns JSON `{ moved: [{ id, scheduledAt, queueId }] }`.
+ */
+export async function PUT(request: NextRequest, { params }: Ctx): Promise<NextResponse> {
+  if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
+  const id = parseObjectId((await params).id);
+  if (!id) return errorResponse("Post not found.", 404);
+  const body = (await request.json().catch(() => null)) as {
+    scheduledAt?: unknown;
+    swapWith?: unknown;
+  } | null;
+
+  const now = new Date();
+  let result: MoveResult;
+  if (body?.swapWith !== undefined) {
+    const other = parseObjectId(body.swapWith);
+    if (!other) return errorResponse("Post not found.", 404);
+    result = await swapPosts(id, other, now);
+  } else {
+    const when = typeof body?.scheduledAt === "string" ? new Date(body.scheduledAt) : null;
+    if (!when || Number.isNaN(when.getTime())) return errorResponse("Pick a date and time.", 400);
+    result = await movePost(id, when, now);
+  }
+  if (!result.ok) return errorResponse(result.error, result.status);
+  return okResponse({ moved: result.moved });
 }
 
 /**
@@ -57,12 +98,17 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
   const id = parseObjectId((await params).id);
   if (!id) return errorResponse("Post not found.", 404);
+  const post = await prisma.socialPost.findUnique({
+    where: { id },
+    select: { queueId: true, scheduledAt: true },
+  });
   const updated = await prisma.socialPost.updateMany({
     where: { id, status: "scheduled" },
-    data: { status: "draft", scheduledAt: null },
+    data: { status: "draft", scheduledAt: null, queueId: null },
   });
   if (updated.count === 0) {
     return errorResponse("It isn't scheduled any more - it may have just started posting.", 409);
   }
+  if (post?.queueId && post.scheduledAt) await skipQueueSlot(post.queueId, post.scheduledAt);
   return okResponse();
 }

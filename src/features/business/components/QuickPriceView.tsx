@@ -8,6 +8,7 @@ import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { StickyRail } from "@/features/admin/components/ui/StickyRail";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import {
   SEGMENTED_GROUP_CLS,
@@ -344,9 +345,14 @@ export function QuickPriceView({
     : 0;
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-4">
+    // Phones stack in DOM order. On lg the total is a pinned right column beside the inputs
+    // and Add to income; on xl the three sit in a row: inputs, total, Add to income.
+    // Today's jobs runs across the top.
+    <div className="mx-auto flex max-w-xl flex-col gap-4 lg:mx-0 lg:grid lg:max-w-none lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start xl:grid-cols-3">
       {events.length > 0 && (
-        <QuickTodaysJobs events={events} activeEventId={prefill?.eventId ?? null} />
+        <div className="lg:col-span-full">
+          <QuickTodaysJobs events={events} activeEventId={prefill?.eventId ?? null} />
+        </div>
       )}
 
       <Card className="text-admin-text">
@@ -444,22 +450,34 @@ export function QuickPriceView({
         </div>
       </Card>
 
-      <QuickTotalCard
-        totals={totals}
-        billedMins={billedMins}
-        hourlyRate={hourlyRate}
-        travel={travel}
-        noTravel={noTravel}
-        onToggleNoTravel={() => setNoTravel((v) => !v)}
-        driveMins={driveMins}
-        lookingUp={lookingUp}
-        surcharge={surcharge}
-        promo={promo}
-        bankAccount={bankAccount}
-        clientName={prefill?.clientName ?? null}
-      />
+      <StickyRail
+        className={cn(
+          "lg:col-start-2 lg:row-span-2 xl:row-span-1",
+          events.length > 0 ? "lg:row-start-2" : "lg:row-start-1",
+        )}
+      >
+        <QuickTotalCard
+          totals={totals}
+          billedMins={billedMins}
+          hourlyRate={hourlyRate}
+          travel={travel}
+          noTravel={noTravel}
+          onToggleNoTravel={() => setNoTravel((v) => !v)}
+          driveMins={driveMins}
+          lookingUp={lookingUp}
+          surcharge={surcharge}
+          promo={promo}
+          bankAccount={bankAccount}
+          clientName={prefill?.clientName ?? null}
+        />
+      </StickyRail>
 
-      <Card className="text-admin-text">
+      <Card
+        className={cn(
+          "text-admin-text xl:col-start-3",
+          events.length > 0 ? "xl:row-start-2" : "xl:row-start-1",
+        )}
+      >
         <CardHeader title="Add to income" className="mb-3" />
         <div className="flex flex-col gap-3">
           <AdminField label="Customer" htmlFor="quick-customer">

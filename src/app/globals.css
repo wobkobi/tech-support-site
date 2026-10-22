@@ -228,14 +228,26 @@ aside.app-admin-drawer {
 }
 
 /* Keep keyboard focus, #main skip-link jumps and scrollIntoView targets clear of the
-   sticky 56px admin top bar (AdminTopBar, h-14); 4rem leaves an 8px gap below it. */
+   sticky admin top bar (AdminTopBar, h-14); 4rem leaves a small gap below it.
+   The admin runs denser than the public site: a fixed 15px root (at the browser's
+   default text size) instead of the fluid rule further down, which grows on wide
+   screens. Every admin size is in rem, so text, padding and the sticky offsets all
+   shrink together; media queries resolve rem against the browser default, so the
+   breakpoints don't move. The :has() selector outranks that plain html rule. */
 html:has(.app-admin) {
   scroll-padding-top: 4rem;
+  font-size: 93.75%;
+}
+/* A printed invoice keeps its full size. */
+@media print {
+  html:has(.app-admin) {
+    font-size: 100%;
+  }
 }
 
 /* iOS Safari zooms the whole page when a field under 16px takes focus, and the
-   admin sets its fields at text-sm (14px). On a touch screen they render at 16px
-   instead; a mouse keeps the denser 14px. Outside @layer so it beats the text-sm
+   admin sets its fields at text-sm (about 13px). On a touch screen they render at
+   16px instead; a mouse keeps the denser size. Outside @layer so it beats the text-sm
    utility on each field without touching every class string. */
 @media (pointer: coarse) {
   .app-admin :is(input, select, textarea) {

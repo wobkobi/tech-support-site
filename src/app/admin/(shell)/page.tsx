@@ -19,6 +19,7 @@ import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { lastCardSpan, StatStrip } from "@/features/admin/components/ui/StatStrip";
+import { StickyRail } from "@/features/admin/components/ui/StickyRail";
 import { loadDashboardData } from "@/features/admin/lib/dashboard-data";
 import { formatNZD } from "@/features/business/lib/business";
 import { SendReviewLinkForm } from "@/features/reviews/components/admin/SendReviewLinkForm";
@@ -200,7 +201,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       <DashboardAlerts overdueCount={overdueInvoices.length} heldCount={heldCount} />
 
       {/* What needs doing first; history below. */}
-      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
         <div className="flex min-w-0 flex-col gap-6 lg:col-span-8">
           <UpcomingBookingsPanel laterBookings={data.laterBookings} />
           <BarChart
@@ -223,7 +224,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
           />
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6 lg:col-span-4">
+        <StickyRail className="flex flex-col gap-6 lg:col-span-4">
           {nextJobPanel("max-lg:hidden")}
           <PendingReviewsPanel pendingReviews={data.pendingReviews} pendingCount={pendingCount} />
           {/* Hidden entirely until at least one retainer client exists. */}
@@ -234,7 +235,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
             <CardHeader title="Send review link" />
             <SendReviewLinkForm contactSuggestions={data.contactsWithoutReviewLinks} defaultOpen />
           </Card>
-        </div>
+        </StickyRail>
       </div>
 
       <StatStrip label="Running totals" className="mb-6 grid-cols-2 lg:grid-cols-5">
@@ -254,13 +255,19 @@ export default async function AdminPage(): Promise<React.ReactElement> {
         ))}
       </StatStrip>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <RecentActivityPanel activity={data.activity} />
-        <SystemStatusPanel
-          calendarLastRefreshMs={data.calendarLastRefreshMs}
-          latestInvoice={data.recentInvoices[0]}
-          unsyncedCount={unsyncedCount}
-        />
+      {/* Same 8/4 split as above; the short status card pins beside the long activity list
+          instead of stretching to its height. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
+        <div className="min-w-0 lg:col-span-8">
+          <RecentActivityPanel activity={data.activity} />
+        </div>
+        <StickyRail className="lg:col-span-4">
+          <SystemStatusPanel
+            calendarLastRefreshMs={data.calendarLastRefreshMs}
+            latestInvoice={data.recentInvoices[0]}
+            unsyncedCount={unsyncedCount}
+          />
+        </StickyRail>
       </div>
     </>
   );

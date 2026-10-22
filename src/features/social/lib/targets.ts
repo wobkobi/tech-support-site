@@ -11,12 +11,16 @@ export interface TargetState {
   imageWidth: number | null;
   imageHeight: number | null;
   cropApprovedFor: string | null;
+  imageOriginalUrl: string | null;
   status: "pending" | "posted" | "failed" | "skipped" | "removed";
   externalId: string | null;
   permalink: string | null;
   error: string | null;
   postedAt: Date | null;
   removedAt: Date | null;
+  /** What the platform is still processing, so a resumed run checks it instead of starting over. */
+  containerId: string | null;
+  containerCreatedAt: Date | null;
 }
 
 /** One platform's take-down result: done, or why not. */
@@ -36,12 +40,15 @@ export function defaultTargets(): TargetState[] {
     imageWidth: null,
     imageHeight: null,
     cropApprovedFor: null,
+    imageOriginalUrl: null,
     status: "pending",
     externalId: null,
     permalink: null,
     error: null,
     postedAt: null,
     removedAt: null,
+    containerId: null,
+    containerCreatedAt: null,
   }));
 }
 
@@ -65,7 +72,9 @@ export function rollUpStatus(targets: TargetState[]): "posting" | "posted" | "pa
  */
 export function resetFailed(targets: TargetState[]): TargetState[] {
   return targets.map((t) =>
-    t.enabled && t.status === "failed" ? { ...t, status: "pending", error: null } : t,
+    t.enabled && t.status === "failed"
+      ? { ...t, status: "pending", error: null, containerId: null, containerCreatedAt: null }
+      : t,
   );
 }
 
@@ -83,6 +92,8 @@ export function freshRun(targets: TargetState[]): TargetState[] {
     error: null,
     postedAt: null,
     removedAt: null,
+    containerId: null,
+    containerCreatedAt: null,
   }));
 }
 

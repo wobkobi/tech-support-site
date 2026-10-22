@@ -5,6 +5,7 @@
 import { BlockDayButton } from "@/features/admin/components/BlockDayButton";
 import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { useNowMinute } from "@/features/admin/hooks/use-now-minute";
 import { useOptimisticDayBlocks } from "@/features/admin/hooks/use-optimistic-day-blocks";
 import {
   KIND_STYLES,
@@ -28,7 +29,7 @@ import {
 } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { FaCalendarDay, FaChevronLeft, FaChevronRight } from "react-icons/fa6";
 
 interface WeekViewProps {
@@ -84,14 +85,11 @@ export function WeekView({
   // Stable "now" for the past-event lock (hides block buttons on old days).
   const [renderedAt] = useState(() => Date.now());
 
-  // Ticking "now" for the time line; renderedAt stays stable so block buttons don't flicker.
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNowMs(Date.now()), 60_000);
-    return () => clearInterval(id);
-  }, []);
-  const nowKey = nzDateKey(new Date(nowMs));
-  const nowMinute = nzMinuteOfDay(new Date(nowMs).toISOString());
+  // Ticking "now" for the time line, browser only; renderedAt stays stable so block buttons
+  // don't flicker.
+  const nowMs = useNowMinute();
+  const nowKey = nowMs === null ? null : nzDateKey(new Date(nowMs));
+  const nowMinute = nowMs === null ? null : nzMinuteOfDay(new Date(nowMs).toISOString());
 
   // Monday keys for the prev/next/Today buttons.
   const { prevWeekKey, nextWeekKey, todayWeekKey } = useMemo(() => {
@@ -184,7 +182,7 @@ export function WeekView({
   const range = useMemo(() => visibleHourRange(days.flatMap((d) => d.timedEvents)), [days]);
   const dayHours = range.endHour - range.startHour;
   const dayHeightPx = dayHours * 60 * PX_PER_MINUTE;
-  const nowOffsetMin = nowMinute - range.startHour * 60;
+  const nowOffsetMin = nowMinute === null ? null : nowMinute - range.startHour * 60;
 
   const hours = useMemo(
     () => Array.from({ length: dayHours + 1 }, (_, i) => range.startHour + i),
@@ -437,7 +435,10 @@ export function WeekView({
                   onClick={(e) => handleColumnClick(e, day.key)}
                   onOpenBooking={(id) => router.push(`/admin/bookings/${id}`)}
                   nowLineTop={
-                    day.key === nowKey && nowOffsetMin >= 0 && nowOffsetMin <= dayHours * 60
+                    nowOffsetMin !== null &&
+                    day.key === nowKey &&
+                    nowOffsetMin >= 0 &&
+                    nowOffsetMin <= dayHours * 60
                       ? nowOffsetMin * PX_PER_MINUTE
                       : null
                   }

@@ -3,7 +3,13 @@
 // validators so help text and rules never drift.
 
 import type { VehicleFuel } from "@/features/business/lib/tax/types";
-import type { SettingsGroup } from "@/shared/lib/settings/types";
+import { MAX_BRAND_HASHTAGS } from "@/shared/lib/hashtags";
+import type {
+  HashtagsDefault,
+  SettingsGroup,
+  WatermarkCorner,
+  WatermarkLogo,
+} from "@/shared/lib/settings/types";
 
 /** Display metadata for one editable field, keyed by its dotted path in a group. */
 export interface FieldMeta {
@@ -52,6 +58,11 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
     title: "Reviews & reputation",
     blurb:
       "Homepage review count, auto-approval, the Google review link, and when the automatic review ask goes out.",
+  },
+  social: {
+    title: "Social & brand",
+    blurb:
+      "What the AI writers should know about you beyond the website, the defaults for Write with AI, the logo on your photos, and how far ahead schedules line up posts.",
   },
 };
 
@@ -234,6 +245,113 @@ export const REVIEWS_FIELD_META = {
       "Don't ask the same person again within this many days, even if they get another invoice.",
     unit: "days",
     off: "Set 0 to ask after every invoice.",
+  },
+} satisfies Record<string, FieldMeta>;
+
+/** Labels for when Write with AI's Hashtags tickbox starts ticked. */
+export const HASHTAGS_DEFAULT_LABELS: Record<HashtagsDefault, string> = {
+  never: "Never",
+  instagram: "When the post goes to Instagram",
+  always: "Always",
+};
+
+/** Labels for the logo artwork "Add my logo" can use. */
+export const WATERMARK_LOGO_LABELS: Record<WatermarkLogo, string> = {
+  mark: "Mark",
+  profile: "Mark with accent",
+  wordmark: "Wordmark",
+  full: "Wordmark and tagline",
+};
+
+/** Labels for the corner the logo sits in. */
+export const WATERMARK_CORNER_LABELS: Record<WatermarkCorner, string> = {
+  "top-left": "Top left",
+  "top-right": "Top right",
+  "bottom-left": "Bottom left",
+  "bottom-right": "Bottom right",
+};
+
+/** The logo size and solidity ranges, as percentages. */
+/** Days ahead a schedule can line up postings. */
+export const QUEUE_FILL_DAYS_RANGE = { min: 3, max: 60 } as const;
+/**
+ * Earliest and latest time slot, in minutes after NZ midnight (5:00am to 11:45pm). Keeping clear
+ * of 2-3am means no slot falls in the hour daylight saving skips or repeats.
+ */
+export const SLOT_MINUTE_RANGE = { min: 300, max: 1425 } as const;
+/** Time slots move in 15-minute steps. */
+export const SLOT_MINUTE_STEP = 15;
+
+export const WATERMARK_SIZE_RANGE = { min: 8, max: 30 } as const;
+export const WATERMARK_OPACITY_RANGE = { min: 40, max: 100 } as const;
+
+/** Field metadata for the social group, keyed by dotted path. */
+export const SOCIAL_FIELD_META = {
+  "brand.notes": {
+    title: "About you",
+    description:
+      "Anything about you or the business the website doesn't say, like how long you've been fixing computers or what you enjoy most. Your hours, area, rates and services already come from these settings.",
+  },
+  "brand.audience": {
+    title: "Who it's for",
+    description:
+      "Who your posts and emails are written for, like 'retired people around Point Chevalier'.",
+  },
+  "brand.tone": {
+    title: "How it should sound",
+    description:
+      "Anything on top of the house voice (plain, friendly, first person), like 'a bit of dry humour'.",
+  },
+  "brand.avoid": {
+    title: "Never mention",
+    description:
+      "Words or topics the AI must never use, separated by commas, like 'cheap, Apple repairs'.",
+  },
+  "brand.hashtags": {
+    title: "Your hashtags",
+    description: `Up to ${MAX_BRAND_HASHTAGS} hashtags, separated by spaces or commas. Write with AI puts these first when it adds hashtags.`,
+  },
+  "brand.hashtagsOn": {
+    title: "Add hashtags",
+    description:
+      "When Write with AI's Hashtags tickbox starts ticked. You can still change it for each post, and words just for Google never get hashtags.",
+  },
+  "brand.emojiOn": {
+    title: "Add emoji",
+    description:
+      "Whether Write with AI's Emoji tickbox starts ticked. When it's on, a post gets one or two at most.",
+  },
+  "watermark.on": {
+    title: "Add my logo to new photos",
+    description:
+      "Puts your logo in a corner of each photo you upload in a post. Each photo has its own Add my logo switch, so you can still take it off. Post maker pictures never get it.",
+  },
+  "watermark.logo": {
+    title: "Logo",
+    description: "Which logo goes on. It sits on a white backing so it shows up on any photo.",
+  },
+  "watermark.corner": {
+    title: "Corner",
+    description: "Where the logo sits. Pick the corner your photos usually leave clear.",
+  },
+  "watermark.size": {
+    title: "Size",
+    description: `How big the logo is, as a share of the photo's shorter side (${WATERMARK_SIZE_RANGE.min}-${WATERMARK_SIZE_RANGE.max}%).`,
+    unit: "%",
+  },
+  "watermark.opacity": {
+    title: "How solid",
+    description: `${WATERMARK_OPACITY_RANGE.max}% is fully solid; lower lets the photo show through (${WATERMARK_OPACITY_RANGE.min}% at least).`,
+    unit: "%",
+  },
+  "schedules.fillDays": {
+    title: "Line up posts ahead",
+    description: `How many days ahead each schedule fills its time slots (${QUEUE_FILL_DAYS_RANGE.min}-${QUEUE_FILL_DAYS_RANGE.max}). Lined-up posts show in Posts, and changes to their content item reach them until they go out.`,
+    unit: "days",
+  },
+  "schedules.defaultMinute": {
+    title: "New time slots start at",
+    description: "The time a new slot in a schedule starts at. You can change each one after.",
   },
 } satisfies Record<string, FieldMeta>;
 
@@ -685,4 +803,5 @@ export const FIELD_META_BY_GROUP: Record<SettingsGroup, Record<string, FieldMeta
   comms: COMMS_FIELD_META,
   scheduling: SCHEDULING_FIELD_META,
   reviews: REVIEWS_FIELD_META,
+  social: SOCIAL_FIELD_META,
 };

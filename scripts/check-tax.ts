@@ -36,7 +36,7 @@ import {
   type TaxYearRecordInput,
   type TaxYearResult,
 } from "@/features/business/lib/tax";
-import { buildTaxCsv, csvMoney, csvText } from "@/features/business/lib/tax/export-csv";
+import { buildTaxCsv, csvMoney } from "@/features/business/lib/tax/export-csv";
 import { inFy, ledgerDay, pctFraction, roundCents } from "@/features/business/lib/tax/helpers";
 import {
   buildTaxYearSnapshot,
@@ -48,6 +48,7 @@ import {
   type FiledYearRef,
   type SnapshotYearInputs,
 } from "@/features/business/lib/tax/snapshot";
+import { csvText } from "@/shared/lib/csv";
 import { expectEqual, finish } from "./lib/harness.js";
 
 /**

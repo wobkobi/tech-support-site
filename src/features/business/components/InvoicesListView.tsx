@@ -7,6 +7,7 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
+import { StickyList } from "@/features/admin/components/ui/StickyList";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
 import { PaymentDialog } from "@/features/business/components/invoice/PaymentDialog";
@@ -359,105 +360,114 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
 
       <InvoicesSummaryCards summary={summary} statusFilter={statusFilter} onToggle={toggleFilter} />
 
-      {/* Every filter change goes back to page 1. */}
-      <InvoicesListToolbar
-        search={search}
-        statusFilter={statusFilter}
-        fromDate={fromDate}
-        toDate={toDate}
-        onSearchChange={(v) => {
-          setSearch(v);
-          setPage(1);
-        }}
-        onStatusChange={(v) => {
-          setStatusFilter(v);
-          setPage(1);
-        }}
-        onFromChange={(v) => {
-          setFromDate(v);
-          setPage(1);
-        }}
-        onToChange={(v) => {
-          setToDate(v);
-          setPage(1);
-        }}
-        anyFilterActive={anyFilterActive}
-        onClear={() => {
-          setSearch("");
-          setStatusFilter("all");
-          setFromDate("");
-          setToDate("");
-          setPage(1);
-        }}
-      />
-
-      {loadError && (
-        <div
-          role="alert"
-          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-        >
-          <span>
-            {invoices.length === 0
-              ? "Couldn't load invoices."
-              : "Couldn't refresh invoices - the list may be out of date."}
-          </span>
-          <AdminButton size="xs" variant="secondary" onClick={() => void reload()} busy={retrying}>
-            Try again
-          </AdminButton>
-        </div>
-      )}
-
-      {/* Phone cards below lg (the table is hard to read there), the sortable table from lg. */}
-      {loading ? (
-        <Card>
-          <p className="text-sm text-admin-muted">Loading...</p>
-        </Card>
-      ) : sorted.length === 0 ? (
-        <Card padding="none">
-          <EmptyState title={emptyText} />
-        </Card>
-      ) : (
-        <>
-          <InvoicesListCards rows={paged} onPay={setPayTarget} />
-          <InvoicesListTable
-            rows={paged}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={toggleSort}
-            onPay={setPayTarget}
+      <StickyList
+        toolbar={
+          // Every filter change goes back to page 1.
+          <InvoicesListToolbar
+            search={search}
+            statusFilter={statusFilter}
+            fromDate={fromDate}
+            toDate={toDate}
+            onSearchChange={(v) => {
+              setSearch(v);
+              setPage(1);
+            }}
+            onStatusChange={(v) => {
+              setStatusFilter(v);
+              setPage(1);
+            }}
+            onFromChange={(v) => {
+              setFromDate(v);
+              setPage(1);
+            }}
+            onToChange={(v) => {
+              setToDate(v);
+              setPage(1);
+            }}
+            anyFilterActive={anyFilterActive}
+            onClear={() => {
+              setSearch("");
+              setStatusFilter("all");
+              setFromDate("");
+              setToDate("");
+              setPage(1);
+            }}
           />
-        </>
-      )}
-
-      {/* Pagination - only when the filtered set spills past one page. */}
-      {!loading && sorted.length > PAGE_SIZE && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-admin-muted">
-          <span>
-            Showing {rangeStart}-{rangeEnd} of {sorted.length}
-          </span>
-          <div className="flex items-center gap-2">
-            <AdminButton
-              variant="secondary"
-              size="xs"
-              onClick={() => setPage(currentPage - 1)}
-              disabled={currentPage <= 1}
-            >
-              Previous
-            </AdminButton>
-            <span className="px-1 font-medium text-admin-text">
-              Page {currentPage} of {totalPages}
+        }
+      >
+        {loadError && (
+          <div
+            role="alert"
+            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          >
+            <span>
+              {invoices.length === 0
+                ? "Couldn't load invoices."
+                : "Couldn't refresh invoices - the list may be out of date."}
             </span>
             <AdminButton
-              variant="secondary"
               size="xs"
-              onClick={() => setPage(currentPage + 1)}
-              disabled={currentPage >= totalPages}
+              variant="secondary"
+              onClick={() => void reload()}
+              busy={retrying}
             >
-              Next
+              Try again
             </AdminButton>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Phone cards below lg (the table is hard to read there), the sortable table from lg. */}
+        {loading ? (
+          <Card>
+            <p className="text-sm text-admin-muted">Loading...</p>
+          </Card>
+        ) : sorted.length === 0 ? (
+          <Card padding="none">
+            <EmptyState title={emptyText} />
+          </Card>
+        ) : (
+          <>
+            <InvoicesListCards rows={paged} onPay={setPayTarget} />
+            <InvoicesListTable
+              rows={paged}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+              onPay={setPayTarget}
+            />
+          </>
+        )}
+
+        {/* Pagination - only when the filtered set spills past one page. */}
+        {!loading && sorted.length > PAGE_SIZE && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-admin-muted">
+            <span>
+              Showing {rangeStart}-{rangeEnd} of {sorted.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <AdminButton
+                variant="secondary"
+                size="xs"
+                onClick={() => setPage(currentPage - 1)}
+                disabled={currentPage <= 1}
+              >
+                Previous
+              </AdminButton>
+              <span className="px-1 font-medium text-admin-text">
+                Page {currentPage} of {totalPages}
+              </span>
+              <AdminButton
+                variant="secondary"
+                size="xs"
+                onClick={() => setPage(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+              >
+                Next
+              </AdminButton>
+            </div>
+          </div>
+        )}
+      </StickyList>
 
       {payTarget && (
         <PaymentDialog

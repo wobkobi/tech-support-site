@@ -1,7 +1,7 @@
 "use client";
 // src/features/social/components/SocialComposerHeader.tsx
 // Heading row above the open post on the Social page: its name and status, and the
-// post-level actions (write from a preset, duplicate, save as preset, delete, close).
+// post-level actions (write from a preset, duplicate, save as preset or content, delete, close).
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
@@ -19,6 +19,8 @@ import { FaXmark } from "react-icons/fa6";
  * @param props.savingPreset - Whether Save as preset is running.
  * @param props.onCreate - Creates a post or preset from this one and opens it.
  * @param props.onSaveAsPreset - Copies this post into a new preset.
+ * @param props.savingContent - Whether Save to content is running.
+ * @param props.onSaveToContent - Copies this post or preset into a new content item.
  * @param props.onDelete - Asks to delete this post or preset.
  * @param props.onClose - Closes the composer.
  * @returns Header element.
@@ -30,6 +32,8 @@ export function SocialComposerHeader({
   savingPreset,
   onCreate,
   onSaveAsPreset,
+  savingContent,
+  onSaveToContent,
   onDelete,
   onClose,
 }: {
@@ -39,6 +43,8 @@ export function SocialComposerHeader({
   savingPreset: boolean;
   onCreate: (body: Record<string, unknown>, key: string) => void;
   onSaveAsPreset: () => void;
+  savingContent: boolean;
+  onSaveToContent: () => void;
   onDelete: () => void;
   onClose: () => void;
 }): React.ReactElement {
@@ -85,6 +91,9 @@ export function SocialComposerHeader({
             </AdminButton>
           </>
         )}
+        <AdminButton size="sm" variant="secondary" busy={savingContent} onClick={onSaveToContent}>
+          Save to content
+        </AdminButton>
         {row.status !== "posting" && row.status !== "removing" && (
           <AdminButton size="sm" variant="danger" onClick={onDelete}>
             Delete

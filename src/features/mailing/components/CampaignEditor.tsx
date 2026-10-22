@@ -10,8 +10,9 @@ import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { AdminTabs } from "@/features/admin/components/ui/AdminTabs";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { Card } from "@/features/admin/components/ui/Card";
-import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
+import { ADMIN_LABEL_CLS, ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { InsertMenu, type InsertGroup } from "@/features/admin/components/ui/InsertMenu";
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { BlockEditor } from "@/features/mailing/components/blocks/BlockEditor";
 import { useBodyMode } from "@/features/mailing/components/blocks/useBodyMode";
@@ -34,7 +35,9 @@ import {
   switchTemplate,
   type Template,
 } from "@/features/mailing/lib/templates";
+import { postHref } from "@/features/social/lib/links";
 import type { QuietHours } from "@/shared/lib/quiet-hours";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 
@@ -45,6 +48,18 @@ export interface SendRow {
   email: string;
   status: "pending" | "sent" | "failed";
   error: string | null;
+}
+
+/** The social post linked to the email, either way round. */
+export interface LinkedPost {
+  id: string;
+  name: string;
+  /** A content item rather than a post, which opens on its own page. */
+  isContent: boolean;
+  /** The email was made from the post by Email this too, rather than the post shared from it. */
+  madeFromPost: boolean;
+  /** The post's words as a Draft with AI brief, for a browser that didn't keep the seeded one. */
+  brief: string;
 }
 
 /** Editable fields, as last saved. */
@@ -77,7 +92,7 @@ const SNIPPETS: { label: string; title: string; before: string; after: string; l
   ];
 
 /**
- * Mailing email editor.
+ * Mailing email editor, with its page header (title, breadcrumbs, Share to social).
  * @param props - Component props.
  * @param props.initial - The email as saved.
  * @param props.sends - Per-recipient results, for an email that has gone out.
@@ -91,6 +106,8 @@ const SNIPPETS: { label: string; title: string; before: string; after: string; l
  * @param props.promo - Wording of the linked or running promo, for the promo card block.
  * @param props.linkTargets - Pages the block editor's buttons and pictures can link to.
  * @param props.canDraft - Whether "Draft with AI" is available (OpenAI is set up).
+ * @param props.draftFromPost - Open Draft with AI on the linked post's words (from Email this too).
+ * @param props.linkedPost - The social post linked to the email, or null.
  * @returns Editor element.
  */
 export function CampaignEditor({
@@ -106,6 +123,8 @@ export function CampaignEditor({
   promo,
   linkTargets,
   canDraft,
+  draftFromPost = false,
+  linkedPost,
 }: {
   initial: CampaignRow;
   sends: SendRow[];
@@ -119,6 +138,8 @@ export function CampaignEditor({
   promo: PromoWording | null;
   linkTargets: LinkTarget[];
   canDraft: boolean;
+  draftFromPost?: boolean;
+  linkedPost: LinkedPost | null;
 }): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -146,6 +167,18 @@ export function CampaignEditor({
   const fieldId = useId();
   const [bodyMode, setBodyMode] = useBodyMode();
   const picture = usePictureUpload();
+  // Cleared once the dialog closes, so a later Blocks tab switch doesn't open it again.
+  const [postDraft, setPostDraft] = useState(draftFromPost);
+
+  // Email this too lands here with ?draft=post: take it off the address so a reload doesn't
+  // reopen the dialog, and show the blocks, where the dialog lives.
+  useEffect(() => {
+    if (!draftFromPost) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("draft");
+    window.history.replaceState(window.history.state, "", url);
+    setBodyMode("blocks");
+  }, [draftFromPost, setBodyMode]);
 
   /**
    * Writes whatever changed since the last save.
@@ -286,6 +319,11 @@ export function CampaignEditor({
     }));
   }
 
+  /** Ends the open-from-post one-shot once its dialog has closed. */
+  function endPostDraft(): void {
+    setPostDraft(false);
+  }
+
   /**
    * Uploads a picture and inserts it on its own line.
    * @param file - Picked image.
@@ -361,7 +399,7 @@ export function CampaignEditor({
       toast(res.error, { tone: "error" });
       return;
     }
-    router.push(`/admin/social?post=${res.post.id}`);
+    router.push(postHref(res.post));
   }
 
   /** Turns a scheduled email back into an editable draft. */
@@ -399,6 +437,25 @@ export function CampaignEditor({
 
   return (
     <div className="flex flex-col gap-6">
+      {/* The header lives here because Share to social saves the editor's unsaved text first.
+          No bottom margin: the column gap spaces it. */}
+      <PageHeader
+        className="mb-0"
+        title={initial.name}
+        breadcrumbs={[{ label: "Mailing list", href: "/admin/mailing" }, { label: initial.name }]}
+        actions={
+          !initial.isPreset && (
+            <AdminButton
+              size="sm"
+              variant="secondary"
+              busy={busy === "share"}
+              onClick={() => void shareToSocial()}
+            >
+              Share to social
+            </AdminButton>
+          )
+        }
+      />
       <CampaignStatusBanner
         campaign={initial}
         busy={busy}
@@ -406,20 +463,9 @@ export function CampaignEditor({
         onRefresh={() => router.refresh()}
       />
 
-      {!initial.isPreset && (
-        <div className="flex justify-end">
-          <AdminButton
-            size="sm"
-            variant="secondary"
-            busy={busy === "share"}
-            onClick={() => void shareToSocial()}
-          >
-            Share to social
-          </AdminButton>
-        </div>
-      )}
-
-      <div className="grid gap-6 xl:grid-cols-2">
+      {/* grid-cols-1 (a 0 minimum) so the preview's one-line inbox row can't widen the
+          column past the screen below xl. */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         {/* On wide screens the editor stays in view and scrolls on its own while the page scrolls
             the full-length preview. Its height leaves room for the top bar and the send bar. */}
         <Card className="xl:sticky xl:top-16 xl:max-h-[calc(100dvh-12.5rem)] xl:self-start xl:overflow-y-auto">
@@ -499,6 +545,18 @@ export function CampaignEditor({
               </AdminSelect>
             </AdminField>
 
+            {linkedPost && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm">
+                <span>
+                  {linkedPost.madeFromPost ? "Made from your post " : "Shared to social as "}
+                  <strong>{linkedPost.name}</strong>.
+                </span>
+                <Link href={postHref(linkedPost)} className={ADMIN_LINK_CLS}>
+                  Open the post
+                </Link>
+              </div>
+            )}
+
             {promoId && (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm">
                 <span>
@@ -548,7 +606,14 @@ export function CampaignEditor({
                   linkTargets={linkTargets}
                   draft={
                     canDraft
-                      ? { campaignId: initial.id, promoId, onSubject: applyDraftSubject }
+                      ? {
+                          campaignId: initial.id,
+                          promoId,
+                          onSubject: applyDraftSubject,
+                          fromPost: postDraft,
+                          postBrief: linkedPost?.brief ?? "",
+                          onFromPostDone: endPostDraft,
+                        }
                       : null
                   }
                 />

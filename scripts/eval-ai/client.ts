@@ -177,12 +177,13 @@ export async function fetchFacts(baseUrl: string): Promise<string> {
  * @param body.brief - What the email is about.
  * @param body.kind - A draft kind key.
  * @param body.buttonUrl - The email's button link, or "" for none.
+ * @param body.source - "post" when the brief is a social post's words (Email this too).
  * @returns The draft.
  */
 export async function callMailingDraft(
   baseUrl: string,
   adminSecret: string,
-  body: { brief: string; kind: string; buttonUrl: string },
+  body: { brief: string; kind: string; buttonUrl: string; source?: "post" },
 ): Promise<AiDraft> {
   const json = await postJson<{ ok: true; draft: AiDraft }>(
     `${baseUrl}/api/admin/mailing/ai-draft`,
@@ -219,4 +220,44 @@ export async function callPostDraft(
     if (error instanceof Error && error.message.includes("returned HTTP 422")) return null;
     throw error;
   }
+}
+
+/**
+ * Calls the admin Write with AI route for a post's words.
+ * @param baseUrl - Server base URL (no trailing slash).
+ * @param adminSecret - Admin secret for auth.
+ * @param body - The caption request, as the composer's dialog sends it.
+ * @returns The options.
+ */
+export async function callCaption(
+  baseUrl: string,
+  adminSecret: string,
+  body: Record<string, unknown>,
+): Promise<string[]> {
+  const json = await postJson<{ ok: true; captions: string[] }>(
+    `${baseUrl}/api/admin/social/caption-ai`,
+    body,
+    adminSecret,
+  );
+  return json.captions;
+}
+
+/**
+ * Calls the admin Suggest a reply route for an inbox message.
+ * @param baseUrl - Server base URL (no trailing slash).
+ * @param adminSecret - Admin secret for auth.
+ * @param body - The reply request, as the inbox's thread sends it.
+ * @returns The suggestion.
+ */
+export async function callReplySuggest(
+  baseUrl: string,
+  adminSecret: string,
+  body: Record<string, unknown>,
+): Promise<{ reply: string; hide: boolean }> {
+  const json = await postJson<{ ok: true; reply: string; hide: boolean }>(
+    `${baseUrl}/api/admin/social/inbox/suggest`,
+    body,
+    adminSecret,
+  );
+  return { reply: json.reply, hide: json.hide };
 }

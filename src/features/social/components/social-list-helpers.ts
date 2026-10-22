@@ -2,6 +2,7 @@
 // Wording helpers shared by the Social page's start buttons, in-progress chips and
 // Posted list.
 
+import { FORMAT_LABEL, usesText } from "@/features/social/lib/media";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 
@@ -53,4 +54,18 @@ export function dateLabel(p: SocialPostRow): string {
  */
 export function firstLine(body: string): string {
   return body.split("\n").find((l) => l.trim()) ?? "";
+}
+
+/**
+ * A post's one-line summary: its kind for a reel, story or cover photo, then its first line of
+ * words when the kind shows any.
+ * @param row - The post.
+ * @param row.format - Its kind.
+ * @param row.body - Its words.
+ * @returns The summary, or "" for an ordinary post with no words.
+ */
+export function summaryLine(row: Pick<SocialPostRow, "format" | "body">): string {
+  const words = usesText(row.format) ? firstLine(row.body) : "";
+  if (row.format === "feed") return words;
+  return words ? `${FORMAT_LABEL[row.format]}: ${words}` : FORMAT_LABEL[row.format];
 }

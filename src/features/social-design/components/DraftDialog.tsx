@@ -40,6 +40,7 @@ function fillsLine(room: DraftRoom): string {
  * The draft dialog.
  * @param props - Component props.
  * @param props.startKind - Kind of post picked to begin with, from the design's kind.
+ * @param props.startBrief - Words to begin the brief with.
  * @param props.room - What the design has room for.
  * @param props.paidAd - The design's paid-ad switch, which keeps contact details out.
  * @param props.onClose - Dismisses it.
@@ -48,12 +49,14 @@ function fillsLine(room: DraftRoom): string {
  */
 export function DraftDialog({
   startKind,
+  startBrief = "",
   room,
   paidAd,
   onClose,
   onDraft,
 }: {
   startKind: string;
+  startBrief?: string;
   room: DraftRoom;
   paidAd: boolean;
   onClose: () => void;
@@ -62,7 +65,7 @@ export function DraftDialog({
   const id = useId();
   const { toast } = useToast();
   const [kind, setKind] = useState(startKind);
-  const [brief, setBrief] = useState("");
+  const [brief, setBrief] = useState(startBrief);
   const [busy, setBusy] = useState(false);
   const example = POST_DRAFT_KINDS.find((k) => k.key === kind)?.example ?? "";
 

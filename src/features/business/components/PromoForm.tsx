@@ -9,6 +9,7 @@ import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { StickyActionBar } from "@/features/admin/components/ui/StickyActionBar";
 import { PromoAdvancedOptions } from "@/features/business/components/PromoAdvancedOptions";
 import {
   PromoPricePreview,
@@ -95,7 +96,9 @@ export function PromoForm({
       <form ref={formRef} onSubmit={onSubmit} className="space-y-4">
         <CardHeader title={editingId ? "Edit promo" : "New promo"} />
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        {/* From xl, four across: Description drops under Title so the dates and Type/Amount
+            stay in pairs, and Who gets it heads the last column with Code under it. */}
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <AdminField label="Title" htmlFor={`${id}-title`}>
             <AdminInput
               id={`${id}-title`}
@@ -106,7 +109,11 @@ export function PromoForm({
               placeholder="e.g. Soft launch"
             />
           </AdminField>
-          <AdminField label="Description (optional)" htmlFor={`${id}-description`}>
+          <AdminField
+            label="Description (optional)"
+            htmlFor={`${id}-description`}
+            className="xl:col-start-1 xl:row-start-2"
+          >
             <AdminInput
               id={`${id}-description`}
               type="text"
@@ -162,12 +169,10 @@ export function PromoForm({
               placeholder={form.type === "flat" ? "50" : form.type === "fixed" ? "20" : "20"}
             />
           </AdminField>
-        </div>
-
-        <div className="flex flex-wrap items-start gap-4">
           <AdminField
             label="Who gets it"
             htmlFor={`${id}-kind`}
+            className="xl:col-start-4 xl:row-start-1"
             hint={
               form.kind === "code"
                 ? "Never shown on the banner or the pricing page - only someone with the code gets it."
@@ -180,7 +185,6 @@ export function PromoForm({
               onChange={(e) =>
                 setForm((p) => ({ ...p, kind: e.target.value as "automatic" | "code" }))
               }
-              className="w-56"
             >
               <option value="automatic">Everyone (automatic)</option>
               <option value="code">Only with a code</option>
@@ -191,6 +195,7 @@ export function PromoForm({
             <AdminField
               label="Code"
               htmlFor={`${id}-code`}
+              className="xl:col-start-4 xl:row-start-2"
               hint="Letters, numbers and dashes. 3 to 32 characters."
             >
               <AdminInput
@@ -206,7 +211,7 @@ export function PromoForm({
                 maxLength={32}
                 autoComplete="off"
                 spellCheck={false}
-                className="w-48 tracking-wider uppercase"
+                className="tracking-wider uppercase"
               />
             </AdminField>
           )}
@@ -261,7 +266,7 @@ export function PromoForm({
           ) : null;
         })()}
 
-        <div className="flex gap-2">
+        <StickyActionBar>
           <AdminButton type="submit" busy={busy}>
             {editingId ? "Update promo" : "Create promo"}
           </AdminButton>
@@ -273,7 +278,7 @@ export function PromoForm({
           >
             Cancel
           </AdminButton>
-        </div>
+        </StickyActionBar>
       </form>
     </Card>
   );

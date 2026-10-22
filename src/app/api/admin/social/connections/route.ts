@@ -1,9 +1,8 @@
 // src/app/api/admin/social/connections/route.ts
-// Checks each platform's credentials with a harmless read, so a revoked or mistyped
-// token shows up on the Social page before a post fails on it.
+// Checks each platform's credentials with a harmless read, so a revoked or mistyped token shows
+// up in Social before a post fails on it. `?fresh=1` skips the ten-minute cache.
 
-import { PLATFORMS } from "@/features/social/lib/platforms";
-import { SOCIAL_PLATFORMS } from "@/features/social/lib/validate";
+import { checkConnections, recheckConnections } from "@/features/social/lib/connections.server";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
@@ -15,15 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
-  const connections = await Promise.all(
-    SOCIAL_PLATFORMS.map(async (platform) => {
-      const adapter = PLATFORMS[platform];
-      const missing = adapter.missingEnv();
-      if (missing.length > 0) {
-        return { platform, ok: false, error: `Not set up: ${missing.join(", ")} missing.` };
-      }
-      return { platform, ...(await adapter.checkConnection()) };
-    }),
-  );
+  const fresh = request.nextUrl.searchParams.get("fresh") === "1";
+  const connections = fresh ? await recheckConnections() : await checkConnections();
   return okResponse({ connections });
 }

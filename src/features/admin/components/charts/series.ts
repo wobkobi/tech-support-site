@@ -29,3 +29,21 @@ export const SPARKLINE_LINE_CLASS = "text-seasalt-400";
 
 /** End-dot colour for a sparkline: the income accent, marking the current month. */
 export const SPARKLINE_DOT_CLASS = "bg-rich-black-700";
+
+/** Each social app's series colour, the same swatches the Social calendar colours apps by. */
+const APP_FILL = {
+  facebook: { label: "Facebook", fillClass: "bg-moonstone-600" },
+  instagram: { label: "Instagram", fillClass: "bg-russian-violet-400" },
+  google: { label: "Google", fillClass: "bg-mustard-500" },
+} as const;
+
+/**
+ * One series per social app, in the order given.
+ * @param platforms - The apps.
+ * @returns The series.
+ */
+export function appSeries(
+  platforms: readonly ("facebook" | "instagram" | "google")[],
+): readonly ChartSeries[] {
+  return platforms.map((p) => ({ key: p, ...APP_FILL[p] }));
+}

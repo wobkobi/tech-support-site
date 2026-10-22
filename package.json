@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.118.0",
+  "version": "5.0.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -24,6 +24,7 @@
     "postinstall": "prisma generate",
     "lint": "eslint --fix --cache \"{src,scripts}/**/*.{js,ts,jsx,tsx}\"",
     "prepare": "simple-git-hooks",
+    "probe:meta": "dotenv -e .env.local -- tsx scripts/probe-meta.ts",
     "reconcile:times:apply": "dotenv -e .env.local -- tsx scripts/reconcile-booking-times.ts --apply",
     "reconcile:times:dry": "dotenv -e .env.local -- tsx scripts/reconcile-booking-times.ts",
     "settings:seed": "dotenv -e .env.local -- tsx scripts/seed-settings.ts",
@@ -51,15 +52,18 @@
     "edge >= 93"
   ],
   "overrides": {
-    "deepmerge-ts": "^8.0.2"
+    "deepmerge-ts": "^8.0.2",
+    "openai": {
+      "google-auth-library": "$google-auth-library"
+    }
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.135.0",
+    "@anthropic-ai/sdk": "^1.1.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@googleapis/calendar": "^20.1.0",
-    "@googleapis/drive": "^26.0.2",
+    "@googleapis/drive": "^27.0.0",
     "@googleapis/people": "^12.0.1",
     "@googleapis/sheets": "^18.1.1",
     "@prisma/client": "6.19.3",
@@ -71,7 +75,7 @@
     "google-auth-library": "^11.3.1",
     "konva": "^10.9.0",
     "next": "^16.4.2",
-    "openai": "^7.39.0",
+    "openai": "^7.41.0",
     "pdf-lib": "^1.17.1",
     "qr-code-styling": "^1.9.2",
     "react": "^19.3.1",
@@ -97,9 +101,9 @@
     "eslint": "9.39.5",
     "eslint-config-next": "^16.4.2",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-jsdoc": "^65.3.15",
+    "eslint-plugin-jsdoc": "^65.4.0",
     "eslint-plugin-prettier": "^5.5.7",
-    "eslint-plugin-tailwind-canonical-classes": "^1.4.1",
+    "eslint-plugin-tailwind-canonical-classes": "^1.6.0",
     "globals": "^17.13.0",
     "jsdom": "^30.1.3",
     "lint-staged": "^17.6.0",
@@ -109,7 +113,7 @@
     "prettier-plugin-packagejson": "^3.0.2",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "prisma": "6.19.3",
-    "puppeteer": "^25.14.0",
+    "puppeteer": "^25.15.0",
     "server-only": "^0.0.1",
     "sharp": "^0.35.5",
     "simple-git-hooks": "^2.14.0",

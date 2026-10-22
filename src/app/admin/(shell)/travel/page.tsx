@@ -6,7 +6,6 @@ import {
   TravelBlockAdminList,
   type TravelBlockRow,
 } from "@/features/admin/components/TravelBlockAdminList";
-import { Card } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -108,9 +107,7 @@ export default async function AdminTravelPage(): Promise<React.ReactElement> {
         actions={<RecalculateButton />}
       />
 
-      <Card flushOnPhone>
-        <TravelBlockAdminList blocks={travelBlockRows} calendarLabels={calendarLabels} />
-      </Card>
+      <TravelBlockAdminList blocks={travelBlockRows} calendarLabels={calendarLabels} />
     </>
   );
 }

@@ -13,6 +13,7 @@ import {
 } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { SettingsWithPreview } from "@/features/admin/components/settings/SettingsWithPreview";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
@@ -134,334 +135,340 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
 
   return (
     <SettingsTabBody changed={form.changedPaths}>
-      {/* Master switch + paused message */}
-      <div className="divide-y divide-admin-border">
-        <ToggleField
-          id="acceptingBookings"
-          meta={m.acceptingBookings}
-          value={draft.acceptingBookings}
-          customised={draft.acceptingBookings !== defaults.acceptingBookings}
-          onChange={(v) => setTop({ acceptingBookings: v })}
-        />
-        <FieldShell
-          id="closedMessage"
-          meta={m.closedMessage}
-          customised={draft.closedMessage !== defaults.closedMessage}
-        >
-          <AdminTextarea
-            id="closedMessage"
-            value={draft.closedMessage}
-            rows={2}
-            onChange={(e) => setTop({ closedMessage: e.target.value })}
+      <SettingsWithPreview preview={<AvailabilityPreview config={draft} />}>
+        {/* Master switch + paused message */}
+        <div className="divide-y divide-admin-border">
+          <ToggleField
+            id="acceptingBookings"
+            meta={m.acceptingBookings}
+            value={draft.acceptingBookings}
+            customised={draft.acceptingBookings !== defaults.acceptingBookings}
+            onChange={(v) => setTop({ acceptingBookings: v })}
           />
-        </FieldShell>
-      </div>
+          <FieldShell
+            id="closedMessage"
+            meta={m.closedMessage}
+            customised={draft.closedMessage !== defaults.closedMessage}
+          >
+            <AdminTextarea
+              id="closedMessage"
+              value={draft.closedMessage}
+              rows={2}
+              onChange={(e) => setTop({ closedMessage: e.target.value })}
+            />
+          </FieldShell>
+        </div>
 
-      {/* Weekly hours */}
-      <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Weekly hours</h3>
-      <p className="mt-1 text-sm text-admin-muted">
-        Set the hours you take bookings each day. Turn a day off, or add a midday break that splits
-        it into two windows.
-      </p>
-      <div className="mt-3 space-y-2">
-        {DAY_ORDER.map(({ index, name }) => {
-          const d = draft.schedule[index];
-          return (
-            <div key={index} className="rounded-lg border border-admin-border px-3 py-2">
+        {/* Weekly hours */}
+        <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Weekly hours</h3>
+        <p className="mt-1 text-sm text-admin-muted">
+          Set the hours you take bookings each day. Turn a day off, or add a midday break that
+          splits it into two windows.
+        </p>
+        {/* Two columns once the fields column is wide enough to keep a day on one line,
+            weekdays down the left (column-major), so a full-width row isn't mostly empty. */}
+        <div className="@container mt-3">
+          <div className="grid gap-2 @min-[68rem]:grid-flow-col @min-[68rem]:grid-cols-2 @min-[68rem]:grid-rows-4">
+            {DAY_ORDER.map(({ index, name }) => {
+              const d = draft.schedule[index];
+              return (
+                <div key={index} className="rounded-lg border border-admin-border px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span
+                      id={`${uid}-day-${index}`}
+                      className="w-24 text-sm font-semibold text-admin-text"
+                    >
+                      {name}
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={d.enabled}
+                      aria-labelledby={`${uid}-day-${index}`}
+                      onClick={() => setDay(index, { enabled: !d.enabled })}
+                      className={cn(
+                        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors after:absolute after:-inset-2.5 after:content-['']",
+                        d.enabled ? "bg-russian-violet" : "bg-admin-border-strong",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "inline-block h-4 w-4 rounded-full bg-admin-surface shadow transition-[translate]",
+                          d.enabled ? "translate-x-6" : "translate-x-1",
+                        )}
+                      />
+                    </button>
+                    {d.enabled ? (
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-admin-text-secondary">
+                        <HourSelect
+                          value={d.open}
+                          from={0}
+                          to={23}
+                          onChange={(h) => setDay(index, { open: h })}
+                        />
+                        <span>to</span>
+                        <HourSelect
+                          value={d.close}
+                          from={1}
+                          to={24}
+                          close
+                          onChange={(h) => setDay(index, { close: h })}
+                        />
+                        <span className="ml-2">
+                          <AdminCheckbox
+                            label="Break"
+                            checked={d.break !== null}
+                            onChange={(checked) =>
+                              setDay(index, {
+                                break: checked ? { start: 13, end: 14 } : null,
+                              })
+                            }
+                          />
+                        </span>
+                        {d.break && (
+                          <span className="flex items-center gap-2">
+                            <HourSelect
+                              value={d.break.start}
+                              from={d.open}
+                              to={d.close}
+                              onChange={(h) =>
+                                setDay(index, { break: { start: h, end: d.break!.end } })
+                              }
+                            />
+                            <span>to</span>
+                            <HourSelect
+                              value={d.break.end}
+                              from={d.open}
+                              to={d.close}
+                              close
+                              onChange={(h) =>
+                                setDay(index, { break: { start: d.break!.start, end: h } })
+                              }
+                            />
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-admin-faint italic">Day off</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Booking rules */}
+        <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Booking rules</h3>
+        <div className="divide-y divide-admin-border">
+          <NumberField
+            id="maxAdvanceDays"
+            meta={m.maxAdvanceDays}
+            value={draft.maxAdvanceDays}
+            min={1}
+            max={365}
+            error={fieldErrors.maxAdvanceDays}
+            customised={draft.maxAdvanceDays !== defaults.maxAdvanceDays}
+            onChange={(v) => setTop({ maxAdvanceDays: v ?? 1 })}
+          />
+          <NumberField
+            id="minHoursNotice"
+            meta={m.minHoursNotice}
+            value={draft.minHoursNotice}
+            min={0}
+            error={fieldErrors.minHoursNotice}
+            customised={draft.minHoursNotice !== defaults.minHoursNotice}
+            onChange={(v) => setTop({ minHoursNotice: v ?? 0 })}
+          />
+          <FieldShell
+            id="sameDayCutoffHour"
+            meta={m.sameDayCutoffHour}
+            error={fieldErrors.sameDayCutoffHour}
+            customised={draft.sameDayCutoffHour !== defaults.sameDayCutoffHour}
+          >
+            <AdminSelect
+              id="sameDayCutoffHour"
+              value={draft.sameDayCutoffHour ?? ""}
+              onChange={(e) =>
+                setTop({ sameDayCutoffHour: e.target.value === "" ? null : Number(e.target.value) })
+              }
+              className="w-auto"
+            >
+              <option value="">No cutoff</option>
+              {Array.from({ length: 24 }, (_, h) => (
+                <option key={h} value={h}>
+                  {hourLabel(h)}
+                </option>
+              ))}
+            </AdminSelect>
+          </FieldShell>
+          <NumberField
+            id="bufferMin"
+            meta={m.bufferMin}
+            value={draft.bufferMin}
+            min={0}
+            minutesHint
+            error={fieldErrors.bufferMin}
+            customised={draft.bufferMin !== defaults.bufferMin}
+            onChange={(v) => setTop({ bufferMin: v ?? 0 })}
+          />
+          <NumberField
+            id="bookingBufferAfterMin"
+            meta={m.bookingBufferAfterMin}
+            value={draft.bookingBufferAfterMin}
+            min={0}
+            minutesHint
+            error={fieldErrors.bookingBufferAfterMin}
+            customised={draft.bookingBufferAfterMin !== defaults.bookingBufferAfterMin}
+            onChange={(v) => setTop({ bookingBufferAfterMin: v ?? 0 })}
+          />
+        </div>
+
+        {/* Durations + daily caps */}
+        <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Job lengths &amp; daily limits</h3>
+        <div className="divide-y divide-admin-border">
+          <NumberField
+            id="durations.short"
+            meta={m["durations.short"]}
+            value={draft.durations.short}
+            min={5}
+            minutesHint
+            error={fieldErrors["durations.short"]}
+            customised={draft.durations.short !== defaults.durations.short}
+            onChange={(v) =>
+              setDraft((p) => ({ ...p, durations: { ...p.durations, short: v ?? 5 } }))
+            }
+          />
+          <NumberField
+            id="durations.long"
+            meta={m["durations.long"]}
+            value={draft.durations.long}
+            min={5}
+            minutesHint
+            error={fieldErrors["durations.long"]}
+            customised={draft.durations.long !== defaults.durations.long}
+            onChange={(v) =>
+              setDraft((p) => ({ ...p, durations: { ...p.durations, long: v ?? 5 } }))
+            }
+          />
+          <NumberField
+            id="maxJobsPerDay"
+            meta={m.maxJobsPerDay}
+            value={draft.maxJobsPerDay}
+            nullable
+            min={0}
+            error={fieldErrors.maxJobsPerDay}
+            customised={draft.maxJobsPerDay !== defaults.maxJobsPerDay}
+            onChange={(v) => setTop({ maxJobsPerDay: v })}
+          />
+          <NumberField
+            id="maxBillableHoursPerDay"
+            meta={m.maxBillableHoursPerDay}
+            value={draft.maxBillableHoursPerDay}
+            nullable
+            min={0}
+            error={fieldErrors.maxBillableHoursPerDay}
+            customised={draft.maxBillableHoursPerDay !== defaults.maxBillableHoursPerDay}
+            onChange={(v) => setTop({ maxBillableHoursPerDay: v })}
+          />
+        </div>
+
+        {/* Morning guards. The id matches the `morningGuards` field-meta key so search can
+          scroll here; the repeating rows have no single input to carry it. */}
+        <h3 id="morningGuards" tabIndex={-1} className={cn("mt-5", ADMIN_EYEBROW_CLS)}>
+          Morning guards
+        </h3>
+        <p className="mt-1 text-sm text-admin-muted">
+          Protect early slots once the night before arrives - e.g. from Friday evening, block
+          Saturday and Sunday before noon. Slots stay bookable if reserved earlier in the week.
+        </p>
+        <div className="mt-3 space-y-2">
+          {draft.morningGuards.map((g, gi) => (
+            <div key={gi} className="rounded-lg border border-admin-border px-3 py-2">
               <div className="flex flex-wrap items-center gap-3">
-                <span
-                  id={`${uid}-day-${index}`}
-                  className="w-24 text-sm font-semibold text-admin-text"
-                >
-                  {name}
-                </span>
                 <button
                   type="button"
                   role="switch"
-                  aria-checked={d.enabled}
-                  aria-labelledby={`${uid}-day-${index}`}
-                  onClick={() => setDay(index, { enabled: !d.enabled })}
+                  aria-checked={g.enabled}
+                  aria-labelledby={`morningGuards ${uid}-guard-${gi}`}
+                  onClick={() => setGuard(gi, { enabled: !g.enabled })}
                   className={cn(
                     "relative inline-flex h-6 w-11 items-center rounded-full transition-colors after:absolute after:-inset-2.5 after:content-['']",
-                    d.enabled ? "bg-russian-violet" : "bg-admin-border-strong",
+                    g.enabled ? "bg-russian-violet" : "bg-admin-border-strong",
                   )}
                 >
                   <span
                     className={cn(
                       "inline-block h-4 w-4 rounded-full bg-admin-surface shadow transition-[translate]",
-                      d.enabled ? "translate-x-6" : "translate-x-1",
+                      g.enabled ? "translate-x-6" : "translate-x-1",
                     )}
                   />
                 </button>
-                {d.enabled ? (
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-admin-text-secondary">
-                    <HourSelect
-                      value={d.open}
-                      from={0}
-                      to={23}
-                      onChange={(h) => setDay(index, { open: h })}
-                    />
-                    <span>to</span>
-                    <HourSelect
-                      value={d.close}
-                      from={1}
-                      to={24}
-                      close
-                      onChange={(h) => setDay(index, { close: h })}
-                    />
-                    <span className="ml-2">
-                      <AdminCheckbox
-                        label="Break"
-                        checked={d.break !== null}
-                        onChange={(checked) =>
-                          setDay(index, {
-                            break: checked ? { start: 13, end: 14 } : null,
-                          })
-                        }
-                      />
-                    </span>
-                    {d.break && (
-                      <span className="flex items-center gap-2">
-                        <HourSelect
-                          value={d.break.start}
-                          from={d.open}
-                          to={d.close}
-                          onChange={(h) =>
-                            setDay(index, { break: { start: h, end: d.break!.end } })
-                          }
-                        />
-                        <span>to</span>
-                        <HourSelect
-                          value={d.break.end}
-                          from={d.open}
-                          to={d.close}
-                          close
-                          onChange={(h) =>
-                            setDay(index, { break: { start: d.break!.start, end: h } })
-                          }
-                        />
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-sm text-admin-faint italic">Day off</span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Booking rules */}
-      <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Booking rules</h3>
-      <div className="divide-y divide-admin-border">
-        <NumberField
-          id="maxAdvanceDays"
-          meta={m.maxAdvanceDays}
-          value={draft.maxAdvanceDays}
-          min={1}
-          max={365}
-          error={fieldErrors.maxAdvanceDays}
-          customised={draft.maxAdvanceDays !== defaults.maxAdvanceDays}
-          onChange={(v) => setTop({ maxAdvanceDays: v ?? 1 })}
-        />
-        <NumberField
-          id="minHoursNotice"
-          meta={m.minHoursNotice}
-          value={draft.minHoursNotice}
-          min={0}
-          error={fieldErrors.minHoursNotice}
-          customised={draft.minHoursNotice !== defaults.minHoursNotice}
-          onChange={(v) => setTop({ minHoursNotice: v ?? 0 })}
-        />
-        <FieldShell
-          id="sameDayCutoffHour"
-          meta={m.sameDayCutoffHour}
-          error={fieldErrors.sameDayCutoffHour}
-          customised={draft.sameDayCutoffHour !== defaults.sameDayCutoffHour}
-        >
-          <AdminSelect
-            id="sameDayCutoffHour"
-            value={draft.sameDayCutoffHour ?? ""}
-            onChange={(e) =>
-              setTop({ sameDayCutoffHour: e.target.value === "" ? null : Number(e.target.value) })
-            }
-            className="w-auto"
-          >
-            <option value="">No cutoff</option>
-            {Array.from({ length: 24 }, (_, h) => (
-              <option key={h} value={h}>
-                {hourLabel(h)}
-              </option>
-            ))}
-          </AdminSelect>
-        </FieldShell>
-        <NumberField
-          id="bufferMin"
-          meta={m.bufferMin}
-          value={draft.bufferMin}
-          min={0}
-          minutesHint
-          error={fieldErrors.bufferMin}
-          customised={draft.bufferMin !== defaults.bufferMin}
-          onChange={(v) => setTop({ bufferMin: v ?? 0 })}
-        />
-        <NumberField
-          id="bookingBufferAfterMin"
-          meta={m.bookingBufferAfterMin}
-          value={draft.bookingBufferAfterMin}
-          min={0}
-          minutesHint
-          error={fieldErrors.bookingBufferAfterMin}
-          customised={draft.bookingBufferAfterMin !== defaults.bookingBufferAfterMin}
-          onChange={(v) => setTop({ bookingBufferAfterMin: v ?? 0 })}
-        />
-      </div>
-
-      {/* Durations + daily caps */}
-      <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Job lengths &amp; daily limits</h3>
-      <div className="divide-y divide-admin-border">
-        <NumberField
-          id="durations.short"
-          meta={m["durations.short"]}
-          value={draft.durations.short}
-          min={5}
-          minutesHint
-          error={fieldErrors["durations.short"]}
-          customised={draft.durations.short !== defaults.durations.short}
-          onChange={(v) =>
-            setDraft((p) => ({ ...p, durations: { ...p.durations, short: v ?? 5 } }))
-          }
-        />
-        <NumberField
-          id="durations.long"
-          meta={m["durations.long"]}
-          value={draft.durations.long}
-          min={5}
-          minutesHint
-          error={fieldErrors["durations.long"]}
-          customised={draft.durations.long !== defaults.durations.long}
-          onChange={(v) => setDraft((p) => ({ ...p, durations: { ...p.durations, long: v ?? 5 } }))}
-        />
-        <NumberField
-          id="maxJobsPerDay"
-          meta={m.maxJobsPerDay}
-          value={draft.maxJobsPerDay}
-          nullable
-          min={0}
-          error={fieldErrors.maxJobsPerDay}
-          customised={draft.maxJobsPerDay !== defaults.maxJobsPerDay}
-          onChange={(v) => setTop({ maxJobsPerDay: v })}
-        />
-        <NumberField
-          id="maxBillableHoursPerDay"
-          meta={m.maxBillableHoursPerDay}
-          value={draft.maxBillableHoursPerDay}
-          nullable
-          min={0}
-          error={fieldErrors.maxBillableHoursPerDay}
-          customised={draft.maxBillableHoursPerDay !== defaults.maxBillableHoursPerDay}
-          onChange={(v) => setTop({ maxBillableHoursPerDay: v })}
-        />
-      </div>
-
-      {/* Morning guards. The id matches the `morningGuards` field-meta key so search can
-          scroll here; the repeating rows have no single input to carry it. */}
-      <h3 id="morningGuards" tabIndex={-1} className={cn("mt-5", ADMIN_EYEBROW_CLS)}>
-        Morning guards
-      </h3>
-      <p className="mt-1 text-sm text-admin-muted">
-        Protect early slots once the night before arrives - e.g. from Friday evening, block Saturday
-        and Sunday before noon. Slots stay bookable if reserved earlier in the week.
-      </p>
-      <div className="mt-3 space-y-2">
-        {draft.morningGuards.map((g, gi) => (
-          <div key={gi} className="rounded-lg border border-admin-border px-3 py-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={g.enabled}
-                aria-labelledby={`morningGuards ${uid}-guard-${gi}`}
-                onClick={() => setGuard(gi, { enabled: !g.enabled })}
-                className={cn(
-                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors after:absolute after:-inset-2.5 after:content-['']",
-                  g.enabled ? "bg-russian-violet" : "bg-admin-border-strong",
-                )}
-              >
-                <span
-                  className={cn(
-                    "inline-block h-4 w-4 rounded-full bg-admin-surface shadow transition-[translate]",
-                    g.enabled ? "translate-x-6" : "translate-x-1",
-                  )}
+                <AdminInput
+                  id={`${uid}-guard-${gi}`}
+                  type="text"
+                  value={g.label}
+                  aria-label="Guard name"
+                  onChange={(e) => setGuard(gi, { label: e.target.value })}
+                  className="w-auto min-w-0 flex-1"
                 />
-              </button>
-              <AdminInput
-                id={`${uid}-guard-${gi}`}
-                type="text"
-                value={g.label}
-                aria-label="Guard name"
-                onChange={(e) => setGuard(gi, { label: e.target.value })}
-                className="w-auto min-w-0 flex-1"
-              />
-              <AdminButton variant="danger" size="xs" onClick={() => removeGuard(gi)}>
-                Remove
-              </AdminButton>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-admin-text-secondary">
-              <span>From</span>
-              <AdminSelect
-                value={g.triggerDay}
-                aria-label="Trigger day"
-                onChange={(e) => setGuard(gi, { triggerDay: Number(e.target.value) })}
-                className="w-auto px-2"
-              >
-                {DAY_ORDER.map((d) => (
-                  <option key={d.index} value={d.index}>
-                    {d.name}
-                  </option>
-                ))}
-              </AdminSelect>
-              <span>at</span>
-              <HourSelect
-                value={g.triggerHour}
-                from={0}
-                to={23}
-                onChange={(h) => setGuard(gi, { triggerHour: h })}
-              />
-              <span>, block</span>
-              {DAY_ORDER.map((d) => (
-                <button
-                  key={d.index}
-                  type="button"
-                  aria-pressed={g.protectedDays.includes(d.index)}
-                  onClick={() => toggleProtectedDay(gi, d.index)}
-                  className={adminChipClass(g.protectedDays.includes(d.index))}
+                <AdminButton variant="danger" size="xs" onClick={() => removeGuard(gi)}>
+                  Remove
+                </AdminButton>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-admin-text-secondary">
+                <span>From</span>
+                <AdminSelect
+                  value={g.triggerDay}
+                  aria-label="Trigger day"
+                  onChange={(e) => setGuard(gi, { triggerDay: Number(e.target.value) })}
+                  className="w-auto px-2"
                 >
-                  {d.name.slice(0, 3)}
-                </button>
-              ))}
-              <span>before</span>
-              <HourSelect
-                value={g.earliestHour}
-                from={1}
-                to={23}
-                onChange={(h) => setGuard(gi, { earliestHour: h })}
-              />
+                  {DAY_ORDER.map((d) => (
+                    <option key={d.index} value={d.index}>
+                      {d.name}
+                    </option>
+                  ))}
+                </AdminSelect>
+                <span>at</span>
+                <HourSelect
+                  value={g.triggerHour}
+                  from={0}
+                  to={23}
+                  onChange={(h) => setGuard(gi, { triggerHour: h })}
+                />
+                <span>, block</span>
+                {DAY_ORDER.map((d) => (
+                  <button
+                    key={d.index}
+                    type="button"
+                    aria-pressed={g.protectedDays.includes(d.index)}
+                    onClick={() => toggleProtectedDay(gi, d.index)}
+                    className={adminChipClass(g.protectedDays.includes(d.index))}
+                  >
+                    {d.name.slice(0, 3)}
+                  </button>
+                ))}
+                <span>before</span>
+                <HourSelect
+                  value={g.earliestHour}
+                  from={1}
+                  to={23}
+                  onChange={(h) => setGuard(gi, { earliestHour: h })}
+                />
+              </div>
+              {fieldErrors[`morningGuards.${gi}.protectedDays`] && (
+                <p className="mt-2 text-sm font-medium text-red-600">
+                  {fieldErrors[`morningGuards.${gi}.protectedDays`]}
+                </p>
+              )}
             </div>
-            {fieldErrors[`morningGuards.${gi}.protectedDays`] && (
-              <p className="mt-2 text-sm font-medium text-red-600">
-                {fieldErrors[`morningGuards.${gi}.protectedDays`]}
-              </p>
-            )}
-          </div>
-        ))}
-        <AdminButton variant="secondary" onClick={addGuard}>
-          + Add guard
-        </AdminButton>
-      </div>
-
-      <AvailabilityPreview config={draft} />
+          ))}
+          <AdminButton variant="secondary" onClick={addGuard}>
+            + Add guard
+          </AdminButton>
+        </div>
+      </SettingsWithPreview>
 
       <SettingsFooter form={form} />
 

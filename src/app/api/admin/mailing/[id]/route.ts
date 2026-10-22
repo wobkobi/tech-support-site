@@ -63,8 +63,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx): Promise<Next
 }
 
 /**
- * DELETE /api/admin/mailing/[id] - removes an email and its send history.
- * Refused while it is sending.
+ * DELETE /api/admin/mailing/[id] - removes an email and its send history, and unlinks any
+ * social post linked to it. Refused while it is sending.
  * @param request - Incoming request.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the campaign id.
@@ -78,6 +78,9 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
   if (deleted.count === 0) {
     return errorResponse("This email is sending right now, so it can't be deleted.", 409);
   }
-  await prisma.campaignSend.deleteMany({ where: { campaignId: id } });
+  await Promise.all([
+    prisma.campaignSend.deleteMany({ where: { campaignId: id } }),
+    prisma.socialPost.updateMany({ where: { campaignId: id }, data: { campaignId: null } }),
+  ]);
   return okResponse();
 }

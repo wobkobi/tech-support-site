@@ -5,7 +5,9 @@
 
 import {
   ROW_CLS,
+  STICKY_THEAD_CLS,
   TABLE_CLS,
+  TABLE_SCROLL_CLS,
   TBODY_CLS,
   TD_CLS,
   TH_CLS,
@@ -13,6 +15,7 @@ import {
 } from "@/features/admin/components/ui/admin-table";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { Card } from "@/features/admin/components/ui/Card";
 import { SEGMENTED_GROUP_CLS } from "@/features/admin/components/ui/chip-classes";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
@@ -22,6 +25,7 @@ import { SortableTh } from "@/features/admin/components/ui/SortableTh";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
+import { StickyList } from "@/features/admin/components/ui/StickyList";
 import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
@@ -320,206 +324,215 @@ export function BookingAdminList({
         <StatCard label="Held" value={stats.held} tone={stats.held > 0 ? "warning" : "default"} />
       </StatStrip>
 
-      {/* Status buckets. */}
-      <div className={cn(SEGMENTED_GROUP_CLS, "flex-wrap self-start")}>
-        {FILTERS.map((f) => {
-          const label = f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1);
-          const count = f === "all" ? bookings.length : counts[f];
-          const isActive = filter === f;
-          return (
-            <button
-              key={f}
-              onClick={() => selectFilter(f)}
-              aria-pressed={isActive}
-              className={cn(
-                "h-9 rounded-md px-3 text-sm font-semibold transition-colors",
-                isActive
-                  ? "bg-admin-surface text-russian-violet shadow-sm"
-                  : "text-admin-muted hover:text-admin-text",
-              )}
-            >
-              {label}{" "}
-              <span
-                className={cn(
-                  "font-normal",
-                  isActive ? "text-russian-violet/70" : "text-admin-muted",
+      <StickyList
+        toolbar={
+          <ListToolbar
+            search={
+              // Status buckets lead the search so phones keep them on top, and they share
+              // the search's growing slot so the whole toolbar fits one row on desktop.
+              <div className="flex flex-wrap items-center gap-3">
+                <div className={cn(SEGMENTED_GROUP_CLS, "flex-wrap")}>
+                  {FILTERS.map((f) => {
+                    const label = f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1);
+                    const count = f === "all" ? bookings.length : counts[f];
+                    const isActive = filter === f;
+                    return (
+                      <button
+                        key={f}
+                        onClick={() => selectFilter(f)}
+                        aria-pressed={isActive}
+                        className={cn(
+                          "h-9 rounded-md px-3 text-sm font-semibold transition-colors",
+                          isActive
+                            ? "bg-admin-surface text-russian-violet shadow-sm"
+                            : "text-admin-muted hover:text-admin-text",
+                        )}
+                      >
+                        {label}{" "}
+                        <span
+                          className={cn(
+                            "font-normal",
+                            isActive ? "text-russian-violet/70" : "text-admin-muted",
+                          )}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <AdminInput
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search name, email, phone"
+                  className="h-10 min-w-0 flex-1 basis-48"
+                />
+              </div>
+            }
+            filters={
+              <>
+                {/* One unit, so "to" can't wrap away from its dates. */}
+                <div className="flex w-full items-center gap-2 sm:w-auto">
+                  <AdminInput
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    aria-label="From date"
+                    className="h-10 min-w-0 flex-1 sm:w-44 sm:flex-none"
+                  />
+                  <span className="text-sm text-admin-muted">to</span>
+                  <AdminInput
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    aria-label="To date"
+                    className="h-10 min-w-0 flex-1 sm:w-44 sm:flex-none"
+                  />
+                </div>
+                {searchActive && (
+                  <AdminButton variant="ghost" onClick={clearSearch}>
+                    Clear
+                  </AdminButton>
                 )}
-              >
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Search and the start-date range. */}
-      <ListToolbar
-        className="mb-0"
-        search={
-          <AdminInput
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, email, phone"
-            className="h-10"
+              </>
+            }
           />
         }
-        filters={
-          <>
-            {/* One unit, so "to" can't wrap away from its dates. */}
-            <div className="flex w-full items-center gap-2 sm:w-auto">
-              <AdminInput
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                aria-label="From date"
-                className="h-10 min-w-0 flex-1 sm:w-44 sm:flex-none"
-              />
-              <span className="text-sm text-admin-muted">to</span>
-              <AdminInput
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                aria-label="To date"
-                className="h-10 min-w-0 flex-1 sm:w-44 sm:flex-none"
-              />
-            </div>
-            {searchActive && (
-              <AdminButton variant="ghost" onClick={clearSearch}>
-                Clear
-              </AdminButton>
-            )}
-          </>
-        }
-      />
-
-      {filtered.length === 0 ? (
-        <EmptyState
-          title="No bookings found."
-          action={
-            searchActive ? (
-              <AdminButton variant="secondary" onClick={clearSearch}>
-                Clear the search
-              </AdminButton>
-            ) : filter !== "all" ? (
-              <AdminButton variant="secondary" onClick={() => selectFilter("all")}>
-                Show all bookings
-              </AdminButton>
-            ) : undefined
-          }
-        />
-      ) : (
-        <>
-          {/* Phone cards: the five-column table needs about 640px. */}
-          <ul className="flex flex-col gap-2 md:hidden">
-            {pager.visible.map((b) => (
-              <li key={b.id} className="rounded-lg border border-admin-border bg-admin-surface p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <Link
-                    href={`/admin/bookings/${b.id}`}
-                    className="min-w-0 font-semibold wrap-break-word text-russian-violet hover:underline"
-                  >
-                    {b.name}
-                  </Link>
-                  <StatusPill tone={STATUS_TONE[b.status]}>{b.status}</StatusPill>
-                </div>
-                <p className="mt-1 text-sm text-admin-text-secondary">
-                  {formatDateTimeShort(b.startAt)}
-                </p>
-                {b.phone && (
-                  <a
-                    href={`tel:${b.phone}`}
-                    className="text-sm text-admin-muted hover:text-admin-text"
-                  >
-                    {b.phone}
-                  </a>
-                )}
-                {b.quotedLow != null && b.quotedHigh != null && (
-                  <p className="text-sm text-admin-muted">
-                    Quoted {formatQuotedRange(b.quotedLow, b.quotedHigh, b.quotedTravel)}
+      >
+        {filtered.length === 0 ? (
+          <Card padding="none" flushOnPhone>
+            <EmptyState
+              title="No bookings found."
+              action={
+                searchActive ? (
+                  <AdminButton variant="secondary" onClick={clearSearch}>
+                    Clear the search
+                  </AdminButton>
+                ) : filter !== "all" ? (
+                  <AdminButton variant="secondary" onClick={() => selectFilter("all")}>
+                    Show all bookings
+                  </AdminButton>
+                ) : undefined
+              }
+            />
+          </Card>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {/* Phone cards: the five-column table needs about 640px. */}
+            <ul className="flex flex-col gap-2 md:hidden">
+              {pager.visible.map((b) => (
+                <li
+                  key={b.id}
+                  className="rounded-lg border border-admin-border bg-admin-surface p-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <Link
+                      href={`/admin/bookings/${b.id}`}
+                      className="min-w-0 font-semibold wrap-break-word text-russian-violet hover:underline"
+                    >
+                      {b.name}
+                    </Link>
+                    <StatusPill tone={STATUS_TONE[b.status]}>{b.status}</StatusPill>
+                  </div>
+                  <p className="mt-1 text-sm text-admin-text-secondary">
+                    {formatDateTimeShort(b.startAt)}
                   </p>
-                )}
-                {renderMissingEvent(b)}
-                <div className="mt-2 flex flex-wrap gap-2">{renderActions(b)}</div>
-              </li>
-            ))}
-          </ul>
-          <div className="hidden overflow-x-auto rounded-lg border border-admin-border md:block">
-            <table className={cn(TABLE_CLS, "min-w-160")}>
-              <thead className={THEAD_CLS}>
-                <tr>
-                  <SortableTh
-                    label="Customer"
-                    active={sortKey === "name"}
-                    dir={sortDir}
-                    onSort={() => toggleSort("name")}
-                  />
-                  <SortableTh
-                    label="When"
-                    active={sortKey === "start"}
-                    dir={sortDir}
-                    onSort={() => toggleSort("start")}
-                  />
-                  <SortableTh
-                    label="Status"
-                    active={sortKey === "status"}
-                    dir={sortDir}
-                    onSort={() => toggleSort("status")}
-                  />
-                  <th className={TH_CLS}>Quoted</th>
-                  <th className={cn(TH_CLS, "text-right")}>Actions</th>
-                </tr>
-              </thead>
-              <tbody className={TBODY_CLS}>
-                {pager.visible.map((b) => {
-                  return (
-                    <tr key={b.id} className={ROW_CLS}>
-                      <td className={cn(TD_CLS, "align-top")}>
-                        <Link
-                          href={`/admin/bookings/${b.id}`}
-                          className="font-semibold text-russian-violet hover:underline"
+                  {b.phone && (
+                    <a
+                      href={`tel:${b.phone}`}
+                      className="text-sm text-admin-muted hover:text-admin-text"
+                    >
+                      {b.phone}
+                    </a>
+                  )}
+                  {b.quotedLow != null && b.quotedHigh != null && (
+                    <p className="text-sm text-admin-muted">
+                      Quoted {formatQuotedRange(b.quotedLow, b.quotedHigh, b.quotedTravel)}
+                    </p>
+                  )}
+                  {renderMissingEvent(b)}
+                  <div className="mt-2 flex flex-wrap gap-2">{renderActions(b)}</div>
+                </li>
+              ))}
+            </ul>
+            <Card padding="none" className={cn("hidden md:block", TABLE_SCROLL_CLS)}>
+              <table className={cn(TABLE_CLS, "min-w-160")}>
+                <thead className={cn(THEAD_CLS, STICKY_THEAD_CLS)}>
+                  <tr>
+                    <SortableTh
+                      label="Customer"
+                      active={sortKey === "name"}
+                      dir={sortDir}
+                      onSort={() => toggleSort("name")}
+                    />
+                    <SortableTh
+                      label="When"
+                      active={sortKey === "start"}
+                      dir={sortDir}
+                      onSort={() => toggleSort("start")}
+                    />
+                    <SortableTh
+                      label="Status"
+                      active={sortKey === "status"}
+                      dir={sortDir}
+                      onSort={() => toggleSort("status")}
+                    />
+                    <th className={TH_CLS}>Quoted</th>
+                    <th className={cn(TH_CLS, "text-right")}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody className={TBODY_CLS}>
+                  {pager.visible.map((b) => {
+                    return (
+                      <tr key={b.id} className={ROW_CLS}>
+                        <td className={cn(TD_CLS, "align-top")}>
+                          <Link
+                            href={`/admin/bookings/${b.id}`}
+                            className="font-semibold text-russian-violet hover:underline"
+                          >
+                            {b.name}
+                          </Link>
+                          <div className="text-sm break-all text-admin-muted">{b.email}</div>
+                          {b.phone && <div className="text-sm text-admin-muted">{b.phone}</div>}
+                        </td>
+                        <td
+                          className={cn(
+                            TD_CLS,
+                            "align-top whitespace-nowrap text-admin-text-secondary",
+                          )}
                         >
-                          {b.name}
-                        </Link>
-                        <div className="text-sm break-all text-admin-muted">{b.email}</div>
-                        {b.phone && <div className="text-sm text-admin-muted">{b.phone}</div>}
-                      </td>
-                      <td
-                        className={cn(
-                          TD_CLS,
-                          "align-top whitespace-nowrap text-admin-text-secondary",
-                        )}
-                      >
-                        {formatDateTimeShort(b.startAt)}
-                      </td>
-                      <td className={cn(TD_CLS, "align-top")}>
-                        <StatusPill tone={STATUS_TONE[b.status]}>{b.status}</StatusPill>
-                        {renderMissingEvent(b)}
-                      </td>
-                      <td
-                        className={cn(
-                          TD_CLS,
-                          "align-top whitespace-nowrap text-admin-text-secondary",
-                        )}
-                      >
-                        {b.quotedLow != null && b.quotedHigh != null ? (
-                          formatQuotedRange(b.quotedLow, b.quotedHigh, b.quotedTravel)
-                        ) : (
-                          <span className="text-admin-muted">-</span>
-                        )}
-                      </td>
-                      <td className={cn(TD_CLS, "text-right align-top")}>
-                        <div className="flex flex-wrap justify-end gap-2">{renderActions(b)}</div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                          {formatDateTimeShort(b.startAt)}
+                        </td>
+                        <td className={cn(TD_CLS, "align-top")}>
+                          <StatusPill tone={STATUS_TONE[b.status]}>{b.status}</StatusPill>
+                          {renderMissingEvent(b)}
+                        </td>
+                        <td
+                          className={cn(
+                            TD_CLS,
+                            "align-top whitespace-nowrap text-admin-text-secondary",
+                          )}
+                        >
+                          {b.quotedLow != null && b.quotedHigh != null ? (
+                            formatQuotedRange(b.quotedLow, b.quotedHigh, b.quotedTravel)
+                          ) : (
+                            <span className="text-admin-muted">-</span>
+                          )}
+                        </td>
+                        <td className={cn(TD_CLS, "text-right align-top")}>
+                          <div className="flex flex-wrap justify-end gap-2">{renderActions(b)}</div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </Card>
+            <ShowMoreButton pager={pager} noun={["booking", "bookings"]} />
           </div>
-          <ShowMoreButton pager={pager} noun={["booking", "bookings"]} />
-        </>
-      )}
+        )}
+      </StickyList>
 
       <ConfirmDialog
         open={pending !== null}

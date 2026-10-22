@@ -12,6 +12,7 @@ import {
 } from "@/features/business/components/BreakdownModal";
 import { formatNZD } from "@/features/business/lib/business";
 import type { TaxEstimateSummary } from "@/features/business/lib/tax/workings";
+import { cn } from "@/shared/lib/cn";
 import { formatDateSlash } from "@/shared/lib/date-format";
 import type React from "react";
 import { useState } from "react";
@@ -369,10 +370,12 @@ export function BusinessDashboardCards({
 
   return (
     <>
-      <p className="mb-2 text-sm font-semibold tracking-wide text-admin-muted uppercase">
-        Showing: {scope.label}
-      </p>
-      <StatStrip label={`Totals for ${scope.label}`} className="mb-6 grid-cols-2 sm:grid-cols-4">
+      {/* One row on 2xl whatever the count (5 to 8 cards by scope and GST): each card takes
+          its own column, so the last card's span is reset there. */}
+      <StatStrip
+        label={`Totals for ${scope.label}`}
+        className="mb-6 grid-cols-2 sm:grid-cols-4 2xl:auto-cols-fr 2xl:grid-flow-col 2xl:grid-cols-none"
+      >
         {cards.map((c, i) => (
           <StatCard
             key={c.label}
@@ -381,7 +384,9 @@ export function BusinessDashboardCards({
             tone={c.tone}
             onClick={() => setActive(c.breakdown)}
             className={
-              i === cards.length - 1 ? lastCardSpan(cards.length, { base: 2, sm: 4 }) : undefined
+              i === cards.length - 1
+                ? cn(lastCardSpan(cards.length, { base: 2, sm: 4 }), "2xl:col-span-1")
+                : undefined
             }
           />
         ))}

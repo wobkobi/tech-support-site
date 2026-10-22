@@ -9,6 +9,7 @@ import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
+import { StickyList } from "@/features/admin/components/ui/StickyList";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import {
   findOverlaps,
@@ -32,6 +33,7 @@ import {
   type FormState,
 } from "@/features/business/lib/promo-form";
 import { callApi } from "@/features/mailing/lib/api-client";
+import { postHref } from "@/features/social/lib/links";
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -293,7 +295,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
       toast(res.error, { tone: "error" });
       return;
     }
-    router.push(`/admin/social?post=${res.post.id}`);
+    router.push(postHref(res.post));
   }
 
   /** Deletes the promo held in the confirm dialog. Past invoices keep their snapshot. */
@@ -350,63 +352,66 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
         </div>
       )}
 
-      <div>
-        {/* Status filter; counts come from the full list, so zero tabs still show. */}
-        {promos.length > 0 && (
-          <ListToolbar
-            filters={(["all", "active", "upcoming", "expired", "disabled"] as const).map((key) => {
-              const count = key === "all" ? promos.length : (statusCounts[key] ?? 0);
-              const selected = statusFilter === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => setStatusFilter(key)}
-                  className={cn(adminChipClass(selected), "capitalize")}
-                >
-                  {key} ({count})
-                </button>
-              );
-            })}
+      {promos.length === 0 ? (
+        <Card padding="none">
+          <EmptyState
+            title="No promos yet."
+            body="Create one above to surface an offer in the site banner, pricing wizard, and admin calculator."
           />
-        )}
-
-        {/* Promo list */}
-        {promos.length === 0 ? (
-          <Card padding="none">
-            <EmptyState
-              title="No promos yet."
-              body="Create one above to surface an offer in the site banner, pricing wizard, and admin calculator."
+        </Card>
+      ) : (
+        <StickyList
+          toolbar={
+            // Status filter; counts come from the full list, so zero tabs still show.
+            <ListToolbar
+              filters={(["all", "active", "upcoming", "expired", "disabled"] as const).map(
+                (key) => {
+                  const count = key === "all" ? promos.length : (statusCounts[key] ?? 0);
+                  const selected = statusFilter === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setStatusFilter(key)}
+                      className={cn(adminChipClass(selected), "capitalize")}
+                    >
+                      {key} ({count})
+                    </button>
+                  );
+                },
+              )}
             />
-          </Card>
-        ) : visiblePromos.length === 0 ? (
-          <Card padding="none">
-            <EmptyState
-              title={`No ${statusFilter} promos.`}
-              body="Pick another filter to see the rest."
+          }
+        >
+          {visiblePromos.length === 0 ? (
+            <Card padding="none">
+              <EmptyState
+                title={`No ${statusFilter} promos.`}
+                body="Pick another filter to see the rest."
+              />
+            </Card>
+          ) : (
+            <PromoListRows
+              visiblePromos={visiblePromos}
+              promos={promos}
+              overlaps={overlaps}
+              overlapWinners={overlapWinners}
+              stats={stats}
+              openStats={openStats}
+              onToggleStats={toggleStats}
+              emailingId={emailingId}
+              postingId={postingId}
+              onEmail={(p) => void emailPromo(p)}
+              onPost={(p) => void postPromo(p)}
+              onToggleActive={(p) => void toggleActive(p)}
+              onEdit={startEdit}
+              onDuplicate={startDuplicate}
+              onDelete={setConfirmDelete}
             />
-          </Card>
-        ) : (
-          <PromoListRows
-            visiblePromos={visiblePromos}
-            promos={promos}
-            overlaps={overlaps}
-            overlapWinners={overlapWinners}
-            stats={stats}
-            openStats={openStats}
-            onToggleStats={toggleStats}
-            emailingId={emailingId}
-            postingId={postingId}
-            onEmail={(p) => void emailPromo(p)}
-            onPost={(p) => void postPromo(p)}
-            onToggleActive={(p) => void toggleActive(p)}
-            onEdit={startEdit}
-            onDuplicate={startDuplicate}
-            onDelete={setConfirmDelete}
-          />
-        )}
-      </div>
+          )}
+        </StickyList>
+      )}
 
       <ConfirmDialog
         open={confirmDelete !== null}

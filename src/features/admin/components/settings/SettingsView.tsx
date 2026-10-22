@@ -19,6 +19,7 @@ import type {
   SchedulingSettings,
   Settings,
   SettingsGroup,
+  SocialSettings,
   TaxSettings,
 } from "@/shared/lib/settings/types";
 import dynamic from "next/dynamic";
@@ -63,6 +64,10 @@ const SchedulingTab = dynamic(
   () => import("@/features/admin/components/settings/SchedulingTab").then((m) => m.SchedulingTab),
   { loading: TabLoading },
 );
+const SocialTab = dynamic(
+  () => import("@/features/admin/components/settings/SocialTab").then((m) => m.SocialTab),
+  { loading: TabLoading },
+);
 const TaxTab = dynamic(
   () => import("@/features/admin/components/settings/TaxTab").then((m) => m.TaxTab),
   { loading: TabLoading },
@@ -92,6 +97,7 @@ const TAB_ORDER: SettingsTabKey[] = [
   "comms",
   "scheduling",
   "reviews",
+  "social",
 ];
 
 /** Tab strip entries, labelled from {@link GROUP_META} and {@link RATES_META}. */
@@ -120,6 +126,8 @@ interface Props {
   taxDefaults: TaxSettings;
   scheduling: SchedulingSettings;
   schedulingDefaults: SchedulingSettings;
+  social: SocialSettings;
+  socialDefaults: SocialSettings;
 }
 
 /**
@@ -143,6 +151,8 @@ interface Props {
  * @param props.taxDefaults - Code default tax settings.
  * @param props.scheduling - Resolved current scheduling settings.
  * @param props.schedulingDefaults - Code default scheduling settings.
+ * @param props.social - Resolved current social settings.
+ * @param props.socialDefaults - Code default social settings.
  * @returns Settings view element.
  */
 export function SettingsView({
@@ -164,6 +174,8 @@ export function SettingsView({
   taxDefaults,
   scheduling,
   schedulingDefaults,
+  social,
+  socialDefaults,
 }: Props): React.ReactElement {
   const [active, setActive] = useState<SettingsTabKey>(initialTab ?? "availability");
   const [focusTarget, setFocusTarget] = useState<{ id: string; nonce: number } | null>(null);
@@ -205,6 +217,7 @@ export function SettingsView({
     identity,
     tax,
     scheduling,
+    social,
   };
 
   return (
@@ -249,6 +262,8 @@ export function SettingsView({
               <TaxTab initial={tax} defaults={taxDefaults} />
             ) : active === "scheduling" ? (
               <SchedulingTab initial={scheduling} defaults={schedulingDefaults} />
+            ) : active === "social" ? (
+              <SocialTab initial={social} defaults={socialDefaults} />
             ) : null}
           </div>
         </Card>

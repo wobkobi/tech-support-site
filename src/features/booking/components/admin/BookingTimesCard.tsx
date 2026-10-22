@@ -114,17 +114,19 @@ export function BookingTimesCard({
             </AdminButton>
           )}
         </div>
-        <div className="flex flex-col gap-0.5">
-          <span className={ADMIN_META_LABEL_CLS}>Start</span>
-          <span className="text-sm text-admin-text">{formatDateTimeShort(startAt)}</span>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className={ADMIN_META_LABEL_CLS}>Finish</span>
-          <span className="text-sm text-admin-text">{formatDateTimeShort(endAt)}</span>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className={ADMIN_META_LABEL_CLS}>On site</span>
-          <span className="text-sm text-admin-text">{formatMins(spanMins)}</span>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="flex flex-col gap-0.5">
+            <span className={ADMIN_META_LABEL_CLS}>Start</span>
+            <span className="text-sm text-admin-text">{formatDateTimeShort(startAt)}</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className={ADMIN_META_LABEL_CLS}>Finish</span>
+            <span className="text-sm text-admin-text">{formatDateTimeShort(endAt)}</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className={ADMIN_META_LABEL_CLS}>On site</span>
+            <span className="text-sm text-admin-text">{formatMins(spanMins)}</span>
+          </div>
         </div>
         {locked && status !== "cancelled" && (
           <p className="text-sm text-admin-muted">
