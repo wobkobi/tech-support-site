@@ -1220,6 +1220,8 @@ model SocialPost {
   recycle      Boolean?
   expiresAt    DateTime?
   maxPosts     Int?
+  // The starter content item this came from, so importing the starter set again skips it.
+  starterKey   String?
 
   // One per platform, always all three; written as a whole array because Prisma
   // rejects composite writes with undeclared fields.

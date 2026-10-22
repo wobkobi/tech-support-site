@@ -13,12 +13,16 @@ export interface ContentStatsRow {
   nextAt: string | null;
 }
 
-/** A content item in the list. */
+/** A content item in the library. */
 export interface ContentListRow {
   item: SocialPostRow;
+  /** When it was made, as an ISO time. */
+  createdAt: string;
   stats: ContentStatsRow;
   /** Past its last day or at its limit, so nothing more goes out from it. */
   spent: boolean;
+  /** Lined-up postings still following it, which go when it's deleted. */
+  linedUp: number;
 }
 
 /**
@@ -35,12 +39,24 @@ export function toStatsRow(stats: ContentStats): ContentStatsRow {
 }
 
 /**
- * Maps a content item and its stats to its list row.
+ * Maps a content item and its stats to its library row.
  * @param item - Item as stored.
  * @param stats - Its stats.
+ * @param linedUp - Its lined-up postings still following it.
  * @param now - The time to judge spent at.
- * @returns The list row.
+ * @returns The library row.
  */
-export function toContentRow(item: SocialPost, stats: ContentStats, now: Date): ContentListRow {
-  return { item: toPostRow(item), stats: toStatsRow(stats), spent: isSpent(item, stats, now) };
+export function toContentRow(
+  item: SocialPost,
+  stats: ContentStats,
+  linedUp: number,
+  now: Date,
+): ContentListRow {
+  return {
+    item: toPostRow(item),
+    createdAt: item.createdAt.toISOString(),
+    stats: toStatsRow(stats),
+    spent: isSpent(item, stats, now),
+    linedUp,
+  };
 }

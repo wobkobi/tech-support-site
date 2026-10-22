@@ -3,12 +3,9 @@
 // preset or another item. Reading, editing and deleting one go through /api/admin/social/[id].
 
 import { parseObjectId } from "@/features/business/lib/validation";
-import { toContentRow } from "@/features/social/lib/content-row";
 import { copyPostFields } from "@/features/social/lib/copy-post";
-import { IS_CONTENT } from "@/features/social/lib/filters";
 import { toPostRow } from "@/features/social/lib/post-row";
-import { NO_STATS } from "@/features/social/lib/postings-core";
-import { contentStats } from "@/features/social/lib/postings.server";
+import { loadContentRows } from "@/features/social/lib/postings.server";
 import { defaultTargets } from "@/features/social/lib/targets";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -22,15 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
-  const items = await prisma.socialPost.findMany({
-    where: IS_CONTENT,
-    orderBy: { updatedAt: "desc" },
-  });
-  const stats = await contentStats(items.map((i) => i.id));
-  const now = new Date();
-  return okResponse({
-    items: items.map((i) => toContentRow(i, stats.get(i.id) ?? NO_STATS, now)),
-  });
+  return okResponse({ items: await loadContentRows(new Date()) });
 }
 
 /**

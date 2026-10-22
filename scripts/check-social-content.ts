@@ -62,6 +62,7 @@ function item(over: Partial<SocialPost> = {}): SocialPost {
     recycle: true,
     expiresAt: null,
     maxPosts: null,
+    starterKey: null,
     targets,
     googleType: "STANDARD",
     googleCta: null,

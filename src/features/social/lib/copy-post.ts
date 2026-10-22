@@ -34,6 +34,7 @@ export function copyPostFields(
   | "recycle"
   | "expiresAt"
   | "maxPosts"
+  | "starterKey"
   | "createdAt"
   | "updatedAt"
 > {

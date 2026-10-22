@@ -1,8 +1,10 @@
 // src/features/social/lib/postings.server.ts
 // Server-only: makes postings from content items, keeps lined-up postings in step with their
-// item, and counts how often each item has gone out.
+// item, counts each item's postings for the library, and deletes items with their lined-up
+// postings.
 
 import { deleteUnusedPictures } from "@/features/social-design/lib/picture-store";
+import { toContentRow, type ContentListRow } from "@/features/social/lib/content-row";
 import { IS_CONTENT, NOT_DETACHED } from "@/features/social/lib/filters";
 import { writePostMeta } from "@/features/social/lib/post-meta.server";
 import {
@@ -74,6 +76,69 @@ export async function contentStats(ids: string[]): Promise<Map<string, ContentSt
     out.set(row.sourceId, { ...(out.get(row.sourceId) ?? NO_STATS), nextAt: row._min.scheduledAt });
   }
   return out;
+}
+
+/**
+ * Every content item as a library row, last edited first.
+ * @param now - The time to judge finished items at.
+ * @returns The rows.
+ */
+export async function loadContentRows(now: Date): Promise<ContentListRow[]> {
+  const items = await prisma.socialPost.findMany({
+    where: IS_CONTENT,
+    orderBy: { updatedAt: "desc" },
+  });
+  const ids = items.map((i) => i.id);
+  const [stats, lined] = await Promise.all([
+    contentStats(ids),
+    ids.length === 0
+      ? []
+      : prisma.socialPost.groupBy({
+          by: ["sourceId"],
+          where: { sourceId: { in: ids }, status: { in: [...NOT_OUT] }, ...NOT_DETACHED },
+          _count: { _all: true },
+        }),
+  ]);
+  const linedUp = new Map(lined.map((row) => [row.sourceId, row._count._all]));
+  return items.map((i) =>
+    toContentRow(i, stats.get(i.id) ?? NO_STATS, linedUp.get(i.id) ?? 0, now),
+  );
+}
+
+/**
+ * Postings from content items that went out on or after a time.
+ * @param ids - Content item ids.
+ * @param from - The earliest posting time counted.
+ * @returns How many.
+ */
+export async function postedSince(ids: string[], from: Date): Promise<number> {
+  if (ids.length === 0) return 0;
+  return prisma.socialPost.count({
+    where: { sourceId: { in: ids }, postedAt: { gte: from } },
+  });
+}
+
+/**
+ * Deletes content items with their lined-up postings, then any Post maker pictures only they
+ * used. Postings already out, and hand-edited ones, stay as ordinary posts.
+ * @param ids - Content item ids; ids that aren't content items are left alone.
+ * @returns How many items were deleted.
+ */
+export async function deleteContentItems(ids: string[]): Promise<number> {
+  const items = await prisma.socialPost.findMany({
+    where: { id: { in: ids }, ...IS_CONTENT },
+    select: { id: true, imageUrl: true, targets: { select: { imageUrl: true } } },
+  });
+  const pictures: (string | null)[] = [];
+  let deleted = 0;
+  for (const item of items) {
+    pictures.push(item.imageUrl, ...item.targets.map((t) => t.imageUrl));
+    pictures.push(...(await deleteLinedUpPostings(item.id)));
+    deleted += (await prisma.socialPost.deleteMany({ where: { id: item.id, ...IS_CONTENT } }))
+      .count;
+  }
+  await deleteUnusedPictures(pictures);
+  return deleted;
 }
 
 /**
