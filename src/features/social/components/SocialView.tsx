@@ -1,7 +1,7 @@
 "use client";
 // src/features/social/components/SocialView.tsx
-// The Social page: start options, then the composer, then Posted folded away and the connection
-// check at the bottom.
+// The Social Posts tab: start options, then the composer, then Posted folded away and the
+// connection check at the bottom.
 
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { Card } from "@/features/admin/components/ui/Card";
@@ -18,6 +18,7 @@ import { SocialPostedList } from "@/features/social/components/SocialPostedList"
 import { SocialStartSection } from "@/features/social/components/SocialStartSection";
 import { SocialTagFilter } from "@/features/social/components/SocialTagFilter";
 import { TagManager, type TagUse } from "@/features/social/components/TagManager";
+import { SOCIAL_POSTS_PATH } from "@/features/social/lib/links";
 import type { OpenPost } from "@/features/social/lib/open-post";
 import { liveOn, type Connection } from "@/features/social/lib/post-display";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
@@ -88,7 +89,8 @@ export function SocialView({
   const openId = open?.post.id ?? null;
   const openRow = open ? (rows.find((r) => r.id === openId) ?? open.post) : null;
   // Email this too lives here, not in the composer, which remounts on the refresh after a
-  // publish. Offered after publishing only while the post has no email and wasn't turned down.
+  // publish. Offered after publishing only while the post has no email and wasn't turned down,
+  // and never on a posting: its content item holds the email.
   const [emailStep, setEmailStep] = useState<{ postId: string; afterPublish: boolean } | null>(
     null,
   );
@@ -102,6 +104,7 @@ export function SocialView({
     open !== null &&
     emailStep.postId === open.post.id &&
     !open.post.isPreset &&
+    !open.post.sourceId &&
     (!emailStep.afterPublish || (open.email === null && !open.emailSkipped));
   // The list arrives newest first; presets read oldest first so the starter set keeps
   // its order and new ones join the end.
@@ -182,7 +185,7 @@ export function SocialView({
     if (!id || !rows.find((r) => r.id === id)?.isPreset) setEditingPresets(false);
     setOpeningKey(key);
     startOpening(() => {
-      router.push(id ? `/admin/social?post=${id}` : "/admin/social", { scroll: false });
+      router.push(id ? `${SOCIAL_POSTS_PATH}?post=${id}` : SOCIAL_POSTS_PATH, { scroll: false });
     });
   }
 
@@ -224,6 +227,25 @@ export function SocialView({
     }
     setRows((prev) => [res.post, ...prev]);
     toast(`Saved "${res.post.name}" to your presets.`, { tone: "success" });
+  }
+
+  /**
+   * Copies a post or preset into a new content item, leaving the post open.
+   * @param row - Post to copy.
+   */
+  async function saveToContent(row: SocialPostRow): Promise<void> {
+    if (saveOpen.current && !(await saveOpen.current())) return;
+    setBusyId(`content-${row.id}`);
+    const res = await callApi<{ item: SocialPostRow }>("/api/admin/social/content", "POST", {
+      source: "copy",
+      sourceId: row.id,
+    });
+    setBusyId(null);
+    if (!res.ok) {
+      toast(res.error, { tone: "error" });
+      return;
+    }
+    toast(`Saved "${res.item.name}" to Content.`, { tone: "success" });
   }
 
   // Check the connections once when the page opens, so a revoked or expired token shows
@@ -400,6 +422,8 @@ export function SocialView({
             savingPreset={busyId === `preset-${openRow.id}`}
             onCreate={(body, key) => void createAndOpen(body, key)}
             onSaveAsPreset={() => void saveAsPreset(openRow)}
+            savingContent={busyId === `content-${openRow.id}`}
+            onSaveToContent={() => void saveToContent(openRow)}
             onDelete={() => askDelete(openRow)}
             onClose={() => void openPost(null)}
           />
@@ -422,6 +446,7 @@ export function SocialView({
             onDraftEmail={onDraftEmail}
             onSaved={onSaved}
             saveRef={saveOpen}
+            source={open.source}
           />
         </section>
       ) : openMissing ? (

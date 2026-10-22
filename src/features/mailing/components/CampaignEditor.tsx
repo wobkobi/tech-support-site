@@ -35,6 +35,7 @@ import {
   switchTemplate,
   type Template,
 } from "@/features/mailing/lib/templates";
+import { postHref } from "@/features/social/lib/links";
 import type { QuietHours } from "@/shared/lib/quiet-hours";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -53,6 +54,8 @@ export interface SendRow {
 export interface LinkedPost {
   id: string;
   name: string;
+  /** A content item rather than a post, which opens on its own page. */
+  isContent: boolean;
   /** The email was made from the post by Email this too, rather than the post shared from it. */
   madeFromPost: boolean;
   /** The post's words as a Draft with AI brief, for a browser that didn't keep the seeded one. */
@@ -396,7 +399,7 @@ export function CampaignEditor({
       toast(res.error, { tone: "error" });
       return;
     }
-    router.push(`/admin/social?post=${res.post.id}`);
+    router.push(postHref(res.post));
   }
 
   /** Turns a scheduled email back into an editable draft. */
@@ -548,7 +551,7 @@ export function CampaignEditor({
                   {linkedPost.madeFromPost ? "Made from your post " : "Shared to social as "}
                   <strong>{linkedPost.name}</strong>.
                 </span>
-                <Link href={`/admin/social?post=${linkedPost.id}`} className={ADMIN_LINK_CLS}>
+                <Link href={postHref(linkedPost)} className={ADMIN_LINK_CLS}>
                   Open the post
                 </Link>
               </div>

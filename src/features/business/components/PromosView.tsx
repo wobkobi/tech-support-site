@@ -33,6 +33,7 @@ import {
   type FormState,
 } from "@/features/business/lib/promo-form";
 import { callApi } from "@/features/mailing/lib/api-client";
+import { postHref } from "@/features/social/lib/links";
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -294,7 +295,7 @@ export function PromosView({ initial, rates }: Props): React.ReactElement {
       toast(res.error, { tone: "error" });
       return;
     }
-    router.push(`/admin/social?post=${res.post.id}`);
+    router.push(postHref(res.post));
   }
 
   /** Deletes the promo held in the confirm dialog. Past invoices keep their snapshot. */

@@ -28,7 +28,7 @@ interface Ctx {
  * @param request - Incoming request.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the design id.
- * @returns JSON `{ postId, created }`, 409 when the pictures are out of date.
+ * @returns JSON `{ postId, created, isContent }`, 409 when the pictures are out of date.
  */
 export async function POST(request: NextRequest, { params }: Ctx): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
@@ -95,8 +95,13 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
   if (linked) {
     await prisma.socialPost.update({
       where: { id: linked.id },
-      // The caption only fills an empty post: words already written there stay.
-      data: { ...picture, ...(linked.body.trim() ? {} : { body: caption }) },
+      // The caption only fills an empty post: words already written there stay. A posting
+      // given a new picture by hand stops following its content item.
+      data: {
+        ...picture,
+        ...(linked.body.trim() ? {} : { body: caption }),
+        ...(linked.sourceId ? { detached: true } : {}),
+      },
     });
     postId = linked.id;
   } else {
@@ -113,5 +118,5 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
   if (linked) {
     await deleteUnusedPictures([linked.imageUrl, ...linked.targets.map((t) => t.imageUrl)]);
   }
-  return okResponse({ postId, created: !linked });
+  return okResponse({ postId, created: !linked, isContent: linked?.isContent === true });
 }

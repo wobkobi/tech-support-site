@@ -197,7 +197,7 @@ const MAILING_NAV_ITEM: NavItem = {
 
 const SOCIAL_NAV_ITEM: NavItem = {
   page: "social",
-  label: "Social posts",
+  label: "Social",
   icon: <FaShareNodes className="shrink-0" />,
   path: "/admin/social",
 };

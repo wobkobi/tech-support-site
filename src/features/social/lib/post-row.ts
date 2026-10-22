@@ -59,6 +59,19 @@ export interface SocialPostRow {
   eventStartTime: string | null;
   eventEndTime: string | null;
   couponCode: string | null;
+  /** A content item: a library post that goes out as postings. */
+  isContent: boolean;
+  /** A posting's content item, the caption it used, and whether it was edited by hand. */
+  sourceId: string | null;
+  captionIndex: number | null;
+  detached: boolean;
+  /** A content item's other captions; body is caption 1. */
+  altCaptions: string[];
+  nextCaption: number | null;
+  recycle: boolean;
+  /** A content item's last day to post as YYYY-MM-DD, or null. */
+  expiresAt: string | null;
+  maxPosts: number | null;
   updatedAt: string;
 }
 
@@ -110,6 +123,15 @@ export function toPostRow(p: SocialPost): SocialPostRow {
     eventStartTime: p.eventStartTime,
     eventEndTime: p.eventEndTime,
     couponCode: p.couponCode,
+    isContent: p.isContent === true,
+    sourceId: p.sourceId,
+    captionIndex: p.captionIndex,
+    detached: p.detached === true,
+    altCaptions: p.altCaptions ?? [],
+    nextCaption: p.nextCaption,
+    recycle: p.recycle === true,
+    expiresAt: dateKey(p.expiresAt),
+    maxPosts: p.maxPosts,
     updatedAt: p.updatedAt.toISOString(),
   };
 }

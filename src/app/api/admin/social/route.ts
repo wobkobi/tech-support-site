@@ -3,6 +3,8 @@
 
 import { findAdvertisablePromo, promoLastDay } from "@/features/business/lib/promos";
 import { parseObjectId } from "@/features/business/lib/validation";
+import { copyPostFields } from "@/features/social/lib/copy-post";
+import { NOT_CONTENT } from "@/features/social/lib/filters";
 import { postFromEmail } from "@/features/social/lib/from-email";
 import { toPostRow } from "@/features/social/lib/post-row";
 import { PROMO_POST_PRESET_KEY, starterPostPresets } from "@/features/social/lib/presets";
@@ -17,6 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/admin/social - every post and preset, newest first; `?tag=<id>` for one tag's.
+ * Content items have their own list.
  * @param request - Incoming request.
  * @returns JSON `{ posts }`.
  */
@@ -26,7 +29,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const tag = rawTag === null ? null : parseObjectId(rawTag);
   if (rawTag !== null && !tag) return errorResponse("tag isn't a valid id.", 400);
   const rows = await prisma.socialPost.findMany({
-    where: tag ? { tagIds: { has: tag } } : {},
+    where: { ...NOT_CONTENT, ...(tag ? { tagIds: { has: tag } } : {}) },
     orderBy: { updatedAt: "desc" },
   });
   return okResponse({ posts: rows.map(toPostRow) });
@@ -69,48 +72,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (!source) return errorResponse("That post no longer exists.", 404);
       // Starting a draft from a preset keeps its name; any other copy says it's one.
       const name = source.isPreset && !asPreset ? source.name : `${source.name} (copy)`;
-      // Toggles, per-platform text and pictures, and crop OKs carry over; past
-      // outcomes and the email link don't.
-      const targets = defaultTargets().map((t) => {
-        const from = source.targets.find((s) => s.platform === t.platform);
-        return from
-          ? {
-              ...t,
-              enabled: from.enabled,
-              textOverride: from.textOverride,
-              imageUrl: from.imageUrl,
-              imageAlt: from.imageAlt,
-              imageWidth: from.imageWidth,
-              imageHeight: from.imageHeight,
-              imageOriginalUrl: from.imageOriginalUrl,
-              cropApprovedFor: from.cropApprovedFor,
-            }
-          : t;
-      });
       const created = await prisma.socialPost.create({
-        data: {
-          name,
-          body: source.body,
-          imageUrl: source.imageUrl,
-          imageAlt: source.imageAlt,
-          imageWidth: source.imageWidth,
-          imageHeight: source.imageHeight,
-          imageOriginalUrl: source.imageOriginalUrl,
-          linkUrl: source.linkUrl,
-          tagIds: source.tagIds,
-          promoId: source.promoId,
-          isPreset: asPreset,
-          targets,
-          googleType: source.googleType,
-          googleCta: source.googleCta,
-          googleUrl: source.googleUrl,
-          googleTitle: source.googleTitle,
-          offerStart: source.offerStart,
-          offerEnd: source.offerEnd,
-          eventStartTime: source.eventStartTime,
-          eventEndTime: source.eventEndTime,
-          couponCode: source.couponCode,
-        },
+        data: { ...copyPostFields(source), name, isPreset: asPreset },
       });
       return okResponse({ post: toPostRow(created) }, 201);
     }

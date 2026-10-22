@@ -1,6 +1,6 @@
 // src/features/social/lib/post-meta.server.ts
-// Server-only: writes a post's side fields (its email link and tags) without touching updatedAt,
-// so the open composer doesn't remount and the posts list keeps its order.
+// Server-only: writes a post's side fields (its email link, tags and next caption) without
+// touching updatedAt, so the open composer doesn't remount and the posts list keeps its order.
 
 import { prisma } from "@/shared/lib/prisma";
 import type { SocialPost } from "@prisma/client";
@@ -10,6 +10,7 @@ export interface PostMetaFields {
   campaignId?: string | null;
   emailSkipped?: boolean;
   tagIds?: string[];
+  nextCaption?: number;
 }
 
 /**

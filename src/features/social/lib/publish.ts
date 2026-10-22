@@ -5,6 +5,7 @@
 import { promoWording } from "@/features/mailing/lib/context";
 import type { PromoWording } from "@/features/mailing/lib/render";
 import { StillProcessingError } from "@/features/social/lib/adapter";
+import { NOT_CONTENT } from "@/features/social/lib/filters";
 import { PLATFORMS } from "@/features/social/lib/platforms";
 import {
   applyTakeDown,
@@ -184,7 +185,8 @@ async function runPending(
  */
 export async function publishPost(id: string): Promise<PublishOutcome> {
   const claimed = await prisma.socialPost.updateMany({
-    where: { id, isPreset: false, status: { in: ["draft", "scheduled"] } },
+    // Content items never go out themselves: their postings do.
+    where: { id, isPreset: false, status: { in: ["draft", "scheduled"] }, ...NOT_CONTENT },
     data: { status: "posting", postingStartedAt: new Date() },
   });
   if (claimed.count === 0) {
@@ -304,7 +306,7 @@ export async function runScheduledSocialPosts(): Promise<
   const results: { id: string; name: string; result: PublishOutcome }[] = [];
 
   const due = await prisma.socialPost.findMany({
-    where: { isPreset: false, status: "scheduled", scheduledAt: { lte: now } },
+    where: { isPreset: false, status: "scheduled", scheduledAt: { lte: now }, ...NOT_CONTENT },
     select: { id: true, name: true },
     orderBy: { scheduledAt: "asc" },
   });

@@ -71,6 +71,7 @@ import {
 import { FORMATS, type FormatKey } from "@/features/social-design/lib/formats";
 import { fullBleed } from "@/features/social-design/lib/layout";
 import { makeLayer, type AddKind } from "@/features/social-design/lib/new-layer";
+import { postHref } from "@/features/social/lib/links";
 import { cn } from "@/shared/lib/cn";
 import { shrinkImage } from "@/shared/lib/resize-image";
 import { useRouter } from "next/navigation";
@@ -401,7 +402,7 @@ export function DesignEditor({
         toast("Not every picture was stored, so the post wasn't changed.", { tone: "error" });
         return;
       }
-      const res = await callApi<{ postId: string; created: boolean }>(
+      const res = await callApi<{ postId: string; created: boolean; isContent: boolean }>(
         `/api/admin/social/designs/${initial.id}/use`,
         "POST",
       );
@@ -409,7 +410,7 @@ export function DesignEditor({
         toast(res.error, { tone: "error" });
         return;
       }
-      router.push(`/admin/social?post=${res.postId}`);
+      router.push(postHref({ id: res.postId, isContent: res.isContent }));
     } finally {
       setUsing(false);
     }

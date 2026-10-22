@@ -1204,6 +1204,23 @@ model SocialPost {
   // Email this too was turned down for this post, so publishing doesn't offer it again.
   emailSkipped Boolean?
 
+  // A content item: a library post that never goes out itself. Each time it goes out, a
+  // posting is made: a full post copied from it, with sourceId pointing back.
+  isContent    Boolean?
+  // A posting's content item, and which of its captions it used (0 is body).
+  sourceId     String?   @db.ObjectId
+  captionIndex Int?
+  // The posting was edited by hand, so changes to its content item no longer reach it.
+  detached     Boolean?
+  // A content item's other captions; body is caption 1.
+  altCaptions  String[]  @default([])
+  // The caption the content item's next posting uses.
+  nextCaption  Int?
+  // Recycling: post the item more than once, stopping at expiresAt or after maxPosts postings.
+  recycle      Boolean?
+  expiresAt    DateTime?
+  maxPosts     Int?
+
   // One per platform, always all three; written as a whole array because Prisma
   // rejects composite writes with undeclared fields.
   targets SocialTarget[]
@@ -1227,6 +1244,8 @@ model SocialPost {
   @@index([isPreset, status])
   @@index([status, scheduledAt])
   @@index([campaignId])
+  @@index([isContent, updatedAt])
+  @@index([sourceId, status])
 }
 
 // A label for sorting social posts. key is the name lowercased, so "Tips" and "tips" are one tag;

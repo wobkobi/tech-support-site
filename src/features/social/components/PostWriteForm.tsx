@@ -95,6 +95,10 @@ function takesLogo(url: string): boolean {
  * @param props.tagIds - Ids of the post's tags.
  * @param props.onTagsChange - Saves the post's new tags.
  * @param props.onCreateTag - Adds a tag from the picker.
+ * @param props.captions - A content item's caption switcher, shown above the words.
+ * @param props.bodyLabel - The words box's label.
+ * @param props.overridesHint - What an empty app box falls back to.
+ * @param props.overridesNote - Shown instead of "Different text for one app" when it doesn't apply.
  * @returns Form card element.
  */
 export function PostWriteForm({
@@ -129,6 +133,10 @@ export function PostWriteForm({
   tagIds,
   onTagsChange,
   onCreateTag,
+  captions,
+  bodyLabel = "Post",
+  overridesHint = "Leave a box empty to use the post above.",
+  overridesNote = null,
 }: {
   content: PostContent;
   setContent: React.Dispatch<React.SetStateAction<PostContent>>;
@@ -161,6 +169,10 @@ export function PostWriteForm({
   tagIds: string[];
   onTagsChange: (ids: string[]) => void;
   onCreateTag: (name: string, colour: TagColour) => Promise<SocialTagRow | null>;
+  captions?: React.ReactNode;
+  bodyLabel?: string;
+  overridesHint?: string;
+  overridesNote?: string | null;
 }): React.ReactElement {
   const fieldId = useId();
   const bodyCount = charCount(content.body);
@@ -230,9 +242,10 @@ export function PostWriteForm({
         </fieldset>
 
         <div className="flex flex-col gap-1">
+          {captions && <div className="mb-2">{captions}</div>}
           <div className="flex items-end justify-between gap-2">
             <label htmlFor="post-body" className={ADMIN_LABEL_CLS}>
-              Post
+              {bodyLabel}
             </label>
             {editable && (
               <div className="flex items-center gap-2">
@@ -607,7 +620,12 @@ export function PostWriteForm({
           </fieldset>
         )}
 
-        {enabled.length > 0 && (
+        {enabled.length > 0 && overridesNote && (
+          <p className="rounded-lg border border-admin-border px-3 py-2.5 text-sm text-admin-muted">
+            {overridesNote}
+          </p>
+        )}
+        {enabled.length > 0 && !overridesNote && (
           <details
             className="group rounded-lg border border-admin-border"
             open={overridesOpen}
@@ -621,7 +639,7 @@ export function PostWriteForm({
               />
             </summary>
             <div className="flex flex-col gap-4 border-t border-admin-border px-3 py-3">
-              <p className="text-sm text-admin-muted">Leave a box empty to use the post above.</p>
+              <p className="text-sm text-admin-muted">{overridesHint}</p>
               {enabled.map((p) => {
                 const target = content.targets.find((t) => t.platform === p);
                 if (!target) return null;

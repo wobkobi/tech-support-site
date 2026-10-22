@@ -48,7 +48,7 @@ export default async function AdminDesignEditorPage({
       <PageHeader
         title={row.isTemplate ? "Edit template" : "Edit design"}
         breadcrumbs={[
-          { label: "Social posts", href: "/admin/social" },
+          { label: "Social", href: "/admin/social" },
           { label: "Post maker", href: "/admin/social/design" },
           { label: row.name },
         ]}

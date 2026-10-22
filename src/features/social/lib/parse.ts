@@ -3,6 +3,7 @@
 // outcomes are never overwritten.
 
 import { parseObjectId } from "@/features/business/lib/validation";
+import { MAX_CAPTIONS, MAX_POSTS_LIMIT } from "@/features/social/lib/postings-core";
 import { MAX_POST_TAGS } from "@/features/social/lib/tags";
 import type { TargetState } from "@/features/social/lib/targets";
 import {
@@ -352,4 +353,69 @@ export function mergeTargets(stored: TargetState[], edits: TargetEdit[]): Target
     }
     return next;
   });
+}
+
+/** A content item's own fields: its other captions and recycling. */
+export interface ContentPatch {
+  altCaptions?: string[];
+  recycle?: boolean;
+  expiresAt?: Date | null;
+  maxPosts?: number | null;
+}
+
+/**
+ * Parses the content item fields of an edit body. Sparse like {@link parsePostPatch}, which
+ * handles the rest of the same body.
+ * @param raw - Request JSON.
+ * @returns The fields present, or the first problem found.
+ */
+export function parseContentPatch(raw: unknown): { patch: ContentPatch } | { error: string } {
+  if (!raw || typeof raw !== "object") return { error: "Expected a JSON object." };
+  const body = raw as Record<string, unknown>;
+  const patch: ContentPatch = {};
+
+  if (body.altCaptions !== undefined) {
+    const list = body.altCaptions;
+    if (!Array.isArray(list) || list.some((c) => typeof c !== "string")) {
+      return { error: "Captions must be a list of text." };
+    }
+    if (list.length > MAX_CAPTIONS - 1) {
+      return { error: `A content item can have up to ${MAX_CAPTIONS} captions.` };
+    }
+    if ((list as string[]).some((c) => c.length > MAX_BODY)) {
+      return { error: `A caption is too long (max ${MAX_BODY} characters).` };
+    }
+    // Blank captions stay, so the numbers don't shift while one is being written.
+    patch.altCaptions = list as string[];
+  }
+  if (body.recycle !== undefined) {
+    if (typeof body.recycle !== "boolean") return { error: "recycle must be true or false." };
+    patch.recycle = body.recycle;
+  }
+  if (body.expiresAt !== undefined) {
+    const day = optionalDay(body.expiresAt, "Last day");
+    if (day !== null && !(day instanceof Date)) return day;
+    patch.expiresAt = day;
+  }
+  if (body.maxPosts !== undefined) {
+    const n = body.maxPosts;
+    if (
+      n !== null &&
+      (!Number.isInteger(n) || (n as number) < 1 || (n as number) > MAX_POSTS_LIMIT)
+    ) {
+      return { error: `Stop after must be a whole number from 1 to ${MAX_POSTS_LIMIT}.` };
+    }
+    patch.maxPosts = n as number | null;
+  }
+  return { patch };
+}
+
+/**
+ * Whether an edit body carries any content item field.
+ * @param raw - Request JSON.
+ * @returns True when one of {@link ContentPatch}'s keys is present.
+ */
+export function hasContentFields(raw: unknown): boolean {
+  if (!raw || typeof raw !== "object") return false;
+  return ["altCaptions", "recycle", "expiresAt", "maxPosts"].some((k) => k in raw);
 }

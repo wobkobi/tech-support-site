@@ -24,6 +24,7 @@ export type PostSaveState = "saved" | "unsaved" | "saving" | "error";
  * @param props.posting - Whether Post now is running.
  * @param props.onSchedule - Opens the schedule dialog.
  * @param props.onPostNow - Asks to confirm posting now.
+ * @param props.scheduleLabel - The schedule button's words.
  * @returns Action bar element.
  */
 export function PostActionBar({
@@ -37,6 +38,7 @@ export function PostActionBar({
   posting,
   onSchedule,
   onPostNow,
+  scheduleLabel = "Schedule",
 }: {
   saveState: PostSaveState;
   onRetrySave: () => void;
@@ -48,6 +50,7 @@ export function PostActionBar({
   posting: boolean;
   onSchedule: () => void;
   onPostNow: () => void;
+  scheduleLabel?: string;
 }): React.ReactElement {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-admin-border bg-admin-surface py-3 pr-20 pl-4 shadow-sm sm:flex-row sm:items-center sm:justify-between lg:pr-4">
@@ -76,7 +79,7 @@ export function PostActionBar({
       {!isPreset && (
         <div className="flex shrink-0 flex-wrap gap-2">
           <AdminButton variant="secondary" disabled={scheduleDisabled} onClick={onSchedule}>
-            Schedule
+            {scheduleLabel}
           </AdminButton>
           <AdminButton busy={posting} disabled={postDisabled} onClick={onPostNow}>
             Post now

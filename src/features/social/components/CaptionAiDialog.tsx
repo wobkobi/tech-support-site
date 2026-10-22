@@ -43,8 +43,11 @@ const MAX_CHARS: Record<SocialPlatformKey, number> = {
   google: GOOGLE_MAX_CHARS,
 };
 
-/** Where a picked option goes: over the post, under it, or as one app's own text. */
-export type CaptionPlacement = "replace" | "add" | SocialPlatformKey;
+/**
+ * Where a picked option goes: over the post, under it, as one app's own text, or as a content
+ * item's next caption.
+ */
+export type CaptionPlacement = "replace" | "add" | "caption" | SocialPlatformKey;
 
 type Tab = "write" | "change";
 
@@ -69,6 +72,8 @@ function maxChars(only: SocialPlatformKey | null, enabled: readonly SocialPlatfo
  * @param props.issuesFor - Problems an option would add, for all the post's apps or one.
  * @param props.onUse - Puts a picked option in the post.
  * @param props.onClose - Dismisses it.
+ * @param props.canAddCaption - A content item with room for another caption, which an option can become.
+ * @param props.perApp - Whether words can go to one app only; off on a content item's later captions.
  * @returns The dialog.
  */
 export function CaptionAiDialog({
@@ -79,6 +84,8 @@ export function CaptionAiDialog({
   issuesFor,
   onUse,
   onClose,
+  canAddCaption = false,
+  perApp = true,
 }: {
   setup: CaptionAiSetup;
   textOf: (only: SocialPlatformKey | null) => string;
@@ -87,6 +94,8 @@ export function CaptionAiDialog({
   issuesFor: (text: string, only: SocialPlatformKey | null) => string[];
   onUse: (text: string, where: CaptionPlacement) => void;
   onClose: () => void;
+  canAddCaption?: boolean;
+  perApp?: boolean;
 }): React.ReactElement {
   const id = useId();
   const { toast } = useToast();
@@ -149,7 +158,7 @@ export function CaptionAiDialog({
     onClose();
   }
 
-  const appChoice = enabled.length > 1 && (
+  const appChoice = perApp && enabled.length > 1 && (
     <AdminField
       label="Words for"
       htmlFor={`${id}-for`}
@@ -367,6 +376,15 @@ export function CaptionAiDialog({
                         {hasWords && tab === "write" && (
                           <AdminButton size="xs" variant="outline" onClick={() => use(text, "add")}>
                             Add under what&apos;s there
+                          </AdminButton>
+                        )}
+                        {canAddCaption && hasWords && (
+                          <AdminButton
+                            size="xs"
+                            variant="outline"
+                            onClick={() => use(text, "caption")}
+                          >
+                            Add as another caption
                           </AdminButton>
                         )}
                       </>

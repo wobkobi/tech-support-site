@@ -1,7 +1,8 @@
 "use client";
 // src/features/social/components/PostComposer.tsx
-// Write, preview and publish one social post. Drafts and presets autosave; previews use the
-// publishing rules and promo wording, so what shows is what goes out.
+// Write, preview and publish one social post, or a content item that goes out as postings. Drafts,
+// presets and content items autosave; previews use the publishing rules and promo wording, so what
+// shows is what goes out.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -17,6 +18,9 @@ import {
   CaptionAiDialog,
   type CaptionPlacement,
 } from "@/features/social/components/CaptionAiDialog";
+import { CaptionsField } from "@/features/social/components/CaptionsField";
+import { ContentPostings } from "@/features/social/components/ContentPostings";
+import { ContentRecycling } from "@/features/social/components/ContentRecycling";
 import type { PreviewPost } from "@/features/social/components/PlatformPreview";
 import { PostActionBar } from "@/features/social/components/PostActionBar";
 import { PostEmailPanel } from "@/features/social/components/PostEmailPanel";
@@ -24,11 +28,16 @@ import { PostPaneTabs } from "@/features/social/components/PostPaneTabs";
 import { PostPreviewPanel } from "@/features/social/components/PostPreviewPanel";
 import { PostStatusBanner } from "@/features/social/components/PostStatusBanner";
 import { PostWriteForm } from "@/features/social/components/PostWriteForm";
+import { PostingDialog } from "@/features/social/components/PostingDialog";
+import { PostingSourceNote } from "@/features/social/components/PostingSourceNote";
+import type { ContentStatsRow } from "@/features/social/lib/content-row";
 import type { PostEmail } from "@/features/social/lib/email-step.server";
 import { insertableGroups } from "@/features/social/lib/insertables";
-import type { CaptionAiSetup, PostDesign } from "@/features/social/lib/open-post";
+import type { CaptionAiSetup, PostDesign, PostingSource } from "@/features/social/lib/open-post";
 import { liveOn, type Connection } from "@/features/social/lib/post-display";
 import type { SocialPostRow, SocialTargetRow } from "@/features/social/lib/post-row";
+import { MAX_CAPTIONS, clampCaption, spentReason } from "@/features/social/lib/postings-core";
+import type { PostingProblem } from "@/features/social/lib/postings.server";
 import type { SocialTagRow, TagColour } from "@/features/social/lib/tags";
 import { postBrief } from "@/features/social/lib/to-email";
 import {
@@ -100,6 +109,19 @@ interface Content {
   eventStartTime: string;
   eventEndTime: string;
   couponCode: string;
+  /** A content item's captions after the first, which is body. */
+  altCaptions: string[];
+  recycle: boolean;
+  /** A content item's last day to post as YYYY-MM-DD, empty for none. */
+  expiresAt: string;
+  maxPosts: number | null;
+}
+
+/** A content item's extras: how often it has gone out, its postings, and lined-up problems. */
+export interface ContentItemInfo {
+  stats: ContentStatsRow;
+  postings: SocialPostRow[];
+  problems: PostingProblem[];
 }
 
 /** The editable fields, for the form card in PostWriteForm. */
@@ -107,10 +129,11 @@ export type PostContent = Content;
 
 type SaveState = "saved" | "unsaved" | "saving" | "error";
 
-/** The post's words and each app's own words, which Write with AI can change. */
+/** The words Write with AI can change: the post's, each app's own, and other captions. */
 interface Words {
   body: string;
   overrides: Record<string, string>;
+  altCaptions: string[];
 }
 
 /**
@@ -122,6 +145,7 @@ function wordsOf(c: Content): Words {
   return {
     body: c.body,
     overrides: Object.fromEntries(c.targets.map((t) => [t.platform, t.textOverride])),
+    altCaptions: c.altCaptions,
   };
 }
 
@@ -160,6 +184,10 @@ function contentOf(p: SocialPostRow): Content {
     eventStartTime: p.eventStartTime ?? "",
     eventEndTime: p.eventEndTime ?? "",
     couponCode: p.couponCode ?? "",
+    altCaptions: p.altCaptions,
+    recycle: p.recycle,
+    expiresAt: p.expiresAt ?? "",
+    maxPosts: p.maxPosts,
   };
 }
 
@@ -199,7 +227,49 @@ function diff(now: Content, saved: Content): Record<string, unknown> {
       .filter((t) => (SOCIAL_PLATFORMS as readonly string[]).includes(t.platform))
       .map((t) => ({ ...t, textOverride: t.textOverride || null, imageAlt: t.imageAlt || null }));
   }
+  if (JSON.stringify(now.altCaptions) !== JSON.stringify(saved.altCaptions)) {
+    out.altCaptions = now.altCaptions;
+  }
+  if (now.recycle !== saved.recycle) out.recycle = now.recycle;
+  if (now.expiresAt !== saved.expiresAt) out.expiresAt = now.expiresAt || null;
+  if (now.maxPosts !== saved.maxPosts) out.maxPosts = now.maxPosts;
   return out;
+}
+
+/**
+ * The fields as the form shows them while a content item's later caption is picked: that caption
+ * as the words, and no app-only text, which goes out with caption 1 alone.
+ * @param c - Content.
+ * @param at - The picked caption.
+ * @returns The form's view.
+ */
+function viewOf(c: Content, at: number): Content {
+  if (at === 0) return c;
+  return {
+    ...c,
+    body: c.altCaptions[at - 1] ?? "",
+    targets: c.targets.map((t) => ({ ...t, textOverride: "" })),
+  };
+}
+
+/**
+ * Writes a changed view back: its words to the picked caption, every other field as it is.
+ * @param v - The view after the change.
+ * @param c - Content before it.
+ * @param at - The picked caption.
+ * @returns Content.
+ */
+function unview(v: Content, c: Content, at: number): Content {
+  if (at === 0) return v;
+  return {
+    ...v,
+    body: c.body,
+    altCaptions: c.altCaptions.map((text, i) => (i === at - 1 ? v.body : text)),
+    targets: v.targets.map((t) => ({
+      ...t,
+      textOverride: c.targets.find((o) => o.platform === t.platform)?.textOverride ?? "",
+    })),
+  };
 }
 
 /**
@@ -220,6 +290,8 @@ function diff(now: Content, saved: Content): Record<string, unknown> {
  * @param props.onDraftEmail - Opens Email this too, by hand or after publishing.
  * @param props.onSaved - Called with the name, text or tags after each successful save.
  * @param props.saveRef - Filled with a save-pending-edits function, used before another post opens.
+ * @param props.contentItem - A content item's stats, postings and problems; null for other posts.
+ * @param props.source - The content item a posting came from, or null.
  * @returns Composer element.
  */
 export function PostComposer({
@@ -238,6 +310,8 @@ export function PostComposer({
   onDraftEmail,
   onSaved,
   saveRef,
+  contentItem = null,
+  source = null,
 }: {
   initial: SocialPostRow;
   promo: PromoWording | null;
@@ -254,6 +328,8 @@ export function PostComposer({
   onDraftEmail?: (afterPublish: boolean) => void;
   onSaved?: (saved: Partial<Pick<SocialPostRow, "name" | "body" | "tagIds">>) => void;
   saveRef?: React.RefObject<(() => Promise<boolean>) | null>;
+  contentItem?: ContentItemInfo | null;
+  source?: PostingSource | null;
 }): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -297,6 +373,23 @@ export function PostComposer({
   const tagSaving = useRef<Promise<void>>(Promise.resolve());
   // A slot whose photo couldn't be read back for the logo, so its next upload gets it.
   const logoNext = useRef<"main" | SocialPlatformKey | null>(null);
+  const isContent = initial.isContent;
+  // The caption a content item's form edits; clamped, as Undo can take the last one away.
+  const [activeCaption, setActiveCaption] = useState(0);
+  const at = Math.min(activeCaption, content.altCaptions.length);
+  const captions = [content.body, ...content.altCaptions];
+  const view = viewOf(content, at);
+  const nextCaption = clampCaption(captions, initial.nextCaption);
+  const [postingFrom, setPostingFrom] = useState<"now" | "later" | null>(null);
+  const [confirmingRelink, setConfirmingRelink] = useState(false);
+  // Lined-up postings that won't go out: from the page, then from each save.
+  const [problems, setProblems] = useState(contentItem?.problems ?? []);
+  const [shownProblems, setShownProblems] = useState(contentItem?.problems);
+  if (contentItem?.problems !== shownProblems) {
+    setShownProblems(contentItem?.problems);
+    setProblems(contentItem?.problems ?? []);
+  }
+  const [openedAt] = useState(() => new Date());
 
   // The previews show the real Page name and username once the connection check
   // answers; until then (or if it fails) they use placeholders.
@@ -330,13 +423,18 @@ export function PostComposer({
       return true;
     }
     setSaveState("saving");
-    const run = callApi(`/api/admin/social/${initial.id}`, "PATCH", changed).then((res) => {
+    const run = callApi<{ postingProblems?: PostingProblem[] }>(
+      `/api/admin/social/${initial.id}`,
+      "PATCH",
+      changed,
+    ).then((res) => {
       if (!res.ok) {
         setSaveState("error");
         toast(res.error, { tone: "error" });
         return false;
       }
       saved.current = target;
+      if (res.postingProblems) setProblems(res.postingProblems);
       onSaved?.({ name: target.name, body: target.body });
       return true;
     });
@@ -409,10 +507,53 @@ export function PostComposer({
    * @param patch - Fields to change.
    */
   function setTarget(platform: string, patch: Partial<Content["targets"][number]>): void {
-    setContent((c) => ({
-      ...c,
-      targets: c.targets.map((t) => (t.platform === platform ? { ...t, ...patch } : t)),
+    setView((v) => ({
+      ...v,
+      targets: v.targets.map((t) => (t.platform === platform ? { ...t, ...patch } : t)),
     }));
+  }
+
+  /**
+   * Updates the fields as the form sees them, writing the words back to the picked caption.
+   * @param update - The new view, or a function of the current one.
+   */
+  function setView(update: React.SetStateAction<Content>): void {
+    setContent((c) => {
+      const v = viewOf(c, at);
+      return unview(typeof update === "function" ? update(v) : update, c, at);
+    });
+  }
+
+  /** Adds a blank caption at the end and picks it. */
+  function addCaption(): void {
+    if (captions.length >= MAX_CAPTIONS) return;
+    setContent((c) => ({ ...c, altCaptions: [...c.altCaptions, ""] }));
+    setActiveCaption(captions.length);
+    requestAnimationFrame(() => bodyRef.current?.focus());
+  }
+
+  /**
+   * Swaps the picked caption with its neighbour, keeping it picked.
+   * @param by - One place earlier (-1) or later (1).
+   */
+  function moveCaption(by: -1 | 1): void {
+    const to = at + by;
+    if (to < 0 || to >= captions.length) return;
+    setContent((c) => {
+      const list = [c.body, ...c.altCaptions];
+      [list[at], list[to]] = [list[to]!, list[at]!];
+      return { ...c, body: list[0]!, altCaptions: list.slice(1) };
+    });
+    setActiveCaption(to);
+  }
+
+  /** Removes the picked caption; removing caption 1 makes caption 2 the first. */
+  function removeCaption(): void {
+    setContent((c) => {
+      const list = [c.body, ...c.altCaptions].filter((_, i) => i !== at);
+      return { ...c, body: list[0] ?? "", altCaptions: list.slice(1) };
+    });
+    setActiveCaption(Math.max(0, at - 1));
   }
 
   /**
@@ -425,13 +566,13 @@ export function PostComposer({
     const el = box === "body" ? bodyRef.current : (overrideRefs.current[box] ?? null);
     const current =
       box === "body"
-        ? content.body
-        : (content.targets.find((t) => t.platform === box)?.textOverride ?? "");
+        ? view.body
+        : (view.targets.find((t) => t.platform === box)?.textOverride ?? "");
     const start = el?.selectionStart ?? current.length;
     const end = el?.selectionEnd ?? current.length;
     const lead = line && start > 0 && current[start - 1] !== "\n" ? "\n" : "";
     const next = current.slice(0, start) + lead + text + current.slice(end);
-    if (box === "body") setContent((c) => ({ ...c, body: next }));
+    if (box === "body") setView((c) => ({ ...c, body: next }));
     else setTarget(box, { textOverride: next });
     // Restore the cursor once React has re-rendered the new value.
     const cursor = start + lead.length + text.length;
@@ -669,6 +810,21 @@ export function PostComposer({
     router.refresh();
   }
 
+  /** Saves, then copies the content item over this posting again, so it follows the item. */
+  async function relink(): Promise<void> {
+    setConfirmingRelink(false);
+    if (!(await save())) return;
+    setBusy("relink");
+    const res = await callApi(`/api/admin/social/${initial.id}/relink`, "POST");
+    setBusy(null);
+    if (!res.ok) {
+      toast(res.error, { tone: "error" });
+      return;
+    }
+    toast("It follows its content item again.", { tone: "success" });
+    router.refresh();
+  }
+
   /** Detaches the post from its promo, so it describes whatever promo is running. */
   async function unlinkPromo(): Promise<void> {
     // Save first: the refresh after unlinking reloads the fields from the server.
@@ -800,13 +956,14 @@ export function PostComposer({
     router.refresh();
   }
 
+  // A content item's checks and preview use the picked caption, as its postings would.
   const draft = {
-    body: content.body,
+    body: view.body,
     imageUrl: content.imageUrl,
     imageWidth: content.imageWidth,
     imageHeight: content.imageHeight,
     linkUrl: content.linkUrl.trim() || null,
-    targets: content.targets,
+    targets: view.targets,
     googleType: content.googleType,
     googleCta: content.googleCta || null,
     googleUrl: content.googleUrl.trim() || null,
@@ -825,7 +982,7 @@ export function PostComposer({
   // The counter only measures against platforms that post the main text; one with its
   // own text has its own limit, checked in its preview.
   const usesBody = enabled.filter(
-    (p) => !content.targets.find((t) => t.platform === p)?.textOverride.trim(),
+    (p) => !view.targets.find((t) => t.platform === p)?.textOverride.trim(),
   );
   const strictest = usesBody.length > 0 ? Math.min(...usesBody.map((p) => MAX_CHARS[p])) : null;
   // Scheduling checks promo wording as if a promo will be running by then, the same
@@ -834,6 +991,16 @@ export function PostComposer({
   const insertGroups = insertableGroups(details, promo);
   const failedCount = initial.targets.filter((t) => t.enabled && t.status === "failed").length;
   const upOn = liveOn(initial);
+  const spent = contentItem
+    ? spentReason(
+        {
+          expiresAt: content.expiresAt ? new Date(`${content.expiresAt}T00:00:00.000Z`) : null,
+          maxPosts: content.maxPosts,
+        },
+        { count: contentItem.stats.count, lastPostedAt: null, nextAt: null },
+        openedAt,
+      )
+    : null;
 
   /**
    * What one platform's preview card shows: its own text when set, promo filled in.
@@ -842,7 +1009,7 @@ export function PostComposer({
    */
   function previewOf(p: SocialPlatformKey): PreviewPost {
     const picture = pictureFor(draft, p);
-    const own = content.targets.find((t) => t.platform === p);
+    const own = view.targets.find((t) => t.platform === p);
     return {
       text: fillPromo(textFor(draft, p), promo).trim(),
       imageUrl: picture?.url ?? null,
@@ -870,30 +1037,34 @@ export function PostComposer({
   /**
    * Puts a Write with AI option in the post, keeping the words before it for Undo.
    * @param text - The option.
-   * @param where - Over the post, under it, or as one app's own text.
+   * @param where - Over the picked caption, under it, as a new caption, or as one app's own text.
    */
   function placeCaption(text: string, where: CaptionPlacement): void {
-    const next: Content =
-      where === "replace"
-        ? { ...content, body: text }
-        : where === "add"
-          ? {
-              ...content,
-              body: content.body.trim() ? `${content.body.trimEnd()}\n\n${text}` : text,
-            }
-          : {
-              ...content,
-              targets: content.targets.map((t) =>
-                t.platform === where ? { ...t, textOverride: text } : t,
-              ),
-            };
+    let next: Content;
+    if (where === "replace" || where === "add") {
+      const words =
+        where === "replace" || !view.body.trim() ? text : `${view.body.trimEnd()}\n\n${text}`;
+      next = unview({ ...view, body: words }, content, at);
+    } else if (where === "caption") {
+      next = { ...content, altCaptions: [...content.altCaptions, text] };
+      setActiveCaption(captions.length);
+    } else {
+      next = {
+        ...content,
+        targets: content.targets.map((t) =>
+          t.platform === where ? { ...t, textOverride: text } : t,
+        ),
+      };
+      setOverridesShown(true);
+    }
     setAiUndo({ before: wordsOf(content), after: wordsOf(next) });
     setContent(next);
-    if (where !== "replace" && where !== "add") setOverridesShown(true);
     toast(
       where === "replace" || where === "add"
         ? "Added to the post. Undo under it takes it back."
-        : `Added as ${PLATFORM_LABEL[where]}'s own text. Undo under the post takes it back.`,
+        : where === "caption"
+          ? `Added as caption ${captions.length + 1}. Undo under it takes it back.`
+          : `Added as ${PLATFORM_LABEL[where]}'s own text. Undo under the post takes it back.`,
       { tone: "success" },
     );
   }
@@ -905,6 +1076,7 @@ export function PostComposer({
     setContent((c) => ({
       ...c,
       body: before.body,
+      altCaptions: before.altCaptions,
       targets: c.targets.map((t) => ({ ...t, textOverride: before.overrides[t.platform] ?? "" })),
     }));
     setAiUndo(null);
@@ -939,8 +1111,9 @@ export function PostComposer({
   }
 
   const shownPreview = enabled.includes(previewOn) ? previewOn : (enabled[0] ?? null);
-  const readyMessage =
-    setupMissing.length > 0
+  const readyMessage = spent
+    ? spent
+    : setupMissing.length > 0
       ? setupMissing.join(" ")
       : blocked.length > 0 && scheduleBlocked.length === 0
         ? "Post now needs a promo running for the promo wording. You can still schedule it."
@@ -968,21 +1141,38 @@ export function PostComposer({
       onRetrySave={() => void save()}
       isPreset={initial.isPreset}
       readyMessage={readyMessage}
-      showProblem={!initial.isPreset && (blocked.length > 0 || setupMissing.length > 0)}
-      scheduleDisabled={scheduleBlocked.length > 0 || setupMissing.length > 0}
-      postDisabled={blocked.length > 0 || setupMissing.length > 0}
+      showProblem={
+        !initial.isPreset && (blocked.length > 0 || setupMissing.length > 0 || spent !== null)
+      }
+      scheduleDisabled={scheduleBlocked.length > 0 || setupMissing.length > 0 || spent !== null}
+      postDisabled={blocked.length > 0 || setupMissing.length > 0 || spent !== null}
       posting={busy === "now"}
+      scheduleLabel={isContent ? "Schedule a posting" : undefined}
       onSchedule={() => {
+        if (isContent) {
+          setPostingFrom("later");
+          return;
+        }
         const next = new Date(Date.now() + 60 * 60_000);
         next.setMinutes(0, 0, 0);
         setScheduling(toNzInputValue(next));
       }}
-      onPostNow={() => setConfirming(true)}
+      onPostNow={() => (isContent ? setPostingFrom("now") : setConfirming(true))}
     />
   );
 
   return (
     <div ref={rootRef} className="flex flex-col gap-4">
+      {source && (
+        <PostingSourceNote
+          source={source}
+          status={initial.status}
+          detached={initial.detached}
+          relinking={busy === "relink"}
+          onRelink={() => setConfirmingRelink(true)}
+        />
+      )}
+
       <PostStatusBanner
         post={initial}
         busy={busy}
@@ -993,6 +1183,26 @@ export function PostComposer({
         canTakeDown={upOn.length > 0}
         onRefresh={() => router.refresh()}
       />
+
+      {problems.length > 0 && (
+        <div
+          role="status"
+          className="rounded-lg border border-mustard-400 bg-mustard-50 px-4 py-3 text-sm text-admin-text"
+        >
+          <p className="font-bold">
+            {problems.length === 1
+              ? "A lined-up posting won't go out as it is:"
+              : `${problems.length} lined-up postings won't go out as they are:`}
+          </p>
+          <ul className="mt-1 list-disc pl-5">
+            {problems.map((p) => (
+              <li key={p.id}>
+                {formatDateTimeShort(p.scheduledAt)}: {p.error}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {actionBar && (
         <div className="sticky top-14 z-20 -mx-6 hidden bg-admin-bg/90 px-6 py-3 backdrop-blur xl:block">
@@ -1006,8 +1216,8 @@ export function PostComposer({
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]">
         <div className={cn(pane === "preview" && "hidden xl:block")}>
           <PostWriteForm
-            content={content}
-            setContent={setContent}
+            content={view}
+            setContent={setView}
             setTarget={setTarget}
             editable={editable}
             isPreset={initial.isPreset}
@@ -1037,8 +1247,48 @@ export function PostComposer({
             tagIds={tagIds}
             onTagsChange={changeTags}
             onCreateTag={createTag}
+            captions={
+              isContent ? (
+                <CaptionsField
+                  captions={captions}
+                  active={at}
+                  next={nextCaption}
+                  editable={editable}
+                  onSelect={setActiveCaption}
+                  onAdd={addCaption}
+                  onMove={moveCaption}
+                  onRemove={removeCaption}
+                />
+              ) : undefined
+            }
+            bodyLabel={isContent ? `Caption ${at + 1}` : "Post"}
+            overridesHint={
+              isContent
+                ? "Leave a box empty to use caption 1. These go out only with caption 1."
+                : undefined
+            }
+            overridesNote={
+              isContent && at > 0
+                ? "Different text for one app goes out with caption 1 only. Pick caption 1 to change it."
+                : null
+            }
           />
-          {!initial.isPreset && (
+          {contentItem && (
+            <div className="mt-6 flex flex-col gap-6">
+              <ContentRecycling
+                value={{
+                  recycle: content.recycle,
+                  maxPosts: content.maxPosts,
+                  expiresAt: content.expiresAt,
+                }}
+                onChange={(patch) => setContent((c) => ({ ...c, ...patch }))}
+                stats={contentItem.stats}
+                spent={spent}
+              />
+              <ContentPostings postings={contentItem.postings} />
+            </div>
+          )}
+          {!initial.isPreset && !initial.sourceId && (
             <div className="mt-6">
               <PostEmailPanel
                 email={email}
@@ -1073,14 +1323,42 @@ export function PostComposer({
       {writingWithAi && captionAi && (
         <CaptionAiDialog
           setup={captionAi}
-          textOf={(only) => (only ? textFor(draft, only) : content.body)}
+          textOf={(only) => (only ? textFor(draft, only) : view.body)}
           enabled={enabled}
           promoId={promoId}
           issuesFor={issuesFor}
           onUse={placeCaption}
           onClose={() => setWritingWithAi(false)}
+          canAddCaption={isContent && captions.length < MAX_CAPTIONS}
+          perApp={at === 0}
         />
       )}
+
+      {postingFrom && (
+        <PostingDialog
+          itemId={initial.id}
+          captions={captions}
+          next={nextCaption}
+          start={postingFrom}
+          beforeSubmit={save}
+          onDone={() => {
+            setPostingFrom(null);
+            onDraftEmail?.(true);
+            router.refresh();
+          }}
+          onClose={() => setPostingFrom(null)}
+        />
+      )}
+
+      <ConfirmDialog
+        open={confirmingRelink}
+        title="Follow the content item again?"
+        body="Your edits to this posting are replaced with the item's words, picture and settings, and later changes to the item reach it again."
+        confirmLabel="Re-link"
+        busy={busy === "relink"}
+        onConfirm={() => void relink()}
+        onCancel={() => setConfirmingRelink(false)}
+      />
 
       <ConfirmDialog
         open={confirming}

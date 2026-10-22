@@ -12,6 +12,7 @@ import {
   type EmailPicture,
   type PostEmail,
 } from "@/features/social/lib/email-step.server";
+import { IS_CONTENT } from "@/features/social/lib/filters";
 import { PLATFORMS } from "@/features/social/lib/platforms";
 import { toPostRow, type SocialPostRow } from "@/features/social/lib/post-row";
 import { SOCIAL_PLATFORMS, type SocialPlatformKey } from "@/features/social/lib/validate";
@@ -36,6 +37,12 @@ export interface CaptionAiSetup {
   emoji: boolean;
 }
 
+/** The content item a posting was made from. */
+export interface PostingSource {
+  id: string;
+  name: string;
+}
+
 /** Everything the composer needs for one post. */
 export interface OpenPost {
   post: SocialPostRow;
@@ -55,6 +62,8 @@ export interface OpenPost {
   emailPicture: EmailPicture | null;
   /** How Add my logo marks a photo, and whether new uploads get it. */
   watermark: WatermarkSettings;
+  /** The content item a posting came from; null for other posts, or once the item is deleted. */
+  source: PostingSource | null;
 }
 
 /**
@@ -91,7 +100,7 @@ async function linkedDesign(
  * @returns Composer data.
  */
 export async function loadOpenPost(post: SocialPost): Promise<OpenPost> {
-  const [{ promo }, linked, { identity, social }, { design, emailPicture }, email] =
+  const [{ promo }, linked, { identity, social }, { design, emailPicture }, email, source] =
     await Promise.all([
       promoWording(post.promoId),
       post.promoId
@@ -100,6 +109,12 @@ export async function loadOpenPost(post: SocialPost): Promise<OpenPost> {
       getSettings(),
       linkedDesign(post),
       loadPostEmail(post),
+      post.sourceId
+        ? prisma.socialPost.findFirst({
+            where: { id: post.sourceId, ...IS_CONTENT },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve(null),
     ]);
   return {
     post: toPostRow(post),
@@ -118,5 +133,6 @@ export async function loadOpenPost(post: SocialPost): Promise<OpenPost> {
     emailSkipped: post.emailSkipped === true,
     emailPicture,
     watermark: social.watermark,
+    source,
   };
 }

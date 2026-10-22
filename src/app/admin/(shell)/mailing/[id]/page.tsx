@@ -83,13 +83,22 @@ async function loadLinkedPost(campaign: {
   const post = await prisma.socialPost.findFirst({
     where: { campaignId: campaign.id, isPreset: false },
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, createdAt: true, body: true, linkUrl: true, targets: true },
+    select: {
+      id: true,
+      name: true,
+      createdAt: true,
+      body: true,
+      linkUrl: true,
+      targets: true,
+      isContent: true,
+    },
   });
   if (!post) return null;
   const madeFromPost = post.createdAt < campaign.createdAt;
   return {
     id: post.id,
     name: post.name,
+    isContent: post.isContent === true,
     madeFromPost,
     brief: madeFromPost ? postBrief(post) : "",
   };

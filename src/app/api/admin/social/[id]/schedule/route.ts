@@ -2,6 +2,7 @@
 // Schedules a draft for the publish-scheduled cron, or cancels back to a draft. Quiet hours don't apply.
 
 import { parseObjectId } from "@/features/business/lib/validation";
+import { NOT_CONTENT } from "@/features/social/lib/filters";
 import { scheduleProblems } from "@/features/social/lib/publish";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -35,11 +36,14 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
 
   const post = await prisma.socialPost.findUnique({ where: { id } });
   if (!post || post.isPreset) return errorResponse("Post not found.", 404);
+  if (post.isContent) {
+    return errorResponse("A content item is scheduled as a posting, from its own page.", 400);
+  }
   const problem = scheduleProblems(post);
   if (problem) return errorResponse(problem.error, problem.status);
 
   const updated = await prisma.socialPost.updateMany({
-    where: { id, isPreset: false, status: "draft" },
+    where: { id, isPreset: false, status: "draft", ...NOT_CONTENT },
     data: { status: "scheduled", scheduledAt: when },
   });
   if (updated.count === 0) return errorResponse("Only a draft can be scheduled.", 409);
