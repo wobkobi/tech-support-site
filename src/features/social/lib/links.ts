@@ -8,6 +8,7 @@ export const SOCIAL_POSTS_PATH = "/admin/social/posts";
 export const SOCIAL_CALENDAR_PATH = "/admin/social/calendar";
 export const SOCIAL_CONTENT_PATH = "/admin/social/content";
 export const SOCIAL_SCHEDULES_PATH = "/admin/social/schedules";
+export const SOCIAL_ANALYTICS_PATH = "/admin/social/analytics";
 
 /**
  * The calendar's address for a view, day and colour, leaving out the defaults.

@@ -1336,6 +1336,81 @@ model SocialTag {
   updatedAt DateTime @updatedAt
 }
 
+// One reading of a published post's figures on one app, taken at a set age so posts compare
+// like for like. Kept apart from SocialPost so a stats sync never touches the post. Filled by
+// src/features/social/lib/insights/sync.server.ts.
+model SocialInsight {
+  id          String         @id @default(auto()) @map("_id") @db.ObjectId
+  postId      String         @db.ObjectId
+  platform    SocialPlatform
+  // The age this reading stands for: 1, 24, 72, 168 or 672 hours (1, 6 or 23 for a story).
+  ageHours    Int
+  takenAt     DateTime
+  views       Int?
+  reach       Int?
+  likes       Int?
+  comments    Int?
+  shares      Int?
+  saves       Int?
+  clicks      Int?
+  engagements Int?
+  // Any other figure the app gave, under its own name.
+  extra       Json?
+
+  @@unique([postId, platform, ageHours])
+}
+
+// A published post's latest figures on one app.
+model SocialPostStats {
+  id           String         @id @default(auto()) @map("_id") @db.ObjectId
+  postId       String         @db.ObjectId
+  platform     SocialPlatform
+  postedAt     DateTime
+  views        Int?
+  reach        Int?
+  likes        Int?
+  comments     Int?
+  shares       Int?
+  saves        Int?
+  clicks       Int?
+  engagements  Int?
+  extra        Json?
+  // Why some figures didn't come back (a permission the token lacks); null when they all did.
+  unavailable  String?
+  // The ages already kept as SocialInsight readings.
+  capturedAges Int[]          @default([])
+  syncedAt     DateTime
+
+  @@unique([postId, platform])
+  @@index([postedAt])
+}
+
+// One app's figures for the whole account on one day. day is YYYY-MM-DD: the NZ day for
+// Instagram and Google, Facebook's own day (US Pacific) for Facebook. Null is a figure the app
+// didn't give.
+model SocialAccountDay {
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  platform      SocialPlatform
+  day           String
+  views         Int?
+  reach         Int?
+  engagements   Int?
+  follows       Int?
+  unfollows     Int?
+  clicks        Int?
+  // Google only: profile views from Search and Maps, and what people did on the profile.
+  searchViews   Int?
+  mapsViews     Int?
+  calls         Int?
+  websiteClicks Int?
+  directions    Int?
+  conversations Int?
+  bookings      Int?
+  syncedAt      DateTime
+
+  @@unique([platform, day])
+}
+
 // One exported size of a post maker design. docHash is the design's fingerprint when it
 // was exported; a different hash now means the picture is out of date.
 type DesignRender {

@@ -10,6 +10,7 @@ import {
 } from "@/features/social/lib/calendar";
 import { coverOf } from "@/features/social/lib/cover";
 import { NOT_CONTENT } from "@/features/social/lib/filters";
+import { postViews } from "@/features/social/lib/insights/analytics.server";
 import { formatOf } from "@/features/social/lib/media";
 import { captionsOf, clampCaption } from "@/features/social/lib/postings-core";
 import { loadContentRows } from "@/features/social/lib/postings.server";
@@ -85,6 +86,7 @@ function toEntry(p: EntryPost, app?: SocialPlatformKey): CalendarEntry | null {
       p.video?.coverUrl ||
       null,
     later: false,
+    views: null,
   };
 }
 
@@ -123,10 +125,12 @@ export async function loadCalendarEntries(
       select: { id: true, name: true, platforms: true, slots: true, skipped: true },
     }),
   ]);
-  const entries = posts.flatMap((p) => {
-    const e = toEntry(p);
-    return e && Date.parse(e.at) >= from.getTime() && Date.parse(e.at) < to.getTime() ? [e] : [];
-  });
+  const entries = await withViews(
+    posts.flatMap((p) => {
+      const e = toEntry(p);
+      return e && Date.parse(e.at) >= from.getTime() && Date.parse(e.at) < to.getTime() ? [e] : [];
+    }),
+  );
 
   // The filler leaves anything inside its lead time alone, so those aren't open any more.
   const start = Math.max(from.getTime(), now.getTime() + FILL_LEAD_MS);
@@ -159,6 +163,7 @@ export async function loadCalendarEntries(
         tagIds: [],
         thumb: null,
         later: ms >= horizon,
+        views: null,
       });
     }
   }
@@ -202,7 +207,19 @@ export async function loadInstagramGrid(): Promise<CalendarEntry[]> {
       select: ENTRY_SELECT,
     }),
   ]);
-  return [...ahead, ...posted].flatMap((p) => toEntry(p, "instagram") ?? []);
+  return withViews([...ahead, ...posted].flatMap((p) => toEntry(p, "instagram") ?? []));
+}
+
+/**
+ * Adds the views read so far to the entries that have gone out.
+ * @param entries - Entries.
+ * @returns The same entries, with views where there are any.
+ */
+async function withViews(entries: CalendarEntry[]): Promise<CalendarEntry[]> {
+  const out = entries.filter((e) => e.status === "posted" || e.status === "partial");
+  const views = await postViews(out.map((e) => e.id));
+  for (const e of out) e.views = views.get(e.id) ?? null;
+  return entries;
 }
 
 /**

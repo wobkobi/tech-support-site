@@ -13,20 +13,21 @@ const STEP_FACTORS = [1, 2, 2.5, 5, 10] as const;
 
 /**
  * Picks a clean axis for 0 to `max`: the smallest 1/2/2.5/5 x 10^n step within `maxTicks`,
- * always whole cents so ticks can't round together. A max <= 0 returns a 0-1 axis.
+ * always a whole number of `minStep` so ticks can't round together. A max <= 0 returns a 0-1 axis.
  * @param max - The largest value plotted.
  * @param maxTicks - The most ticks wanted, 0 included (default 6).
+ * @param minStep - The smallest step: 0.01 for money (whole cents), 1 for counts.
  * @returns The scale.
  */
-export function niceScale(max: number, maxTicks = 6): ChartScale {
+export function niceScale(max: number, maxTicks = 6, minStep = 0.01): ChartScale {
   if (!(max > 0)) return { top: 1, step: 1, ticks: [0, 1] };
   const rough = max / (maxTicks - 1);
   const pow = 10 ** Math.floor(Math.log10(rough));
-  // 2.5 x 0.01 is the one candidate that isn't whole cents; the filter skips it.
+  // The filter skips 2.5 x 0.01 for money and 2.5 for counts.
   const step = Math.max(
-    0.01,
+    minStep,
     STEP_FACTORS.map((f) => f * pow)
-      .filter((s) => Math.abs(s * 100 - Math.round(s * 100)) < 1e-9)
+      .filter((s) => Math.abs(s / minStep - Math.round(s / minStep)) < 1e-9)
       .find((s) => s >= rough) ?? 10 * pow,
   );
   const count = Math.ceil(max / step - 1e-9);
@@ -45,4 +46,13 @@ export function niceScale(max: number, maxTicks = 6): ChartScale {
 export function formatAxisDollars(value: number): string {
   const digits = Number.isInteger(value) ? 0 : 2;
   return `$${value.toLocaleString("en-NZ", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+}
+
+/**
+ * A count with thousands commas ("12,400").
+ * @param value - The count.
+ * @returns The label.
+ */
+export function formatCount(value: number): string {
+  return Math.round(value).toLocaleString("en-NZ");
 }

@@ -18,6 +18,7 @@ import {
   type ChecklistKey,
 } from "@/features/social/lib/checklist";
 import { NOT_CONTENT } from "@/features/social/lib/filters";
+import { loadViewsWeek, type ViewsWeek } from "@/features/social/lib/insights/analytics.server";
 import { loadContentRows } from "@/features/social/lib/postings.server";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -67,6 +68,8 @@ export interface OverviewData {
   attention: AttentionItem[];
   facts: Omit<ChecklistFacts, "connected" | "permissions">;
   skipped: ChecklistKey[];
+  /** Views by app over the last seven full days. */
+  views: ViewsWeek;
 }
 
 /**
@@ -82,47 +85,51 @@ export async function loadOverview(now: Date): Promise<OverviewData> {
   // Empty times are judged over the filler's whole reach, which can be longer than the week.
   const horizon = new Date(Math.max(weekEnd.getTime(), now.getTime() + fillDays * DAY_MS));
 
-  const [entries, schedules, queues, rows, posted, problems, emailed, skipped] = await Promise.all([
-    loadCalendarEntries(atMinute(today, 0), horizon, now, fillDays),
-    loadCalendarSchedules(),
-    prisma.socialQueue.findMany({ select: { id: true, name: true, paused: true, itemIds: true } }),
-    loadContentRows(now),
-    prisma.socialPost.count({
-      where: {
-        AND: [
-          NOT_CONTENT,
-          {
-            isPreset: false,
-            status: { in: ["posted", "partial"] },
-            postedAt: { gte: new Date(now.getTime() - 7 * DAY_MS), lte: now },
-          },
-        ],
-      },
-    }),
-    prisma.socialPost.findMany({
-      where: {
-        AND: [
-          NOT_CONTENT,
-          {
-            isPreset: false,
-            status: { in: ["failed", "partial"] },
-            updatedAt: { gte: new Date(now.getTime() - PROBLEM_DAYS * DAY_MS) },
-          },
-        ],
-      },
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        name: true,
-        status: true,
-        scheduledAt: true,
-        postedAt: true,
-        postingStartedAt: true,
-      },
-    }),
-    hasDraftedEmail(),
-    loadChecklistSkipped(),
-  ]);
+  const [entries, schedules, queues, rows, posted, problems, emailed, skipped, views] =
+    await Promise.all([
+      loadCalendarEntries(atMinute(today, 0), horizon, now, fillDays),
+      loadCalendarSchedules(),
+      prisma.socialQueue.findMany({
+        select: { id: true, name: true, paused: true, itemIds: true },
+      }),
+      loadContentRows(now),
+      prisma.socialPost.count({
+        where: {
+          AND: [
+            NOT_CONTENT,
+            {
+              isPreset: false,
+              status: { in: ["posted", "partial"] },
+              postedAt: { gte: new Date(now.getTime() - 7 * DAY_MS), lte: now },
+            },
+          ],
+        },
+      }),
+      prisma.socialPost.findMany({
+        where: {
+          AND: [
+            NOT_CONTENT,
+            {
+              isPreset: false,
+              status: { in: ["failed", "partial"] },
+              updatedAt: { gte: new Date(now.getTime() - PROBLEM_DAYS * DAY_MS) },
+            },
+          ],
+        },
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          scheduledAt: true,
+          postedAt: true,
+          postingStartedAt: true,
+        },
+      }),
+      hasDraftedEmail(),
+      loadChecklistSkipped(),
+      loadViewsWeek(now),
+    ]);
 
   const week = entries.filter((e) => Date.parse(e.at) < weekEnd.getTime());
   const ahead = week.filter(
@@ -187,6 +194,7 @@ export async function loadOverview(now: Date): Promise<OverviewData> {
       emailed,
     },
     skipped,
+    views,
   };
 }
 

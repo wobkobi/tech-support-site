@@ -25,6 +25,8 @@ export interface ContentListRow {
   linedUp: number;
   /** The schedules it's in. */
   queueIds: string[];
+  /** Average views a posting, once any posting's figures are read. */
+  views: number | null;
 }
 
 /**
@@ -47,6 +49,7 @@ export function toStatsRow(stats: ContentStats): ContentStatsRow {
  * @param linedUp - Its lined-up postings still following it.
  * @param queueIds - The schedules it's in.
  * @param now - The time to judge spent at.
+ * @param views - Average views a posting, or null before any are read.
  * @returns The library row.
  */
 export function toContentRow(
@@ -55,6 +58,7 @@ export function toContentRow(
   linedUp: number,
   queueIds: string[],
   now: Date,
+  views: number | null,
 ): ContentListRow {
   return {
     item: toPostRow(item),
@@ -63,5 +67,6 @@ export function toContentRow(
     spent: isSpent(item, stats, now),
     linedUp,
     queueIds,
+    views,
   };
 }

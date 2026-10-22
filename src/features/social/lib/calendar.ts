@@ -109,6 +109,8 @@ export interface CalendarEntry {
   thumb: string | null;
   /** An open time further ahead than schedules line up, so it fills nearer the time. */
   later: boolean;
+  /** Views across its apps once figures are read; null before then and for an open time. */
+  views: number | null;
 }
 
 /** A content item in the calendar's side panel, ready to drag onto a day. */
@@ -158,6 +160,10 @@ export interface RangeStats {
   later: number;
   /** Posts per app, open times left out. */
   byApp: Record<SocialPlatformKey, number>;
+  /** Views added up over the posts that have them. */
+  views: number;
+  /** Posts with views. */
+  viewed: number;
 }
 
 /**
@@ -483,6 +489,8 @@ export function rangeStats(entries: readonly CalendarEntry[]): RangeStats {
     open: 0,
     later: 0,
     byApp: { facebook: 0, instagram: 0, google: 0 },
+    views: 0,
+    viewed: 0,
   };
   for (const e of entries) {
     if (e.status === "open") {
@@ -495,6 +503,10 @@ export function rangeStats(entries: readonly CalendarEntry[]): RangeStats {
     else if (e.status === "partial" || e.status === "failed") out.problems++;
     else out.removed++;
     for (const p of e.platforms) out.byApp[p]++;
+    if (e.views !== null) {
+      out.views += e.views;
+      out.viewed++;
+    }
   }
   return out;
 }

@@ -104,6 +104,9 @@ export function ContentCard({
         <div className="mt-auto text-sm text-admin-muted">
           <p>{postingsLine(stats)}</p>
           {stats.nextAt && <p>Next: {formatDateTimeShort(stats.nextAt)}</p>}
+          {row.views !== null && (
+            <p>{Math.round(row.views).toLocaleString("en-NZ")} views a posting on average</p>
+          )}
         </div>
       </div>
     </li>

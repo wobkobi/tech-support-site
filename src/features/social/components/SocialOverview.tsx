@@ -2,8 +2,10 @@
 // src/features/social/components/SocialOverview.tsx
 // The Social Overview: a warning when the Meta token is close to running out, figures either side
 // of now, the set-up list until it's done, what needs attention beside whether each app is
-// connected, the next seven days, and what each app can do.
+// connected, the next seven days, views over the last seven, and what each app can do.
 
+import { BarChart } from "@/features/admin/components/charts/BarChart";
+import { appSeries } from "@/features/admin/components/charts/series";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatStrip } from "@/features/admin/components/ui/StatStrip";
@@ -18,9 +20,11 @@ import {
 } from "@/features/social/components/SocialPermissions";
 import { shortDay, timeOfDay, type ColourContext } from "@/features/social/lib/calendar";
 import { checklistOf, type ChecklistKey } from "@/features/social/lib/checklist";
+import { dayLabel } from "@/features/social/lib/insights/metrics";
 import {
   calendarHref,
   postHref,
+  SOCIAL_ANALYTICS_PATH,
   SOCIAL_CONTENT_PATH,
   SOCIAL_POSTS_PATH,
   SOCIAL_SCHEDULES_PATH,
@@ -211,6 +215,23 @@ export function SocialOverview({
       </div>
 
       <OverviewWeek today={data.today} entries={data.week} ctx={ctx} />
+
+      <BarChart
+        title="Views, last 7 days"
+        description={
+          <>
+            {dayLabel(data.views.from)} to {dayLabel(data.views.to)}.{" "}
+            <Link href={SOCIAL_ANALYTICS_PATH} className="font-semibold text-russian-violet">
+              See Analytics
+            </Link>
+          </>
+        }
+        series={appSeries(data.views.series)}
+        groups={data.views.groups}
+        groupHeading="Day"
+        emptyText="No views read for these days yet. They come in once the stats sync runs."
+        format="count"
+      />
 
       <SocialPermissions permissions={permissions} error={permissionsError} />
     </div>

@@ -60,6 +60,7 @@ All endpoints are **GET**. Create one cron-job.org job per row.
 | Purge price estimates   | `/api/cron/purge-price-estimates`   | GET    | daily            | Delete price estimate logs past retention                                                                                                                                         |
 | Public holidays         | `/api/cron/refresh-public-holidays` | GET    | monthly          | Refresh NZ public holidays (current + next year)                                                                                                                                  |
 | Scheduled publishing    | `/api/cron/publish-scheduled`       | GET    | every 5 minutes  | Post due social posts, send due emails, resume stuck runs, bust the promo cache when a promo starts or ends, and once an hour line up posts in social schedules' empty time slots |
+| Social stats sync       | `/api/cron/sync-social`             | GET    | hourly           | Read each app's daily figures and each published post's figures for Social > Analytics                                                                                            |
 
 Full URL = the production URL + the path above. cron-job.org lets you pick a timezone per job -
 schedule Record subscriptions and Review asks in `Pacific/Auckland` so they keep their local time
@@ -142,6 +143,17 @@ across DST changes.
   treats a slot as filled when any posting from that schedule holds the time. Slots you emptied by
   hand (unscheduled or deleted) are remembered and left empty. Nothing new needs registering on
   cron-job.org.
+- Social stats sync holds the `social:insightsSync` run lock, so an overlapping run or a Refresh
+  press does nothing and answers `{ running: true }`. Each app's account days are read at most every
+  6 hours: the last 30 days on the first run, then the last 3 again for Facebook and Instagram (the
+  newest day settles late) and the last 5 for Google, which runs 3 days behind. Post figures are
+  read once a post reaches 1 hour, 1, 3, 7 and 28 days (a story at 1, 6 and 23 hours, before it
+  goes); a missed age is caught up once, not repeated. A run stops starting reads after 120 s or 40
+  posts and the next run carries on, so no `maxDuration` is needed. A metric Meta rejects as invalid
+  is left out for 7 days and one the token lacks the permission for for 1 day, so a missing scope
+  costs one failed call a day, not one a post. The Refresh buttons in Analytics and on a post are
+  turned away within 10 minutes of the last read. Register it on cron-job.org after the deploy that
+  adds it.
 - Contacts sync runs local dedup/merge first, then pushes only the dirty set, then pulls Google's
   changes. The manual full sync lives at `/api/admin/contacts/sync`.
 - Sheets sync treats the sheet as source of truth, joining rows on the hidden column-Z Sync ID, and

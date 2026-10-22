@@ -1,12 +1,13 @@
 // src/features/social/lib/google-business.ts
 // Publishes to and deletes from the Google Business Profile via the v4 localPosts API, using the
-// shared Google OAuth refresh token with the business.manage scope, and checks which of its APIs
-// answer for the permissions grid.
+// shared Google OAuth refresh token with the business.manage scope, checks which of its APIs
+// answer for the permissions grid, and reads the profile's daily figures for Analytics.
 
 import { withRetry } from "@/features/business/lib/google-retry";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import type { PlatformAdapter, PublishInput, PublishResult } from "@/features/social/lib/adapter";
 import { googlePostBody } from "@/features/social/lib/google-post";
+import type { DailyMetricsAnswer } from "@/features/social/lib/insights/metrics";
 import type { GoogleProbe, ProbeResult } from "@/features/social/lib/permissions";
 import { addDaysToDateKey, dateKeyParts, nzDateKey } from "@/shared/lib/timezone-utils";
 
@@ -140,32 +141,63 @@ async function probe(read: () => Promise<unknown>, api: string): Promise<ProbeRe
  */
 export async function probeGoogle(now: Date): Promise<Record<GoogleProbe, ProbeResult>> {
   const path = locationPath();
-  const { locationId } = googleConfig();
   const end = addDaysToDateKey(nzDateKey(now), -3);
-  const [sy, sm, sd] = dateKeyParts(addDaysToDateKey(end, -6));
-  const [ey, em, ed] = dateKeyParts(end);
-  const range = new URLSearchParams({
-    dailyMetrics: "WEBSITE_CLICKS",
-    "dailyRange.startDate.year": String(sy),
-    "dailyRange.startDate.month": String(sm),
-    "dailyRange.startDate.day": String(sd),
-    "dailyRange.endDate.year": String(ey),
-    "dailyRange.endDate.month": String(em),
-    "dailyRange.endDate.day": String(ed),
-  });
   const [posts, reviews, performance] = await Promise.all([
     probe(() => call(`${V4_BASE}/${path}/localPosts?pageSize=1`, "GET"), "Google My Business API"),
     probe(() => call(`${V4_BASE}/${path}/reviews?pageSize=1`, "GET"), "Google My Business API"),
     probe(
-      () =>
-        call(
-          `${PERFORMANCE_BASE}/locations/${locationId}:fetchMultiDailyMetricsTimeSeries?${range}`,
-          "GET",
-        ),
+      () => call(dailyMetricsUrl(addDaysToDateKey(end, -6), end, ["WEBSITE_CLICKS"]), "GET"),
       "Business Profile Performance API",
     ),
   ]);
   return { posts, reviews, performance };
+}
+
+/**
+ * The Performance API address for some daily figures over a run of days.
+ * @param from - First day, YYYY-MM-DD.
+ * @param to - Last day, included.
+ * @param metrics - Google's DailyMetric names.
+ * @returns The full URL.
+ */
+function dailyMetricsUrl(from: string, to: string, metrics: readonly string[]): string {
+  const { locationId } = googleConfig();
+  if (!locationId) throw new Error("GOOGLE_BUSINESS_LOCATION_ID must be set.");
+  const [sy, sm, sd] = dateKeyParts(from);
+  const [ey, em, ed] = dateKeyParts(to);
+  const params = new URLSearchParams();
+  for (const metric of metrics) params.append("dailyMetrics", metric);
+  params.set("dailyRange.startDate.year", String(sy));
+  params.set("dailyRange.startDate.month", String(sm));
+  params.set("dailyRange.startDate.day", String(sd));
+  params.set("dailyRange.endDate.year", String(ey));
+  params.set("dailyRange.endDate.month", String(em));
+  params.set("dailyRange.endDate.day", String(ed));
+  return `${PERFORMANCE_BASE}/locations/${locationId}:fetchMultiDailyMetricsTimeSeries?${params}`;
+}
+
+/**
+ * Reads the profile's daily figures (views from Search and Maps, calls, clicks and so on).
+ * @param from - First day, YYYY-MM-DD; Google counts days in the profile's own time zone.
+ * @param to - Last day, included.
+ * @param metrics - Google's DailyMetric names.
+ * @returns Google's answer, for the stats sync to read.
+ */
+export async function readDailyMetrics(
+  from: string,
+  to: string,
+  metrics: readonly string[],
+): Promise<DailyMetricsAnswer> {
+  try {
+    return await withRetry(
+      () => call<DailyMetricsAnswer>(dailyMetricsUrl(from, to, metrics), "GET"),
+      {
+        label: "gbp",
+      },
+    );
+  } catch (error) {
+    throw toGoogleError(error, "Business Profile Performance API");
+  }
 }
 
 export const google: PlatformAdapter = {

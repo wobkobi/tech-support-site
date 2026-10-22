@@ -13,6 +13,7 @@ import {
   type PostEmail,
 } from "@/features/social/lib/email-step.server";
 import { IS_CONTENT } from "@/features/social/lib/filters";
+import { loadPostStats, type PostStatsView } from "@/features/social/lib/insights/analytics.server";
 import { PLATFORMS } from "@/features/social/lib/platforms";
 import { toPostRow, type SocialPostRow } from "@/features/social/lib/post-row";
 import { SOCIAL_PLATFORMS, type SocialPlatformKey } from "@/features/social/lib/validate";
@@ -64,6 +65,8 @@ export interface OpenPost {
   watermark: WatermarkSettings;
   /** The content item a posting came from; null for other posts, or once the item is deleted. */
   source: PostingSource | null;
+  /** Its figures once it has gone out, for the Stats card; null before. */
+  stats: PostStatsView | null;
 }
 
 /**
@@ -100,7 +103,7 @@ async function linkedDesign(
  * @returns Composer data.
  */
 export async function loadOpenPost(post: SocialPost): Promise<OpenPost> {
-  const [{ promo }, linked, { identity, social }, { design, emailPicture }, email, source] =
+  const [{ promo }, linked, { identity, social }, { design, emailPicture }, email, source, stats] =
     await Promise.all([
       promoWording(post.promoId),
       post.promoId
@@ -115,6 +118,7 @@ export async function loadOpenPost(post: SocialPost): Promise<OpenPost> {
             select: { id: true, name: true },
           })
         : Promise.resolve(null),
+      post.isContent ? Promise.resolve(null) : loadPostStats(new Date(), post),
     ]);
   return {
     post: toPostRow(post),
@@ -134,5 +138,6 @@ export async function loadOpenPost(post: SocialPost): Promise<OpenPost> {
     emailPicture,
     watermark: social.watermark,
     source,
+    stats,
   };
 }

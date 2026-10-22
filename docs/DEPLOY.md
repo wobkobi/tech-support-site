@@ -180,3 +180,17 @@ until 3 Jan 2027):
 - Stories and cover photos can't be taken down from the site.
 - A cover photo needs `pages_manage_metadata`.
 - Not yet tried on the real accounts: a carousel, a reel, a story and a cover photo.
+
+**Stats (Social > Analytics, each post's Stats card):**
+
+- Read by the hourly `/api/cron/sync-social` job (see CRON.md); register it on cron-job.org after
+  the deploy that adds it.
+- Facebook figures need `read_insights` and Instagram's need `instagram_manage_insights`. Without
+  them the page says which permission is missing. Instagram's likes and comments still come from the
+  post itself; a Facebook post's reactions and comments need `pages_read_user_content` too.
+- Google figures need the Business Profile Performance API turned on in Google Cloud. Google gives
+  no figures for single posts, only for the profile, and runs about 3 days behind.
+- Facebook gives no figures for stories, and a cover photo has none.
+- Facebook's day runs on Pacific time, so its daily figures don't line up exactly with NZ days.
+- Check one post and one day against Meta Business Suite and the Business Profile dashboard once the
+  permissions are in.

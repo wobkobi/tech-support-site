@@ -229,6 +229,13 @@ function Figures({ stats, range }: { stats: RangeStats; range: string }): React.
         ? `${stats.later === 1 ? "1 more fills" : `${stats.later} more fill`} nearer the time`
         : undefined,
     ],
+    [
+      "Views",
+      stats.views,
+      stats.viewed > 0
+        ? `From ${stats.viewed} post${stats.viewed === 1 ? "" : "s"} with figures`
+        : "None read yet",
+    ],
   ];
   return (
     <div className="flex flex-col gap-3">
@@ -238,7 +245,9 @@ function Figures({ stats, range }: { stats: RangeStats; range: string }): React.
           <div key={label} className="flex flex-col">
             <div className="flex items-baseline justify-between gap-2">
               <dt className="text-sm text-admin-text-secondary">{label}</dt>
-              <dd className="text-base font-bold text-admin-text">{value}</dd>
+              <dd className="text-base font-bold text-admin-text">
+                {value.toLocaleString("en-NZ")}
+              </dd>
             </div>
             {sub && <p className="text-sm text-admin-muted">{sub}</p>}
           </div>

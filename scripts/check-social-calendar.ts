@@ -57,6 +57,7 @@ function entry(over: Partial<CalendarEntry> = {}): CalendarEntry {
     tagIds: [],
     thumb: null,
     later: false,
+    views: null,
     ...over,
   };
 }
@@ -247,8 +248,8 @@ function checkLooks(): void {
 
   const stats = rangeStats([
     ...mix,
-    entry({ id: "d", status: "failed" }),
-    entry({ id: "e", status: "removed" }),
+    entry({ id: "d", status: "failed", views: 40 }),
+    entry({ id: "e", status: "removed", views: 2 }),
     entry({ id: "f", status: "open", later: true, platforms: ["google"] }),
   ]);
   expectEqual("figures", stats, {
@@ -259,6 +260,8 @@ function checkLooks(): void {
     open: 1,
     later: 1,
     byApp: { facebook: 4, instagram: 1, google: 0 },
+    views: 42,
+    viewed: 2,
   });
 }
 

@@ -11,6 +11,7 @@ import { useToast } from "@/features/admin/components/ui/Toast";
 import { callApi } from "@/features/mailing/lib/api-client";
 import { EmailStepDialog } from "@/features/social/components/EmailStepDialog";
 import { PostComposer } from "@/features/social/components/PostComposer";
+import { PostStatsCard } from "@/features/social/components/PostStatsCard";
 import { SocialComposerHeader } from "@/features/social/components/SocialComposerHeader";
 
 import { SocialInProgress } from "@/features/social/components/SocialInProgress";
@@ -400,6 +401,7 @@ export function SocialView({
             onDelete={() => askDelete(openRow)}
             onClose={() => void openPost(null)}
           />
+          {open.stats && <PostStatsCard postId={open.post.id} stats={open.stats} />}
           {/* Keyed on status and last save: router.refresh() after a publish or schedule
               change remounts the composer with the new state instead of keeping stale fields. */}
           <PostComposer

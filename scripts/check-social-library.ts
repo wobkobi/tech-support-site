@@ -220,6 +220,7 @@ function row(item: Partial<SocialPostRow>, over: Partial<ContentListRow> = {}): 
     spent: false,
     linedUp: 0,
     queueIds: [],
+    views: null,
     ...over,
   };
 }

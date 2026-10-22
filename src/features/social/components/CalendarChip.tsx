@@ -50,7 +50,7 @@ interface ChipDrag {
 }
 
 /**
- * The words a chip's tooltip and the CSV share: status, apps and schedule.
+ * The words a chip's tooltip and the CSV share: status, apps, schedule and views.
  * @param entry - The entry.
  * @param ctx - Schedule names.
  * @returns Plain words.
@@ -64,6 +64,7 @@ export function entryDetail(entry: CalendarEntry, ctx: ColourContext): string {
   ];
   const queue = entry.queueId ? ctx.queues.get(entry.queueId) : undefined;
   if (queue && entry.status !== "open") parts.push(`From ${queue.name}`);
+  if (entry.views !== null) parts.push(`${entry.views.toLocaleString("en-NZ")} views`);
   return parts.filter(Boolean).join(" - ");
 }
 

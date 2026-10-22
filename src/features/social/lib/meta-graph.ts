@@ -35,15 +35,19 @@ export function metaConfig(): MetaConfig {
 export class GraphError extends Error {
   /** Meta's numeric error code, when it sent one. */
   readonly code: number | null;
+  /** Meta's own message, which tells apart errors that share a code. */
+  readonly raw: string | null;
   /**
    * Creates the error.
    * @param message - Operator-readable message.
    * @param code - Meta's error code, or null.
+   * @param raw - Meta's own message, or null.
    */
-  constructor(message: string, code: number | null) {
+  constructor(message: string, code: number | null, raw: string | null = null) {
     super(message);
     this.name = "GraphError";
     this.code = code;
+    this.raw = raw;
   }
 }
 
@@ -60,20 +64,26 @@ interface GraphErrorBody {
  */
 function toGraphError(body: GraphErrorBody | null, status: number): GraphError {
   const code = body?.error?.code ?? null;
+  const raw = body?.error?.message ?? null;
   if (code === 190) {
-    return new GraphError("Facebook connection expired - regenerate the Page token.", code);
+    return new GraphError("Facebook connection expired - regenerate the Page token.", code, raw);
   }
   if (code === 10 || (code !== null && code >= 200 && code < 300)) {
     return new GraphError(
       "The Facebook app is missing a permission - check the token's permissions.",
       code,
+      raw,
     );
   }
   if (code === 4 || code === 17 || code === 32 || code === 613) {
-    return new GraphError("Meta's rate limit was hit. Try again in an hour.", code);
+    return new GraphError("Meta's rate limit was hit. Try again in an hour.", code, raw);
   }
-  const detail = body?.error?.error_user_msg || body?.error?.message;
-  return new GraphError(detail ? `Meta said: ${detail}` : `Meta request failed (${status}).`, code);
+  const detail = body?.error?.error_user_msg || raw;
+  return new GraphError(
+    detail ? `Meta said: ${detail}` : `Meta request failed (${status}).`,
+    code,
+    raw,
+  );
 }
 
 /**

@@ -6,6 +6,7 @@
 import { deleteUnusedMedia } from "@/features/social-design/lib/picture-store";
 import { toContentRow, type ContentListRow } from "@/features/social/lib/content-row";
 import { IS_CONTENT, NOT_DETACHED } from "@/features/social/lib/filters";
+import { contentViews } from "@/features/social/lib/insights/analytics.server";
 import { MEDIA_SELECT, mediaUrlsOf } from "@/features/social/lib/media";
 import { writePostMeta } from "@/features/social/lib/post-meta.server";
 import {
@@ -111,7 +112,7 @@ export async function loadContentRows(now: Date): Promise<ContentListRow[]> {
     orderBy: { updatedAt: "desc" },
   });
   const ids = items.map((i) => i.id);
-  const [stats, lined, queues] = await Promise.all([
+  const [stats, lined, queues, views] = await Promise.all([
     contentStats(ids),
     ids.length === 0
       ? []
@@ -121,6 +122,7 @@ export async function loadContentRows(now: Date): Promise<ContentListRow[]> {
           _count: { _all: true },
         }),
     prisma.socialQueue.findMany({ select: { id: true, itemIds: true } }),
+    contentViews(ids),
   ]);
   const linedUp = new Map(lined.map((row) => [row.sourceId, row._count._all]));
   return items.map((i) =>
@@ -130,6 +132,7 @@ export async function loadContentRows(now: Date): Promise<ContentListRow[]> {
       linedUp.get(i.id) ?? 0,
       queues.filter((q) => q.itemIds.includes(i.id)).map((q) => q.id),
       now,
+      views.get(i.id) ?? null,
     ),
   );
 }
