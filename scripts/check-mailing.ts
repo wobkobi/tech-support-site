@@ -584,10 +584,20 @@ function checkBlockRendering(): void {
   );
   expect("an unknown ::word renders nothing", renderBody("::mystery", VALUES) === "");
 
+  const full = renderBody(`![Shop](${BLOB_IMAGE})`, VALUES);
+  expect(
+    "a picture fills the card's 560px column and is centred",
+    full.includes('width="560"') &&
+      full.includes("max-width:560px") &&
+      full.includes("text-align:center"),
+    full,
+  );
   const small = renderBody(`![Shop](${BLOB_IMAGE} "small")`, VALUES);
   expect(
     'a "small" picture is half width and centred',
-    small.includes("max-width:248px") && small.includes("text-align:center"),
+    small.includes('width="280"') &&
+      small.includes("max-width:280px") &&
+      small.includes("text-align:center"),
     small,
   );
   const linked = renderBody(`[![Shop](${BLOB_IMAGE})](https://example.test/x)`, VALUES);

@@ -118,11 +118,12 @@ const BUTTON_BG = "#206f79";
 const BUTTON_STYLE = `display:inline-block;background:${BUTTON_BG};color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:16px`;
 // Outlook ignores padding and radius on an <a>, so a one-cell table carries the colour.
 const BUTTON_TABLE = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 22px"><tr><td style="background:${BUTTON_BG};border-radius:8px">`;
-// 496px = the 560px card less its 32px padding each side; a small picture is half that.
+// 560px = the card's column, since its padding sits outside the max-width; a small picture is
+// half that. Centred both ways: Outlook ignores the margin and the card's max-width.
 const IMAGE_STYLE =
-  "display:block;width:100%;max-width:496px;height:auto;border:0;border-radius:8px";
+  "display:block;width:100%;max-width:560px;height:auto;border:0;border-radius:8px;margin:0 auto";
 const SMALL_IMAGE_STYLE =
-  "display:block;width:100%;max-width:248px;height:auto;border:0;border-radius:8px;margin:0 auto";
+  "display:block;width:100%;max-width:280px;height:auto;border:0;border-radius:8px;margin:0 auto";
 // Full-width one-cell table: the reliable way to get background, border and padding.
 const BOX_TABLE =
   '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 18px">';
@@ -225,10 +226,10 @@ function renderInline(escaped: string): string {
 function pictureHtml(alt: string, url: string, small: boolean, link: string | null): string | null {
   if (!isBlobImageUrl(url)) return null;
   const img = small
-    ? `<img src="${escapeHtml(url)}" alt="${alt}" width="248" style="${SMALL_IMAGE_STYLE}" />`
-    : `<img src="${escapeHtml(url)}" alt="${alt}" width="496" style="${IMAGE_STYLE}" />`;
+    ? `<img src="${escapeHtml(url)}" alt="${alt}" width="280" style="${SMALL_IMAGE_STYLE}" />`
+    : `<img src="${escapeHtml(url)}" alt="${alt}" width="560" style="${IMAGE_STYLE}" />`;
   const inner = link ? `<a href="${escapeHtml(link)}" style="display:block">${img}</a>` : img;
-  return `<p style="margin:0 0 14px${small ? ";text-align:center" : ""}">${inner}</p>`;
+  return `<p style="margin:0 0 14px;text-align:center">${inner}</p>`;
 }
 
 /**
