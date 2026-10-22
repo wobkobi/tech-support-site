@@ -9,6 +9,7 @@ import { DayAgendaList, type AgendaItem } from "@/features/admin/components/DayA
 import { EventActionSheet } from "@/features/admin/components/EventActionSheet";
 import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { useNowMinute } from "@/features/admin/hooks/use-now-minute";
 import { useOptimisticDayBlocks } from "@/features/admin/hooks/use-optimistic-day-blocks";
 import {
   KIND_STYLES,
@@ -30,7 +31,7 @@ import {
 } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 
 /** Minimum gap between consecutive bookings to render a "free" label. */
 const MIN_GAP_MINUTES = 30;
@@ -83,12 +84,9 @@ export function DayAgendaView({
   const [actionSheetEvent, setActionSheetEvent] = useState<WeekEvent | null>(null);
   // Stable "now" for the past-event lock (avoids an impure call during render).
   const [renderedAt] = useState(() => Date.now());
-  // Ticking clock for the now marker; renderedAt stays frozen so the lock doesn't shift.
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNowMs(Date.now()), 60_000);
-    return () => clearInterval(id);
-  }, []);
+  // Ticking clock for the now marker, browser only; renderedAt stays frozen so the lock doesn't
+  // shift.
+  const nowMs = useNowMinute();
   // Keeps the current view up while the next week fetches.
   const [isPending, startTransition] = useTransition();
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -152,7 +150,7 @@ export function DayAgendaView({
     }
 
     // Now marker goes before the first event still to come; skipped on an empty day.
-    if (timed.length > 0 && selectedDayKey === nzDateKey(new Date(nowMs))) {
+    if (nowMs !== null && timed.length > 0 && selectedDayKey === nzDateKey(new Date(nowMs))) {
       const next = items.findIndex(
         (it) => it.type === "event" && new Date(it.ev.startAt).getTime() > nowMs,
       );
