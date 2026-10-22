@@ -28,6 +28,7 @@ const DesignEditor = dynamic(
  * @param props.canUpload - Whether photo uploads are set up.
  * @param props.bookingUrl - Booking page address, where a new QR code points.
  * @param props.canDraft - Whether "Draft with AI" is available (OpenAI is set up).
+ * @param props.seedBrief - A brief to open Draft with AI with, such as an inbox review.
  * @returns Editor element.
  */
 export function DesignEditorLoader(props: {
@@ -36,6 +37,7 @@ export function DesignEditorLoader(props: {
   canUpload: boolean;
   bookingUrl: string;
   canDraft: boolean;
+  seedBrief: string | null;
 }): React.ReactElement {
   return <DesignEditor {...props} />;
 }

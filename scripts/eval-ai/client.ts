@@ -241,3 +241,23 @@ export async function callCaption(
   );
   return json.captions;
 }
+
+/**
+ * Calls the admin Suggest a reply route for an inbox message.
+ * @param baseUrl - Server base URL (no trailing slash).
+ * @param adminSecret - Admin secret for auth.
+ * @param body - The reply request, as the inbox's thread sends it.
+ * @returns The suggestion.
+ */
+export async function callReplySuggest(
+  baseUrl: string,
+  adminSecret: string,
+  body: Record<string, unknown>,
+): Promise<{ reply: string; hide: boolean }> {
+  const json = await postJson<{ ok: true; reply: string; hide: boolean }>(
+    `${baseUrl}/api/admin/social/inbox/suggest`,
+    body,
+    adminSecret,
+  );
+  return { reply: json.reply, hide: json.hide };
+}

@@ -29,7 +29,7 @@ function claudeEffort(): ClaudeEffort | null {
 
 /** The AI features, each of which can run on its own provider. */
 export type AiFeature =
-  "parse-job" | "estimate" | "mailing-draft" | "post-draft" | "social-caption";
+  "parse-job" | "estimate" | "mailing-draft" | "post-draft" | "social-caption" | "social-reply";
 
 export interface JsonCompletionRequest {
   /** Which feature is calling, for its AI_PROVIDER_<FEATURE> override. */

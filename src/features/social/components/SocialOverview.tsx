@@ -1,16 +1,18 @@
 "use client";
 // src/features/social/components/SocialOverview.tsx
 // The Social Overview: a warning when the Meta token is close to running out, figures either side
-// of now, the set-up list until it's done, what needs attention beside whether each app is
-// connected, the next seven days, views over the last seven, and what each app can do.
+// of now, the set-up list until it's done, what needs attention and new comments beside whether
+// each app is connected, the next seven days, views over the last seven, and what each app can do.
 
 import { BarChart } from "@/features/admin/components/charts/BarChart";
 import { appSeries } from "@/features/admin/components/charts/series";
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { callApi } from "@/features/mailing/lib/api-client";
+import { InboxRow } from "@/features/social/components/InboxRow";
 import { OverviewWeek } from "@/features/social/components/OverviewWeek";
 import { SocialChecklist } from "@/features/social/components/SocialChecklist";
 import { SocialConnections } from "@/features/social/components/SocialConnections";
@@ -20,12 +22,15 @@ import {
 } from "@/features/social/components/SocialPermissions";
 import { shortDay, timeOfDay, type ColourContext } from "@/features/social/lib/calendar";
 import { checklistOf, type ChecklistKey } from "@/features/social/lib/checklist";
+import type { InboxSummary } from "@/features/social/lib/inbox/inbox-data.server";
+import { inboxHref, readInboxQuery } from "@/features/social/lib/inbox/map";
 import { dayLabel } from "@/features/social/lib/insights/metrics";
 import {
   calendarHref,
   postHref,
   SOCIAL_ANALYTICS_PATH,
   SOCIAL_CONTENT_PATH,
+  SOCIAL_INBOX_PATH,
   SOCIAL_POSTS_PATH,
   SOCIAL_SCHEDULES_PATH,
 } from "@/features/social/lib/links";
@@ -38,6 +43,7 @@ import {
 } from "@/features/social/lib/permissions";
 import type { Connection } from "@/features/social/lib/post-display";
 import type { SocialTagRow } from "@/features/social/lib/tags";
+import { PLATFORM_LABEL } from "@/features/social/lib/validate";
 import { Notice } from "@/shared/components/Notice";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { nzDateKey } from "@/shared/lib/timezone-utils";
@@ -205,7 +211,10 @@ export function SocialOverview({
       )}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <NeedsAttention items={data.attention} />
+        <div className="flex min-w-0 flex-col gap-6">
+          <NeedsAttention items={data.attention} />
+          <NewComments inbox={data.inbox} now={data.now} />
+        </div>
         <SocialConnections
           connections={connections}
           error={connectionsError}
@@ -256,6 +265,58 @@ function NeedsAttention({ items }: { items: AttentionItem[] }): React.ReactEleme
             <AttentionRow key={`${item.kind}:${item.id}`} item={item} />
           ))}
         </ul>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * New comments card: the unread and waiting counts, the newest unread threads, and which apps'
+ * comments aren't coming through.
+ * @param props - Component props.
+ * @param props.inbox - The inbox summary.
+ * @param props.now - When the page loaded, as ISO.
+ * @returns Card element.
+ */
+function NewComments({ inbox, now }: { inbox: InboxSummary; now: string }): React.ReactElement {
+  const query = readInboxQuery({});
+  const counts = [
+    inbox.unread > 0 && `${inbox.unread} unread`,
+    inbox.needsReply > 0 && `${inbox.needsReply} waiting for a reply`,
+  ].filter((s): s is string => typeof s === "string");
+  return (
+    <Card>
+      <CardHeader
+        title="New comments"
+        description={counts.length > 0 ? counts.join(", ") : undefined}
+        actions={
+          <AdminButton href={SOCIAL_INBOX_PATH} variant="outline" size="xs">
+            Open the inbox
+          </AdminButton>
+        }
+      />
+      {inbox.latest.length === 0 ? (
+        <p className="text-base text-admin-muted">
+          Nothing new. Comments on your posts and Google reviews show here when they come in.
+        </p>
+      ) : (
+        <ul className="flex flex-col overflow-hidden rounded-xl border border-admin-border">
+          {inbox.latest.map((row) => (
+            <InboxRow
+              key={row.id}
+              row={row}
+              href={inboxHref(query, row.id)}
+              open={false}
+              nowMs={Date.parse(now)}
+            />
+          ))}
+        </ul>
+      )}
+      {inbox.failing.length > 0 && (
+        <p className="mt-3 text-sm text-admin-muted">
+          {inbox.failing.map((p) => PLATFORM_LABEL[p]).join(" and ")}{" "}
+          {inbox.failing.length === 1 ? "isn't" : "aren't"} being read. The Inbox says why.
+        </p>
       )}
     </Card>
   );

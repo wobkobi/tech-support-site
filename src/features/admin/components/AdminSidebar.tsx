@@ -5,6 +5,7 @@
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
 import { useDialogKeys } from "@/features/admin/hooks/use-dialog-keys";
 import { signOut } from "@/features/admin/lib/sign-out";
+import { useInboxUnread } from "@/features/social/hooks/use-inbox-unread";
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -69,6 +70,8 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   path: string;
+  /** A count to show beside the label (a dot when collapsed); hidden at 0. */
+  badge?: number;
 }
 
 // Ordered by how often each page is opened.
@@ -336,6 +339,7 @@ export function AdminSidebar({
   const asideRef = useRef<HTMLElement>(null);
   const searchParams = useSearchParams();
   const active = activeNavPath(pathname, searchParams, ALL_NAV_PATHS);
+  const unread = useInboxUnread();
 
   useDialogKeys(asideRef, drawerOpen, () => onDrawerClose(true));
 
@@ -346,21 +350,43 @@ export function AdminSidebar({
    * @param item.label - Visible label, also the collapsed tooltip.
    * @param item.icon - Leading icon.
    * @param item.path - Link target, compared against the active path.
+   * @param item.badge - Count shown beside the label, if any.
    * @returns The link element.
    */
-  function navLink({ page, label, icon, path }: NavItem): React.ReactElement {
+  function navLink({ page, label, icon, path, badge }: NavItem): React.ReactElement {
     const isActive = active === path;
+    const count = badge && badge > 0 ? badge : 0;
     return (
       <Link
         key={page}
         href={path}
         onClick={() => onDrawerClose(false)}
         aria-current={isActive ? "page" : undefined}
-        title={collapsed ? label : undefined}
+        title={collapsed ? (count ? `${label} (${count} unread)` : label) : undefined}
         className={rowClasses(isActive, collapsed)}
       >
         {icon}
         <RowLabel collapsed={collapsed}>{label}</RowLabel>
+        {count > 0 && (
+          <>
+            <span
+              aria-hidden="true"
+              className={cn(
+                "ml-auto rounded-full bg-coquelicot-600 px-2 py-0.5 text-sm leading-none font-bold text-white",
+                collapsed && "lg:hidden",
+              )}
+            >
+              {count > 99 ? "99+" : count}
+            </span>
+            {collapsed && (
+              <span
+                aria-hidden="true"
+                className="absolute top-2 right-3 hidden size-2.5 rounded-full bg-coquelicot-500 lg:block"
+              />
+            )}
+            <span className="sr-only">, {count} unread</span>
+          </>
+        )}
       </Link>
     );
   }
@@ -443,7 +469,9 @@ export function AdminSidebar({
 
           <div className="my-2 border-t border-white/10" />
 
-          {TOOL_NAV_ITEMS.map(navLink)}
+          {TOOL_NAV_ITEMS.map((item) =>
+            navLink(item.page === "social" ? { ...item, badge: unread } : item),
+          )}
         </nav>
 
         {/* Footer - link back to the public site + sign-out trigger. */}

@@ -172,6 +172,7 @@ function isTyping(e: KeyboardEvent): boolean {
  * @param props.canUpload - Whether photo uploads are set up.
  * @param props.bookingUrl - Booking page address, where a new QR code points.
  * @param props.canDraft - Whether "Draft with AI" is available (OpenAI is set up).
+ * @param props.seedBrief - A brief to open Draft with AI with, such as an inbox review.
  * @returns Editor element.
  */
 export function DesignEditor({
@@ -180,12 +181,14 @@ export function DesignEditor({
   canUpload,
   bookingUrl,
   canDraft,
+  seedBrief,
 }: {
   initial: DesignRow;
   bound: BoundValues;
   canUpload: boolean;
   bookingUrl: string;
   canDraft: boolean;
+  seedBrief: string | null;
 }): React.ReactElement {
   const { toast } = useToast();
   const router = useRouter();
@@ -216,7 +219,16 @@ export function DesignEditor({
   const [copying, setCopying] = useState(false);
   const [picturesOpen, setPicturesOpen] = useState(false);
   const [using, setUsing] = useState(false);
-  const [draftOpen, setDraftOpen] = useState(false);
+  const [draftOpen, setDraftOpen] = useState(canDraft && seedBrief !== null);
+
+  // The Inbox lands here with ?review=: take it off the address so a reload doesn't reopen the
+  // dialog.
+  useEffect(() => {
+    if (seedBrief === null) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("review");
+    window.history.replaceState(window.history.state, "", url);
+  }, [seedBrief]);
   // Phones get the simple editor unless the operator asks for the full one.
   const narrow = useNarrowScreen();
   const [fullOnPhone, setFullOnPhone] = useState(false);
@@ -1083,6 +1095,7 @@ export function DesignEditor({
       {draftOpen && (
         <DraftDialog
           startKind={draftKindFor(initial.kind)}
+          startBrief={seedBrief ?? ""}
           room={draftRoom(doc)}
           paidAd={doc.paidAd}
           onClose={() => setDraftOpen(false)}

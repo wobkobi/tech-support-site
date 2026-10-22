@@ -10,6 +10,7 @@
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import { calcSessionMins } from "@/features/business/lib/time-parse";
 import { parseCaptionRequest, type CaptionRequest } from "@/features/social/lib/caption-ai";
+import { parseReplyRequest, type ReplyRequest } from "@/features/social/lib/inbox/map";
 import { avoidList } from "@/shared/lib/ai/brand-rules";
 import { parseHashtags } from "@/shared/lib/hashtags";
 import {
@@ -18,6 +19,7 @@ import {
   estimateTolerance,
   expectedEstimateMins,
   postDraftProblems,
+  replyProblems,
   spread,
   withinTolerance,
   type CheckResult,
@@ -105,6 +107,25 @@ function sampleCaptionReq(over: Record<string, unknown> = {}): CaptionRequest {
   return req;
 }
 const NO_BRAND = { tags: [], avoid: [] };
+
+/**
+ * A parsed reply request for the self-test: a 5-star Google review from Mary Smith, unless
+ * `over` sets otherwise.
+ * @param over - Request fields to set.
+ * @returns The request.
+ */
+function sampleReplyReq(over: Record<string, unknown> = {}): ReplyRequest {
+  const req = parseReplyRequest({
+    platform: "google",
+    kind: "review",
+    rating: 5,
+    author: "Mary Smith",
+    text: "Sorted my email out, thanks.",
+    ...over,
+  });
+  if ("error" in req) throw new Error(req.error);
+  return req;
+}
 
 /**
  * Runs the network-free pure-logic checks and reports pass/fail.
@@ -326,6 +347,48 @@ function runSelfTest(): number {
       want: 1,
     },
     {
+      name: "a clean review thanks is clean",
+      got: replyProblems(
+        { reply: "Thanks so much Mary. I'm glad the email is working again.", hide: false },
+        sampleReplyReq(),
+        "",
+      ).hard.length,
+      want: 0,
+    },
+    {
+      name: "a 5-star thanks without their name is a hard problem",
+      got: replyProblems(
+        { reply: "Thanks so much. Glad it's working again.", hide: false },
+        sampleReplyReq(),
+        "",
+      ).hard.length,
+      want: 1,
+    },
+    {
+      name: "a low-star reply with no apology or phone is two hard problems",
+      got: replyProblems(
+        { reply: "Thanks for the feedback, Peter. I'll do better.", hide: false },
+        sampleReplyReq({ rating: 2, author: "Peter Jones" }),
+        "",
+      ).hard.length,
+      want: 2,
+    },
+    {
+      name: "spam with no hide is a hard problem",
+      got: replyProblems({ reply: "", hide: false }, sampleReplyReq(), "", { wantHide: true }).hard
+        .length,
+      want: 1,
+    },
+    {
+      name: "a link on Instagram is a hard problem",
+      got: replyProblems(
+        { reply: "Yes I do. Book at www.example.co.nz.", hide: false },
+        sampleReplyReq({ platform: "instagram", kind: "comment", rating: null, author: null }),
+        "",
+      ).hard.length,
+      want: 1,
+    },
+    {
       name: "a fix that keeps the post's emoji and hashtags is clean",
       got: captionProblems(
         ["I'm here 🙂 #Titirangi"],
@@ -417,8 +480,15 @@ async function collectRaw(
   only: string[],
 ): Promise<{ ctx: LiveContext; raw: RawRun[]; aborted: boolean }> {
   const { loadLiveContext } = await import("./context");
-  const { callCaption, callEstimate, callParseJob, callMailingDraft, callPostDraft, fetchFacts } =
-    await import("./client");
+  const {
+    callCaption,
+    callEstimate,
+    callParseJob,
+    callMailingDraft,
+    callPostDraft,
+    callReplySuggest,
+    fetchFacts,
+  } = await import("./client");
   const {
     PARSE_CASES,
     ESTIMATE_CASES,
@@ -428,6 +498,7 @@ async function collectRaw(
     EMAIL_FROM_POST_CASES,
     POST_DRAFT_CASES,
     CAPTION_CASES,
+    REPLY_CASES,
     DEAL_RE,
   } = await import("./cases");
 
@@ -449,6 +520,7 @@ async function collectRaw(
   const draftCases = [...DRAFT_CASES, ...EMAIL_FROM_POST_CASES].filter((c) => keep(c.id));
   const postDraftCases = POST_DRAFT_CASES.filter((c) => keep(c.id));
   const captionCases = CAPTION_CASES.filter((c) => keep(c.id));
+  const replyCases = REPLY_CASES.filter((c) => keep(c.id));
 
   const total =
     benchmarks.length +
@@ -458,7 +530,8 @@ async function collectRaw(
     travelCases.length +
     draftCases.length +
     postDraftCases.length +
-    captionCases.length;
+    captionCases.length +
+    replyCases.length;
   console.log(
     `Running ${total} cases x ${runs} run(s) = ${total * runs} paid calls. This takes a few minutes.\n`,
   );
@@ -717,6 +790,35 @@ async function collectRaw(
         input: body.brief,
         durations: [],
         first: { captions },
+        draftCheck: { hard, soft },
+      });
+    });
+  }
+
+  // Suggest a reply runs once per case, checked against the live business facts.
+  for (const c of replyCases) {
+    if (aborted) break;
+    tick(c.id);
+    await tryCase(c.id, "draft", async () => {
+      facts ??= await fetchFacts(url);
+      const req = parseReplyRequest(c.request);
+      if ("error" in req) throw new Error(`bad case request: ${req.error}`);
+      const got = await callReplySuggest(url, adminSecret, c.request);
+      const { hard, soft } = replyProblems(got, req, facts, c);
+      for (const w of c.want ?? []) if (!w.pattern.test(got.reply)) hard.push(w.why);
+      for (const f of c.forbid ?? []) if (f.pattern.test(got.reply)) hard.push(f.why);
+      if (c.wantRate) {
+        const rate = facts.match(/Standard rate: NZ\$([\d.]+) per hour/)?.[1];
+        if (!rate) hard.push("BUSINESS FACTS has no standard rate");
+        else if (!got.reply.includes(`$${rate}`))
+          hard.push(`doesn't quote the standard rate ($${rate})`);
+      }
+      raw.push({
+        id: c.id,
+        kind: "draft",
+        input: req.text || `${req.rating} stars, no words`,
+        durations: [],
+        first: { captions: [got.hide ? `(hide) ${got.reply}` : got.reply] },
         draftCheck: { hard, soft },
       });
     });

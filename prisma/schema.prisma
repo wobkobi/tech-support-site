@@ -1411,6 +1411,63 @@ model SocialAccountDay {
   @@unique([platform, day])
 }
 
+enum SocialCommentKind {
+  comment
+  reply
+  review
+}
+
+// A comment on one of the Page's Facebook posts or Instagram media, a reply in its thread, or a
+// Google review (our reply to it is a reply row). The top-level row of a thread carries its inbox
+// state; replies point at it through threadExternalId. Every optional field is written as an
+// explicit null, so `{ field: null }` filters match. Filled by
+// src/features/social/lib/inbox/sync.server.ts.
+model SocialComment {
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  platform         SocialPlatform
+  kind             SocialCommentKind
+  // The app's own id: a Facebook or Instagram comment id, or the review's resource name. Our
+  // reply to a review is the review's name plus "/reply".
+  externalId       String
+  // The top-level comment or review a reply belongs to; null on a top-level row.
+  threadExternalId String?
+  // The post or media a Facebook or Instagram comment is on.
+  objectExternalId String?
+  // Our post, when the comment is on one made here.
+  postId           String?           @db.ObjectId
+  // The post's words, picture and link as the app gave them, on top-level rows, so a thread can
+  // show a post that wasn't made here.
+  objectText       String?
+  objectImageUrl   String?
+  objectUrl        String?
+  // Null when the app doesn't say who wrote it.
+  authorName       String?
+  authorId         String?
+  fromUs           Boolean           @default(false)
+  text             String
+  // Google's stars, 1 to 5.
+  rating           Int?
+  postedAt         DateTime
+  // When a review's writer last changed it.
+  editedAt         DateTime?
+  hidden           Boolean?
+  // Inbox state, kept on top-level rows only.
+  lastActivityAt   DateTime?
+  needsReply       Boolean?
+  repliedAt        DateTime?
+  readAt           DateTime?
+  archivedAt       DateTime?
+  // When the app said it no longer exists.
+  goneAt           DateTime?
+  syncedAt         DateTime
+  createdAt        DateTime          @default(now())
+
+  @@unique([platform, externalId])
+  @@index([threadExternalId])
+  @@index([objectExternalId])
+  @@index([lastActivityAt])
+}
+
 // One exported size of a post maker design. docHash is the design's fingerprint when it
 // was exported; a different hash now means the picture is out of date.
 type DesignRender {

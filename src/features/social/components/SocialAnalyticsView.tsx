@@ -247,7 +247,7 @@ export function SocialAnalyticsView({
       {!hasAny && (
         <Card>
           <p className="text-base text-admin-text">
-            No figures for these days yet. They&apos;re read every hour once the stats sync is
+            No figures for these days yet. They&apos;re read every 6 hours once the stats sync is
             running, and each post&apos;s figures an hour after it goes out. Press Refresh to read
             them now.
           </p>

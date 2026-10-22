@@ -1,6 +1,6 @@
 // src/features/social/lib/overview-data.server.ts
 // Everything the Social Overview shows: the figures, the next seven days, what needs attention,
-// the set-up list's facts and the steps you've skipped.
+// new comments, the set-up list's facts and the steps you've skipped.
 
 import {
   atMinute,
@@ -18,6 +18,7 @@ import {
   type ChecklistKey,
 } from "@/features/social/lib/checklist";
 import { NOT_CONTENT } from "@/features/social/lib/filters";
+import { loadInboxSummary, type InboxSummary } from "@/features/social/lib/inbox/inbox-data.server";
 import { loadViewsWeek, type ViewsWeek } from "@/features/social/lib/insights/analytics.server";
 import { loadContentRows } from "@/features/social/lib/postings.server";
 import { prisma } from "@/shared/lib/prisma";
@@ -70,6 +71,9 @@ export interface OverviewData {
   skipped: ChecklistKey[];
   /** Views by app over the last seven full days. */
   views: ViewsWeek;
+  inbox: InboxSummary;
+  /** When it loaded, as ISO, so times read the same on both sides. */
+  now: string;
 }
 
 /**
@@ -85,7 +89,7 @@ export async function loadOverview(now: Date): Promise<OverviewData> {
   // Empty times are judged over the filler's whole reach, which can be longer than the week.
   const horizon = new Date(Math.max(weekEnd.getTime(), now.getTime() + fillDays * DAY_MS));
 
-  const [entries, schedules, queues, rows, posted, problems, emailed, skipped, views] =
+  const [entries, schedules, queues, rows, posted, problems, emailed, skipped, views, inbox] =
     await Promise.all([
       loadCalendarEntries(atMinute(today, 0), horizon, now, fillDays),
       loadCalendarSchedules(),
@@ -129,6 +133,7 @@ export async function loadOverview(now: Date): Promise<OverviewData> {
       hasDraftedEmail(),
       loadChecklistSkipped(),
       loadViewsWeek(now),
+      loadInboxSummary(),
     ]);
 
   const week = entries.filter((e) => Date.parse(e.at) < weekEnd.getTime());
@@ -195,6 +200,8 @@ export async function loadOverview(now: Date): Promise<OverviewData> {
     },
     skipped,
     views,
+    inbox,
+    now: now.toISOString(),
   };
 }
 

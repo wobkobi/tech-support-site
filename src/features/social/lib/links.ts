@@ -1,5 +1,6 @@
 // src/features/social/lib/links.ts
-// Admin addresses for the Social pages, posts, content items, schedules and calendar views.
+// Admin addresses for the Social pages, posts, content items, schedules, calendar views and the
+// Inbox.
 
 import type { CalendarView, ColourMode } from "@/features/social/lib/calendar";
 
@@ -9,6 +10,7 @@ export const SOCIAL_CALENDAR_PATH = "/admin/social/calendar";
 export const SOCIAL_CONTENT_PATH = "/admin/social/content";
 export const SOCIAL_SCHEDULES_PATH = "/admin/social/schedules";
 export const SOCIAL_ANALYTICS_PATH = "/admin/social/analytics";
+export const SOCIAL_INBOX_PATH = "/admin/social/inbox";
 
 /**
  * The calendar's address for a view, day and colour, leaving out the defaults.

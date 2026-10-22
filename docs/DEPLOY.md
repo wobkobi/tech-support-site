@@ -183,8 +183,8 @@ until 3 Jan 2027):
 
 **Stats (Social > Analytics, each post's Stats card):**
 
-- Read by the hourly `/api/cron/sync-social` job (see CRON.md); register it on cron-job.org after
-  the deploy that adds it.
+- Read by the `/api/cron/sync-social` job (see CRON.md); register it on cron-job.org after the
+  deploy that adds it.
 - Facebook figures need `read_insights` and Instagram's need `instagram_manage_insights`. Without
   them the page says which permission is missing. Instagram's likes and comments still come from the
   post itself; a Facebook post's reactions and comments need `pages_read_user_content` too.
@@ -194,3 +194,18 @@ until 3 Jan 2027):
 - Facebook's day runs on Pacific time, so its daily figures don't line up exactly with NZ days.
 - Check one post and one day against Meta Business Suite and the Business Profile dashboard once the
   permissions are in.
+
+**Comments and reviews (Social > Inbox):**
+
+- Read by `/api/cron/sync-social` every 30 minutes (see CRON.md), or straight away with Check now.
+- Google reviews need nothing more: they're read and answered through the Business Profile API with
+  the existing `business.manage` scope. A reply replaces any earlier one, and only our reply can be
+  deleted, never the review.
+- Facebook comments need `pages_read_user_content` to read and `pages_manage_engagement` to reply,
+  hide or delete. Instagram's need `instagram_basic` and `instagram_manage_comments`. Until the
+  token has them, the Inbox names the permission Meta asked for and the other apps carry on.
+- A comment that comes back without its writer (a Development mode app only sees people with a role
+  on it) shows as "Someone". If every comment comes back like that once the permissions are in, the
+  app needs Live mode.
+- Suggest a reply uses the AI writers' provider (feature `social-reply`) with the live business
+  facts; nothing is ever sent without pressing Send.
