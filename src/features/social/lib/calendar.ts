@@ -295,6 +295,16 @@ export function viewTitle(view: CalendarView, key: string): string {
 }
 
 /**
+ * A day's short heading.
+ * @param key - YYYY-MM-DD.
+ * @returns Like "Thu 22".
+ */
+export function shortDay(key: string): string {
+  const [y, m, d] = dateKeyParts(key);
+  return `${DAY_NAMES[weekdayOf(new Date(Date.UTC(y, m - 1, d)))].slice(0, 3)} ${d}`;
+}
+
+/**
  * Orders entries by time, then name.
  * @param a - One entry.
  * @param b - The other.

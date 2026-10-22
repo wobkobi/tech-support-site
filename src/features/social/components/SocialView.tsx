@@ -1,7 +1,7 @@
 "use client";
 // src/features/social/components/SocialView.tsx
-// The Social Posts tab: start options, then the composer, then Posted folded away and the
-// connection check at the bottom.
+// The Social Posts tab: start options, then the composer, then Posted folded away. Linked
+// accounts live on the Overview.
 
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { Card } from "@/features/admin/components/ui/Card";
@@ -12,7 +12,7 @@ import { callApi } from "@/features/mailing/lib/api-client";
 import { EmailStepDialog } from "@/features/social/components/EmailStepDialog";
 import { PostComposer } from "@/features/social/components/PostComposer";
 import { SocialComposerHeader } from "@/features/social/components/SocialComposerHeader";
-import { SocialConnections } from "@/features/social/components/SocialConnections";
+
 import { SocialInProgress } from "@/features/social/components/SocialInProgress";
 import { SocialPostedList } from "@/features/social/components/SocialPostedList";
 import { SocialStartSection } from "@/features/social/components/SocialStartSection";
@@ -20,7 +20,7 @@ import { SocialTagFilter } from "@/features/social/components/SocialTagFilter";
 import { TagManager, type TagUse } from "@/features/social/components/TagManager";
 import { SOCIAL_POSTS_PATH } from "@/features/social/lib/links";
 import type { OpenPost } from "@/features/social/lib/open-post";
-import { liveOn, type Connection } from "@/features/social/lib/post-display";
+import { liveOn } from "@/features/social/lib/post-display";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
 import { byTagName, type SocialTagRow } from "@/features/social/lib/tags";
 import { cn } from "@/shared/lib/cn";
@@ -78,9 +78,7 @@ export function SocialView({
   const [editingPresets, setEditingPresets] = useState(open?.post.isPreset ?? false);
   const [deleting, setDeleting] = useState<SocialPostRow | null>(null);
   const [alsoTakeDown, setAlsoTakeDown] = useState(true);
-  const [connections, setConnections] = useState<Connection[] | null>(null);
-  // Why the check on opening the page couldn't run, shown in the strip instead of a toast.
-  const [connectionsError, setConnectionsError] = useState<string | null>(null);
+
   const saveOpen = useRef<(() => Promise<boolean>) | null>(null);
   const composerRef = useRef<HTMLElement>(null);
   const composerHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -246,34 +244,6 @@ export function SocialView({
       return;
     }
     toast(`Saved "${res.item.name}" to Content.`, { tone: "success" });
-  }
-
-  // Check the connections once when the page opens, so a revoked or expired token shows
-  // before a post fails on it. Opening other posts keeps this component mounted, so it
-  // doesn't re-check on every click.
-  useEffect(() => {
-    let live = true;
-    void callApi<{ connections: Connection[] }>("/api/admin/social/connections").then((res) => {
-      if (!live) return;
-      if (res.ok) setConnections(res.connections);
-      else setConnectionsError(res.error);
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
-
-  /** Checks every platform's credentials again, from the Check button. */
-  async function checkConnections(): Promise<void> {
-    setBusyId("connections");
-    const res = await callApi<{ connections: Connection[] }>("/api/admin/social/connections");
-    setBusyId(null);
-    if (!res.ok) {
-      toast(res.error, { tone: "error" });
-      return;
-    }
-    setConnections(res.connections);
-    setConnectionsError(null);
   }
 
   /**
@@ -466,13 +436,6 @@ export function SocialView({
         openId={openId}
         isBusy={isBusy}
         onOpen={(id) => void openPost(id)}
-      />
-
-      <SocialConnections
-        connections={connections}
-        error={connectionsError}
-        checking={busyId === "connections"}
-        onCheck={() => void checkConnections()}
       />
 
       <TagManager

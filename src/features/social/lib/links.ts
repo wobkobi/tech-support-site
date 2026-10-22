@@ -3,6 +3,7 @@
 
 import type { CalendarView, ColourMode } from "@/features/social/lib/calendar";
 
+export const SOCIAL_OVERVIEW_PATH = "/admin/social";
 export const SOCIAL_POSTS_PATH = "/admin/social/posts";
 export const SOCIAL_CALENDAR_PATH = "/admin/social/calendar";
 export const SOCIAL_CONTENT_PATH = "/admin/social/content";
