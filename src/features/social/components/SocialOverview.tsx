@@ -271,8 +271,8 @@ function NeedsAttention({ items }: { items: AttentionItem[] }): React.ReactEleme
 }
 
 /**
- * New comments card: the unread and waiting counts, the newest unread threads, and which apps'
- * comments aren't coming through.
+ * New comments and messages card: the unread and waiting counts, the newest unread threads, and
+ * which apps' comments or messages aren't coming through.
  * @param props - Component props.
  * @param props.inbox - The inbox summary.
  * @param props.now - When the page loaded, as ISO.
@@ -287,7 +287,7 @@ function NewComments({ inbox, now }: { inbox: InboxSummary; now: string }): Reac
   return (
     <Card>
       <CardHeader
-        title="New comments"
+        title="New comments and messages"
         description={counts.length > 0 ? counts.join(", ") : undefined}
         actions={
           <AdminButton href={SOCIAL_INBOX_PATH} variant="outline" size="xs">
@@ -297,7 +297,8 @@ function NewComments({ inbox, now }: { inbox: InboxSummary; now: string }): Reac
       />
       {inbox.latest.length === 0 ? (
         <p className="text-base text-admin-muted">
-          Nothing new. Comments on your posts and Google reviews show here when they come in.
+          Nothing new. Comments on your posts, Google reviews and messages show here when they come
+          in.
         </p>
       ) : (
         <ul className="flex flex-col overflow-hidden rounded-xl border border-admin-border">

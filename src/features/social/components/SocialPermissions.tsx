@@ -194,11 +194,11 @@ function Cell({
         <FaCircleExclamation aria-hidden className="mt-0.5 size-4 shrink-0 text-coquelicot-700" />
         <span className="min-w-0">
           {name}
-          Needs
+          Needs{" "}
           {status.missing.map((s, i) => (
             <span key={s} className="block wrap-anywhere">
               {s}
-              {i < status.missing.length - 1 ? "," : ""}
+              {i < status.missing.length - 1 ? ", " : ""}
             </span>
           ))}
         </span>

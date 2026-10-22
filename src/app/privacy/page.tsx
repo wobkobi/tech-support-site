@@ -1,5 +1,7 @@
 // src/app/privacy/page.tsx
-// Privacy policy: collection, analytics/ad tools, sharing, retention and Privacy Act 2020 rights.
+// Privacy policy: collection, social media messages and comments, analytics/ad tools, sharing,
+// retention, deleting your information (Meta's data deletion link points at #delete-your-data) and
+// Privacy Act 2020 rights.
 
 import { PageHead } from "@/shared/components/PageHead";
 import { PageShell } from "@/shared/components/PageLayout";
@@ -22,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 /** Date this policy was last reviewed; shown to visitors in the header. */
-const LAST_UPDATED = "12 October 2026";
+const LAST_UPDATED = "23 October 2026";
 
 const H2 = "mb-4 text-[1.75rem] font-extrabold";
 
@@ -101,6 +103,30 @@ export default async function PrivacyPage(): Promise<React.ReactElement> {
           </div>
 
           <div>
+            <h2 className={H2}>Messages, comments and reviews</h2>
+            <p className="mb-3">
+              When you message my Facebook Page or Instagram account, comment on my posts, or review
+              me on Google, I keep a copy in my own system so I can read and answer everything in
+              one place. That copy holds:
+            </p>
+            <TickList>
+              <TickItem variant="dot">
+                Your name or username as the app shows it, and the number the app uses for you
+              </TickItem>
+              <TickItem variant="dot">
+                What you wrote and when, and the star rating on a review
+              </TickItem>
+              <TickItem variant="dot">My replies to you</TickItem>
+            </TickList>
+            <p className="mt-3">
+              I use it only to read and answer you. I don&apos;t add you to my mailing list from it
+              or use it for advertising. When I ask for help writing a reply, the words go to an AI
+              writing service (OpenAI or Anthropic) to suggest one, and I read every reply before
+              it&apos;s sent.
+            </p>
+          </div>
+
+          <div>
             <h2 className={H2}>Cookies, analytics and advertising</h2>
             <p className="mb-3">
               I use cookies and small tracking scripts (&quot;pixels&quot;) to understand how the
@@ -158,6 +184,11 @@ export default async function PrivacyPage(): Promise<React.ReactElement> {
               <TickItem variant="dot">Google (Analytics, Ads, Maps and Calendar)</TickItem>
               <TickItem variant="dot">Meta Platforms (advertising pixel)</TickItem>
               <TickItem variant="dot">
+                An AI service (OpenAI or Anthropic), which reads what you describe in the price
+                estimate, my notes about your job, and your message, comment or review when I ask it
+                to suggest a reply
+              </TickItem>
+              <TickItem variant="dot">
                 My email provider, for booking, review and mailing-list emails
               </TickItem>
               <TickItem variant="dot">My website hosting and database providers</TickItem>
@@ -175,6 +206,22 @@ export default async function PrivacyPage(): Promise<React.ReactElement> {
               I keep booking and contact records only as long as I need them - to provide the
               service, for my own records, and to meet legal and tax obligations - after which I
               delete them.
+            </p>
+          </div>
+
+          <div id="delete-your-data">
+            <h2 className={H2}>Deleting your information</h2>
+            <p>
+              You can ask me to delete the information I hold about you, including my copies of your
+              Facebook and Instagram messages and comments and your Google reviews. Email{" "}
+              <a href={`mailto:${identity.email}`} className={TEXT_LINK}>
+                {identity.email}
+              </a>{" "}
+              with your name and, for social media, the name you use on Facebook or Instagram.
+              I&apos;ll delete it within 30 days and let you know when it&apos;s done. I keep
+              invoices and other business records for the seven years New Zealand tax law requires.
+              Deleting my copy doesn&apos;t remove anything from Facebook, Instagram or Google: you
+              can delete your own messages, comments and reviews there.
             </p>
           </div>
 

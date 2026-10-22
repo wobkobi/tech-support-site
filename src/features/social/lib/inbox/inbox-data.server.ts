@@ -1,14 +1,18 @@
 // src/features/social/lib/inbox/inbox-data.server.ts
 // What the Inbox page shows: the threads its address asks for, the open thread with every
 // message, the counts on its filters, the unread count the sidebar badge uses, and why an app's
-// comments aren't coming through; plus the Overview's New comments card.
+// comments or messages aren't coming through; plus the Overview's New comments and messages card.
 
 import {
   authorLabel,
+  replyOpenUntil,
+  SHOW_KINDS,
   snippet,
   type InboxFilter,
   type InboxKind,
   type InboxQuery,
+  type InboxShow,
+  type MessagingPlatform,
 } from "@/features/social/lib/inbox/map";
 import { loadCommentsState } from "@/features/social/lib/inbox/sync.server";
 import { PLATFORMS } from "@/features/social/lib/platforms";
@@ -67,6 +71,11 @@ export interface InboxThreadDetail {
   archived: boolean;
   needsReply: boolean;
   gone: boolean;
+  /** Who a conversation is with, as the inbox shows them; null for comments and reviews. */
+  with: string | null;
+  /** Until when a conversation can be answered from here, as ISO; null when it can't be. */
+  openUntil: string | null;
+  /** On a conversation, url is where to open it on the app. */
   post: {
     id: string | null;
     name: string | null;
@@ -88,6 +97,8 @@ export interface InboxData {
   ranAt: string | null;
   /** Why an app's read failed. */
   errors: Partial<Record<SocialPlatformKey, string>>;
+  /** Why an app's messages couldn't be read. */
+  messageErrors: Partial<Record<MessagingPlatform, string>>;
   /** Apps with their keys set. */
   setUp: SocialPlatformKey[];
 }
@@ -106,6 +117,16 @@ export async function unreadCount(): Promise<number> {
     console.error("[inbox] unread count failed:", error);
     return 0;
   }
+}
+
+/**
+ * The show switch's part of the list query.
+ * @param show - Which kinds of thread to list.
+ * @returns Its where clause.
+ */
+function showWhere(show: InboxShow): Prisma.SocialCommentWhereInput {
+  const kinds = SHOW_KINDS[show];
+  return kinds ? { kind: { in: kinds } } : {};
 }
 
 /**
@@ -128,12 +149,13 @@ function filterWhere(filter: InboxFilter): Prisma.SocialCommentWhereInput {
 
 /**
  * Loads the page.
- * @param query - The address's tab, filter, app and words.
+ * @param query - The address's tab, filter, app, kinds and words.
  * @param openId - The thread to open.
  * @returns The data.
  */
 export async function loadInbox(query: InboxQuery, openId: string | null): Promise<InboxData> {
   const app: Prisma.SocialCommentWhereInput = query.app === "all" ? {} : { platform: query.app };
+  const show = showWhere(query.show);
   const tab: Prisma.SocialCommentWhereInput =
     query.tab === "archive" ? { archivedAt: { not: null } } : { archivedAt: null };
 
@@ -158,11 +180,11 @@ export async function loadInbox(query: InboxQuery, openId: string | null): Promi
 
   const [rows, counts, unread, state, open] = await Promise.all([
     prisma.socialComment.findMany({
-      where: { ...TOP, ...app, ...tab, ...filterWhere(query.filter), ...search },
+      where: { ...TOP, ...app, ...show, ...tab, ...filterWhere(query.filter), ...search },
       orderBy: { lastActivityAt: "desc" },
       take: LIST_MAX,
     }),
-    countFilters(app),
+    countFilters({ ...app, ...show }),
     unreadCount(),
     loadCommentsState(),
     openId ? loadThread(openId) : Promise.resolve(null),
@@ -175,6 +197,7 @@ export async function loadInbox(query: InboxQuery, openId: string | null): Promi
     open,
     ranAt: state.ranAt,
     errors: state.errors,
+    messageErrors: state.messageErrors,
     setUp: SOCIAL_PLATFORMS.filter((p) => PLATFORMS[p].missingEnv().length === 0),
   };
 }
@@ -214,7 +237,7 @@ async function toThreadRows(rows: SocialComment[]): Promise<InboxThreadRow[]> {
   }));
 }
 
-/** The Overview's New comments card. */
+/** The Overview's New comments and messages card. */
 export interface InboxSummary {
   unread: number;
   needsReply: number;
@@ -228,7 +251,7 @@ export interface InboxSummary {
 const SUMMARY_MAX = 4;
 
 /**
- * Loads the Overview's New comments card.
+ * Loads the Overview's New comments and messages card.
  * @returns The summary; an empty one when the read fails, so the Overview still opens.
  */
 export async function loadInboxSummary(): Promise<InboxSummary> {
@@ -248,7 +271,9 @@ export async function loadInboxSummary(): Promise<InboxSummary> {
       unread,
       needsReply,
       latest: await toThreadRows(rows),
-      failing: SOCIAL_PLATFORMS.filter((p) => state.errors[p]),
+      failing: SOCIAL_PLATFORMS.filter(
+        (p) => state.errors[p] || (p !== "google" && state.messageErrors[p]),
+      ),
     };
   } catch (error) {
     console.error("[inbox] summary failed:", error);
@@ -258,13 +283,13 @@ export async function loadInboxSummary(): Promise<InboxSummary> {
 
 /**
  * How many inbox threads each filter holds.
- * @param app - The app part of the query.
+ * @param scope - The app and kinds parts of the query.
  * @returns The counts.
  */
 async function countFilters(
-  app: Prisma.SocialCommentWhereInput,
+  scope: Prisma.SocialCommentWhereInput,
 ): Promise<Record<InboxFilter, number>> {
-  const base = { ...TOP, ...app, archivedAt: null };
+  const base = { ...TOP, ...scope, archivedAt: null };
   const [all, needsReply, replied, hidden] = await Promise.all([
     prisma.socialComment.count({ where: base }),
     prisma.socialComment.count({ where: { ...base, ...filterWhere("needs-reply") } }),
@@ -311,7 +336,8 @@ function pictureOf(appPicture: string | null, post: PostInfo | undefined): strin
 }
 
 /**
- * Loads one thread with every message, oldest first. A reply's id opens its thread.
+ * Loads one thread with every message, oldest first. A reply's id opens its thread. A
+ * conversation's top row stands for the person, so only its messages are listed.
  * @param id - Our id for any message in it.
  * @returns The thread, or null when there's no such message.
  */
@@ -333,6 +359,16 @@ export async function loadThread(id: string): Promise<InboxThreadDetail | null> 
   if (!top) return null;
   const posts = await postInfo([top.postId]);
   const post = top.postId ? posts.get(top.postId) : undefined;
+  const conversation = top.kind === "conversation";
+  // A comment or review first, then replies in time order.
+  const messages = conversation
+    ? rows.filter((r) => r.id !== top.id)
+    : [top, ...rows.filter((r) => r.id !== top.id)];
+  const until = conversation
+    ? replyOpenUntil(
+        messages.map((r) => ({ fromUs: r.fromUs, postedAt: r.postedAt, gone: r.goneAt !== null })),
+      )
+    : null;
   return {
     id: top.id,
     platform: top.platform,
@@ -341,6 +377,8 @@ export async function loadThread(id: string): Promise<InboxThreadDetail | null> 
     archived: top.archivedAt !== null,
     needsReply: top.needsReply === true,
     gone: top.goneAt !== null,
+    with: conversation ? authorLabel(top.platform, top.authorName, false) : null,
+    openUntil: until?.toISOString() ?? null,
     post: {
       id: top.postId,
       name: post?.name ?? null,
@@ -348,8 +386,7 @@ export async function loadThread(id: string): Promise<InboxThreadDetail | null> 
       imageUrl: pictureOf(top.objectImageUrl, post),
       url: top.objectUrl,
     },
-    // The top message first, then replies in time order.
-    messages: [top, ...rows.filter((r) => r.id !== top.id)].map((r) => ({
+    messages: messages.map((r) => ({
       id: r.id,
       kind: r.kind,
       fromUs: r.fromUs,

@@ -793,8 +793,9 @@ export interface ReplyCase {
 }
 
 // Suggest a reply: review stars both ways, a price question, spam, an Instagram question, an
-// injection, a follow-up in a thread and stars with no words. The shared rules (name, apology and
-// phone, no money back, length, no links on Instagram) are in replyProblems.
+// injection, a follow-up in a thread, stars with no words, and Messenger and Instagram messages
+// (a price question, a booking with a problem, spam). The shared rules (name, apology and phone,
+// no money back, length, no links in Instagram comments) are in replyProblems.
 export const REPLY_CASES: ReplyCase[] = [
   {
     id: "reply-review-5-stars",
@@ -901,5 +902,55 @@ export const REPLY_CASES: ReplyCase[] = [
         why: "makes up what the job was",
       },
     ],
+  },
+  {
+    id: "reply-message-price",
+    request: {
+      platform: "facebook",
+      kind: "message",
+      author: "Linda Brown",
+      text: "Hi there, how much would it be for you to come and set up my new printer?",
+    },
+    wantRate: true,
+    want: [{ pattern: /\/booking\b/, why: "doesn't point them to book" }],
+    forbid: [
+      {
+        pattern: /\btotal\b|\ball up\b|\bwould cost\b|\bwill cost\b|\bit'll be \$/i,
+        why: "gives a total for their job",
+      },
+    ],
+  },
+  {
+    id: "reply-message-booking",
+    request: {
+      platform: "instagram",
+      kind: "message",
+      author: "kiwi_nan",
+      text: "My laptop won't turn on since yesterday. Can you come tomorrow morning?",
+      earlier: [{ fromUs: false, text: "Hello" }],
+    },
+    want: [
+      { pattern: /\/booking\b|\d{3}[\s-]?\d{3,4}/, why: "doesn't point them to book or call" },
+    ],
+    forbid: [
+      {
+        pattern: /\b(?:see you|I'll be there|I can come) tomorrow\b|\bbooked (?:you )?in\b/i,
+        why: "promises a time",
+      },
+      {
+        pattern: /\b(?:battery|motherboard|power supply|charger) (?:is|has)\b/i,
+        why: "guesses the fault",
+      },
+    ],
+  },
+  {
+    id: "reply-message-spam",
+    request: {
+      platform: "facebook",
+      kind: "message",
+      author: "Page Support Team",
+      text: "Your page will be disabled in 24 hours for breaking our rules. Verify your account now at meta-pages-help.com",
+    },
+    wantHide: true,
   },
 ];

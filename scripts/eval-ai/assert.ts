@@ -11,7 +11,12 @@ import {
   type DraftRoom,
 } from "@/features/social-design/lib/ai-draft";
 import type { CaptionRequest } from "@/features/social/lib/caption-ai";
-import { firstName, REPLY_MAX, type ReplyRequest } from "@/features/social/lib/inbox/map";
+import {
+  firstName,
+  replyLength,
+  replyLimit,
+  type ReplyRequest,
+} from "@/features/social/lib/inbox/map";
 import { GOOGLE_MAX_CHARS } from "@/features/social/lib/validate";
 
 /** Grouping for a reported check. */
@@ -362,19 +367,21 @@ export function replyProblems(
   if (/\*\*|^#+ /m.test(text)) hard.push("has markup");
   if (hashtagsIn(text).length > 0) hard.push("has hashtags");
   if ((text.match(EMOJI_RE) ?? []).length > 0) hard.push("has emoji");
-  if (text.length > REPLY_MAX[req.platform]) {
-    hard.push(`${text.length} characters, ${req.platform} takes ${REPLY_MAX[req.platform]}`);
-  }
+  const direct = req.kind === "message";
+  const max = replyLimit(req.platform, direct);
+  const length = replyLength(req.platform, direct, text);
+  if (length > max) hard.push(`${length} characters, ${req.platform} takes ${max}`);
   const said = [req.text, req.postText ?? "", ...req.earlier.map((m) => m.text)].join("\n");
   const invented = inventedFigures(text, said, facts);
   if (invented.length > 0) hard.push(`figures not in the thread or facts: ${invented.join(", ")}`);
-  if (req.platform === "instagram" && /https?:\/\/|\bwww\.|\.co\.nz\b/i.test(text)) {
+  // Links work in Instagram messages, just not in comments.
+  if (req.platform === "instagram" && !direct && /https?:\/\/|\bwww\.|\.co\.nz\b/i.test(text)) {
     hard.push("a link Instagram can't tap");
   }
 
   // A sentence ends at . ! or ? followed by a space or the end.
   const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => s.trim()).length;
-  const most = req.kind === "review" ? 4 : 2;
+  const most = req.kind === "review" ? 4 : direct ? 3 : 2;
   if (sentences > most + 1) hard.push(`${sentences} sentences, at most ${most}`);
   else if (sentences > most) soft.push(`${sentences} sentences, at most ${most}`);
   if (req.kind === "review" && sentences < 2) soft.push("one sentence for a review");

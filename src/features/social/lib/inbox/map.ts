@@ -1,16 +1,49 @@
 // src/features/social/lib/inbox/map.ts
-// Inbox rules with no I/O: reading Facebook comments, Instagram comments and Google reviews into
-// rows, which thread still needs a reply, the inbox's address, the names and snippets the list
-// shows with their times, and the brief for making a post from a review.
+// Inbox rules with no I/O: reading Facebook comments, Instagram comments, Google reviews and
+// Messenger and Instagram conversations into rows, which thread still needs a reply, how long a
+// message can still be answered, the inbox's address, the names and snippets the list shows with
+// their times, and the brief for making a post from a review.
 
 import { timeAgo } from "@/features/business/lib/calculator-draft";
 import { plainPunctuation } from "@/features/mailing/lib/ai-draft";
 import { POST_BRIEF_MAX } from "@/features/social-design/lib/ai-draft";
 import { SOCIAL_INBOX_PATH } from "@/features/social/lib/links";
-import { SOCIAL_PLATFORMS, type SocialPlatformKey } from "@/features/social/lib/validate";
+import {
+  PLATFORM_LABEL,
+  SOCIAL_PLATFORMS,
+  type SocialPlatformKey,
+} from "@/features/social/lib/validate";
 import { NZ_TZ } from "@/shared/lib/timezone-utils";
 
-export type InboxKind = "comment" | "reply" | "review";
+export type InboxKind = "comment" | "reply" | "review" | "conversation" | "message";
+
+/** The apps with direct messages. */
+export const MESSAGING_PLATFORMS = ["facebook", "instagram"] as const;
+export type MessagingPlatform = (typeof MESSAGING_PLATFORMS)[number];
+
+/** Where each app's direct messages live, as people call it. */
+export const DM_APP_LABEL: Record<MessagingPlatform, string> = {
+  facebook: "Messenger",
+  instagram: "Instagram",
+};
+
+/**
+ * Where an app's direct messages live, for any app key.
+ * @param platform - The app.
+ * @returns "Messenger" or "Instagram" (Google, which has none, keeps its own name).
+ */
+export function dmAppLabel(platform: SocialPlatformKey): string {
+  return platform === "google" ? PLATFORM_LABEL.google : DM_APP_LABEL[platform];
+}
+
+/**
+ * Whether a thread is a direct message conversation rather than comments or a review.
+ * @param kind - The thread's or a message's kind.
+ * @returns True for a conversation or one of its messages.
+ */
+export function isDirect(kind: InboxKind): boolean {
+  return kind === "conversation" || kind === "message";
+}
 
 /**
  * How long after our reply a message must come to count as new. Google can stamp a review a few
@@ -245,6 +278,159 @@ export function googleRows(review: GoogleReview): CommentRow[] {
   return rows;
 }
 
+// --- Direct messages ---
+
+/** A message as Messenger or Instagram gives it inside a conversation. */
+export interface MetaMessage {
+  id?: string;
+  created_time?: string;
+  /** Messenger gives a name, Instagram a username. */
+  from?: { id?: string; name?: string; username?: string };
+  /** Empty when the message is only a picture, sticker or share. */
+  message?: string;
+  attachments?: { data?: { mime_type?: string }[] };
+  sticker?: string;
+  story?: unknown;
+  shares?: { data?: unknown[] };
+}
+
+/** A conversation as the Page's conversations list gives it, newest message first. */
+export interface MetaConversation {
+  id?: string;
+  updated_time?: string;
+  /** Messenger only: the conversation in the Page's inbox, from facebook.com. */
+  link?: string;
+  participants?: { data?: { id?: string; name?: string; username?: string }[] };
+  messages?: { data?: MetaMessage[]; paging?: { next?: string } };
+}
+
+/** Where to open a conversation on Instagram, which gives no link to one. */
+export const INSTAGRAM_DM_URL = "https://www.instagram.com/direct/inbox/";
+
+/**
+ * What a message with no words held, for the inbox to show in their place.
+ * @param m - The message.
+ * @returns Words like "(Sent a picture)".
+ */
+export function attachmentLabel(m: MetaMessage): string {
+  const files = m.attachments?.data ?? [];
+  if (files.length > 0) {
+    const type = files[0]?.mime_type ?? "";
+    const what = type.startsWith("image/")
+      ? ["a picture", "pictures"]
+      : type.startsWith("video/")
+        ? ["a video", "videos"]
+        : type.startsWith("audio/")
+          ? ["a voice message", "voice messages"]
+          : ["a file", "files"];
+    return files.length === 1 ? `(Sent ${what[0]})` : `(Sent ${files.length} ${what[1]})`;
+  }
+  if (m.sticker) return "(Sent a sticker)";
+  if (m.story) return "(Replied to your story)";
+  if ((m.shares?.data ?? []).length > 0) return "(Shared a post)";
+  return "(Sent something the app can't show here)";
+}
+
+/**
+ * Reads a conversation into a top row for the person we're talking to, then a row per message.
+ * The top row's words are the latest message ("You: " when it's ours), so the list reads like a
+ * chat list, and its author id is where a reply is sent.
+ * @param platform - The app.
+ * @param conv - The conversation.
+ * @param us - Our side: the Page id on Messenger, the Instagram account id on Instagram.
+ * @returns The rows, the conversation's first; none when it lacks an id or messages.
+ */
+export function conversationRows(
+  platform: MessagingPlatform,
+  conv: MetaConversation,
+  us: string,
+): CommentRow[] {
+  if (!conv.id) return [];
+  const convId = conv.id;
+  const them = (conv.participants?.data ?? []).find((p) => p.id && p.id !== us);
+  const messages = (conv.messages?.data ?? []).flatMap((m): CommentRow[] => {
+    if (!m.id || !m.created_time) return [];
+    return [
+      {
+        platform,
+        kind: "message",
+        externalId: m.id,
+        threadExternalId: convId,
+        objectExternalId: null,
+        authorName: (m.from?.username ?? m.from?.name)?.trim() || null,
+        authorId: m.from?.id ?? null,
+        fromUs: m.from?.id === us,
+        text: m.message?.trim() || attachmentLabel(m),
+        rating: null,
+        postedAt: new Date(m.created_time),
+        editedAt: null,
+        hidden: null,
+      },
+    ];
+  });
+  if (messages.length === 0) return [];
+  const byTime = [...messages].sort((a, b) => a.postedAt.getTime() - b.postedAt.getTime());
+  const latest = byTime.at(-1)!;
+  return [
+    {
+      platform,
+      kind: "conversation",
+      externalId: convId,
+      threadExternalId: null,
+      objectExternalId: null,
+      authorName: (them?.username ?? them?.name)?.trim() || null,
+      authorId: them?.id ?? null,
+      fromUs: false,
+      text: latest.fromUs ? `You: ${latest.text}` : latest.text,
+      rating: null,
+      postedAt: byTime[0]!.postedAt,
+      editedAt: null,
+      hidden: null,
+    },
+    ...byTime,
+  ];
+}
+
+/** How long after someone's last message the apps let a business answer it. */
+export const DM_WINDOW_MS = 24 * 3_600_000;
+
+/**
+ * Until when a conversation can still be answered: a day after their latest message.
+ * @param messages - The conversation's messages.
+ * @returns The time, or null when they haven't written (so it can't be answered at all).
+ */
+export function replyOpenUntil(
+  messages: readonly { fromUs: boolean; postedAt: string | Date; gone?: boolean }[],
+): Date | null {
+  const theirs = messages
+    .filter((m) => !m.fromUs && !m.gone)
+    .map((m) => new Date(m.postedAt).getTime());
+  return theirs.length > 0 ? new Date(Math.max(...theirs) + DM_WINDOW_MS) : null;
+}
+
+/**
+ * Whether Meta refused a message for coming after the 24-hour window. It sends that as code 10,
+ * the code it also uses for a missing permission, so only the wording tells them apart.
+ * @param raw - Meta's own message.
+ * @returns True for the window refusal.
+ */
+export function isWindowError(raw: string | null): boolean {
+  return /outside (of )?(the )?allowed window/i.test(raw ?? "");
+}
+
+/**
+ * Why a conversation can't be answered from the inbox.
+ * @param platform - Facebook (Messenger) or Instagram.
+ * @param theyWrote - Whether the person has sent a message in it.
+ * @returns The words.
+ */
+export function windowClosedText(platform: SocialPlatformKey, theyWrote: boolean): string {
+  const app = dmAppLabel(platform);
+  return theyWrote
+    ? `It's been more than a day since their last message, and ${app} only lets a business answer from here within a day. Answer it on ${app} itself instead.`
+    : `They haven't sent you a message in this chat, and ${app} only lets a business answer from here within a day of one. Message them on ${app} itself instead.`;
+}
+
 // --- Threads ---
 
 /** One message of a thread, as the needs-reply rule reads it. */
@@ -362,6 +548,10 @@ export interface CommentsState {
   googleSeen: string | null;
   /** Why an app's read failed, by app. */
   errors: Partial<Record<SocialPlatformKey, string>>;
+  /** The newest conversation change read per app, as ISO; later runs read back to it. */
+  messagesSeen: Partial<Record<MessagingPlatform, string>>;
+  /** Why an app's messages couldn't be read, by app. */
+  messageErrors: Partial<Record<MessagingPlatform, string>>;
 }
 
 /**
@@ -386,6 +576,8 @@ export function readCommentsState(raw: string | null | undefined): CommentsState
     googleTotal: null,
     googleSeen: null,
     errors: {},
+    messagesSeen: {},
+    messageErrors: {},
   };
   if (!raw) return empty;
   try {
@@ -399,12 +591,24 @@ export function readCommentsState(raw: string | null | undefined): CommentsState
       const message = parsed.errors?.[platform];
       if (typeof message === "string") errors[platform] = message;
     }
+    const messagesSeen: CommentsState["messagesSeen"] = {};
+    const messageErrors: CommentsState["messageErrors"] = {};
+    for (const platform of MESSAGING_PLATFORMS) {
+      const seen = parsed.messagesSeen?.[platform];
+      if (typeof seen === "string" && !Number.isNaN(Date.parse(seen))) {
+        messagesSeen[platform] = seen;
+      }
+      const message = parsed.messageErrors?.[platform];
+      if (typeof message === "string") messageErrors[platform] = message;
+    }
     return {
       ranAt: typeof parsed.ranAt === "string" ? parsed.ranAt : null,
       counts,
       googleTotal: Number.isInteger(parsed.googleTotal) ? (parsed.googleTotal as number) : null,
       googleSeen: typeof parsed.googleSeen === "string" ? parsed.googleSeen : null,
       errors,
+      messagesSeen,
+      messageErrors,
     };
   } catch {
     return empty;
@@ -459,17 +663,67 @@ export const REPLY_MAX: Record<SocialPlatformKey, number> = {
   google: 4000,
 };
 
+/** Longest direct message each app takes: Messenger counts characters, Instagram bytes. */
+export const DM_MAX: Record<MessagingPlatform, number> = { facebook: 2000, instagram: 1000 };
+
+/**
+ * The longest reply a thread takes.
+ * @param platform - The app.
+ * @param direct - Whether it's a direct message.
+ * @returns The limit, in what {@link replyLength} counts.
+ */
+export function replyLimit(platform: SocialPlatformKey, direct: boolean): number {
+  return direct && platform !== "google" ? DM_MAX[platform] : REPLY_MAX[platform];
+}
+
+/**
+ * A reply's length as the app counts it: bytes for an Instagram message (an emoji is up to 4),
+ * characters otherwise.
+ * @param platform - The app.
+ * @param direct - Whether it's a direct message.
+ * @param text - The reply.
+ * @returns The length.
+ */
+export function replyLength(platform: SocialPlatformKey, direct: boolean, text: string): number {
+  return direct && platform === "instagram" ? new TextEncoder().encode(text).length : text.length;
+}
+
+/**
+ * Cuts a reply to what the app takes, never splitting a character.
+ * @param text - The reply.
+ * @param platform - The app.
+ * @param direct - Whether it's a direct message.
+ * @returns The reply, cut when it was too long.
+ */
+function clipReply(text: string, platform: SocialPlatformKey, direct: boolean): string {
+  const max = replyLimit(platform, direct);
+  let out = "";
+  for (const ch of text) {
+    if (replyLength(platform, direct, out + ch) > max) break;
+    out += ch;
+  }
+  return out;
+}
+
 /**
  * What's wrong with a reply before it's sent.
  * @param platform - The app.
  * @param text - The reply.
+ * @param direct - Whether it's a direct message, which the apps keep shorter.
  * @returns The problem, or null when it can go.
  */
-export function replyProblem(platform: SocialPlatformKey, text: string): string | null {
+export function replyProblem(
+  platform: SocialPlatformKey,
+  text: string,
+  direct = false,
+): string | null {
   const reply = text.trim();
   if (!reply) return "Write a reply first.";
-  if (reply.length > REPLY_MAX[platform]) {
-    return `Keep it to ${REPLY_MAX[platform].toLocaleString("en-NZ")} characters.`;
+  const max = replyLimit(platform, direct);
+  if (replyLength(platform, direct, reply) > max) {
+    return direct && platform === "instagram"
+      ? "Keep it shorter. Instagram takes about 1,000 letters in a message, fewer with emoji."
+      : `Keep it to ${max.toLocaleString("en-NZ")} characters.`;
   }
   return null;
 }
@@ -480,7 +734,8 @@ export const REPLY_INPUT_MAX = 2000;
 /** What a reply suggestion is wanted for. */
 export interface ReplyRequest {
   platform: SocialPlatformKey;
-  kind: "comment" | "review";
+  /** "message" is a direct message on Messenger or Instagram. */
+  kind: "comment" | "review" | "message";
   /** A review's stars, 1 to 5. */
   rating: number | null;
   /** The writer's name as the app gave it. */
@@ -511,8 +766,9 @@ export function parseReplyRequest(raw: unknown): ReplyRequest | { error: string 
   if (!(SOCIAL_PLATFORMS as readonly string[]).includes(platform)) {
     return { error: "Say which app it's on." };
   }
-  const kind = body.kind === "review" ? "review" : "comment";
+  const kind = body.kind === "review" || body.kind === "message" ? body.kind : "comment";
   if (kind === "review" && platform !== "google") return { error: "Only Google has reviews." };
+  if (kind === "message" && platform === "google") return { error: "Google has no messages." };
   const rating =
     kind === "review" && Number.isInteger(body.rating) && (body.rating as number) >= 1
       ? Math.min(5, body.rating as number)
@@ -548,18 +804,26 @@ export interface ReplySuggestion {
  * Reads the AI's answer: plain punctuation, no hashtags, capped to what the app takes.
  * @param raw - The parsed JSON.
  * @param platform - The app it's for.
+ * @param direct - Whether it answers a direct message.
  * @returns The suggestion.
  */
-export function readReplySuggestion(raw: unknown, platform: SocialPlatformKey): ReplySuggestion {
+export function readReplySuggestion(
+  raw: unknown,
+  platform: SocialPlatformKey,
+  direct = false,
+): ReplySuggestion {
   const value = (raw ?? {}) as { reply?: unknown; hide?: unknown };
   const reply =
     typeof value.reply === "string"
-      ? plainPunctuation(value.reply)
-          .replace(/(^|\s)#[\p{L}\p{N}_]+/gu, "$1")
-          .replace(/[ \t]+\n/g, "\n")
-          .replace(/[ \t]{2,}/g, " ")
-          .trim()
-          .slice(0, REPLY_MAX[platform])
+      ? clipReply(
+          plainPunctuation(value.reply)
+            .replace(/(^|\s)#[\p{L}\p{N}_]+/gu, "$1")
+            .replace(/[ \t]+\n/g, "\n")
+            .replace(/[ \t]{2,}/g, " ")
+            .trim(),
+          platform,
+          direct,
+        )
       : "";
   return { reply, hide: value.hide === true };
 }
@@ -579,11 +843,29 @@ export const INBOX_FILTER_LABEL: Record<InboxFilter, string> = {
 export type InboxTab = "inbox" | "archive";
 export type InboxApp = SocialPlatformKey | "all";
 
+/** Which kinds of thread the list shows. */
+export const INBOX_SHOWS = ["all", "comments", "messages"] as const;
+export type InboxShow = (typeof INBOX_SHOWS)[number];
+
+export const INBOX_SHOW_LABEL: Record<InboxShow, string> = {
+  all: "Everything",
+  comments: "Comments and reviews",
+  messages: "Messages",
+};
+
+/** The thread kinds each {@link InboxShow} lists, or null for every kind. */
+export const SHOW_KINDS: Record<InboxShow, InboxKind[] | null> = {
+  all: null,
+  comments: ["comment", "review"],
+  messages: ["conversation"],
+};
+
 /** What the inbox's address asks for. */
 export interface InboxQuery {
   tab: InboxTab;
   filter: InboxFilter;
   app: InboxApp;
+  show: InboxShow;
   q: string;
 }
 
@@ -593,6 +875,7 @@ export interface InboxQuery {
  * @param params.tab - "archive" or anything else.
  * @param params.filter - One of {@link INBOX_FILTERS}.
  * @param params.app - An app key.
+ * @param params.show - One of {@link INBOX_SHOWS}.
  * @param params.q - Words to find.
  * @returns The query.
  */
@@ -600,6 +883,7 @@ export function readInboxQuery(params: {
   tab?: string;
   filter?: string;
   app?: string;
+  show?: string;
   q?: string;
 }): InboxQuery {
   return {
@@ -609,6 +893,9 @@ export function readInboxQuery(params: {
       : "all",
     app: (SOCIAL_PLATFORMS as readonly string[]).includes(params.app ?? "")
       ? (params.app as SocialPlatformKey)
+      : "all",
+    show: (INBOX_SHOWS as readonly string[]).includes(params.show ?? "")
+      ? (params.show as InboxShow)
       : "all",
     q: (params.q ?? "").trim().slice(0, 100),
   };
@@ -625,6 +912,7 @@ export function inboxHref(query: InboxQuery, open?: string | null): string {
   if (query.tab !== "inbox") params.set("tab", query.tab);
   if (query.filter !== "all") params.set("filter", query.filter);
   if (query.app !== "all") params.set("app", query.app);
+  if (query.show !== "all") params.set("show", query.show);
   if (query.q) params.set("q", query.q);
   if (open) params.set("open", open);
   const search = params.toString();

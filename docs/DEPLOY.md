@@ -151,16 +151,27 @@ The Overview warns when the token stops working, or when it or its data access e
 permissions and dates, Page, post and Instagram stats under each metric name, whether comments come
 back with who wrote them, and the Instagram posting quota.
 
-**State on 2026-10-22** (Page token for the "To the Point Posting" app, never runs out, data access
-until 3 Jan 2027):
+**How it's set up (2026-10-23):**
+
+- The app's use cases are Manage everything on your Page, Manage messaging & content on Instagram
+  (its "API setup with Facebook login" side; the `instagram_business_*` permissions belong to the
+  Instagram-login side, which the site doesn't use) and Engage with customers on Messenger.
+- Meta refused every name for a new system user, so the token comes from the existing "Conversions
+  API System User", which was given the To the Point Posting app and the Instagram account with full
+  access. Don't press its Revoke tokens without checking it only revokes this app's tokens: the same
+  system user holds the ad tracking token.
+
+**State on 2026-10-23** (Page token for the "To the Point Posting" app, never runs out, data access
+never ends; the probe shows all 15 permissions the Overview lists):
 
 - Posting and take-downs work on all three apps.
 - Post views are `post_media_view`; `post_media_views` and `post_impressions` are rejected as
-  invalid metrics. Page insights answer but return no figures without `read_insights`.
-- Instagram stats and Facebook comments need `instagram_manage_insights`, `read_insights`,
-  `pages_read_user_content` and `pages_manage_engagement`, which the token doesn't have yet.
-- Google posts and reviews answer; the **Business Profile Performance API is switched off** in
-  Google Cloud and needs turning on before Google stats work.
+  invalid metrics.
+- Page insights, Instagram account and media insights, and Facebook comments now answer.
+- Google posts, reviews and the Business Profile Performance API all answer.
+- Every permission is "Ready for testing" (Standard access): it works for people with a role on the
+  app. Messages and comments from the public need Live mode, Business Verification and Advanced
+  access through App Review.
 - Live mode: not checked yet. Whether posts made through the API show to the public, and whether
   comments from people without a role on the app come back with who wrote them, decide if the app
   needs Live mode (and App Review) before the comments inbox.
@@ -209,3 +220,21 @@ until 3 Jan 2027):
   app needs Live mode.
 - Suggest a reply uses the AI writers' provider (feature `social-reply`) with the live business
   facts; nothing is ever sent without pressing Send.
+
+**Messages (Social > Inbox, Messages):**
+
+- Messenger and Instagram conversations are read by the same `/api/cron/sync-social` job and Check
+  now, with `pages_messaging` and `instagram_manage_messages`. Each conversation keeps its newest 20
+  messages. Pictures, videos, stickers and story replies show as a line saying what was sent.
+- A reply goes through the Send API as a `RESPONSE`, so it only works within a day of the person's
+  last message. After that the Inbox says so and links to the app. Messenger takes 2,000 characters
+  and Instagram about 1,000 (counted in bytes, so emoji use more).
+- Messages can't be hidden or deleted from the site; Archive puts a chat away.
+- Every read takes in the last 7 days of chats again, so a message the sender unsends drops out of
+  the next one (or Check now): it shows as "Unsent" and its words are cleared from the database. A
+  chat whose every message was unsent leaves the Inbox until they write again.
+- With Standard access (the app in Development mode) Meta only returns chats with people who have a
+  role on the app. Customers' messages need Live mode, Business Verification and Advanced access for
+  `pages_messaging` and `instagram_manage_messages` through App Review.
+- Dev run on 2026-10-23: one Instagram chat (Harrison's own second account, only the Page's
+  messages) and no Messenger chats. No message has been sent from the site yet.

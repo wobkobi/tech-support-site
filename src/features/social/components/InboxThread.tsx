@@ -2,7 +2,8 @@
 // src/features/social/components/InboxThread.tsx
 // One open inbox thread: the post it's on, every message with Hide and Delete, a reply box with
 // Suggest a reply, and Archive, Mark unread, Open on the app and, on a review, Make a post from
-// this review. Opening an unread thread marks it read.
+// this review. A Messenger or Instagram conversation reads as a chat, with the box open only
+// within a day of their last message. Opening an unread thread marks it read.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
@@ -19,7 +20,14 @@ import type {
   InboxMessage,
   InboxThreadDetail,
 } from "@/features/social/lib/inbox/inbox-data.server";
-import { messageWhen, REPLY_MAX, replyProblem } from "@/features/social/lib/inbox/map";
+import {
+  dmAppLabel,
+  messageWhen,
+  replyLength,
+  replyLimit,
+  replyProblem,
+  windowClosedText,
+} from "@/features/social/lib/inbox/map";
 import { PLATFORM_LABEL } from "@/features/social/lib/validate";
 import { Notice } from "@/shared/components/Notice";
 import { cn } from "@/shared/lib/cn";
@@ -77,13 +85,17 @@ export function InboxThread({
   const [making, setMaking] = useState(false);
   const markedRead = useRef<string | null>(null);
 
-  const app = PLATFORM_LABEL[thread.platform];
+  const direct = thread.kind === "conversation";
+  const app = direct ? dmAppLabel(thread.platform) : PLATFORM_LABEL[thread.platform];
   const top = thread.messages[0];
   const answer = messageToAnswer(thread.messages);
   const ourReply = thread.messages.some((m) => m.fromUs && !m.gone);
   const nowMs = Date.parse(now);
-  const problem = text.trim() ? replyProblem(thread.platform, text) : null;
+  const problem = text.trim() ? replyProblem(thread.platform, text, direct) : null;
   const unchanged = googleReply !== undefined && text.trim() === googleReply.text.trim();
+  // The apps only take a business's message within a day of the person's last one.
+  const windowOpen = !direct || (thread.openUntil !== null && Date.parse(thread.openUntil) > nowMs);
+  const sendLabel = direct ? "Send message" : "Send reply";
 
   // Opening an unread thread marks it read, once per thread.
   useEffect(() => {
@@ -128,7 +140,7 @@ export function InboxThread({
 
   /** Sends the reply on the app. */
   async function send(): Promise<void> {
-    const wrong = replyProblem(thread.platform, text);
+    const wrong = replyProblem(thread.platform, text, direct);
     if (wrong) {
       toast(wrong, { tone: "error" });
       return;
@@ -146,7 +158,7 @@ export function InboxThread({
     }
     if (thread.platform !== "google") setText("");
     setLooksLikeSpam(false);
-    toast(`Reply posted on ${app}.`, { tone: "success" });
+    toast(direct ? `Message sent on ${app}.` : `Reply posted on ${app}.`, { tone: "success" });
     announceInboxChange();
     router.refresh();
   }
@@ -161,7 +173,7 @@ export function InboxThread({
       "POST",
       {
         platform: thread.platform,
-        kind: thread.kind === "review" ? "review" : "comment",
+        kind: direct ? "message" : thread.kind === "review" ? "review" : "comment",
         rating: top?.rating ?? null,
         author: answer.authorName,
         text: answer.text,
@@ -169,7 +181,7 @@ export function InboxThread({
           .slice(0, at)
           .filter((m) => !m.gone)
           .map((m) => ({ fromUs: m.fromUs, text: m.text })),
-        postText: thread.post.text,
+        postText: direct ? null : thread.post.text,
       },
     );
     setSuggesting(false);
@@ -212,8 +224,9 @@ export function InboxThread({
     if (ok && deleting.id === top?.id) router.push(closeHref);
   }
 
-  const title =
-    thread.kind === "review"
+  const title = direct
+    ? `${app} chat with ${thread.with ?? "someone"}`
+    : thread.kind === "review"
       ? "Google review"
       : thread.post.name
         ? `Comment on ${thread.post.name}`
@@ -284,7 +297,7 @@ export function InboxThread({
         </div>
       </div>
 
-      {thread.kind !== "review" && (thread.post.text || thread.post.imageUrl) && (
+      {thread.kind === "comment" && (thread.post.text || thread.post.imageUrl) && (
         <div className="flex gap-3 rounded-lg border border-admin-border bg-admin-bg p-3">
           {thread.post.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element -- Blob picture of unknown size, which next/image needs up front.
@@ -307,7 +320,9 @@ export function InboxThread({
 
       {thread.gone && (
         <Notice tone="warn" onGrey>
-          This is no longer on {app}, so it can&apos;t be answered.
+          {direct
+            ? `Every message in this chat was unsent, so there's nothing left to answer.`
+            : `This is no longer on ${app}, so it can't be answered.`}
         </Notice>
       )}
 
@@ -317,11 +332,14 @@ export function InboxThread({
             key={m.id}
             className={cn(
               "rounded-lg border p-3",
+              // A chat sets theirs and ours on opposite sides; a comment thread indents replies.
               m.fromUs
                 ? "ml-6 border-moonstone-200 bg-moonstone-50"
-                : i > 0
-                  ? "ml-6 border-admin-border"
-                  : "border-admin-border",
+                : direct
+                  ? "mr-6 border-admin-border"
+                  : i > 0
+                    ? "ml-6 border-admin-border"
+                    : "border-admin-border",
               m.gone && "opacity-60",
             )}
           >
@@ -333,16 +351,21 @@ export function InboxThread({
                 {m.editedAt && " (edited)"}
               </span>
               {m.hidden && <StatusPill tone="warning">Hidden</StatusPill>}
-              {m.gone && <StatusPill tone="neutral">Deleted</StatusPill>}
+              {m.gone && <StatusPill tone="neutral">{direct ? "Unsent" : "Deleted"}</StatusPill>}
             </div>
             {m.text ? (
               <p className="mt-1.5 text-base wrap-break-word whitespace-pre-line text-admin-text">
                 {m.text}
               </p>
+            ) : direct ? (
+              // An unsent message's words are cleared when the sync finds it gone.
+              <p className="mt-1.5 text-base text-admin-muted italic">
+                {m.fromUs ? "You unsent this message." : "They unsent this message."}
+              </p>
             ) : (
               <p className="mt-1.5 text-base text-admin-muted italic">Stars only, no words.</p>
             )}
-            {!m.gone && (
+            {!m.gone && !direct && (
               <MessageActions
                 message={m}
                 platform={thread.platform}
@@ -363,12 +386,41 @@ export function InboxThread({
         ))}
       </ol>
 
-      {!thread.gone && (
+      {!thread.gone && !windowOpen && (
+        <Notice tone="info" onGrey>
+          {windowClosedText(
+            thread.platform,
+            thread.messages.some((m) => !m.fromUs && !m.gone),
+          )}
+          {thread.post.url && (
+            <>
+              {" "}
+              <a
+                href={thread.post.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold underline"
+              >
+                Open it on {app}
+                <span className="sr-only"> (opens in a new tab)</span>
+              </a>
+              .
+            </>
+          )}
+        </Notice>
+      )}
+
+      {!thread.gone && windowOpen && (
         <div className="flex flex-col gap-3 border-t border-admin-border pt-4">
           <label htmlFor={replyId} className="text-base font-semibold text-admin-text">
             {thread.platform === "google" && ourReply ? "Change your reply" : "Your reply"}
           </label>
-          {looksLikeSpam && (
+          {looksLikeSpam && direct && (
+            <Notice tone="warn" onGrey>
+              This reads like spam. You don&apos;t have to answer it: Archive puts it away.
+            </Notice>
+          )}
+          {looksLikeSpam && !direct && (
             <Notice tone="warn" onGrey>
               <span className="flex flex-wrap items-center gap-3">
                 This reads like spam. Hide it rather than answer?
@@ -400,15 +452,22 @@ export function InboxThread({
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={
-              thread.kind === "review" ? "Thank them, or answer what they said." : "Write a reply."
+              direct
+                ? "Write a message."
+                : thread.kind === "review"
+                  ? "Thank them, or answer what they said."
+                  : "Write a reply."
             }
             aria-describedby={`${replyId}-hint`}
           />
           <p id={`${replyId}-hint`} className="text-sm text-admin-muted">
-            {text.length} of {REPLY_MAX[thread.platform]} characters.{" "}
-            {thread.platform === "google"
-              ? "It shows under the review for everyone, and sending again replaces it."
-              : "It shows under their comment for everyone."}
+            {replyLength(thread.platform, direct, text)} of {replyLimit(thread.platform, direct)}{" "}
+            characters.{" "}
+            {direct
+              ? `Only they see it. You can answer from here until ${messageWhen(thread.openUntil!, nowMs)}.`
+              : thread.platform === "google"
+                ? "It shows under the review for everyone, and sending again replaces it."
+                : "It shows under their comment for everyone."}
             {problem && <span className="block font-semibold text-coquelicot-700">{problem}</span>}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -427,12 +486,12 @@ export function InboxThread({
               disabled={suggesting || !text.trim() || problem !== null || unchanged}
               onClick={() => void send()}
             >
-              Send reply
+              {sendLabel}
             </AdminButton>
           </div>
           {canSuggest && (
             <p className="text-sm text-admin-muted">
-              A suggestion only fills the box. Nothing goes out until you press Send reply.
+              A suggestion only fills the box. Nothing goes out until you press {sendLabel}.
             </p>
           )}
         </div>

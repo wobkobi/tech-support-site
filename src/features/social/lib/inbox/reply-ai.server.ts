@@ -1,14 +1,15 @@
 // src/features/social/lib/inbox/reply-ai.server.ts
-// Server-only: suggests a reply to a comment or review in the operator's voice, with the live
-// business facts for price and area questions. Never sent on its own: the Inbox puts it in the
-// reply box to check first. Rules are YES/NO branches with INVARIANT lines, like the other AI
-// writers.
+// Server-only: suggests a reply to a comment, review or direct message in the operator's voice,
+// with the live business facts for price and area questions. Never sent on its own: the Inbox
+// puts it in the reply box to check first. Rules are YES/NO branches with INVARIANT lines, like
+// the other AI writers.
 
 import {
+  DM_APP_LABEL,
   firstName,
   readReplySuggestion,
   REPLY_INPUT_MAX,
-  REPLY_MAX,
+  replyLimit,
   type ReplyRequest,
   type ReplySuggestion,
 } from "@/features/social/lib/inbox/map";
@@ -22,7 +23,7 @@ import { getSiteUrl } from "@/shared/lib/site-url";
 import "server-only";
 
 /**
- * The WHAT IT IS section: reviews by their stars, comments by what they ask.
+ * The WHAT IT IS section: reviews by their stars, comments and messages by what they ask.
  * @param req - The request.
  * @param phone - The live phone number.
  * @param site - The site's address.
@@ -41,6 +42,25 @@ Is it 4 or 5 stars?
   - NO: a short, warm thanks.
 - NO (1 to 3 stars, or no stars): say sorry it wasn't what they hoped for, acknowledge what they raised in their own terms without disputing it, and ask them to give me a call on ${phone}, written exactly like that, so I can put it right. INVARIANT: never argue, never blame them, never offer a refund, discount or free work, and never promise an outcome.
 INVARIANT: never make up details of the job; say only what the review says.`;
+  }
+  if (req.kind === "message" && req.platform !== "google") {
+    // Links work in direct messages on both apps, unlike Instagram comments.
+    const booking = `${site}/booking, written exactly like that`;
+    return `A private message someone sent me on ${DM_APP_LABEL[req.platform]}. Only they see my reply.
+Is it spam, a scam, a sales pitch, abuse, or a link to somewhere else?
+- YES: the reply is "" and hide is true. Stop there.
+- NO: hide is false, and go on.
+Does it ask what something costs?
+- YES: give the standard rate exactly as BUSINESS FACTS gives it and point them to book at ${booking}. INVARIANT: never give a total, an estimate or a quote for their job; every job is different.
+- NO: do they want to book, or tell me about a problem with a device?
+  - YES: say I can help and point them to book at ${booking}, or to call me on ${phone}, written exactly like that. INVARIANT: never promise a time, a day or a fix, and never guess what's wrong beyond what they said.
+  - NO: does it ask something BUSINESS FACTS answers (hours, area, what I fix)?
+    - YES: answer it from BUSINESS FACTS.
+    - NO: does it ask anything else?
+      - YES: say I'd be happy to help and ask them to give me a call on ${phone}, written exactly like that. INVARIANT: never make up a fact.
+      - NO: is it thanks?
+        - YES: thank them back, warmly and briefly.
+        - NO: reply in kind, friendly and short.`;
   }
   return `A comment on one of my ${PLATFORM_LABEL[req.platform]} posts.
 Is it spam, a scam, a sales pitch, abuse, or a link to somewhere else?
@@ -72,11 +92,17 @@ function systemPrompt(
   parts: { voice: string; brand: string; phone: string; site: string },
 ): string {
   const name = firstName(req.platform, req.author);
+  const direct = req.kind === "message";
   const where =
     req.kind === "review"
       ? "a review someone left on my Google Business Profile"
-      : `a comment on one of my ${PLATFORM_LABEL[req.platform]} posts`;
-  return `You write my reply to ${where}, for a small tech help business. Readers are locals, many of them older and not technical. I read and edit the reply before it is sent.
+      : direct && req.platform !== "google"
+        ? `a private message someone sent me on ${DM_APP_LABEL[req.platform]}`
+        : `a comment on one of my ${PLATFORM_LABEL[req.platform]} posts`;
+  const readers = direct
+    ? "They are most likely a local, maybe older and not technical."
+    : "Readers are locals, many of them older and not technical.";
+  return `You write my reply to ${where}, for a small tech help business. ${readers} I read and edit the reply before it is sent.
 
 ${parts.voice}${parts.brand ? `\n\n${parts.brand}` : ""}
 
@@ -92,7 +118,7 @@ Does EARLIER hold messages?
 - NO: answer MESSAGE on its own.
 
 LENGTH
-${req.kind === "review" ? "2 to 4 sentences." : "INVARIANT: at most 2 sentences."} INVARIANT: at most ${REPLY_MAX[req.platform]} characters.
+${req.kind === "review" ? "2 to 4 sentences." : direct ? "INVARIANT: at most 3 sentences." : "INVARIANT: at most 2 sentences."} INVARIANT: at most ${replyLimit(req.platform, direct)} characters.
 
 STYLE
 Plain text only: no markup, no **bold**, no headings. INVARIANT: no hashtags and no emoji. Don't sign off with my name.
@@ -157,5 +183,5 @@ export async function suggestReply(req: ReplyRequest): Promise<ReplySuggestion> 
     timeoutMs: 20_000,
     maxRetries: 0,
   });
-  return readReplySuggestion(JSON.parse(text), req.platform);
+  return readReplySuggestion(JSON.parse(text), req.platform, req.kind === "message");
 }

@@ -1,11 +1,11 @@
 // src/features/social/components/InboxRow.tsx
-// One inbox thread as a list shows it, used by the Inbox and the Overview's New comments card,
-// and a review's stars.
+// One inbox thread as a list shows it, used by the Inbox and the Overview's New comments and
+// messages card, and a review's stars.
 
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { AppIcons } from "@/features/social/components/AppIcons";
 import type { InboxThreadRow } from "@/features/social/lib/inbox/inbox-data.server";
-import { listWhen } from "@/features/social/lib/inbox/map";
+import { dmAppLabel, listWhen } from "@/features/social/lib/inbox/map";
 import { PLATFORM_LABEL } from "@/features/social/lib/validate";
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
@@ -56,8 +56,10 @@ export function InboxRow({
   open: boolean;
   nowMs: number;
 }): React.ReactElement {
-  const where =
-    row.kind === "review"
+  const conversation = row.kind === "conversation";
+  const where = conversation
+    ? `${dmAppLabel(row.platform)} message`
+    : row.kind === "review"
       ? "Google review"
       : row.postName
         ? `On ${row.postName}`
@@ -102,7 +104,15 @@ export function InboxRow({
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-admin-muted">
             <span className="min-w-0 truncate">{where}</span>
             {row.replies > 0 && (
-              <span>{row.replies === 1 ? "1 reply" : `${row.replies} replies`}</span>
+              <span>
+                {conversation
+                  ? row.replies === 1
+                    ? "1 message"
+                    : `${row.replies} messages`
+                  : row.replies === 1
+                    ? "1 reply"
+                    : `${row.replies} replies`}
+              </span>
             )}
             {row.needsReply && <StatusPill tone="info">Needs a reply</StatusPill>}
             {row.hidden && <StatusPill tone="warning">Hidden</StatusPill>}

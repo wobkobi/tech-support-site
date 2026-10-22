@@ -1,6 +1,7 @@
 // src/app/admin/(shell)/social/(hub)/inbox/page.tsx
-// Admin Social Inbox tab: comments on Facebook and Instagram posts and Google reviews, read by the
-// sync. `?tab=archive`, `?filter=`, `?app=` and `?q=` pick the list, and `?open=` the thread.
+// Admin Social Inbox tab: comments on Facebook and Instagram posts, Google reviews, and Messenger
+// and Instagram messages, read by the sync. `?tab=archive`, `?filter=`, `?app=`, `?show=` and
+// `?q=` pick the list, and `?open=` the thread.
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import { InboxView } from "@/features/social/components/InboxView";
@@ -20,7 +21,10 @@ export const metadata: Metadata = {
 };
 
 /** The address's params. */
-type InboxParams = Record<"tab" | "filter" | "app" | "q" | "open", string | string[] | undefined>;
+type InboxParams = Record<
+  "tab" | "filter" | "app" | "show" | "q" | "open",
+  string | string[] | undefined
+>;
 
 /**
  * A param's single value; a repeated param counts as none.
@@ -34,7 +38,7 @@ function one(value: string | string[] | undefined): string | undefined {
 /**
  * Admin Social Inbox page.
  * @param props - Page props.
- * @param props.searchParams - `tab`, `filter`, `app`, `q` and `open`.
+ * @param props.searchParams - `tab`, `filter`, `app`, `show`, `q` and `open`.
  * @returns Inbox page element.
  */
 export default async function AdminSocialInboxPage({
@@ -48,6 +52,7 @@ export default async function AdminSocialInboxPage({
     tab: one(params.tab),
     filter: one(params.filter),
     app: one(params.app),
+    show: one(params.show),
     q: one(params.q),
   });
   const open = parseObjectId(one(params.open));

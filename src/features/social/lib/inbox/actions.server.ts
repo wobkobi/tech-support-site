@@ -1,17 +1,26 @@
 // src/features/social/lib/inbox/actions.server.ts
 // What the Inbox does to a message on the app itself (reply, hide or show, delete) and to its
 // marks (read, archived), then the stored rows and the thread's state. A message the app says is
-// gone is marked gone, and a missing permission is named.
+// gone is marked gone, and a missing permission is named. Direct messages can only be answered:
+// the apps don't let a business hide or delete them, and only within a day of their last one.
 
 import {
   deleteReviewReply,
   GoogleGoneError,
   replyToReview,
 } from "@/features/social/lib/google-business";
-import { replyProblem } from "@/features/social/lib/inbox/map";
+import {
+  dmAppLabel,
+  isDirect,
+  isWindowError,
+  replyOpenUntil,
+  replyProblem,
+  windowClosedText,
+  type InboxKind,
+} from "@/features/social/lib/inbox/map";
 import { readableError, refreshThreads } from "@/features/social/lib/inbox/sync.server";
 import { metaProblem } from "@/features/social/lib/insights/metrics";
-import { graph, GraphError } from "@/features/social/lib/meta-graph";
+import { graph, GraphError, metaConfig } from "@/features/social/lib/meta-graph";
 import { PLATFORM_LABEL, type SocialPlatformKey } from "@/features/social/lib/validate";
 import { errorResponse } from "@/shared/lib/api-response";
 import { prisma } from "@/shared/lib/prisma";
@@ -49,7 +58,7 @@ export function actionErrorResponse(error: unknown, where: string): NextResponse
 interface Message {
   id: string;
   platform: SocialPlatformKey;
-  kind: "comment" | "reply" | "review";
+  kind: InboxKind;
   externalId: string;
   threadExternalId: string | null;
   fromUs: boolean;
@@ -94,15 +103,22 @@ function rootOf(message: Message): string {
 
 /**
  * Turns an app's refusal into an action error, marking the message gone when the app says so.
+ * A direct message is never marked gone this way: Meta's "does not exist" there can mean the
+ * person, not the conversation.
  * @param message - The message acted on.
  * @param error - What the app threw.
  * @param now - Now.
  * @returns The error to throw.
  */
 async function failed(message: Message, error: unknown, now: Date): Promise<InboxActionError> {
+  // Meta sends the window refusal as code 10, which otherwise reads as a missing permission.
+  if (error instanceof GraphError && isWindowError(error.raw)) {
+    return new InboxActionError(windowClosedText(message.platform, true), 400);
+  }
   const gone =
-    error instanceof GoogleGoneError ||
-    (error instanceof GraphError && metaProblem(error.code, error.raw) === "gone");
+    !isDirect(message.kind) &&
+    (error instanceof GoogleGoneError ||
+      (error instanceof GraphError && metaProblem(error.code, error.raw) === "gone"));
   if (gone) {
     await markGone(message, now);
     return new InboxActionError(`That's no longer on ${PLATFORM_LABEL[message.platform]}.`, 410);
@@ -144,6 +160,7 @@ async function markGone(message: Message, now: Date): Promise<void> {
  */
 export async function replyTo(id: string, text: string, now: Date): Promise<string> {
   const message = await loadMessage(id);
+  if (isDirect(message.kind)) return sendMessage(message, text, now);
   const problem = replyProblem(message.platform, text);
   if (problem) throw new InboxActionError(problem, 400);
   const root = rootOf(message);
@@ -213,7 +230,101 @@ export async function replyTo(id: string, text: string, now: Date): Promise<stri
 }
 
 /**
- * Hides or shows a comment on the app. Google reviews can't be hidden, and nor can our own.
+ * Answers a direct message conversation on Messenger or Instagram and keeps the message. The
+ * apps only take it within a day of their latest message, so that's checked here first, and
+ * again by the app.
+ * @param message - The conversation or one of its messages.
+ * @param text - The message to send.
+ * @param now - Now.
+ * @returns Our id for the sent message.
+ */
+async function sendMessage(message: Message, text: string, now: Date): Promise<string> {
+  const problem = replyProblem(message.platform, text, true);
+  if (problem) throw new InboxActionError(problem, 400);
+  const root = rootOf(message);
+  const thread = await prisma.socialComment.findMany({
+    where: { platform: message.platform, OR: [{ externalId: root }, { threadExternalId: root }] },
+    select: { kind: true, authorId: true, fromUs: true, postedAt: true, goneAt: true },
+  });
+  const top = thread.find((r) => r.kind === "conversation");
+  if (!top?.authorId) {
+    throw new InboxActionError(
+      `Couldn't tell who this is with. Answer it on ${dmAppLabel(message.platform)} instead.`,
+      400,
+    );
+  }
+  const until = replyOpenUntil(
+    thread
+      .filter((r) => r.kind === "message")
+      .map((r) => ({ fromUs: r.fromUs, postedAt: r.postedAt, gone: r.goneAt !== null })),
+  );
+  if (!until || now > until) {
+    throw new InboxActionError(windowClosedText(message.platform, until !== null), 400);
+  }
+  const { pageId } = metaConfig();
+  if (!pageId) throw new InboxActionError("META_PAGE_ID isn't set.", 503);
+  const reply = text.trim();
+
+  let externalId: string;
+  try {
+    // Both apps answer through the Page; Instagram's recipient is the person's Instagram id.
+    const res = await graph<{ message_id?: string }>(`/${pageId}/messages`, "POST", {
+      recipient: JSON.stringify({ id: top.authorId }),
+      messaging_type: "RESPONSE",
+      message: JSON.stringify({ text: reply }),
+    });
+    if (!res.message_id) {
+      throw new Error(`${dmAppLabel(message.platform)} didn't say it was sent.`);
+    }
+    externalId = res.message_id;
+  } catch (error) {
+    throw await failed(message, error, now);
+  }
+
+  const kept = await prisma.socialComment.upsert({
+    where: { platform_externalId: { platform: message.platform, externalId } },
+    create: {
+      platform: message.platform,
+      kind: "message",
+      externalId,
+      threadExternalId: root,
+      objectExternalId: null,
+      postId: null,
+      objectText: null,
+      objectImageUrl: null,
+      objectUrl: null,
+      authorName: null,
+      authorId: null,
+      fromUs: true,
+      text: reply,
+      rating: null,
+      postedAt: now,
+      editedAt: null,
+      hidden: null,
+      lastActivityAt: null,
+      needsReply: null,
+      repliedAt: null,
+      readAt: null,
+      archivedAt: null,
+      goneAt: null,
+      syncedAt: now,
+    },
+    update: { text: reply, goneAt: null, syncedAt: now },
+    select: { id: true },
+  });
+  // The list shows a conversation's latest message, as the sync writes it.
+  await prisma.socialComment.updateMany({
+    where: { platform: message.platform, externalId: root },
+    data: { text: `You: ${reply}` },
+  });
+  await refreshThreads(message.platform, [root], { now, firstRun: false });
+  await setMarks(message.id, { read: true }, now);
+  return kept.id;
+}
+
+/**
+ * Hides or shows a comment on the app. Google reviews and direct messages can't be hidden, and
+ * nor can our own.
  * @param id - The comment.
  * @param hidden - Whether to hide it.
  * @param now - Now.
@@ -223,6 +334,7 @@ export async function setHidden(id: string, hidden: boolean, now: Date): Promise
   if (message.platform === "google") {
     throw new InboxActionError("Google reviews can't be hidden.", 400);
   }
+  if (isDirect(message.kind)) throw new InboxActionError("Messages can't be hidden.", 400);
   if (message.fromUs) throw new InboxActionError("Your own replies can't be hidden.", 400);
   try {
     await graph(`/${message.externalId}`, "POST", {
@@ -239,12 +351,19 @@ export async function setHidden(id: string, hidden: boolean, now: Date): Promise
 }
 
 /**
- * Deletes a message on the app. On Google only our reply can go: a review is its writer's.
+ * Deletes a message on the app. On Google only our reply can go: a review is its writer's. The
+ * apps don't let a business delete direct messages.
  * @param id - The message.
  * @param now - Now.
  */
 export async function deleteMessage(id: string, now: Date): Promise<void> {
   const message = await loadMessage(id);
+  if (isDirect(message.kind)) {
+    throw new InboxActionError(
+      `Messages can't be deleted from here. You can delete the chat on ${dmAppLabel(message.platform)} itself.`,
+      400,
+    );
+  }
   try {
     if (message.platform === "google") {
       if (message.kind === "review") {

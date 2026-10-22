@@ -1,8 +1,8 @@
 // src/app/api/cron/sync-social/route.ts
-// Cron (cron-job.org, every 30 minutes) that reads new comments and reviews for the Inbox, then
-// social figures: each app's account days at most every 6 hours, and each published post's
-// figures at 1 hour, 1, 3, 7 and 28 days (a story's at 1, 6 and 23 hours). Each read has its own
-// run lock, so an overlapping run or a Refresh press is harmless.
+// Cron (cron-job.org, every 30 minutes) that reads new comments, reviews and messages for the
+// Inbox, then social figures: each app's account days at most every 6 hours, and each published
+// post's figures at 1 hour, 1, 3, 7 and 28 days (a story's at 1, 6 and 23 hours). Each read has
+// its own run lock, so an overlapping run or a Refresh press is harmless.
 
 import { syncComments } from "@/features/social/lib/inbox/sync.server";
 import { syncInsights } from "@/features/social/lib/insights/sync.server";
