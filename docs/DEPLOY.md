@@ -230,6 +230,9 @@ never ends; the probe shows all 15 permissions the Overview lists):
   last message. After that the Inbox says so and links to the app. Messenger takes 2,000 characters
   and Instagram about 1,000 (counted in bytes, so emoji use more).
 - Messages can't be hidden or deleted from the site; Archive puts a chat away.
+- Every read takes in the last 7 days of chats again, so a message the sender unsends drops out of
+  the next one (or Check now): it shows as "Unsent" and its words are cleared from the database. A
+  chat whose every message was unsent leaves the Inbox until they write again.
 - With Standard access (the app in Development mode) Meta only returns chats with people who have a
   role on the app. Customers' messages need Live mode, Business Verification and Advanced access for
   `pages_messaging` and `instagram_manage_messages` through App Review.

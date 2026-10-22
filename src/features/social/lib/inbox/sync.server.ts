@@ -13,6 +13,7 @@ import {
   googleRows,
   INSTAGRAM_DM_URL,
   instagramRows,
+  isDirect,
   marksAfterSync,
   MESSAGING_PLATFORMS,
   objectsToRead,
@@ -56,6 +57,11 @@ const MAX_CONVERSATION_PAGES = 4;
  * so a longer conversation keeps the older messages already stored.
  */
 const MESSAGES_PER_CONVERSATION = 20;
+/**
+ * Conversations changed within this long are read again every run, whatever the mark says, so a
+ * message the sender unsent leaves the inbox even if Meta doesn't move the conversation's time.
+ */
+const RECHECK_MS = 7 * 24 * 3_600_000;
 const MESSAGE_FIELDS = "id,created_time,from,message,attachments{mime_type},sticker,story,shares";
 
 /**
@@ -84,10 +90,11 @@ interface KeepOpts {
   now: Date;
   firstRun: boolean;
   /**
-   * Messages this read saw all of: everything on a post, or everything in some threads. Stored
+   * Messages this read saw all of: everything on a post, or everything in some threads (with
+   * `after`, only their messages after that time, as a long chat's newest were read). Stored
    * ones it didn't see are gone. Null when the read stopped early.
    */
-  complete: { objectExternalId: string } | { threadIds: string[] } | null;
+  complete: { objectExternalId: string } | { threadIds: string[]; after?: Date } | null;
   object?: ObjectInfo | null;
   postId?: string | null;
 }
@@ -516,10 +523,13 @@ async function syncGoogle(ctx: SyncCtx): Promise<number> {
 // --- Messages ---
 
 /**
- * Reads Messenger or Instagram conversations changed since the last read (the last 60 days on
- * the first), newest first, with each one's latest messages. The list is sorted by its last
- * change, so the read stops at the first conversation older than that. The mark only moves on
- * when the run read everything it found, so a run cut short by the budget is picked up again.
+ * Reads Messenger or Instagram conversations changed since the last read or within the last 7
+ * days, whichever reaches further back (the last 60 days on the first run), newest first, with
+ * each one's latest messages. The list is sorted by its last change, so the read stops at the
+ * first conversation older than that. Reading the last week every time is what drops a message
+ * the sender unsent: it's missing from the read, so it's marked gone and its words are cleared.
+ * The mark only moves on when the run read everything it found, so a run cut short by the
+ * budget is picked up again.
  * @param platform - The app.
  * @param ctx - The run.
  * @returns Rows written.
@@ -530,7 +540,10 @@ async function syncMessages(platform: MessagingPlatform, ctx: SyncCtx): Promise<
   const us = platform === "facebook" ? pageId : igAccountId;
   if (!us) throw new Error("INSTAGRAM_ACCOUNT_ID isn't set.");
   const seen = ctx.state.messagesSeen[platform];
-  const since = seen && !ctx.firstRun ? Date.parse(seen) : ctx.now.getTime() - WINDOW_MS;
+  const since = Math.min(
+    seen && !ctx.firstRun ? Date.parse(seen) : ctx.now.getTime() - WINDOW_MS,
+    ctx.now.getTime() - RECHECK_MS,
+  );
 
   const conversations: MetaConversation[] = [];
   let after: string | undefined;
@@ -543,7 +556,7 @@ async function syncMessages(platform: MessagingPlatform, ctx: SyncCtx): Promise<
       ...(after ? { after } : {}),
     });
     const list = res.data ?? [];
-    // At or after the mark: the newest one read last time comes again, which writes nothing.
+    // Ones read last time come again, which writes nothing unless they changed.
     conversations.push(
       ...list.filter((c) => c.updated_time && Date.parse(c.updated_time) >= since),
     );
@@ -559,13 +572,28 @@ async function syncMessages(platform: MessagingPlatform, ctx: SyncCtx): Promise<
       finished = false;
       break;
     }
+    if (!conv.id) continue;
     const rows = conversationRows(platform, conv, us);
-    if (rows.length === 0) continue;
+    const partial = !!conv.messages?.paging?.next;
+    if (rows.length === 0) {
+      // Every message unsent: the chat leaves the inbox, and comes back if they write again.
+      if (!partial) {
+        written += await keepRows(platform, [], {
+          now: ctx.now,
+          firstRun: ctx.firstRun,
+          complete: { threadIds: [conv.id] },
+        });
+      }
+      continue;
+    }
     written += await keepRows(platform, rows, {
       now: ctx.now,
       firstRun: ctx.firstRun,
-      // Only a conversation read to its first message shows which stored ones were unsent.
-      complete: conv.messages?.paging?.next ? null : { threadIds: [rows[0]!.externalId] },
+      // A long chat only gives its newest messages, so only stored ones newer than the oldest
+      // of those can be told apart as unsent. rows[1] is the oldest message read.
+      complete: partial
+        ? { threadIds: [conv.id], after: rows[1]!.postedAt }
+        : { threadIds: [conv.id] },
       object: {
         text: null,
         imageUrl: null,
@@ -645,7 +673,12 @@ export async function keepRows(
       ? [{ objectExternalId: opts.complete.objectExternalId }]
       : [
           { externalId: { in: opts.complete.threadIds } },
-          { threadExternalId: { in: opts.complete.threadIds } },
+          {
+            threadExternalId: { in: opts.complete.threadIds },
+            // Strictly after: Meta's times are to the second, so another message in the oldest
+            // one's second may simply not have been read.
+            ...(opts.complete.after ? { postedAt: { gt: opts.complete.after } } : {}),
+          },
         ];
   const existing = await prisma.socialComment.findMany({
     where: { platform, OR: [{ externalId: { in: ids } }, ...scope] },
@@ -727,10 +760,15 @@ export async function keepRows(
     const read = new Set(ids);
     const missing = existing.filter((r) => !read.has(r.externalId) && r.goneAt === null);
     if (missing.length > 0) {
-      await prisma.socialComment.updateMany({
-        where: { id: { in: missing.map((r) => r.id) } },
-        data: { goneAt: opts.now, syncedAt: opts.now },
-      });
+      // An unsent message's words aren't kept, as Meta's rules ask; a chat's top row holds a copy.
+      for (const chat of [true, false]) {
+        const gone = missing.filter((r) => isDirect(r.kind) === chat).map((r) => r.id);
+        if (gone.length === 0) continue;
+        await prisma.socialComment.updateMany({
+          where: { id: { in: gone } },
+          data: { goneAt: opts.now, syncedAt: opts.now, ...(chat ? { text: "" } : {}) },
+        });
+      }
       for (const r of missing) touched.add(r.threadExternalId ?? r.externalId);
       written += missing.length;
     }

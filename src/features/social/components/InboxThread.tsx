@@ -320,7 +320,9 @@ export function InboxThread({
 
       {thread.gone && (
         <Notice tone="warn" onGrey>
-          This is no longer on {app}, so it can&apos;t be answered.
+          {direct
+            ? `Every message in this chat was unsent, so there's nothing left to answer.`
+            : `This is no longer on ${app}, so it can't be answered.`}
         </Notice>
       )}
 
@@ -349,11 +351,16 @@ export function InboxThread({
                 {m.editedAt && " (edited)"}
               </span>
               {m.hidden && <StatusPill tone="warning">Hidden</StatusPill>}
-              {m.gone && <StatusPill tone="neutral">Deleted</StatusPill>}
+              {m.gone && <StatusPill tone="neutral">{direct ? "Unsent" : "Deleted"}</StatusPill>}
             </div>
             {m.text ? (
               <p className="mt-1.5 text-base wrap-break-word whitespace-pre-line text-admin-text">
                 {m.text}
+              </p>
+            ) : direct ? (
+              // An unsent message's words are cleared when the sync finds it gone.
+              <p className="mt-1.5 text-base text-admin-muted italic">
+                {m.fromUs ? "You unsent this message." : "They unsent this message."}
               </p>
             ) : (
               <p className="mt-1.5 text-base text-admin-muted italic">Stars only, no words.</p>
