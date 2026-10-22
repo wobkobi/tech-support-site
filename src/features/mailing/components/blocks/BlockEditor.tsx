@@ -83,10 +83,35 @@ export function BlockEditor({
     campaignId: string;
     promoId: string | null;
     onSubject: (subject: string, preheader: string) => void;
+    /** Open the dialog straight away on the linked social post's words (Email this too). */
+    fromPost?: boolean;
+    /** The post's words, for when this browser didn't keep the seeded brief. */
+    postBrief?: string;
+    /** Called when the post's dialog closes, so it opens only once. */
+    onFromPostDone?: () => void;
   } | null;
 }): React.ReactElement {
   const { toast } = useToast();
   const [drafting, setDrafting] = useState(false);
+  const [postDialog, setPostDialog] = useState(false);
+  const openFromPost = draft?.fromPost === true;
+  // After mount, not in the first render: the dialog reads this browser's storage.
+  useEffect(() => {
+    if (!openFromPost) return;
+    /* eslint-disable react-hooks/set-state-in-effect -- one-shot open from Email this too */
+    setDrafting(true);
+    setPostDialog(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [openFromPost]);
+
+  /** Closes the draft dialog, and ends the open-from-post one-shot. */
+  function closeDraft(): void {
+    setDrafting(false);
+    if (postDialog) {
+      setPostDialog(false);
+      draft?.onFromPostDone?.();
+    }
+  }
   const { blocks, commit, undo, redo, reset, canUndo, canRedo } = useBlockHistory(() =>
     parseBlocks(body),
   );
@@ -298,9 +323,11 @@ export function BlockEditor({
           promoId={draft.promoId}
           buttonUrl={blocks.find((b) => b.type === "button")?.url ?? ""}
           canPicture={canUpload}
-          onClose={() => setDrafting(false)}
+          fromPost={postDialog}
+          postBrief={draft.postBrief ?? ""}
+          onClose={closeDraft}
           onDraft={(result, withSubject, picture, stale) => {
-            setDrafting(false);
+            closeDraft();
             const filled = fillBlocks(blocks, result);
             apply(picture ? placePicture(filled, picture) : dropPicture(filled, stale));
             if (withSubject) draft.onSubject(result.subject, result.preheader);

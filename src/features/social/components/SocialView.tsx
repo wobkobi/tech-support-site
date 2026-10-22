@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { callApi } from "@/features/mailing/lib/api-client";
+import { EmailStepDialog } from "@/features/social/components/EmailStepDialog";
 import { PostComposer } from "@/features/social/components/PostComposer";
 import { SocialComposerHeader } from "@/features/social/components/SocialComposerHeader";
 import { SocialConnections } from "@/features/social/components/SocialConnections";
@@ -71,6 +72,22 @@ export function SocialView({
 
   const openId = open?.post.id ?? null;
   const openRow = open ? (rows.find((r) => r.id === openId) ?? open.post) : null;
+  // Email this too lives here, not in the composer, which remounts on the refresh after a
+  // publish. Offered after publishing only while the post has no email and wasn't turned down.
+  const [emailStep, setEmailStep] = useState<{ postId: string; afterPublish: boolean } | null>(
+    null,
+  );
+  const [emailStepFor, setEmailStepFor] = useState(openId);
+  if (emailStepFor !== openId) {
+    setEmailStepFor(openId);
+    setEmailStep(null);
+  }
+  const showEmailStep =
+    emailStep !== null &&
+    open !== null &&
+    emailStep.postId === open.post.id &&
+    !open.post.isPreset &&
+    (!emailStep.afterPublish || (open.email === null && !open.emailSkipped));
   // The list arrives newest first; presets read oldest first so the starter set keeps
   // its order and new ones join the end.
   const presets = rows.filter((r) => r.isPreset).reverse();
@@ -270,6 +287,12 @@ export function SocialView({
     },
     [openId],
   );
+  const onDraftEmail = useCallback(
+    (afterPublish: boolean) => {
+      if (openId) setEmailStep({ postId: openId, afterPublish });
+    },
+    [openId],
+  );
 
   const deletingLive = deleting ? liveOn(deleting) : [];
 
@@ -324,6 +347,8 @@ export function SocialView({
             details={open.details}
             design={open.design}
             captionAi={open.captionAi}
+            email={open.email}
+            onDraftEmail={onDraftEmail}
             onSaved={onSaved}
             saveRef={saveOpen}
           />
@@ -349,6 +374,17 @@ export function SocialView({
         checking={busyId === "connections"}
         onCheck={() => void checkConnections()}
       />
+
+      {showEmailStep && (
+        <EmailStepDialog
+          postId={open.post.id}
+          imageUrl={open.post.imageUrl}
+          hasDesignPicture={open.emailPicture !== null}
+          aiReady={open.captionAi !== null}
+          afterPublish={emailStep.afterPublish}
+          onClose={() => setEmailStep(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={deleting !== null}

@@ -3,7 +3,8 @@
 // "Draft with AI": a one-line brief and the kind of email in, a draft out. When the draft says
 // a picture fits, it either picks a saved Post maker picture that already says it, or a design
 // is made and drawn before the dialog hands over (a redraft draws over the same design). The
-// block editor fills it all in as one undo step; nothing is sent here.
+// block editor fills it all in as one undo step; nothing is sent here. From Email this too, the
+// brief is the social post's words instead.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -22,7 +23,9 @@ import type { DraftedPicture, PictureJob } from "@/features/mailing/components/b
 import {
   BRIEF_MAX,
   DRAFT_KINDS,
+  POST_SOURCE_MAX,
   type AiDraft,
+  type DraftSource,
   type ReusedPicture,
 } from "@/features/mailing/lib/ai-draft";
 import { callApi } from "@/features/mailing/lib/api-client";
@@ -60,6 +63,9 @@ export interface HandedPicture {
  * @param props.buttonUrl - Where the email's first button goes ("" for none), so the
  *   drafted button words match the link they keep.
  * @param props.canPicture - Whether pictures can be stored, so a draft may come with one.
+ * @param props.fromPost - Opened by Email this too, so the brief is the post even when this
+ *   browser couldn't store it.
+ * @param props.postBrief - The linked post's words, the brief when this browser kept none.
  * @param props.onClose - Dismisses it.
  * @param props.onDraft - Called with the draft, whether to replace the subject and preview text,
  *   the picture made or picked for it (null for none), and, when it has none, the last draft's
@@ -71,6 +77,8 @@ export function DraftDialog({
   promoId,
   buttonUrl,
   canPicture,
+  fromPost = false,
+  postBrief = "",
   onClose,
   onDraft,
 }: {
@@ -78,6 +86,8 @@ export function DraftDialog({
   promoId: string | null;
   buttonUrl: string;
   canPicture: boolean;
+  fromPost?: boolean;
+  postBrief?: string;
   onClose: () => void;
   onDraft: (
     draft: AiDraft,
@@ -91,9 +101,13 @@ export function DraftDialog({
   // Only mounts after a click, so storage is safe to read on the first render.
   const [last] = useState(() => readDraftBrief(campaignId));
   const [kind, setKind] = useState(last?.kind ?? DRAFT_KINDS[0]!.key);
-  const [brief, setBrief] = useState(last?.brief ?? "");
+  const [brief, setBrief] = useState(last?.brief ?? (fromPost ? postBrief : ""));
   const [withSubject, setWithSubject] = useState(last?.withSubject ?? true);
-  const [withPicture, setWithPicture] = useState(last?.withPicture ?? true);
+  const [withPicture, setWithPicture] = useState(last?.withPicture ?? !fromPost);
+  const [source, setSource] = useState<DraftSource>(
+    fromPost || last?.source === "post" ? "post" : "brief",
+  );
+  const max = source === "post" ? POST_SOURCE_MAX : BRIEF_MAX;
   const [step, setStep] = useState<Step | null>(null);
   const [job, setJob] = useState<(PictureJob & { draft: AiDraft }) | null>(null);
   const busy = step !== null;
@@ -142,6 +156,7 @@ export function DraftDialog({
         buttonUrl,
         picture: canPicture && withPicture,
         ownDesign: design?.id,
+        source,
       },
     );
     if (!res.ok) {
@@ -156,6 +171,7 @@ export function DraftDialog({
       withPicture,
       design,
       picture: last?.picture ?? null,
+      ...(source === "post" ? { source } : {}),
     });
     const { draft, reuse } = res;
     if (reuse) {
@@ -202,7 +218,11 @@ export function DraftDialog({
       open
       onClose={busy ? () => {} : onClose}
       title="Draft with AI"
-      description="Say what the email is about in a sentence or two. The draft goes into your blocks for you to read and change; Undo takes it back."
+      description={
+        source === "post"
+          ? "This turns your post into an email for your mailing list: the hashtags, emoji and follow-us lines come out, and nothing new is made up. The draft goes into your blocks for you to read and change; Undo takes it back."
+          : "Say what the email is about in a sentence or two. The draft goes into your blocks for you to read and change; Undo takes it back."
+      }
       dirty={brief.trim() !== (last?.brief ?? "").trim()}
       footer={
         <>
@@ -230,19 +250,40 @@ export function DraftDialog({
           </AdminSelect>
         </AdminField>
         <AdminField
-          label="What it's about"
+          label={source === "post" ? "From your post" : "What it's about"}
           htmlFor={`${id}-brief`}
-          hint={`${brief.length} of ${BRIEF_MAX} characters. Put in any dates or prices you want used; it won't make them up.`}
+          hint={
+            source === "post"
+              ? `${brief.length} of ${max} characters. Change anything you want said differently in the email.`
+              : `${brief.length} of ${max} characters. Put in any dates or prices you want used; it won't make them up.`
+          }
         >
           <AdminTextarea
             id={`${id}-brief`}
-            rows={4}
-            maxLength={BRIEF_MAX}
+            rows={source === "post" ? 8 : 4}
+            maxLength={max}
             value={brief}
-            placeholder="I'm now doing home visits in Titirangi and Laingholm, Tuesdays and Thursdays."
+            placeholder={
+              source === "post"
+                ? "Paste your post here."
+                : "I'm now doing home visits in Titirangi and Laingholm, Tuesdays and Thursdays."
+            }
             onChange={(e) => setBrief(e.target.value)}
           />
         </AdminField>
+        {source === "post" && (
+          <AdminButton
+            variant="secondary"
+            className="self-start"
+            disabled={busy}
+            onClick={() => {
+              setSource("brief");
+              setBrief("");
+            }}
+          >
+            Write my own brief instead
+          </AdminButton>
+        )}
         <label className="flex items-start gap-2 text-sm">
           <input
             type="checkbox"

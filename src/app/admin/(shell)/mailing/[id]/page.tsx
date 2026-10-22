@@ -1,13 +1,19 @@
 // src/app/admin/(shell)/mailing/[id]/page.tsx
-// Admin editor for one mailing-list email or preset, with its recipients, presets and send setup.
+// Admin editor for one mailing-list email or preset, with its recipients, presets, send setup and
+// linked social post. `?draft=post` (from Email this too) opens Draft with AI on the post's words.
 
 import { insertDetailsOf } from "@/features/admin/lib/insertables";
 import { parseObjectId } from "@/features/business/lib/validation";
-import { CampaignEditor, type SendRow } from "@/features/mailing/components/CampaignEditor";
+import {
+  CampaignEditor,
+  type LinkedPost,
+  type SendRow,
+} from "@/features/mailing/components/CampaignEditor";
 import { toCampaignRow } from "@/features/mailing/lib/campaign-row";
 import { missingSendEnv, promoWording } from "@/features/mailing/lib/context";
 import { emailInsertGroups, emailLinkTargets } from "@/features/mailing/lib/insertables";
 import { BLANK_TEMPLATE, type Template } from "@/features/mailing/lib/templates";
+import { postBrief } from "@/features/social/lib/to-email";
 import { aiConfigured } from "@/shared/lib/ai/json-completion";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { canUploadImages } from "@/shared/lib/image-upload";
@@ -64,15 +70,44 @@ async function loadTemplates(): Promise<Template[]> {
 }
 
 /**
+ * The social post linked to an email, the first one when several were shared from it.
+ * @param campaign - The email.
+ * @param campaign.id - Its id.
+ * @param campaign.createdAt - When it was made, to tell which came first.
+ * @returns The post, or null.
+ */
+async function loadLinkedPost(campaign: {
+  id: string;
+  createdAt: Date;
+}): Promise<LinkedPost | null> {
+  const post = await prisma.socialPost.findFirst({
+    where: { campaignId: campaign.id, isPreset: false },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true, createdAt: true, body: true, linkUrl: true, targets: true },
+  });
+  if (!post) return null;
+  const madeFromPost = post.createdAt < campaign.createdAt;
+  return {
+    id: post.id,
+    name: post.name,
+    madeFromPost,
+    brief: madeFromPost ? postBrief(post) : "",
+  };
+}
+
+/**
  * Admin email editor page.
  * @param props - Page props.
  * @param props.params - Route params with the campaign id.
+ * @param props.searchParams - Query string; `draft=post` opens Draft with AI on the linked post.
  * @returns Editor page element.
  */
 export default async function AdminMailingEditPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ draft?: string | string[] }>;
 }): Promise<React.ReactElement> {
   await requireAdminAuth();
   const id = parseObjectId((await params).id);
@@ -80,15 +115,18 @@ export default async function AdminMailingEditPage({
   if (!campaign) notFound();
 
   const isDraft = !campaign.isPreset && campaign.status === "draft";
-  const [sends, { comms, identity, reviews }, promo, templates, wording] = await Promise.all([
-    campaign.status === "draft" ? Promise.resolve([]) : loadSends(campaign.id),
-    getSettings(),
-    campaign.promoId
-      ? prisma.promo.findUnique({ where: { id: campaign.promoId }, select: { title: true } })
-      : Promise.resolve(null),
-    isDraft ? loadTemplates() : Promise.resolve([]),
-    promoWording(campaign.promoId),
-  ]);
+  const draftFromPost = isDraft && (await searchParams).draft === "post";
+  const [sends, { comms, identity, reviews }, promo, templates, wording, linkedPost] =
+    await Promise.all([
+      campaign.status === "draft" ? Promise.resolve([]) : loadSends(campaign.id),
+      getSettings(),
+      campaign.promoId
+        ? prisma.promo.findUnique({ where: { id: campaign.promoId }, select: { title: true } })
+        : Promise.resolve(null),
+      isDraft ? loadTemplates() : Promise.resolve([]),
+      promoWording(campaign.promoId),
+      campaign.isPreset ? Promise.resolve(null) : loadLinkedPost(campaign),
+    ]);
   const row = toCampaignRow(campaign);
 
   return (
@@ -111,6 +149,8 @@ export default async function AdminMailingEditPage({
       promo={wording.promo}
       linkTargets={emailLinkTargets(getSiteUrl(), reviews.googleReviewUrl)}
       canDraft={aiConfigured()}
+      draftFromPost={draftFromPost && aiConfigured()}
+      linkedPost={linkedPost}
       adminEmail={process.env.ADMIN_EMAIL?.trim() || null}
     />
   );

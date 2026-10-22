@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import type { InsertDetails } from "@/features/admin/lib/insertables";
+import { seedPostBrief } from "@/features/mailing/components/blocks/draft-brief";
 import { callApi } from "@/features/mailing/lib/api-client";
 import type { PromoWording } from "@/features/mailing/lib/render";
 import {
@@ -18,14 +19,17 @@ import {
 } from "@/features/social/components/CaptionAiDialog";
 import type { PreviewPost } from "@/features/social/components/PlatformPreview";
 import { PostActionBar } from "@/features/social/components/PostActionBar";
+import { PostEmailPanel } from "@/features/social/components/PostEmailPanel";
 import { PostPaneTabs } from "@/features/social/components/PostPaneTabs";
 import { PostPreviewPanel } from "@/features/social/components/PostPreviewPanel";
 import { PostStatusBanner } from "@/features/social/components/PostStatusBanner";
 import { PostWriteForm } from "@/features/social/components/PostWriteForm";
+import type { PostEmail } from "@/features/social/lib/email-step.server";
 import { insertableGroups } from "@/features/social/lib/insertables";
 import type { CaptionAiSetup, PostDesign } from "@/features/social/lib/open-post";
 import { liveOn, type Connection } from "@/features/social/lib/post-display";
 import type { SocialPostRow, SocialTargetRow } from "@/features/social/lib/post-row";
+import { postBrief } from "@/features/social/lib/to-email";
 import {
   FACEBOOK_MAX_CHARS,
   GOOGLE_MAX_CHARS,
@@ -185,6 +189,8 @@ function diff(now: Content, saved: Content): Record<string, unknown> {
  * @param props.details - Site address and contact details for the Add menu.
  * @param props.design - Post maker design the picture came from, or null.
  * @param props.captionAi - Write with AI's starting choices; null hides it.
+ * @param props.email - The email linked to the post, or null.
+ * @param props.onDraftEmail - Opens Email this too, by hand or after publishing.
  * @param props.onSaved - Called with the name and text after each successful save.
  * @param props.saveRef - Filled with a save-pending-edits function, used before another post opens.
  * @returns Composer element.
@@ -198,6 +204,8 @@ export function PostComposer({
   details,
   design,
   captionAi,
+  email,
+  onDraftEmail,
   onSaved,
   saveRef,
 }: {
@@ -209,6 +217,8 @@ export function PostComposer({
   details: InsertDetails;
   design: PostDesign | null;
   captionAi: CaptionAiSetup | null;
+  email: PostEmail | null;
+  onDraftEmail?: (afterPublish: boolean) => void;
   onSaved?: (saved: { name: string; body: string }) => void;
   saveRef?: React.RefObject<(() => Promise<boolean>) | null>;
 }): React.ReactElement {
@@ -441,6 +451,45 @@ export function PostComposer({
     }
   }
 
+  /** Saves, then opens Email this too. */
+  async function draftEmail(): Promise<void> {
+    setBusy("email");
+    const ok = await save();
+    setBusy(null);
+    if (ok) onDraftEmail?.(false);
+  }
+
+  /** Saves, then opens the linked email in Mailing with Draft with AI ready on the post's words. */
+  async function redoEmail(): Promise<void> {
+    if (!email) return;
+    const brief = postBrief({
+      name: content.name,
+      body: content.body,
+      linkUrl: content.linkUrl.trim() || null,
+      targets: content.targets,
+    });
+    if (!brief) {
+      toast("Write the post first: the email is made from its words.", { tone: "error" });
+      return;
+    }
+    setBusy("email-redo");
+    if (!(await save())) {
+      setBusy(null);
+      return;
+    }
+    seedPostBrief(email.id, brief);
+    router.push(`/admin/mailing/${email.id}?draft=post`);
+  }
+
+  /** Unlinks the post's email; the email stays in Mailing. */
+  async function unlinkEmail(): Promise<void> {
+    setBusy("email-unlink");
+    const res = await callApi(`/api/admin/social/${initial.id}/email`, "DELETE");
+    setBusy(null);
+    if (!res.ok) toast(res.error, { tone: "error" });
+    router.refresh();
+  }
+
   /** Detaches the post from its promo, so it describes whatever promo is running. */
   async function unlinkPromo(): Promise<void> {
     // Save first: the refresh after unlinking reloads the fields from the server.
@@ -492,6 +541,7 @@ export function PostComposer({
     toast(`${parts.join("; ")}.`, {
       tone: failed.length > 0 ? (posted.length > 0 ? "warning" : "error") : "success",
     });
+    if (mode === "now" && (posted.length > 0 || waiting.length > 0)) onDraftEmail?.(true);
     router.refresh();
   }
 
@@ -558,6 +608,7 @@ export function PostComposer({
     }
     setScheduling(null);
     toast(`Scheduled for ${formatDateTimeShort(res.scheduledAt)}.`, { tone: "success" });
+    onDraftEmail?.(true);
     router.refresh();
   }
 
@@ -797,6 +848,18 @@ export function PostComposer({
             onWriteWithAi={captionAi ? () => setWritingWithAi(true) : null}
             onUndoAi={canUndoAi ? undoCaption : null}
           />
+          {!initial.isPreset && (
+            <div className="mt-6">
+              <PostEmailPanel
+                email={email}
+                aiReady={captionAi !== null}
+                busy={busy}
+                onDraft={() => void draftEmail()}
+                onRedo={() => void redoEmail()}
+                onUnlink={() => void unlinkEmail()}
+              />
+            </div>
+          )}
         </div>
 
         <PostPreviewPanel

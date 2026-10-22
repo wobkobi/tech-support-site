@@ -1,7 +1,8 @@
 "use client";
 // src/features/mailing/components/blocks/draft-brief.ts
 // The last "Draft with AI" brief for each email, kept in this browser so reopening the dialog
-// brings it back to change and redraft, along with the picture it put in and its design.
+// brings it back to change and redraft, along with the picture it put in and its design. Email
+// this too seeds one from the social post the email was made from.
 
 import { DRAFT_KINDS } from "@/features/mailing/lib/ai-draft";
 
@@ -21,6 +22,8 @@ export interface DraftBrief {
   design: DraftDesign | null;
   /** The picture the last draft put in the email, so a draft without one takes it out. */
   picture: string | null;
+  /** The brief is a social post's words, from Email this too. */
+  source?: "post";
 }
 
 /**
@@ -54,6 +57,7 @@ export function readDraftBrief(campaignId: string): DraftBrief | null {
           ? { id: d.id, updatedAt: d.updatedAt }
           : null,
       picture: typeof r.picture === "string" ? r.picture : null,
+      ...(r.source === "post" ? { source: "post" as const } : {}),
     };
   } catch {
     return null;
@@ -71,6 +75,25 @@ export function saveDraftBrief(campaignId: string, brief: DraftBrief): void {
   } catch {
     // Storage blocked: the dialog just opens empty next time.
   }
+}
+
+/**
+ * Seeds an email's brief with a social post's words, so its Draft dialog opens ready to write
+ * the email from the post. The picture Email this too put in stays: the seed has no picture of
+ * its own to take out, and asks for no new one.
+ * @param campaignId - The email.
+ * @param brief - The post's words, stripped for email.
+ */
+export function seedPostBrief(campaignId: string, brief: string): void {
+  saveDraftBrief(campaignId, {
+    brief,
+    kind: DRAFT_KINDS[0]!.key,
+    withSubject: true,
+    withPicture: false,
+    design: null,
+    picture: null,
+    source: "post",
+  });
 }
 
 /**

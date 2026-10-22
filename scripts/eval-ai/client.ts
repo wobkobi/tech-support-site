@@ -177,12 +177,13 @@ export async function fetchFacts(baseUrl: string): Promise<string> {
  * @param body.brief - What the email is about.
  * @param body.kind - A draft kind key.
  * @param body.buttonUrl - The email's button link, or "" for none.
+ * @param body.source - "post" when the brief is a social post's words (Email this too).
  * @returns The draft.
  */
 export async function callMailingDraft(
   baseUrl: string,
   adminSecret: string,
-  body: { brief: string; kind: string; buttonUrl: string },
+  body: { brief: string; kind: string; buttonUrl: string; source?: "post" },
 ): Promise<AiDraft> {
   const json = await postJson<{ ok: true; draft: AiDraft }>(
     `${baseUrl}/api/admin/mailing/ai-draft`,

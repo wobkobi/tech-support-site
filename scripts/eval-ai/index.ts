@@ -425,6 +425,7 @@ async function collectRaw(
     CROSS_ROUTE_CASES,
     TRAVEL_CASES,
     DRAFT_CASES,
+    EMAIL_FROM_POST_CASES,
     POST_DRAFT_CASES,
     CAPTION_CASES,
     DEAL_RE,
@@ -445,7 +446,7 @@ async function collectRaw(
   const parseCases = PARSE_CASES.filter((c) => keep(c.id));
   const travelCases = TRAVEL_CASES.filter((c) => keep(c.id));
   const crossRouteCases = CROSS_ROUTE_CASES.filter((c) => keep(c.id));
-  const draftCases = DRAFT_CASES.filter((c) => keep(c.id));
+  const draftCases = [...DRAFT_CASES, ...EMAIL_FROM_POST_CASES].filter((c) => keep(c.id));
   const postDraftCases = POST_DRAFT_CASES.filter((c) => keep(c.id));
   const captionCases = CAPTION_CASES.filter((c) => keep(c.id));
 
@@ -587,11 +588,18 @@ async function collectRaw(
         brief: c.brief,
         kind: c.kind,
         buttonUrl: c.buttonUrl,
+        source: c.source,
       });
       const { hard, soft } = draftProblems(draft, c.brief, facts);
       const text = JSON.stringify(draft);
       for (const f of c.forbid ?? []) if (f.pattern.test(text)) hard.push(f.why);
       if (c.wantBullets && draft.bullets.length === 0) hard.push("steps not listed as bullets");
+      for (const fact of c.mustInclude ?? []) {
+        if (!text.includes(fact)) hard.push(`dropped "${fact}" from the post`);
+      }
+      if (c.buttonLike && !c.buttonLike.test(draft.buttonText)) {
+        hard.push(`button "${draft.buttonText}" doesn't match ${c.buttonLike}`);
+      }
       raw.push({
         id: c.id,
         kind: "draft",

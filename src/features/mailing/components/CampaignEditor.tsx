@@ -10,7 +10,7 @@ import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { AdminTabs } from "@/features/admin/components/ui/AdminTabs";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { Card } from "@/features/admin/components/ui/Card";
-import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
+import { ADMIN_LABEL_CLS, ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { InsertMenu, type InsertGroup } from "@/features/admin/components/ui/InsertMenu";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { useToast } from "@/features/admin/components/ui/Toast";
@@ -36,6 +36,7 @@ import {
   type Template,
 } from "@/features/mailing/lib/templates";
 import type { QuietHours } from "@/shared/lib/quiet-hours";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 
@@ -46,6 +47,16 @@ export interface SendRow {
   email: string;
   status: "pending" | "sent" | "failed";
   error: string | null;
+}
+
+/** The social post linked to the email, either way round. */
+export interface LinkedPost {
+  id: string;
+  name: string;
+  /** The email was made from the post by Email this too, rather than the post shared from it. */
+  madeFromPost: boolean;
+  /** The post's words as a Draft with AI brief, for a browser that didn't keep the seeded one. */
+  brief: string;
 }
 
 /** Editable fields, as last saved. */
@@ -92,6 +103,8 @@ const SNIPPETS: { label: string; title: string; before: string; after: string; l
  * @param props.promo - Wording of the linked or running promo, for the promo card block.
  * @param props.linkTargets - Pages the block editor's buttons and pictures can link to.
  * @param props.canDraft - Whether "Draft with AI" is available (OpenAI is set up).
+ * @param props.draftFromPost - Open Draft with AI on the linked post's words (from Email this too).
+ * @param props.linkedPost - The social post linked to the email, or null.
  * @returns Editor element.
  */
 export function CampaignEditor({
@@ -107,6 +120,8 @@ export function CampaignEditor({
   promo,
   linkTargets,
   canDraft,
+  draftFromPost = false,
+  linkedPost,
 }: {
   initial: CampaignRow;
   sends: SendRow[];
@@ -120,6 +135,8 @@ export function CampaignEditor({
   promo: PromoWording | null;
   linkTargets: LinkTarget[];
   canDraft: boolean;
+  draftFromPost?: boolean;
+  linkedPost: LinkedPost | null;
 }): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -147,6 +164,18 @@ export function CampaignEditor({
   const fieldId = useId();
   const [bodyMode, setBodyMode] = useBodyMode();
   const picture = usePictureUpload();
+  // Cleared once the dialog closes, so a later Blocks tab switch doesn't open it again.
+  const [postDraft, setPostDraft] = useState(draftFromPost);
+
+  // Email this too lands here with ?draft=post: take it off the address so a reload doesn't
+  // reopen the dialog, and show the blocks, where the dialog lives.
+  useEffect(() => {
+    if (!draftFromPost) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("draft");
+    window.history.replaceState(window.history.state, "", url);
+    setBodyMode("blocks");
+  }, [draftFromPost, setBodyMode]);
 
   /**
    * Writes whatever changed since the last save.
@@ -285,6 +314,11 @@ export function CampaignEditor({
       subject: subject || c.subject,
       preheader: preheader || c.preheader,
     }));
+  }
+
+  /** Ends the open-from-post one-shot once its dialog has closed. */
+  function endPostDraft(): void {
+    setPostDraft(false);
   }
 
   /**
@@ -508,6 +542,18 @@ export function CampaignEditor({
               </AdminSelect>
             </AdminField>
 
+            {linkedPost && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm">
+                <span>
+                  {linkedPost.madeFromPost ? "Made from your post " : "Shared to social as "}
+                  <strong>{linkedPost.name}</strong>.
+                </span>
+                <Link href={`/admin/social?post=${linkedPost.id}`} className={ADMIN_LINK_CLS}>
+                  Open the post
+                </Link>
+              </div>
+            )}
+
             {promoId && (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm">
                 <span>
@@ -557,7 +603,14 @@ export function CampaignEditor({
                   linkTargets={linkTargets}
                   draft={
                     canDraft
-                      ? { campaignId: initial.id, promoId, onSubject: applyDraftSubject }
+                      ? {
+                          campaignId: initial.id,
+                          promoId,
+                          onSubject: applyDraftSubject,
+                          fromPost: postDraft,
+                          postBrief: linkedPost?.brief ?? "",
+                          onFromPostDone: endPostDraft,
+                        }
                       : null
                   }
                 />

@@ -1,9 +1,10 @@
 // scripts/check-social.ts
 // Social posting logic: platform validators, Google post body, promo placeholders, email to
-// post, JPEG size reader, status roll-up, take-downs, PATCH parsing, the brand profile and
-// Write with AI's request and reply reading. Pure logic, no DB.
+// post and post to email, JPEG size reader, status roll-up, take-downs, PATCH parsing, the brand
+// profile and Write with AI's request and reply reading. Pure logic, no DB.
 // Run with: npm test -- social
 
+import { BRIEF_MAX, POST_SOURCE_MAX } from "@/features/mailing/lib/ai-draft";
 import {
   hashtagsOnByDefault,
   parseCaptionRequest,
@@ -25,6 +26,13 @@ import {
   type TakeDownOutcome,
   type TargetState,
 } from "@/features/social/lib/targets";
+import {
+  EMAIL_SUBJECT_MAX,
+  emailFromPost,
+  postBrief,
+  stripSocial,
+  type PostForEmail,
+} from "@/features/social/lib/to-email";
 import {
   blockingIssues,
   cropOf,
@@ -1151,6 +1159,100 @@ function checkCaptionAi(): void {
   expectEqual("captions: null reads as none", readCaptions(null, 3), []);
 }
 
+/**
+ * A post for Email this too, with any fields overridden.
+ * @param over - Fields to change.
+ * @returns The post.
+ */
+function forEmail(over: Partial<PostForEmail> = {}): PostForEmail {
+  return { name: "Parcel scam", body: "", linkUrl: null, targets: [], ...over };
+}
+
+/** Email this too's no-AI email and the brief it hands Draft with AI. */
+function checkToEmail(): void {
+  console.log("To email");
+  expectEqual(
+    "strip: emoji, skin tones and the closing hashtag block go; ©, ™ and #1 stay",
+    stripSocial(
+      "Fake parcel texts 📦 are back! 👍🏽\nI'm #1 for help in #Titirangi.\n\nBook now 🙂.\n\n#AucklandTech #ScamAlert\n© 2026 Pixel™",
+    ),
+    "Fake parcel texts are back!\nI'm #1 for help in Titirangi.\n\nBook now.\n\n© 2026 Pixel™",
+  );
+  expectEqual(
+    "strip: tags ending a line go, the sentence stays",
+    stripSocial("Back up your photos today #TechTips #Backups"),
+    "Back up your photos today",
+  );
+  expectEqual(
+    "strip: a flag and a joined family emoji leave nothing behind",
+    stripSocial("Kia ora 🇳🇿 from 👨‍👩‍👧 us"),
+    "Kia ora from us",
+  );
+  expectEqual(
+    "strip: a tag a sentence runs into keeps its word, even with an emoji after it",
+    stripSocial("Ask me in #Titirangi 🙂\nHelp near #Laingholm #Titirangi #TechTips"),
+    "Ask me in Titirangi\nHelp near Laingholm",
+  );
+
+  const out = emailFromPost(
+    forEmail({
+      body: "Para one 🙂\n\nPara two in #Titirangi today #Tips\n\n#AucklandTech",
+      linkUrl: "https://tothepoint.co.nz/booking",
+    }),
+    { url: BLOB, alt: "A parcel" },
+  );
+  const lines = out.body.split("\n\n");
+  expectEqual("email: greeting, picture, each paragraph, then the link as a button", lines, [
+    "Hi {firstName},",
+    `![A parcel](${BLOB})`,
+    "Para one",
+    "Para two in Titirangi today",
+    "[Find out more](https://tothepoint.co.nz/booking)",
+  ]);
+  expectEqual("email: subject is the post's name", out.subject, "Parcel scam");
+  const bare = emailFromPost(forEmail({ body: "Just words" }), null);
+  expect(
+    "email: no link and no picture means no button and no picture",
+    !bare.body.includes("](") && bare.body.includes("Just words"),
+    bare.body,
+  );
+  const long = emailFromPost(forEmail({ name: "word ".repeat(30), body: "x" }), null);
+  expect(
+    `email: a long name is cut at a word, within ${EMAIL_SUBJECT_MAX}`,
+    long.subject.length <= EMAIL_SUBJECT_MAX && long.subject.endsWith("word"),
+    long.subject,
+  );
+  const ownFacebook = forEmail({
+    body: "Main words",
+    targets: [
+      { platform: "instagram", textOverride: "Link in bio" },
+      { platform: "facebook", textOverride: "Facebook words #Help" },
+    ],
+  });
+  expectEqual(
+    "brief: Facebook's own words win, stripped",
+    postBrief(ownFacebook),
+    "Facebook words",
+  );
+  expectEqual(
+    "brief: a blank Facebook override falls back to the post",
+    postBrief(forEmail({ body: "Main", targets: [{ platform: "facebook", textOverride: "  " }] })),
+    "Main",
+  );
+  expectEqual(
+    "brief: placeholders stay for Draft with AI to keep",
+    postBrief(forEmail({ body: "Get {promoOffer} until {promoEnds} 🎉" })),
+    "Get {promoOffer} until {promoEnds}",
+  );
+  expectEqual("brief: hashtags alone leave nothing", postBrief(forEmail({ body: "#A #B" })), "");
+  expectEqual(
+    "brief: a long post is cut to what Draft with AI takes from a post",
+    postBrief(forEmail({ body: "word ".repeat(1000) })).length,
+    POST_SOURCE_MAX,
+  );
+  expectEqual("brief: a post may run longer than a typed brief", POST_SOURCE_MAX > BRIEF_MAX, true);
+}
+
 /** Runs every group and exits non-zero on any failure. */
 function main(): void {
   checkValidators();
@@ -1158,6 +1260,7 @@ function main(): void {
   checkPictures();
   checkFilling();
   checkFromEmail();
+  checkToEmail();
   checkJpegSize();
   checkTargets();
   checkTakeDown();

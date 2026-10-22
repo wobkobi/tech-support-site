@@ -1187,9 +1187,11 @@ model SocialPost {
   postingStartedAt DateTime?
 
   // Promo the post advertises; publishing is blocked once it ends.
-  promoId    String? @db.ObjectId
-  // Mailing-list email the post was shared from.
-  campaignId String? @db.ObjectId
+  promoId      String?  @db.ObjectId
+  // The email linked to this post: the one it was shared from, or the draft Email this too made.
+  campaignId   String?  @db.ObjectId
+  // Email this too was turned down for this post, so publishing doesn't offer it again.
+  emailSkipped Boolean?
 
   // One per platform, always all three; written as a whole array because Prisma
   // rejects composite writes with undeclared fields.
@@ -1208,6 +1210,7 @@ model SocialPost {
 
   @@index([isPreset, status])
   @@index([status, scheduledAt])
+  @@index([campaignId])
 }
 
 // One exported size of a post maker design. docHash is the design's fingerprint when it
