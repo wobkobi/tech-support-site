@@ -60,7 +60,7 @@ All endpoints are **GET**. Create one cron-job.org job per row.
 | Purge price estimates   | `/api/cron/purge-price-estimates`   | GET    | daily            | Delete price estimate logs past retention                                                                                                                                         |
 | Public holidays         | `/api/cron/refresh-public-holidays` | GET    | monthly          | Refresh NZ public holidays (current + next year)                                                                                                                                  |
 | Scheduled publishing    | `/api/cron/publish-scheduled`       | GET    | every 5 minutes  | Post due social posts, send due emails, resume stuck runs, bust the promo cache when a promo starts or ends, and once an hour line up posts in social schedules' empty time slots |
-| Social sync             | `/api/cron/sync-social`             | GET    | every 30 minutes | Read new comments and reviews for Social > Inbox, then each app's daily figures and each published post's figures for Social > Analytics                                          |
+| Social sync             | `/api/cron/sync-social`             | GET    | every 30 minutes | Read new comments, reviews and messages for Social > Inbox, then each app's daily figures and each published post's figures for Social > Analytics                                |
 
 Full URL = the production URL + the path above. cron-job.org lets you pick a timezone per job -
 schedule Record subscriptions and Review asks in `Pacific/Auckland` so they keep their local time
@@ -148,10 +148,13 @@ across DST changes.
   their comment counts, and only posts whose count moved are read again, at most 30 a run; a post
   read in full has comments missing from it marked gone. Google reviews are read newest change first
   back to the last one seen, all of them (up to 1,000) on the first run or when Google counts fewer
-  than before. The first run of each app leaves threads older than 14 days read. A run stops
-  starting reads after 90 s. A failed read keeps its reason for the Inbox to show and never stops
-  the figures. The Inbox's Check now is turned away within 2 minutes of the last read. Move the
-  cron-job.org job to every 30 minutes after the deploy that adds the Inbox.
+  than before. Messenger and Instagram conversations that changed since the last read come next (the
+  last 60 days on the first run, at most 100 a run), each with its newest 20 messages; a
+  conversation read in full has messages missing from it marked gone. The first run of each app
+  leaves threads older than 14 days read. A run stops starting reads after 90 s. A failed read keeps
+  its reason for the Inbox to show and never stops the figures. The Inbox's Check now is turned away
+  within 2 minutes of the last read. Move the cron-job.org job to every 30 minutes after the deploy
+  that adds the Inbox.
 - The figures part holds the `social:insightsSync` run lock, so an overlapping run or a Refresh
   press does nothing and answers `{ running: true }`. Each app's account days are read at most every
   6 hours: the last 30 days on the first run, then the last 3 again for Facebook and Instagram (the

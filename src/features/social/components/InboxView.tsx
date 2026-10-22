@@ -1,8 +1,8 @@
 "use client";
 // src/features/social/components/InboxView.tsx
-// Social Inbox: Inbox and Archive, the apps on show, Check now and Mark all read, why an app's
-// comments aren't coming through, the filters with their counts, search, the threads, and the
-// open thread beside them (on its own on a phone).
+// Social Inbox: Inbox and Archive, the apps and kinds on show, Check now and Mark all read, why
+// an app's comments or messages aren't coming through, the filters with their counts, search, the
+// threads, and the open thread beside them (on its own on a phone).
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
@@ -24,9 +24,13 @@ import { InboxThread } from "@/features/social/components/InboxThread";
 import { announceInboxChange } from "@/features/social/hooks/use-inbox-unread";
 import type { InboxData } from "@/features/social/lib/inbox/inbox-data.server";
 import {
+  dmAppLabel,
   INBOX_FILTER_LABEL,
   INBOX_FILTERS,
+  INBOX_SHOW_LABEL,
+  INBOX_SHOWS,
   inboxHref,
+  MESSAGING_PLATFORMS,
   type InboxApp,
   type InboxQuery,
 } from "@/features/social/lib/inbox/map";
@@ -44,7 +48,7 @@ import { FaArrowsRotate, FaMagnifyingGlass } from "react-icons/fa6";
  * The Inbox page.
  * @param props - Component props.
  * @param props.data - What the server loaded.
- * @param props.query - The address's tab, filter, app and words.
+ * @param props.query - The address's tab, filter, app, kinds and words.
  * @param props.now - When the page loaded, as ISO, so times read the same on both sides.
  * @param props.canSuggest - Whether an AI provider is set up for Suggest a reply.
  * @param props.reviewTemplateId - The Post maker's review template, if there is one.
@@ -73,8 +77,24 @@ export function InboxView({
   const apps: InboxApp[] = ["all", ...SOCIAL_PLATFORMS.filter((p) => data.setUp.includes(p))];
   const checked = data.ranAt ? timeAgo(Date.parse(data.ranAt), nowMs) : null;
   const searching = query.q !== "" || query.filter !== "all";
+  const messaging = MESSAGING_PLATFORMS.filter((p) => data.setUp.includes(p));
+  const empty =
+    query.show === "messages"
+      ? {
+          title: "No messages yet",
+          body: "Messages people send you on Messenger and Instagram show here once they're read.",
+        }
+      : query.show === "comments"
+        ? {
+            title: "No comments or reviews yet",
+            body: "New comments on your posts and new Google reviews show here once they're read.",
+          }
+        : {
+            title: "Nothing here yet",
+            body: "New comments on your posts, Google reviews and messages show here once they're read.",
+          };
 
-  /** Reads new comments and reviews now, then reloads the page's data. */
+  /** Reads new comments, reviews and messages now, then reloads the page's data. */
   async function checkNow(): Promise<void> {
     setChecking(true);
     const res = await callApi<{ result: Record<string, number | string> }>(
@@ -184,14 +204,14 @@ export function InboxView({
               ? "Nothing matches"
               : query.tab === "archive"
                 ? "Nothing archived"
-                : "No comments or reviews yet"
+                : empty.title
           }
           body={
             searching
               ? "Try other words, or show every thread."
               : query.tab === "archive"
                 ? "Threads you archive move here, and come back to the inbox when someone writes again."
-                : "New comments on your posts and new Google reviews show here once they're read."
+                : empty.body
           }
           action={
             searching ? (
@@ -252,6 +272,20 @@ export function InboxView({
             ))}
           </nav>
         )}
+        {messaging.length > 0 && (
+          <nav aria-label="What to show" className={cn(SEGMENTED_GROUP_CLS, "flex-wrap")}>
+            {INBOX_SHOWS.map((s) => (
+              <Link
+                key={s}
+                href={inboxHref({ ...query, show: s })}
+                aria-current={s === query.show ? "page" : undefined}
+                className={cn(segmentedButtonClass(s === query.show), "inline-flex items-center")}
+              >
+                {INBOX_SHOW_LABEL[s]}
+              </Link>
+            ))}
+          </nav>
+        )}
         <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
           <p className="text-sm text-admin-text-secondary" aria-live="polite">
             {checking ? "Checking..." : checked ? `Checked ${checked}` : "Not checked yet"}
@@ -285,6 +319,13 @@ export function InboxView({
           <span className="font-semibold">{PLATFORM_LABEL[p]}:</span> {data.errors[p]}
         </Notice>
       ))}
+      {messaging
+        .filter((p) => data.messageErrors[p])
+        .map((p) => (
+          <Notice key={`${p}-messages`} tone="warn" onGrey>
+            <span className="font-semibold">{dmAppLabel(p)} messages:</span> {data.messageErrors[p]}
+          </Notice>
+        ))}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <div className={cn(data.open && "hidden lg:block")}>{list}</div>

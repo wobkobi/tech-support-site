@@ -389,6 +389,15 @@ function runSelfTest(): number {
       want: 1,
     },
     {
+      name: "a link in an Instagram message is clean",
+      got: replyProblems(
+        { reply: "Yes I do. Book at www.example.co.nz.", hide: false },
+        sampleReplyReq({ platform: "instagram", kind: "message", rating: null, author: null }),
+        "",
+      ).hard.length,
+      want: 0,
+    },
+    {
       name: "a fix that keeps the post's emoji and hashtags is clean",
       got: captionProblems(
         ["I'm here 🙂 #Titirangi"],

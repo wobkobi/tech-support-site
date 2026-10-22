@@ -1,18 +1,24 @@
 // scripts/check-social-inbox.ts
-// Social inbox: reading Facebook comments, Instagram comments and Google reviews into rows,
-// spotting our own replies, which threads need a reply, read and archive marks after a sync, the
-// sync's stored record, the inbox's address, names, snippets, times, reply checks, suggestion
-// requests and the review post brief. Pure logic, no DB.
+// Social inbox: reading Facebook comments, Instagram comments, Google reviews and Messenger and
+// Instagram conversations into rows, spotting our own replies, which threads need a reply, the
+// 24-hour message window, read and archive marks after a sync, the sync's stored record, the
+// inbox's address, names, snippets, times, reply checks, suggestion requests and the review post
+// brief. Pure logic, no DB.
 // Run with: npm test -- social-inbox
 
 import {
+  attachmentLabel,
   authorLabel,
+  conversationRows,
   countKey,
+  DM_WINDOW_MS,
   facebookRows,
   firstName,
   googleRows,
   inboxHref,
   instagramRows,
+  isDirect,
+  isWindowError,
   listWhen,
   marksAfterSync,
   messageWhen,
@@ -22,10 +28,13 @@ import {
   readCommentsState,
   readInboxQuery,
   readReplySuggestion,
+  replyLength,
+  replyOpenUntil,
   replyProblem,
   reviewBrief,
   snippet,
   threadState,
+  windowClosedText,
   type ThreadMessage,
 } from "@/features/social/lib/inbox/map";
 import { expect, expectEqual, finish } from "./lib/harness.js";
@@ -230,6 +239,167 @@ console.log("Google reviews");
   );
 }
 
+console.log("Messenger and Instagram conversations");
+{
+  const page = "883";
+  const rows = conversationRows(
+    "facebook",
+    {
+      id: "t_1",
+      updated_time: ago(5).toISOString(),
+      link: "/883/inbox/1/?section=messages",
+      participants: {
+        data: [
+          { id: "psid9", name: " Mary Smith " },
+          { id: page, name: "To The Point Tech" },
+        ],
+      },
+      // Newest first, as Messenger gives them.
+      messages: {
+        data: [
+          {
+            id: "m_3",
+            created_time: ago(5).toISOString(),
+            from: { id: page, name: "To The Point Tech" },
+            message: "Sure, see you then",
+          },
+          {
+            id: "m_2",
+            created_time: ago(30).toISOString(),
+            from: { id: "psid9", name: "Mary Smith" },
+            message: "",
+            attachments: { data: [{ mime_type: "image/jpeg" }, { mime_type: "image/png" }] },
+          },
+          {
+            id: "m_1",
+            created_time: ago(60).toISOString(),
+            from: { id: "psid9", name: "Mary Smith" },
+            message: " Can you look at my laptop? ",
+          },
+          { id: "m_bad" },
+        ],
+      },
+    },
+    page,
+  );
+  expectEqual(
+    "conversation first, then messages oldest first",
+    rows.map((r) => [r.kind, r.externalId, r.threadExternalId]),
+    [
+      ["conversation", "t_1", null],
+      ["message", "m_1", "t_1"],
+      ["message", "m_2", "t_1"],
+      ["message", "m_3", "t_1"],
+    ],
+  );
+  const top = rows[0]!;
+  expectEqual(
+    "the person, with their id to reply to",
+    [top.authorName, top.authorId],
+    ["Mary Smith", "psid9"],
+  );
+  expectEqual("latest words, marked when ours", top.text, "You: Sure, see you then");
+  expectEqual("starts at the oldest message", top.postedAt.getTime(), ago(60).getTime());
+  expectEqual(
+    "ours spotted by the Page id",
+    rows.map((r) => r.fromUs),
+    [false, false, false, true],
+  );
+  expectEqual("pictures with no words", rows[2]?.text, "(Sent 2 pictures)");
+  expectEqual("words trimmed", rows[1]?.text, "Can you look at my laptop?");
+
+  const ig = conversationRows(
+    "instagram",
+    {
+      id: "aWdf",
+      participants: {
+        data: [
+          { id: "1784", username: "tothepointtech" },
+          { id: "igsid5", username: "kiwi_nan" },
+        ],
+      },
+      messages: {
+        data: [
+          {
+            id: "ig_1",
+            created_time: ago(10).toISOString(),
+            from: { id: "igsid5", username: "kiwi_nan" },
+            message: "Hi, do you come to Ponsonby?",
+          },
+        ],
+      },
+    },
+    "1784",
+  );
+  expectEqual(
+    "Instagram username kept",
+    [ig[0]?.authorName, ig[0]?.authorId],
+    ["kiwi_nan", "igsid5"],
+  );
+  expectEqual("their latest words as written", ig[0]?.text, "Hi, do you come to Ponsonby?");
+  expectEqual("no messages, no thread", conversationRows("facebook", { id: "t_2" }, page), []);
+  expectEqual("no id, no thread", conversationRows("facebook", {}, page), []);
+
+  expectEqual(
+    "one video",
+    attachmentLabel({ attachments: { data: [{ mime_type: "video/mp4" }] } }),
+    "(Sent a video)",
+  );
+  expectEqual(
+    "voice",
+    attachmentLabel({ attachments: { data: [{ mime_type: "audio/mpeg" }] } }),
+    "(Sent a voice message)",
+  );
+  expectEqual("file", attachmentLabel({ attachments: { data: [{}] } }), "(Sent a file)");
+  expectEqual("sticker", attachmentLabel({ sticker: "https://x" }), "(Sent a sticker)");
+  expectEqual("story reply", attachmentLabel({ story: { id: "s" } }), "(Replied to your story)");
+  expectEqual("share", attachmentLabel({ shares: { data: [{}] } }), "(Shared a post)");
+  expectEqual("anything else", attachmentLabel({}), "(Sent something the app can't show here)");
+
+  expect("conversations are direct", isDirect("conversation") && isDirect("message"));
+  expect("comments aren't", !isDirect("comment") && !isDirect("reply") && !isDirect("review"));
+}
+
+console.log("The message window");
+{
+  const until = replyOpenUntil([
+    { fromUs: false, postedAt: ago(120).toISOString() },
+    { fromUs: false, postedAt: ago(60) },
+    { fromUs: true, postedAt: ago(5) },
+  ]);
+  expectEqual("a day after their latest", until?.getTime(), ago(60).getTime() + DM_WINDOW_MS);
+  expectEqual(
+    "only ours: can't answer",
+    replyOpenUntil([{ fromUs: true, postedAt: ago(5) }]),
+    null,
+  );
+  expectEqual(
+    "an unsent one doesn't count",
+    replyOpenUntil([
+      { fromUs: false, postedAt: ago(120) },
+      { fromUs: false, postedAt: ago(10), gone: true },
+    ])?.getTime(),
+    ago(120).getTime() + DM_WINDOW_MS,
+  );
+  expect(
+    "Meta's window refusal",
+    isWindowError("(#10) This message is sent outside of allowed window."),
+  );
+  expect(
+    "a missing permission isn't",
+    !isWindowError("(#10) Requires pages_messaging permission") && !isWindowError(null),
+  );
+  expect(
+    "closed after their message",
+    windowClosedText("instagram", true).startsWith("It's been more than a day since their last"),
+  );
+  expect(
+    "closed when only we wrote",
+    windowClosedText("facebook", false).startsWith("They haven't sent you a message") &&
+      windowClosedText("facebook", false).includes("Messenger itself"),
+  );
+}
+
 console.log("Needs a reply");
 {
   expect("their comment alone needs a reply", threadState([msg(false, 60)]).needsReply);
@@ -323,6 +493,8 @@ console.log("The sync's record");
     googleTotal: null,
     googleSeen: null,
     errors: {},
+    messagesSeen: {},
+    messageErrors: {},
   });
   expectEqual("broken JSON", readCommentsState("{oops").counts, {});
   expectEqual(
@@ -334,6 +506,8 @@ console.log("The sync's record");
         googleTotal: 12,
         googleSeen: "2026-10-21T00:00:00Z",
         errors: { facebook: "Needs pages_read_user_content", tiktok: "no" },
+        messagesSeen: { facebook: "2026-10-22T01:00:00.000Z", instagram: "soon", google: "x" },
+        messageErrors: { instagram: "Needs instagram_manage_messages", google: "no" },
       }),
     ),
     {
@@ -342,6 +516,8 @@ console.log("The sync's record");
       googleTotal: 12,
       googleSeen: "2026-10-21T00:00:00Z",
       errors: { facebook: "Needs pages_read_user_content" },
+      messagesSeen: { facebook: "2026-10-22T01:00:00.000Z" },
+      messageErrors: { instagram: "Needs instagram_manage_messages" },
     },
   );
   const counts = { [countKey("facebook", "p1")]: 2, [countKey("facebook", "p2")]: 1 };
@@ -371,23 +547,37 @@ console.log("The sync's record");
 
 console.log("The inbox's address");
 {
-  expectEqual("defaults", readInboxQuery({}), { tab: "inbox", filter: "all", app: "all", q: "" });
-  expectEqual(
-    "reads each part",
-    readInboxQuery({ tab: "archive", filter: "needs-reply", app: "google", q: "  printer " }),
-    { tab: "archive", filter: "needs-reply", app: "google", q: "printer" },
-  );
-  expectEqual("unknown parts fall back", readInboxQuery({ tab: "x", filter: "y", app: "tiktok" }), {
+  expectEqual("defaults", readInboxQuery({}), {
     tab: "inbox",
     filter: "all",
     app: "all",
+    show: "all",
     q: "",
   });
+  expectEqual(
+    "reads each part",
+    readInboxQuery({
+      tab: "archive",
+      filter: "needs-reply",
+      app: "google",
+      show: "comments",
+      q: "  printer ",
+    }),
+    { tab: "archive", filter: "needs-reply", app: "google", show: "comments", q: "printer" },
+  );
+  expectEqual(
+    "unknown parts fall back",
+    readInboxQuery({ tab: "x", filter: "y", app: "tiktok", show: "dms" }),
+    { tab: "inbox", filter: "all", app: "all", show: "all", q: "" },
+  );
   expectEqual("default href", inboxHref(readInboxQuery({})), "/admin/social/inbox");
   expectEqual(
     "href with parts and a thread",
-    inboxHref({ tab: "archive", filter: "hidden", app: "facebook", q: "mac book" }, "abc"),
-    "/admin/social/inbox?tab=archive&filter=hidden&app=facebook&q=mac+book&open=abc",
+    inboxHref(
+      { tab: "archive", filter: "hidden", app: "facebook", show: "messages", q: "mac book" },
+      "abc",
+    ),
+    "/admin/social/inbox?tab=archive&filter=hidden&app=facebook&show=messages&q=mac+book&open=abc",
   );
 }
 
@@ -435,6 +625,24 @@ console.log("Replies");
     readReplySuggestion({ reply: "a".repeat(3000) }, "instagram").reply.length,
     2200,
   );
+  expectEqual(
+    "Messenger message too long",
+    replyProblem("facebook", "a".repeat(2001), true),
+    "Keep it to 2,000 characters.",
+  );
+  expectEqual("Messenger message fine", replyProblem("facebook", "a".repeat(2000), true), null);
+  expectEqual("Instagram counts bytes", replyLength("instagram", true, "hi \u{1F600}"), 7);
+  expectEqual("comments count characters", replyLength("instagram", false, "hi \u{1F600}"), 5);
+  expectEqual(
+    "Instagram message too long with emoji",
+    replyProblem("instagram", "\u{1F600}".repeat(300), true),
+    "Keep it shorter. Instagram takes about 1,000 letters in a message, fewer with emoji.",
+  );
+  const clipped = readReplySuggestion({ reply: "\u{1F600}".repeat(300) }, "instagram", true).reply;
+  expect(
+    "Instagram message suggestion capped whole",
+    replyLength("instagram", true, clipped) === 1000 && clipped === "\u{1F600}".repeat(250),
+  );
 }
 
 console.log("Suggestion requests");
@@ -461,6 +669,13 @@ console.log("Suggestion requests");
     },
   );
   expectEqual("no app", parseReplyRequest({ text: "hi" }), { error: "Say which app it's on." });
+  const dm = parseReplyRequest({ platform: "instagram", kind: "message", text: "Ponsonby?" });
+  expectEqual("message read", "error" in dm ? dm.error : dm.kind, "message");
+  expectEqual(
+    "no messages on Google",
+    parseReplyRequest({ platform: "google", kind: "message", text: "hi" }),
+    { error: "Google has no messages." },
+  );
   expectEqual(
     "review off Google",
     parseReplyRequest({ platform: "facebook", kind: "review", text: "hi" }),

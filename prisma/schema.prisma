@@ -1415,21 +1415,24 @@ enum SocialCommentKind {
   comment
   reply
   review
+  conversation
+  message
 }
 
-// A comment on one of the Page's Facebook posts or Instagram media, a reply in its thread, or a
-// Google review (our reply to it is a reply row). The top-level row of a thread carries its inbox
-// state; replies point at it through threadExternalId. Every optional field is written as an
-// explicit null, so `{ field: null }` filters match. Filled by
+// A comment on one of the Page's Facebook posts or Instagram media, a reply in its thread, a
+// Google review (our reply to it is a reply row), or a Messenger or Instagram direct message
+// conversation (a conversation row with its messages under it). The top-level row of a thread
+// carries its inbox state; replies and messages point at it through threadExternalId. Every
+// optional field is written as an explicit null, so `{ field: null }` filters match. Filled by
 // src/features/social/lib/inbox/sync.server.ts.
 model SocialComment {
   id               String            @id @default(auto()) @map("_id") @db.ObjectId
   platform         SocialPlatform
   kind             SocialCommentKind
-  // The app's own id: a Facebook or Instagram comment id, or the review's resource name. Our
-  // reply to a review is the review's name plus "/reply".
+  // The app's own id: a Facebook or Instagram comment, conversation or message id, or the
+  // review's resource name. Our reply to a review is the review's name plus "/reply".
   externalId       String
-  // The top-level comment or review a reply belongs to; null on a top-level row.
+  // The top-level comment, review or conversation a row belongs to; null on a top-level row.
   threadExternalId String?
   // The post or media a Facebook or Instagram comment is on.
   objectExternalId String?
@@ -1440,7 +1443,8 @@ model SocialComment {
   objectText       String?
   objectImageUrl   String?
   objectUrl        String?
-  // Null when the app doesn't say who wrote it.
+  // Null when the app doesn't say who wrote it. On a conversation row, the person we're talking
+  // to; their id is where a reply goes.
   authorName       String?
   authorId         String?
   fromUs           Boolean           @default(false)

@@ -121,7 +121,7 @@ export const FEATURES: readonly Feature[] = [
   {
     key: "messages",
     label: "Messages",
-    detail: "Messenger and Instagram direct messages.",
+    detail: "Read and answer Messenger and Instagram messages in the Inbox.",
     needs: {
       facebook: { scopes: ["pages_messaging"] },
       instagram: { scopes: ["instagram_manage_messages"] },

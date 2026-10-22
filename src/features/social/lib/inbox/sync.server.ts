@@ -1,16 +1,20 @@
 // src/features/social/lib/inbox/sync.server.ts
-// The comments sync: reads comments on the Page's Facebook posts and Instagram media from the
-// last 60 days (only posts whose count moved), and Google reviews newest first back to the last
-// one read, keeping them as SocialComment rows with each thread's inbox state. The sync-social
-// cron and the Inbox's Refresh share one run lock, so they never read at once.
+// The inbox sync: reads comments on the Page's Facebook posts and Instagram media from the last
+// 60 days (only posts whose count moved), Google reviews newest first back to the last one read,
+// and Messenger and Instagram conversations changed since the last read, keeping them as
+// SocialComment rows with each thread's inbox state. The sync-social cron and the Inbox's Refresh
+// share one run lock, so they never read at once.
 
 import { readReviews } from "@/features/social/lib/google-business";
 import {
+  conversationRows,
   countKey,
   facebookRows,
   googleRows,
+  INSTAGRAM_DM_URL,
   instagramRows,
   marksAfterSync,
+  MESSAGING_PLATFORMS,
   objectsToRead,
   pruneCounts,
   readCommentsState,
@@ -20,6 +24,8 @@ import {
   type FacebookComment,
   type GoogleReview,
   type InstagramComment,
+  type MessagingPlatform,
+  type MetaConversation,
 } from "@/features/social/lib/inbox/map";
 import { metaProblem, scopeIn } from "@/features/social/lib/insights/metrics";
 import { graph, GraphError, metaConfig } from "@/features/social/lib/meta-graph";
@@ -43,9 +49,22 @@ const MAX_COMMENT_PAGES = 5;
 const MAX_REVIEW_PAGES = 20;
 /** A Refresh press within this long of the last read is turned away. */
 export const REFRESH_EVERY_MS = 2 * 60_000;
+/** Pages of conversations (25 each) read per app in a run. */
+const MAX_CONVERSATION_PAGES = 4;
+/**
+ * Messages read per conversation, newest first. The conversations list nests at most this many,
+ * so a longer conversation keeps the older messages already stored.
+ */
+const MESSAGES_PER_CONVERSATION = 20;
+const MESSAGE_FIELDS = "id,created_time,from,message,attachments{mime_type},sticker,story,shares";
 
-/** How a run went: messages written per app, or why its read failed. */
-export type CommentsSyncResult = Partial<Record<SocialPlatformKey, number | string>>;
+/**
+ * How a run went: rows written per app, or why its read failed. Messages are keyed
+ * "facebook:messages" and "instagram:messages".
+ */
+export type CommentsSyncResult = Partial<
+  Record<SocialPlatformKey | `${MessagingPlatform}:messages`, number | string>
+>;
 
 /** A page of a Graph list. */
 interface Paged<T> {
@@ -99,8 +118,8 @@ async function saveState(state: CommentsState): Promise<void> {
 }
 
 /**
- * Runs the sync for every app that's set up. One app failing doesn't stop the others; its
- * reason is kept for the Inbox to show.
+ * Runs the sync for every app that's set up: comments or reviews, then messages. One read
+ * failing doesn't stop the others; its reason is kept for the Inbox to show.
  * @param now - Now.
  * @param opts - How long to keep starting reads.
  * @param opts.budgetMs - The budget.
@@ -116,14 +135,19 @@ export async function syncComments(
     const state = await loadCommentsState();
     const result: CommentsSyncResult = {};
     for (const platform of SOCIAL_PLATFORMS) {
+      const messaging = (MESSAGING_PLATFORMS as readonly string[]).includes(platform)
+        ? (platform as MessagingPlatform)
+        : null;
       if (PLATFORMS[platform].missingEnv().length > 0) {
         delete state.errors[platform];
+        if (messaging) delete state.messageErrors[messaging];
         continue;
       }
       if (Date.now() > deadline) break;
-      // Per app, so an app whose permission arrives later doesn't fill the inbox with months.
+      // Per app and per kind, so an app whose permission arrives later doesn't fill the inbox
+      // with months.
       const firstRun = !(await prisma.socialComment.findFirst({
-        where: { platform },
+        where: { platform, kind: { notIn: ["conversation", "message"] } },
         select: { id: true },
       }));
       try {
@@ -140,6 +164,25 @@ export async function syncComments(
         console.error(`[inbox/sync] ${platform} failed:`, message);
         result[platform] = message;
         state.errors[platform] = message;
+      }
+      if (!messaging || Date.now() > deadline) continue;
+      try {
+        const firstMessages = !(await prisma.socialComment.findFirst({
+          where: { platform, kind: "conversation" },
+          select: { id: true },
+        }));
+        result[`${messaging}:messages`] = await syncMessages(messaging, {
+          state,
+          now,
+          firstRun: firstMessages,
+          deadline,
+        });
+        delete state.messageErrors[messaging];
+      } catch (error) {
+        const message = readableError(error);
+        console.error(`[inbox/sync] ${platform} messages failed:`, message);
+        result[`${messaging}:messages`] = message;
+        state.messageErrors[messaging] = message;
       }
     }
     state.ranAt = now.toISOString();
@@ -269,7 +312,7 @@ interface InstagramMedia {
  */
 async function syncInstagram(ctx: SyncCtx): Promise<number> {
   const { igAccountId } = metaConfig();
-  if (!igAccountId) throw new Error("META_IG_ACCOUNT_ID isn't set.");
+  if (!igAccountId) throw new Error("INSTAGRAM_ACCOUNT_ID isn't set.");
   const account = await graph<{ username?: string }>(`/${igAccountId}`, "GET", {
     fields: "username",
   });
@@ -470,6 +513,81 @@ async function syncGoogle(ctx: SyncCtx): Promise<number> {
   return written;
 }
 
+// --- Messages ---
+
+/**
+ * Reads Messenger or Instagram conversations changed since the last read (the last 60 days on
+ * the first), newest first, with each one's latest messages. The list is sorted by its last
+ * change, so the read stops at the first conversation older than that. The mark only moves on
+ * when the run read everything it found, so a run cut short by the budget is picked up again.
+ * @param platform - The app.
+ * @param ctx - The run.
+ * @returns Rows written.
+ */
+async function syncMessages(platform: MessagingPlatform, ctx: SyncCtx): Promise<number> {
+  const { pageId, igAccountId } = metaConfig();
+  if (!pageId) throw new Error("META_PAGE_ID isn't set.");
+  const us = platform === "facebook" ? pageId : igAccountId;
+  if (!us) throw new Error("INSTAGRAM_ACCOUNT_ID isn't set.");
+  const seen = ctx.state.messagesSeen[platform];
+  const since = seen && !ctx.firstRun ? Date.parse(seen) : ctx.now.getTime() - WINDOW_MS;
+
+  const conversations: MetaConversation[] = [];
+  let after: string | undefined;
+  for (let page = 0; page < MAX_CONVERSATION_PAGES; page++) {
+    const res = await graph<Paged<MetaConversation>>(`/${pageId}/conversations`, "GET", {
+      platform: platform === "facebook" ? "messenger" : "instagram",
+      // Instagram gives no link to a conversation.
+      fields: `id,updated_time,${platform === "facebook" ? "link," : ""}participants,messages.limit(${MESSAGES_PER_CONVERSATION}){${MESSAGE_FIELDS}}`,
+      limit: "25",
+      ...(after ? { after } : {}),
+    });
+    const list = res.data ?? [];
+    // At or after the mark: the newest one read last time comes again, which writes nothing.
+    conversations.push(
+      ...list.filter((c) => c.updated_time && Date.parse(c.updated_time) >= since),
+    );
+    const last = list.at(-1)?.updated_time;
+    after = res.paging?.next ? res.paging.cursors?.after : undefined;
+    if (!after || (last && Date.parse(last) < since)) break;
+  }
+
+  let written = 0;
+  let finished = true;
+  for (const conv of conversations) {
+    if (Date.now() > ctx.deadline) {
+      finished = false;
+      break;
+    }
+    const rows = conversationRows(platform, conv, us);
+    if (rows.length === 0) continue;
+    written += await keepRows(platform, rows, {
+      now: ctx.now,
+      firstRun: ctx.firstRun,
+      // Only a conversation read to its first message shows which stored ones were unsent.
+      complete: conv.messages?.paging?.next ? null : { threadIds: [rows[0]!.externalId] },
+      object: {
+        text: null,
+        imageUrl: null,
+        url:
+          platform === "facebook"
+            ? conv.link
+              ? `https://www.facebook.com${conv.link}`
+              : null
+            : INSTAGRAM_DM_URL,
+      },
+    });
+  }
+  if (finished) {
+    const newest = conversations.reduce<number>(
+      (max, c) => Math.max(max, c.updated_time ? Date.parse(c.updated_time) : 0),
+      seen ? Date.parse(seen) : 0,
+    );
+    if (newest > 0) ctx.state.messagesSeen[platform] = new Date(newest).toISOString();
+  }
+  return written;
+}
+
 // --- Writing rows ---
 
 /** The parts of a stored row a fresh read can change. */
@@ -644,6 +762,7 @@ export async function refreshThreads(
     },
     select: {
       id: true,
+      kind: true,
       externalId: true,
       threadExternalId: true,
       fromUs: true,
@@ -662,15 +781,16 @@ export async function refreshThreads(
     const top = all.find((r) => r.externalId === root);
     // A reply whose top-level comment wasn't read has no thread to keep state on.
     if (!top) continue;
+    const thread = all.filter((r) => r.externalId === root || r.threadExternalId === root);
+    // A conversation's top row stands for the person, not a message they wrote.
+    const said = top.kind === "conversation" ? thread.filter((r) => r.id !== top.id) : thread;
     const state = threadState(
-      all
-        .filter((r) => r.externalId === root || r.threadExternalId === root)
-        .map((r) => ({
-          fromUs: r.fromUs,
-          at: r.editedAt ?? r.postedAt,
-          hidden: r.hidden,
-          gone: r.goneAt !== null,
-        })),
+      (said.length > 0 ? said : thread).map((r) => ({
+        fromUs: r.fromUs,
+        at: r.editedAt ?? r.postedAt,
+        hidden: r.hidden,
+        gone: r.goneAt !== null,
+      })),
     );
     const marks = marksAfterSync(
       opts.created?.has(root) || top.lastActivityAt === null

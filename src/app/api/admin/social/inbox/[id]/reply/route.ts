@@ -1,6 +1,6 @@
 // src/app/api/admin/social/inbox/[id]/reply/route.ts
-// Sends a reply on the app to a comment or review. A Google review holds one reply, which this
-// replaces.
+// Sends a reply on the app to a comment, review or direct message. A Google review holds one
+// reply, which this replaces; a message can only be answered within a day of their last one.
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import { actionErrorResponse, replyTo } from "@/features/social/lib/inbox/actions.server";

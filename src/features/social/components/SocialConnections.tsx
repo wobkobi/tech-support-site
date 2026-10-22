@@ -1,4 +1,3 @@
-"use client";
 // src/features/social/components/SocialConnections.tsx
 // The Overview's Linked accounts card: whether each app's keys still work, the account they
 // reach or why they don't, and a button to check again.
