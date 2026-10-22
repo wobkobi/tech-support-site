@@ -2,6 +2,7 @@
 // The Social calendar's date maths, statuses, colours and figures. Pure and client-safe. Days
 // are NZ YYYY-MM-DD keys, so a grid never slips a day across daylight saving.
 
+import type { SocialFormatKey } from "@/features/social/lib/media";
 import type { SocialPostStatus } from "@/features/social/lib/post-row";
 import { minuteLabel } from "@/features/social/lib/queue-slots";
 import type { TagColour } from "@/features/social/lib/tags";
@@ -93,6 +94,8 @@ export interface CalendarEntry {
   status: CalendarStatus;
   /** The post's name, or the schedule's for an open time. */
   name: string;
+  /** The kind of post; "feed" for an open time. */
+  format: SocialFormatKey;
   /** The words it goes out with; empty for an open time. */
   text: string;
   /** Apps it's switched on for, or the schedule's apps. */

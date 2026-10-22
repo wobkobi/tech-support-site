@@ -25,6 +25,11 @@ import { ContentSchedules } from "@/features/social/components/ContentSchedules"
 import type { PreviewPost } from "@/features/social/components/PlatformPreview";
 import { PostActionBar } from "@/features/social/components/PostActionBar";
 import { PostEmailPanel } from "@/features/social/components/PostEmailPanel";
+import {
+  MorePictures,
+  PostKindSwitch,
+  PostVideo,
+} from "@/features/social/components/PostMediaFields";
 import { PostPaneTabs } from "@/features/social/components/PostPaneTabs";
 import { PostPreviewPanel } from "@/features/social/components/PostPreviewPanel";
 import { PostStatusBanner } from "@/features/social/components/PostStatusBanner";
@@ -34,6 +39,16 @@ import { PostingSourceNote } from "@/features/social/components/PostingSourceNot
 import type { ContentStatsRow } from "@/features/social/lib/content-row";
 import type { PostEmail } from "@/features/social/lib/email-step.server";
 import { insertableGroups } from "@/features/social/lib/insertables";
+import {
+  FORMAT_PLURAL,
+  MAX_PICTURES,
+  VIDEO_MAX_BYTES,
+  canTakeDown,
+  formatTakes,
+  usesText,
+  type MediaItem,
+  type SocialFormatKey,
+} from "@/features/social/lib/media";
 import type { CaptionAiSetup, PostDesign, PostingSource } from "@/features/social/lib/open-post";
 import { liveOn, type Connection } from "@/features/social/lib/post-display";
 import type { SocialPostRow, SocialTargetRow } from "@/features/social/lib/post-row";
@@ -57,16 +72,33 @@ import {
   type GooglePostType,
   type SocialPlatformKey,
 } from "@/features/social/lib/validate";
+import {
+  captureFrame,
+  loadVideo,
+  uploadCoverFrame,
+  uploadVideo,
+  videoMetaOf,
+  videoTypeOf,
+} from "@/features/social/lib/video-upload";
 import { watermarkImage } from "@/features/social/lib/watermark";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { shrinkImage } from "@/shared/lib/resize-image";
 import type { WatermarkSettings } from "@/shared/lib/settings/types";
 import { fromNzInputValue, toNzInputValue } from "@/shared/lib/timezone-utils";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
+// Konva has no server build, and most posts never make a story.
+const StoryMaker = dynamic(
+  () => import("@/features/social/components/StoryMaker").then((m) => m.StoryMaker),
+  { ssr: false },
+);
+
 const AUTOSAVE_MS = 1200;
+// While a video processes, the page checks back this often.
+const POSTING_POLL_MS = 15_000;
 
 const MAX_CHARS: Record<SocialPlatformKey, number> = {
   facebook: FACEBOOK_MAX_CHARS,
@@ -77,6 +109,8 @@ const MAX_CHARS: Record<SocialPlatformKey, number> = {
 /** Editable fields, as last saved. */
 interface Content {
   name: string;
+  /** The kind of post. */
+  format: SocialFormatKey;
   body: string;
   imageUrl: string | null;
   imageAlt: string;
@@ -84,6 +118,10 @@ interface Content {
   imageHeight: number | null;
   /** The picture before Add my logo marked it; null when it has no logo. */
   imageOriginalUrl: string | null;
+  /** Pictures 2 onwards of an ordinary post. */
+  moreImages: MediaItem[];
+  /** A reel's or story's video. */
+  video: MediaItem | null;
   linkUrl: string;
   targets: {
     platform: string;
@@ -163,12 +201,15 @@ function wordsOf(c: Content): Words {
 function contentOf(p: SocialPostRow): Content {
   return {
     name: p.name,
+    format: p.format,
     body: p.body,
     imageUrl: p.imageUrl,
     imageAlt: p.imageAlt ?? "",
     imageWidth: p.imageWidth,
     imageHeight: p.imageHeight,
     imageOriginalUrl: p.imageOriginalUrl,
+    moreImages: p.moreImages,
+    video: p.video,
     linkUrl: p.linkUrl ?? "",
     targets: p.targets.map((t) => ({
       platform: t.platform,
@@ -206,7 +247,12 @@ function contentOf(p: SocialPostRow): Content {
 function diff(now: Content, saved: Content): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (now.name !== saved.name) out.name = now.name;
+  if (now.format !== saved.format) out.format = now.format === "feed" ? null : now.format;
   if (now.body !== saved.body) out.body = now.body;
+  if (JSON.stringify(now.moreImages) !== JSON.stringify(saved.moreImages)) {
+    out.moreImages = now.moreImages.map((m) => ({ ...m, alt: m.alt?.trim() || null }));
+  }
+  if (JSON.stringify(now.video) !== JSON.stringify(saved.video)) out.video = now.video;
   if (now.imageUrl !== saved.imageUrl) {
     out.imageUrl = now.imageUrl;
     out.imageWidth = now.imageWidth;
@@ -360,8 +406,15 @@ export function PostComposer({
   const rootRef = useRef<HTMLDivElement>(null);
   const [scheduling, setScheduling] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  // Which picture the file picker is choosing: the post's, or one platform's own.
-  const uploadFor = useRef<"main" | SocialPlatformKey>("main");
+  // Which picture the file picker is choosing: the post's, another for a set, or one app's own.
+  const uploadFor = useRef<"main" | "more" | SocialPlatformKey>("main");
+  // Share of the video uploaded so far, null when no upload is running.
+  const [videoProgress, setVideoProgress] = useState<number | null>(null);
+  const videoAbort = useRef<AbortController | null>(null);
+  // The video picked this visit, still open, so a cover frame can be drawn without reading the
+  // stored copy back across origins.
+  const localVideo = useRef<{ url: string; element: HTMLVideoElement } | null>(null);
+  const [makingStory, setMakingStory] = useState(false);
   const [accounts, setAccounts] = useState<Partial<Record<SocialPlatformKey, string>>>({});
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const overrideRefs = useRef<Partial<Record<SocialPlatformKey, HTMLTextAreaElement | null>>>({});
@@ -396,6 +449,21 @@ export function PostComposer({
     setProblems(contentItem?.problems ?? []);
   }
   const [openedAt] = useState(() => new Date());
+
+  // A video can take the apps minutes to process; check back until the post settles.
+  useEffect(() => {
+    if (initial.status !== "posting") return;
+    const timer = setInterval(() => router.refresh(), POSTING_POLL_MS);
+    return () => clearInterval(timer);
+  }, [initial.status, router]);
+
+  // Let go of the open local video when the composer closes.
+  useEffect(
+    () => () => {
+      if (localVideo.current) URL.revokeObjectURL(localVideo.current.url);
+    },
+    [],
+  );
 
   // The previews show the real Page name and username once the connection check
   // answers; until then (or if it fails) they use placeholders.
@@ -589,10 +657,10 @@ export function PostComposer({
   }
 
   /**
-   * Opens the file picker for the post's picture or one platform's own.
-   * @param forWhat - "main" or the platform the picture is for.
+   * Opens the file picker for the post's picture, another picture for a set, or one app's own.
+   * @param forWhat - "main", "more" or the platform the picture is for.
    */
-  function pickPicture(forWhat: "main" | SocialPlatformKey): void {
+  function pickPicture(forWhat: "main" | "more" | SocialPlatformKey): void {
     uploadFor.current = forWhat;
     fileRef.current?.click();
   }
@@ -673,6 +741,27 @@ export function PostComposer({
     setBusy(`image:${forWhat}`);
     try {
       const small = await shrinkImage(file);
+      if (forWhat === "more") {
+        // Later pictures in a set take the logo as they upload, with no plain copy kept.
+        const marked = withLogo ? await watermarkImage(small.file, watermark) : null;
+        const url = await upload((marked ?? small).file);
+        if (!url) return;
+        const picture: MediaItem = {
+          kind: "image",
+          url,
+          alt: "",
+          width: small.width,
+          height: small.height,
+          durationMs: null,
+          sizeBytes: null,
+          coverUrl: null,
+        };
+        setContent((c) => ({
+          ...c,
+          moreImages: [...c.moreImages, picture].slice(0, MAX_PICTURES - 1),
+        }));
+        return;
+      }
       const marked = withLogo ? await watermarkImage(small.file, watermark) : null;
       const plain = await upload(small.file);
       if (!plain) return;
@@ -737,6 +826,119 @@ export function PostComposer({
     } finally {
       setBusy(null);
     }
+  }
+
+  /**
+   * Switches the kind of post, switching off the apps that don't take the new kind.
+   * @param next - The kind picked.
+   */
+  function changeFormat(next: SocialFormatKey): void {
+    const off = content.targets
+      .filter((t) => t.enabled && !formatTakes(next, t.platform as SocialPlatformKey))
+      .map((t) => PLATFORM_LABEL[t.platform as SocialPlatformKey] ?? t.platform);
+    setContent((c) => ({
+      ...c,
+      format: next,
+      targets: c.targets.map((t) =>
+        formatTakes(next, t.platform as SocialPlatformKey) ? t : { ...t, enabled: false },
+      ),
+    }));
+    if (off.length > 0) {
+      toast(
+        `${off.join(" and ")} switched off: ${off.length > 1 ? "they don't" : "it doesn't"} take ${FORMAT_PLURAL[next]}.`,
+      );
+    }
+  }
+
+  /**
+   * Opens a picked video, draws a first cover frame, then uploads both. The video goes straight
+   * to the Blob store, so a big one never passes through the site.
+   * @param file - MP4 or MOV the operator picked.
+   */
+  async function addVideo(file: File): Promise<void> {
+    if (!videoTypeOf(file)) {
+      toast("Pick an MP4 or MOV video.", { tone: "error" });
+      return;
+    }
+    if (file.size > VIDEO_MAX_BYTES) {
+      toast("That video is over 250 MB. Export it smaller and try again.", { tone: "error" });
+      return;
+    }
+    const abort = new AbortController();
+    videoAbort.current = abort;
+    setVideoProgress(0);
+    const local = URL.createObjectURL(file);
+    try {
+      const element = await loadVideo(local, false);
+      const meta = videoMetaOf(element);
+      // Half a second in skips the black frame many clips open on.
+      const frame = await captureFrame(element, Math.min(500, meta.durationMs / 2));
+      const url = await uploadVideo(file, (p) => setVideoProgress(Math.round(p)), abort.signal);
+      const coverUrl = await uploadCoverFrame(frame);
+      if (localVideo.current) URL.revokeObjectURL(localVideo.current.url);
+      localVideo.current = { url: local, element };
+      setContent((c) => ({
+        ...c,
+        video: {
+          kind: "video",
+          url,
+          alt: null,
+          width: meta.width,
+          height: meta.height,
+          durationMs: meta.durationMs,
+          sizeBytes: file.size,
+          coverUrl,
+        },
+      }));
+    } catch (error) {
+      URL.revokeObjectURL(local);
+      if (!abort.signal.aborted) {
+        toast(error instanceof Error ? error.message : "Couldn't add the video.", {
+          tone: "error",
+        });
+      }
+    } finally {
+      videoAbort.current = null;
+      setVideoProgress(null);
+    }
+  }
+
+  /**
+   * Draws the frame at a time as the reel's cover, from the video picked this visit when it's
+   * still open, else from the stored copy.
+   * @param atMs - Where in the video, in milliseconds.
+   */
+  async function setVideoCover(atMs: number): Promise<void> {
+    const video = content.video;
+    if (!video) return;
+    setBusy("cover");
+    try {
+      const element =
+        localVideo.current?.element ??
+        (await loadVideo(`${video.url}${video.url.includes("?") ? "&" : "?"}cover=1`, true));
+      const coverUrl = await uploadCoverFrame(await captureFrame(element, atMs));
+      setContent((c) => (c.video ? { ...c, video: { ...c.video, coverUrl } } : c));
+    } catch {
+      toast(
+        "Couldn't read the video back to draw a frame. Pick it again with Replace, then choose the frame.",
+        { tone: "error" },
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** Takes the video off the post and lets go of the open local copy. */
+  function removeVideo(): void {
+    if (localVideo.current) URL.revokeObjectURL(localVideo.current.url);
+    localVideo.current = null;
+    setContent((c) => ({ ...c, video: null }));
+  }
+
+  /** Saves, then makes a story draft from this post's design or picture. */
+  async function makeStory(): Promise<void> {
+    if (!(await save())) return;
+    setMakingStory(true);
   }
 
   /**
@@ -964,10 +1166,13 @@ export function PostComposer({
 
   // A content item's checks and preview use the picked caption, as its postings would.
   const draft = {
+    format: content.format,
     body: view.body,
     imageUrl: content.imageUrl,
     imageWidth: content.imageWidth,
     imageHeight: content.imageHeight,
+    moreImages: content.format === "feed" ? content.moreImages : [],
+    video: content.format === "reel" || content.format === "story" ? content.video : null,
     linkUrl: content.linkUrl.trim() || null,
     targets: view.targets,
     googleType: content.googleType,
@@ -997,6 +1202,7 @@ export function PostComposer({
   const insertGroups = insertableGroups(details, promo);
   const failedCount = initial.targets.filter((t) => t.enabled && t.status === "failed").length;
   const upOn = liveOn(initial);
+  const lasting = !canTakeDown(initial.format);
   const spent = contentItem
     ? spentReason(
         {
@@ -1017,11 +1223,14 @@ export function PostComposer({
     const picture = pictureFor(draft, p);
     const own = view.targets.find((t) => t.platform === p);
     return {
+      format: content.format,
       text: fillPromo(textFor(draft, p), promo).trim(),
       imageUrl: picture?.url ?? null,
       imageAlt: own?.imageUrl ? own.imageAlt : content.imageAlt,
       imageWidth: picture?.width ?? null,
       imageHeight: picture?.height ?? null,
+      moreImages: draft.moreImages.map((m) => ({ url: m.url, alt: m.alt ?? "" })),
+      video: draft.video ? { url: draft.video.url, coverUrl: draft.video.coverUrl } : null,
       linkUrl: draft.linkUrl,
       google: {
         type: content.googleType,
@@ -1186,7 +1395,7 @@ export function PostComposer({
         onRetry={() => void publish("retry")}
         canRetry={failedCount > 0 && (initial.status === "partial" || initial.status === "failed")}
         onTakeDown={() => setConfirmingTakeDown(true)}
-        canTakeDown={upOn.length > 0}
+        canTakeDown={upOn.length > 0 && !lasting}
         onRefresh={() => router.refresh()}
       />
 
@@ -1237,7 +1446,9 @@ export function PostComposer({
             overrideRefs={overrideRefs}
             strictest={strictest}
             canUpload={canUpload}
-            pictureBusy={busy?.startsWith("image:") ? busy.slice(6) : null}
+            pictureBusy={
+              busy?.startsWith("image:") ? busy.slice(6) : videoProgress !== null ? "video" : null
+            }
             fileRef={fileRef}
             onPickPicture={pickPicture}
             onFile={(file) => void addImage(file)}
@@ -1278,6 +1489,43 @@ export function PostComposer({
                 ? "Different text for one app goes out with caption 1 only. Pick caption 1 to change it."
                 : null
             }
+            format={content.format}
+            kindSwitch={
+              editable ? (
+                <PostKindSwitch format={content.format} editable onChange={changeFormat} />
+              ) : undefined
+            }
+            moreMedia={
+              content.format === "feed" ? (
+                <MorePictures
+                  pictures={content.moreImages}
+                  editable={editable}
+                  canUpload={canUpload}
+                  busy={busy === "image:more"}
+                  onAdd={() => pickPicture("more")}
+                  onChange={(moreImages) => setContent((c) => ({ ...c, moreImages }))}
+                />
+              ) : content.format === "reel" || content.format === "story" ? (
+                <PostVideo
+                  video={content.video}
+                  format={content.format}
+                  editable={editable}
+                  canUpload={canUpload}
+                  progress={videoProgress}
+                  coverBusy={busy === "cover"}
+                  onFile={(file) => void addVideo(file)}
+                  onCancel={() => videoAbort.current?.abort()}
+                  onRemove={removeVideo}
+                  onCover={(atMs) => void setVideoCover(atMs)}
+                />
+              ) : undefined
+            }
+            onMakeStory={
+              !initial.isPreset && content.format === "feed" && (design || content.imageUrl)
+                ? () => void makeStory()
+                : null
+            }
+            makingStory={makingStory}
           />
           {contentItem && (
             <div className="mt-6 flex flex-col gap-6">
@@ -1299,7 +1547,7 @@ export function PostComposer({
               <ContentPostings postings={contentItem.postings} />
             </div>
           )}
-          {!initial.isPreset && !initial.sourceId && (
+          {!initial.isPreset && !initial.sourceId && usesText(content.format) && (
             <div className="mt-6">
               <PostEmailPanel
                 email={email}
@@ -1345,6 +1593,24 @@ export function PostComposer({
         />
       )}
 
+      {makingStory && (
+        <StoryMaker
+          postId={initial.id}
+          designId={design?.id ?? null}
+          imageUrl={content.imageUrl}
+          imageAlt={content.imageAlt}
+          onDone={(id) => {
+            setMakingStory(false);
+            toast("Story draft made. Check it, then post or schedule it.", { tone: "success" });
+            router.push(`/admin/social/posts?post=${id}`);
+          }}
+          onFail={(message) => {
+            setMakingStory(false);
+            toast(message, { tone: "error" });
+          }}
+        />
+      )}
+
       {postingFrom && (
         <PostingDialog
           itemId={initial.id}
@@ -1374,7 +1640,13 @@ export function PostComposer({
       <ConfirmDialog
         open={confirming}
         title="Post this now?"
-        body={`It goes straight to ${enabled.map((p) => PLATFORM_LABEL[p]).join(" and ")}. You can take it down again from here.`}
+        body={
+          content.format === "story"
+            ? `It goes straight to ${enabled.map((p) => PLATFORM_LABEL[p]).join(" and ")} and shows for 24 hours. A story can't be taken down early.`
+            : content.format === "cover"
+              ? "It replaces your Facebook Page's cover photo straight away. It stays until you change it."
+              : `It goes straight to ${enabled.map((p) => PLATFORM_LABEL[p]).join(" and ")}. You can take it down again from here.`
+        }
         confirmLabel="Post now"
         busy={busy === "now"}
         onConfirm={() => void publish("now")}

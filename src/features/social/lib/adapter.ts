@@ -2,6 +2,7 @@
 // The shape every platform adapter shares, so the publisher and the connections
 // check loop over platforms instead of branching on their names.
 
+import type { SocialFormatKey } from "@/features/social/lib/media";
 import type { GooglePostCta, GooglePostType } from "@/features/social/lib/validate";
 
 /**
@@ -21,13 +22,33 @@ export interface GoogleFields {
   couponCode: string | null;
 }
 
+/** A picture as an adapter sends it. */
+export interface PublishPicture {
+  url: string;
+  alt: string | null;
+}
+
+/** A video as an adapter sends it. */
+export interface PublishVideo {
+  url: string;
+  coverUrl: string | null;
+}
+
 /** What an adapter needs to publish: final text, already filled in. */
 export interface PublishInput {
+  format: SocialFormatKey;
   text: string;
+  /** Picture 1: the app's own when it has one. */
   imageUrl: string | null;
   imageAlt: string | null;
+  /** Every picture in order, picture 1 included; more than one makes a carousel. */
+  images: PublishPicture[];
+  video: PublishVideo | null;
   linkUrl: string | null;
   google: GoogleFields;
+  /** What an earlier run left processing, to check instead of uploading again. */
+  containerId: string | null;
+  containerCreatedAt: Date | null;
 }
 
 /** Where the published post lives. */
@@ -49,16 +70,20 @@ export interface PlatformAdapter {
 }
 
 /**
- * Thrown when a platform accepted the post but hasn't finished processing it in
- * time. The target stays pending and the cron picks it up again later.
+ * Thrown when a platform accepted the post but hasn't finished processing it in time. The target
+ * stays pending with the container saved, and the cron checks on it again later.
  */
 export class StillProcessingError extends Error {
+  /** What the platform is processing, for the next run to check. */
+  readonly containerId: string | null;
   /**
    * Creates the error.
    * @param message - What is still processing, for the target's error field.
+   * @param containerId - The platform's id for it, or null when there's nothing to check.
    */
-  constructor(message: string) {
+  constructor(message: string, containerId: string | null = null) {
     super(message);
     this.name = "StillProcessingError";
+    this.containerId = containerId;
   }
 }

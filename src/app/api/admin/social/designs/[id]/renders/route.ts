@@ -5,7 +5,7 @@ import { parseObjectId } from "@/features/business/lib/validation";
 import { parseDesignDoc } from "@/features/social-design/lib/doc";
 import { FORMATS, isFormatKey } from "@/features/social-design/lib/formats";
 import {
-  deleteUnusedPictures,
+  deleteUnusedMedia,
   writeKeepingUpdatedAt,
 } from "@/features/social-design/lib/picture-store";
 import { RENDER_PREFIX } from "@/features/social-design/lib/pictures";
@@ -106,9 +106,9 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
     renders: [...d.renders.filter(kept), render],
   }));
   if (!before) {
-    await deleteUnusedPictures([url]);
+    await deleteUnusedMedia([url]);
     return errorResponse("Design not found.", 404);
   }
-  await deleteUnusedPictures(before.renders.filter((r) => !kept(r)).map((r) => r.url));
+  await deleteUnusedMedia(before.renders.filter((r) => !kept(r)).map((r) => r.url));
   return okResponse({ render: { ...render, renderedAt: render.renderedAt.toISOString() } });
 }

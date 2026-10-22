@@ -124,3 +124,22 @@ export async function deleteObject(
     if (!unreadable || !(await ownerVisible().catch(() => false))) throw error;
   }
 }
+
+/**
+ * Hands Meta a video to fetch for an upload session it opened (a reel or video story). Meta
+ * downloads the file from the URL itself, so nothing large passes through this function.
+ * @param videoId - The id the session's start call returned.
+ * @param fileUrl - Public address of the video.
+ */
+export async function rupload(videoId: string, fileUrl: string): Promise<void> {
+  const token = metaConfig().token;
+  if (!token) throw new GraphError("META_PAGE_ACCESS_TOKEN isn't set.", null);
+  const res = await fetch(`https://rupload.facebook.com/video-upload/${GRAPH_VERSION}/${videoId}`, {
+    method: "POST",
+    headers: { Authorization: `OAuth ${token}`, file_url: fileUrl },
+    signal: AbortSignal.timeout(60_000),
+  });
+  const body = (await res.json().catch(() => null)) as
+    ({ success?: boolean } & GraphErrorBody) | null;
+  if (!res.ok || !body?.success) throw toGraphError(body, res.status);
+}

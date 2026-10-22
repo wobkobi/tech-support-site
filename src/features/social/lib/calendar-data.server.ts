@@ -10,6 +10,7 @@ import {
 } from "@/features/social/lib/calendar";
 import { coverOf } from "@/features/social/lib/cover";
 import { NOT_CONTENT } from "@/features/social/lib/filters";
+import { formatOf } from "@/features/social/lib/media";
 import { captionsOf, clampCaption } from "@/features/social/lib/postings-core";
 import { loadContentRows } from "@/features/social/lib/postings.server";
 import { FILL_LEAD_MS, slotInstants } from "@/features/social/lib/queue-slots";
@@ -47,6 +48,8 @@ const ENTRY_SELECT = {
   sourceId: true,
   tagIds: true,
   imageUrl: true,
+  format: true,
+  video: { select: { coverUrl: true } },
   targets: { select: { platform: true, enabled: true, textOverride: true, imageUrl: true } },
 } satisfies Prisma.SocialPostSelect;
 
@@ -69,12 +72,18 @@ function toEntry(p: EntryPost, app?: SocialPlatformKey): CalendarEntry | null {
     at: at.toISOString(),
     status,
     name: p.name,
+    format: formatOf(p.format),
     text: own?.textOverride ?? p.body,
     platforms: on.map((t) => t.platform),
     queueId: p.queueId,
     sourceId: p.sourceId,
     tagIds: p.tagIds,
-    thumb: (app && own?.imageUrl) || p.imageUrl || on.find((t) => t.imageUrl)?.imageUrl || null,
+    thumb:
+      (app && own?.imageUrl) ||
+      p.imageUrl ||
+      on.find((t) => t.imageUrl)?.imageUrl ||
+      p.video?.coverUrl ||
+      null,
     later: false,
   };
 }
@@ -142,6 +151,7 @@ export async function loadCalendarEntries(
         at: at.toISOString(),
         status: "open",
         name: q.name,
+        format: "feed",
         text: "",
         platforms: q.platforms,
         queueId: q.id,
@@ -161,7 +171,11 @@ export async function loadCalendarEntries(
  * @returns Tiles in grid order, each with its Instagram picture.
  */
 export async function loadInstagramGrid(): Promise<CalendarEntry[]> {
-  const base = [NOT_CONTENT, { isPreset: false }];
+  // Stories never reach the profile grid; posts and reels do.
+  const onGrid = {
+    OR: [{ format: null }, { format: { isSet: false } }, { format: { in: ["feed", "reel"] } }],
+  } satisfies Prisma.SocialPostWhereInput;
+  const base = [NOT_CONTENT, { isPreset: false }, onGrid];
   const [ahead, posted] = await Promise.all([
     prisma.socialPost.findMany({
       where: {

@@ -3,9 +3,10 @@
 // item, counts each item's postings for the library, and deletes items with their lined-up
 // postings.
 
-import { deleteUnusedPictures } from "@/features/social-design/lib/picture-store";
+import { deleteUnusedMedia } from "@/features/social-design/lib/picture-store";
 import { toContentRow, type ContentListRow } from "@/features/social/lib/content-row";
 import { IS_CONTENT, NOT_DETACHED } from "@/features/social/lib/filters";
+import { MEDIA_SELECT, mediaUrlsOf } from "@/features/social/lib/media";
 import { writePostMeta } from "@/features/social/lib/post-meta.server";
 import {
   COUNTED_STATUSES,
@@ -156,18 +157,18 @@ export async function postedSince(ids: string[], from: Date): Promise<number> {
 export async function deleteContentItems(ids: string[]): Promise<number> {
   const items = await prisma.socialPost.findMany({
     where: { id: { in: ids }, ...IS_CONTENT },
-    select: { id: true, imageUrl: true, targets: { select: { imageUrl: true } } },
+    select: { id: true, ...MEDIA_SELECT },
   });
   const pictures: (string | null)[] = [];
   let deleted = 0;
   for (const item of items) {
-    pictures.push(item.imageUrl, ...item.targets.map((t) => t.imageUrl));
+    pictures.push(...mediaUrlsOf(item));
     pictures.push(...(await deleteLinedUpPostings(item.id)));
     deleted += (await prisma.socialPost.deleteMany({ where: { id: item.id, ...IS_CONTENT } }))
       .count;
   }
   await dropFromQueues(items.map((i) => i.id));
-  await deleteUnusedPictures(pictures);
+  await deleteUnusedMedia(pictures);
   return deleted;
 }
 
@@ -287,8 +288,7 @@ export async function syncPostings(item: SocialPost): Promise<PostingProblem[]> 
       scheduledAt: true,
       captionIndex: true,
       queueId: true,
-      imageUrl: true,
-      targets: { select: { imageUrl: true } },
+      ...MEDIA_SELECT,
     },
   });
   const captions = captionsOf(item);
@@ -306,14 +306,14 @@ export async function syncPostings(item: SocialPost): Promise<PostingProblem[]> 
       data,
     });
     if (updated.count === 0) continue;
-    replaced.push(p.imageUrl, ...p.targets.map((t) => t.imageUrl));
+    replaced.push(...mediaUrlsOf(p));
     if (p.status !== "scheduled" || !p.scheduledAt) continue;
     const problem = scheduleProblems({ ...item, ...data, isContent: null });
     if (problem) {
       problems.push({ id: p.id, scheduledAt: p.scheduledAt.toISOString(), error: problem.error });
     }
   }
-  await deleteUnusedPictures(replaced);
+  await deleteUnusedMedia(replaced);
   return problems;
 }
 
@@ -368,7 +368,7 @@ export async function relinkPosting(
       status: 409,
     };
   }
-  await deleteUnusedPictures([posting.imageUrl, ...posting.targets.map((t) => t.imageUrl)]);
+  await deleteUnusedMedia(mediaUrlsOf(posting));
   return { ok: true };
 }
 
@@ -376,14 +376,11 @@ export async function relinkPosting(
  * Deletes a content item's postings that haven't gone out and weren't edited by hand, before the
  * item goes. Postings already out, and hand-edited ones, stay as ordinary posts.
  * @param itemId - Content item id.
- * @returns Picture addresses the deleted postings used, for the caller's clean-up.
+ * @returns Picture and video addresses the deleted postings used, for the caller's clean-up.
  */
 export async function deleteLinedUpPostings(itemId: string): Promise<(string | null)[]> {
   const where = { sourceId: itemId, status: { in: [...NOT_OUT] }, ...NOT_DETACHED };
-  const postings = await prisma.socialPost.findMany({
-    where,
-    select: { imageUrl: true, targets: { select: { imageUrl: true } } },
-  });
+  const postings = await prisma.socialPost.findMany({ where, select: MEDIA_SELECT });
   await prisma.socialPost.deleteMany({ where });
-  return postings.flatMap((p) => [p.imageUrl, ...p.targets.map((t) => t.imageUrl)]);
+  return postings.flatMap(mediaUrlsOf);
 }

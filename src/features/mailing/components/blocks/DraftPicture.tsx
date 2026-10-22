@@ -6,17 +6,16 @@
 
 import type { DraftDesign } from "@/features/mailing/components/blocks/draft-brief";
 import { callApi } from "@/features/mailing/lib/api-client";
-import { usePictureExporter } from "@/features/social-design/components/canvas/export";
-import { exoFamily, loadExo } from "@/features/social-design/components/canvas/fonts";
 import { reflowText } from "@/features/social-design/components/canvas/text-layout";
+import { useFormatRender } from "@/features/social-design/components/canvas/use-format-render";
 import { fillDraft, type DesignDraft } from "@/features/social-design/lib/ai-draft";
-import type { DesignRow, RenderRow } from "@/features/social-design/lib/design-row";
-import { docHash, type BoundValues, type DesignDoc } from "@/features/social-design/lib/doc";
+import type { DesignRow } from "@/features/social-design/lib/design-row";
+import type { BoundValues, DesignDoc } from "@/features/social-design/lib/doc";
 import { makeRoom } from "@/features/social-design/lib/editor-ops";
 import { EMAIL_PICTURE_FORMAT } from "@/features/social-design/lib/formats";
 import { autoAltText } from "@/features/social-design/lib/pictures";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 /** What the ai-picture route hands back. */
 export interface PictureJob {
@@ -52,23 +51,9 @@ export function DraftPicture({
   onDone: (picture: DraftedPicture) => void;
   onFail: (message: string) => void;
 }): React.ReactElement | null {
-  const [family, setFamily] = useState<string | null>(null);
-  const { exportPicture, stage } = usePictureExporter(job.bound, family);
+  const { family, render, stage } = useFormatRender(job.bound);
   // Strict mode runs effects twice; the job must only draw and store once.
   const started = useRef(false);
-
-  useEffect(() => {
-    let live = true;
-    const fam = exoFamily();
-    void loadExo(fam)
-      .catch(() => undefined)
-      .then(() => {
-        if (live) setFamily(fam);
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (!family || started.current) return;
@@ -85,33 +70,17 @@ export function DraftPicture({
         { expectedUpdatedAt: design.updatedAt, doc },
       );
       if (!saved.ok) throw new Error(saved.error);
-      const blob = await exportPicture({
-        doc,
-        format: EMAIL_PICTURE_FORMAT,
-        scale: 1,
-        type: "image/jpeg",
-      });
-      const form = new FormData();
-      form.append("format", EMAIL_PICTURE_FORMAT);
-      // Matches the saved design, so the picker and Post maker see the picture as current.
-      form.append("docHash", docHash(doc, bound));
-      form.append("file", blob, `${EMAIL_PICTURE_FORMAT}.jpg`);
-      const stored = await callApi<{ render: RenderRow }>(
-        `/api/admin/social/designs/${design.id}/renders`,
-        "POST",
-        form,
-      );
-      if (!stored.ok) throw new Error(stored.error);
+      const stored = await render(design.id, doc, EMAIL_PICTURE_FORMAT);
       // Storing the picture leaves updatedAt alone, so this is how the draft left the design.
       return {
-        url: stored.render.url,
+        url: stored.url,
         alt: autoAltText(doc),
         design: { id: design.id, updatedAt: saved.updatedAt },
       };
     })().then(onDone, (error: unknown) =>
       onFail(error instanceof Error ? error.message : "The picture couldn't be drawn."),
     );
-  }, [family, job, exportPicture, onDone, onFail]);
+  }, [family, job, render, onDone, onFail]);
 
   return stage;
 }

@@ -14,6 +14,7 @@ import { InsertMenu, type InsertGroup } from "@/features/admin/components/ui/Ins
 import { isRenderUrl } from "@/features/social-design/lib/pictures";
 import type { PostContent } from "@/features/social/components/PostComposer";
 import { TagPicker } from "@/features/social/components/TagPicker";
+import { usesText, type SocialFormatKey } from "@/features/social/lib/media";
 import type { PostDesign } from "@/features/social/lib/open-post";
 import type { SocialTagRow, TagColour } from "@/features/social/lib/tags";
 import {
@@ -99,6 +100,11 @@ function takesLogo(url: string): boolean {
  * @param props.bodyLabel - The words box's label.
  * @param props.overridesHint - What an empty app box falls back to.
  * @param props.overridesNote - Shown instead of "Different text for one app" when it doesn't apply.
+ * @param props.format - The kind of post; stories and cover photos hide the words and link.
+ * @param props.kindSwitch - The Kind of post switch, shown above Post to.
+ * @param props.moreMedia - Pictures 2 onwards, or the video, shown after the picture.
+ * @param props.onMakeStory - Makes a story draft from this post's picture, or null to hide it.
+ * @param props.makingStory - True while the story draft is being made.
  * @returns Form card element.
  */
 export function PostWriteForm({
@@ -137,6 +143,11 @@ export function PostWriteForm({
   bodyLabel = "Post",
   overridesHint = "Leave a box empty to use the post above.",
   overridesNote = null,
+  format = "feed",
+  kindSwitch,
+  moreMedia,
+  onMakeStory = null,
+  makingStory = false,
 }: {
   content: PostContent;
   setContent: React.Dispatch<React.SetStateAction<PostContent>>;
@@ -173,8 +184,14 @@ export function PostWriteForm({
   bodyLabel?: string;
   overridesHint?: string;
   overridesNote?: string | null;
+  format?: SocialFormatKey;
+  kindSwitch?: React.ReactNode;
+  moreMedia?: React.ReactNode;
+  onMakeStory?: (() => void) | null;
+  makingStory?: boolean;
 }): React.ReactElement {
   const fieldId = useId();
+  const words = usesText(format);
   const bodyCount = charCount(content.body);
   const event = content.googleType === "EVENT";
   const allDay = !content.eventStartTime && !content.eventEndTime;
@@ -210,6 +227,8 @@ export function PostWriteForm({
           </div>
         )}
 
+        {kindSwitch}
+
         <fieldset className="flex flex-col gap-2">
           <legend className={ADMIN_LABEL_CLS}>Post to</legend>
           <div className="flex flex-wrap gap-2">
@@ -241,7 +260,15 @@ export function PostWriteForm({
           </div>
         </fieldset>
 
-        <div className="flex flex-col gap-1">
+        {!words && (
+          <p className="rounded-lg border border-admin-border px-3 py-2.5 text-sm text-admin-muted">
+            {format === "story" ? "A story" : "A cover photo"} shows no words or link, so
+            they&apos;re hidden. Put any words on the picture. They come back if you switch to a
+            post.
+          </p>
+        )}
+
+        <div className={cn("flex flex-col gap-1", !words && "hidden")}>
           {captions && <div className="mb-2">{captions}</div>}
           <div className="flex items-end justify-between gap-2">
             <label htmlFor="post-body" className={ADMIN_LABEL_CLS}>
@@ -294,9 +321,13 @@ export function PostWriteForm({
           </div>
         </div>
 
-        <div className="flex flex-col gap-2">
+        {format === "reel" && moreMedia}
+
+        <div className={cn("flex flex-col gap-2", format === "reel" && "hidden")}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className={cn(ADMIN_LABEL_CLS, "mb-0")}>Picture</span>
+            <span className={cn(ADMIN_LABEL_CLS, "mb-0")}>
+              {format === "feed" && content.imageUrl ? "Picture 1" : "Picture"}
+            </span>
             {editable && !isPreset && (
               <AdminButton
                 size="xs"
@@ -309,6 +340,19 @@ export function PostWriteForm({
               </AdminButton>
             )}
           </div>
+          {format === "story" && (
+            <p className="text-sm text-admin-muted">
+              A story fills a phone screen: 1080 x 1920 fits exactly. The app&apos;s own bars cover
+              the top 14% and the bottom 20%, so keep words and faces out of those strips. Add a
+              video below instead of a picture if you like.
+            </p>
+          )}
+          {format === "cover" && (
+            <p className="text-sm text-admin-muted">
+              Facebook shows the cover at 1640 x 624, and phones show only its middle. The Post
+              maker&apos;s Facebook cover size fits exactly.
+            </p>
+          )}
           {editable && design?.stale && (
             <div
               role="status"
@@ -398,6 +442,17 @@ export function PostWriteForm({
               Picture uploads are off until BLOB_READ_WRITE_TOKEN is set.
             </p>
           )}
+          {format === "feed" && content.imageUrl && moreMedia}
+          {onMakeStory && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <AdminButton size="xs" variant="secondary" busy={makingStory} onClick={onMakeStory}>
+                Make a story from this
+              </AdminButton>
+              <span className="text-sm text-admin-muted">
+                A separate story draft, tall for phones, for Facebook and Instagram.
+              </span>
+            </div>
+          )}
           {enabled.map((p) => (
             <AppPicture
               key={p}
@@ -410,6 +465,7 @@ export function PostWriteForm({
               anyBusy={pictureBusy !== null}
               onPick={() => onPickPicture(p)}
               onLogo={(on) => onLogo(p, on)}
+              checkCrop={format === "feed"}
             />
           ))}
           <input
@@ -424,16 +480,20 @@ export function PostWriteForm({
           />
         </div>
 
-        <AdminField label="Link (optional)" htmlFor={`${fieldId}-link`}>
-          <AdminInput
-            id={`${fieldId}-link`}
-            value={content.linkUrl}
-            onChange={(e) => setContent((c) => ({ ...c, linkUrl: e.target.value }))}
-            disabled={!editable}
-            placeholder="https://"
-            inputMode="url"
-          />
-        </AdminField>
+        {format === "story" && moreMedia}
+
+        {words && (
+          <AdminField label="Link (optional)" htmlFor={`${fieldId}-link`}>
+            <AdminInput
+              id={`${fieldId}-link`}
+              value={content.linkUrl}
+              onChange={(e) => setContent((c) => ({ ...c, linkUrl: e.target.value }))}
+              disabled={!editable}
+              placeholder="https://"
+              inputMode="url"
+            />
+          </AdminField>
+        )}
 
         {enabled.includes("google") && (
           <fieldset className="flex flex-col gap-4 rounded-lg border border-admin-border px-3 py-3">
@@ -620,12 +680,12 @@ export function PostWriteForm({
           </fieldset>
         )}
 
-        {enabled.length > 0 && overridesNote && (
+        {words && enabled.length > 0 && overridesNote && (
           <p className="rounded-lg border border-admin-border px-3 py-2.5 text-sm text-admin-muted">
             {overridesNote}
           </p>
         )}
-        {enabled.length > 0 && !overridesNote && (
+        {words && enabled.length > 0 && !overridesNote && (
           <details
             className="group rounded-lg border border-admin-border"
             open={overridesOpen}
@@ -699,6 +759,8 @@ const FIT_WORDS: Record<SocialPlatformKey, string> = {
  * @param props.anyBusy - Whether any picture is uploading.
  * @param props.onPick - Opens the file picker for this app's picture.
  * @param props.onLogo - Adds the logo to this app's own photo or takes it off.
+ * @param props.checkCrop - Whether to check the shape against the app's feed; off for stories and
+ * cover photos, which have rules of their own.
  * @returns Row element, or null.
  */
 function AppPicture({
@@ -711,6 +773,7 @@ function AppPicture({
   anyBusy,
   onPick,
   onLogo,
+  checkCrop,
 }: {
   platform: SocialPlatformKey;
   content: PostContent;
@@ -721,6 +784,7 @@ function AppPicture({
   anyBusy: boolean;
   onPick: () => void;
   onLogo: (on: boolean) => void;
+  checkCrop: boolean;
 }): React.ReactElement | null {
   const fieldId = useId();
   const target = content.targets.find((t) => t.platform === platform);
@@ -728,7 +792,9 @@ function AppPicture({
   if (!target || !picture) return null;
   const label = PLATFORM_LABEL[platform];
   const cut =
-    picture.width && picture.height ? cropOf(platform, picture.width, picture.height) : null;
+    checkCrop && picture.width && picture.height
+      ? cropOf(platform, picture.width, picture.height)
+      : null;
   const approved = cut !== null && target.cropApprovedFor === picture.url;
   if (!target.imageUrl && !cut) return null;
 

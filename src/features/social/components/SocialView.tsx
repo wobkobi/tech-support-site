@@ -19,6 +19,7 @@ import { SocialStartSection } from "@/features/social/components/SocialStartSect
 import { SocialTagFilter } from "@/features/social/components/SocialTagFilter";
 import { TagManager, type TagUse } from "@/features/social/components/TagManager";
 import { SOCIAL_POSTS_PATH } from "@/features/social/lib/links";
+import { usesText } from "@/features/social/lib/media";
 import type { OpenPost } from "@/features/social/lib/open-post";
 import { liveOn } from "@/features/social/lib/post-display";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
@@ -103,6 +104,8 @@ export function SocialView({
     emailStep.postId === open.post.id &&
     !open.post.isPreset &&
     !open.post.sourceId &&
+    // Stories and cover photos have no words to make an email from.
+    usesText(open.post.format) &&
     (!emailStep.afterPublish || (open.email === null && !open.emailSkipped));
   // The list arrives newest first; presets read oldest first so the starter set keeps
   // its order and new ones join the end.

@@ -79,7 +79,7 @@ export function captionAfter(captions: readonly string[], used: number): number 
 }
 
 /**
- * What a posting takes from its content item: name, words, picture, link, promo and the Google
+ * What a posting takes from its content item: name, words, kind, media, link, promo and the Google
  * card. Caption 1 keeps each app's own words; any other caption replaces them, since they were
  * written to go with caption 1. Targets start fresh, as nothing has gone out yet.
  * @param item - The content item.
@@ -96,11 +96,14 @@ export function postingContent(
   | "name"
   | "body"
   | "captionIndex"
+  | "format"
   | "imageUrl"
   | "imageAlt"
   | "imageWidth"
   | "imageHeight"
   | "imageOriginalUrl"
+  | "moreImages"
+  | "video"
   | "linkUrl"
   | "promoId"
   | "googleType"
@@ -118,11 +121,14 @@ export function postingContent(
     name: item.name,
     body: captions[captionIndex] ?? item.body,
     captionIndex,
+    format: item.format,
     imageUrl: item.imageUrl,
     imageAlt: item.imageAlt,
     imageWidth: item.imageWidth,
     imageHeight: item.imageHeight,
     imageOriginalUrl: item.imageOriginalUrl,
+    moreImages: item.moreImages ?? [],
+    video: item.video,
     linkUrl: item.linkUrl,
     promoId: item.promoId,
     googleType: item.googleType,
@@ -144,6 +150,8 @@ export function postingContent(
       error: null,
       postedAt: null,
       removedAt: null,
+      containerId: null,
+      containerCreatedAt: null,
     })),
   };
 }

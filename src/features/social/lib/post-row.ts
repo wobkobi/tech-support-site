@@ -1,8 +1,9 @@
 // src/features/social/lib/post-row.ts
 // Plain-data social post shape for the server > client boundary and the social API.
 
+import { formatOf, type MediaItem, type SocialFormatKey } from "@/features/social/lib/media";
 import { dateKey, type GooglePostCta, type GooglePostType } from "@/features/social/lib/validate";
-import type { SocialPost } from "@prisma/client";
+import type { SocialMedia, SocialPost } from "@prisma/client";
 
 /** Post lifecycle, mirroring the SocialPostStatus enum. */
 export type SocialPostStatus =
@@ -32,12 +33,16 @@ export interface SocialPostRow {
   id: string;
   name: string;
   body: string;
+  format: SocialFormatKey;
   imageUrl: string | null;
   imageAlt: string | null;
   imageWidth: number | null;
   imageHeight: number | null;
   /** The picture before the logo went on, when it has one. */
   imageOriginalUrl: string | null;
+  /** Pictures 2 onwards. */
+  moreImages: MediaItem[];
+  video: MediaItem | null;
   linkUrl: string | null;
   tagIds: string[];
   isPreset: boolean;
@@ -76,6 +81,24 @@ export interface SocialPostRow {
 }
 
 /**
+ * Maps a stored picture or video to its plain shape.
+ * @param m - As stored.
+ * @returns The plain shape.
+ */
+export function toMediaItem(m: SocialMedia): MediaItem {
+  return {
+    kind: m.kind,
+    url: m.url,
+    alt: m.alt,
+    width: m.width,
+    height: m.height,
+    durationMs: m.durationMs,
+    sizeBytes: m.sizeBytes,
+    coverUrl: m.coverUrl,
+  };
+}
+
+/**
  * Maps a post to its plain shape.
  * @param p - Post as stored.
  * @returns The plain shape.
@@ -85,11 +108,14 @@ export function toPostRow(p: SocialPost): SocialPostRow {
     id: p.id,
     name: p.name,
     body: p.body,
+    format: formatOf(p.format),
     imageUrl: p.imageUrl,
     imageAlt: p.imageAlt,
     imageWidth: p.imageWidth,
     imageHeight: p.imageHeight,
     imageOriginalUrl: p.imageOriginalUrl,
+    moreImages: (p.moreImages ?? []).map(toMediaItem),
+    video: p.video ? toMediaItem(p.video) : null,
     linkUrl: p.linkUrl,
     tagIds: p.tagIds ?? [],
     isPreset: p.isPreset,

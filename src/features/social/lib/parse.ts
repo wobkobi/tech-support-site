@@ -3,6 +3,13 @@
 // outcomes are never overwritten.
 
 import { parseObjectId } from "@/features/business/lib/validation";
+import {
+  MAX_PICTURES,
+  SOCIAL_FORMATS,
+  isVideoFile,
+  type MediaItem,
+  type SocialFormatKey,
+} from "@/features/social/lib/media";
 import { MAX_CAPTIONS, MAX_POSTS_LIMIT } from "@/features/social/lib/postings-core";
 import { MAX_POST_TAGS } from "@/features/social/lib/tags";
 import type { TargetState } from "@/features/social/lib/targets";
@@ -24,11 +31,14 @@ const MAX_URL = 2_000;
 export interface PostPatch {
   name?: string;
   body?: string;
+  format?: SocialFormatKey | null;
   imageUrl?: string | null;
   imageAlt?: string | null;
   imageWidth?: number | null;
   imageHeight?: number | null;
   imageOriginalUrl?: string | null;
+  moreImages?: MediaItem[];
+  video?: MediaItem | null;
   linkUrl?: string | null;
   tagIds?: string[];
   promoId?: string | null;
@@ -174,6 +184,64 @@ function optionalPixels(value: unknown, label: string): number | null | { error:
 }
 
 /**
+ * Checks an optional whole number within a range.
+ * @param value - Raw value.
+ * @param label - Field name for the error.
+ * @param max - Largest allowed.
+ * @returns The number or null, or an error message.
+ */
+function optionalCount(
+  value: unknown,
+  label: string,
+  max: number,
+): number | null | { error: string } {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0 || value > max) {
+    return { error: `${label} isn't a sensible number.` };
+  }
+  return value;
+}
+
+/**
+ * Checks one stored picture or video. Pictures must be uploaded here; a video must be one of the
+ * uploaded videos, so clean-up can find it.
+ * @param raw - Raw value.
+ * @param kind - What it should be.
+ * @param label - "Picture 2" or "The video", for the errors.
+ * @returns The media, or an error message.
+ */
+function parseMedia(
+  raw: unknown,
+  kind: MediaItem["kind"],
+  label: string,
+): MediaItem | { error: string } {
+  if (!raw || typeof raw !== "object") return { error: `${label} must be an object.` };
+  const m = raw as Record<string, unknown>;
+  const url = optionalUrl(m.url ?? null, label, BLOB_IMAGE_HOST_SUFFIX);
+  if (url === null) return { error: `${label} needs an address.` };
+  if (typeof url !== "string") return url;
+  if (kind === "video" && !isVideoFile(url)) return { error: `${label} must be uploaded here.` };
+  const coverUrl =
+    kind === "video"
+      ? optionalUrl(m.coverUrl ?? null, "The cover frame", BLOB_IMAGE_HOST_SUFFIX)
+      : null;
+  const fields = {
+    alt: optionalText(m.alt ?? null, `${label}'s description`, MAX_ALT),
+    width: optionalPixels(m.width ?? null, `${label}'s width`),
+    height: optionalPixels(m.height ?? null, `${label}'s height`),
+    durationMs:
+      kind === "video" ? optionalCount(m.durationMs, `${label}'s length`, 3_600_000) : null,
+    sizeBytes:
+      kind === "video" ? optionalCount(m.sizeBytes, `${label}'s size`, 5 * 1024 ** 3) : null,
+    coverUrl,
+  };
+  for (const v of Object.values(fields)) {
+    if (v !== null && typeof v === "object") return v;
+  }
+  return { kind, url, ...(fields as Omit<MediaItem, "kind" | "url">) };
+}
+
+/**
  * Parses a post edit body.
  * @param raw - Request JSON.
  * @returns The fields present and any target edits, or the first problem found.
@@ -195,6 +263,33 @@ export function parsePostPatch(
     if (body.body.length > MAX_BODY)
       return { error: `Text is too long (max ${MAX_BODY} characters).` };
     patch.body = body.body;
+  }
+  if (body.format !== undefined) {
+    if (body.format !== null && !(SOCIAL_FORMATS as readonly unknown[]).includes(body.format)) {
+      return { error: "Unknown kind of post." };
+    }
+    patch.format = body.format as SocialFormatKey | null;
+  }
+  if (body.moreImages !== undefined) {
+    if (!Array.isArray(body.moreImages)) return { error: "moreImages must be a list." };
+    if (body.moreImages.length > MAX_PICTURES - 1) {
+      return { error: `A post can have ${MAX_PICTURES} pictures at most.` };
+    }
+    const list: MediaItem[] = [];
+    for (const [i, rawPicture] of (body.moreImages as unknown[]).entries()) {
+      const picture = parseMedia(rawPicture, "image", `Picture ${i + 2}`);
+      if ("error" in picture) return picture;
+      list.push(picture);
+    }
+    patch.moreImages = list;
+  }
+  if (body.video !== undefined) {
+    if (body.video === null) patch.video = null;
+    else {
+      const video = parseMedia(body.video, "video", "The video");
+      if ("error" in video) return video;
+      patch.video = video;
+    }
   }
   const checks: [keyof PostPatch, string | null | { error: string } | number][] = [];
   if (body.imageUrl !== undefined) {

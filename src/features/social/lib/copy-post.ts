@@ -5,11 +5,11 @@ import { defaultTargets } from "@/features/social/lib/targets";
 import type { SocialPost } from "@prisma/client";
 
 /**
- * The fields a copy takes: words, picture, link, tags, promo, the Google card, and each app's
- * toggle, own words, own picture and crop OK. Past outcomes, the email link, the content item a
- * posting came from, and content item settings don't come along.
+ * The fields a copy takes: words, the kind of post, pictures and video, link, tags, promo, the
+ * Google card, and each app's toggle, own words, own picture and crop OK. Past outcomes, the email
+ * link, the content item a posting came from, and content item settings don't come along.
  * @param source - The row being copied.
- * @returns Fields for the create, without a name or kind.
+ * @returns Fields for the create, without a name or whether it's a preset or content item.
  */
 export function copyPostFields(
   source: SocialPost,
@@ -23,6 +23,7 @@ export function copyPostFields(
   | "scheduledAt"
   | "postedAt"
   | "postingStartedAt"
+  | "resumeAfter"
   | "campaignId"
   | "emailSkipped"
   | "isContent"
@@ -57,11 +58,14 @@ export function copyPostFields(
   });
   return {
     body: source.body,
+    format: source.format,
     imageUrl: source.imageUrl,
     imageAlt: source.imageAlt,
     imageWidth: source.imageWidth,
     imageHeight: source.imageHeight,
     imageOriginalUrl: source.imageOriginalUrl,
+    moreImages: source.moreImages ?? [],
+    video: source.video,
     linkUrl: source.linkUrl,
     tagIds: source.tagIds,
     promoId: source.promoId,

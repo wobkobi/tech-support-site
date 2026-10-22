@@ -6,6 +6,12 @@ import { promoWording } from "@/features/mailing/lib/context";
 import type { PromoWording } from "@/features/mailing/lib/render";
 import { StillProcessingError } from "@/features/social/lib/adapter";
 import { NOT_CONTENT } from "@/features/social/lib/filters";
+import {
+  RESUME_AFTER_MS,
+  canTakeDown,
+  containerExpired,
+  formatOf,
+} from "@/features/social/lib/media";
 import { PLATFORMS } from "@/features/social/lib/platforms";
 import {
   applyTakeDown,
@@ -125,15 +131,32 @@ async function runPending(
   targets: TargetState[],
   promo: PromoWording | null,
 ): Promise<{ status: SocialPost["status"]; targets: TargetState[] }> {
+  const started = new Date();
+  const format = formatOf(post.format);
   const due = targets.filter((t) => t.enabled && t.status === "pending" && isLive(t.platform));
   const settled = await Promise.allSettled(
-    due.map((t) =>
-      PLATFORMS[t.platform].publish({
+    due.map(async (t) => {
+      if (t.containerId && containerExpired(t.containerCreatedAt, started)) {
+        throw new Error(
+          `${PLATFORM_LABEL[t.platform]} dropped the upload after a day of processing. Press Retry to send it again.`,
+        );
+      }
+      // The platform's own picture when it has one, with its own description.
+      const first = pictureFor(post, t.platform);
+      const firstAlt = t.imageUrl ? t.imageAlt : post.imageAlt;
+      const more = format === "feed" ? post.moreImages : [];
+      return PLATFORMS[t.platform].publish({
+        format,
         text: fillPromo(textFor(post, t.platform), promo).trim(),
-        // The platform's own picture when it has one, with its own description.
-        imageUrl: pictureFor(post, t.platform)?.url ?? null,
-        imageAlt: t.imageUrl ? t.imageAlt : post.imageAlt,
+        imageUrl: first?.url ?? null,
+        imageAlt: firstAlt,
+        images: first
+          ? [{ url: first.url, alt: firstAlt }, ...more.map((m) => ({ url: m.url, alt: m.alt }))]
+          : [],
+        video: post.video ? { url: post.video.url, coverUrl: post.video.coverUrl } : null,
         linkUrl: post.linkUrl,
+        containerId: t.containerId,
+        containerCreatedAt: t.containerCreatedAt,
         google: {
           type: post.googleType,
           cta: post.googleCta,
@@ -145,8 +168,8 @@ async function runPending(
           endTime: post.eventEndTime,
           couponCode: post.couponCode,
         },
-      }),
-    ),
+      });
+    }),
   );
 
   const now = new Date();
@@ -154,14 +177,23 @@ async function runPending(
   const next = targets.map((t): TargetState => {
     const outcome = outcomes.get(t.platform);
     if (!outcome) return t;
+    const done = { containerId: null, containerCreatedAt: null };
     if (outcome.status === "fulfilled") {
-      return { ...t, status: "posted", ...outcome.value, error: null, postedAt: now };
+      return { ...t, status: "posted", ...outcome.value, error: null, postedAt: now, ...done };
     }
     const reason = outcome.reason;
-    // Accepted but still processing: stays pending for the cron's resume pass.
-    if (reason instanceof StillProcessingError) return { ...t, error: reason.message };
+    // Accepted but still processing: stays pending with what to check, for the cron's next pass.
+    if (reason instanceof StillProcessingError) {
+      const same = reason.containerId !== null && reason.containerId === t.containerId;
+      return {
+        ...t,
+        error: reason.message,
+        containerId: reason.containerId,
+        containerCreatedAt: same ? t.containerCreatedAt : reason.containerId ? started : null,
+      };
+    }
     const message = reason instanceof Error ? reason.message : "Posting failed.";
-    return { ...t, status: "failed", error: message.slice(0, 500) };
+    return { ...t, status: "failed", error: message.slice(0, 500), ...done };
   });
 
   const status = rollUpStatus(next);
@@ -171,8 +203,13 @@ async function runPending(
       targets: next,
       status,
       ...(status === "posting"
-        ? {}
-        : { postedAt: post.postedAt ?? now, postingStartedAt: null, scheduledAt: null }),
+        ? { resumeAfter: new Date(now.getTime() + RESUME_AFTER_MS) }
+        : {
+            postedAt: post.postedAt ?? now,
+            postingStartedAt: null,
+            scheduledAt: null,
+            resumeAfter: null,
+          }),
     },
   });
   return { status, targets: next };
@@ -232,6 +269,17 @@ export async function retryFailed(id: string): Promise<PublishOutcome> {
 export async function takeDownPost(id: string): Promise<PublishOutcome> {
   const before = await prisma.socialPost.findUnique({ where: { id } });
   if (!before) return { ok: false, error: "Post not found.", status: 404 };
+  const format = formatOf(before.format);
+  if (!canTakeDown(format)) {
+    return {
+      ok: false,
+      error:
+        format === "story"
+          ? "The apps don't let stories be taken down early. They go on their own a day after they went up."
+          : "A cover photo stays until you change it. Change it in Facebook, or post a new one from here.",
+      status: 409,
+    };
+  }
   if (takeDownDue(before.targets).length === 0) {
     return {
       ok: false,
@@ -295,8 +343,9 @@ export async function takeDownPost(id: string): Promise<PublishOutcome> {
 }
 
 /**
- * Cron: publishes due scheduled posts and resumes stalled or processing runs. Ignores quiet
- * hours, since a post wakes nobody.
+ * Cron: publishes due scheduled posts, checks on runs a platform is still processing once their
+ * wait is over, and resumes runs that stalled part-way. Ignores quiet hours, since a post wakes
+ * nobody.
  * @returns One line per post touched.
  */
 export async function runScheduledSocialPosts(): Promise<
@@ -314,17 +363,24 @@ export async function runScheduledSocialPosts(): Promise<
     results.push({ id: p.id, name: p.name, result: await publishPost(p.id) });
   }
 
+  // A claimed run clears resumeAfter, so one still going is only picked up once it stalls.
   const stuck = await prisma.socialPost.findMany({
     where: {
       status: "posting",
-      postingStartedAt: { lt: new Date(now.getTime() - STUCK_AFTER_MS) },
+      OR: [
+        { resumeAfter: { lte: now } },
+        {
+          OR: [{ resumeAfter: null }, { resumeAfter: { isSet: false } }],
+          postingStartedAt: { lt: new Date(now.getTime() - STUCK_AFTER_MS) },
+        },
+      ],
     },
   });
   for (const post of stuck) {
     // Re-claim by the old timestamp so two overlapping cron runs can't both resume it.
     const claimed = await prisma.socialPost.updateMany({
       where: { id: post.id, status: "posting", postingStartedAt: post.postingStartedAt },
-      data: { postingStartedAt: new Date() },
+      data: { postingStartedAt: new Date(), resumeAfter: null },
     });
     if (claimed.count === 0) continue;
     const ready = await readiness(post);

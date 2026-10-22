@@ -1,8 +1,9 @@
 // src/features/social-design/lib/picture-store.ts
-// Server-side writes for a design's exported pictures: swapping one size's picture
-// without disturbing the editor's save guard, and deleting exports nothing uses any more.
+// Server-side writes for a design's exported pictures: swapping one size's picture without
+// disturbing the editor's save guard, and deleting exports and videos nothing uses any more.
 
 import { isRenderUrl } from "@/features/social-design/lib/pictures";
+import { isVideoFile } from "@/features/social/lib/media";
 import { prisma } from "@/shared/lib/prisma";
 import type { DesignRender, SocialDesign } from "@prisma/client";
 import { del } from "@vercel/blob";
@@ -31,19 +32,28 @@ export async function writeKeepingUpdatedAt(
 }
 
 /**
- * Deletes exported pictures from Blob once nothing points at them: no post, design, email or
- * email preset. Uploaded photos are never touched. Failures are logged, never thrown.
+ * Deletes exported pictures, uploaded videos and their cover frames from Blob once nothing points
+ * at them: no post (any of its pictures or its video), design, email or email preset. Uploaded
+ * photos are never touched. Failures are logged, never thrown.
  * @param urls - Addresses that may have fallen out of use.
  */
-export async function deleteUnusedPictures(urls: (string | null | undefined)[]): Promise<void> {
+export async function deleteUnusedMedia(urls: (string | null | undefined)[]): Promise<void> {
   const candidates = [...new Set(urls)].filter(
-    (u): u is string => typeof u === "string" && isRenderUrl(u),
+    (u): u is string => typeof u === "string" && (isRenderUrl(u) || isVideoFile(u)),
   );
   for (const url of candidates) {
     try {
       const [posts, designs, emails] = await Promise.all([
         prisma.socialPost.count({
-          where: { OR: [{ imageUrl: url }, { targets: { some: { imageUrl: url } } }] },
+          where: {
+            OR: [
+              { imageUrl: url },
+              { targets: { some: { imageUrl: url } } },
+              { moreImages: { some: { url } } },
+              { video: { is: { url } } },
+              { video: { is: { coverUrl: url } } },
+            ],
+          },
         }),
         prisma.socialDesign.count({ where: { renders: { some: { url } } } }),
         prisma.campaign.count({ where: { body: { contains: url } } }),

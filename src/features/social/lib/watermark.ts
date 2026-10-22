@@ -73,7 +73,7 @@ export function watermarkBox(
  * @param cors - Whether to ask for it with CORS.
  * @returns The loaded image.
  */
-function loadImage(src: string, cors: boolean): Promise<HTMLImageElement> {
+export function loadImage(src: string, cors: boolean): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     if (cors) img.crossOrigin = "anonymous";

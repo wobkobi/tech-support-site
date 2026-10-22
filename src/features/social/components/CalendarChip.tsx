@@ -1,7 +1,8 @@
 "use client";
 // src/features/social/components/CalendarChip.tsx
 // One post or open time on the calendar: a link that opens the post, or a dashed button that
-// fills the open time. A post that can still move is draggable to another day or time.
+// fills the open time. A post that can still move is draggable to another day or time. Reels,
+// stories and cover photos carry an icon for their kind.
 
 import type { CalendarDrag } from "@/features/social/components/calendar-drag";
 import {
@@ -13,13 +14,22 @@ import {
   type ColourMode,
 } from "@/features/social/lib/calendar";
 import { postHref } from "@/features/social/lib/links";
+import { FORMAT_LABEL, type SocialFormatKey } from "@/features/social/lib/media";
 import { TAG_COLOURS } from "@/features/social/lib/tags";
 import { PLATFORM_LABEL } from "@/features/social/lib/validate";
 import { cn } from "@/shared/lib/cn";
 import { useDraggable, type DraggableAttributes } from "@dnd-kit/core";
 import Link from "next/link";
 import type React from "react";
-import { FaCheck, FaTriangleExclamation } from "react-icons/fa6";
+import type { IconType } from "react-icons";
+import { FaCheck, FaFilm, FaImage, FaMobileScreen, FaTriangleExclamation } from "react-icons/fa6";
+
+/** The icon for each kind of post besides an ordinary one. */
+export const FORMAT_ICON: Record<Exclude<SocialFormatKey, "feed">, IconType> = {
+  reel: FaFilm,
+  story: FaMobileScreen,
+  cover: FaImage,
+};
 
 /** What a chip needs to show an entry. */
 export interface ChipProps {
@@ -106,6 +116,7 @@ export function CalendarChip({
 
   const colour = TAG_COLOURS[colourOf(entry, mode, ctx)];
   const problem = entry.status === "failed" || entry.status === "partial";
+  const KindIcon = entry.format === "feed" ? null : FORMAT_ICON[entry.format];
   return (
     <Link
       ref={drag?.ref}
@@ -127,6 +138,12 @@ export function CalendarChip({
       {entry.status === "posted" && <FaCheck aria-hidden className="size-3 shrink-0" />}
       {problem && <FaTriangleExclamation aria-hidden className="size-3 shrink-0" />}
       <span className="sr-only">{CALENDAR_STATUS[entry.status].label}, </span>
+      {KindIcon && (
+        <>
+          <KindIcon aria-hidden className="size-3 shrink-0" />
+          <span className="sr-only">{FORMAT_LABEL[entry.format]}, </span>
+        </>
+      )}
       <span className="shrink-0 font-semibold">{time}</span>
       <span className={cn("truncate", entry.status === "removed" && "line-through")}>
         {entry.name}

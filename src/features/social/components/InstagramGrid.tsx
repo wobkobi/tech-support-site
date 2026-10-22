@@ -11,7 +11,7 @@ import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import Link from "next/link";
 import type React from "react";
-import { FaClock } from "react-icons/fa6";
+import { FaClock, FaFilm } from "react-icons/fa6";
 
 /** Tile shape: Instagram's profile grid shows 3:4, older profiles square. */
 export type TileShape = "tall" | "square";
@@ -108,6 +108,12 @@ function Tile({
         ) : (
           <span className="flex size-full items-center justify-center p-2 text-center text-sm text-admin-muted">
             {entry.name}
+          </span>
+        )}
+        {entry.format === "reel" && (
+          <span className="absolute top-1.5 right-1.5 rounded-full bg-rich-black/60 p-1.5 text-white">
+            <FaFilm aria-hidden className="size-3.5" />
+            <span className="sr-only">Reel</span>
           </span>
         )}
         {ahead && (

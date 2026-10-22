@@ -3,6 +3,7 @@
 // The composer's preview column: a look-alike card per enabled platform with its notes. From xl
 // it pins beside the form, below the top bar and any pinned action bar.
 
+import { CoverPreview, ReelPreview, StoryPreview } from "@/features/social/components/MediaPreview";
 import {
   FacebookPreview,
   GooglePreview,
@@ -46,6 +47,10 @@ export function PostPreviewPanel({
   previewOf: (p: SocialPlatformKey) => PreviewPost;
   accounts: Partial<Record<SocialPlatformKey, string>>;
 }): React.ReactElement {
+  const post = shownPreview ? previewOf(shownPreview) : null;
+  const pageName = accounts.facebook ?? "Your Page";
+  const username = (accounts.instagram ?? "your.account").replace(/^@/, "");
+  const name = shownPreview === "instagram" ? username : pageName;
   return (
     <section
       aria-label="Preview"
@@ -96,26 +101,23 @@ export function PostPreviewPanel({
         )}
       </div>
 
-      {shownPreview === null ? (
+      {shownPreview === null || post === null ? (
         <p className="text-sm text-admin-muted">Pick where to post to see a preview.</p>
       ) : (
         <>
           <div className="rounded-lg bg-[#f0f2f5] p-3">
-            {shownPreview === "facebook" ? (
-              <FacebookPreview
-                post={previewOf("facebook")}
-                pageName={accounts.facebook ?? "Your Page"}
-              />
+            {post.format === "story" && shownPreview !== "google" ? (
+              <StoryPreview post={post} platform={shownPreview} name={name} />
+            ) : post.format === "reel" && shownPreview !== "google" ? (
+              <ReelPreview post={post} platform={shownPreview} name={name} />
+            ) : post.format === "cover" && shownPreview === "facebook" ? (
+              <CoverPreview post={post} pageName={pageName} />
+            ) : shownPreview === "facebook" ? (
+              <FacebookPreview post={post} pageName={pageName} />
             ) : shownPreview === "instagram" ? (
-              <InstagramPreview
-                post={previewOf("instagram")}
-                username={(accounts.instagram ?? "your.account").replace(/^@/, "")}
-              />
+              <InstagramPreview post={post} username={username} />
             ) : (
-              <GooglePreview
-                post={previewOf("google")}
-                businessName={accounts.google ?? "Your business"}
-              />
+              <GooglePreview post={post} businessName={accounts.google ?? "Your business"} />
             )}
           </div>
           {(issues[shownPreview] ?? []).length > 0 && (
@@ -131,7 +133,11 @@ export function PostPreviewPanel({
               ))}
             </ul>
           )}
-          <p className="text-sm text-admin-muted">Likes and comments are for show.</p>
+          <p className="text-sm text-admin-muted">
+            {post.format === "cover"
+              ? "The name and profile picture are for show."
+              : "Likes and comments are for show."}
+          </p>
         </>
       )}
     </section>

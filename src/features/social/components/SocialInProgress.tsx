@@ -3,7 +3,7 @@
 // "In progress" chips on the Social page: drafts, scheduled posts and posts stuck partway,
 // each opening in the composer.
 
-import { chipStatus, firstLine } from "@/features/social/components/social-list-helpers";
+import { chipStatus, summaryLine } from "@/features/social/components/social-list-helpers";
 import { TagChipRow } from "@/features/social/components/TagPicker";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
 import type { SocialTagRow } from "@/features/social/lib/tags";
@@ -61,7 +61,7 @@ export function SocialInProgress({
                   {r.name || "Untitled"}
                 </span>
                 <span className="w-full truncate text-sm text-admin-text-secondary">
-                  {firstLine(r.body) || <span className="italic">No text yet</span>}
+                  {summaryLine(r) || <span className="italic">No text yet</span>}
                 </span>
                 <span className={cn("text-sm", status.className)}>{status.text}</span>
                 {r.tagIds.length > 0 && (

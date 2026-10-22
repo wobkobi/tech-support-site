@@ -6,6 +6,7 @@ import { parseObjectId } from "@/features/business/lib/validation";
 import { copyPostFields } from "@/features/social/lib/copy-post";
 import { NOT_CONTENT } from "@/features/social/lib/filters";
 import { postFromEmail } from "@/features/social/lib/from-email";
+import { FORMAT_LABEL, formatOf, formatTakes } from "@/features/social/lib/media";
 import { toPostRow } from "@/features/social/lib/post-row";
 import { PROMO_POST_PRESET_KEY, starterPostPresets } from "@/features/social/lib/presets";
 import { defaultTargets } from "@/features/social/lib/targets";
@@ -36,8 +37,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 }
 
 /**
- * POST /api/admin/social - creates a post.
- * Body: `{ source: "blank" | "copy" | "promo" | "campaign", sourceId?, promoId?, campaignId?, asPreset? }`.
+ * POST /api/admin/social - creates a post. A blank one can start as a reel, story or cover photo
+ * (`format`), with only the apps that take it switched on.
+ * Body: `{ source: "blank" | "copy" | "promo" | "campaign", sourceId?, promoId?, campaignId?, asPreset?, format? }`.
  * @param request - Incoming request.
  * @returns JSON `{ post }`.
  */
@@ -49,17 +51,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     promoId?: unknown;
     campaignId?: unknown;
     asPreset?: unknown;
+    format?: unknown;
   } | null;
   const asPreset = body?.asPreset === true;
 
   try {
     if (body?.source === "blank") {
+      const format = formatOf(typeof body.format === "string" ? body.format : null);
       const created = await prisma.socialPost.create({
         data: {
-          name: asPreset ? "New preset" : "New post",
+          name: asPreset
+            ? "New preset"
+            : `New ${format === "feed" ? "post" : FORMAT_LABEL[format].toLowerCase()}`,
           body: "",
           isPreset: asPreset,
-          targets: defaultTargets(),
+          format: format === "feed" ? null : format,
+          targets: defaultTargets().map((t) => ({
+            ...t,
+            enabled: formatTakes(format, t.platform),
+          })),
         },
       });
       return okResponse({ post: toPostRow(created) }, 201);

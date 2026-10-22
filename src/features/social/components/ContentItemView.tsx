@@ -11,6 +11,7 @@ import { callApi } from "@/features/mailing/lib/api-client";
 import { EmailStepDialog } from "@/features/social/components/EmailStepDialog";
 import { PostComposer, type ContentItemInfo } from "@/features/social/components/PostComposer";
 import { SOCIAL_CONTENT_PATH, postHref } from "@/features/social/lib/links";
+import { usesText } from "@/features/social/lib/media";
 import type { OpenPost } from "@/features/social/lib/open-post";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
 import { byTagName, type SocialTagRow } from "@/features/social/lib/tags";
@@ -111,7 +112,9 @@ export function ContentItemView({
   }
 
   const showEmailStep =
-    emailStep !== null && (!emailStep.afterPublish || (open.email === null && !open.emailSkipped));
+    emailStep !== null &&
+    usesText(item.format) &&
+    (!emailStep.afterPublish || (open.email === null && !open.emailSkipped));
 
   return (
     <section aria-label="Content item" className="flex flex-col gap-4">

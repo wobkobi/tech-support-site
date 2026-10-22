@@ -4,8 +4,9 @@
 // from schedules. The publish-scheduled cron fills every schedule at most hourly; saving a
 // schedule fills just that one.
 
-import { deleteUnusedPictures } from "@/features/social-design/lib/picture-store";
+import { deleteUnusedMedia } from "@/features/social-design/lib/picture-store";
 import { IS_CONTENT, NOT_DETACHED } from "@/features/social/lib/filters";
+import { MEDIA_SELECT, mediaUrlsOf } from "@/features/social/lib/media";
 import { writePostMeta } from "@/features/social/lib/post-meta.server";
 import {
   COUNTED_STATUSES,
@@ -281,8 +282,7 @@ export async function clearQueuePostings(queueId: string, which: QueueClear): Pr
       id: true,
       sourceId: true,
       scheduledAt: true,
-      imageUrl: true,
-      targets: { select: { imageUrl: true } },
+      ...MEDIA_SELECT,
     },
   });
   let chosen = postings;
@@ -296,9 +296,7 @@ export async function clearQueuePostings(queueId: string, which: QueueClear): Pr
   const deleted = await prisma.socialPost.deleteMany({
     where: { id: { in: chosen.map((p) => p.id) }, status: "scheduled" },
   });
-  await deleteUnusedPictures(
-    chosen.flatMap((p) => [p.imageUrl, ...p.targets.map((t) => t.imageUrl)]),
-  );
+  await deleteUnusedMedia(chosen.flatMap(mediaUrlsOf));
   return deleted.count;
 }
 

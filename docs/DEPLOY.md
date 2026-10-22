@@ -164,3 +164,19 @@ until 3 Jan 2027):
 - Live mode: not checked yet. Whether posts made through the API show to the public, and whether
   comments from people without a role on the app come back with who wrote them, decide if the app
   needs Live mode (and App Review) before the comments inbox.
+
+**Media (several pictures, reels, stories, cover photos):**
+
+- Videos go from the browser straight to the Blob store, past Vercel's 4.5 MB request limit, using a
+  token from `/api/admin/social/video-upload`. That token only allows MP4 or MOV up to 250 MB under
+  `social/video/`, plus JPEG cover frames. It needs `BLOB_READ_WRITE_TOKEN`; `onUploadCompleted`
+  isn't used, so local uploads work.
+- Meta fetches each video from its Blob address, so the store must stay public.
+- Make a story and the reel cover frame draw stored files into a canvas. That needs the Blob store
+  to keep sending `Access-Control-Allow-Origin: *`, which it did on 2026-10-22.
+- A video the apps are still processing carries across publish-cron passes, checked again 4 minutes
+  after each. Instagram drops an upload still unfinished after 24 hours, and that app fails with a
+  Retry.
+- Stories and cover photos can't be taken down from the site.
+- A cover photo needs `pages_manage_metadata`.
+- Not yet tried on the real accounts: a carousel, a reel, a story and a cover photo.

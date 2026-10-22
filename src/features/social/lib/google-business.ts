@@ -103,6 +103,7 @@ interface LocalPost {
  * @returns The post's resource name and its link in Google search.
  */
 async function publish(input: PublishInput): Promise<PublishResult> {
+  if (input.format !== "feed") throw new Error("Google only takes ordinary posts.");
   const body = googlePostBody(input);
   let post: LocalPost;
   try {

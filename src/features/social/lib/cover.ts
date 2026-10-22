@@ -12,14 +12,23 @@ export interface Cover {
 }
 
 /**
- * A post's cover: its own picture, or else the first app picture of an app it's on (Facebook,
- * then Instagram, then Google).
+ * A post's cover: a reel's or story's video frame, its own picture (picture 1 of a carousel), or
+ * else the first app picture of an app it's on (Facebook, then Instagram, then Google).
  * @param post - The post.
  * @returns The cover, or null when it has no picture anywhere.
  */
 export function coverOf(
-  post: Pick<SocialPostRow, "imageUrl" | "imageAlt" | "imageWidth" | "imageHeight" | "targets">,
+  post: Pick<SocialPostRow, "imageUrl" | "imageAlt" | "imageWidth" | "imageHeight" | "targets"> &
+    Partial<Pick<SocialPostRow, "format" | "video">>,
 ): Cover | null {
+  if (post.format !== "feed" && post.format !== "cover" && post.video?.coverUrl) {
+    return {
+      url: post.video.coverUrl,
+      alt: post.video.alt ?? "",
+      width: post.video.width,
+      height: post.video.height,
+    };
+  }
   if (post.imageUrl) {
     return {
       url: post.imageUrl,

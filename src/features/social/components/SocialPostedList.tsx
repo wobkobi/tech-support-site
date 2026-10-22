@@ -7,7 +7,7 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ADMIN_LINK_CLS } from "@/features/admin/components/ui/field-classes";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
-import { dateLabel, firstLine } from "@/features/social/components/social-list-helpers";
+import { dateLabel, summaryLine } from "@/features/social/components/social-list-helpers";
 import { TagChipRow } from "@/features/social/components/TagPicker";
 import { POST_STATUS_PILL } from "@/features/social/lib/post-display";
 import type { SocialPostRow } from "@/features/social/lib/post-row";
@@ -127,7 +127,7 @@ function PostedRow({
           <TagChipRow ids={row.tagIds} tagsById={tagsById} />
         </div>
         <p className="truncate text-sm text-admin-text-secondary">
-          {firstLine(row.body) || <span className="italic">No text</span>}
+          {summaryLine(row) || <span className="italic">No text</span>}
         </p>
         <p className="text-sm text-admin-muted">{dateLabel(row)}</p>
         {outcomes.length > 0 && (

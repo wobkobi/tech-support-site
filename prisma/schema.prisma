@@ -1140,28 +1140,59 @@ enum GooglePostCta {
   CALL
 }
 
+// What a post is on Facebook and Instagram. feed is an ordinary post (one picture, several, or
+// none); reel and story need a video or picture of their own; cover changes the Facebook Page's
+// cover photo. Google only takes feed posts.
+enum SocialFormat {
+  feed
+  reel
+  story
+  cover
+}
+
+enum SocialMediaKind {
+  image
+  video
+}
+
+// A picture after the first, or a post's video. Sizes are pixels; coverUrl is a video's cover frame.
+type SocialMedia {
+  kind       SocialMediaKind
+  url        String
+  alt        String?
+  width      Int?
+  height     Int?
+  durationMs Int?
+  sizeBytes  Int?
+  coverUrl   String?
+}
+
 // One platform's copy of a social post and how publishing it went.
 type SocialTarget {
-  platform         SocialPlatform
-  enabled          Boolean            @default(true)
+  platform           SocialPlatform
+  enabled            Boolean            @default(true)
   // Replaces the shared body on this platform only.
-  textOverride     String?
+  textOverride       String?
   // Replaces the shared picture on this platform only, for one that fits its shape.
-  imageUrl         String?
-  imageAlt         String?
-  imageWidth       Int?
-  imageHeight      Int?
+  imageUrl           String?
+  imageAlt           String?
+  imageWidth         Int?
+  imageHeight        Int?
   // The picture URL the operator agreed this platform may cut off. Tied to the URL so
   // a new picture needs a new OK.
-  cropApprovedFor  String?
+  cropApprovedFor    String?
   // The upload before "Add my logo" marked imageUrl; null when no logo was added.
-  imageOriginalUrl String?
-  status           SocialTargetStatus @default(pending)
-  externalId       String?
-  permalink        String?
-  error            String?
-  postedAt         DateTime?
-  removedAt        DateTime?
+  imageOriginalUrl   String?
+  status             SocialTargetStatus @default(pending)
+  externalId         String?
+  permalink          String?
+  error              String?
+  postedAt           DateTime?
+  removedAt          DateTime?
+  // What the platform is still processing (an Instagram container, a Facebook video), so a
+  // resumed run checks it instead of uploading again. Instagram drops containers after 24 hours.
+  containerId        String?
+  containerCreatedAt DateTime?
 }
 
 // A post the operator writes once in /admin/social and publishes to Facebook,
@@ -1173,6 +1204,9 @@ model SocialPost {
   name String
   body String
 
+  // Null is feed.
+  format           SocialFormat?
+  // Picture 1; moreImages holds pictures 2 to 10 of a feed post.
   imageUrl         String?
   imageAlt         String?
   // Pixel size of the stored image, for Instagram's aspect-ratio and width rules.
@@ -1180,6 +1214,9 @@ model SocialPost {
   imageHeight      Int?
   // The upload before "Add my logo" marked imageUrl; null when no logo was added.
   imageOriginalUrl String?
+  moreImages       SocialMedia[]
+  // A reel's video, or a story's when it isn't a picture.
+  video            SocialMedia?
   linkUrl          String?
 
   // SocialTag ids, for sorting posts; only the admin sees them.
@@ -1196,6 +1233,8 @@ model SocialPost {
   // "posting" well past this died mid-way, and the cron resumes its pending targets;
   // one still "removing" can be claimed again by pressing Take down.
   postingStartedAt DateTime?
+  // A platform is still processing a video or container: the cron checks on it from this time.
+  resumeAfter      DateTime?
 
   // Promo the post advertises; publishing is blocked once it ends.
   promoId      String?  @db.ObjectId

@@ -49,6 +49,7 @@ function entry(over: Partial<CalendarEntry> = {}): CalendarEntry {
     at: "2026-10-21T20:00:00.000Z",
     status: "scheduled",
     name: "Tip",
+    format: "feed",
     text: "Back up your phone.",
     platforms: ["facebook"],
     queueId: null,

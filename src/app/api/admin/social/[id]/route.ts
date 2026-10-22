@@ -1,10 +1,11 @@
 // src/app/api/admin/social/[id]/route.ts
 // One social post, preset or content item. PATCH is a sparse update of drafts, presets and
 // content items only, apart from tags, which any post can change; DELETE can take the post down
-// from its platforms first.
+// from its platforms first. Pictures and videos either one leaves unused are deleted from Blob.
 
 import { parseObjectId } from "@/features/business/lib/validation";
-import { deleteUnusedPictures } from "@/features/social-design/lib/picture-store";
+import { deleteUnusedMedia } from "@/features/social-design/lib/picture-store";
+import { MEDIA_SELECT, canTakeDown, formatOf, mediaUrlsOf } from "@/features/social/lib/media";
 import {
   hasContentFields,
   mergeTargets,
@@ -97,6 +98,12 @@ export async function PATCH(request: NextRequest, { params }: Ctx): Promise<Next
     const current = await prisma.socialPost.findFirst({ where: editable });
     if (current) targets = mergeTargets(current.targets, parsed.targets);
   }
+  // What the edit may replace, to clean up once it's saved.
+  const mediaEdit = ["imageUrl", "moreImages", "video"].some((k) => k in parsed.patch);
+  const mediaBefore =
+    mediaEdit || parsed.targets
+      ? await prisma.socialPost.findUnique({ where: { id }, select: MEDIA_SELECT })
+      : null;
   // Status guard in the write itself, so an edit can't race a publish.
   const updated = await prisma.socialPost.updateMany({
     where: editable,
@@ -114,6 +121,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx): Promise<Next
       : errorResponse("Post not found.", 404);
   }
   const post = await prisma.socialPost.findUniqueOrThrow({ where: { id } });
+  if (mediaBefore) await deleteUnusedMedia(mediaUrlsOf(mediaBefore));
   if (!post.isContent) return okResponse({ post: toPostRow(post) });
   return okResponse({ post: toPostRow(post), postingProblems: await syncPostings(post) });
 }
@@ -123,8 +131,9 @@ const NOTHING_UP = ["draft", "scheduled", "failed", "removed"] as const;
 
 /**
  * DELETE /api/admin/social/[id] - takes the post down everywhere first (kept if any platform
- * refuses), or with `?keepOnline=1` deletes only the record. Refused mid-post or mid-take-down.
- * A content item takes its lined-up postings with it; ones already out stay as plain posts.
+ * refuses), or with `?keepOnline=1` deletes only the record. Stories and cover photos can't be
+ * taken down, so they always just lose the record. Refused mid-post or mid-take-down. A content
+ * item takes its lined-up postings with it; ones already out stay as plain posts.
  * @param request - Incoming request.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the post id.
@@ -135,11 +144,12 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
   const id = parseObjectId((await params).id);
   if (!id) return errorResponse("Post not found.", 404);
 
-  const keepOnline = request.nextUrl.searchParams.get("keepOnline") === "1";
+  let keepOnline = request.nextUrl.searchParams.get("keepOnline") === "1";
   if (!keepOnline) {
     const post = await prisma.socialPost.findUnique({ where: { id } });
     if (!post) return errorResponse("Post not found.", 404);
-    if (takeDownDue(post.targets).length > 0) {
+    if (!canTakeDown(formatOf(post.format))) keepOnline = true;
+    else if (takeDownDue(post.targets).length > 0) {
       try {
         const result = await takeDownPost(id);
         if (!result.ok) return errorResponse(result.error, result.status);
@@ -164,7 +174,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
     ? null
     : await prisma.socialPost.findUnique({
         where: { id },
-        select: { imageUrl: true, isContent: true, targets: { select: { imageUrl: true } } },
+        select: { isContent: true, ...MEDIA_SELECT },
       });
   const postingPictures = pictures?.isContent ? await deleteLinedUpPostings(id) : [];
   const slot = await prisma.socialPost.findUnique({
@@ -188,13 +198,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
     await skipQueueSlot(slot.queueId, slot.scheduledAt);
   }
   if (pictures?.isContent) await dropFromQueues([id]);
-  // Post maker pictures only this post used go too. Kept when the post stays online.
-  if (pictures) {
-    await deleteUnusedPictures([
-      pictures.imageUrl,
-      ...pictures.targets.map((t) => t.imageUrl),
-      ...postingPictures,
-    ]);
-  }
+  // Post maker pictures and videos only this post used go too. Kept when the post stays online.
+  if (pictures) await deleteUnusedMedia([...mediaUrlsOf(pictures), ...postingPictures]);
   return okResponse();
 }

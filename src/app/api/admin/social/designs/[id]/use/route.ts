@@ -6,7 +6,7 @@ import { parseObjectId } from "@/features/business/lib/validation";
 import { docHash, parseDesignDoc } from "@/features/social-design/lib/doc";
 import { loadBoundValues } from "@/features/social-design/lib/load-bound";
 import {
-  deleteUnusedPictures,
+  deleteUnusedMedia,
   writeKeepingUpdatedAt,
 } from "@/features/social-design/lib/picture-store";
 import { autoAltText } from "@/features/social-design/lib/pictures";
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
     console.error(`[social-design] ${id} version copy failed:`, error),
   );
   if (linked) {
-    await deleteUnusedPictures([linked.imageUrl, ...linked.targets.map((t) => t.imageUrl)]);
+    await deleteUnusedMedia([linked.imageUrl, ...linked.targets.map((t) => t.imageUrl)]);
   }
   return okResponse({ postId, created: !linked, isContent: linked?.isContent === true });
 }

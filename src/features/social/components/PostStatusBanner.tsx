@@ -71,6 +71,11 @@ export function PostStatusBanner({
 
   const pill = POST_STATUS_PILL[post.status];
   const live = post.targets.filter((t) => t.enabled && t.status !== "skipped");
+  const waiting = live
+    .filter((t) => t.status === "pending")
+    .map((t) => PLATFORM_LABEL[t.platform] ?? t.platform);
+  // A video can take the apps minutes to process; the composer checks back every 15 seconds.
+  const processing = post.video !== null && post.format !== "feed" && waiting.length > 0;
   const removedAt = post.targets
     .map((t) => t.removedAt)
     .filter((d): d is string => d !== null)
@@ -93,7 +98,9 @@ export function PostStatusBanner({
         <span className="flex items-center gap-2">
           <StatusPill tone={pill.tone}>{pill.label}</StatusPill>
           {post.status === "posting"
-            ? "Still going. Anything left over is picked up automatically within 15 minutes."
+            ? processing
+              ? `${waiting.join(" and ")} ${waiting.length > 1 ? "are" : "is"} processing the video. This checks again every 15 seconds, and it finishes on its own if you leave.`
+              : "Still going. Anything left over is picked up automatically within 15 minutes."
             : post.status === "removing"
               ? "Taking it down. If this still shows after 10 minutes, press Take down again."
               : post.status === "removed" && removedAt
@@ -150,6 +157,8 @@ export function PostStatusBanner({
                   ) : (
                     "posted"
                   )}
+                  {post.format === "story" && ". It shows for 24 hours"}
+                  {post.format === "cover" && ". It stays until you change it"}
                   {t.error && ` - couldn't take it down: ${t.error}`}
                 </>
               ) : t.status === "removed" ? (
@@ -163,7 +172,11 @@ export function PostStatusBanner({
           );
         })}
       </ul>
-      <span>To post something similar, press Duplicate above.</span>
+      <span>
+        {post.format === "story" || post.format === "cover"
+          ? `The apps don't let a ${post.format === "story" ? "story" : "cover photo"} be taken down from here. To post something similar, press Duplicate above.`
+          : "To post something similar, press Duplicate above."}
+      </span>
     </div>
   );
 }

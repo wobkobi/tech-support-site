@@ -18,6 +18,9 @@ export interface TargetState {
   error: string | null;
   postedAt: Date | null;
   removedAt: Date | null;
+  /** What the platform is still processing, so a resumed run checks it instead of starting over. */
+  containerId: string | null;
+  containerCreatedAt: Date | null;
 }
 
 /** One platform's take-down result: done, or why not. */
@@ -44,6 +47,8 @@ export function defaultTargets(): TargetState[] {
     error: null,
     postedAt: null,
     removedAt: null,
+    containerId: null,
+    containerCreatedAt: null,
   }));
 }
 
@@ -67,7 +72,9 @@ export function rollUpStatus(targets: TargetState[]): "posting" | "posted" | "pa
  */
 export function resetFailed(targets: TargetState[]): TargetState[] {
   return targets.map((t) =>
-    t.enabled && t.status === "failed" ? { ...t, status: "pending", error: null } : t,
+    t.enabled && t.status === "failed"
+      ? { ...t, status: "pending", error: null, containerId: null, containerCreatedAt: null }
+      : t,
   );
 }
 
@@ -85,6 +92,8 @@ export function freshRun(targets: TargetState[]): TargetState[] {
     error: null,
     postedAt: null,
     removedAt: null,
+    containerId: null,
+    containerCreatedAt: null,
   }));
 }
 
