@@ -65,7 +65,7 @@ export interface OverviewData {
   week: CalendarEntry[];
   schedules: CalendarSchedule[];
   attention: AttentionItem[];
-  facts: Omit<ChecklistFacts, "connected">;
+  facts: Omit<ChecklistFacts, "connected" | "permissions">;
   skipped: ChecklistKey[];
 }
 

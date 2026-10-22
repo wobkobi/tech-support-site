@@ -1,7 +1,8 @@
 "use client";
 // src/features/social/components/SocialOverview.tsx
-// The Social Overview: figures either side of now, the set-up list until it's done, what needs
-// attention beside whether each app is connected, then the next seven days.
+// The Social Overview: a warning when the Meta token is close to running out, figures either side
+// of now, the set-up list until it's done, what needs attention beside whether each app is
+// connected, the next seven days, and what each app can do.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
@@ -11,6 +12,10 @@ import { callApi } from "@/features/mailing/lib/api-client";
 import { OverviewWeek } from "@/features/social/components/OverviewWeek";
 import { SocialChecklist } from "@/features/social/components/SocialChecklist";
 import { SocialConnections } from "@/features/social/components/SocialConnections";
+import {
+  APP_PERMISSIONS_ID,
+  SocialPermissions,
+} from "@/features/social/components/SocialPermissions";
 import { shortDay, timeOfDay, type ColourContext } from "@/features/social/lib/calendar";
 import { checklistOf, type ChecklistKey } from "@/features/social/lib/checklist";
 import {
@@ -21,8 +26,15 @@ import {
   SOCIAL_SCHEDULES_PATH,
 } from "@/features/social/lib/links";
 import type { AttentionItem, OverviewData } from "@/features/social/lib/overview-data.server";
+import {
+  coreReady,
+  tokenWarning,
+  type Permissions,
+  type TokenWarning,
+} from "@/features/social/lib/permissions";
 import type { Connection } from "@/features/social/lib/post-display";
 import type { SocialTagRow } from "@/features/social/lib/tags";
+import { Notice } from "@/shared/components/Notice";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { nzDateKey } from "@/shared/lib/timezone-utils";
 import Link from "next/link";
@@ -47,17 +59,30 @@ export function SocialOverview({
   const { toast } = useToast();
   const [connections, setConnections] = useState<Connection[] | null>(null);
   const [connectionsError, setConnectionsError] = useState<string | null>(null);
+  const [permissions, setPermissions] = useState<Permissions | null>(null);
+  const [permissionsError, setPermissionsError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<TokenWarning | null>(null);
   const [checking, setChecking] = useState(false);
   const [skipped, setSkipped] = useState<ChecklistKey[]>(data.skipped);
   const [busyKey, setBusyKey] = useState<ChecklistKey | null>(null);
 
-  // The browser asks for the connections so the page doesn't wait on three apps to answer.
+  // The browser asks for the connections and permissions so the page doesn't wait on three apps
+  // to answer.
   useEffect(() => {
     let live = true;
     void callApi<{ connections: Connection[] }>("/api/admin/social/connections").then((res) => {
       if (!live) return;
       if (res.ok) setConnections(res.connections);
       else setConnectionsError(res.error);
+    });
+    void callApi<{ permissions: Permissions }>("/api/admin/social/permissions").then((res) => {
+      if (!live) return;
+      if (!res.ok) {
+        setPermissionsError(res.error);
+        return;
+      }
+      setPermissions(res.permissions);
+      setWarning(tokenWarning(res.permissions.token, new Date()));
     });
     return () => {
       live = false;
@@ -73,17 +98,29 @@ export function SocialOverview({
   );
 
   const list = checklistOf(
-    { ...data.facts, connected: connections ? connections.filter((c) => c.ok).length : null },
+    {
+      ...data.facts,
+      connected: connections ? connections.filter((c) => c.ok).length : null,
+      permissions: coreReady(permissions),
+    },
     skipped,
   );
 
-  /** Checks every app again, skipping the cache. */
+  /** Checks every app's connection and permissions again, skipping the cache. */
   async function checkAgain(): Promise<void> {
     setChecking(true);
-    const res = await callApi<{ connections: Connection[] }>(
-      "/api/admin/social/connections?fresh=1",
-    );
+    const [res, perms] = await Promise.all([
+      callApi<{ connections: Connection[] }>("/api/admin/social/connections?fresh=1"),
+      callApi<{ permissions: Permissions }>("/api/admin/social/permissions?fresh=1"),
+    ]);
     setChecking(false);
+    if (perms.ok) {
+      setPermissions(perms.permissions);
+      setPermissionsError(null);
+      setWarning(tokenWarning(perms.permissions.token, new Date()));
+    } else {
+      toast(perms.error, { tone: "error" });
+    }
     if (!res.ok) {
       toast(res.error, { tone: "error" });
       return;
@@ -116,6 +153,15 @@ export function SocialOverview({
 
   return (
     <div className="flex flex-col gap-6">
+      {warning && (
+        <Notice tone="warn" role="alert" onGrey>
+          {warning.text}{" "}
+          <a href={`#${APP_PERMISSIONS_ID}`} className="font-semibold text-russian-violet">
+            See what each app can do
+          </a>
+        </Notice>
+      )}
+
       <StatStrip label="Social at a glance" className="grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
         <StatCard label="Posted, last 7 days" value={stats.posted} href={SOCIAL_POSTS_PATH} />
         <StatCard label="Scheduled, next 7 days" value={stats.scheduled} href={weekHref} />
@@ -165,6 +211,8 @@ export function SocialOverview({
       </div>
 
       <OverviewWeek today={data.today} entries={data.week} ctx={ctx} />
+
+      <SocialPermissions permissions={permissions} error={permissionsError} />
     </div>
   );
 }

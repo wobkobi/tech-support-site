@@ -15,6 +15,7 @@ export const CHECKLIST_KEYS = [
   "schedule",
   "recycle",
   "email",
+  "permissions",
 ] as const;
 export type ChecklistKey = (typeof CHECKLIST_KEYS)[number];
 
@@ -35,6 +36,8 @@ export interface ChecklistFacts {
   recycling: boolean;
   /** Whether Email this too has drafted an email from any post. */
   emailed: boolean;
+  /** Whether every app is ready for posting, take-downs, stats and comments, or null while checking. */
+  permissions: boolean | null;
 }
 
 /** One step as the list shows it. */
@@ -125,6 +128,17 @@ export function checklistOf(facts: ChecklistFacts, skipped: readonly string[]): 
       href: SOCIAL_POSTS_PATH,
       action: "Open Posts",
       done: facts.emailed,
+    },
+    {
+      key: "permissions",
+      title: "Give the apps the permissions they need",
+      detail:
+        facts.permissions === null
+          ? "Checking what each app can do..."
+          : "Stats and the comments inbox need more than posting does. What each app can do shows what's missing.",
+      href: "#app-permissions",
+      action: "See what's missing",
+      done: facts.permissions === true,
     },
   ];
   const list = steps.map((s) => ({ ...s, skipped: skipped.includes(s.key) }));
