@@ -38,7 +38,8 @@ export async function GET(request: NextRequest, { params }: Ctx): Promise<NextRe
 
 /**
  * POST /api/admin/social/content/[id]/postings
- * Body: `{ when: "now" | ISO string, captionIndex? }`; the item's next caption when left out.
+ * Body: `{ when: "now" | ISO string, captionIndex?, queueId? }`; the item's next caption when
+ * left out, and `queueId` when the time is a schedule's open time being filled.
  * @param request - Incoming request.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the content item id.
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
   const body = (await request.json().catch(() => null)) as {
     when?: unknown;
     captionIndex?: unknown;
+    queueId?: unknown;
   } | null;
 
   let when: "now" | Date;
@@ -71,11 +73,18 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
   ) {
     return errorResponse("captionIndex must be a caption number from 0.", 400);
   }
+  let queueId: string | undefined;
+  if (body?.queueId !== undefined && body.queueId !== null) {
+    queueId = parseObjectId(body.queueId) ?? undefined;
+    if (!queueId) return errorResponse("That schedule no longer exists.", 404);
+    if (when === "now") return errorResponse("A schedule's time is a set time, not now.", 400);
+  }
 
   try {
     const result = await createPosting(id, {
       when,
       ...(typeof captionIndex === "number" ? { captionIndex } : {}),
+      ...(queueId ? { queueId } : {}),
     });
     if (!result.ok) return errorResponse(result.error, result.status);
     const published = result.published?.ok ? result.published : null;

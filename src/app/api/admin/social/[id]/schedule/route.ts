@@ -1,8 +1,10 @@
 // src/app/api/admin/social/[id]/schedule/route.ts
-// Schedules a draft for the publish-scheduled cron, or cancels back to a draft. Quiet hours don't
-// apply. Cancelling a schedule's posting takes it out of the schedule and leaves its slot empty.
+// Schedules a draft for the publish-scheduled cron, moves a scheduled post to another time (or
+// swaps two), or cancels back to a draft. Quiet hours don't apply. Cancelling or moving a
+// schedule's posting leaves its slot empty.
 
 import { parseObjectId } from "@/features/business/lib/validation";
+import { movePost, swapPosts, type MoveResult } from "@/features/social/lib/calendar-moves.server";
 import { NOT_CONTENT } from "@/features/social/lib/filters";
 import { scheduleProblems } from "@/features/social/lib/publish";
 import { skipQueueSlot } from "@/features/social/lib/queue-fill.server";
@@ -50,6 +52,39 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
   });
   if (updated.count === 0) return errorResponse("Only a draft can be scheduled.", 409);
   return okResponse({ scheduledAt: when.toISOString() });
+}
+
+/**
+ * PUT /api/admin/social/[id]/schedule
+ * Body: `{ scheduledAt: ISO string }` to move a scheduled post, or `{ swapWith: post id }` to
+ * swap its time with another scheduled post's.
+ * @param request - Incoming request.
+ * @param ctx - Route context.
+ * @param ctx.params - Route params with the post id.
+ * @returns JSON `{ moved: [{ id, scheduledAt, queueId }] }`.
+ */
+export async function PUT(request: NextRequest, { params }: Ctx): Promise<NextResponse> {
+  if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
+  const id = parseObjectId((await params).id);
+  if (!id) return errorResponse("Post not found.", 404);
+  const body = (await request.json().catch(() => null)) as {
+    scheduledAt?: unknown;
+    swapWith?: unknown;
+  } | null;
+
+  const now = new Date();
+  let result: MoveResult;
+  if (body?.swapWith !== undefined) {
+    const other = parseObjectId(body.swapWith);
+    if (!other) return errorResponse("Post not found.", 404);
+    result = await swapPosts(id, other, now);
+  } else {
+    const when = typeof body?.scheduledAt === "string" ? new Date(body.scheduledAt) : null;
+    if (!when || Number.isNaN(when.getTime())) return errorResponse("Pick a date and time.", 400);
+    result = await movePost(id, when, now);
+  }
+  if (!result.ok) return errorResponse(result.error, result.status);
+  return okResponse({ moved: result.moved });
 }
 
 /**

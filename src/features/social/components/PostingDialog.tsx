@@ -21,10 +21,13 @@ import { useId, useState } from "react";
 const SNIPPET = 60;
 
 /**
- * The top of the next hour, as a datetime-local value in NZ time.
- * @returns Input value.
+ * The time the dialog starts on: the one asked for while it's still ahead, else the top of the
+ * next hour.
+ * @param wanted - ISO time asked for, if any.
+ * @returns A datetime-local value in NZ time.
  */
-function nextHour(): string {
+function startTime(wanted: string | undefined): string {
+  if (wanted && Date.parse(wanted) > Date.now() + 60_000) return toNzInputValue(new Date(wanted));
   const at = new Date(Date.now() + 60 * 60_000);
   at.setMinutes(0, 0, 0);
   return toNzInputValue(at);
@@ -67,7 +70,9 @@ function postedSummary(targets: SocialTargetRow[]): {
  * @param props.captions - Its captions in order.
  * @param props.next - The caption next in turn.
  * @param props.start - Whether it opened from Post now or Schedule a posting.
- * @param props.beforeSubmit - Saves pending edits first; false stops the posting.
+ * @param props.at - ISO time to start the date and time on, such as the day it was dropped on.
+ * @param props.beforeSubmit - Saves pending edits first; false stops the posting. Left out when
+ * there's nothing to save.
  * @param props.onDone - Called with the posting once it's made.
  * @param props.onClose - Dismisses it.
  * @returns The dialog.
@@ -77,6 +82,7 @@ export function PostingDialog({
   captions,
   next,
   start,
+  at: startAt,
   beforeSubmit,
   onDone,
   onClose,
@@ -85,14 +91,15 @@ export function PostingDialog({
   captions: string[];
   next: number;
   start: "now" | "later";
-  beforeSubmit: () => Promise<boolean>;
+  at?: string;
+  beforeSubmit?: () => Promise<boolean>;
   onDone: (posting: SocialPostRow) => void;
   onClose: () => void;
 }): React.ReactElement {
   const { toast } = useToast();
   const id = useId();
   const [when, setWhen] = useState(start);
-  const [at, setAt] = useState(nextHour);
+  const [at, setAt] = useState(() => startTime(startAt));
   const [caption, setCaption] = useState(next);
   const [busy, setBusy] = useState(false);
   const choices = captions.flatMap((text, i) => (text.trim() ? [{ i, text: text.trim() }] : []));
@@ -109,7 +116,7 @@ export function PostingDialog({
       }
     }
     setBusy(true);
-    if (!(await beforeSubmit())) {
+    if (beforeSubmit && !(await beforeSubmit())) {
       setBusy(false);
       return;
     }

@@ -25,6 +25,7 @@ import {
   type PublishOutcome,
 } from "@/features/social/lib/publish";
 import { dropFromQueues } from "@/features/social/lib/queue-fill.server";
+import { slotKey, slotOf } from "@/features/social/lib/queue-slots";
 import type { SocialPlatformKey } from "@/features/social/lib/validate";
 import { prisma } from "@/shared/lib/prisma";
 import type { SocialPost } from "@prisma/client";
@@ -174,21 +175,29 @@ export async function deleteContentItems(ids: string[]): Promise<number> {
  * Makes a posting from a content item, for now or a set time. It's checked before it exists the
  * way publishing or scheduling would check it, so a post that can't go is never left behind; a
  * straight-away one that still fails to start is deleted again. The item's next caption moves
- * on once it has gone or been scheduled.
+ * on once it has gone or been scheduled. Filling a schedule's open time posts to that
+ * schedule's apps and counts as the schedule's, as if the filler had made it.
  * @param itemId - Content item id.
- * @param opts - When and which caption.
+ * @param opts - When, which caption, and the schedule whose time it fills.
  * @param opts.when - "now", or the time to go out.
  * @param opts.captionIndex - Caption to use; the item's next in turn when left out.
+ * @param opts.queueId - The schedule whose time `when` is, if any.
  * @returns The posting, or why it wasn't made.
  */
 export async function createPosting(
   itemId: string,
-  opts: { when: "now" | Date; captionIndex?: number },
+  opts: { when: "now" | Date; captionIndex?: number; queueId?: string },
 ): Promise<PostingResult> {
   const item = await prisma.socialPost.findFirst({ where: { id: itemId, ...IS_CONTENT } });
   if (!item) return { ok: false, error: "That content item no longer exists.", status: 404 };
 
   const at = opts.when === "now" ? new Date() : opts.when;
+  let queue: { id: string; platforms: SocialPlatformKey[] } | null = null;
+  if (opts.queueId) {
+    const found = await queueTime(opts.queueId, at);
+    if (!found.ok) return found;
+    queue = found.queue;
+  }
   const stats = (await contentStats([item.id])).get(item.id) ?? NO_STATS;
   const spent = spentReason(item, stats, at);
   if (spent) return { ok: false, error: spent, status: 409 };
@@ -207,6 +216,7 @@ export async function createPosting(
   const data = postingFields(item, {
     captionIndex,
     scheduledAt: opts.when === "now" ? null : at,
+    ...(queue ? { platforms: queue.platforms, queueId: queue.id } : {}),
   });
   const preview = { ...item, ...data, isContent: null } as SocialPost;
   if (opts.when === "now") {
@@ -229,6 +239,35 @@ export async function createPosting(
   await writePostMeta(item.id, () => ({ nextCaption: captionAfter(captions, captionIndex) }));
   const fresh = await prisma.socialPost.findUnique({ where: { id: posting.id } });
   return { ok: true, posting: fresh ?? posting, published };
+}
+
+/**
+ * Checks that a time is one of a schedule's and has nothing in it yet.
+ * @param queueId - Schedule id.
+ * @param at - The time.
+ * @returns The schedule's id and apps, or why the time can't be filled.
+ */
+async function queueTime(
+  queueId: string,
+  at: Date,
+): Promise<
+  | { ok: true; queue: { id: string; platforms: SocialPlatformKey[] } }
+  | { ok: false; error: string; status: number }
+> {
+  const queue = await prisma.socialQueue.findUnique({
+    where: { id: queueId },
+    select: { id: true, platforms: true, slots: true },
+  });
+  if (!queue) return { ok: false, error: "That schedule no longer exists.", status: 404 };
+  const key = slotKey(slotOf(at));
+  if (!queue.slots.some((s) => slotKey(s) === key)) {
+    return { ok: false, error: "That isn't one of the schedule's times any more.", status: 409 };
+  }
+  const taken = await prisma.socialPost.count({ where: { queueId, scheduledAt: at } });
+  if (taken > 0) {
+    return { ok: false, error: "That time already has a post lined up.", status: 409 };
+  }
+  return { ok: true, queue };
 }
 
 /**

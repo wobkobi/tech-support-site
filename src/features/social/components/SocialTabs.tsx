@@ -1,10 +1,11 @@
 "use client";
 // src/features/social/components/SocialTabs.tsx
-// The Social pages' tab strip: Posts, Content and Schedules. Links, so the address is the source
-// of truth.
+// The Social pages' tab strip: Posts, Calendar, Content and Schedules. Links, so the address is
+// the source of truth.
 
 import { AdminTabs } from "@/features/admin/components/ui/AdminTabs";
 import {
+  SOCIAL_CALENDAR_PATH,
   SOCIAL_CONTENT_PATH,
   SOCIAL_POSTS_PATH,
   SOCIAL_SCHEDULES_PATH,
@@ -12,10 +13,11 @@ import {
 import { usePathname } from "next/navigation";
 import type React from "react";
 
-type SocialTabKey = "posts" | "content" | "schedules";
+type SocialTabKey = "posts" | "calendar" | "content" | "schedules";
 
 const TABS = [
   { key: "posts", label: "Posts", href: SOCIAL_POSTS_PATH },
+  { key: "calendar", label: "Calendar", href: SOCIAL_CALENDAR_PATH },
   { key: "content", label: "Content", href: SOCIAL_CONTENT_PATH },
   { key: "schedules", label: "Schedules", href: SOCIAL_SCHEDULES_PATH },
 ] as const;
@@ -30,6 +32,8 @@ export function SocialTabs(): React.ReactElement {
     ? "content"
     : pathname.startsWith(SOCIAL_SCHEDULES_PATH)
       ? "schedules"
-      : "posts";
+      : pathname.startsWith(SOCIAL_CALENDAR_PATH)
+        ? "calendar"
+        : "posts";
   return <AdminTabs aria-label="Social" tabs={TABS} active={active} className="mb-6" />;
 }
