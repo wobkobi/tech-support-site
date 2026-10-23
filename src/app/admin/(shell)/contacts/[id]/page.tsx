@@ -1,6 +1,6 @@
 // src/app/admin/(shell)/contacts/[id]/page.tsx
 // Customer-360 contact detail: everything loadContact360 matches, as stat cards and one
-// timeline, with contact, sync and review-ask state in the rail.
+// timeline, with contact, sync, mailing-list and review-ask state in the rail.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
@@ -13,6 +13,8 @@ import { StickyRail } from "@/features/admin/components/ui/StickyRail";
 import { formatNZD } from "@/features/business/lib/business";
 import { ContactDetailActions } from "@/features/contacts/components/ContactDetailActions";
 import { loadContact360 } from "@/features/contacts/lib/contact-360";
+import { MailingListButton } from "@/features/mailing/components/MailingListButton";
+import { contactMailingState, OPT_OUT_WHY } from "@/features/mailing/lib/opt-out";
 import { AllowReviewAsksButton } from "@/features/reviews/components/admin/AllowReviewAsksButton";
 import { contactReviewAskState } from "@/features/reviews/lib/review-ask-opt-out";
 import { requireAdminAuth } from "@/shared/lib/auth";
@@ -64,7 +66,11 @@ export default async function ContactDetailPage({
   await requireAdminAuth();
   const { id } = await params;
 
-  const [data, askState] = await Promise.all([loadContact360(id), contactReviewAskState(id)]);
+  const [data, askState, mailing] = await Promise.all([
+    loadContact360(id),
+    contactReviewAskState(id),
+    contactMailingState(id),
+  ]);
   if (!data) notFound();
 
   const { contact, bookings, invoices, income, reviews, totals } = data;
@@ -247,6 +253,45 @@ export default async function ContactDetailPage({
               </dl>
             </Card>
           )}
+
+          <Card>
+            <CardHeader title="Mailing list" />
+            <dl className="space-y-2 text-sm">
+              <InfoRow label="Emails">
+                {mailing.hasEmail ? (
+                  <span className="flex flex-wrap items-center justify-end gap-2">
+                    {mailing.optOut ? (
+                      <StatusPill tone="neutral">Unsubscribed</StatusPill>
+                    ) : (
+                      <StatusPill tone="success">On the list</StatusPill>
+                    )}
+                    <MailingListButton
+                      contactId={contact.id}
+                      name={contact.name}
+                      action={mailing.optOut ? "resubscribe" : "unsubscribe"}
+                    />
+                  </span>
+                ) : (
+                  "None - no email address"
+                )}
+              </InfoRow>
+              {mailing.optOut && (
+                <>
+                  <InfoRow label="Why">{OPT_OUT_WHY[mailing.optOut.source]}</InfoRow>
+                  <InfoRow label="Since">
+                    {formatDateShort(mailing.optOut.at.toISOString())}
+                  </InfoRow>
+                </>
+              )}
+            </dl>
+            {mailing.optOut && mailing.optOut.source !== "manual" && (
+              <p className="mt-3 text-sm text-admin-muted">
+                {mailing.optOut.source === "bounce"
+                  ? "Changing their email to an address that works puts them back on the list."
+                  : "Only resubscribe them if they've asked you to."}
+              </p>
+            )}
+          </Card>
 
           <Card>
             <CardHeader title="Review asks" />

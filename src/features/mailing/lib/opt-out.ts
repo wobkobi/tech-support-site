@@ -38,6 +38,21 @@ export async function optOutContact(
 }
 
 /**
+ * Opts out whoever uses an address: the whole matching contact, or just the address when
+ * no live contact has it.
+ * @param email - Lowercased address.
+ * @param source - How the request arrived.
+ */
+export async function optOutByEmail(email: string, source: EmailOptOutSource): Promise<void> {
+  const contact = await prisma.contact.findFirst({
+    where: { deletedAt: null, OR: [{ email }, { altEmails: { has: email } }] },
+    select: { id: true },
+  });
+  if (contact && (await optOutContact(contact.id, source))) return;
+  await prisma.emailOptOut.upsert({ where: { email }, create: { email, source }, update: {} });
+}
+
+/**
  * Takes addresses off the list after Resend reports a problem. A bounce drops only the
  * dead address (no contact id); a spam report opts out the whole matching contact.
  * @param action - What the webhook asked for.
@@ -45,11 +60,8 @@ export async function optOutContact(
 export async function optOutForDelivery(action: OptOutAction): Promise<void> {
   for (const email of action.emails) {
     if (action.source === "complaint") {
-      const contact = await prisma.contact.findFirst({
-        where: { deletedAt: null, OR: [{ email }, { altEmails: { has: email } }] },
-        select: { id: true },
-      });
-      if (contact && (await optOutContact(contact.id, "complaint"))) continue;
+      await optOutByEmail(email, "complaint");
+      continue;
     }
     await prisma.emailOptOut.upsert({
       where: { email },
@@ -76,19 +88,48 @@ export async function resubscribeContact(contactId: string): Promise<void> {
   });
 }
 
+/** Why someone is off the list, as their contact page says it. */
+export const OPT_OUT_WHY: Record<EmailOptOutSource, string> = {
+  link: "They used the unsubscribe link in an email",
+  one_click: "They used their inbox's Unsubscribe button",
+  manual: "You took them off",
+  bounce: "An email bounced: the address doesn't exist",
+  complaint: "They marked an email as spam",
+};
+
+/** A contact's place on the mailing list. */
+export interface MailingState {
+  /** Whether they have an address the list can send to. */
+  hasEmail: boolean;
+  /** How and when they came off the list, or null while they're on it. */
+  optOut: { source: EmailOptOutSource; at: Date } | null;
+}
+
+/**
+ * Where a contact stands on the mailing list. Their id or the address emails go to counts, the
+ * same as when an email is sent.
+ * @param contactId - Contact id.
+ * @returns Whether they have an address, and their first opt-out.
+ */
+export async function contactMailingState(contactId: string): Promise<MailingState> {
+  const contact = await prisma.contact.findUnique({
+    where: { id: contactId },
+    select: { email: true },
+  });
+  const email = normaliseEmail(contact?.email);
+  const row = await prisma.emailOptOut.findFirst({
+    where: { OR: [{ contactId }, ...(email ? [{ email }] : [])] },
+    orderBy: { createdAt: "asc" },
+    select: { source: true, createdAt: true },
+  });
+  return { hasEmail: !!email, optOut: row ? { source: row.source, at: row.createdAt } : null };
+}
+
 /**
  * Whether a contact is currently opted out.
  * @param contactId - Contact id.
  * @returns True when any opt-out row matches them.
  */
 export async function isContactOptedOut(contactId: string): Promise<boolean> {
-  const contact = await prisma.contact.findUnique({
-    where: { id: contactId },
-    select: { email: true },
-  });
-  const email = normaliseEmail(contact?.email);
-  const count = await prisma.emailOptOut.count({
-    where: { OR: [{ contactId }, ...(email ? [{ email }] : [])] },
-  });
-  return count > 0;
+  return (await contactMailingState(contactId)).optOut !== null;
 }

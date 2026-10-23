@@ -76,41 +76,50 @@ export function SubscribersPanel({
     }
   }
 
+  const lists = (
+    <div className="mt-3 grid gap-4 md:grid-cols-2">
+      <SubscriberList
+        heading="On the list"
+        rows={subscribed.filter((r) => matches(r, q))}
+        actionLabel="Unsubscribe"
+        busyId={busyId}
+        onAction={(r) => void move(r, "unsubscribe")}
+      />
+      <SubscriberList
+        heading="Unsubscribed"
+        rows={unsubscribed.filter((r) => matches(r, q))}
+        actionLabel="Resubscribe"
+        busyId={busyId}
+        onAction={(r) => void move(r, "resubscribe")}
+      />
+    </div>
+  );
+
   return (
     <Card>
       <CardHeader
         title="Subscribers"
-        description={`${subscribed.length} on the list, ${unsubscribed.length} unsubscribed. Everyone in Contacts with an email address is on it until they unsubscribe.`}
+        description={`${subscribed.length} on the list, ${unsubscribed.length} unsubscribed. Everyone in Contacts with an email address is on it until they unsubscribe. Find someone to take them off, or to put them back.`}
       />
-      <details className="mt-3">
-        <summary className="cursor-pointer text-sm font-semibold text-russian-violet">
-          Show everyone
-        </summary>
-        <AdminInput
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search name or email"
-          className="mt-3"
-          aria-label="Search subscribers"
-        />
-        <div className="mt-3 grid gap-4 md:grid-cols-2">
-          <SubscriberList
-            heading="On the list"
-            rows={subscribed.filter((r) => matches(r, q))}
-            actionLabel="Unsubscribe"
-            busyId={busyId}
-            onAction={(r) => void move(r, "unsubscribe")}
-          />
-          <SubscriberList
-            heading="Unsubscribed"
-            rows={unsubscribed.filter((r) => matches(r, q))}
-            actionLabel="Resubscribe"
-            busyId={busyId}
-            onAction={(r) => void move(r, "resubscribe")}
-          />
-        </div>
-      </details>
+      <AdminInput
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Find someone by name or email"
+        className="mt-3"
+        aria-label="Find a subscriber"
+      />
+      {/* A search shows its matches straight away; with none, everyone stays folded away. */}
+      {q ? (
+        lists
+      ) : (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-sm font-semibold text-russian-violet">
+            Show everyone
+          </summary>
+          {lists}
+        </details>
+      )}
     </Card>
   );
 }
