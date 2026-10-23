@@ -74,7 +74,7 @@ export function SocialStartSection({
             // page then; a compact row of buttons once a post is being written.
             // On a phone the compact row scrolls sideways, keeping the post in view.
             hasOpen
-              ? "-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
+              ? "-mx-4 flex gap-2 overflow-x-auto overflow-y-hidden px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
               : "grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
           }
         >

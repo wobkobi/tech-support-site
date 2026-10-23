@@ -134,7 +134,7 @@ export function AssetScheduleModal({
               );
             })}
           </ul>
-          <div className="hidden overflow-x-auto rounded-lg border border-admin-border md:block">
+          <div className="hidden overflow-x-auto overflow-y-hidden rounded-lg border border-admin-border md:block">
             <table className={TABLE_CLS}>
               <thead className={THEAD_CLS}>
                 <tr>

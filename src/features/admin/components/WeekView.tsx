@@ -322,7 +322,7 @@ export function WeekView({
 
       {/* Carries the right-edge fade: the grid scrolls horizontally until ~xl. */}
       <div className="relative">
-        <div className="overflow-x-auto rounded-lg border border-admin-border bg-admin-surface">
+        <div className="overflow-x-auto overflow-y-hidden rounded-lg border border-admin-border bg-admin-surface">
           <div className="min-w-225">
             {/* Day headers */}
             <div className="grid grid-cols-[64px_repeat(7,1fr)] border-b border-admin-border">

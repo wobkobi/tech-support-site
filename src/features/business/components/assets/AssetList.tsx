@@ -219,7 +219,7 @@ export function AssetList({
         ))}
       </ul>
 
-      <Card padding="none" className="hidden overflow-x-auto xl:block">
+      <Card padding="none" className="hidden overflow-x-auto overflow-y-hidden xl:block">
         <table className={TABLE_CLS}>
           <thead className={THEAD_CLS}>
             <tr>

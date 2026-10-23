@@ -11,8 +11,11 @@ export const THEAD_CLS = "border-b border-admin-border bg-admin-bg/60";
  * Horizontal scroll for a table's wrapper, in place of `overflow-x-auto`. A scrolling box
  * traps a sticky header inside it, so from xl (where every admin table fits the full-width
  * page) the wrapper clips instead, which doesn't, and {@link STICKY_THEAD_CLS} can pin.
+ * Below xl the y lock stops the box scrolling up and down as well; it goes back to visible
+ * at xl, since clip beside hidden would make the wrapper a scrolling box again.
  */
-export const TABLE_SCROLL_CLS = "overflow-x-auto xl:overflow-x-clip";
+export const TABLE_SCROLL_CLS =
+  "overflow-x-auto overflow-y-hidden xl:overflow-x-clip xl:overflow-y-visible";
 
 /**
  * Add to {@link THEAD_CLS} to pin the column names on xl+, under the top bar and any

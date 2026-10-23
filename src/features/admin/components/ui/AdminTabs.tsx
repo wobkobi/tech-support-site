@@ -94,13 +94,14 @@ export function AdminTabs<K extends string>({
   };
 
   return (
-    // Scrolls sideways on phones, wraps from md up so every tab shows.
+    // Scrolls sideways on phones, wraps from md up so every tab shows. The y lock stops
+    // the underline's -mb-px from making the strip scroll up and down too.
     <div
       ref={listRef}
       role="tablist"
       aria-label={aria["aria-label"]}
       className={cn(
-        "flex gap-x-1 overflow-x-auto border-b border-admin-border md:flex-wrap md:overflow-visible",
+        "flex gap-x-1 overflow-x-auto overflow-y-hidden border-b border-admin-border md:flex-wrap md:overflow-visible",
         className,
       )}
     >

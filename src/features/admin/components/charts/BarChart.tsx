@@ -336,7 +336,7 @@ export function BarChart({
           <summary className="cursor-pointer text-sm font-bold text-russian-violet select-none">
             Show as table
           </summary>
-          <div className="mt-3 overflow-x-auto">
+          <div className="mt-3 overflow-x-auto overflow-y-hidden">
             <table className={TABLE_CLS}>
               <thead className={THEAD_CLS}>
                 <tr>

@@ -95,7 +95,7 @@ export function CalendarWeek({
   const hourMarks = Array.from({ length: end - start }, (_, i) => start + i);
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-admin-border bg-admin-surface">
+    <div className="overflow-x-auto overflow-y-hidden rounded-lg border border-admin-border bg-admin-surface">
       <div className="grid min-w-3xl grid-cols-[4.5rem_repeat(7,minmax(0,1fr))]">
         <div className="border-b border-admin-border bg-admin-bg" />
         {days.map((k, i) => {

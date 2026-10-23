@@ -646,7 +646,7 @@ function BestTimes({ times }: { times: AnalyticsData["times"] }): React.ReactEle
           lucky post can&apos;t make a time look best.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-hidden">
           <table className="w-full min-w-120 border-separate border-spacing-1 text-sm">
             <thead>
               <tr>
