@@ -84,6 +84,21 @@ export async function removeMarketingContact(id: string): Promise<void> {
 }
 
 /**
+ * Clears Resend's own unsubscribed flag on an address, which their inbox's Unsubscribe
+ * button sets. Never throws: an address Resend doesn't hold has no flag to clear.
+ * @param email - Lowercased address.
+ */
+export async function clearMarketingUnsubscribe(email: string): Promise<void> {
+  try {
+    await paced("resubscribe a contact", (r) => r.contacts.update({ email, unsubscribed: false }));
+  } catch (err) {
+    if (!/not.?found/i.test(String(err))) {
+      console.warn("[mailing] Couldn't clear a Resend unsubscribe:", err);
+    }
+  }
+}
+
+/**
  * Creates any of the given string properties the account doesn't have yet.
  * @param keys - Property keys the import and the merge tags use.
  */

@@ -3,6 +3,7 @@
 // opted out together, so a merged contact's second address can't keep getting emails.
 
 import type { OptOutAction } from "@/features/mailing/lib/delivery-events";
+import { clearMarketingUnsubscribe, marketingReady } from "@/features/mailing/lib/resend-marketing";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import type { EmailOptOutSource } from "@prisma/client";
@@ -72,19 +73,44 @@ export async function optOutForDelivery(action: OptOutAction): Promise<void> {
 }
 
 /**
- * Re-subscribes a contact by removing every opt-out tied to their id or any address.
+ * Every address a contact uses, lowercased.
  * @param contactId - Contact id.
+ * @returns Their addresses; empty when the contact doesn't exist.
  */
-export async function resubscribeContact(contactId: string): Promise<void> {
+async function contactEmails(contactId: string): Promise<string[]> {
   const contact = await prisma.contact.findUnique({
     where: { id: contactId },
     select: { email: true, altEmails: true },
   });
-  const emails = [contact?.email, ...(contact?.altEmails ?? [])]
-    .map(normaliseEmail)
-    .filter(Boolean);
+  return [contact?.email, ...(contact?.altEmails ?? [])].map(normaliseEmail).filter(Boolean);
+}
+
+/**
+ * Re-subscribes a contact by removing every opt-out tied to their id or any address.
+ * @param contactId - Contact id.
+ */
+export async function resubscribeContact(contactId: string): Promise<void> {
+  const emails = await contactEmails(contactId);
   await prisma.emailOptOut.deleteMany({
     where: { OR: [{ contactId }, { email: { in: emails } }] },
+  });
+  // Left set, Resend's own flag from an inbox Unsubscribe button would opt them out again
+  // at the next send's sync.
+  if (marketingReady()) {
+    for (const email of emails) await clearMarketingUnsubscribe(email);
+  }
+}
+
+/**
+ * Notes on a contact's opt-outs when they were emailed to confirm coming back.
+ * @param contactId - Contact id.
+ * @param at - When the email went out.
+ */
+export async function markResubscribeAsked(contactId: string, at: Date): Promise<void> {
+  const emails = await contactEmails(contactId);
+  await prisma.emailOptOut.updateMany({
+    where: { OR: [{ contactId }, { email: { in: emails } }] },
+    data: { resubscribeAskedAt: at },
   });
 }
 
@@ -95,14 +121,18 @@ export const OPT_OUT_WHY: Record<EmailOptOutSource, string> = {
   manual: "You took them off",
   bounce: "An email bounced: the address doesn't exist",
   complaint: "They marked an email as spam",
+  booking_form: "They unticked mailing-list emails when they booked",
 };
 
 /** A contact's place on the mailing list. */
 export interface MailingState {
   /** Whether they have an address the list can send to. */
   hasEmail: boolean;
-  /** How and when they came off the list, or null while they're on it. */
-  optOut: { source: EmailOptOutSource; at: Date } | null;
+  /**
+   * How and when they came off the list, and when they were last emailed to confirm
+   * coming back; null while they're on it.
+   */
+  optOut: { source: EmailOptOutSource; at: Date; askedAt: Date | null } | null;
 }
 
 /**
@@ -120,9 +150,14 @@ export async function contactMailingState(contactId: string): Promise<MailingSta
   const row = await prisma.emailOptOut.findFirst({
     where: { OR: [{ contactId }, ...(email ? [{ email }] : [])] },
     orderBy: { createdAt: "asc" },
-    select: { source: true, createdAt: true },
+    select: { source: true, createdAt: true, resubscribeAskedAt: true },
   });
-  return { hasEmail: !!email, optOut: row ? { source: row.source, at: row.createdAt } : null };
+  return {
+    hasEmail: !!email,
+    optOut: row
+      ? { source: row.source, at: row.createdAt, askedAt: row.resubscribeAskedAt ?? null }
+      : null,
+  };
 }
 
 /**

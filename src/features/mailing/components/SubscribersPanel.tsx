@@ -1,7 +1,7 @@
 "use client";
 // src/features/mailing/components/SubscribersPanel.tsx
 // Who's on the mailing list. Lets the operator unsubscribe someone who asked by
-// phone or reply, and put back someone who unsubscribed by mistake.
+// phone or reply, and email someone who wants back on a button to confirm it.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
@@ -43,11 +43,12 @@ export function SubscribersPanel({
   const q = query.trim().toLowerCase();
 
   /**
-   * Moves a contact between the two lists through the opt-outs route.
-   * @param r - Contact to move.
+   * Unsubscribes a contact, or emails them a button to confirm coming back, through the
+   * opt-outs route. An asked contact stays under Unsubscribed until they press it.
+   * @param r - Contact.
    * @param action - Which way.
    */
-  async function move(r: Recipient, action: "unsubscribe" | "resubscribe"): Promise<void> {
+  async function move(r: Recipient, action: "unsubscribe" | "ask-resubscribe"): Promise<void> {
     setBusyId(r.contactId);
     const res = await callApi("/api/admin/mailing/opt-outs", "POST", {
       action,
@@ -58,22 +59,16 @@ export function SubscribersPanel({
       toast(res.error, { tone: "error" });
       return;
     }
-    /**
-     * Alphabetical order by name.
-     * @param a - First contact.
-     * @param b - Second contact.
-     * @returns Sort comparison.
-     */
-    const byName = (a: Recipient, b: Recipient): number => a.name.localeCompare(b.name);
-    if (action === "unsubscribe") {
-      setSubscribed((prev) => prev.filter((x) => x.contactId !== r.contactId));
-      setUnsubscribed((prev) => [...prev, r].sort(byName));
-      toast(`${r.name} won't get mailing-list emails.`, { tone: "success" });
-    } else {
-      setUnsubscribed((prev) => prev.filter((x) => x.contactId !== r.contactId));
-      setSubscribed((prev) => [...prev, r].sort(byName));
-      toast(`${r.name} is back on the list.`, { tone: "success" });
+    if (action === "ask-resubscribe") {
+      toast(
+        `Sent ${r.name} an email to confirm. They're back on the list once they press the button in it.`,
+        { tone: "success" },
+      );
+      return;
     }
+    setSubscribed((prev) => prev.filter((x) => x.contactId !== r.contactId));
+    setUnsubscribed((prev) => [...prev, r].sort((a, b) => a.name.localeCompare(b.name)));
+    toast(`${r.name} won't get mailing-list emails.`, { tone: "success" });
   }
 
   const lists = (
@@ -88,9 +83,11 @@ export function SubscribersPanel({
       <SubscriberList
         heading="Unsubscribed"
         rows={unsubscribed.filter((r) => matches(r, q))}
-        actionLabel="Resubscribe"
+        actionLabel="Ask to resubscribe"
         busyId={busyId}
-        onAction={(r) => void move(r, "resubscribe")}
+        // A bounced address can't get the confirm email.
+        canAct={(r) => r.optOutReason !== "bounce"}
+        onAction={(r) => void move(r, "ask-resubscribe")}
       />
     </div>
   );
@@ -99,7 +96,7 @@ export function SubscribersPanel({
     <Card>
       <CardHeader
         title="Subscribers"
-        description={`${subscribed.length} on the list, ${unsubscribed.length} unsubscribed. Everyone in Contacts with an email address is on it until they unsubscribe. Find someone to take them off, or to put them back.`}
+        description={`${subscribed.length} on the list, ${unsubscribed.length} unsubscribed. Everyone in Contacts with an email address is on it until they unsubscribe. Find someone to take them off, or to email them a button to come back on.`}
       />
       <AdminInput
         type="search"
@@ -131,6 +128,7 @@ export function SubscribersPanel({
  * @param props.rows - Contacts to list.
  * @param props.actionLabel - Button text for each row.
  * @param props.busyId - Contact id whose request is running.
+ * @param props.canAct - Whether a row gets the action button; every row when unset.
  * @param props.onAction - Runs the row action.
  * @returns List element.
  */
@@ -139,12 +137,14 @@ function SubscriberList({
   rows,
   actionLabel,
   busyId,
+  canAct,
   onAction,
 }: {
   heading: string;
   rows: Recipient[];
   actionLabel: string;
   busyId: string | null;
+  canAct?: (r: Recipient) => boolean;
   onAction: (r: Recipient) => void;
 }): React.ReactElement {
   return (
@@ -167,14 +167,16 @@ function SubscriberList({
                   </p>
                 )}
               </div>
-              <AdminButton
-                size="xs"
-                variant="secondary"
-                busy={busyId === r.contactId}
-                onClick={() => onAction(r)}
-              >
-                {actionLabel}
-              </AdminButton>
+              {(!canAct || canAct(r)) && (
+                <AdminButton
+                  size="xs"
+                  variant="secondary"
+                  busy={busyId === r.contactId}
+                  onClick={() => onAction(r)}
+                >
+                  {actionLabel}
+                </AdminButton>
+              )}
             </li>
           ))}
         </ul>

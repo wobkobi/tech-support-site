@@ -1,6 +1,6 @@
 "use client";
 // src/features/mailing/components/MailingListButton.tsx
-// Unsubscribe or Resubscribe on a contact page, for someone who asks by phone or reply.
+// Unsubscribe, or ask to resubscribe, on a contact page, for someone who asks by phone or reply.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { useToast } from "@/features/admin/components/ui/Toast";
@@ -10,21 +10,25 @@ import type React from "react";
 import { useState } from "react";
 
 /**
- * Takes a contact off the mailing list or puts them back, then refreshes the page.
+ * Takes a contact off the mailing list, or emails them a button to confirm coming back,
+ * then refreshes the page.
  * @param props - Component props.
  * @param props.contactId - Contact id.
  * @param props.name - Their name, for the toast.
  * @param props.action - Which way.
+ * @param props.asked - Whether they've been emailed to confirm already.
  * @returns Button element.
  */
 export function MailingListButton({
   contactId,
   name,
   action,
+  asked = false,
 }: {
   contactId: string;
   name: string;
-  action: "unsubscribe" | "resubscribe";
+  action: "unsubscribe" | "ask-resubscribe";
+  asked?: boolean;
 }): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -42,7 +46,7 @@ export function MailingListButton({
     toast(
       action === "unsubscribe"
         ? `${name} won't get mailing-list emails.`
-        : `${name} is back on the list.`,
+        : `Sent ${name} an email to confirm. They're back on the list once they press the button in it.`,
       { tone: "success" },
     );
     router.refresh();
@@ -50,7 +54,7 @@ export function MailingListButton({
 
   return (
     <AdminButton size="xs" variant="secondary" busy={busy} onClick={() => void move()}>
-      {action === "unsubscribe" ? "Unsubscribe" : "Resubscribe"}
+      {action === "unsubscribe" ? "Unsubscribe" : asked ? "Ask again" : "Ask to resubscribe"}
     </AdminButton>
   );
 }

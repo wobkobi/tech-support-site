@@ -1,7 +1,7 @@
 "use client";
 // src/features/booking/components/BookingContactFields.tsx
 // "Your details" inputs for the booking form: name, email (with the typo
-// prompt), phone and meeting type.
+// prompt), the mailing-list tickbox, phone and meeting type.
 
 import { BOOKING_FIELD_LIMITS, PHONE_INVALID_MESSAGE } from "@/features/booking/lib/booking";
 import { EmailInput } from "@/shared/components/EmailInput";
@@ -189,6 +189,48 @@ export function BookingEmailField({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+export interface BookingMailingListFieldProps {
+  /** Whether the box is ticked. */
+  checked: boolean;
+  /** Called with the new state when it's ticked or unticked. */
+  onChange: (checked: boolean) => void;
+}
+
+/**
+ * Mailing-list tickbox for new bookings. It starts ticked; unticking takes them off the
+ * list when they book.
+ * @param props - Component props.
+ * @param props.checked - Whether the box is ticked.
+ * @param props.onChange - Called with the new state.
+ * @returns The tickbox.
+ */
+export function BookingMailingListField({
+  checked,
+  onChange,
+}: BookingMailingListFieldProps): React.ReactElement {
+  return (
+    <div className="flex flex-col gap-1">
+      <label
+        htmlFor="booking-mailing-list"
+        className="flex min-h-11 cursor-pointer items-start gap-3 text-base text-rich-black"
+      >
+        <input
+          id="booking-mailing-list"
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          aria-describedby="booking-mailing-list-hint"
+          className="mt-0.5 size-5 shrink-0 cursor-pointer accent-russian-violet"
+        />
+        <span>Send me the occasional email about offers, holiday hours or scam warnings</span>
+      </label>
+      <p id="booking-mailing-list-hint" className="pl-8 text-base text-rich-black/70">
+        You can unsubscribe any time. Emails about your booking come either way.
+      </p>
     </div>
   );
 }

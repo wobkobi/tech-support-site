@@ -265,11 +265,15 @@ export default async function ContactDetailPage({
                     ) : (
                       <StatusPill tone="success">On the list</StatusPill>
                     )}
-                    <MailingListButton
-                      contactId={contact.id}
-                      name={contact.name}
-                      action={mailing.optOut ? "resubscribe" : "unsubscribe"}
-                    />
+                    {/* A bounced address can't get the confirm email, so there's nothing to ask. */}
+                    {mailing.optOut?.source !== "bounce" && (
+                      <MailingListButton
+                        contactId={contact.id}
+                        name={contact.name}
+                        action={mailing.optOut ? "ask-resubscribe" : "unsubscribe"}
+                        asked={!!mailing.optOut?.askedAt}
+                      />
+                    )}
                   </span>
                 ) : (
                   "None - no email address"
@@ -281,14 +285,19 @@ export default async function ContactDetailPage({
                   <InfoRow label="Since">
                     {formatDateShort(mailing.optOut.at.toISOString())}
                   </InfoRow>
+                  {mailing.optOut.askedAt && (
+                    <InfoRow label="Asked to come back">
+                      {formatDateShort(mailing.optOut.askedAt.toISOString())}
+                    </InfoRow>
+                  )}
                 </>
               )}
             </dl>
-            {mailing.optOut && mailing.optOut.source !== "manual" && (
+            {mailing.optOut && (
               <p className="mt-3 text-sm text-admin-muted">
                 {mailing.optOut.source === "bounce"
                   ? "Changing their email to an address that works puts them back on the list."
-                  : "Only resubscribe them if they've asked you to."}
+                  : `${mailing.optOut.source === "manual" ? "" : "Only ask if they've asked you to. "}Ask to resubscribe emails them a button, and they're back on the list once they press it.`}
               </p>
             )}
           </Card>
