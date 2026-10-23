@@ -34,8 +34,7 @@ export interface PostEmail {
 
 /** What drafting an email from a post came to. */
 export type DraftEmailResult =
-  | { ok: true; campaignId: string; brief: string }
-  | { ok: false; status: 400 | 404 | 409; error: string };
+  { ok: true; campaignId: string } | { ok: false; status: 400 | 404 | 409; error: string };
 
 /**
  * A design's wide picture for email, when it still matches the design and the live contact and
@@ -112,7 +111,7 @@ async function pickPicture(
  * @param id - Post id.
  * @param opts - Options.
  * @param opts.picture - Where the email's picture comes from.
- * @returns The new email's id and the post as a Draft with AI brief, or an error.
+ * @returns The new email's id, or an error.
  */
 export async function draftEmailForPost(
   id: string,
@@ -160,7 +159,7 @@ export async function draftEmailForPost(
       ? { ok: false, status: 404, error: "Post not found." }
       : { ok: false, status: 409, error: "This post already has an email." };
   }
-  return { ok: true, campaignId: created.id, brief };
+  return { ok: true, campaignId: created.id };
 }
 
 /**

@@ -11,6 +11,7 @@ import {
 } from "@/features/mailing/components/CampaignEditor";
 import { toCampaignRow } from "@/features/mailing/lib/campaign-row";
 import { missingSendEnv, promoWording } from "@/features/mailing/lib/context";
+import { readDraftBrief } from "@/features/mailing/lib/draft-brief";
 import { emailInsertGroups, emailLinkTargets } from "@/features/mailing/lib/insertables";
 import { BLANK_TEMPLATE, type Template } from "@/features/mailing/lib/templates";
 import { postBrief } from "@/features/social/lib/to-email";
@@ -159,6 +160,7 @@ export default async function AdminMailingEditPage({
       linkTargets={emailLinkTargets(getSiteUrl(), reviews.googleReviewUrl)}
       canDraft={aiConfigured()}
       draftFromPost={draftFromPost && aiConfigured()}
+      draftBrief={readDraftBrief(campaign.draftBrief)}
       linkedPost={linkedPost}
       adminEmail={process.env.ADMIN_EMAIL?.trim() || null}
     />

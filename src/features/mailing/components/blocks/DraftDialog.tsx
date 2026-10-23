@@ -14,11 +14,6 @@ import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { ADMIN_CHECKBOX_CLS } from "@/features/admin/components/ui/field-classes";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import {
-  readDraftBrief,
-  saveDraftBrief,
-  saveDraftPictures,
-} from "@/features/mailing/components/blocks/draft-brief";
 import type { DraftedPicture, PictureJob } from "@/features/mailing/components/blocks/DraftPicture";
 import {
   BRIEF_MAX,
@@ -30,6 +25,12 @@ import {
   type PlannedPicture,
 } from "@/features/mailing/lib/ai-draft";
 import { callApi } from "@/features/mailing/lib/api-client";
+import {
+  NO_DRAFT_BRIEF,
+  postDraftBrief,
+  sameDraftBrief,
+  type DraftBrief,
+} from "@/features/mailing/lib/draft-brief";
 import dynamic from "next/dynamic";
 import type React from "react";
 import { useCallback, useId, useState } from "react";
@@ -56,6 +57,8 @@ type QueuedJob = PictureJob & { at: number };
 /** A draft whose new pictures are being drawn, one at a time. */
 interface Drawing {
   draft: AiDraft;
+  /** The brief as it was sent, kept with the pictures once they're in. */
+  sent: DraftBrief;
   /** Pictures ready so far, saved ones included. */
   done: HandedPicture[];
   /** Pictures left to draw; the first is being drawn. */
@@ -93,18 +96,21 @@ export function draftedMessage(pictures: readonly HandedPicture[]): string {
 }
 
 /**
- * The draft dialog. It opens with the email's last brief, so a draft can be changed and redone.
+ * The draft dialog. It opens with the email's kept brief, so a draft can be changed and redone,
+ * and closing it keeps what was typed.
  * @param props - Component props.
- * @param props.campaignId - The email, so its last brief comes back.
+ * @param props.campaignId - The email, so its new pictures' designs are its own.
+ * @param props.last - The email's kept brief, or null when it has none.
  * @param props.promoId - The email's linked promo, so the draft knows which promo it's about.
  * @param props.buttonUrl - Where the email's first button goes ("" for none), so the
  *   drafted button words match the link they keep.
  * @param props.canPicture - Whether pictures can be stored, so a draft may come with some.
  * @param props.pictures - Addresses of the pictures already in the email, so a saved one
  *   isn't handed back as one of the draft's "new" pictures.
- * @param props.fromPost - Opened by Email this too, so the brief is the post even when this
- *   browser couldn't store it.
- * @param props.postBrief - The linked post's words, the brief when this browser kept none.
+ * @param props.fromPost - Opened by Email this too or Redo it with AI, so the brief is the post's
+ *   words whatever was kept.
+ * @param props.postBrief - The linked post's words.
+ * @param props.onKeep - Called with what the dialog had in it, to keep with the email.
  * @param props.onClose - Dismisses it.
  * @param props.onDraft - Called with the draft, whether to replace the subject and preview text,
  *   the pictures made or picked for it (top first), and the last draft's pictures to take out.
@@ -112,22 +118,26 @@ export function draftedMessage(pictures: readonly HandedPicture[]): string {
  */
 export function DraftDialog({
   campaignId,
+  last,
   promoId,
   buttonUrl,
   canPicture,
   pictures,
   fromPost = false,
   postBrief = "",
+  onKeep,
   onClose,
   onDraft,
 }: {
   campaignId: string;
+  last: DraftBrief | null;
   promoId: string | null;
   buttonUrl: string;
   canPicture: boolean;
   pictures: readonly string[];
   fromPost?: boolean;
   postBrief?: string;
+  onKeep: (brief: DraftBrief) => void;
   onClose: () => void;
   onDraft: (
     draft: AiDraft,
@@ -138,30 +148,37 @@ export function DraftDialog({
 }): React.ReactElement {
   const id = useId();
   const { toast } = useToast();
-  // Only mounts after a click, so storage is safe to read on the first render.
-  const [last] = useState(() => readDraftBrief(campaignId));
-  const [kind, setKind] = useState(last?.kind ?? DRAFT_KINDS[0]!.key);
-  const [brief, setBrief] = useState(last?.brief ?? (fromPost ? postBrief : ""));
-  const [withSubject, setWithSubject] = useState(last?.withSubject ?? true);
-  const [withPicture, setWithPicture] = useState(last?.withPicture ?? !fromPost);
-  const [source, setSource] = useState<DraftSource>(
-    fromPost || last?.source === "post" ? "post" : "brief",
-  );
+  const kept = last ?? NO_DRAFT_BRIEF;
+  const [opening] = useState(() => (fromPost ? postDraftBrief(postBrief, kept.pictures) : kept));
+  const [kind, setKind] = useState(opening.kind);
+  const [brief, setBrief] = useState(opening.brief);
+  const [withSubject, setWithSubject] = useState(opening.withSubject);
+  const [withPicture, setWithPicture] = useState(opening.withPicture);
+  const [source, setSource] = useState<DraftSource>(opening.source ?? "brief");
   const max = source === "post" ? POST_SOURCE_MAX : BRIEF_MAX;
+  const inBoxes: DraftBrief = {
+    brief,
+    kind,
+    withSubject,
+    withPicture,
+    pictures: opening.pictures,
+    ...(source === "post" ? { source } : {}),
+  };
   // While pictures are made, the step holds how many.
   const [step, setStep] = useState<"email" | { pictures: number } | null>(null);
   const [drawing, setDrawing] = useState<Drawing | null>(null);
   const busy = step !== null;
 
   /**
-   * Hands the draft over, says which pictures couldn't be made, and remembers the ones it put
-   * in so the next draft takes them out first.
+   * Hands the draft over, says which pictures couldn't be made, and keeps the brief with the
+   * pictures it put in, so the next draft takes them out first.
    * @param draft - The email draft.
+   * @param sent - The brief as it was sent.
    * @param handed - The pictures made or picked for it.
    * @param failed - Why any pictures couldn't be made.
    */
   const handOver = useCallback(
-    (draft: AiDraft, handed: HandedPicture[], failed: readonly string[]) => {
+    (draft: AiDraft, sent: DraftBrief, handed: HandedPicture[], failed: readonly string[]) => {
       if (failed.length > 0) {
         toast(
           failed.length === 1
@@ -170,19 +187,15 @@ export function DraftDialog({
           { tone: "error" },
         );
       }
-      const previous = readDraftBrief(campaignId)?.pictures ?? [];
-      saveDraftPictures(
-        campaignId,
-        handed.map((p) => p.url),
-      );
+      onKeep({ ...sent, pictures: handed.map((p) => p.url) });
       onDraft(
         draft,
-        withSubject,
+        sent.withSubject,
         [...handed].sort((a, b) => a.at - b.at),
-        previous,
+        sent.pictures,
       );
     },
-    [campaignId, onDraft, toast, withSubject],
+    [onDraft, onKeep, toast],
   );
 
   /**
@@ -207,7 +220,7 @@ export function DraftDialog({
         queue,
       };
       if (queue.length > 0) setDrawing(next);
-      else handOver(next.draft, next.done, next.failed);
+      else handOver(next.draft, next.sent, next.done, next.failed);
     },
     [drawing, handOver],
   );
@@ -217,10 +230,17 @@ export function DraftDialog({
   );
   const onPictureFail = useCallback((message: string) => nextPicture(null, message), [nextPicture]);
 
+  /** Keeps what's in the boxes when it changed, then closes. */
+  function close(): void {
+    if (!sameDraftBrief(inBoxes, kept)) onKeep(inBoxes);
+    onClose();
+  }
+
   /** Asks for the draft, then the words for its new pictures, and starts drawing them. */
   async function write(): Promise<void> {
     setStep("email");
-    const last = readDraftBrief(campaignId);
+    // The boxes stay open to typing while pictures are drawn; what was sent is what's kept.
+    const sent = inBoxes;
     const res = await callApi<{ draft: AiDraft; pictures: PlannedPicture[] }>(
       "/api/admin/mailing/ai-draft",
       "POST",
@@ -240,21 +260,13 @@ export function DraftDialog({
       toast(res.error, { tone: "error" });
       return;
     }
-    saveDraftBrief(campaignId, {
-      brief,
-      kind,
-      withSubject,
-      withPicture,
-      pictures: last?.pictures ?? [],
-      ...(source === "post" ? { source } : {}),
-    });
     const { draft } = res;
     const reused: HandedPicture[] = res.pictures.flatMap((p) =>
       p.reuse ? [{ url: p.reuse.url, alt: p.reuse.alt, at: p.at, reusedFrom: p.reuse.name }] : [],
     );
     const fresh = res.pictures.flatMap((p) => (p.look ? [{ at: p.at, look: p.look }] : []));
     if (fresh.length === 0) {
-      handOver(draft, reused, []);
+      handOver(draft, sent, reused, []);
       return;
     }
 
@@ -279,11 +291,11 @@ export function DraftDialog({
       else failed.push(pic.error);
     });
     if (queue.length === 0) {
-      handOver(draft, reused, failed);
+      handOver(draft, sent, reused, failed);
       return;
     }
     // DraftPicture draws and stores each one, then calls back.
-    setDrawing({ draft, done: reused, queue, failed, total: queue.length });
+    setDrawing({ draft, sent, done: reused, queue, failed, total: queue.length });
   }
 
   const job = drawing?.queue[0] ?? null;
@@ -301,18 +313,17 @@ export function DraftDialog({
   return (
     <Modal
       open
-      onClose={busy ? () => {} : onClose}
+      onClose={busy ? () => {} : close}
       title="Draft with AI"
       description={
         source === "post"
           ? "This turns your post into an email for your mailing list: the hashtags, emoji and follow-us lines come out, and nothing new is made up. The draft goes into your blocks for you to read and change; Undo takes it back."
           : "Say what the email is about in a sentence or two. The draft goes into your blocks for you to read and change; Undo takes it back."
       }
-      dirty={brief.trim() !== (last?.brief ?? "").trim()}
       footer={
         <>
-          <AdminButton variant="secondary" disabled={busy} onClick={onClose}>
-            Cancel
+          <AdminButton variant="secondary" disabled={busy} onClick={close}>
+            Close
           </AdminButton>
           <AdminButton busy={busy} disabled={!brief.trim()} onClick={() => void write()}>
             Write draft

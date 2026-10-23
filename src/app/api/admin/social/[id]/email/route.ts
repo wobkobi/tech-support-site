@@ -26,7 +26,7 @@ const PICTURE_SOURCES: readonly EmailPictureSource[] = ["design", "photo", "none
  * @param request - Incoming request.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the post id.
- * @returns JSON `{ campaignId, brief }` (201), 409 when the post already has an email.
+ * @returns JSON `{ campaignId }` (201), 409 when the post already has an email.
  */
 export async function POST(request: NextRequest, { params }: Ctx): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
   try {
     const result = await draftEmailForPost(id, { picture });
     if (!result.ok) return errorResponse(result.error, result.status);
-    return okResponse({ campaignId: result.campaignId, brief: result.brief }, 201);
+    return okResponse({ campaignId: result.campaignId }, 201);
   } catch (error) {
     console.error("[admin/social/email] Draft failed:", error);
     return errorResponse("Couldn't make the email.", 500);

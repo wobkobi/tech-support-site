@@ -1012,6 +1012,15 @@ model Campaign {
   // that come with it, so Resend drops anything that already went.
   sendAttempt      Int            @default(0)
 
+  // A Resend broadcast send, step by step: the segment holding this send's
+  // recipients, the contact import that filled it, the broadcast itself, and
+  // when the run claimed the call that sends it. Each is written before the
+  // next step starts, so a resumed run carries on and never sends twice.
+  segmentId       String?
+  importId        String?
+  broadcastId     String?
+  broadcastSentAt DateTime?
+
   // Contacts unticked in the send dialog.
   excludedContactIds String[]          @db.ObjectId
   // Promo the {promo} placeholders describe. Null falls back to whichever
@@ -1019,6 +1028,8 @@ model Campaign {
   promoId            String?           @db.ObjectId
   // Optional so existing rows read as everyone without a backfill.
   audience           CampaignAudience?
+  // The last Draft with AI brief and its settings, so the dialog opens with them on any device.
+  draftBrief         Json?
 
   sentCount   Int @default(0)
   failedCount Int @default(0)
@@ -1028,6 +1039,7 @@ model Campaign {
 
   @@index([isPreset, status])
   @@index([status, scheduledAt])
+  @@index([broadcastId])
 }
 
 enum CampaignSendStatus {

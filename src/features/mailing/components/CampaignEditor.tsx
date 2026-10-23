@@ -26,7 +26,8 @@ import { CampaignStatusBanner } from "@/features/mailing/components/CampaignStat
 import { SendDialog, type SendMode } from "@/features/mailing/components/SendDialog";
 import { callApi } from "@/features/mailing/lib/api-client";
 import { AUDIENCE_OPTIONS, type CampaignAudience } from "@/features/mailing/lib/audience";
-import type { CampaignRow } from "@/features/mailing/lib/campaign-row";
+import { BROADCAST_WAITING_NOTE, type CampaignRow } from "@/features/mailing/lib/campaign-row";
+import type { DraftBrief } from "@/features/mailing/lib/draft-brief";
 import type { LinkTarget } from "@/features/mailing/lib/insertables";
 import type { PromoWording } from "@/features/mailing/lib/render";
 import {
@@ -107,6 +108,7 @@ const SNIPPETS: { label: string; title: string; before: string; after: string; l
  * @param props.linkTargets - Pages the block editor's buttons and pictures can link to.
  * @param props.canDraft - Whether "Draft with AI" is available (OpenAI is set up).
  * @param props.draftFromPost - Open Draft with AI on the linked post's words (from Email this too).
+ * @param props.draftBrief - The email's kept Draft with AI brief, or null when it has none.
  * @param props.linkedPost - The social post linked to the email, or null.
  * @returns Editor element.
  */
@@ -124,6 +126,7 @@ export function CampaignEditor({
   linkTargets,
   canDraft,
   draftFromPost = false,
+  draftBrief,
   linkedPost,
 }: {
   initial: CampaignRow;
@@ -139,6 +142,7 @@ export function CampaignEditor({
   linkTargets: LinkTarget[];
   canDraft: boolean;
   draftFromPost?: boolean;
+  draftBrief: DraftBrief | null;
   linkedPost: LinkedPost | null;
 }): React.ReactElement {
   const router = useRouter();
@@ -169,6 +173,20 @@ export function CampaignEditor({
   const picture = usePictureUpload();
   // Cleared once the dialog closes, so a later Blocks tab switch doesn't open it again.
   const [postDraft, setPostDraft] = useState(draftFromPost);
+  const [keptBrief, setKeptBrief] = useState(draftBrief);
+
+  /**
+   * Keeps Draft with AI's brief with the email, so the dialog opens with it on any device. A
+   * failed save only costs the brief on other devices, so it says nothing.
+   * @param brief - What the dialog had in it.
+   */
+  const keepBrief = useCallback(
+    (brief: DraftBrief) => {
+      setKeptBrief(brief);
+      void callApi(`/api/admin/mailing/${initial.id}/draft-brief`, "PUT", { ...brief });
+    },
+    [initial.id],
+  );
 
   // Email this too lands here with ?draft=post: take it off the address so a reload doesn't
   // reopen the dialog, and show the blocks, where the dialog lives.
@@ -414,13 +432,14 @@ export function CampaignEditor({
   /** Re-sends only the copies that failed. */
   async function retryFailed(): Promise<void> {
     setBusy("retry");
-    const res = await callApi<{ sent: number; failed: number }>(
+    const res = await callApi<{ sent: number; failed: number; waiting?: boolean }>(
       `/api/admin/mailing/${initial.id}/send`,
       "POST",
       { mode: "retry" },
     );
     setBusy(null);
     if (!res.ok) toast(res.error, { tone: "error" });
+    else if (res.waiting) toast(BROADCAST_WAITING_NOTE, { tone: "success" });
     else
       toast(
         res.failed > 0
@@ -608,6 +627,8 @@ export function CampaignEditor({
                     canDraft
                       ? {
                           campaignId: initial.id,
+                          last: keptBrief,
+                          onKeep: keepBrief,
                           promoId,
                           onSubject: applyDraftSubject,
                           fromPost: postDraft,
@@ -776,6 +797,8 @@ export function CampaignEditor({
           sends={sends}
           failedCount={failedCount}
           status={initial.status}
+          sentByBroadcast={initial.sentByBroadcast}
+          broadcastFinishing={initial.broadcastFinishing}
           retrying={busy === "retry"}
           onRetry={() => void retryFailed()}
         />
