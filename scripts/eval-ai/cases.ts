@@ -421,6 +421,12 @@ export interface DraftCase {
   mustInclude?: string[];
   /** What the button words must say. */
   buttonLike?: RegExp;
+  /** Topics that must each open a paragraph with a bold label, like "**Prices:**". */
+  labelled?: RegExp[];
+  /** The ask the body ends on: the last paragraph makes it and no other paragraph does. */
+  askLast?: RegExp;
+  /** Things said in exactly one paragraph, like the thank-you. */
+  once?: RegExp[];
 }
 
 // Mailing drafts: one per kind with a rule worth guarding, plus an injection.
@@ -466,6 +472,18 @@ export const DRAFT_CASES: DraftCase[] = [
     brief:
       "Announcing the mailing list. The main point being is to thank everyone who has used me in the past for their service and requesting them to review me on Google. Pricing update coming at the end of the month",
     buttonUrl: "",
+  },
+  {
+    // The operator's own wording: news gets bold labels, the review ask ends the body, and the
+    // thanks and the ask are each said once.
+    id: "draft-sections-review-last",
+    kind: "auto",
+    brief:
+      "Thanking everyone for with support of my business by using me and welcoming you to the mailing list. Requesting a Google review. Price changes. And I'm quite busy with working on the elections till the 7th of Nov, but they can still book me on weekends or after 6",
+    buttonUrl: "",
+    labelled: [/pric|rate/i, /availab|busy|hours|diary|book/i],
+    askLast: /review/i,
+    once: [/thank/i, /review/i],
   },
   {
     // "Let AI decide" has to spot a tip in a short brief and list its steps.
@@ -522,7 +540,9 @@ export const EMAIL_FROM_POST_CASES: DraftCase[] = [
     brief:
       "Get {promoOffer} on any home visit until {promoEnds}. A good time to get the computer, phone and printer all sorted in one go.",
     buttonUrl: "https://www.tothepoint.co.nz/booking",
-    forbid: [{ pattern: /\$\d/, why: "wrote the promo's figures instead of its placeholders" }],
+    // Not "no $ at all": a promo whose words say prices are changing brings in the on-site rate.
+    mustInclude: ["{promoOffer}", "{promoEnds}"],
+    once: [/\{promoOffer\}/],
   },
   {
     id: "draft-post-booking-link",

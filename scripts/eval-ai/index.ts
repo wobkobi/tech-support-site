@@ -682,6 +682,20 @@ async function collectRaw(
       if (c.buttonLike && !c.buttonLike.test(draft.buttonText)) {
         hard.push(`button "${draft.buttonText}" doesn't match ${c.buttonLike}`);
       }
+      const labels = draft.paragraphs.map((p) => /^\*\*([^*]+)\*\*/.exec(p)?.[1] ?? "");
+      for (const topic of c.labelled ?? []) {
+        if (!labels.some((l) => topic.test(l))) hard.push(`no bold label for ${topic}`);
+      }
+      if (c.askLast) {
+        const asks = draft.paragraphs.flatMap((p, i) => (c.askLast!.test(p) ? [i] : []));
+        if (asks.length !== 1 || asks[0] !== draft.paragraphs.length - 1) {
+          hard.push(`the ask (${c.askLast}) isn't the last paragraph alone`);
+        }
+      }
+      for (const thing of c.once ?? []) {
+        const count = draft.paragraphs.filter((p) => thing.test(p)).length;
+        if (count !== 1) hard.push(`${thing} is in ${count} paragraphs, not 1`);
+      }
       raw.push({
         id: c.id,
         kind: "draft",

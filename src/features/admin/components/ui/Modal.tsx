@@ -6,6 +6,7 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { useDialogKeys } from "@/features/admin/hooks/use-dialog-keys";
+import { useVisibleViewport } from "@/features/admin/hooks/use-visible-viewport";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -123,6 +124,18 @@ export function Modal({
     if (confirmingDiscard) discardBarRef.current?.querySelector("button")?.focus();
   }, [confirmingDiscard]);
 
+  // With a phone's keyboard up the dialog shrinks to the part still showing; keep the field
+  // being typed in on screen as it does.
+  const visible = useVisibleViewport(open);
+  const visibleHeight = visible?.height ?? null;
+  useEffect(() => {
+    if (visibleHeight === null) return;
+    const field = document.activeElement;
+    if (field instanceof HTMLElement && dialogRef.current?.contains(field)) {
+      field.scrollIntoView({ block: "nearest" });
+    }
+  }, [visibleHeight]);
+
   if (!open) return null;
 
   return (
@@ -135,6 +148,7 @@ export function Modal({
             ? "items-start sm:items-center"
             : "items-center",
       )}
+      style={visible ? { top: visible.top, bottom: "auto", height: visible.height } : undefined}
       onClick={requestClose}
       role="dialog"
       aria-modal="true"
@@ -146,7 +160,7 @@ export function Modal({
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-lg border border-admin-border bg-admin-surface shadow-xl outline-none",
+          "flex max-h-[min(85dvh,100%)] w-full flex-col overflow-hidden rounded-lg border border-admin-border bg-admin-surface shadow-xl outline-none",
           sizeClass(size),
         )}
       >

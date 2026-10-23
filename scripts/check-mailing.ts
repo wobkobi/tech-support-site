@@ -586,17 +586,17 @@ function checkBlockRendering(): void {
 
   const full = renderBody(`![Shop](${BLOB_IMAGE})`, VALUES);
   expect(
-    "a picture fills the card's 560px column and is centred",
-    full.includes('width="560"') &&
-      full.includes("max-width:560px") &&
+    "a picture fills the card's 680px column and is centred",
+    full.includes('width="680"') &&
+      full.includes("max-width:680px") &&
       full.includes("text-align:center"),
     full,
   );
   const small = renderBody(`![Shop](${BLOB_IMAGE} "small")`, VALUES);
   expect(
     'a "small" picture is half width and centred',
-    small.includes('width="280"') &&
-      small.includes("max-width:280px") &&
+    small.includes('width="340"') &&
+      small.includes("max-width:340px") &&
       small.includes("text-align:center"),
     small,
   );
@@ -801,16 +801,11 @@ function checkAiDraft(): void {
     JSON.stringify(filledTip),
   );
   expect(
-    "an empty email gets a greeting, then every part in order, and a button still needing a link",
+    "an empty email gets every part in order with no greeting added, and a button still needing a link",
     fillOf("") ===
-      [
-        "Hi {firstName},",
-        "# New heading",
-        "First para.",
-        "Second para.",
-        "- One\n- Two",
-        "[Read more]()",
-      ].join("\n\n"),
+      ["# New heading", "First para.", "Second para.", "- One\n- Two", "[Read more]()"].join(
+        "\n\n",
+      ),
     JSON.stringify(fillOf("")),
   );
   const announcement = starterPresets("https://example.co.nz").find(
@@ -835,14 +830,7 @@ function checkAiDraft(): void {
   expect(
     "drafting again swaps the paragraphs and the button instead of adding more",
     twice ===
-      [
-        "Hi {firstName},",
-        "# New heading",
-        "New one.",
-        "New two.",
-        "- One\n- Two",
-        "[Read more]()",
-      ].join("\n\n"),
+      ["# New heading", "New one.", "New two.", "- One\n- Two", "[Read more]()"].join("\n\n"),
     JSON.stringify(twice),
   );
   const written = fillOf("Hi {firstName},\n\nMy own words.\n\nMore of mine.\n\n---\n\nKept below.");
@@ -853,6 +841,15 @@ function checkAiDraft(): void {
       !written.includes("More of mine") &&
       written.includes("---\n\nKept below."),
     JSON.stringify(written),
+  );
+  const ungreeted = fillOf("My own words.\n\nMore of mine.");
+  expect(
+    "an email with its greeting taken out gets none back, and its words are swapped",
+    ungreeted ===
+      ["# New heading", "First para.", "Second para.", "- One\n- Two", "[Read more]()"].join(
+        "\n\n",
+      ),
+    JSON.stringify(ungreeted),
   );
   const linked = { ...draft, buttonUrl: "https://example.co.nz/reviews" };
   expect(

@@ -323,6 +323,9 @@ export function BlockEditor({
           promoId={draft.promoId}
           buttonUrl={blocks.find((b) => b.type === "button")?.url ?? ""}
           canPicture={canUpload}
+          pictures={blocks.flatMap((b) =>
+            b.type === "picture" && b.url.trim() ? [b.url.trim()] : [],
+          )}
           fromPost={postDialog}
           postBrief={draft.postBrief ?? ""}
           onClose={closeDraft}

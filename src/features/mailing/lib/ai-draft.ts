@@ -186,7 +186,8 @@ function isGreeting(block: Block): boolean {
 /**
  * Fills a block list from a draft by position, so a template keeps its shape: each part
  * replaces the first matching block (paragraphs swap the Text run after the greeting, so
- * drafting twice doesn't pile up), else is added. Other blocks are left alone.
+ * drafting twice doesn't pile up), else is added. Other blocks are left alone, and no greeting
+ * is added: an email without one stays without.
  * @param blocks - The current blocks.
  * @param draft - The draft.
  * @returns The new blocks.
@@ -194,11 +195,8 @@ function isGreeting(block: Block): boolean {
 export function fillBlocks(blocks: readonly Block[], draft: AiDraft): Block[] {
   const out = [...blocks];
 
-  let greeting = out.findIndex(isGreeting);
-  if (greeting < 0) {
-    out.unshift({ ...emptyBlock("text"), text: "Hi {firstName}," } as Block);
-    greeting = 0;
-  }
+  // -1 with no greeting, so "after the greeting" counts from the top.
+  const greeting = out.findIndex(isGreeting);
 
   // Heading: the first one, wherever it is; else straight under the greeting.
   let heading = out.findIndex((b) => b.type === "heading");

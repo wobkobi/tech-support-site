@@ -63,6 +63,8 @@ export interface HandedPicture {
  * @param props.buttonUrl - Where the email's first button goes ("" for none), so the
  *   drafted button words match the link they keep.
  * @param props.canPicture - Whether pictures can be stored, so a draft may come with one.
+ * @param props.pictures - Addresses of the pictures already in the email, so a saved one
+ *   isn't handed back as the draft's "new" picture.
  * @param props.fromPost - Opened by Email this too, so the brief is the post even when this
  *   browser couldn't store it.
  * @param props.postBrief - The linked post's words, the brief when this browser kept none.
@@ -77,6 +79,7 @@ export function DraftDialog({
   promoId,
   buttonUrl,
   canPicture,
+  pictures,
   fromPost = false,
   postBrief = "",
   onClose,
@@ -86,6 +89,7 @@ export function DraftDialog({
   promoId: string | null;
   buttonUrl: string;
   canPicture: boolean;
+  pictures: readonly string[];
   fromPost?: boolean;
   postBrief?: string;
   onClose: () => void;
@@ -156,6 +160,7 @@ export function DraftDialog({
         buttonUrl,
         picture: canPicture && withPicture,
         ownDesign: design?.id,
+        inEmail: pictures,
         source,
       },
     );
