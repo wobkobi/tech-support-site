@@ -374,6 +374,21 @@ export function replyProblems(
   if ((lowReview || opts.noEmoji) && emoji > 0) hard.push("has emoji where it shouldn't");
   else if (emoji > 2) hard.push(`${emoji} emoji, two at most`);
   if (opts.wantEmoji && emoji === 0) soft.push("no emoji in a casual reply");
+  // The slack covers the full stop and space between a link and a trailing emoji.
+  if (
+    /(?:https?:\/\/\S+|\d{3}[\s-]?\d{3,4}|\$\d+)[^\n]{0,3}\p{Extended_Pictographic}/u.test(text)
+  ) {
+    soft.push("emoji straight after a link, number or price");
+  }
+  // No first name means a username: no word of it may come back as their name.
+  if (req.author && !firstName(req.platform, req.author)) {
+    const used = req.author
+      .split(/[^\p{L}]+/u)
+      .filter((part) => part.length >= 3)
+      .map((part) => part[0].toUpperCase() + part.slice(1).toLowerCase())
+      .find((part) => new RegExp(`\\b${part}\\b`, "u").test(text));
+    if (used) hard.push(`calls them "${used}" from their username`);
+  }
   const direct = req.kind === "message";
   const max = replyLimit(req.platform, direct);
   const length = replyLength(req.platform, direct, text);

@@ -377,6 +377,20 @@ function runSelfTest(): number {
       want: true,
     },
     {
+      name: "a word of an Instagram username used as a name is a hard problem",
+      got: replyProblems(
+        { reply: "Glad it helps, Nan, it's an easy one to miss.", hide: false },
+        sampleReplyReq({
+          platform: "instagram",
+          kind: "comment",
+          rating: null,
+          author: "kiwi_nan",
+        }),
+        "",
+      ).hard.length,
+      want: 1,
+    },
+    {
       name: "an emoji on a serious case is a hard problem",
       got: replyProblems(
         { reply: "Thanks Mary, I'm glad it's sorted 👍", hide: false },

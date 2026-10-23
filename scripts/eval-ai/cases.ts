@@ -861,7 +861,8 @@ export const REPLY_CASES: ReplyCase[] = [
     noEmoji: true,
     forbid: [
       {
-        pattern: /\btotal\b|\ball up\b|\bwould cost\b|\bwill cost\b|\bit'll be \$/i,
+        // A figure has to follow: "I can't say what yours will cost" is the right answer.
+        pattern: /\b(?:total|all up|would cost|will cost)\b[^.\n]*\$\d|\bit'll be \$/i,
         why: "gives a total for their job",
       },
     ],
@@ -944,7 +945,8 @@ export const REPLY_CASES: ReplyCase[] = [
     want: [{ pattern: /\/booking\b/, why: "doesn't point them to book" }],
     forbid: [
       {
-        pattern: /\btotal\b|\ball up\b|\bwould cost\b|\bwill cost\b|\bit'll be \$/i,
+        // A figure has to follow: "I can't say what yours will cost" is the right answer.
+        pattern: /\b(?:total|all up|would cost|will cost)\b[^.\n]*\$\d|\bit'll be \$/i,
         why: "gives a total for their job",
       },
     ],

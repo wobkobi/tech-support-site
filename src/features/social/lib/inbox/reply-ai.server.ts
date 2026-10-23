@@ -116,14 +116,14 @@ function systemPrompt(
       : `Is MESSAGE upset, a complaint, a worry about a problem or a device, or a question about cost?
 - YES: INVARIANT: no emoji.
 - NO: is it casual (friendly chat, thanks or praise in everyday words, a joke, or written with emoji)?
-  - YES: end with one emoji that fits, like 😊 or 👍. INVARIANT: two at most, never in place of a word, and never in the same sentence as a price, phone number or link.
+  - YES: add one emoji that fits, like 😊 or 👍, at the end of a sentence with no price, phone number or link in it. INVARIANT: two at most, never in place of a word, and never straight after a price, phone number or link.
   - NO (formal or businesslike): INVARIANT: no emoji.`;
   return `You write my reply to ${where}, for a small tech help business. ${readers} I read and edit the reply before it is sent.
 
 ${parts.voice}${parts.brand ? `\n\n${parts.brand}` : ""}
 
 WHO WROTE IT
-${name ? `Their first name is ${name}. Use it once.` : "No first name is known. INVARIANT: don't guess a name, and never use a username as one."}
+${name ? `Their first name is ${name}. Use it once.` : 'No first name is known. INVARIANT: don\'t guess a name, and never use a username or any word in it as one (jo_smith_77 is not "Jo").'}
 
 WHAT IT IS
 ${taskLines(req, parts.phone, parts.site)}
@@ -138,6 +138,7 @@ ${length} INVARIANT: at most ${replyLimit(req.platform, direct)} characters.
 
 STYLE
 Plain text only: no markup, no **bold**, no headings. INVARIANT: no hashtags. Don't sign off with my name.
+INVARIANT: finding a time or sorting something out is mine to do: "I'll find a time that suits you", never "we'll".
 
 EMOJI
 ${emoji}
