@@ -20,6 +20,7 @@ import {
   type Block,
   type BlockType,
 } from "@/features/mailing/lib/blocks";
+import type { DraftBrief } from "@/features/mailing/lib/draft-brief";
 import type { LinkTarget } from "@/features/mailing/lib/insertables";
 import type { PromoWording } from "@/features/mailing/lib/render";
 import {
@@ -83,26 +84,21 @@ export function BlockEditor({
     campaignId: string;
     promoId: string | null;
     onSubject: (subject: string, preheader: string) => void;
+    /** The email's kept brief, or null when it has none. */
+    last: DraftBrief | null;
+    /** Keeps the dialog's brief with the email. */
+    onKeep: (brief: DraftBrief) => void;
     /** Open the dialog straight away on the linked social post's words (Email this too). */
     fromPost?: boolean;
-    /** The post's words, for when this browser didn't keep the seeded brief. */
+    /** The linked post's words. */
     postBrief?: string;
     /** Called when the post's dialog closes, so it opens only once. */
     onFromPostDone?: () => void;
   } | null;
 }): React.ReactElement {
   const { toast } = useToast();
-  const [drafting, setDrafting] = useState(false);
-  const [postDialog, setPostDialog] = useState(false);
-  const openFromPost = draft?.fromPost === true;
-  // After mount, not in the first render: the dialog reads this browser's storage.
-  useEffect(() => {
-    if (!openFromPost) return;
-    /* eslint-disable react-hooks/set-state-in-effect -- one-shot open from Email this too */
-    setDrafting(true);
-    setPostDialog(true);
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [openFromPost]);
+  const [drafting, setDrafting] = useState(draft?.fromPost === true);
+  const [postDialog, setPostDialog] = useState(draft?.fromPost === true);
 
   /** Closes the draft dialog, and ends the open-from-post one-shot. */
   function closeDraft(): void {
@@ -320,6 +316,7 @@ export function BlockEditor({
       {draft && drafting && (
         <DraftDialog
           campaignId={draft.campaignId}
+          last={draft.last}
           promoId={draft.promoId}
           buttonUrl={blocks.find((b) => b.type === "button")?.url ?? ""}
           canPicture={canUpload}
@@ -328,6 +325,7 @@ export function BlockEditor({
           )}
           fromPost={postDialog}
           postBrief={draft.postBrief ?? ""}
+          onKeep={draft.onKeep}
           onClose={closeDraft}
           onDraft={(result, withSubject, pictures, previous) => {
             closeDraft();

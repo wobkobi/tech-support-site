@@ -5,7 +5,7 @@
 import { UnsubscribeForm } from "@/features/mailing/components/UnsubscribeForm";
 import { isContactOptedOut } from "@/features/mailing/lib/opt-out";
 import { verifyUnsubscribeToken } from "@/features/mailing/lib/unsubscribe-token";
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { CARD, CardPage } from "@/shared/components/PageLayout";
 import type { Metadata } from "next";
 import type React from "react";
 
@@ -33,28 +33,26 @@ export default async function UnsubscribePage({
   const alreadyOut = contactId ? await isContactOptedOut(contactId) : false;
 
   return (
-    <PageShell>
-      <FrostedSection maxWidth="40rem">
-        <section className={CARD}>
-          <h1 className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl">
-            Unsubscribe
-          </h1>
-          {isPreview && (
-            <p className="text-base text-rich-black/80">
-              This is the unsubscribe link from a test email, so there&apos;s nothing to change. In
-              a real email, this page has a button that takes the person off the list.
-            </p>
-          )}
-          {!isPreview && !contactId && (
-            <p className="text-base text-rich-black/80">
-              This link doesn&apos;t look right - it may have been cut short when it was copied. Try
-              clicking it straight from the email, or just reply to the email and say you&apos;d
-              like to stop getting them.
-            </p>
-          )}
-          {contactId && <UnsubscribeForm token={token} initiallyUnsubscribed={alreadyOut} />}
-        </section>
-      </FrostedSection>
-    </PageShell>
+    <CardPage maxWidth="40rem">
+      <section className={CARD}>
+        <h1 className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl">
+          Unsubscribe
+        </h1>
+        {isPreview && (
+          <p className="text-base text-rich-black/80">
+            This is the unsubscribe link from a test email, so there&apos;s nothing to change. In a
+            real email, this page has a button that takes the person off the list.
+          </p>
+        )}
+        {!isPreview && !contactId && (
+          <p className="text-base text-rich-black/80">
+            This link doesn&apos;t look right - it may have been cut short when it was copied. Try
+            clicking it straight from the email, or just reply to the email and say you&apos;d like
+            to stop getting them.
+          </p>
+        )}
+        {contactId && <UnsubscribeForm token={token} initiallyUnsubscribed={alreadyOut} />}
+      </section>
+    </CardPage>
   );
 }

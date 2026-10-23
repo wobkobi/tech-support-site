@@ -10,7 +10,7 @@ import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { callApi } from "@/features/mailing/lib/api-client";
-import type { CampaignRow } from "@/features/mailing/lib/campaign-row";
+import { BROADCAST_WAITING_NOTE, type CampaignRow } from "@/features/mailing/lib/campaign-row";
 import type { Recipient } from "@/features/mailing/lib/recipients";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { nextSendTime, type QuietHours } from "@/shared/lib/quiet-hours";
@@ -188,7 +188,7 @@ export function SendDialog({
       toast(`Scheduled for ${formatDateTimeShort(res.scheduledAt)}.`, { tone: "success" });
     } else {
       setBusy(kind);
-      const res = await callApi<{ sent: number; failed: number }>(
+      const res = await callApi<{ sent: number; failed: number; waiting?: boolean }>(
         `/api/admin/mailing/${campaign.id}/send`,
         "POST",
         { mode: "now", excludedContactIds, sendDuringQuietHours: kind === "nowAnyway" },
@@ -198,12 +198,14 @@ export function SendDialog({
         toast(res.error, { tone: "error" });
         return;
       }
-      toast(
-        res.failed > 0
-          ? `Sent to ${res.sent}. ${res.failed} didn't go - you can retry them on this page.`
-          : `Sent to ${res.sent} ${res.sent === 1 ? "person" : "people"}.`,
-        { tone: res.failed > 0 ? "warning" : "success" },
-      );
+      if (res.waiting) toast(BROADCAST_WAITING_NOTE, { tone: "success" });
+      else
+        toast(
+          res.failed > 0
+            ? `Sent to ${res.sent}. ${res.failed} didn't go - you can retry them on this page.`
+            : `Sent to ${res.sent} ${res.sent === 1 ? "person" : "people"}.`,
+          { tone: res.failed > 0 ? "warning" : "success" },
+        );
     }
     onDone();
   }

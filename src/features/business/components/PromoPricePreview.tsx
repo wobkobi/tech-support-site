@@ -139,7 +139,7 @@ export function PromoPricePreview({
   return (
     <div className="rounded-lg border border-admin-border bg-admin-bg px-4 py-3">
       <p className="text-sm font-medium text-admin-muted">Prices with this promo</p>
-      <div className="mt-2 overflow-x-auto">
+      <div className="mt-2 overflow-x-auto overflow-y-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-sm text-admin-muted">

@@ -6,6 +6,7 @@
 import { BookingAddressFields } from "@/features/booking/components/BookingAddressFields";
 import {
   BookingEmailField,
+  BookingMailingListField,
   BookingMeetingTypeField,
   BookingNameField,
   BookingPhoneField,
@@ -180,6 +181,8 @@ export default function BookingForm({
   const [emailSuggestionAcked, setEmailSuggestionAcked] = useState(false);
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
   const [accessNotes, setAccessNotes] = useState(initialValues?.accessNotes ?? "");
+  // Unticked opts them out of mailing-list emails; ticked leaves an earlier unsubscribe alone.
+  const [mailingList, setMailingList] = useState(true);
   // Honeypot value - see the hidden input in the form markup below.
   const [website, setWebsite] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -323,6 +326,7 @@ export default function BookingForm({
     }
     if (d.notes) setNotes(d.notes);
     if (d.accessNotes) setAccessNotes(d.accessNotes);
+    if (d.mailingList !== undefined) setMailingList(d.mailingList);
     if (d.slot) {
       setSelectedDateKey(d.slot.dateKey);
       setSelectedTime(d.slot.timeOfDay);
@@ -344,6 +348,7 @@ export default function BookingForm({
       addressVerified,
       notes,
       accessNotes,
+      mailingList,
       dateKey: selectedDay?.dateKey,
       timeOfDay: selectedTime ?? undefined,
       startMinute: selectedTime ? selectedMinute : undefined,
@@ -366,6 +371,7 @@ export default function BookingForm({
     setAddressCandidates(null);
     setNotes("");
     setAccessNotes("");
+    setMailingList(true);
     setContactHint(null);
     setFieldErrors({});
     resetAttention();
@@ -515,6 +521,7 @@ export default function BookingForm({
             idempotencyKey,
             estimateId,
             promoCode: promoCode.trim() || undefined,
+            mailingList,
           };
 
       const res = await fetch(endpoint, {
@@ -662,6 +669,9 @@ export default function BookingForm({
             }}
           />
         </div>
+
+        {/* New bookings only: an edit never changes who's on the list. */}
+        {!isEditMode && <BookingMailingListField checked={mailingList} onChange={setMailingList} />}
 
         <BookingPhoneField
           value={phone}

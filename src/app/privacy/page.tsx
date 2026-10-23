@@ -92,9 +92,9 @@ export default async function PrivacyPage(): Promise<React.ReactElement> {
                 To reply to your enquiries and, after a job, invite a review
               </TickItem>
               <TickItem variant="dot">
-                To send you the occasional email about offers, holiday hours or scam warnings. Every
-                one has an unsubscribe link, and unsubscribing doesn&apos;t stop emails about your
-                own bookings and invoices.
+                To send you the occasional email about offers, holiday hours or scam warnings. You
+                can untick these when you book, every one has an unsubscribe link, and unsubscribing
+                doesn&apos;t stop emails about your own bookings and invoices.
               </TickItem>
               <TickItem variant="dot">
                 To improve the website and measure how well my advertising works

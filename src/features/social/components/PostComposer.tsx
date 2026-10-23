@@ -11,7 +11,6 @@ import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import type { InsertDetails } from "@/features/admin/lib/insertables";
-import { seedPostBrief } from "@/features/mailing/components/blocks/draft-brief";
 import { callApi } from "@/features/mailing/lib/api-client";
 import type { PromoWording } from "@/features/mailing/lib/render";
 import {
@@ -990,22 +989,22 @@ export function PostComposer({
   /** Saves, then opens the linked email in Mailing with Draft with AI ready on the post's words. */
   async function redoEmail(): Promise<void> {
     if (!email) return;
-    const brief = postBrief({
+    const words = postBrief({
       name: content.name,
       body: content.body,
       linkUrl: content.linkUrl.trim() || null,
       targets: content.targets,
     });
-    if (!brief) {
+    if (!words) {
       toast("Write the post first: the email is made from its words.", { tone: "error" });
       return;
     }
     setBusy("email-redo");
+    // Saved first: Mailing reads the post's words from the saved post.
     if (!(await save())) {
       setBusy(null);
       return;
     }
-    seedPostBrief(email.id, brief);
     router.push(`/admin/mailing/${email.id}?draft=post`);
   }
 

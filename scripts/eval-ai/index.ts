@@ -356,6 +356,51 @@ function runSelfTest(): number {
       want: 0,
     },
     {
+      name: "one emoji on a 5-star thanks is clean",
+      got: replyProblems(
+        { reply: "Thanks so much Mary, I'm glad the email is working again 😊", hide: false },
+        sampleReplyReq(),
+        "",
+      ).hard.length,
+      want: 0,
+    },
+    {
+      name: "an emoji on a low-star reply is a hard problem",
+      got: replyProblems(
+        {
+          reply: "Sorry it wasn't what you hoped for, Peter 🙏 Please give me a call.",
+          hide: false,
+        },
+        sampleReplyReq({ rating: 2, author: "Peter Jones" }),
+        "",
+      ).hard.includes("has emoji where it shouldn't"),
+      want: true,
+    },
+    {
+      name: "a word of an Instagram username used as a name is a hard problem",
+      got: replyProblems(
+        { reply: "Glad it helps, Nan, it's an easy one to miss.", hide: false },
+        sampleReplyReq({
+          platform: "instagram",
+          kind: "comment",
+          rating: null,
+          author: "kiwi_nan",
+        }),
+        "",
+      ).hard.length,
+      want: 1,
+    },
+    {
+      name: "an emoji on a serious case is a hard problem",
+      got: replyProblems(
+        { reply: "Thanks Mary, I'm glad it's sorted 👍", hide: false },
+        sampleReplyReq(),
+        "",
+        { noEmoji: true },
+      ).hard.length,
+      want: 1,
+    },
+    {
       name: "a 5-star thanks without their name is a hard problem",
       got: replyProblems(
         { reply: "Thanks so much. Glad it's working again.", hide: false },

@@ -1,7 +1,7 @@
 // src/app/booking/manage/page.tsx
 // Find-my-booking page: re-send change/cancel links to the address booked with.
 
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { CARD, CardPage } from "@/shared/components/PageLayout";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { pageOpenGraph } from "@/shared/lib/open-graph";
@@ -31,24 +31,22 @@ export default async function ManageBookingPage(): Promise<React.ReactElement> {
   const identity = await getIdentity();
 
   return (
-    <PageShell>
-      <FrostedSection maxWidth="min(100vw - 2rem, 44rem)">
-        <div className="flex flex-col gap-6 sm:gap-8">
-          <section className={cn(CARD)}>
-            <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
-              Manage your booking
-            </h1>
-            <p className="text-base text-rich-black/80 sm:text-lg">
-              Lost the confirmation email? Pop your email address in below and I'll send the links
-              to change or cancel your appointment straight back to you.
-            </p>
-          </section>
+    <CardPage maxWidth="min(100vw - 2rem, 44rem)">
+      <div className="flex flex-col gap-6 sm:gap-8">
+        <section className={cn(CARD)}>
+          <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+            Manage your booking
+          </h1>
+          <p className="text-base text-rich-black/80 sm:text-lg">
+            Lost the confirmation email? Pop your email address in below and I'll send the links to
+            change or cancel your appointment straight back to you.
+          </p>
+        </section>
 
-          <section className={cn(CARD)}>
-            <ManageLookupForm phone={identity.phone} phoneTel={identity.phoneTel} />
-          </section>
-        </div>
-      </FrostedSection>
-    </PageShell>
+        <section className={cn(CARD)}>
+          <ManageLookupForm phone={identity.phone} phoneTel={identity.phoneTel} />
+        </section>
+      </div>
+    </CardPage>
   );
 }

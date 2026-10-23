@@ -17,6 +17,10 @@ export const CAMPAIGN_STATUS_PILL: Record<CampaignStatus, { tone: StatusTone; la
   failed: { tone: "critical", label: "Failed" },
 };
 
+/** Toast for a send or retry that left a broadcast waiting on Resend's list upload. */
+export const BROADCAST_WAITING_NOTE =
+  "Resend is still loading the list. It goes out within 10 minutes, and this page shows it once it has.";
+
 /** A campaign as the admin UI sees it. */
 export interface CampaignRow {
   id: string;
@@ -33,6 +37,10 @@ export interface CampaignRow {
   audience: CampaignAudience;
   sentCount: number;
   failedCount: number;
+  /** It went out as a Resend broadcast, so its failed copies bounced and can't be retried. */
+  sentByBroadcast: boolean;
+  /** Resend hasn't reported the broadcast finished yet. */
+  broadcastFinishing: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,6 +66,8 @@ export function toCampaignRow(c: Campaign): CampaignRow {
     audience: audienceOf(c.audience),
     sentCount: c.sentCount,
     failedCount: c.failedCount,
+    sentByBroadcast: c.broadcastSentAt !== null,
+    broadcastFinishing: c.status === "sent" && c.segmentId !== null,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
   };

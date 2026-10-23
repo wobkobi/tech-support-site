@@ -4,6 +4,7 @@
 
 import { signReviewAskStopToken } from "@/features/mailing/lib/unsubscribe-token";
 import {
+  brandName,
   buildEmailSignature,
   escapeHtml,
   htmlToText,
@@ -52,7 +53,7 @@ export async function buildReviewAskEmail(
   const google = links.googleUrl.trim();
   const identity = await getIdentity();
   // Say who's writing up front; a one-off customer may not place the email otherwise.
-  const sender = `${identity.name.split(" ")[0]} here from ${identity.company} Tech`;
+  const sender = `${identity.name.split(" ")[0]} here from ${brandName(identity)}`;
   const mainButton = google
     ? `<a href="${escapeHtml(google)}" style="${BUTTON_STYLE}">Leave a review on Google</a>
     <p style="margin:16px 0 0;color:#444;font-size:15px;line-height:1.6">No Google account? <a href="${escapeHtml(links.siteFormUrl)}" style="color:#1f7f8c">Leave it on my website instead</a>.</p>`

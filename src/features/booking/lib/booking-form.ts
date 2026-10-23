@@ -168,6 +168,7 @@ export interface BookingDraft {
   addressVerified: boolean;
   notes: string;
   accessNotes?: string;
+  mailingList?: boolean;
   dateKey?: string;
   timeOfDay?: TimeOfDay;
   startMinute?: StartMinute;
@@ -208,6 +209,8 @@ export interface RestoredBookingDraft {
   addressVerified?: boolean;
   notes?: string;
   accessNotes?: string;
+  /** The mailing-list tickbox, so an untick isn't lost to a reload. */
+  mailingList?: boolean;
   /** The saved pick, kept only when it is still bookable for the saved duration. */
   slot?: { dateKey: string; timeOfDay: TimeOfDay; startMinute: StartMinute };
 }
@@ -238,6 +241,7 @@ export function parseBookingDraft(raw: string, availableDays: BookableDay[]): Re
   if (typeof draft.accessNotes === "string" && draft.accessNotes) {
     out.accessNotes = draft.accessNotes;
   }
+  if (typeof draft.mailingList === "boolean") out.mailingList = draft.mailingList;
 
   // Restore the pick only if it is still bookable.
   if (draft.dateKey && draft.timeOfDay) {

@@ -8,5 +8,5 @@ import type React from "react";
  * @returns Loading element.
  */
 export default function BookingLoading(): React.ReactElement {
-  return <PageLoadingShell label="booking page" />;
+  return <PageLoadingShell label="booking page" cardPage />;
 }

@@ -73,7 +73,7 @@ export default async function SignPage({
       </div>
 
       <div className="flex h-full w-full flex-col" style={{ padding }}>
-        {/* Frosted panel - the site's FrostedSection at sign scale */}
+        {/* Frosted panel - the booking confirmation page's panel at sign scale */}
         <div className="flex flex-1 flex-col items-center justify-between rounded-[64px] border-[3px] border-seasalt-200/40 bg-white/60 px-18 py-18 text-center shadow-xl backdrop-blur-xl">
           {/* Logo doubles as the document's top-level heading for a11y. */}
           <h1 className="sr-only">{identity.company} - Computer &amp; IT Support in Auckland</h1>

@@ -28,6 +28,7 @@ import {
 } from "@/features/calendar/lib/google-calendar";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import { optOutByEmail, optOutContact } from "@/features/mailing/lib/opt-out";
 import { sendOwnerPush } from "@/features/notifications/lib/push";
 import {
   sendCustomerBookingConfirmation,
@@ -74,6 +75,8 @@ interface BookingRequestPayload {
   estimateId?: string;
   /** Promo code the customer entered. Never trusted - re-resolved server-side. */
   promoCode?: string;
+  /** The mailing-list tickbox: false opts them out; true or missing changes nothing. */
+  mailingList?: boolean;
 }
 
 /**
@@ -104,6 +107,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       idempotencyKey,
       estimateId,
       promoCode,
+      mailingList,
     } = body;
 
     if (idempotencyKey) {
@@ -427,6 +431,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         await syncContactToGoogle(contact.id);
       } catch (contactError) {
         console.error("[booking/request] Failed to upsert contact:", contactError);
+      }
+
+      // An unticked mailing-list box opts them out. A ticked one changes nothing, so an
+      // earlier unsubscribe still stands.
+      if (mailingList === false) {
+        try {
+          if (redeemedByContactId) await optOutContact(redeemedByContactId, "booking_form");
+          else await optOutByEmail(normalisedEmail, "booking_form");
+        } catch (optOutError) {
+          console.error(
+            "[booking/request] Failed to record the mailing-list opt-out:",
+            optOutError,
+          );
+        }
       }
 
       // Awaited: Vercel freezes the instance after the response. Never throws.

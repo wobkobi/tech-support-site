@@ -15,6 +15,7 @@ import {
   LINKED_IMAGE_LINE_RE,
   PICTURE_PLACEHOLDER_RE,
 } from "@/features/mailing/lib/body-syntax";
+import { MERGE_TAG, splitName } from "@/features/mailing/lib/broadcast";
 import {
   EMAIL_COLUMN_PX,
   escapeHtml,
@@ -157,13 +158,13 @@ const SPACER_HTML = '<div style="height:20px;line-height:20px;font-size:1px">&nb
 const SOCIAL_HTML = `<p style="${P_STYLE};text-align:center">Find us on <a href="${GOOGLE_BUSINESS_PROFILE_URL}" style="${LINK_STYLE}">Google</a> · <a href="${FACEBOOK_PAGE_URL}" style="${LINK_STYLE}">Facebook</a> · <a href="${INSTAGRAM_URL}" style="${LINK_STYLE}">Instagram</a></p>`;
 
 /**
- * First word of a stored name, or null when there is none.
+ * First word of a stored name, or null when there is none. Shares {@link splitName} with
+ * the broadcast import, so a batch send and a broadcast greet people the same way.
  * @param name - Contact name.
  * @returns First name or null.
  */
 function firstNameOf(name: string | null): string | null {
-  const first = name?.trim().split(/\s+/)[0];
-  return first ? first : null;
+  return splitName(name).first || null;
 }
 
 /**
@@ -376,19 +377,62 @@ function blockHtml(
   }
 }
 
+/** A rendered email: subject, preview text, the full HTML document and its plain-text part. */
+export interface RenderedCampaign {
+  subject: string;
+  preheader: string;
+  html: string;
+  text: string;
+}
+
 /**
  * Renders one recipient's copy of a campaign.
  * @param content - Subject, preheader and body as the operator wrote them.
  * @param recipient - Who this copy is for.
  * @param ctx - Brand, signature, promo wording and unsubscribe link.
- * @returns The filled subject and preview text, the full HTML document and its plain-text part.
+ * @returns The filled email.
  */
 export function renderCampaign(
   content: CampaignContent,
   recipient: CampaignRecipient,
   ctx: RenderContext,
-): { subject: string; preheader: string; html: string; text: string } {
-  const values = placeholderValues(recipient, ctx.promo);
+): RenderedCampaign {
+  return renderWith(content, placeholderValues(recipient, ctx.promo), ctx);
+}
+
+/**
+ * Renders the single copy a Resend broadcast sends to everyone. Names, the review and the
+ * unsubscribe link become {@link MERGE_TAG} tags that Resend fills from each contact;
+ * promo wording and link tags are filled here as usual.
+ * @param content - Subject, preheader and body as the operator wrote them.
+ * @param ctx - Brand, signature, promo wording and link tracking.
+ * @returns The email with merge tags in place.
+ */
+export function renderBroadcast(
+  content: CampaignContent,
+  ctx: Omit<RenderContext, "unsubscribeUrl">,
+): RenderedCampaign {
+  const values = {
+    ...placeholderValues({ name: null }, ctx.promo),
+    firstName: MERGE_TAG.firstName,
+    name: MERGE_TAG.name,
+    reviewText: MERGE_TAG.reviewText,
+  };
+  return renderWith(content, values, { ...ctx, unsubscribeUrl: MERGE_TAG.unsubscribeUrl });
+}
+
+/**
+ * Shared body of {@link renderCampaign} and {@link renderBroadcast}.
+ * @param content - Subject, preheader and body as the operator wrote them.
+ * @param values - Placeholder values, real or merge tags.
+ * @param ctx - Brand, signature, promo wording and unsubscribe link.
+ * @returns The filled email.
+ */
+function renderWith(
+  content: CampaignContent,
+  values: Record<PlaceholderKey, string>,
+  ctx: RenderContext,
+): RenderedCampaign {
   const subject = fillText(content.subject, values).trim();
   const preheader = content.preheader ? fillText(content.preheader, values).trim() : "";
 

@@ -1012,6 +1012,15 @@ model Campaign {
   // that come with it, so Resend drops anything that already went.
   sendAttempt      Int            @default(0)
 
+  // A Resend broadcast send, step by step: the segment holding this send's
+  // recipients, the contact import that filled it, the broadcast itself, and
+  // when the run claimed the call that sends it. Each is written before the
+  // next step starts, so a resumed run carries on and never sends twice.
+  segmentId       String?
+  importId        String?
+  broadcastId     String?
+  broadcastSentAt DateTime?
+
   // Contacts unticked in the send dialog.
   excludedContactIds String[]          @db.ObjectId
   // Promo the {promo} placeholders describe. Null falls back to whichever
@@ -1019,6 +1028,8 @@ model Campaign {
   promoId            String?           @db.ObjectId
   // Optional so existing rows read as everyone without a backfill.
   audience           CampaignAudience?
+  // The last Draft with AI brief and its settings, so the dialog opens with them on any device.
+  draftBrief         Json?
 
   sentCount   Int @default(0)
   failedCount Int @default(0)
@@ -1028,6 +1039,7 @@ model Campaign {
 
   @@index([isPreset, status])
   @@index([status, scheduledAt])
+  @@index([broadcastId])
 }
 
 enum CampaignSendStatus {
@@ -1055,25 +1067,30 @@ model CampaignSend {
 }
 
 // bounce and complaint come from Resend's webhook: an address that hard-bounced, or a
-// reader who marked an email as spam.
+// reader who marked an email as spam. booking_form is the mailing-list box unticked
+// when booking.
 enum EmailOptOutSource {
   link
   one_click
   manual
   bounce
   complaint
+  booking_form
 }
 
 // Addresses that asked not to get mailing-list emails. Kept off Contact: a
 // write there bumps updatedAt past lastSyncedAt and re-pushes the contact to
 // Google on the next sync. Transactional mail (bookings, invoices) ignores it.
 model EmailOptOut {
-  id        String            @id @default(auto()) @map("_id") @db.ObjectId
+  id                 String            @id @default(auto()) @map("_id") @db.ObjectId
   // Lowercased.
-  email     String            @unique
-  contactId String?           @db.ObjectId
-  source    EmailOptOutSource
-  createdAt DateTime          @default(now())
+  email              String            @unique
+  contactId          String?           @db.ObjectId
+  source             EmailOptOutSource
+  createdAt          DateTime          @default(now())
+  // When the email asking them to confirm coming back last went out. They stay off
+  // until they press its button.
+  resubscribeAskedAt DateTime?
 
   @@index([contactId])
 }

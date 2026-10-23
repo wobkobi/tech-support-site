@@ -54,7 +54,7 @@ export function SizeTabs({
       <div
         role="tablist"
         aria-label="Sizes"
-        className="flex min-w-0 flex-1 items-stretch gap-1.5 overflow-x-auto pb-1"
+        className="flex min-w-0 flex-1 items-stretch gap-1.5 overflow-x-auto overflow-y-hidden pb-1"
       >
         {doc.formats.map((f) => {
           const on = !allSizes && f === format;

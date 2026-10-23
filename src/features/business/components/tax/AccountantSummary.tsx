@@ -151,7 +151,7 @@ export function AccountantSummary({
               );
             })}
           </ul>
-          <div className="hidden overflow-x-auto md:block">
+          <div className="hidden overflow-x-auto overflow-y-hidden md:block">
             <table className={TABLE_CLS}>
               <thead className={THEAD_CLS}>
                 <tr>

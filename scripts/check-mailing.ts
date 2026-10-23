@@ -4,6 +4,7 @@
 // Run with: npm test -- mailing
 
 import {
+  BRIEF_MAX,
   dropPictures,
   fillBlocks,
   pictureBriefOf,
@@ -19,13 +20,31 @@ import {
   serializeBlocks,
   type Block,
 } from "@/features/mailing/lib/blocks";
-import { optOutActionFor } from "@/features/mailing/lib/delivery-events";
+import {
+  importCsv,
+  MERGE_TAG,
+  mergeValue,
+  sendDecision,
+  splitName,
+} from "@/features/mailing/lib/broadcast";
+import {
+  broadcastFailureFor,
+  contactUnsubscribeFor,
+  optOutActionFor,
+} from "@/features/mailing/lib/delivery-events";
+import {
+  NO_DRAFT_BRIEF,
+  postDraftBrief,
+  readDraftBrief,
+  sameDraftBrief,
+} from "@/features/mailing/lib/draft-brief";
 import { emailInsertGroups, emailLinkTargets } from "@/features/mailing/lib/insertables";
 import { selectRecipients, type PoolContact } from "@/features/mailing/lib/recipients";
 import {
   campaignTag,
   listProblems,
   renderBody,
+  renderBroadcast,
   renderCampaign,
   tagLinks,
   type RenderContext,
@@ -881,6 +900,51 @@ function checkAiDraft(): void {
   );
 
   checkDraftPictures();
+  checkDraftBrief();
+}
+
+/** The brief kept on an email: reading it back, Email this too's brief, and what counts as a change. */
+function checkDraftBrief(): void {
+  expect("a value with no brief text isn't a brief", readDraftBrief({ kind: "tip" }) === null);
+  expect("nothing kept isn't a brief", readDraftBrief(null) === null);
+  const read = readDraftBrief({
+    brief: "x".repeat(BRIEF_MAX + 50),
+    kind: "gone-kind",
+    withSubject: false,
+    pictures: [BLOB_IMAGE, 7, "y".repeat(3000), "a", "b"],
+  });
+  expect(
+    "a kept brief is capped, an old kind falls back, and only real picture addresses stay",
+    read?.brief.length === BRIEF_MAX &&
+      read.kind === NO_DRAFT_BRIEF.kind &&
+      read.withSubject === false &&
+      read.withPicture === true &&
+      read.source === undefined &&
+      JSON.stringify(read.pictures) === JSON.stringify([BLOB_IMAGE, "a"]),
+    JSON.stringify(read),
+  );
+  const long = "p".repeat(BRIEF_MAX + 50);
+  expect(
+    "a post's words get the longer post cap",
+    readDraftBrief({ brief: long, source: "post" })?.brief.length === long.length,
+  );
+  const seed = postDraftBrief("The post's words.", [BLOB_IMAGE]);
+  expect(
+    "Email this too opens on the post with a subject, no new picture, and the last pictures to take out",
+    seed.source === "post" &&
+      seed.withSubject &&
+      !seed.withPicture &&
+      JSON.stringify(seed.pictures) === JSON.stringify([BLOB_IMAGE]),
+  );
+  expect(
+    "the same boxes have nothing to keep, even with other pictures",
+    sameDraftBrief({ ...NO_DRAFT_BRIEF, pictures: [BLOB_IMAGE] }, NO_DRAFT_BRIEF),
+  );
+  expect(
+    "a changed tick or a post brief is something to keep",
+    !sameDraftBrief({ ...NO_DRAFT_BRIEF, withPicture: false }, NO_DRAFT_BRIEF) &&
+      !sameDraftBrief(postDraftBrief(""), NO_DRAFT_BRIEF),
+  );
 }
 
 /** Draft with AI's pictures: what the model asks for, their names, and where they go. */
@@ -1181,6 +1245,147 @@ function checkDeliveryEvents(): void {
       optOutActionFor({ type: "email.complained", data: { to: ["not an address"] } }) === null &&
       optOutActionFor(null) === null,
   );
+
+  const bounced = broadcastFailureFor(
+    event("email.bounced", { broadcast_id: "b1", bounce: { type: "Permanent" } }),
+  );
+  expect(
+    "a hard bounce on a broadcast marks that copy, by its lowercased address",
+    bounced?.broadcastId === "b1" &&
+      bounced.emails.join() === "sam@example.com" &&
+      bounced.reason.startsWith("Bounced"),
+    JSON.stringify(bounced),
+  );
+  expect(
+    "a suppressed broadcast copy is marked too",
+    broadcastFailureFor(event("email.suppressed", { broadcast_id: "b1" }))?.reason.startsWith(
+      "Not sent",
+    ) === true,
+  );
+  expect(
+    "a soft bounce, a spam report and a non-broadcast bounce don't mark a broadcast copy",
+    broadcastFailureFor(
+      event("email.bounced", { broadcast_id: "b1", bounce: { type: "Transient" } }),
+    ) === null &&
+      broadcastFailureFor(event("email.complained", { broadcast_id: "b1" })) === null &&
+      broadcastFailureFor(event("email.bounced", { bounce: { type: "Permanent" } })) === null,
+  );
+  /**
+   * A contact webhook event.
+   * @param type - Event type.
+   * @param unsubscribed - The contact's unsubscribed flag.
+   * @returns The event.
+   */
+  const contactEvent = (type: string, unsubscribed: boolean): unknown => ({
+    type,
+    data: { id: "c1", email: "Sam@Example.com", unsubscribed },
+  });
+  expect(
+    "an unsubscribe on Resend's side names the lowercased address",
+    contactUnsubscribeFor(contactEvent("contact.updated", true)) === "sam@example.com",
+  );
+  expect(
+    "other contact events unsubscribe nobody",
+    contactUnsubscribeFor(contactEvent("contact.updated", false)) === null &&
+      contactUnsubscribeFor(contactEvent("contact.created", true)) === null &&
+      contactUnsubscribeFor(null) === null,
+  );
+}
+
+/** Resend broadcasts: merge tags, the contact import, and the rule for the send call. */
+function checkBroadcast(): void {
+  console.log("Broadcasts");
+  const shared = { brand: CTX.brand, signatureHtml: CTX.signatureHtml, promo: CTX.promo };
+  const email = renderBroadcast(
+    {
+      subject: "Hi {firstName}, {promoOffer} this week",
+      preheader: null,
+      body: "Kia ora {name},\n\n> {reviewText}\n\nThanks!",
+    },
+    shared,
+  );
+  expect(
+    "names become Resend's tags, in the subject and the body",
+    email.subject === `Hi ${MERGE_TAG.firstName}, $10 off this week` &&
+      email.html.includes(`Kia ora ${MERGE_TAG.name},`),
+    email.subject,
+  );
+  expect(
+    "promo wording is still filled in on the site's side",
+    email.subject.includes("$10 off") && !email.subject.includes("{promoOffer}"),
+  );
+  expect(
+    "the review quote stays, holding Resend's review tag",
+    email.html.includes(MERGE_TAG.reviewText),
+  );
+  expect(
+    "the footer's unsubscribe link is the per-person tag",
+    email.html.includes(`href="${MERGE_TAG.unsubscribeUrl}"`) &&
+      !email.html.includes(CTX.unsubscribeUrl),
+  );
+  expect("the text part carries the tags too", email.text.includes(MERGE_TAG.name));
+  expect(
+    "a batch send still fills real names",
+    renderCampaign(
+      { subject: "Hi {firstName}", preheader: null, body: "x" },
+      { name: "Sam Taylor" },
+      CTX,
+    ).subject === "Hi Sam",
+  );
+
+  const split = splitName("  Sam  van Taylor ");
+  expect(
+    "a name splits into its first word and the rest",
+    split.first === "Sam" && split.last === "van Taylor" && splitName(null).first === "",
+  );
+  expect(
+    "merge values lose angle brackets and line breaks",
+    mergeValue("Fixed it <3\n\nThanks ") === "Fixed it 3 Thanks" && mergeValue(null) === "",
+  );
+
+  const csv = importCsv([
+    {
+      email: "sam@example.com",
+      name: 'Sam "Sammy", Taylor',
+      reviewText: "-Great\nwork",
+      unsubscribeUrl: "https://example.test/unsubscribe/abc.def",
+    },
+    { email: "jo@example.com", name: null, reviewText: null, unsubscribeUrl: "https://x.test/u" },
+  ]);
+  const [header, sam, jo] = csv.split("\n");
+  expect(
+    "the import has Resend's name columns and the broadcast properties",
+    header === "email,first_name,last_name,full_name,review_text,unsubscribe_url",
+    header,
+  );
+  expect(
+    "cells are quoted with doubled quotes, flattened, and never get a formula guard",
+    sam ===
+      '"sam@example.com","Sam","""Sammy"", Taylor","Sam ""Sammy"", Taylor","-Great work","https://example.test/unsubscribe/abc.def"',
+    sam,
+  );
+  expect("a missing name and review are blank cells", jo?.includes(',"","","",""') === true, jo);
+
+  const now = new Date("2026-10-23T05:00:00Z");
+  /**
+   * A moment before the fixed `now`.
+   * @param minutes - How many minutes before.
+   * @returns That moment.
+   */
+  const ago = (minutes: number): Date => new Date(now.getTime() - minutes * 60_000);
+  expect(
+    "a broadcast Resend has queued or sent is never sent again",
+    sendDecision(ago(1), "queued", now) === "done" && sendDecision(null, "sent", now) === "done",
+  );
+  expect("an unclaimed draft is sent", sendDecision(null, "draft", now) === "send");
+  expect(
+    "a draft claimed moments ago is left to the run that claimed it",
+    sendDecision(ago(1), "draft", now) === "wait",
+  );
+  expect(
+    "a draft claimed long ago is sent, since that call never landed",
+    sendDecision(ago(5), "draft", now) === "send",
+  );
 }
 
 /** The big box: a coloured panel with a large headline, smaller lines, a button and a photo. */
@@ -1292,6 +1497,7 @@ function main(): void {
   checkAiDraft();
   checkTracking();
   checkDeliveryEvents();
+  checkBroadcast();
   checkPlaceholders();
   checkTokens();
   checkRecipients();

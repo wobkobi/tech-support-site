@@ -1,9 +1,15 @@
 // src/features/mailing/lib/send.ts
 // Sends mailing-list emails: an atomic claim, one CampaignSend row per recipient (the record
-// of truth for resume and retry), then batches of 100 with Resend idempotency keys.
+// of truth for resume and retry), then one Resend broadcast when the marketing key is set,
+// else batches of 100 with idempotency keys (which count toward the daily send limit).
 // Quiet hours hold every list send unless the operator chose to send anyway.
 
 import { audienceOf } from "@/features/mailing/lib/audience";
+import {
+  deliverByBroadcast,
+  finishBroadcasts,
+  syncResendContacts,
+} from "@/features/mailing/lib/broadcast-send";
 import {
   loadSharedRenderParts,
   mailingFrom,
@@ -20,6 +26,7 @@ import {
   SAMPLE_REVIEW_TEXT,
   type CampaignContent,
 } from "@/features/mailing/lib/render";
+import { marketingReady } from "@/features/mailing/lib/resend-marketing";
 import { signUnsubscribeToken } from "@/features/mailing/lib/unsubscribe-token";
 import { sendBatch, sendNow, type BatchMailPayload } from "@/features/reviews/lib/email-core";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -36,12 +43,21 @@ const CHUNK_SIZE = 100;
 const CHUNK_PAUSE_MS = 600;
 /** A run "sending" for longer than this died part-way, and the cron resumes it. */
 const STUCK_AFTER_MS = 10 * 60_000;
+/**
+ * A broadcast left waiting on Resend's list upload is picked up after this, well past the
+ * minute one run waits for it.
+ */
+const BROADCAST_RESUME_MS = 2 * 60_000;
 /** Hard stop on the batch loop, far above any real list (100 x 50 = 5,000 people). */
 const MAX_CHUNKS = 50;
 
-/** Outcome of a send, retry or test. */
+/**
+ * Outcome of a send, retry or test. `waiting` means a broadcast is still on its way (Resend
+ * is loading the list) and the cron finishes it.
+ */
 export type SendResult =
-  { ok: true; sent: number; failed: number } | { ok: false; error: string; status: number };
+  | { ok: true; sent: number; failed: number; waiting?: boolean }
+  | { ok: false; error: string; status: number };
 
 /**
  * When a list send triggered at `at` must wait until, under the live quiet-hours window.
@@ -191,6 +207,35 @@ async function deliverPending(campaign: Campaign, parts: SharedRenderParts): Pro
 }
 
 /**
+ * Sends the pending rows: as one broadcast when the marketing key is set, else in batches.
+ * A broadcast step that fails marks the pending rows failed with its reason, so Retry
+ * failed carries on from that step.
+ * @param campaign - The claimed campaign.
+ * @param parts - Shared render parts.
+ * @returns True while a broadcast is still on its way, for the cron to finish.
+ */
+async function deliver(campaign: Campaign, parts: SharedRenderParts): Promise<boolean> {
+  if (!marketingReady()) {
+    await deliverPending(campaign, parts);
+    return false;
+  }
+  try {
+    return (await deliverByBroadcast(campaign.id, parts)) === "waiting";
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Send failed";
+    console.error(`[mailing] Broadcast for campaign ${campaign.id} failed:`, err);
+    await prisma.campaignSend.updateMany({
+      where: { campaignId: campaign.id, status: "pending" },
+      data: { status: "failed", error: message.slice(0, 500) },
+    });
+    return false;
+  }
+}
+
+/** The result for a broadcast the cron will finish. */
+const WAITING: SendResult = { ok: true, sent: 0, failed: 0, waiting: true };
+
+/**
  * Totals the rows and closes the run: "sent" when anything went out, else "failed".
  * @param campaign - The claimed campaign.
  * @returns Sent and failed counts.
@@ -271,13 +316,15 @@ export async function startCampaignSend(
     return { ok: false, error: problems.join(" "), status: 400 };
   }
 
+  // Resend-side unsubscribes must land before the recipients are picked.
+  if (marketingReady()) await syncResendContacts();
   const total = await ensureSendRows(campaign);
   if (total === 0) {
     await releaseToDraft(id);
     return { ok: false, error: "There's nobody to send this to.", status: 400 };
   }
 
-  await deliverPending(campaign, parts);
+  if (await deliver(campaign, parts)) return WAITING;
   const counts = await finishRun(campaign);
   return { ok: true, ...counts };
 }
@@ -302,6 +349,14 @@ export async function retryFailedSends(id: string): Promise<SendResult> {
   }
   const before = await prisma.campaign.findUnique({ where: { id } });
   if (!before) return { ok: false, error: "Email not found.", status: 404 };
+  if (before.broadcastSentAt) {
+    return {
+      ok: false,
+      error:
+        "These went out but bounced, or Resend won't send to the address, so sending again won't help.",
+      status: 409,
+    };
+  }
   const parts = await loadSharedRenderParts(before.promoId);
   if (!parts.linkedPromoLive) {
     return {
@@ -323,14 +378,15 @@ export async function retryFailedSends(id: string): Promise<SendResult> {
     data: { status: "pending", error: null },
   });
   const campaign = await prisma.campaign.findUniqueOrThrow({ where: { id } });
-  await deliverPending(campaign, parts);
+  if (await deliver(campaign, parts)) return WAITING;
   const counts = await finishRun(campaign);
   return { ok: true, ...counts };
 }
 
 /**
- * Cron: sends due scheduled campaigns, then resumes stalled runs. Does nothing inside
- * quiet hours; a stalled run whose promo has ended is closed, not resumed.
+ * Cron: gives back the segments of finished broadcasts, then sends due scheduled campaigns
+ * and resumes stalled runs. Sends nothing inside quiet hours; a stalled run whose promo has
+ * ended is closed, not resumed.
  * @returns When quiet hours end (null outside them), and one line per campaign touched.
  */
 export async function runScheduledSends(): Promise<{
@@ -339,6 +395,7 @@ export async function runScheduledSends(): Promise<{
 }> {
   const now = new Date();
   const results: { id: string; name: string; result: SendResult }[] = [];
+  if (marketingReady()) await finishBroadcasts();
   const heldUntil = await quietHoldUntil(now);
   if (heldUntil) return { heldUntil, results };
 
@@ -354,7 +411,13 @@ export async function runScheduledSends(): Promise<{
   const stuck = await prisma.campaign.findMany({
     where: {
       status: "sending",
-      sendingStartedAt: { lt: new Date(now.getTime() - STUCK_AFTER_MS) },
+      OR: [
+        { sendingStartedAt: { lt: new Date(now.getTime() - STUCK_AFTER_MS) } },
+        {
+          importId: { not: null },
+          sendingStartedAt: { lt: new Date(now.getTime() - BROADCAST_RESUME_MS) },
+        },
+      ],
     },
   });
   for (const campaign of stuck) {
@@ -367,7 +430,10 @@ export async function runScheduledSends(): Promise<{
     const parts = await loadSharedRenderParts(campaign.promoId);
     if (parts.linkedPromoLive) {
       await ensureSendRows(campaign);
-      await deliverPending(campaign, parts);
+      if (await deliver(campaign, parts)) {
+        results.push({ id: campaign.id, name: campaign.name, result: WAITING });
+        continue;
+      }
     } else {
       // Part of the list may already have it, so close the run; the rest fail with a reason.
       await prisma.campaignSend.updateMany({

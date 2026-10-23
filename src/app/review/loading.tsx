@@ -8,5 +8,5 @@ import type React from "react";
  * @returns Loading element.
  */
 export default function ReviewLoading(): React.ReactElement {
-  return <PageLoadingShell label="review page" />;
+  return <PageLoadingShell label="review page" cardPage />;
 }

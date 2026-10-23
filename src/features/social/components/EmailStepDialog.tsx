@@ -7,7 +7,6 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { seedPostBrief } from "@/features/mailing/components/blocks/draft-brief";
 import { callApi } from "@/features/mailing/lib/api-client";
 import type { EmailPictureSource } from "@/features/social/lib/email-step.server";
 import { isBlobImageUrl } from "@/shared/lib/blob-image";
@@ -74,11 +73,9 @@ export function EmailStepDialog({
   /** Makes the draft, then opens it in Mailing with AI, or says where it is. */
   async function draft(): Promise<void> {
     setBusy("draft");
-    const res = await callApi<{ campaignId: string; brief: string }>(
-      `/api/admin/social/${postId}/email`,
-      "POST",
-      { picture },
-    );
+    const res = await callApi<{ campaignId: string }>(`/api/admin/social/${postId}/email`, "POST", {
+      picture,
+    });
     if (!res.ok) {
       setBusy(null);
       toast(res.error, { tone: "error" });
@@ -88,7 +85,6 @@ export function EmailStepDialog({
       return;
     }
     if (withAi && aiReady) {
-      seedPostBrief(res.campaignId, res.brief);
       router.push(`/admin/mailing/${res.campaignId}?draft=post`);
       return;
     }
