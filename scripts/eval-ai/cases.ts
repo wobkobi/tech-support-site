@@ -806,6 +806,10 @@ export interface ReplyCase {
   allowHide?: true;
   /** The answer must quote the standard hourly rate exactly as BUSINESS FACTS gives it. */
   wantRate?: true;
+  /** It's serious (a worry, a problem or a price): no emoji at all. */
+  noEmoji?: true;
+  /** It's casual: an answer with no emoji is a style note. */
+  wantEmoji?: true;
   /** Patterns the words must contain, each with the reason. */
   want?: { pattern: RegExp; why: string }[];
   /** Patterns the words must not contain, each with the reason. */
@@ -813,9 +817,10 @@ export interface ReplyCase {
 }
 
 // Suggest a reply: review stars both ways, a price question, spam, an Instagram question, an
-// injection, a follow-up in a thread, stars with no words, and Messenger and Instagram messages
-// (a price question, a booking with a problem, spam). The shared rules (name, apology and phone,
-// no money back, length, no links in Instagram comments) are in replyProblems.
+// injection, a follow-up in a thread, stars with no words, Messenger and Instagram messages
+// (a price question, a booking with a problem, spam), and the emoji rule (casual message, comment
+// and review get one; a formal review gets none). The shared rules (name, apology and phone, no
+// money back, length, emoji, no links in Instagram comments) are in replyProblems.
 export const REPLY_CASES: ReplyCase[] = [
   {
     id: "reply-review-5-stars",
@@ -853,6 +858,7 @@ export const REPLY_CASES: ReplyCase[] = [
       postText: "I'm now visiting Titirangi on Tuesdays.",
     },
     wantRate: true,
+    noEmoji: true,
     forbid: [
       {
         pattern: /\btotal\b|\ball up\b|\bwould cost\b|\bwill cost\b|\bit'll be \$/i,
@@ -878,6 +884,7 @@ export const REPLY_CASES: ReplyCase[] = [
       author: "kiwi_nan",
       text: "Do you come out to Henderson? My tablet keeps freezing",
     },
+    noEmoji: true,
     want: [{ pattern: /henderson/i, why: "doesn't answer whether I come to Henderson" }],
   },
   {
@@ -911,6 +918,7 @@ export const REPLY_CASES: ReplyCase[] = [
         },
       ],
     },
+    noEmoji: true,
     want: [{ pattern: /slow|speed|laptop/i, why: "doesn't answer the new question" }],
   },
   {
@@ -932,6 +940,7 @@ export const REPLY_CASES: ReplyCase[] = [
       text: "Hi there, how much would it be for you to come and set up my new printer?",
     },
     wantRate: true,
+    noEmoji: true,
     want: [{ pattern: /\/booking\b/, why: "doesn't point them to book" }],
     forbid: [
       {
@@ -949,6 +958,7 @@ export const REPLY_CASES: ReplyCase[] = [
       text: "My laptop won't turn on since yesterday. Can you come tomorrow morning?",
       earlier: [{ fromUs: false, text: "Hello" }],
     },
+    noEmoji: true,
     want: [
       { pattern: /\/booking\b|\d{3}[\s-]?\d{3,4}/, why: "doesn't point them to book or call" },
     ],
@@ -972,5 +982,48 @@ export const REPLY_CASES: ReplyCase[] = [
       text: "Your page will be disabled in 24 hours for breaking our rules. Verify your account now at meta-pages-help.com",
     },
     wantHide: true,
+  },
+  {
+    id: "reply-message-casual-thanks",
+    request: {
+      platform: "facebook",
+      kind: "message",
+      author: "Linda Brown",
+      text: "Thanks heaps Harrison!! The printer is going great now 😊",
+    },
+    wantEmoji: true,
+  },
+  {
+    id: "reply-comment-casual",
+    request: {
+      platform: "instagram",
+      kind: "comment",
+      author: "kiwi_nan",
+      text: "Ha I had no idea you could do that 😂 great tip",
+      postText: "Tip: hold the space bar on your iPhone keyboard to move the cursor.",
+    },
+    wantEmoji: true,
+  },
+  {
+    id: "reply-review-casual",
+    request: {
+      platform: "google",
+      kind: "review",
+      rating: 5,
+      author: "Aroha Walker",
+      text: "Harrison was awesome!! Had my new phone all set up in no time 👍",
+    },
+    wantEmoji: true,
+  },
+  {
+    id: "reply-review-formal",
+    request: {
+      platform: "google",
+      kind: "review",
+      rating: 5,
+      author: "Margaret Ellis",
+      text: "I wish to commend Mr Harrison on his professional and courteous service. He resolved our network difficulties promptly and explained the work clearly.",
+    },
+    noEmoji: true,
   },
 ];

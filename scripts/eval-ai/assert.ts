@@ -340,13 +340,15 @@ const MONEY_BACK_RE = /\brefund|\bdiscount|\bmoney back|\bfree of charge|\bfor f
  * @param opts - What the case expects.
  * @param opts.wantHide - It's spam: the answer must say hide.
  * @param opts.allowHide - Hide is a fair answer as well as words.
+ * @param opts.noEmoji - It's serious (a worry, a problem or a price): no emoji at all.
+ * @param opts.wantEmoji - It's casual: a reply with no emoji is a style note.
  * @returns The hard and soft problems, empty when it's clean.
  */
 export function replyProblems(
   got: { reply: string; hide: boolean },
   req: ReplyRequest,
   facts: string,
-  opts: { wantHide?: boolean; allowHide?: boolean } = {},
+  opts: { wantHide?: boolean; allowHide?: boolean; noEmoji?: boolean; wantEmoji?: boolean } = {},
 ): { hard: string[]; soft: string[] } {
   const hard: string[] = [];
   const soft: string[] = [];
@@ -366,7 +368,12 @@ export function replyProblems(
   if (saysWe(text)) hard.push('says "we", "us" or "our"');
   if (/\*\*|^#+ /m.test(text)) hard.push("has markup");
   if (hashtagsIn(text).length > 0) hard.push("has hashtags");
-  if ((text.match(EMOJI_RE) ?? []).length > 0) hard.push("has emoji");
+  // Emoji only in a casual reply: none on a review under 4 stars or a serious case, two at most.
+  const emoji = (text.match(EMOJI_RE) ?? []).length;
+  const lowReview = req.kind === "review" && (req.rating ?? 0) < 4;
+  if ((lowReview || opts.noEmoji) && emoji > 0) hard.push("has emoji where it shouldn't");
+  else if (emoji > 2) hard.push(`${emoji} emoji, two at most`);
+  if (opts.wantEmoji && emoji === 0) soft.push("no emoji in a casual reply");
   const direct = req.kind === "message";
   const max = replyLimit(req.platform, direct);
   const length = replyLength(req.platform, direct, text);
