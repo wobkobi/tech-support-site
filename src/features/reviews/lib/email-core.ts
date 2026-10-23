@@ -173,10 +173,17 @@ export async function buildEmailSignature(siteUrl: string): Promise<string> {
 }
 
 /**
- * Wraps body HTML in the notification email shell (560px card). Pinned to light scheme:
- * the navy logo mark vanishes on an auto-inverted dark card. On a phone the padding shrinks so
- * the words and pictures get about 330px of a 375px screen rather than 260px; the rules need
- * !important to beat the inline padding, which mail apps without media queries keep.
+ * Width of the email card's column; its padding sits outside it. Every email shares it, and
+ * mailing pictures size to it, so a full picture fills the card.
+ */
+export const EMAIL_COLUMN_PX = 680;
+
+/**
+ * Wraps body HTML in the email shell ({@link EMAIL_COLUMN_PX} column) that every email shares,
+ * so they all read as one set. Pinned to light scheme: the navy logo mark vanishes on an
+ * auto-inverted dark card. On a phone the padding shrinks so the words and pictures get about
+ * 330px of a 375px screen rather than 260px; the rules need !important to beat the inline
+ * padding, which mail apps without media queries keep.
  * @param bodyHtml - Inner HTML for the card.
  * @returns A complete HTML document.
  */
@@ -186,7 +193,7 @@ export function renderNotificationEmail(bodyHtml: string): string {
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><style>@media (max-width:600px){.email-shell{padding:8px!important}.email-card{padding:20px 16px!important}}</style></head>
 <body class="email-shell" style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
-  <div class="email-card" style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+  <div class="email-card" style="max-width:${EMAIL_COLUMN_PX}px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
 ${bodyHtml}
   </div>
 </body>
@@ -194,21 +201,15 @@ ${bodyHtml}
 }
 
 /**
- * Wraps body HTML in the document email shell (600px card, no shadow) for invoice,
- * quote and void emails. A distinct design from {@link renderNotificationEmail}.
+ * Wraps invoice, quote and void email HTML in the shared {@link renderNotificationEmail} card,
+ * with navy as the text colour their unstyled lines inherit.
  * @param bodyHtml - Inner HTML for the card.
  * @returns A complete HTML document.
  */
 export function renderDocumentEmail(bodyHtml: string): string {
-  return `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8" /><meta name="color-scheme" content="light" /><meta name="supported-color-schemes" content="light" /></head>
-<body style="margin:0;padding:24px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0c0a3e;background:#f6f7f8">
-  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px">
+  return renderNotificationEmail(`<div style="color:#0c0a3e">
 ${bodyHtml}
-  </div>
-</body>
-</html>`;
+</div>`);
 }
 
 // Lazy singleton so module import never throws when RESEND_API_KEY is unset.

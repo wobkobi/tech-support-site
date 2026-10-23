@@ -23,7 +23,7 @@ import type { LinkTarget } from "@/features/mailing/lib/insertables";
 import type { PromoWording } from "@/features/mailing/lib/render";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { FaArrowDown, FaArrowUp, FaPlus, FaXmark } from "react-icons/fa6";
 
 /** A block of one type. */
@@ -43,6 +43,17 @@ export interface FieldsProps<B extends Block> {
 
 /** Button labels past this length wrap on a phone and stop reading as a button. */
 const LONG_BUTTON_LABEL = 25;
+
+/**
+ * Sizes a textarea to its words. Going through "auto" first lets it shrink, and never below
+ * its `rows`, since scrollHeight is at least the box's own height.
+ * @param el - The textarea.
+ */
+function fitHeight(el: HTMLTextAreaElement): void {
+  el.style.height = "auto";
+  // scrollHeight leaves out the border, which the border-box height includes.
+  el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+}
 
 /**
  * Inserts text at the cursor (or around the selection) of a textarea's value.
@@ -135,6 +146,25 @@ export function TextFields({
   const ref = useRef<HTMLTextAreaElement>(null);
   const [link, setLink] = useState<{ start: number; end: number; text: string } | null>(null);
 
+  // Grow with the words, a line at a time, from the 3-row start; past max-h-96 it scrolls.
+  useLayoutEffect(() => {
+    if (ref.current) fitHeight(ref.current);
+  }, [block.text]);
+
+  // A wider or narrower box wraps differently, so fit again when the width changes.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let width = el.offsetWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.offsetWidth === width) return;
+      width = el.offsetWidth;
+      fitHeight(el);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   /**
    * Inserts at the cursor and puts the cursor after it.
    * @param before - Text before the selection.
@@ -163,10 +193,6 @@ export function TextFields({
     setLink({ start, end, text: block.text.slice(start, end) });
   }
 
-  // Rough height so a paragraph shows whole: one row per ~40 characters (a phone-width row).
-  const rows = block.text
-    .split("\n")
-    .reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / 40)), 1);
   return (
     <div className="flex flex-col gap-2">
       {editable && (
@@ -198,9 +224,9 @@ export function TextFields({
         placeholder="Write a paragraph. Press Enter for a new line, or Enter twice for a new paragraph."
         value={block.text}
         disabled={!editable}
-        rows={Math.min(14, Math.max(3, rows))}
+        rows={3}
         onChange={(e) => onChange({ text: e.target.value }, `${block.id}:text`)}
-        className="leading-relaxed"
+        className="max-h-96 leading-relaxed"
       />
       {link && (
         <LinkDialog

@@ -381,10 +381,14 @@ export function replyProblems(
 
   // A sentence ends at . ! or ? followed by a space or the end.
   const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => s.trim()).length;
-  const most = req.kind === "review" ? 4 : direct ? 3 : 2;
+  // A 4 or 5 star review gets a short thanks; a lower one room to say sorry and give the phone.
+  const praise = req.kind === "review" && (req.rating ?? 0) >= 4;
+  const most = praise ? 2 : req.kind === "review" ? 4 : direct ? 3 : 2;
   if (sentences > most + 1) hard.push(`${sentences} sentences, at most ${most}`);
   else if (sentences > most) soft.push(`${sentences} sentences, at most ${most}`);
-  if (req.kind === "review" && sentences < 2) soft.push("one sentence for a review");
+  if (req.kind === "review" && !praise && sentences < 2) soft.push("one sentence for a review");
+  const words = text.split(/\s+/).filter(Boolean).length;
+  if (praise && words > 35) soft.push(`${words} words, a thanks takes 35 at most`);
 
   if (req.kind === "review" && req.rating !== null) {
     const name = firstName("google", req.author);

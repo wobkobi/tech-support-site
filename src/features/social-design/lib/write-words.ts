@@ -57,6 +57,18 @@ This picture goes at the top of an email to past customers, who are already on t
 - The post words ("caption") are still for Facebook and Instagram.`;
 
 /**
+ * A picture partway down a long email, just above one part of it: its words are about that
+ * part, with the whole brief as context.
+ */
+const IN_EMAIL_PART = `IN AN EMAIL, PARTWAY DOWN
+This picture goes partway down an email to past customers, who are already on the mailing list, just above one part of it. Where THIS POST and these lines differ, these lines win.
+- The brief comes in two halves: THIS PART OF THE EMAIL, then THE WHOLE EMAIL'S BRIEF.
+- INVARIANT: the headline and every picture word are about THIS PART only. The whole brief is there for context: never put another part's news on this picture.
+- INVARIANT: never copy anything in curly brackets, like {promoOffer}, into any words.
+- INVARIANT: the picture words never ask the reader to join, sign up, subscribe or follow: they already get these emails.
+- The post words ("caption") are still for Facebook and Instagram.`;
+
+/**
  * The system prompt; live values come in as arguments.
  * @param who - Who is writing.
  * @param facts - The business's live facts.
@@ -67,7 +79,7 @@ This picture goes at the top of an email to past customers, who are already on t
  * @param paidAd - Whether the design is a paid ad.
  * @param bookingUrl - The booking page address.
  * @param review - Whether this is a review post.
- * @param inEmail - Whether the picture goes in a mailing list email.
+ * @param emailLines - Where the picture sits in a mailing list email, or "" for a post.
  * @returns The prompt.
  */
 function systemPrompt(
@@ -80,14 +92,14 @@ function systemPrompt(
   paidAd: boolean,
   bookingUrl: string,
   review: boolean,
-  inEmail: boolean,
+  emailLines: string,
 ): string {
   return `You write the words for one social media picture for a small tech help business, and the post words that go with it on Facebook and Instagram. Readers are locals, many of them older and not technical. The operator reads and edits everything before it is posted.
 
 ${voiceRules(who, facts)}${brand ? `\n\n${brand}` : ""}
 
 THIS POST
-${kindGuide}${inEmail ? `\n\n${IN_EMAIL}` : ""}
+${kindGuide}${emailLines ? `\n\n${emailLines}` : ""}
 
 ON THE PICTURE
 People scroll past in a second, so the picture carries very few words: what each part says must make sense at a glance.
@@ -134,6 +146,7 @@ Plain text only: no markup, no bold, no headings.`;
  * @param options.paidAd - Whether the design is a paid ad.
  * @param options.review - Whether this is a review post.
  * @param options.inEmail - Whether the picture goes in a mailing list email.
+ * @param options.part - For a picture partway down an email, the part it sits above.
  * @returns The draft, or null when it came back empty.
  */
 export async function writeDesignWords({
@@ -143,6 +156,7 @@ export async function writeDesignWords({
   paidAd,
   review,
   inEmail,
+  part = "",
 }: {
   brief: string;
   guide: string;
@@ -150,6 +164,7 @@ export async function writeDesignWords({
   paidAd: boolean;
   review: boolean;
   inEmail: boolean;
+  part?: string;
 }): Promise<DesignDraft | null> {
   const [settings, { promo }, facts] = await Promise.all([
     getSettings(),
@@ -162,6 +177,11 @@ export async function writeDesignWords({
   const promoLine = promo
     ? `A promo is running: ${promo.summary}.${promo.about ? ` In its own words: "${promo.about}".` : ""} When it ends, the standard rates in BUSINESS FACTS apply. Is this post about it, or about a price change its own words describe?\n- YES: INVARIANT: the picture words never give its figures or end date (the promo layers show them); say what the deal is good for. The post words may give the offer and end date exactly as written in this line, which counts as given like the brief.\n- NO: don't mention it.`
     : "No promo is running. INVARIANT: never mention a deal, discount or promo.";
+
+  const data =
+    inEmail && part
+      ? `THIS PART OF THE EMAIL:\n${part}\n\nTHE WHOLE EMAIL'S BRIEF:\n${brief}`
+      : brief;
 
   // One attempt inside the function budget; a 429 goes back as retryable instead.
   const { text } = await jsonCompletion({
@@ -178,14 +198,14 @@ export async function writeDesignWords({
         paidAd,
         `${getSiteUrl()}/booking`,
         review,
-        inEmail,
+        !inEmail ? "" : part ? IN_EMAIL_PART : IN_EMAIL,
       ),
     ],
-    user: `--- USER DATA ---\n${brief}\n--- END USER DATA ---`,
+    user: `--- USER DATA ---\n${data}\n--- END USER DATA ---`,
     maxTokens: 800,
     temperature: 0.7,
     timeoutMs: 25_000,
     maxRetries: 0,
   });
-  return readDesignDraft(JSON.parse(text), room, brief);
+  return readDesignDraft(JSON.parse(text), room, data);
 }

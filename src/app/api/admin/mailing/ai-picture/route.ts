@@ -1,11 +1,19 @@
 // src/app/api/admin/mailing/ai-picture/route.ts
 // Makes the post maker design for a picture an email draft asked for: a starter in the chosen
-// look with AI words from the email's brief. The editor then measures, draws and stores it.
+// look with AI words from the email's brief, or from the part of the email it sits above. The
+// editor then measures, draws and stores it.
 
 import { parseObjectId } from "@/features/business/lib/validation";
-import { BRIEF_MAX, isPictureKind, type PictureKind } from "@/features/mailing/lib/ai-draft";
+import {
+  isPictureKind,
+  MAX_DRAFT_PICTURES,
+  pictureBriefOf,
+  POST_SOURCE_MAX,
+  type PictureKind,
+} from "@/features/mailing/lib/ai-draft";
 import { draftRoom, fillDraft, POST_DRAFT_KINDS } from "@/features/social-design/lib/ai-draft";
 import { toDesignRow } from "@/features/social-design/lib/design-row";
+import { goneOut } from "@/features/social-design/lib/gone-out.server";
 import { loadBoundValues } from "@/features/social-design/lib/load-bound";
 import { snapshotBeforeSave } from "@/features/social-design/lib/versions";
 import { writeDesignWords } from "@/features/social-design/lib/write-words";
@@ -22,7 +30,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 const MAX_NAME = 80;
 
-/** The design an email's last draft made, and the updatedAt the draft left it at. */
+/** Longest part of an email a picture's words are written from. */
+const MAX_PART = 1000;
+
+/** The design an email's drafts draw in, and the updatedAt it was read at. */
 interface Redraw {
   id: string;
   updatedAt: Date;
@@ -36,61 +47,45 @@ interface DesignData {
 }
 
 /**
- * Reads the body's `replace`.
- * @param value - `{ id, updatedAt }` from the dialog, or anything else for none.
- * @returns The design to draw over, or null.
+ * The design an email's drafted picture in this slot is drawn in: the newest made for it that
+ * only this email shows. One made for a post, or with a picture in a post or another email
+ * (drafts too), is passed over, so a new design takes its place and it stays as it is.
+ * @param campaignId - The email.
+ * @param slot - Which of the draft's new pictures it is.
+ * @returns The design free to draw over, or null to make a new one.
  */
-function readRedraw(value: unknown): Redraw | null {
-  if (!value || typeof value !== "object") return null;
-  const r = value as { id?: unknown; updatedAt?: unknown };
-  const id = parseObjectId(r.id);
-  const updatedAt = typeof r.updatedAt === "string" ? new Date(r.updatedAt) : null;
-  return id && updatedAt && !Number.isNaN(updatedAt.getTime()) ? { id, updatedAt } : null;
+async function emailDesign(campaignId: string, slot: number): Promise<Redraw | null> {
+  // A design drawn before slots were kept counts as the first.
+  const designs = await prisma.socialDesign.findMany({
+    where: {
+      campaignId,
+      isTemplate: false,
+      ...(slot === 0
+        ? { OR: [{ campaignSlot: 0 }, { campaignSlot: null }, { campaignSlot: { isSet: false } }] }
+        : { campaignSlot: slot }),
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, updatedAt: true, postId: true, renders: true },
+  });
+  const used = await goneOut(designs, { anyState: true, exceptEmail: campaignId });
+  const free = designs.find((d) => !d.postId && !used.has(d.id));
+  return free ? { id: free.id, updatedAt: free.updatedAt } : null;
 }
 
 /**
- * Writes a redraft over the design the email's last draft made, so Post maker keeps one per
- * email instead of one per try. Only while it's as the draft left it and only this email shows
- * it: once it has been changed, posted, deleted or picked for another email, a new design keeps
- * that one as it is.
- * @param redraw - The design, and the updatedAt the draft left it at.
+ * Writes a redraft over one of the email's designs, so Post maker keeps one per picture however
+ * often the email is drafted; the last version goes in the design's History.
+ * @param redraw - The design, and the updatedAt it was read at.
  * @param data - The new name, kind and doc.
- * @param campaignId - The email being drafted, or null when not sent.
  * @returns The rewritten design, or null to make a new one.
  */
-async function drawOver(
-  redraw: Redraw,
-  data: DesignData,
-  campaignId: string | null,
-): Promise<SocialDesign | null> {
-  const where: Prisma.SocialDesignWhereInput = {
-    id: redraw.id,
-    updatedAt: redraw.updatedAt,
-    isTemplate: false,
-    OR: [{ postId: null }, { postId: { isSet: false } }],
-  };
+async function drawOver(redraw: Redraw, data: DesignData): Promise<SocialDesign | null> {
+  const where: Prisma.SocialDesignWhereInput = { id: redraw.id, updatedAt: redraw.updatedAt };
   const before = await prisma.socialDesign.findFirst({
     where,
     select: { name: true, doc: true, renders: true },
   });
   if (!before) return null;
-  const urls = before.renders.map((r) => r.url);
-  if (urls.length > 0) {
-    const [emails, posts] = await Promise.all([
-      prisma.campaign.count({
-        where: {
-          ...(campaignId ? { id: { not: campaignId } } : {}),
-          OR: urls.map((url) => ({ body: { contains: url } })),
-        },
-      }),
-      prisma.socialPost.count({
-        where: {
-          OR: [{ imageUrl: { in: urls } }, { targets: { some: { imageUrl: { in: urls } } } }],
-        },
-      }),
-    ]);
-    if (emails + posts > 0) return null;
-  }
   // Matched on updatedAt again, so a Post maker save in between isn't overwritten.
   const { count } = await prisma.socialDesign.updateMany({ where, data });
   if (count === 0) return null;
@@ -119,9 +114,10 @@ function guideFor(kind: PictureKind): string {
 
 /**
  * POST /api/admin/mailing/ai-picture
- * Body: `{ brief, kind, name, replace, campaignId }`: the email's brief, a picture look, the
- * design's name, the design the email's last draft made (`{ id, updatedAt }` or null) to draw
- * over, and the email itself.
+ * Body: `{ brief, kind, name, campaignId, part, slot }`: the email's brief, a picture look, the
+ * design's name, the email, the paragraph a picture partway down sits above ("" for the top
+ * one), and which of the draft's new pictures this is, from 0. The email's design for that
+ * slot is drawn over when there is one free.
  * @param request - Incoming request.
  * @returns JSON `{ design, template, words, bound }` (201): the stored design with its words in,
  *   the unfilled starter to measure against, the words, and live values for drawing. 503 when
@@ -133,15 +129,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     brief?: unknown;
     kind?: unknown;
     name?: unknown;
-    replace?: unknown;
     campaignId?: unknown;
+    part?: unknown;
+    slot?: unknown;
   } | null;
   if (!body || typeof body !== "object") return errorResponse("Invalid request body", 400);
 
   const brief = typeof body.brief === "string" ? body.brief.trim() : "";
   if (!brief) return errorResponse("Say what the email is about.", 400);
-  if (brief.length > BRIEF_MAX) {
-    return errorResponse(`Keep it to ${BRIEF_MAX} characters or fewer.`, 400);
+  if (brief.length > POST_SOURCE_MAX) {
+    return errorResponse(`Keep it to ${POST_SOURCE_MAX} characters or fewer.`, 400);
+  }
+  const part = typeof body.part === "string" ? pictureBriefOf(body.part) : "";
+  if (part.length > MAX_PART) {
+    return errorResponse(`Keep the part to ${MAX_PART} characters or fewer.`, 400);
+  }
+  // Left out means the first; anything that isn't a number fails the check.
+  const slot = body.slot === undefined ? 0 : typeof body.slot === "number" ? body.slot : -1;
+  if (!Number.isInteger(slot) || slot < 0 || slot >= MAX_DRAFT_PICTURES) {
+    return errorResponse("slot isn't one of the draft's pictures.", 400);
   }
   if (!isPictureKind(body.kind)) return errorResponse("kind isn't a known picture look.", 400);
   const kind = body.kind;
@@ -150,7 +156,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       0,
       MAX_NAME,
     ) || "Email picture";
-  const redraw = readRedraw(body.replace);
   const campaignId = parseObjectId(body.campaignId);
 
   if (!canUploadImages()) {
@@ -160,7 +165,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     const starter = emailPictureStarter(kind, { bookingUrl: `${getSiteUrl()}/booking` });
-    const [words, bound] = await Promise.all([
+    const [redraw, words, bound] = await Promise.all([
+      campaignId ? emailDesign(campaignId, slot) : null,
       writeDesignWords({
         brief,
         guide: guideFor(kind),
@@ -168,6 +174,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         paidAd: false,
         review: false,
         inEmail: true,
+        part,
       }),
       loadBoundValues(),
     ]);
@@ -180,8 +187,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       doc: fillDraft(starter.doc, words).doc as unknown as Prisma.InputJsonValue,
     };
     const design =
-      (redraw && (await drawOver(redraw, data, campaignId))) ??
-      (await prisma.socialDesign.create({ data: { ...data, isTemplate: false } }));
+      (redraw ? await drawOver(redraw, data) : null) ??
+      (await prisma.socialDesign.create({
+        data: { ...data, isTemplate: false, campaignId, campaignSlot: campaignId ? slot : null },
+      }));
     return okResponse({ design: toDesignRow(design), template: starter.doc, words, bound }, 201);
   } catch (err) {
     console.error("[mailing/ai-picture] failed:", err);

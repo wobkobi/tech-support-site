@@ -102,6 +102,13 @@ function systemPrompt(
   const readers = direct
     ? "They are most likely a local, maybe older and not technical."
     : "Readers are locals, many of them older and not technical.";
+  // A 4 or 5 star review gets a short thanks; a lower one room to say sorry and give the phone.
+  const length =
+    req.kind !== "review"
+      ? `INVARIANT: at most ${direct ? 3 : 2} sentences.`
+      : (req.rating ?? 0) >= 4
+        ? 'INVARIANT: 1 or 2 short sentences in all, 35 words at most: the thanks, and the one thing they liked when they said one. Their name goes inside the first sentence ("Thanks so much, Mary, ..."), never as a sentence of its own. INVARIANT: thank them once, and add no closing line like "Happy to help anytime".'
+        : "2 to 4 sentences.";
   return `You write my reply to ${where}, for a small tech help business. ${readers} I read and edit the reply before it is sent.
 
 ${parts.voice}${parts.brand ? `\n\n${parts.brand}` : ""}
@@ -118,7 +125,7 @@ Does EARLIER hold messages?
 - NO: answer MESSAGE on its own.
 
 LENGTH
-${req.kind === "review" ? "2 to 4 sentences." : direct ? "INVARIANT: at most 3 sentences." : "INVARIANT: at most 2 sentences."} INVARIANT: at most ${replyLimit(req.platform, direct)} characters.
+${length} INVARIANT: at most ${replyLimit(req.platform, direct)} characters.
 
 STYLE
 Plain text only: no markup, no **bold**, no headings. INVARIANT: no hashtags and no emoji. Don't sign off with my name.

@@ -4,10 +4,11 @@
 
 /**
  * Full-width admin input/select/textarea. Explicit disabled styles: the set colours
- * override the browser's own greying.
+ * override the browser's own greying. 16px text on phones, since an iPhone zooms the page in
+ * when a field with smaller text is tapped.
  */
 export const ADMIN_INPUT_CLS =
-  "w-full rounded-md border border-admin-border-strong bg-admin-surface px-3 py-2 text-[0.9375rem] text-admin-text focus:border-russian-violet disabled:cursor-not-allowed disabled:bg-admin-bg disabled:text-admin-muted";
+  "w-full rounded-md border border-admin-border-strong bg-admin-surface px-3 py-2 text-base text-admin-text sm:text-[0.9375rem] focus:border-russian-violet disabled:cursor-not-allowed disabled:bg-admin-bg disabled:text-admin-muted";
 
 /** Fixed-height variant used for filter-bar controls that sit next to buttons. */
 export const ADMIN_CONTROL_CLS = `h-10 ${ADMIN_INPUT_CLS}`;

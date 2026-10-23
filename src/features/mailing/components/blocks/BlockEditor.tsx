@@ -9,9 +9,9 @@ import type { InsertGroup } from "@/features/admin/components/ui/InsertMenu";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { AddBlockMenu } from "@/features/mailing/components/blocks/AddBlockMenu";
 import { BlockCard, type BlockCardShared } from "@/features/mailing/components/blocks/BlockCard";
-import { DraftDialog } from "@/features/mailing/components/blocks/DraftDialog";
+import { DraftDialog, draftedMessage } from "@/features/mailing/components/blocks/DraftDialog";
 import { useBlockHistory } from "@/features/mailing/components/blocks/useBlockHistory";
-import { dropPicture, fillBlocks, placePicture } from "@/features/mailing/lib/ai-draft";
+import { dropPictures, fillBlocks, placePictures } from "@/features/mailing/lib/ai-draft";
 import {
   emptyBlock,
   newBlockId,
@@ -323,22 +323,19 @@ export function BlockEditor({
           promoId={draft.promoId}
           buttonUrl={blocks.find((b) => b.type === "button")?.url ?? ""}
           canPicture={canUpload}
+          pictures={blocks.flatMap((b) =>
+            b.type === "picture" && b.url.trim() ? [b.url.trim()] : [],
+          )}
           fromPost={postDialog}
           postBrief={draft.postBrief ?? ""}
           onClose={closeDraft}
-          onDraft={(result, withSubject, picture, stale) => {
+          onDraft={(result, withSubject, pictures, previous) => {
             closeDraft();
-            const filled = fillBlocks(blocks, result);
-            apply(picture ? placePicture(filled, picture) : dropPicture(filled, stale));
+            // The last draft's pictures come out first, so the paragraphs swap as one run.
+            const filled = fillBlocks(dropPictures(blocks, previous), result);
+            apply(placePictures(filled, result.paragraphs, pictures));
             if (withSubject) draft.onSubject(result.subject, result.preheader);
-            toast(
-              picture?.reusedFrom
-                ? `Draft added with your "${picture.reusedFrom}" picture from Post maker. Read it through and make it yours; Undo takes it back.`
-                : picture
-                  ? "Draft added with a picture. Read it through and make it yours; Undo takes it back. The picture's design is in Post maker if you want to change it."
-                  : "Draft added. Read it through and make it yours; Undo takes it back.",
-              { tone: "success" },
-            );
+            toast(draftedMessage(pictures), { tone: "success" });
           }}
         />
       )}

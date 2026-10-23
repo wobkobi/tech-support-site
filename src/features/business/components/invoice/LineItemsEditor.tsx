@@ -21,8 +21,9 @@ interface LineItemsEditorProps {
   disabled?: boolean;
 }
 
+/** 16px text on phones, since an iPhone zooms the page in when a field with smaller text is tapped. */
 const INPUT_CLS =
-  "rounded-lg border border-admin-border-strong bg-admin-surface px-2.5 py-2 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
+  "rounded-lg border border-admin-border-strong bg-admin-surface px-2.5 py-2 text-base text-admin-text sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
 
 /**
  * Parses a numeric input value, treating blank/garbage as 0.

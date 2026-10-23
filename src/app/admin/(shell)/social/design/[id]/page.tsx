@@ -1,11 +1,15 @@
 // src/app/admin/(shell)/social/design/[id]/page.tsx
 // Admin post maker editor for one design. `?review=<inbox id>` (from the Inbox's Make a post from
-// this review) opens Draft with AI with that Google review as the brief.
+// this review) opens Draft with AI with that Google review as the brief. A design that has gone
+// out opens locked instead, offering a copy to edit.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { DesignEditorLoader } from "@/features/social-design/components/DesignEditorLoader";
+import { GoneOutDesign } from "@/features/social-design/components/GoneOutDesign";
 import { toDesignRow } from "@/features/social-design/lib/design-row";
+import { docHash } from "@/features/social-design/lib/doc";
+import { designGoneOut } from "@/features/social-design/lib/gone-out.server";
 import { loadBoundValues } from "@/features/social-design/lib/load-bound";
 import { reviewBrief } from "@/features/social/lib/inbox/map";
 import { aiConfigured } from "@/shared/lib/ai/json-completion";
@@ -55,9 +59,45 @@ export default async function AdminDesignEditorPage({
   ]);
   if (!design) notFound();
   const row = toDesignRow(design);
+  const goneOut = await designGoneOut(design);
   const seedBrief = reviewRow?.text.trim()
     ? reviewBrief(reviewRow.text, reviewRow.authorName, reviewRow.rating)
     : null;
+
+  if (goneOut) {
+    // Same check as the use route: its post pictures must match the design as it is now.
+    const hash = docHash(row.doc, bound);
+    const formats: readonly string[] = row.doc.formats;
+    /**
+     * Whether a size's stored picture matches the design as it is now.
+     * @param format - The size.
+     * @returns True when it's current.
+     */
+    const current = (format: string): boolean =>
+      row.renders.some((r) => r.format === format && r.docHash === hash);
+    const canPost =
+      current("feed-4x5") && (!formats.includes("google-4x3") || current("google-4x3"));
+    return (
+      <>
+        <PageHeader
+          title="Design"
+          breadcrumbs={[
+            { label: "Social", href: "/admin/social" },
+            { label: "Post maker", href: "/admin/social/design" },
+            { label: row.name },
+          ]}
+        />
+        <GoneOutDesign
+          designId={row.id}
+          pictures={[...row.renders].sort(
+            (a, b) => formats.indexOf(a.format) - formats.indexOf(b.format),
+          )}
+          goneOut={goneOut}
+          canPost={canPost}
+        />
+      </>
+    );
+  }
 
   return (
     <>

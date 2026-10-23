@@ -31,6 +31,8 @@ export interface DesignPictures {
   current: boolean;
   /** Widest first, so the first suits an email best. */
   pictures: DesignPicture[];
+  /** The email whose Draft with AI drew it, or null. */
+  campaignId: string | null;
 }
 
 /**
@@ -69,6 +71,7 @@ export async function loadEmailPictures(): Promise<DesignPictures[]> {
       alt: (doc?.altText.trim() || (doc ? autoAltText(doc) : "")).slice(0, 200),
       current: hash !== null && row.renders.every((r) => r.docHash === hash),
       pictures,
+      campaignId: row.campaignId,
     });
   }
   return designs;

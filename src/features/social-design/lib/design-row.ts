@@ -46,6 +46,8 @@ export interface DesignSummary {
   formatCount: number;
   postId: string | null;
   updatedAt: string;
+  /** Its pictures went out in a post or email, so it opens locked. Set by the Post maker page. */
+  goneOut?: boolean;
 }
 
 /** A design opened in the editor. */

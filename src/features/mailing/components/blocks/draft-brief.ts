@@ -1,16 +1,10 @@
 "use client";
 // src/features/mailing/components/blocks/draft-brief.ts
 // The last "Draft with AI" brief for each email, kept in this browser so reopening the dialog
-// brings it back to change and redraft, along with the picture it put in and its design. Email
-// this too seeds one from the social post the email was made from.
+// brings it back to change and redraft, along with the pictures it put in. Email this too seeds
+// one from the social post the email was made from.
 
 import { DRAFT_KINDS } from "@/features/mailing/lib/ai-draft";
-
-/** The post maker design a drafted picture was made in, as the draft left it. */
-export interface DraftDesign {
-  id: string;
-  updatedAt: string;
-}
 
 /** What the dialog had in it when the draft was written. */
 export interface DraftBrief {
@@ -18,10 +12,8 @@ export interface DraftBrief {
   kind: string;
   withSubject: boolean;
   withPicture: boolean;
-  /** Where the last picture was made, so the next draft draws over it instead of adding one. */
-  design: DraftDesign | null;
-  /** The picture the last draft put in the email, so a draft without one takes it out. */
-  picture: string | null;
+  /** The pictures the last draft put in the email, so the next draft takes them out first. */
+  pictures: string[];
   /** The brief is a social post's words, from Email this too. */
   source?: "post";
 }
@@ -46,17 +38,14 @@ export function readDraftBrief(campaignId: string): DraftBrief | null {
     if (!raw) return null;
     const r = JSON.parse(raw) as Partial<DraftBrief>;
     if (typeof r.brief !== "string") return null;
-    const d = r.design;
     return {
       brief: r.brief,
       kind: DRAFT_KINDS.some((k) => k.key === r.kind) ? r.kind! : DRAFT_KINDS[0]!.key,
       withSubject: r.withSubject !== false,
       withPicture: r.withPicture !== false,
-      design:
-        d && typeof d.id === "string" && typeof d.updatedAt === "string"
-          ? { id: d.id, updatedAt: d.updatedAt }
-          : null,
-      picture: typeof r.picture === "string" ? r.picture : null,
+      pictures: Array.isArray(r.pictures)
+        ? r.pictures.filter((p): p is string => typeof p === "string")
+        : [],
       ...(r.source === "post" ? { source: "post" as const } : {}),
     };
   } catch {
@@ -79,8 +68,8 @@ export function saveDraftBrief(campaignId: string, brief: DraftBrief): void {
 
 /**
  * Seeds an email's brief with a social post's words, so its Draft dialog opens ready to write
- * the email from the post. The picture Email this too put in stays: the seed has no picture of
- * its own to take out, and asks for no new one.
+ * the email from the post. The picture Email this too put in stays: the seed has no pictures of
+ * its own to take out, and asks for no new ones.
  * @param campaignId - The email.
  * @param brief - The post's words, stripped for email.
  */
@@ -90,23 +79,17 @@ export function seedPostBrief(campaignId: string, brief: string): void {
     kind: DRAFT_KINDS[0]!.key,
     withSubject: true,
     withPicture: false,
-    design: null,
-    picture: null,
+    pictures: [],
     source: "post",
   });
 }
 
 /**
- * Remembers the picture a draft put in the email, alongside its brief.
+ * Remembers the pictures a draft put in the email, alongside its brief.
  * @param campaignId - The email.
- * @param picture - The picture's address, or null when the draft has none.
- * @param design - The design a new picture was made in; without one the last is kept.
+ * @param pictures - The pictures' addresses.
  */
-export function saveDraftPicture(
-  campaignId: string,
-  picture: string | null,
-  design?: DraftDesign,
-): void {
+export function saveDraftPictures(campaignId: string, pictures: readonly string[]): void {
   const last = readDraftBrief(campaignId);
-  if (last) saveDraftBrief(campaignId, { ...last, picture, design: design ?? last.design });
+  if (last) saveDraftBrief(campaignId, { ...last, pictures: [...pictures] });
 }

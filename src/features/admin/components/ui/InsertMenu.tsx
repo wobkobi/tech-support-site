@@ -199,7 +199,7 @@ export function InsertMenu({
               placeholder="Search"
               aria-label="Search what to add"
               aria-controls={menuId}
-              className="h-9 w-full rounded-lg bg-admin-bg pr-2.5 pl-8 text-sm text-admin-text placeholder:text-admin-muted focus:ring-2 focus:ring-russian-violet/30 focus:outline-none pointer-coarse:h-11"
+              className="h-9 w-full rounded-lg bg-admin-bg pr-2.5 pl-8 text-base text-admin-text placeholder:text-admin-muted focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:text-sm pointer-coarse:h-11"
             />
           </div>
           <div ref={menuRef} id={menuId} role="menu" className="overflow-y-auto p-1.5">
