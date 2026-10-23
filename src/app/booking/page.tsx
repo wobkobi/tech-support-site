@@ -14,7 +14,7 @@ import { withDateSurcharges } from "@/features/business/lib/pricing-policy.serve
 import { hasActivePromoCode } from "@/features/business/lib/promos";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
-import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
+import { CARD, CardPage, SOFT_CARD } from "@/shared/components/PageLayout";
 import { PhoneLink } from "@/shared/components/PhoneLink";
 import { PixelEvent } from "@/shared/components/PixelEvent";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -398,7 +398,7 @@ export default async function BookingPage(): Promise<React.ReactElement> {
   // Cached settings read, so the static shell still renders ahead of the slot data.
   const identity = await getIdentity();
   return (
-    <PageShell>
+    <CardPage>
       <PixelEvent event="InitiateCheckout" />
       <BreadcrumbJsonLd
         crumbs={[
@@ -406,117 +406,113 @@ export default async function BookingPage(): Promise<React.ReactElement> {
           { name: "Book", path: "/booking" },
         ]}
       />
-      <FrostedSection>
-        <div className="flex flex-col gap-6 sm:gap-8">
-          {/* Header */}
-          <section className={cn(CARD, "animate-fade-in")}>
-            <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
-              Request an appointment
-            </h1>
-            <p className="text-base text-rich-black">
-              Pick a time that works for you and tell me what you need help with. I'll confirm the
-              details and send you a calendar invite.
-              <br />
-              Prefer to call or text? Reach me on{" "}
-              <PhoneLink phone={identity.phone} phoneTel={identity.phoneTel} />.
-            </p>
-            <p className="mt-3 text-base text-rich-black">
-              Want to check the prices first?{" "}
-              <Link
-                href="/pricing"
-                className="font-semibold whitespace-nowrap text-russian-violet underline underline-offset-2 hover:opacity-80"
-              >
-                See pricing
-              </Link>
-              .
-            </p>
-            <p className="mt-1 text-base text-rich-black">
-              Already booked?{" "}
-              <Link
-                href="/booking/manage"
-                className="font-semibold text-russian-violet underline underline-offset-2 hover:opacity-80"
-              >
-                Manage your booking
-              </Link>
-              .
-            </p>
+      <div className="flex flex-col gap-6 sm:gap-8">
+        {/* Header */}
+        <section className={cn(CARD, "animate-fade-in")}>
+          <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+            Request an appointment
+          </h1>
+          <p className="text-base text-rich-black">
+            Pick a time that works for you and tell me what you need help with. I'll confirm the
+            details and send you a calendar invite.
+            <br />
+            Prefer to call or text? Reach me on{" "}
+            <PhoneLink phone={identity.phone} phoneTel={identity.phoneTel} />.
+          </p>
+          <p className="mt-3 text-base text-rich-black">
+            Want to check the prices first?{" "}
+            <Link
+              href="/pricing"
+              className="font-semibold whitespace-nowrap text-russian-violet underline underline-offset-2 hover:opacity-80"
+            >
+              See pricing
+            </Link>
+            .
+          </p>
+          <p className="mt-1 text-base text-rich-black">
+            Already booked?{" "}
+            <Link
+              href="/booking/manage"
+              className="font-semibold text-russian-violet underline underline-offset-2 hover:opacity-80"
+            >
+              Manage your booking
+            </Link>
+            .
+          </p>
+        </section>
+
+        {/* Two-column: Form + Sidebar */}
+        <div className="grid gap-6 sm:gap-8 lg:grid-cols-[1fr_20rem]">
+          {/* Form Card - data island streams in inside the Suspense boundary */}
+          <section
+            className={cn(
+              CARD,
+              "animate-slide-up animate-fill-both animate-delay-100 order-2 lg:order-1",
+            )}
+          >
+            <Suspense fallback={<BookingFormSkeleton />}>
+              <BookingFormIsland />
+            </Suspense>
           </section>
 
-          {/* Two-column: Form + Sidebar */}
-          <div className="grid gap-6 sm:gap-8 lg:grid-cols-[1fr_20rem]">
-            {/* Form Card - data island streams in inside the Suspense boundary */}
-            <section
-              className={cn(
-                CARD,
-                "animate-slide-up animate-fill-both animate-delay-100 order-2 lg:order-1",
-              )}
-            >
-              <Suspense fallback={<BookingFormSkeleton />}>
-                <BookingFormIsland />
-              </Suspense>
-            </section>
+          {/* Sidebar */}
+          <aside className="sticky order-1 flex flex-col gap-6 sm:gap-8 lg:top-24 lg:order-2 lg:self-start">
+            {/* How it works */}
+            <div className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
+              <h2 className="mb-4 text-xl font-bold text-russian-violet sm:text-2xl">
+                How it works
+              </h2>
+              <ol className="space-y-5">
+                <li className="flex gap-3">
+                  <span className={STEP_ICON}>
+                    <FaClock className="text-base text-moonstone-400" aria-hidden />
+                  </span>
+                  <div>
+                    <p className="text-base font-semibold text-rich-black">Choose length</p>
+                    <p className="text-base text-rich-black/70">1 or 2 hours</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className={STEP_ICON}>
+                    <FaCalendarCheck className="text-base text-moonstone-400" aria-hidden />
+                  </span>
+                  <div>
+                    <p className="text-base font-semibold text-rich-black">Pick a time</p>
+                    <p className="text-base text-rich-black/70">Day and start time</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className={STEP_ICON}>
+                    <FaListCheck className="text-base text-moonstone-400" aria-hidden />
+                  </span>
+                  <div>
+                    <p className="text-base font-semibold text-rich-black">Describe the issue</p>
+                    <p className="text-base text-rich-black/70">What you need help with</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className={STEP_ICON}>
+                    <FaEnvelopeOpenText className="text-base text-moonstone-400" aria-hidden />
+                  </span>
+                  <div>
+                    <p className="text-base font-semibold text-rich-black">Get confirmed</p>
+                    <p className="text-base text-rich-black/70">Calendar invite by email</p>
+                  </div>
+                </li>
+              </ol>
+            </div>
 
-            {/* Sidebar */}
-            <aside className="sticky order-1 flex flex-col gap-6 sm:gap-8 lg:top-24 lg:order-2 lg:self-start">
-              {/* How it works */}
-              <div className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
-                <h2 className="mb-4 text-xl font-bold text-russian-violet sm:text-2xl">
-                  How it works
-                </h2>
-                <ol className="space-y-5">
-                  <li className="flex gap-3">
-                    <span className={STEP_ICON}>
-                      <FaClock className="text-base text-moonstone-400" aria-hidden />
-                    </span>
-                    <div>
-                      <p className="text-base font-semibold text-rich-black">Choose length</p>
-                      <p className="text-base text-rich-black/70">1 or 2 hours</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className={STEP_ICON}>
-                      <FaCalendarCheck className="text-base text-moonstone-400" aria-hidden />
-                    </span>
-                    <div>
-                      <p className="text-base font-semibold text-rich-black">Pick a time</p>
-                      <p className="text-base text-rich-black/70">Day and start time</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className={STEP_ICON}>
-                      <FaListCheck className="text-base text-moonstone-400" aria-hidden />
-                    </span>
-                    <div>
-                      <p className="text-base font-semibold text-rich-black">Describe the issue</p>
-                      <p className="text-base text-rich-black/70">What you need help with</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className={STEP_ICON}>
-                      <FaEnvelopeOpenText className="text-base text-moonstone-400" aria-hidden />
-                    </span>
-                    <div>
-                      <p className="text-base font-semibold text-rich-black">Get confirmed</p>
-                      <p className="text-base text-rich-black/70">Calendar invite by email</p>
-                    </div>
-                  </li>
-                </ol>
-              </div>
-
-              {/* Info card */}
-              <div
-                className={cn(SOFT_CARD, "animate-slide-up animate-fill-both animate-delay-300")}
-              >
-                <p className="text-base leading-relaxed text-rich-black/80">
-                  <strong>Timing is flexible.</strong> Most appointments are 1 hour. Choose 2 hours
-                  if you have multiple issues or need more time. Actual time may be shorter or
-                  longer as needed.
-                </p>
-              </div>
-            </aside>
-          </div>
+            {/* Info card */}
+            <div className={cn(SOFT_CARD, "animate-slide-up animate-fill-both animate-delay-300")}>
+              <p className="text-base leading-relaxed text-rich-black/80">
+                <strong>Timing is flexible.</strong> Most appointments are 1 hour. Choose 2 hours if
+                you have multiple issues or need more time. Actual time may be shorter or longer as
+                needed.
+              </p>
+            </div>
+          </aside>
         </div>
-      </FrostedSection>
-    </PageShell>
+      </div>
+    </CardPage>
   );
 }

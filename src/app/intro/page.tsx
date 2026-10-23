@@ -32,7 +32,7 @@ const introText =
 /** Proof line. Typographic rather than chips, so nothing reads as a button. */
 const proofLine = "No jargon · Fair pricing · Weekends too";
 
-/** Frosted card both layouts sit on, matching the site's FrostedSection. */
+/** Frosted card both layouts sit on, matching the booking confirmation page's panel. */
 const CARD_CLASS =
   "flex min-h-0 flex-1 rounded-[44px] border-[3px] border-seasalt-200/50 bg-white/78 shadow-xl backdrop-blur-2xl";
 

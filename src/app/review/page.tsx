@@ -4,7 +4,7 @@
 
 import ReviewFormProtected from "@/features/reviews/components/ReviewForm";
 import { Button } from "@/shared/components/Button";
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { CARD, CardPage } from "@/shared/components/PageLayout";
 import { PhoneLink } from "@/shared/components/PhoneLink";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
@@ -138,100 +138,54 @@ export default async function ReviewPage({
   }
 
   return (
-    <PageShell>
-      <FrostedSection maxWidth="56rem">
-        <div className="flex flex-col gap-4 sm:gap-5">
-          {/* Token invalid warning */}
-          {token && !tokenValid && (
-            <section className={cn(CARD)}>
-              <h1 className="mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
-                Invalid review link
-              </h1>
-              <p className="mb-4 text-base text-rich-black/80">
-                This review link is invalid or has expired. If you recently had an appointment,
-                please check your email for the correct link, or call or text me on{" "}
-                <PhoneLink phone={identity.phone} phoneTel={identity.phoneTel} /> and I'll send you
-                a fresh one.
-              </p>
-              {googleUrl && (
-                <div className="mb-4 space-y-3">
-                  <p className="text-base text-rich-black/80">
-                    Or leave a review on Google - that doesn&apos;t need a link from me.
-                  </p>
-                  <GoogleReviewButton url={googleUrl} label="Leave a review on Google" />
-                </div>
-              )}
-              <Button href="/" variant="secondary" size="md">
-                Back to home
-              </Button>
-            </section>
-          )}
-
-          {/* Valid token, Google URL set, no review yet: Google first, site form folded */}
-          {tokenValid && !alreadyReviewed && googleUrl && (
-            <>
-              <section className={cn(CARD)}>
-                <h1 className="mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
-                  How was your appointment?
-                </h1>
-                <p className="mb-4 text-base text-rich-black/80">
-                  Hi {prefillName}! Thanks for choosing To the Point Tech. If you&apos;ve got a
-                  minute, a review on Google is the biggest help - it&apos;s where most people look
-                  for local tech help.
+    <CardPage maxWidth="56rem">
+      <div className="flex flex-col gap-4 sm:gap-5">
+        {/* Token invalid warning */}
+        {token && !tokenValid && (
+          <section className={cn(CARD)}>
+            <h1 className="mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+              Invalid review link
+            </h1>
+            <p className="mb-4 text-base text-rich-black/80">
+              This review link is invalid or has expired. If you recently had an appointment, please
+              check your email for the correct link, or call or text me on{" "}
+              <PhoneLink phone={identity.phone} phoneTel={identity.phoneTel} /> and I'll send you a
+              fresh one.
+            </p>
+            {googleUrl && (
+              <div className="mb-4 space-y-3">
+                <p className="text-base text-rich-black/80">
+                  Or leave a review on Google - that doesn&apos;t need a link from me.
                 </p>
                 <GoogleReviewButton url={googleUrl} label="Leave a review on Google" />
-              </section>
+              </div>
+            )}
+            <Button href="/" variant="secondary" size="md">
+              Back to home
+            </Button>
+          </section>
+        )}
 
-              <details open={openForm} className={cn(CARD)}>
-                <summary className="cursor-pointer text-base font-semibold text-russian-violet underline underline-offset-2 hover:opacity-80">
-                  No Google account? Leave it here instead
-                </summary>
-                <div className="mt-4">
-                  <ReviewFormProtected
-                    bookingId={sourceType === "booking" ? sourceId! : undefined}
-                    contactId={sourceType === "contact" ? sourceId! : undefined}
-                    token={token}
-                    prefillName={prefillName!}
-                    prefillEmail={prefillEmail ?? undefined}
-                    prefillPhone={prefillPhone ?? undefined}
-                    phone={identity.phone}
-                    phoneTel={identity.phoneTel}
-                    googleReviewUrl={googleUrl}
-                  />
-                </div>
-              </details>
-            </>
-          )}
+        {/* Valid token, Google URL set, no review yet: Google first, site form folded */}
+        {tokenValid && !alreadyReviewed && googleUrl && (
+          <>
+            <section className={cn(CARD)}>
+              <h1 className="mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+                How was your appointment?
+              </h1>
+              <p className="mb-4 text-base text-rich-black/80">
+                Hi {prefillName}! Thanks for choosing To the Point Tech. If you&apos;ve got a
+                minute, a review on Google is the biggest help - it&apos;s where most people look
+                for local tech help.
+              </p>
+              <GoogleReviewButton url={googleUrl} label="Leave a review on Google" />
+            </section>
 
-          {/* Valid token otherwise: editing an existing review, or no Google URL set */}
-          {tokenValid && (alreadyReviewed || !googleUrl) && (
-            <>
-              <section className={cn(CARD)}>
-                <h1 className="mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
-                  {alreadyReviewed ? "Edit your review" : "How was your appointment?"}
-                </h1>
-                <p className="text-base text-rich-black/80">
-                  {alreadyReviewed
-                    ? `Hi ${prefillName}! You can update your review any time using this link.`
-                    : `Hi ${prefillName}! Thanks for choosing To the Point Tech. I'd love to hear about your experience.`}
-                </p>
-              </section>
-
-              {/* Every past reviewer: Google bans asking only happy customers. */}
-              {alreadyReviewed && googleUrl && (
-                <section className={cn(CARD, "space-y-3")}>
-                  <h2 className="text-xl font-bold text-russian-violet sm:text-2xl">
-                    Could you post it on Google too?
-                  </h2>
-                  <p className="text-base text-rich-black/80">
-                    Thanks for the review you left here. Google is where most people look for local
-                    tech help, so a copy there makes a big difference.
-                  </p>
-                  <GoogleReviewButton url={googleUrl} label="Post it on Google" />
-                </section>
-              )}
-
-              <section className={cn(CARD)}>
+            <details open={openForm} className={cn(CARD)}>
+              <summary className="cursor-pointer text-base font-semibold text-russian-violet underline underline-offset-2 hover:opacity-80">
+                No Google account? Leave it here instead
+              </summary>
+              <div className="mt-4">
                 <ReviewFormProtected
                   bookingId={sourceType === "booking" ? sourceId! : undefined}
                   contactId={sourceType === "contact" ? sourceId! : undefined}
@@ -239,54 +193,98 @@ export default async function ReviewPage({
                   prefillName={prefillName!}
                   prefillEmail={prefillEmail ?? undefined}
                   prefillPhone={prefillPhone ?? undefined}
-                  existingReview={existingReview ?? undefined}
                   phone={identity.phone}
                   phoneTel={identity.phoneTel}
-                  googleReviewUrl={googleUrl ?? undefined}
+                  googleReviewUrl={googleUrl}
                 />
-              </section>
-            </>
-          )}
+              </div>
+            </details>
+          </>
+        )}
 
-          {/* No token - show message */}
-          {!token && (
+        {/* Valid token otherwise: editing an existing review, or no Google URL set */}
+        {tokenValid && (alreadyReviewed || !googleUrl) && (
+          <>
             <section className={cn(CARD)}>
               <h1 className="mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
-                {googleUrl ? "Leave a review" : "Review link required"}
+                {alreadyReviewed ? "Edit your review" : "How was your appointment?"}
               </h1>
-              {googleUrl && (
-                <div className="mb-6 space-y-3">
-                  <p className="text-base text-rich-black/80">
-                    The quickest way is on Google - no link needed, and it&apos;s where most people
-                    look for local tech help.
-                  </p>
-                  <GoogleReviewButton url={googleUrl} label="Leave a review on Google" />
-                </div>
-              )}
-              <p className="mb-4 text-base text-rich-black/80">
-                {googleUrl
-                  ? "To leave one on this site instead, use the personalised review link sent to your email after your appointment."
-                  : "To leave a review, please use the personalised review link sent to your email after your appointment."}
+              <p className="text-base text-rich-black/80">
+                {alreadyReviewed
+                  ? `Hi ${prefillName}! You can update your review any time using this link.`
+                  : `Hi ${prefillName}! Thanks for choosing To the Point Tech. I'd love to hear about your experience.`}
               </p>
-              <p className="mb-4 text-base text-rich-black/80">
-                This helps ensure all reviews are from verified customers. If you can't find your
-                review link, call or text me on{" "}
-                <PhoneLink phone={identity.phone} phoneTel={identity.phoneTel} />, or{" "}
-                <Link
-                  href="/contact"
-                  className="font-semibold text-russian-violet underline underline-offset-2 hover:opacity-80"
-                >
-                  send me a message
-                </Link>
-                , and I'll send you a fresh one.
-              </p>
-              <Button href="/" variant="secondary" size="md">
-                Back to home
-              </Button>
             </section>
-          )}
-        </div>
-      </FrostedSection>
-    </PageShell>
+
+            {/* Every past reviewer: Google bans asking only happy customers. */}
+            {alreadyReviewed && googleUrl && (
+              <section className={cn(CARD, "space-y-3")}>
+                <h2 className="text-xl font-bold text-russian-violet sm:text-2xl">
+                  Could you post it on Google too?
+                </h2>
+                <p className="text-base text-rich-black/80">
+                  Thanks for the review you left here. Google is where most people look for local
+                  tech help, so a copy there makes a big difference.
+                </p>
+                <GoogleReviewButton url={googleUrl} label="Post it on Google" />
+              </section>
+            )}
+
+            <section className={cn(CARD)}>
+              <ReviewFormProtected
+                bookingId={sourceType === "booking" ? sourceId! : undefined}
+                contactId={sourceType === "contact" ? sourceId! : undefined}
+                token={token}
+                prefillName={prefillName!}
+                prefillEmail={prefillEmail ?? undefined}
+                prefillPhone={prefillPhone ?? undefined}
+                existingReview={existingReview ?? undefined}
+                phone={identity.phone}
+                phoneTel={identity.phoneTel}
+                googleReviewUrl={googleUrl ?? undefined}
+              />
+            </section>
+          </>
+        )}
+
+        {/* No token - show message */}
+        {!token && (
+          <section className={cn(CARD)}>
+            <h1 className="mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+              {googleUrl ? "Leave a review" : "Review link required"}
+            </h1>
+            {googleUrl && (
+              <div className="mb-6 space-y-3">
+                <p className="text-base text-rich-black/80">
+                  The quickest way is on Google - no link needed, and it&apos;s where most people
+                  look for local tech help.
+                </p>
+                <GoogleReviewButton url={googleUrl} label="Leave a review on Google" />
+              </div>
+            )}
+            <p className="mb-4 text-base text-rich-black/80">
+              {googleUrl
+                ? "To leave one on this site instead, use the personalised review link sent to your email after your appointment."
+                : "To leave a review, please use the personalised review link sent to your email after your appointment."}
+            </p>
+            <p className="mb-4 text-base text-rich-black/80">
+              This helps ensure all reviews are from verified customers. If you can't find your
+              review link, call or text me on{" "}
+              <PhoneLink phone={identity.phone} phoneTel={identity.phoneTel} />, or{" "}
+              <Link
+                href="/contact"
+                className="font-semibold text-russian-violet underline underline-offset-2 hover:opacity-80"
+              >
+                send me a message
+              </Link>
+              , and I'll send you a fresh one.
+            </p>
+            <Button href="/" variant="secondary" size="md">
+              Back to home
+            </Button>
+          </section>
+        )}
+      </div>
+    </CardPage>
   );
 }

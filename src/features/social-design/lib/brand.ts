@@ -118,7 +118,10 @@ export type LogoVariant = keyof typeof LOGOS;
 export const BACKDROP_BLURRED_SRC = "/source/backdrop-blur.webp";
 export const BACKDROP_SRC = "/source/backdrop.jpg";
 
-/** Frosted card matching FrostedSection: white 60%, 2px seasalt-200 border at 40%, navy shadow. */
+/**
+ * Frosted card matching the booking confirmation page's panel: white 60%, 2px seasalt-200
+ * border at 40%, navy shadow.
+ */
 export const FROSTED = {
   fill: "rgba(252,252,252,0.6)",
   stroke: "rgba(191,198,205,0.4)",

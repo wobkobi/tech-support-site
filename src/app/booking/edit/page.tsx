@@ -19,7 +19,7 @@ import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.s
 import { withDateSurcharges } from "@/features/business/lib/pricing-policy.server";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import { Button } from "@/shared/components/Button";
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { CARD, CardPage } from "@/shared/components/PageLayout";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
@@ -227,82 +227,80 @@ export default async function EditBookingPage({
   const pricedDays = await withDateSurcharges(availableDays);
 
   return (
-    <PageShell>
-      <FrostedSection>
-        <div className="flex flex-col gap-6 sm:gap-8">
-          <section className={cn(CARD, "animate-fade-in")}>
-            <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
-              Edit booking
-            </h1>
-            <p className="text-base text-rich-black">
-              {blocked
-                ? "This booking can no longer be changed online."
-                : "Update your appointment details below. A new calendar invite will be sent when you save."}
-            </p>
-          </section>
+    <CardPage>
+      <div className="flex flex-col gap-6 sm:gap-8">
+        <section className={cn(CARD, "animate-fade-in")}>
+          <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+            Edit booking
+          </h1>
+          <p className="text-base text-rich-black">
+            {blocked
+              ? "This booking can no longer be changed online."
+              : "Update your appointment details below. A new calendar invite will be sent when you save."}
+          </p>
+        </section>
 
-          {blocked ? (
-            /* The server would reject a save anyway, so don't show a form that
+        {blocked ? (
+          /* The server would reject a save anyway, so don't show a form that
                can only fail - explain why and offer the paths that still work. */
-            <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
-              <h2 className="mb-2 text-lg font-bold text-russian-violet sm:text-xl">
-                {cutoffBlocked ? "Too close to your appointment" : "Change limit reached"}
-              </h2>
-              <p className="mb-4 text-base text-rich-black/80 sm:text-lg">
-                {cutoffBlocked
-                  ? `Bookings can't be changed within ${reschedule.cutoffHours} hours of the appointment.`
-                  : "This booking has already been changed the maximum number of times."}{" "}
-                Give me a call or text and I'll sort it out for you.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                {identity.phoneTel && (
-                  <Button href={identity.phoneTel} variant="secondary" size="md">
-                    Call {identity.phone}
-                  </Button>
-                )}
-                <Button
-                  href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}
-                  variant="ghost"
-                  size="md"
-                >
-                  Cancel instead
+          <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
+            <h2 className="mb-2 text-lg font-bold text-russian-violet sm:text-xl">
+              {cutoffBlocked ? "Too close to your appointment" : "Change limit reached"}
+            </h2>
+            <p className="mb-4 text-base text-rich-black/80 sm:text-lg">
+              {cutoffBlocked
+                ? `Bookings can't be changed within ${reschedule.cutoffHours} hours of the appointment.`
+                : "This booking has already been changed the maximum number of times."}{" "}
+              Give me a call or text and I'll sort it out for you.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {identity.phoneTel && (
+                <Button href={identity.phoneTel} variant="secondary" size="md">
+                  Call {identity.phone}
                 </Button>
-              </div>
-            </section>
-          ) : (
-            <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
-              {/* Only worth saying when a limit is actually configured. */}
-              {(changesLeft !== null || reschedule.cutoffHours > 0) && (
-                <p className="mb-4 rounded-lg border border-mustard-400 bg-mustard-50 px-4 py-3 text-base text-rich-black/80">
-                  {changesLeft !== null && (
-                    <>
-                      You can change this booking{" "}
-                      <strong>
-                        {changesLeft} more {changesLeft === 1 ? "time" : "times"}
-                      </strong>
-                      .{" "}
-                    </>
-                  )}
-                  {reschedule.cutoffHours > 0 && (
-                    <>
-                      Changes close <strong>{reschedule.cutoffHours} hours before</strong> your
-                      appointment.
-                    </>
-                  )}
-                </p>
               )}
-              <BookingForm
-                availableDays={pricedDays}
-                durations={availabilityConfig.durations}
-                cancelToken={cancelToken}
-                initialValues={initialValues}
-                phone={identity.phone}
-                phoneTel={identity.phoneTel}
-              />
-            </section>
-          )}
-        </div>
-      </FrostedSection>
-    </PageShell>
+              <Button
+                href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}
+                variant="ghost"
+                size="md"
+              >
+                Cancel instead
+              </Button>
+            </div>
+          </section>
+        ) : (
+          <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
+            {/* Only worth saying when a limit is actually configured. */}
+            {(changesLeft !== null || reschedule.cutoffHours > 0) && (
+              <p className="mb-4 rounded-lg border border-mustard-400 bg-mustard-50 px-4 py-3 text-base text-rich-black/80">
+                {changesLeft !== null && (
+                  <>
+                    You can change this booking{" "}
+                    <strong>
+                      {changesLeft} more {changesLeft === 1 ? "time" : "times"}
+                    </strong>
+                    .{" "}
+                  </>
+                )}
+                {reschedule.cutoffHours > 0 && (
+                  <>
+                    Changes close <strong>{reschedule.cutoffHours} hours before</strong> your
+                    appointment.
+                  </>
+                )}
+              </p>
+            )}
+            <BookingForm
+              availableDays={pricedDays}
+              durations={availabilityConfig.durations}
+              cancelToken={cancelToken}
+              initialValues={initialValues}
+              phone={identity.phone}
+              phoneTel={identity.phoneTel}
+            />
+          </section>
+        )}
+      </div>
+    </CardPage>
   );
 }

@@ -4,7 +4,7 @@
 // segment supplies its own copy and secondary action.
 
 import { Button } from "@/shared/components/Button";
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { CARD, CardPage } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useEffect } from "react";
@@ -30,7 +30,8 @@ interface ErrorPageShellProps {
 }
 
 /**
- * Frosted error-boundary layout shared by the segment `error.tsx` files.
+ * Error-boundary layout shared by the segment `error.tsx` files: one card on the grey
+ * {@link CardPage}.
  * @param props - Component props.
  * @param props.title - Heading describing what failed.
  * @param props.body - Reassurance copy shown under the heading.
@@ -59,54 +60,50 @@ export function ErrorPageShell({
   }, [logPrefix, error]);
 
   return (
-    <PageShell>
-      <FrostedSection maxWidth="56rem">
-        <div className="flex flex-col gap-6 sm:gap-8">
-          <section className={cn(CARD, "text-center")}>
-            <div className="mb-4 text-7xl font-extrabold text-coquelicot-500 sm:text-8xl">
-              Oops!
-            </div>
+    <CardPage maxWidth="56rem">
+      <div className="flex flex-col gap-6 sm:gap-8">
+        <section className={cn(CARD, "text-center")}>
+          <div className="mb-4 text-7xl font-extrabold text-coquelicot-500 sm:text-8xl">Oops!</div>
 
-            <h1 className="mb-4 text-3xl font-extrabold text-russian-violet sm:text-4xl md:text-5xl">
-              {title}
-            </h1>
+          <h1 className="mb-4 text-3xl font-extrabold text-russian-violet sm:text-4xl md:text-5xl">
+            {title}
+          </h1>
 
-            <p className="mb-6 text-base text-rich-black sm:text-lg md:text-xl">{body}</p>
+          <p className="mb-6 text-base text-rich-black sm:text-lg md:text-xl">{body}</p>
 
-            {showMessage && (
-              <p
-                className="mb-6 text-sm wrap-break-word text-rich-black/70 italic sm:text-base"
-                role="status"
-                aria-live="polite"
-              >
-                {msg}
-              </p>
-            )}
+          {showMessage && (
+            <p
+              className="mb-6 text-sm wrap-break-word text-rich-black/70 italic sm:text-base"
+              role="status"
+              aria-live="polite"
+            >
+              {msg}
+            </p>
+          )}
 
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Button type="button" onClick={onReset} variant="primary">
-                <FaArrowRotateRight className="h-5 w-5" aria-hidden />
-                Try again
-              </Button>
-              <Button href={secondary.href} variant="ghost">
-                {secondary.icon}
-                {secondary.label}
-              </Button>
-            </div>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Button type="button" onClick={onReset} variant="primary">
+              <FaArrowRotateRight className="h-5 w-5" aria-hidden />
+              Try again
+            </Button>
+            <Button href={secondary.href} variant="ghost">
+              {secondary.icon}
+              {secondary.label}
+            </Button>
+          </div>
 
-            {detailsSummary && (
-              <details className="mt-6 text-base text-rich-black/80">
-                <summary className="cursor-pointer font-semibold hover:text-russian-violet">
-                  {detailsSummary}
-                </summary>
-                <pre className="mt-3 max-w-full overflow-auto rounded-lg border border-seasalt-200/60 bg-white/60 p-4 text-left text-base">
-                  {String(error?.stack || error)}
-                </pre>
-              </details>
-            )}
-          </section>
-        </div>
-      </FrostedSection>
-    </PageShell>
+          {detailsSummary && (
+            <details className="mt-6 text-base text-rich-black/80">
+              <summary className="cursor-pointer font-semibold hover:text-russian-violet">
+                {detailsSummary}
+              </summary>
+              <pre className="mt-3 max-w-full overflow-auto rounded-lg border border-seasalt-200/60 bg-white/60 p-4 text-left text-base">
+                {String(error?.stack || error)}
+              </pre>
+            </details>
+          )}
+        </section>
+      </div>
+    </CardPage>
   );
 }

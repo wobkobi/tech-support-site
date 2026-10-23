@@ -5,7 +5,7 @@
 import { verifyReviewAskStopToken } from "@/features/mailing/lib/unsubscribe-token";
 import { ReviewAskStopForm } from "@/features/reviews/components/ReviewAskStopForm";
 import { isReviewAskOptedOut } from "@/features/reviews/lib/review-ask-opt-out";
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { CARD, CardPage } from "@/shared/components/PageLayout";
 import type { Metadata } from "next";
 import type React from "react";
 
@@ -33,28 +33,26 @@ export default async function ReviewAskStopPage({
   const alreadyStopped = contactId ? await isReviewAskOptedOut(contactId) : false;
 
   return (
-    <PageShell>
-      <FrostedSection maxWidth="40rem">
-        <section className={CARD}>
-          <h1 className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl">
-            Review requests
-          </h1>
-          {isPreview && (
-            <p className="text-base text-rich-black/80">
-              This is the link from a preview email, so there&apos;s nothing to change. In a real
-              email, this page has a button that stops review requests for that person.
-            </p>
-          )}
-          {!isPreview && !contactId && (
-            <p className="text-base text-rich-black/80">
-              This link doesn&apos;t look right - it may have been cut short when it was copied. Try
-              clicking it straight from the email, or just reply to the email and say you&apos;d
-              like me to stop asking.
-            </p>
-          )}
-          {contactId && <ReviewAskStopForm token={token} initiallyStopped={alreadyStopped} />}
-        </section>
-      </FrostedSection>
-    </PageShell>
+    <CardPage maxWidth="40rem">
+      <section className={CARD}>
+        <h1 className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl">
+          Review requests
+        </h1>
+        {isPreview && (
+          <p className="text-base text-rich-black/80">
+            This is the link from a preview email, so there&apos;s nothing to change. In a real
+            email, this page has a button that stops review requests for that person.
+          </p>
+        )}
+        {!isPreview && !contactId && (
+          <p className="text-base text-rich-black/80">
+            This link doesn&apos;t look right - it may have been cut short when it was copied. Try
+            clicking it straight from the email, or just reply to the email and say you&apos;d like
+            me to stop asking.
+          </p>
+        )}
+        {contactId && <ReviewAskStopForm token={token} initiallyStopped={alreadyStopped} />}
+      </section>
+    </CardPage>
   );
 }
