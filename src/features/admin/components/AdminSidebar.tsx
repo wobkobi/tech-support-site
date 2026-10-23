@@ -430,7 +430,7 @@ export function AdminSidebar({
                 collapsed && "lg:hidden",
               )}
             >
-              To the Point
+              To the Point Tech
             </p>
           </div>
           {/* Close button - only rendered below lg. */}

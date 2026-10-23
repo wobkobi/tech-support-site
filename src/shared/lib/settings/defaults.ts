@@ -125,7 +125,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // Source: business-identity.ts + layout.tsx JSON-LD + HOME_ADDRESS env.
   identity: {
     name: "Harrison Raynes",
-    company: "To the Point",
+    company: "To the Point Tech",
     email: "harrison@tothepoint.co.nz",
     phone: "021 297 1237",
     phoneTel: "tel:+64212971237",

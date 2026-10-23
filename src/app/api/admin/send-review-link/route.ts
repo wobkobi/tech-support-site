@@ -6,6 +6,7 @@ import {
   findOrCreateContactByEmail,
   findOrCreateContactByPhone,
 } from "@/features/contacts/lib/find-or-create";
+import { brandName } from "@/features/reviews/lib/email-core";
 import { reviewFormUrl, sendReviewAsk } from "@/features/reviews/lib/email-review-ask";
 import { reviewAskBlockedBy } from "@/features/reviews/lib/review-ask-opt-out";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const first = name.trim().split(" ")[0] ?? "";
       const greeting =
         `Hi ${first.includes("@") ? "there" : first}, ${identity.name.split(" ")[0]} here from ` +
-        `${identity.company} Tech. Thanks for having me out, I hope everything's still working well.`;
+        `${brandName(identity)}. Thanks for having me out, I hope everything's still working well.`;
       // Google first, like the email; their /review link is the fallback.
       const googleUrl = reviews.googleReviewUrl.trim();
       const smsText = googleUrl

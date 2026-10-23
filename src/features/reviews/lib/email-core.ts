@@ -62,13 +62,15 @@ export function linkifyEscaped(escaped: string): string {
 }
 
 /**
- * Customer-facing brand name: the identity company plus the shared " Tech" suffix.
+ * Customer-facing brand name: the identity business name, with " Tech" added only when it
+ * doesn't already end in it, so a name saved as "To the Point" still reads in full.
  * @param identity - Live business identity (only `company` is read).
  * @param identity.company - Trading name from the identity settings.
  * @returns Brand name for customer-facing copy.
  */
 export function brandName(identity: { company: string }): string {
-  return `${identity.company} Tech`;
+  const name = identity.company.trim();
+  return /\btech$/i.test(name) ? name : `${name} Tech`;
 }
 
 /**
