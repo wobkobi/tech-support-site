@@ -4,7 +4,6 @@
 // draws its Landscape size off screen and stores it. Loaded only when a draft wants a picture,
 // so the canvas code stays out of the mail editor until then.
 
-import type { DraftDesign } from "@/features/mailing/components/blocks/draft-brief";
 import { callApi } from "@/features/mailing/lib/api-client";
 import { reflowText } from "@/features/social-design/components/canvas/text-layout";
 import { useFormatRender } from "@/features/social-design/components/canvas/use-format-render";
@@ -30,8 +29,6 @@ export interface PictureJob {
 export interface DraftedPicture {
   url: string;
   alt: string;
-  /** The design it was drawn from, for the next draft to draw over. */
-  design: DraftDesign;
 }
 
 /**
@@ -71,12 +68,7 @@ export function DraftPicture({
       );
       if (!saved.ok) throw new Error(saved.error);
       const stored = await render(design.id, doc, EMAIL_PICTURE_FORMAT);
-      // Storing the picture leaves updatedAt alone, so this is how the draft left the design.
-      return {
-        url: stored.url,
-        alt: autoAltText(doc),
-        design: { id: design.id, updatedAt: saved.updatedAt },
-      };
+      return { url: stored.url, alt: autoAltText(doc) };
     })().then(onDone, (error: unknown) =>
       onFail(error instanceof Error ? error.message : "The picture couldn't be drawn."),
     );

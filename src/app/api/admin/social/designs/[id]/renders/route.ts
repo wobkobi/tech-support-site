@@ -4,6 +4,7 @@
 import { parseObjectId } from "@/features/business/lib/validation";
 import { parseDesignDoc } from "@/features/social-design/lib/doc";
 import { FORMATS, isFormatKey } from "@/features/social-design/lib/formats";
+import { designGoneOut, GONE_OUT_ERROR } from "@/features/social-design/lib/gone-out.server";
 import {
   deleteUnusedMedia,
   writeKeepingUpdatedAt,
@@ -64,11 +65,18 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
     return errorResponse(`The ${want.label} picture must be ${want.width}x${want.height}.`, 400);
   }
 
-  const design = await prisma.socialDesign.findUnique({ where: { id }, select: { doc: true } });
+  const design = await prisma.socialDesign.findUnique({
+    where: { id },
+    select: { id: true, isTemplate: true, postId: true, renders: true, doc: true },
+  });
   if (!design) return errorResponse("Design not found.", 404);
   const parsed = parseDesignDoc(design.doc);
   if ("error" in parsed || !parsed.doc.formats.includes(format)) {
     return errorResponse("This design doesn't have that size any more.", 409);
+  }
+  // A size that went out keeps the picture it went out with; a new size can still be drawn.
+  if (design.renders.some((r) => r.format === format) && (await designGoneOut(design))) {
+    return errorResponse(GONE_OUT_ERROR, 409);
   }
 
   let url: string;

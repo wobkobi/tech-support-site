@@ -76,7 +76,7 @@ const SAMPLE_DRAFT = {
   bullets: [],
   buttonText: "Book a time",
   buttonUrl: "",
-  picture: "" as const,
+  pictures: [],
 };
 
 /** A post maker draft that breaks no rule, and the room it was written for. */

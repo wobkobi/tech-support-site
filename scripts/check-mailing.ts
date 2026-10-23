@@ -3,7 +3,15 @@
 // placeholders, tokens, recipients, templates, blocks and quiet hours. No DB, no network.
 // Run with: npm test -- mailing
 
-import { fillBlocks, readDraft, type AiDraft } from "@/features/mailing/lib/ai-draft";
+import {
+  dropPictures,
+  fillBlocks,
+  pictureBriefOf,
+  pictureNameOf,
+  placePictures,
+  readDraft,
+  type AiDraft,
+} from "@/features/mailing/lib/ai-draft";
 import {
   emptyBlock,
   isEmptyBlock,
@@ -777,6 +785,7 @@ function checkAiDraft(): void {
     bullets: ["One", "Two"],
     buttonText: "Read more",
     buttonUrl: "",
+    pictures: [],
   };
   /**
    * Fills a body's blocks with the test draft.
@@ -869,6 +878,100 @@ function checkAiDraft(): void {
     serializeBlocks(
       fillBlocks(parseBlocks("Hi {firstName},\n\n[Old](https://example.co.nz/booking)"), linked),
     ).endsWith("[Read more](https://example.co.nz/booking)"),
+  );
+
+  checkDraftPictures();
+}
+
+/** Draft with AI's pictures: what the model asks for, their names, and where they go. */
+function checkDraftPictures(): void {
+  const parts = ["Intro.", "**Prices:** Up a little.", "**Scams:** Fake parcel texts.", "Ask."];
+  const pictured = readDraft({
+    heading: "A few updates",
+    paragraphs: parts,
+    pictures: [
+      { paragraph: 3, look: "scam", reuse: "" },
+      { paragraph: 1, look: "thanks", reuse: "" },
+      { paragraph: 1, look: "tip", reuse: "" },
+      { paragraph: 9, look: "tip", reuse: "" },
+      { paragraph: 2, look: "nonsense", reuse: "" },
+      { paragraph: 2, look: "", reuse: "p2" },
+    ],
+  });
+  expect(
+    "pictures come back top first and counted from 0; a second above one paragraph, one right under another, one past the end and one with no look or label drop out",
+    JSON.stringify(pictured?.pictures) ===
+      JSON.stringify([
+        { at: 0, look: "thanks", reuse: "" },
+        { at: 2, look: "scam", reuse: "" },
+      ]),
+    JSON.stringify(pictured?.pictures),
+  );
+  const many = readDraft({
+    paragraphs: [...parts, "More.", "Even more."],
+    pictures: [1, 3, 5].map((paragraph) => ({ paragraph, look: "tip" })),
+  });
+  expect(
+    "a draft holds at most two pictures, however long it is",
+    many?.pictures.map((p) => p.at).join() === "0,2",
+    JSON.stringify(many?.pictures),
+  );
+  expect(
+    "with no top picture, one can sit above the second paragraph",
+    readDraft({ paragraphs: parts, pictures: [{ paragraph: 2, look: "tip" }] })?.pictures[0]?.at ===
+      1,
+  );
+  expect(
+    "a picture with no paragraph goes at the top",
+    readDraft({ paragraphs: parts, pictures: [{ look: "tip" }] })?.pictures[0]?.at === 0,
+  );
+  expect(
+    "a reply with no pictures has none",
+    readDraft({ paragraphs: parts, pictures: "one please" })?.pictures.length === 0,
+  );
+
+  expect(
+    "a picture partway down is named for its part's label, the top one for the email",
+    pictured !== null &&
+      pictureNameOf(pictured, 2) === "A few updates: Scams" &&
+      pictureNameOf(pictured, 0) === "A few updates",
+  );
+  expect(
+    "a part as a picture's brief loses its bold marks",
+    pictureBriefOf("**Scams:** Fake parcel texts.") === "Scams: Fake parcel texts.",
+  );
+
+  const scam = "https://abc123.public.blob.vercel-storage.com/social-design/render-scam.png";
+  const blocks = parseBlocks(["# A few updates", ...parts].join("\n\n"));
+  const placed = placePictures(blocks, parts, [
+    { url: BLOB_IMAGE, alt: "Top", at: 0 },
+    { url: scam, alt: "Scam", at: 2 },
+  ]);
+  expect(
+    "the top picture takes the main heading's place and one partway down sits above its part",
+    serializeBlocks(placed) ===
+      [
+        `![Top](${BLOB_IMAGE})`,
+        "Intro.",
+        "**Prices:** Up a little.",
+        `![Scam](${scam})`,
+        "**Scams:** Fake parcel texts.",
+        "Ask.",
+      ].join("\n\n"),
+    JSON.stringify(serializeBlocks(placed)),
+  );
+  expect(
+    "a picture whose part the operator changed is left out",
+    serializeBlocks(
+      placePictures(blocks, ["Intro.", "Something else."], [{ url: scam, alt: "Scam", at: 1 }]),
+    ) === ["# A few updates", ...parts].join("\n\n"),
+  );
+  const own = "https://abc123.public.blob.vercel-storage.com/mailing/image-mine.jpg";
+  const dropped = dropPictures([...placed, ...parseBlocks(`![Mine](${own})`)], [BLOB_IMAGE, scam]);
+  expect(
+    "the last draft's pictures come out and a picture put in by hand stays",
+    serializeBlocks(dropped) === [...parts, `![Mine](${own})`].join("\n\n"),
+    JSON.stringify(serializeBlocks(dropped)),
   );
 }
 

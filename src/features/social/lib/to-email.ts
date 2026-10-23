@@ -130,7 +130,7 @@ export function emailFromPost(
     bullets: [],
     buttonText: post.linkUrl ? POST_LINK_BUTTON : "",
     buttonUrl: post.linkUrl ?? "",
-    picture: "",
+    pictures: [],
   };
   const blocks = fillBlocks(parseBlocks(BLANK_TEMPLATE.body), draft);
   return {

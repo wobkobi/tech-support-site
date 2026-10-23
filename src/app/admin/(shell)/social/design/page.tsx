@@ -6,6 +6,7 @@ import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { DesignList } from "@/features/social-design/components/DesignList";
 import { toDesignSummary } from "@/features/social-design/lib/design-row";
+import { goneOut } from "@/features/social-design/lib/gone-out.server";
 import { ensureStarterTemplates } from "@/features/social-design/templates/seed";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -40,6 +41,7 @@ export default async function AdminPostMakerPage({
       ? prisma.socialPost.findUnique({ where: { id: postId }, select: { id: true, name: true } })
       : Promise.resolve(null),
   ]);
+  const gone = await goneOut(designs.filter((d) => !d.isTemplate));
 
   return (
     <>
@@ -48,7 +50,10 @@ export default async function AdminPostMakerPage({
         description="Design a picture once and get every size, ready for each app."
         breadcrumbs={[{ label: "Social", href: "/admin/social" }, { label: "Post maker" }]}
       />
-      <DesignList initial={designs.map(toDesignSummary)} forPost={forPost} />
+      <DesignList
+        initial={designs.map((d) => ({ ...toDesignSummary(d), goneOut: gone.has(d.id) }))}
+        forPost={forPost}
+      />
     </>
   );
 }

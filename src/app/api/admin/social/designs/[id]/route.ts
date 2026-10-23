@@ -4,7 +4,9 @@
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import { DESIGN_KINDS, toDesignRow, toKind } from "@/features/social-design/lib/design-row";
-import { MAX_DOC_BYTES, parseDesignDoc } from "@/features/social-design/lib/doc";
+import { MAX_DOC_BYTES, parseDesignDoc, type DesignDoc } from "@/features/social-design/lib/doc";
+import { onlyAddsSizes } from "@/features/social-design/lib/editor-ops";
+import { designGoneOut, GONE_OUT_ERROR } from "@/features/social-design/lib/gone-out.server";
 import { loadBoundValues } from "@/features/social-design/lib/load-bound";
 import { deleteUnusedMedia } from "@/features/social-design/lib/picture-store";
 import { snapshotBeforeSave } from "@/features/social-design/lib/versions";
@@ -85,10 +87,28 @@ export async function PATCH(request: NextRequest, { params }: Ctx): Promise<Next
     }
     data.kind = toKind(body.kind);
   }
+  let doc: DesignDoc | null = null;
   if (body.doc !== undefined) {
     const parsed = parseDesignDoc(body.doc);
     if ("error" in parsed) return errorResponse(parsed.error, 400);
+    doc = parsed.doc;
     data.doc = parsed.doc as unknown as Prisma.InputJsonValue;
+  }
+
+  // A design that went out keeps its pictures: it can be renamed, or gain a size, but nothing
+  // already in it changes. A History restore comes through here too.
+  if (data.kind !== undefined || doc) {
+    const current = await prisma.socialDesign.findUnique({
+      where: { id },
+      select: { id: true, isTemplate: true, postId: true, renders: true, kind: true, doc: true },
+    });
+    if (!current) return errorResponse("Design not found.", 404);
+    if (await designGoneOut(current)) {
+      const stored = parseDesignDoc(current.doc);
+      const kindKept = data.kind === undefined || data.kind === current.kind;
+      const docKept = !doc || ("doc" in stored && onlyAddsSizes(stored.doc, doc));
+      if (!kindKept || !docKept) return errorResponse(GONE_OUT_ERROR, 409);
+    }
   }
 
   // Copy the design as it stands before this save, for the History menu. A failure

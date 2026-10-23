@@ -88,6 +88,22 @@ export function isPictureKind(value: unknown): value is PictureKind {
   return (PICTURE_KINDS as readonly unknown[]).includes(value);
 }
 
+/** The most pictures a drafted email holds: one at the top and one partway down a long one. */
+export const MAX_DRAFT_PICTURES = 2;
+
+/** Fewest paragraphs between two drafted pictures, so they never crowd the words. */
+const PICTURE_GAP = 2;
+
+/** A picture the model asked for, before the route checks its saved-picture label. */
+export interface PictureWant {
+  /** The paragraph it sits just above, from 0: 0 is the top of the email, under the heading. */
+  at: number;
+  /** The look for a new picture, or "" when it picked a saved one. */
+  look: PictureKind | "";
+  /** The saved picture's label, like "p1", or "". */
+  reuse: string;
+}
+
 /** What the route returns: the parts the editor fills in. */
 export interface AiDraft {
   subject: string;
@@ -98,8 +114,8 @@ export interface AiDraft {
   buttonText: string;
   /** Link for a button that has none yet (one of the editor's choices), or "". */
   buttonUrl: string;
-  /** The picture look that suits the email, or "" when it doesn't want one or none was asked for. */
-  picture: PictureKind | "";
+  /** The pictures that suit the email, top first; none when none fit or none were asked for. */
+  pictures: PictureWant[];
 }
 
 /** A saved Post maker picture the draft picked instead of making a new one. */
@@ -109,6 +125,10 @@ export interface ReusedPicture {
   /** The design's name, to say which one went in. */
   name: string;
 }
+
+/** A picture the route settled on: a new one in a look, or a saved one as it is. */
+export type PlannedPicture =
+  { at: number; look: PictureKind; reuse: null } | { at: number; look: null; reuse: ReusedPicture };
 
 /**
  * Straightens curly quotes and turns en/em dashes into a spaced hyphen, or an unspaced
@@ -150,6 +170,39 @@ function list(value: unknown, count: number, max: number): string[] {
 }
 
 /**
+ * Reads the model's pictures: each sits above a paragraph it names from 1, which comes back
+ * counted from 0. One without a look or a label, or above a paragraph the draft doesn't have,
+ * drops out; so does one closer than {@link PICTURE_GAP} paragraphs to the one before it, so
+ * the email never reads as a run of pictures. Kept top first, at most
+ * {@link MAX_DRAFT_PICTURES}.
+ * @param value - The model's "pictures".
+ * @param paragraphs - How many paragraphs the draft has.
+ * @returns The pictures.
+ */
+function readPictures(value: unknown, paragraphs: number): PictureWant[] {
+  if (!Array.isArray(value)) return [];
+  const wants: PictureWant[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const p = item as Record<string, unknown>;
+    const at =
+      typeof p.paragraph === "number" && Number.isInteger(p.paragraph) ? p.paragraph - 1 : 0;
+    const look = isPictureKind(p.look) ? p.look : "";
+    const reuse = text(p.reuse, 10);
+    if ((!look && !reuse) || at < 0 || at >= Math.max(paragraphs, 1)) continue;
+    wants.push({ at, look, reuse });
+  }
+  // The sort is stable, so of two above one paragraph the model's first stays.
+  const out: PictureWant[] = [];
+  for (const want of wants.sort((a, b) => a.at - b.at)) {
+    const before = out[out.length - 1];
+    if (before && want.at - before.at < PICTURE_GAP) continue;
+    out.push(want);
+  }
+  return out.slice(0, MAX_DRAFT_PICTURES);
+}
+
+/**
  * Reads the model's JSON into a draft, dropping wrong-shaped fields and capping lengths
  * so a runaway reply can't flood the editor.
  * @param raw - Parsed JSON from the model.
@@ -158,17 +211,40 @@ function list(value: unknown, count: number, max: number): string[] {
 export function readDraft(raw: unknown): AiDraft | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
+  const paragraphs = list(r.paragraphs, 5, 800);
   const draft: AiDraft = {
     subject: text(r.subject, 150),
     preheader: text(r.preheader, 150),
     heading: text(r.heading, 120),
-    paragraphs: list(r.paragraphs, 5, 800),
+    paragraphs,
     bullets: list(r.bullets, 8, 200),
     buttonText: text(r.buttonText, 40),
     buttonUrl: text(r.buttonUrl, 300),
-    picture: isPictureKind(r.picture) ? r.picture : "",
+    pictures: readPictures(r.pictures, paragraphs.length),
   };
   return draft.paragraphs.length > 0 || draft.heading ? draft : null;
+}
+
+/**
+ * A paragraph as a picture's brief: its bold label marks taken out.
+ * @param paragraph - The drafted paragraph.
+ * @returns The plain words.
+ */
+export function pictureBriefOf(paragraph: string): string {
+  return paragraph.replace(/\*\*/g, "").trim();
+}
+
+/**
+ * A short name for a picture's design: the email's heading, and for one above a part of the
+ * email, that part's bold label ("Thanks for a great year: Prices").
+ * @param draft - The draft.
+ * @param at - The paragraph the picture sits above.
+ * @returns The name.
+ */
+export function pictureNameOf(draft: AiDraft, at: number): string {
+  const title = draft.heading || draft.subject;
+  const label = at > 0 ? /^\*\*([^*]+?):?\*\*/.exec(draft.paragraphs[at] ?? "")?.[1]?.trim() : "";
+  return label ? `${title}: ${label}` : title;
 }
 
 /** A greeting line on its own, like "Hi {firstName}," or "Kia ora {firstName}". */
@@ -285,13 +361,37 @@ export function placePicture(
 }
 
 /**
- * Takes out the picture an earlier draft put in, for a draft that comes without one, so its old
- * words don't sit with the new text. A picture the operator changed since has another address,
- * so it stays.
- * @param blocks - The blocks.
- * @param url - The earlier draft's picture, or null for none.
+ * Puts a draft's pictures in: one at 0 goes under the heading through {@link placePicture}, and
+ * each other one just above the paragraph it goes with, found by its words.
+ * @param blocks - The blocks, already filled with the draft.
+ * @param paragraphs - The draft's paragraphs.
+ * @param pictures - The pictures, each with the paragraph it sits above.
  * @returns The new blocks.
  */
-export function dropPicture(blocks: readonly Block[], url: string | null): Block[] {
-  return blocks.filter((b) => !url || b.type !== "picture" || b.url.trim() !== url);
+export function placePictures(
+  blocks: readonly Block[],
+  paragraphs: readonly string[],
+  pictures: readonly { url: string; alt: string; at: number }[],
+): Block[] {
+  const top = pictures.find((p) => p.at === 0);
+  const out = top ? placePicture(blocks, top) : [...blocks];
+  for (const p of pictures) {
+    if (p.at === 0) continue;
+    const at = out.findIndex((b) => b.type === "text" && b.text === paragraphs[p.at]);
+    if (at < 0) continue;
+    out.splice(at, 0, { ...emptyBlock("picture"), url: p.url, alt: p.alt } as Block);
+  }
+  return out;
+}
+
+/**
+ * Takes out the pictures an earlier draft put in, before a new draft fills the email, so old
+ * pictures neither sit with the new words nor break up the paragraphs it swaps. A picture the
+ * operator changed since has another address, so it stays.
+ * @param blocks - The blocks.
+ * @param urls - The earlier draft's pictures.
+ * @returns The new blocks.
+ */
+export function dropPictures(blocks: readonly Block[], urls: readonly string[]): Block[] {
+  return blocks.filter((b) => b.type !== "picture" || !urls.includes(b.url.trim()));
 }

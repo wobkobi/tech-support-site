@@ -9,6 +9,7 @@ import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
+import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { callApi } from "@/features/mailing/lib/api-client";
 import {
@@ -396,6 +397,11 @@ function DesignGrid({
               <p className="text-sm text-admin-text-secondary">
                 {KIND_LABEL[r.kind]} · {r.formatCount} sizes · {formatDateShort(r.updatedAt)}
               </p>
+              {r.goneOut && (
+                <StatusPill tone="info" className="mt-1">
+                  Gone out
+                </StatusPill>
+              )}
             </div>
             {/* Screen-reader text, not aria-label: a typed name in an attribute trips CodeQL. */}
             <div className={cn("flex shrink-0 gap-1", editing?.id === r.id && "hidden")}>

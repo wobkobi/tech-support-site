@@ -790,6 +790,41 @@ export function addFormat(doc: DesignDoc, key: FormatKey): DesignDoc {
 }
 
 /**
+ * Whether a save only gives the design new sizes, leaving every picture it already has as it
+ * was: a design that has gone out may still gain a size (Make a story adds Story). Text heights
+ * are left out of the check, since re-measuring them in another browser can move them a little.
+ * Both documents must come through parseDesignDoc, so their keys are in the same order.
+ * @param before - The design as stored.
+ * @param after - The design being saved.
+ * @returns True when the layers and every size it had are unchanged.
+ */
+export function onlyAddsSizes(before: DesignDoc, after: DesignDoc): boolean {
+  /**
+   * Whether two parsed values match.
+   * @param a - One value.
+   * @param b - The other.
+   * @returns True when their JSON matches.
+   */
+  const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+  /**
+   * A size's layout with the text heights zeroed.
+   * @param layout - The layout, or undefined when the size has none.
+   * @returns The layout to compare.
+   */
+  const placed = (layout: FormatLayout | undefined): Record<string, Geometry> =>
+    Object.fromEntries(Object.entries(layout ?? {}).map(([id, g]) => [id, { ...g, h: 0 }]));
+  return (
+    same(before.layers, after.layers) &&
+    before.caption === after.caption &&
+    before.altText === after.altText &&
+    before.paidAd === after.paidAd &&
+    before.formats.every(
+      (f) => after.formats.includes(f) && same(placed(before.layouts[f]), placed(after.layouts[f])),
+    )
+  );
+}
+
+/**
  * Removes a size and its layout. The last size can't be removed.
  * @param doc - Design.
  * @param key - Size to remove.

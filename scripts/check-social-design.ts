@@ -38,6 +38,7 @@ import {
   makeRoom,
   moveLayerTo,
   nearestFormat,
+  onlyAddsSizes,
   pasteStyle,
   presetFontSize,
   relinkLayers,
@@ -831,6 +832,50 @@ function checkSizes(): void {
   );
   expect("adding a size twice changes nothing", addFormat(withX, "x") === withX);
   expect("a design with an extra size parses", "doc" in parseDesignDoc(withX));
+
+  // A design that went out may gain a size, but nothing it already has may change. The save
+  // route compares both documents as parsed.
+  /**
+   * A design as the save route reads it.
+   * @param d - Design.
+   * @returns The parsed design.
+   */
+  const asSaved = (d: DesignDoc): DesignDoc => {
+    const p = parseDesignDoc(JSON.parse(JSON.stringify(d)));
+    if ("error" in p) throw new Error(p.error);
+    return p.doc;
+  };
+  const stored = asSaved(base);
+  expect("a design that went out may gain a size", onlyAddsSizes(stored, asSaved(withX)));
+  expect(
+    "re-measured text heights don't count as a change",
+    onlyAddsSizes(stored, asSaved(setTextHeights(withX, { square: { head1: 340 } }))),
+  );
+  expect(
+    "moving a layer on a size it had counts",
+    !onlyAddsSizes(
+      stored,
+      asSaved(setGeometry(withX, "square", { head1: { ...head(base, "square")!, x: 10 } }, "this")),
+    ),
+  );
+  expect(
+    "changing its words counts",
+    !onlyAddsSizes(
+      stored,
+      asSaved({
+        ...withX,
+        layers: withX.layers.map((l) => (l.type === "text" ? { ...l, text: "New words" } : l)),
+      }),
+    ),
+  );
+  expect(
+    "taking a size away counts",
+    !onlyAddsSizes(stored, asSaved(removeFormat(base, "square"))),
+  );
+  expect(
+    "a new caption counts",
+    !onlyAddsSizes(stored, asSaved({ ...withX, caption: "Different post text" })),
+  );
 
   const lessSquare = removeFormat(base, "square");
   expect(

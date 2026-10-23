@@ -1487,20 +1487,24 @@ type DesignRender {
 // it exports. The document's shape and checks live in
 // src/features/social-design/lib/doc.ts.
 model SocialDesign {
-  id          String         @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
+  id           String         @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
   // announcement | review | tip | promo | blank
-  kind        String         @default("blank")
+  kind         String         @default("blank")
   // Templates are starting points; opening one makes a copy.
-  isTemplate  Boolean        @default(false)
+  isTemplate   Boolean        @default(false)
   // Stable handle for a starter template the code seeds.
-  templateKey String?
-  doc         Json
-  renders     DesignRender[]
+  templateKey  String?
+  doc          Json
+  renders      DesignRender[]
   // Social post the pictures were handed to.
-  postId      String?        @db.ObjectId
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  postId       String?        @db.ObjectId
+  // Email whose Draft with AI drew it; that email's next draft redraws it.
+  campaignId   String?        @db.ObjectId
+  // Which of that draft's new pictures it is, from 0, so a redraft redraws the same one.
+  campaignSlot Int?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   @@index([isTemplate, updatedAt])
 }

@@ -6,10 +6,11 @@ import { parseObjectId } from "@/features/business/lib/validation";
 import {
   BRIEF_MAX,
   DRAFT_KINDS,
+  MAX_DRAFT_PICTURES,
   POST_SOURCE_MAX,
   readDraft,
   type DraftSource,
-  type ReusedPicture,
+  type PlannedPicture,
 } from "@/features/mailing/lib/ai-draft";
 import { promoWording } from "@/features/mailing/lib/context";
 import { emailLinkTargets } from "@/features/mailing/lib/insertables";
@@ -43,22 +44,25 @@ interface SavedPicture {
 
 /**
  * Saved pictures the draft may reuse: up to date with the design and the live contact and promo,
- * with words to judge them by. The email's own last drafted picture is left out, since a redraft
+ * with words to judge them by. A design this email's drafts drew is left out, since a redraft
  * redraws it instead, and so is any design already showing in the email, since handing it back
  * would change nothing.
- * @param ownDesign - The design the email's last draft made, or null.
+ * @param campaignId - The email being drafted, or null.
  * @param inEmail - Addresses of the pictures already in the email.
  * @returns The pictures, labelled p1, p2 and on.
  */
 async function savedPictures(
-  ownDesign: string | null,
+  campaignId: string | null,
   inEmail: ReadonlySet<string>,
 ): Promise<SavedPicture[]> {
   const designs = await loadEmailPictures();
   return designs
     .filter(
       (d) =>
-        d.current && d.alt && d.id !== ownDesign && !d.pictures.some((p) => inEmail.has(p.url)),
+        d.current &&
+        d.alt &&
+        (!campaignId || d.campaignId !== campaignId) &&
+        !d.pictures.some((p) => inEmail.has(p.url)),
     )
     .slice(0, MAX_SAVED)
     .map((design, i) => ({ label: `p${i + 1}`, design }));
@@ -162,20 +166,21 @@ ${pictureLine}
 
 OUTPUT
 Return only a JSON object with exactly these keys:
-{"subject": string, "preheader": string, "heading": string, "paragraphs": string[], "bullets": string[], "buttonText": string, "buttonUrl": string, "picture": string, "reuse": string}
+{"subject": string, "preheader": string, "heading": string, "paragraphs": string[], "bullets": string[], "buttonText": string, "buttonUrl": string, "pictures": [{"paragraph": number, "look": string, "reuse": string}]}
 Paragraphs and bullets are plain text: you may use **bold** for a few words, but no other markup, no headings and no links.`;
 }
 
 /**
  * POST /api/admin/mailing/ai-draft
- * Body: `{ brief, kind, promoId, buttonUrl, picture, ownDesign, inEmail, source }`: brief up to
+ * Body: `{ brief, kind, promoId, buttonUrl, picture, campaignId, inEmail, source }`: brief up to
  * {@link BRIEF_MAX} chars ({@link POST_SOURCE_MAX} when source is "post"), a {@link DRAFT_KINDS}
- * key, the linked promo or null, the first button's link or "", whether to pick a picture for the
- * email, the design its last draft made (or null), the addresses of the pictures already in it,
- * and whether the brief is a social post.
+ * key, the linked promo or null, the first button's link or "", whether to pick pictures for the
+ * email, the email itself (or null), the addresses of the pictures already in it, and whether
+ * the brief is a social post.
  * @param request - Incoming request.
- * @returns JSON `{ draft, reuse }`: reuse is the saved picture picked instead of a new one, or
- *   null. A 429 with a retry hint when the AI provider is rate limited, or an error.
+ * @returns JSON `{ draft, pictures }`: the pictures to put in, top first, each a look for a new
+ *   one or a saved one to use as it is. A 429 with a retry hint when the AI provider is rate
+ *   limited, or an error.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
@@ -185,7 +190,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     promoId?: unknown;
     buttonUrl?: unknown;
     picture?: unknown;
-    ownDesign?: unknown;
+    campaignId?: unknown;
     inEmail?: unknown;
     source?: unknown;
   } | null;
@@ -203,7 +208,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const buttonUrl =
     typeof body.buttonUrl === "string" && body.buttonUrl.length <= 300 ? body.buttonUrl.trim() : "";
   const wantsPicture = body.picture === true;
-  const ownDesign = parseObjectId(body.ownDesign);
+  const campaignId = parseObjectId(body.campaignId);
   const inEmail = new Set(
     (Array.isArray(body.inEmail) ? body.inEmail : [])
       .filter((url): url is string => typeof url === "string" && url.length <= 1000)
@@ -219,7 +224,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       loadBusinessFacts(),
       // Reuse is a nice-to-have: a failure here drafts without it rather than failing the draft.
       wantsPicture
-        ? savedPictures(ownDesign, inEmail).catch((error: unknown) => {
+        ? savedPictures(campaignId, inEmail).catch((error: unknown) => {
             console.error("[mailing/ai-draft] saved pictures failed:", error);
             return [];
           })
@@ -236,32 +241,41 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const promoLine = promo
       ? `A promo is running: ${promo.summary}.${promo.about ? ` In its own words: "${promo.about}".` : ""} When it ends, the standard rates in BUSINESS FACTS apply.\nIs the email about this promo, or about a price change its own words describe?\n- YES: refer to it with {promoOffer} (which reads "${promo.offer}") and {promoEnds} (which reads like "${promo.ends}"), or {promo} for the whole line, rather than writing its figures, so the email stays right if the promo changes. Write each sentence so it reads right once they're filled in. Do its own words say prices are changing?\n  - YES: say plainly that {promoOffer} still applies until {promoEnds} (and what its own words say to do before then), and that after that the on-site rate applies (the "On-site visit" line under "Rates and pricing rules" in BUSINESS FACTS): just its hourly figure, exactly as written there. INVARIANT: all of it goes in the one paragraph that gives the offer, so the offer is never given twice.\n  - NO: carry on.\n- NO: don't mention it.`
       : "No promo is running. INVARIANT: never mention a deal, discount or promo, and never use {promo}, {promoOffer} or {promoEnds}.";
-    // A saved picture that already says it comes first. The looks are then asked in order: a
-    // thank-you that's the main point wins over news in the same email, scam signs get "scam",
-    // and a promo listing what it covers stays "promo".
-    const reuseLines = saved.length
-      ? [
-          "These pictures are saved already, each with the words on it:",
-          ...saved.map((s) => `- ${s.label}: ${JSON.stringify(s.design.alt)}`),
-          `Does one of them already say what this email is mainly about, so it fits as it is?\n- YES: "reuse" is its label, like "p1". INVARIANT: never one whose words say something this email doesn't: a different scam, another offer, or a date or price the brief doesn't give.\n- NO: "reuse" is "".`,
-        ]
-      : [`"reuse" is "".`];
+    // A saved picture that already says it comes first. The top picture's looks are then asked
+    // in order: a thank-you that's the main point wins over news in the same email, scam signs
+    // get "scam", and a promo listing what it covers stays "promo".
+    const notSaid =
+      "INVARIANT: never one whose words say something this email doesn't: a different scam, another offer, or a date or price the brief doesn't give.";
+    const topReuse = saved.length
+      ? `   Does one of the saved pictures already say what this email is mainly about, so it fits as it is?\n   - YES: "reuse" is its label, like "p1", and "look" is "". ${notSaid}\n   - NO: carry on.\n`
+      : "";
+    const partReuse = saved.length
+      ? ` Does a saved picture already say what that paragraph says, so it fits as it is? YES: "reuse" is its label and "look" is "" (${notSaid}). NO: a new one in the look that fits:`
+      : " Its look:";
     const pictureLine = wantsPicture
       ? [
-          "A picture can go near the top of the email.",
-          ...reuseLines,
-          `When "reuse" is a label, "picture" is "". Otherwise a new picture can be made from the brief: pick the look that fits, or none:`,
-          `- Is thanking the reader the email's main point (the brief says so, or most of it is a thank-you)?\n  - YES: "picture" is "thanks".\n  - NO: carry on.`,
-          `- Does the email warn about a scam?\n  - YES: "picture" is "scam".\n  - NO: carry on.`,
-          ...(promo
+          `"pictures" lists the email's pictures, top first, each as {"paragraph": number, "look": string, "reuse": string}: "paragraph" is the number of the paragraph it sits just above, counting from 1, so 1 is the top of the email.`,
+          ...(saved.length
             ? [
-                `- Is it about the promo that's running?\n  - YES: "picture" is "promo".\n  - NO: carry on.`,
+                "These pictures are saved already, each with the words on it:",
+                ...saved.map((s) => `- ${s.label}: ${JSON.stringify(s.design.alt)}`),
               ]
             : []),
-          `- Does it give the reader a tip, steps or signs to follow?\n  - YES: "picture" is "tip".\n  - NO: carry on.`,
-          `- Does it share news: a new service, area, hours or a change?\n  - YES: "picture" is "announcement".\n  - NO: "picture" is "". A check-in or a general catch-up reads better without one.`,
+          `1. The top picture ("paragraph": 1, "reuse": "" unless a saved one fits).\n${topReuse}   Pick the look for a new one, or none:`,
+          `   - Is thanking the reader the email's main point (the brief says so, or most of it is a thank-you)?\n     - YES: "look" is "thanks".\n     - NO: carry on.`,
+          `   - Does the email warn about a scam?\n     - YES: "look" is "scam".\n     - NO: carry on.`,
+          ...(promo
+            ? [
+                `   - Is it about the promo that's running?\n     - YES: "look" is "promo".\n     - NO: carry on.`,
+              ]
+            : []),
+          `   - Does it give the reader a tip, steps or signs to follow?\n     - YES: "look" is "tip".\n     - NO: carry on.`,
+          `   - Does it share news: a new service, area, hours or a change?\n     - YES: "look" is "announcement".\n     - NO: no top picture. A check-in or a general catch-up reads better without one.`,
+          `2. A picture further down. Are there three or more news paragraphs, each with a bold label?\n   - YES: one more picture can go just above the news paragraph that most needs showing: a scam warning first, then${promo ? " the promo that's running, then" : ""} a tip, steps or signs, then any other news. Pick that one paragraph only.${partReuse} "scam" for a scam warning,${promo ? ` "promo" for the promo that's running,` : ""} "tip" for a tip, steps or signs, and "announcement" for a new service, area, hours or another change.\n     INVARIANT: it is about something the top picture isn't, it never sits above the opening or the ask, and with a top picture at least two paragraphs come between them.\n   - NO: no more pictures.`,
+          `INVARIANT: at most ${MAX_DRAFT_PICTURES} pictures in all, so the words lead and the email never reads as a run of pictures.`,
+          "INVARIANT: each saved picture's label is used once at most.",
         ].join("\n")
-      : `No picture this time: "picture" and "reuse" are "".`;
+      : `No pictures this time: "pictures" is [].`;
 
     // One attempt inside the function budget; a 429 goes back as retryable instead.
     const { text: raw } = await jsonCompletion({
@@ -289,14 +303,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const draft = readDraft(reply);
     if (!draft) return errorResponse("The draft came back empty. Try saying a bit more.", 422);
     if (buttonUrl || !targets.some((t) => t.url === draft.buttonUrl)) draft.buttonUrl = "";
-    const label = (reply as { reuse?: unknown }).reuse;
-    const pick = saved.find((s) => s.label === label)?.design;
-    const reuse: ReusedPicture | null = pick
-      ? { url: pick.pictures[0]!.url, alt: pick.alt, name: pick.name }
-      : null;
-    // The promo look draws the live promo, so it needs one running.
-    if (reuse || !wantsPicture || (draft.picture === "promo" && !promo)) draft.picture = "";
-    return okResponse({ draft, reuse });
+    // A label that names no saved picture, or one already used, falls back to the look. The
+    // promo look draws the live promo, so it needs one running.
+    const used = new Set<string>();
+    const pictures: PlannedPicture[] = (wantsPicture ? draft.pictures : []).flatMap(
+      (want): PlannedPicture[] => {
+        const pick = saved.find((s) => s.label === want.reuse && !used.has(s.label));
+        if (pick) {
+          used.add(pick.label);
+          const { design } = pick;
+          const reuse = { url: design.pictures[0]!.url, alt: design.alt, name: design.name };
+          return [{ at: want.at, look: null, reuse }];
+        }
+        if (!want.look || (want.look === "promo" && !promo)) return [];
+        return [{ at: want.at, look: want.look, reuse: null }];
+      },
+    );
+    return okResponse({ draft: { ...draft, pictures: [] }, pictures });
   } catch (err) {
     console.error("[mailing/ai-draft] failed:", err);
     if (isAiRateLimitError(err)) return aiRateLimitResponse(err);
