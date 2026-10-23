@@ -1,17 +1,23 @@
 // src/app/api/webhooks/resend/route.ts
-// Resend delivery webhook: hard bounces and spam reports opt the address out (protecting
-// sender reputation); a bounce on a recent booking alerts the operator as likely fake.
+// Resend webhook: hard bounces and spam reports opt the address out (protecting sender
+// reputation); a bounce on a recent booking alerts the operator as likely fake; a broadcast
+// copy that never arrived marks its row; an unsubscribe on Resend's side opts the reader out.
 
 import { flagBouncedBookings } from "@/features/booking/lib/bounced-booking.server";
-import { optOutActionFor } from "@/features/mailing/lib/delivery-events";
-import { optOutForDelivery } from "@/features/mailing/lib/opt-out";
+import { recordBroadcastFailure } from "@/features/mailing/lib/broadcast-send";
+import {
+  broadcastFailureFor,
+  contactUnsubscribeFor,
+  optOutActionFor,
+} from "@/features/mailing/lib/delivery-events";
+import { optOutByEmail, optOutForDelivery } from "@/features/mailing/lib/opt-out";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 
 /**
- * POST /api/webhooks/resend - subscribed to `email.bounced`, `email.complained` and
- * `email.suppressed`; other events are acknowledged and ignored.
+ * POST /api/webhooks/resend - subscribed to `email.bounced`, `email.complained`,
+ * `email.suppressed` and `contact.updated`; other events are acknowledged and ignored.
  * @param request - Incoming request, signed with Svix headers.
  * @returns JSON `{ ok }`, a 401 for a bad signature, or a 503 when the secret isn't set.
  */
@@ -39,9 +45,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Invalid signature", 401);
   }
 
+  const unsubscribed = contactUnsubscribeFor(event);
+  const failure = broadcastFailureFor(event);
   const action = optOutActionFor(event);
-  if (!action) return okResponse();
+  if (!unsubscribed && !failure && !action) return okResponse();
   try {
+    if (unsubscribed) await optOutByEmail(unsubscribed, "one_click");
+    if (failure) await recordBroadcastFailure(failure);
+    if (!action) return okResponse();
     await optOutForDelivery(action);
     // Swallows its own errors so a push failure can't make Resend retry the opt-out.
     if (action.source === "bounce") await flagBouncedBookings(action.emails);

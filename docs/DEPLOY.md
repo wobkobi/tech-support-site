@@ -122,6 +122,30 @@ non-blank in each Vercel environment.
   `Harrison at To The Point Tech <news@tothepoint.co.nz>`; falls back to `EMAIL_FROM`. A separate
   address means a reader who blocks the list or reports it as spam still gets booking emails. Any
   address on the domain verified in Resend works; replies go to `ADMIN_EMAIL`.
+- **Optional:** `RESEND_MARKETING_API_KEY` - a Resend key with **Full access**, used only for the
+  mailing list (see Mailing list below). Without it, mailing-list emails go out as ordinary sends
+  through `RESEND_API_KEY`, which count toward Resend's daily send limit.
+
+## Mailing list (Resend broadcasts)
+
+With `RESEND_MARKETING_API_KEY` set, each mailing-list email goes out as one Resend broadcast.
+Broadcasts don't count toward the transactional limit (100 a day on the free plan) that booking,
+invoice, quote and review emails share. `RESEND_API_KEY` stays send-only for those.
+
+- **Contacts:** the site manages every contact on the Resend account. Before each send it copies
+  Resend-side unsubscribes into its own list, then deletes the Resend contacts that are no longer
+  subscribed or no longer exist, so the account stays under the free plan's 1,000 contacts. Don't
+  keep contacts in Resend for anything else.
+- **Segments:** each send makes a segment named `Mailing: <email name>` and the cron deletes it once
+  Resend reports the broadcast sent. The free plan allows 3, so leave at least one free.
+- **Per-person parts:** names, the review and the unsubscribe link are contact properties
+  (`full_name`, `review_text`, `unsubscribe_url`) that Resend fills through merge tags.
+- **Webhook:** the existing endpoint must also be subscribed to `contact.updated`, so an unsubscribe
+  through Resend's own link reaches the site straight away (the pull before each send catches any
+  that are missed).
+- **Retry failed** only runs for a send that never reached Resend. A broadcast copy that bounced
+  shows its reason and can't be re-sent.
+- **Test emails** still go through `RESEND_API_KEY`, one email each.
 
 **The `$`-expansion trap:** locally, `.env.local` runs through dotenv-expand, which expands `$VAR`
 inside every value (single-quoted included). A value containing `$` must be single-quoted with the

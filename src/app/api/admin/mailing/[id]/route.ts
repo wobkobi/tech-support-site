@@ -3,6 +3,7 @@
 // written) and only touches drafts and presets: what was sent stays as it was sent.
 
 import { parseObjectId } from "@/features/business/lib/validation";
+import { releaseSegment } from "@/features/mailing/lib/broadcast-send";
 import { toCampaignRow } from "@/features/mailing/lib/campaign-row";
 import { parseCampaignPatch } from "@/features/mailing/lib/validate";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
@@ -74,6 +75,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
   const id = parseObjectId((await params).id);
   if (!id) return errorResponse("Email not found.", 404);
+  const held = await prisma.campaign.findUnique({ where: { id }, select: { segmentId: true } });
   const deleted = await prisma.campaign.deleteMany({ where: { id, status: { not: "sending" } } });
   if (deleted.count === 0) {
     return errorResponse("This email is sending right now, so it can't be deleted.", 409);
@@ -81,6 +83,8 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
   await Promise.all([
     prisma.campaignSend.deleteMany({ where: { campaignId: id } }),
     prisma.socialPost.updateMany({ where: { campaignId: id }, data: { campaignId: null } }),
+    // The free plan allows 3 segments, so a deleted email gives its one back.
+    releaseSegment(held?.segmentId ?? null),
   ]);
   return okResponse();
 }

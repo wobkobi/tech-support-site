@@ -22,6 +22,8 @@ const SEND_PILL: Record<SendRow["status"], { tone: StatusTone; label: string }> 
  * @param props.sends - One row per recipient's copy.
  * @param props.failedCount - How many copies failed.
  * @param props.status - The email's status; no retry while it's still sending.
+ * @param props.sentByBroadcast - It went as a Resend broadcast, so failures are bounces.
+ * @param props.broadcastFinishing - Resend is still sending the broadcast.
  * @param props.retrying - Whether a retry is running.
  * @param props.onRetry - Re-sends only the failed copies.
  * @returns Card element.
@@ -30,22 +32,31 @@ export function CampaignSendsCard({
   sends,
   failedCount,
   status,
+  sentByBroadcast,
+  broadcastFinishing,
   retrying,
   onRetry,
 }: {
   sends: SendRow[];
   failedCount: number;
   status: CampaignStatus;
+  sentByBroadcast: boolean;
+  broadcastFinishing: boolean;
   retrying: boolean;
   onRetry: () => void;
 }): React.ReactElement {
+  const tally = `${sends.filter((s) => s.status === "sent").length} sent, ${failedCount} failed`;
   return (
     <Card>
       <CardHeader
         title="Who it went to"
-        description={`${sends.filter((s) => s.status === "sent").length} sent, ${failedCount} failed`}
+        description={
+          broadcastFinishing
+            ? `${tally}. Resend is still sending it, which can take a few minutes.`
+            : tally
+        }
         actions={
-          failedCount > 0 && status !== "sending" ? (
+          failedCount > 0 && status !== "sending" && !sentByBroadcast ? (
             <AdminButton busy={retrying} onClick={onRetry}>
               Retry failed
             </AdminButton>
