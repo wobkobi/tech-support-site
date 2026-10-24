@@ -63,6 +63,7 @@ import {
   toggleTaskModifierLine,
   updateTaskField,
 } from "@/features/business/lib/calculator-helpers";
+import { goldCardPercent } from "@/features/business/lib/gold-card";
 import type { ReissuePrefill } from "@/features/business/lib/invoice-reissue";
 import { fitTasksToWindow } from "@/features/business/lib/parse-hydrate";
 import { calcTravelCharge, type CancellationPolicy } from "@/features/business/lib/pricing-policy";
@@ -198,6 +199,8 @@ export function CalculatorView({
   const [notes, setNotes] = useState(() => reissue?.notes ?? "");
   // Paid in cash on the day: invoices save as paid, income entries record Cash.
   const [paidCash, setPaidCash] = useState(false);
+  // Gold Card holder: labour comes down by the Gold Card rate. A re-issue keeps the tick.
+  const [goldCard, setGoldCard] = useState(() => reissue?.goldCard ?? false);
   // Part of the bill handed over on the day: shown on the invoice, recorded in income.
   const [alreadyPaid, setAlreadyPaid] = useState<AlreadyPaidState>(EMPTY_ALREADY_PAID);
   // Client, save buttons and preview; the phone total bar hides while any is on screen.
@@ -448,6 +451,7 @@ export function CalculatorView({
       setParts(draft.parts ?? []);
       setNotes(draft.notes ?? "");
       setPaidCash(draft.paidCash ?? false);
+      setGoldCard(draft.goldCard ?? false);
       setAlreadyPaid(draft.alreadyPaid ?? EMPTY_ALREADY_PAID);
       setClientName(draft.clientName ?? "");
       setClientEmail(normaliseEmail(draft.clientEmail));
@@ -514,6 +518,7 @@ export function CalculatorView({
         parts,
         notes,
         paidCash,
+        goldCard,
         alreadyPaid,
         clientName,
         clientEmail,
@@ -537,6 +542,7 @@ export function CalculatorView({
     parts,
     notes,
     paidCash,
+    goldCard,
     alreadyPaid,
     clientName,
     clientEmail,
@@ -591,12 +597,17 @@ export function CalculatorView({
     rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
     rates.find((r) => r.ratePerHour !== null && r.unit === "hour")?.ratePerHour ??
     null;
+  // The Gold Card rate from Settings > Rates (null hides the box). A cancellation fee is
+  // flat, so it never takes the discount.
+  const goldCardRate = goldCardPercent(rates);
+  const appliedGoldCard = goldCard && !cancelMode ? goldCardRate : null;
   const jobPricing = {
     ...pricing,
     surchargeUplift: surcharge?.uplift ?? 0,
     businessModifierId,
     standardRate,
     rates,
+    goldCardPercent: appliedGoldCard ?? 0,
   };
   const totals = calcJobTotal(job, !skipPromo ? pricedPromo : null, jobPricing);
   const showTotalBar = !finishInView && totals.total > 0;
@@ -643,6 +654,7 @@ export function CalculatorView({
     pricing,
     activePromo: pricedPromo,
     skipPromo,
+    goldCardPercent: appliedGoldCard,
     eventPrefill,
     pickedContactGoogleId,
     jobDate,
@@ -691,6 +703,7 @@ export function CalculatorView({
     setShowParts(false);
     setNotes("");
     setPaidCash(false);
+    setGoldCard(false);
     setAlreadyPaid(EMPTY_ALREADY_PAID);
     setClientName("");
     setClientEmail("");
@@ -1013,6 +1026,9 @@ export function CalculatorView({
             renameOffer={contactRenameOffer}
             renameContact={renameContact}
             onRenameContactChange={setRenameContact}
+            goldCard={goldCard}
+            onGoldCardChange={setGoldCard}
+            goldCardPercent={cancelMode ? null : goldCardRate}
             contacts={contacts}
             onSelectContact={(c) => {
               const company = c.company?.trim() || null;
@@ -1071,6 +1087,8 @@ export function CalculatorView({
             notes={notes}
             gstRegistered={pricing.gstRegistered}
             unsuccessfulDiscount={totals.unsuccessfulDiscount}
+            goldCardDiscount={totals.goldCardDiscount}
+            goldCardPercent={appliedGoldCard}
             alreadyPaid={paidCash || quoteMode ? 0 : alreadyPaidAmount(alreadyPaid)}
             promoTitle={
               pricedPromo && !skipPromo && totals.promoDiscount > 0 ? pricedPromo.title : null

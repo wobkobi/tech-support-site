@@ -5,7 +5,12 @@
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import type { QuickEvent } from "@/features/business/components/QuickPriceView";
-import { type calcJobTotal, formatMins, formatNZD } from "@/features/business/lib/business";
+import {
+  type calcJobTotal,
+  formatMins,
+  formatNZD,
+  goldCardLineLabel,
+} from "@/features/business/lib/business";
 import { bankParticulars } from "@/features/business/lib/payment-fields";
 import type { DateSurcharge } from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
@@ -90,12 +95,13 @@ interface TotalCardProps {
   surcharge: DateSurcharge | null;
   promo: ActivePromo | null;
   bookedAt: string | null;
+  goldCardPercent: number | null;
   bankAccount: string;
   clientName: string | null;
 }
 
 /**
- * The total to pay, its time/travel/surcharge/promo/GST lines, and the bank details.
+ * The total to pay, its time/travel/surcharge/promo/Gold Card/GST lines, and the bank details.
  * @param props - Component props.
  * @param props.totals - Job totals from calcJobTotal.
  * @param props.billedMins - Billed minutes after the snap and minimum; 0 before a start time.
@@ -108,6 +114,7 @@ interface TotalCardProps {
  * @param props.surcharge - Today's labour surcharge (public holiday or weekend), or null.
  * @param props.promo - Promo applied, or null.
  * @param props.bookedAt - When the seeded job was booked (ISO), shown by its promo; null hides it.
+ * @param props.goldCardPercent - Gold Card share off labour when ticked, or null.
  * @param props.bankAccount - Account number for bank transfers; empty hides the section.
  * @param props.clientName - Seeded client name for the bank particulars, or null.
  * @returns Total card element.
@@ -124,6 +131,7 @@ export function QuickTotalCard({
   surcharge,
   promo,
   bookedAt,
+  goldCardPercent,
   bankAccount,
   clientName,
 }: TotalCardProps): React.ReactElement {
@@ -204,6 +212,12 @@ export function QuickTotalCard({
               )}
             </dt>
             <dd>-{formatNZD(totals.promoDiscount)}</dd>
+          </div>
+        )}
+        {totals.goldCardDiscount > 0 && (
+          <div className="flex justify-between gap-3 text-moonstone-700">
+            <dt>{goldCardLineLabel(goldCardPercent)}</dt>
+            <dd>-{formatNZD(totals.goldCardDiscount)}</dd>
           </div>
         )}
         {/* Same wording as the calculator preview and the invoice PDF. */}

@@ -20,6 +20,8 @@ export interface ReissuePrefill {
   notes: string;
   /** Amount paid on the day, which stays on the voided invoice; null when none. */
   alreadyPaid: number | null;
+  /** The voided invoice was for a Gold Card holder, so the box starts ticked. */
+  goldCard: boolean;
 }
 
 /** The invoice fields a re-issue reads. */
@@ -36,6 +38,7 @@ interface ReissueSource {
   }[];
   notes: string | null;
   alreadyPaid: number | null;
+  goldCardPercent: number | null;
 }
 
 /**
@@ -90,5 +93,6 @@ export function reissuePrefill(invoice: ReissueSource): ReissuePrefill {
     jobText: invoice.lineItems.map(lineText).join("\n"),
     notes: invoice.notes ?? "",
     alreadyPaid: invoice.alreadyPaid && invoice.alreadyPaid > 0 ? invoice.alreadyPaid : null,
+    goldCard: (invoice.goldCardPercent ?? 0) > 0,
   };
 }

@@ -44,6 +44,8 @@ export interface CalculatorDraft {
   paidCash?: boolean;
   /** Already paid box. Optional so drafts saved before it existed still load. */
   alreadyPaid?: AlreadyPaidState;
+  /** Gold Card tick. Optional so drafts saved before it existed still load. */
+  goldCard?: boolean;
   clientName: string;
   clientEmail: string;
   pickedContactName: string | null;

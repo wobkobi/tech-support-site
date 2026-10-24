@@ -54,6 +54,10 @@ export interface Invoice {
   unsuccessful?: boolean;
   /** Computed labour-half discount, persisted for audit + PDF rendering. */
   unsuccessfulDiscount?: number | null;
+  /** Gold Card share taken off labour (0.1 = 10%), or null when the client isn't a holder. */
+  goldCardPercent?: number | null;
+  /** Gold Card dollars off labour, after the promo and before the unsuccessful discount. */
+  goldCardDiscount?: number | null;
   status: InvoiceStatus;
   notes: string | null;
   contactId: string | null;

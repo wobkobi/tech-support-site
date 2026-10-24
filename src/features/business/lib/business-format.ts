@@ -131,3 +131,22 @@ export function restatesTaskLine(
 export function promoLineLabel(title: string | null | undefined): string {
   return title ? `Promo: ${title}` : "Promo discount";
 }
+
+/**
+ * A Gold Card share as "10% off labour", for its tick boxes and invoice line.
+ * @param percent - The share taken off labour (0.1 = 10%).
+ * @returns The text, one decimal at most: 12.5% stays 12.5%, 10% doesn't print as 10.0%.
+ */
+export function goldCardOffText(percent: number): string {
+  return `${Number((percent * 100).toFixed(1))}% off labour`;
+}
+
+/**
+ * Totals-block label for an invoice's Gold Card line, shared by the PDF, preview, invoice
+ * page and quick price.
+ * @param percent - The share taken off labour (0.1 = 10%), when the invoice kept it.
+ * @returns The label text, e.g. "Gold Card discount (10% off labour)".
+ */
+export function goldCardLineLabel(percent: number | null | undefined): string {
+  return `Gold Card discount (${percent ? goldCardOffText(percent) : "labour only"})`;
+}

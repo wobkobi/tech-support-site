@@ -512,6 +512,10 @@ model Invoice {
   // clause was invoked so a pattern of abuse is spottable.
   unsuccessful         Boolean           @default(false)
   unsuccessfulDiscount Float?
+  // Gold Card holder: goldCardPercent (0.1 = 10%) came off labour after the promo,
+  // goldCardDiscount dollars. Both null when the box wasn't ticked.
+  goldCardPercent      Float?
+  goldCardDiscount     Float?
   status               InvoiceStatus     @default(DRAFT)
   notes                String?
   contactId            String?           @db.ObjectId
