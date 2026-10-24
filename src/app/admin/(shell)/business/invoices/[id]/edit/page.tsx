@@ -132,6 +132,8 @@ export default async function EditInvoicePage({
         rates.find((r) => r.ratePerHour !== null && r.unit === "hour")?.ratePerHour ??
         null,
       rates,
+      // The share kept on the invoice, not today's rate, like the promo terms.
+      goldCardPercent: invoice.goldCardPercent ?? 0,
     },
     promo,
   };
@@ -170,6 +172,8 @@ export default async function EditInvoicePage({
           promoTitle: invoice.promoTitle,
           promoDiscount: invoice.promoDiscount ?? 0,
           unsuccessfulDiscount: invoice.unsuccessfulDiscount ?? 0,
+          goldCardDiscount: invoice.goldCardDiscount ?? 0,
+          goldCardPercent: invoice.goldCardPercent,
         }}
         identity={identity}
         gstRegistered={policy.GST_REGISTERED}

@@ -26,6 +26,7 @@ import {
   balanceDue,
   calcInvoiceTotals,
   formatNZD,
+  goldCardLineLabel,
   isValidLineItem,
 } from "@/features/business/lib/business";
 import type { LineItem } from "@/features/business/types/business";
@@ -58,6 +59,9 @@ export interface PreservedDiscounts {
   promoTitle?: string | null;
   promoDiscount?: number;
   unsuccessfulDiscount?: number;
+  goldCardDiscount?: number;
+  /** Gold Card share off labour (0.1 = 10%); the invoice's own, never today's rate. */
+  goldCardPercent?: number | null;
 }
 
 /** Props for {@link InvoiceForm}. */
@@ -148,10 +152,11 @@ export function InvoiceForm({
   }
 
   const promoDiscount = preservedDiscounts?.promoDiscount ?? 0;
+  const goldCardDiscount = preservedDiscounts?.goldCardDiscount ?? 0;
   const unsuccessfulDiscount = preservedDiscounts?.unsuccessfulDiscount ?? 0;
   const totals = calcInvoiceTotals(
     form.lineItems,
-    promoDiscount + unsuccessfulDiscount,
+    promoDiscount + goldCardDiscount + unsuccessfulDiscount,
     gstRegistered,
   );
   const paid = alreadyPaidAmount(form.alreadyPaid);
@@ -320,6 +325,12 @@ export function InvoiceForm({
               Promo{preservedDiscounts?.promoTitle ? `: ${preservedDiscounts.promoTitle}` : ""}
             </span>
             <span>-{formatNZD(promoDiscount)}</span>
+          </div>
+        )}
+        {goldCardDiscount > 0 && (
+          <div className="flex justify-between gap-3 text-amber-700">
+            <span>{goldCardLineLabel(preservedDiscounts?.goldCardPercent)}</span>
+            <span>-{formatNZD(goldCardDiscount)}</span>
           </div>
         )}
         {unsuccessfulDiscount > 0 && (

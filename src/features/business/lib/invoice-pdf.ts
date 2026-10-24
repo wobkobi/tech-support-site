@@ -5,6 +5,7 @@
 import {
   balanceDue,
   formatNZD,
+  goldCardLineLabel,
   lineItemQtyLabel,
   promoLineLabel,
 } from "@/features/business/lib/business";
@@ -135,6 +136,8 @@ export function serialiseInvoice(inv: PrismaInvoice): Invoice {
     promoDiscount: inv.promoDiscount,
     unsuccessful: inv.unsuccessful,
     unsuccessfulDiscount: inv.unsuccessfulDiscount,
+    goldCardPercent: inv.goldCardPercent,
+    goldCardDiscount: inv.goldCardDiscount,
     status: inv.status,
     notes: inv.notes,
     contactId: inv.contactId,
@@ -515,6 +518,12 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
   drawRow("Subtotal", formatNZD(invoice.subtotal));
   if (invoice.promoDiscount && invoice.promoDiscount > 0) {
     drawRow(promoLineLabel(invoice.promoTitle), `-${formatNZD(invoice.promoDiscount)}`, {
+      isPromo: true,
+    });
+  }
+  // Promo, Gold Card, then unsuccessful: the order calcJobTotal takes them off.
+  if (invoice.goldCardDiscount && invoice.goldCardDiscount > 0) {
+    drawRow(goldCardLineLabel(invoice.goldCardPercent), `-${formatNZD(invoice.goldCardDiscount)}`, {
       isPromo: true,
     });
   }

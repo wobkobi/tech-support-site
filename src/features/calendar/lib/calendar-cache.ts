@@ -287,9 +287,12 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     }
   }
 
+  // All-day blocks aren't trips: "Busy" would read as an address, and as an origin or next stop.
+  const timedEvents = rawEvents.filter((e) => !e.allDay);
+
   // TravelBlock-eligible: any event in the travel window with a location, or a summary
   // (a business name title still resolves).
-  const eligibleEvents = rawEvents.filter(
+  const eligibleEvents = timedEvents.filter(
     (e) => (e.location ?? e.summary) && new Date(e.start) > travelWindowStart,
   );
 
@@ -367,7 +370,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
 
     // Origin: the preceding event's location within the lookahead, else home.
     const detectedOrigin = findSmartOrigin(
-      rawEvents,
+      timedEvents,
       event,
       homeAddress,
       scheduling.smartOriginLookaheadHours,
@@ -383,7 +386,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     // custom back destination.
     const chained = hasCustomBackDestination
       ? null
-      : findNextChainedEvent(rawEvents, event, departureForBack, new Set<string>());
+      : findNextChainedEvent(timedEvents, event, departureForBack, new Set<string>());
     const currentChainedId = chained?.event.id ?? null;
     const currentChainedStart = chained?.startAt ?? null;
 

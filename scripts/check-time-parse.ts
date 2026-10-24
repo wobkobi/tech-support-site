@@ -93,14 +93,16 @@ function parsedHour(unsuccessful: boolean): ParseJobResponse["tasks"][number] {
  * @param factor - Share of an unsuccessful line still charged.
  * @param promo - The invoice's promo terms, or null.
  * @param uplift - Weekend or holiday labour uplift for the job date.
- * @returns The promo and unsuccessful-work discounts for the new lines.
+ * @param gold - The invoice's Gold Card share off labour, or 0 for none.
+ * @returns The parse's line items and discounts.
  */
-function repriced(
+function reparse(
   factor: number,
   promo: JobPromo | null,
   uplift = 0,
-): { promoDiscount: number; unsuccessfulDiscount: number } {
-  const { promoDiscount, unsuccessfulDiscount } = parsedJobToLineItems(
+  gold = 0,
+): ReturnType<typeof parsedJobToLineItems> {
+  return parsedJobToLineItems(
     reply({ durationMins: 120, tasks: [parsedHour(false), parsedHour(true)] }),
     [],
     "18:00",
@@ -111,11 +113,41 @@ function repriced(
       surcharge: uplift > 0 ? { label: "Weekend surcharge", uplift } : null,
       unsuccessfulFactor: factor,
       standardRate: 80,
+      goldCardPercent: gold,
     },
     { line: null, destination: null },
     promo,
   );
+}
+
+/**
+ * {@link reparse}'s promo and unsuccessful-work discounts.
+ * @param factor - Share of an unsuccessful line still charged.
+ * @param promo - The invoice's promo terms, or null.
+ * @param uplift - Weekend or holiday labour uplift for the job date.
+ * @returns The promo and unsuccessful-work discounts for the new lines.
+ */
+function repriced(
+  factor: number,
+  promo: JobPromo | null,
+  uplift = 0,
+): { promoDiscount: number; unsuccessfulDiscount: number } {
+  const { promoDiscount, unsuccessfulDiscount } = reparse(factor, promo, uplift);
   return { promoDiscount, unsuccessfulDiscount };
+}
+
+/**
+ * {@link reparse} on a 10% Gold Card invoice, at half price for the unfixed hour.
+ * @param promo - The invoice's promo terms, or null.
+ * @returns All three discounts for the new lines.
+ */
+function repricedGold(promo: JobPromo | null): {
+  promoDiscount: number;
+  goldCardDiscount: number;
+  unsuccessfulDiscount: number;
+} {
+  const { promoDiscount, goldCardDiscount, unsuccessfulDiscount } = reparse(0.5, promo, 0, 0.1);
+  return { promoDiscount, goldCardDiscount, unsuccessfulDiscount };
 }
 
 /**
@@ -383,6 +415,21 @@ function main(): void {
     repriced(0.5, null, 0.25).unsuccessfulDiscount,
     50,
   );
+  expectEqual(
+    "a Gold Card invoice takes 10% off, then halves the unfixed hour",
+    repricedGold(null),
+    {
+      promoDiscount: 0,
+      goldCardDiscount: 16,
+      unsuccessfulDiscount: 36,
+    },
+  );
+  expectEqual(
+    "a $65 flat rate, then 10% off, then half",
+    repricedGold(terms({ discountType: "flat_hourly", flatHourlyRate: 65 })),
+    { promoDiscount: 30, goldCardDiscount: 13, unsuccessfulDiscount: 29.25 },
+  );
+  expectEqual("no Gold Card on the invoice, no line", reparse(0.5, null).goldCardDiscount, 0);
 
   console.log("\nDetails that only repeat the line");
   expectEqual(

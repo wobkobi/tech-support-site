@@ -20,6 +20,9 @@ interface PreviewPayload {
   total: number;
   promoTitle?: string | null;
   promoDiscount?: number | null;
+  goldCardPercent?: number | null;
+  goldCardDiscount?: number | null;
+  unsuccessfulDiscount?: number | null;
   notes?: string | null;
 }
 
@@ -60,6 +63,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     total: body.total,
     promoTitle: body.promoTitle ?? null,
     promoDiscount: body.promoDiscount ?? null,
+    goldCardPercent: body.goldCardPercent ?? null,
+    goldCardDiscount: body.goldCardDiscount ?? null,
+    unsuccessfulDiscount: body.unsuccessfulDiscount ?? null,
     status: "DRAFT",
     notes: body.notes ?? null,
     contactId: null,

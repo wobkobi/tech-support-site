@@ -2,6 +2,7 @@
 // Resolves booking calendar events into a job prefill: corrected times, client details, and
 // one round trip of frozen drive time.
 
+import { jobBookedAt } from "@/features/business/lib/promos";
 import type { EventPrefill, EventPrefillSlot } from "@/features/business/types/business";
 import { fetchBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { prisma } from "@/shared/lib/prisma";
@@ -17,6 +18,7 @@ const BOOKING_SELECT = {
   meetingType: true,
   travelMinsAtBooking: true,
   travelMinsBackAtBooking: true,
+  createdAt: true,
 } as const;
 
 /**
@@ -36,6 +38,8 @@ interface ResolvedEvent {
   end: string;
   summary: string | null;
   location: string | null;
+  /** When the event was made in Calendar (ISO), if Google says. */
+  created: string | null;
   booking: {
     id: string;
     name: string;
@@ -45,6 +49,7 @@ interface ResolvedEvent {
     meetingType: string | null;
     travelMinsAtBooking: number | null;
     travelMinsBackAtBooking: number | null;
+    createdAt: Date;
   } | null;
   travelBlock: { rawTravelMinutes: number | null; rawTravelBackMinutes: number | null } | null;
 }
@@ -77,6 +82,7 @@ async function resolveEvent(eventId: string): Promise<ResolvedEvent | null> {
     end: event.end,
     summary: event.summary,
     location: event.location,
+    created: event.created,
     booking,
     travelBlock,
   };
@@ -161,5 +167,6 @@ export async function buildEventPrefill(eventIds: string[]): Promise<EventPrefil
           : null,
     travelMinsThere: outbound.there,
     travelMinsBack: inbound.back ?? outbound.back,
+    bookedAt: jobBookedAt(booking?.createdAt, withBooking.created)?.toISOString() ?? null,
   };
 }

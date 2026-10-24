@@ -6,6 +6,7 @@ import {
   balanceDue,
   calcInvoiceTotals,
   formatNZD,
+  goldCardLineLabel,
   lineItemQtyLabel,
   promoLineLabel,
 } from "@/features/business/lib/business";
@@ -34,6 +35,10 @@ interface Props {
   promoTitle: string | null;
   /** Dollar amount; rendered when > 0. */
   promoDiscount: number;
+  /** Gold Card dollars off labour; rendered when > 0. */
+  goldCardDiscount?: number;
+  /** Gold Card share off labour (0.1 = 10%), for the line's wording. */
+  goldCardPercent?: number | null;
   /** Half-price labour discount when operator ticked unsuccessful; rendered when > 0. */
   unsuccessfulDiscount?: number;
   /** Live GST-registration flag; controls the "Includes GST" line so the preview matches the saved invoice. */
@@ -57,6 +62,8 @@ interface Props {
  * @param props.notes - Footer notes text.
  * @param props.promoTitle - Promo title (when discount > 0).
  * @param props.promoDiscount - Promo discount in dollars; renders the line when > 0.
+ * @param props.goldCardDiscount - Gold Card discount in dollars; renders the line when > 0.
+ * @param props.goldCardPercent - Gold Card share off labour, printed in the line's label.
  * @param props.unsuccessfulDiscount - Half-price labour discount; renders the line when > 0.
  * @param props.gstRegistered - Live GST-registration flag; controls the "Includes GST" line.
  * @param props.alreadyPaid - Amount already paid; renders Already paid and Balance due when > 0.
@@ -74,12 +81,18 @@ function InvoicePreviewPanelImpl({
   notes,
   promoTitle,
   promoDiscount,
+  goldCardDiscount = 0,
+  goldCardPercent = null,
   unsuccessfulDiscount = 0,
   gstRegistered,
   alreadyPaid = 0,
   isQuote = false,
 }: Props): React.ReactElement {
-  const totals = calcInvoiceTotals(lineItems, promoDiscount + unsuccessfulDiscount, gstRegistered);
+  const totals = calcInvoiceTotals(
+    lineItems,
+    promoDiscount + goldCardDiscount + unsuccessfulDiscount,
+    gstRegistered,
+  );
   const showPromoLine = promoDiscount > 0;
   const showUnsuccessfulLine = unsuccessfulDiscount > 0;
   return (
@@ -211,6 +224,12 @@ function InvoicePreviewPanelImpl({
             <div className="flex justify-between gap-3 text-amber-700">
               <span>{promoLineLabel(promoTitle)}</span>
               <span className="whitespace-nowrap">-{formatNZD(promoDiscount)}</span>
+            </div>
+          )}
+          {goldCardDiscount > 0 && (
+            <div className="flex justify-between gap-3 text-amber-700">
+              <span>{goldCardLineLabel(goldCardPercent)}</span>
+              <span className="whitespace-nowrap">-{formatNZD(goldCardDiscount)}</span>
             </div>
           )}
           {showUnsuccessfulLine && (

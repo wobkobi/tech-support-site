@@ -28,7 +28,12 @@ import {
 } from "@/features/business/lib/promo-redemption";
 import type { AutoTripResult } from "@/features/business/lib/trips";
 import { autoLogJobTrip } from "@/features/business/lib/trips.server";
-import { parseAmount, parseDate, parseObjectId } from "@/features/business/lib/validation";
+import {
+  parseAmount,
+  parseDate,
+  parseObjectId,
+  parseRate,
+} from "@/features/business/lib/validation";
 import { attachEmailIfMissing } from "@/features/contacts/lib/find-or-create";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -101,6 +106,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Unsuccessful-work snapshot, so the dashboard can count the half-price clause.
     unsuccessful,
     unsuccessfulDiscount,
+    // Gold Card holder: the share off labour and the dollars it came to.
+    goldCardPercent,
+    goldCardDiscount,
     // Optional match back to the billed job (calculator event-prefill flow).
     bookingId,
     calendarEventId,
@@ -129,6 +137,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     promoId?: string | null;
     unsuccessful?: boolean;
     unsuccessfulDiscount?: number | null;
+    goldCardPercent?: number | null;
+    goldCardDiscount?: number | null;
     bookingId?: string | null;
     calendarEventId?: string | null;
     calendarEventIds?: string[];
@@ -184,6 +194,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (parsed === null) return errorResponse("Invalid unsuccessful-work discount", 400);
     unsuccessfulDiscountValue = parsed;
   }
+  let goldCardDiscountValue = 0;
+  if (goldCardDiscount != null) {
+    const parsed = parseAmount(goldCardDiscount);
+    if (parsed === null) return errorResponse("Invalid Gold Card discount", 400);
+    goldCardDiscountValue = parsed;
+  }
+  // Kept whenever the box was ticked, even on a job with no labour to take it off, so a
+  // re-parse or reissue still knows the client holds one.
+  let goldCardPercentValue: number | null = null;
+  if (goldCardPercent != null) {
+    goldCardPercentValue = parseRate(goldCardPercent);
+    if (goldCardPercentValue === null) return errorResponse("Invalid Gold Card percent", 400);
+  }
 
   // A quote bills nothing yet, so it never carries a part payment.
   const prepaid = isQuote
@@ -208,12 +231,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ),
     ),
   );
-  // GST mode comes from live settings, never the body. Both discounts reduce the taxable
+  // GST mode comes from live settings, never the body. Every discount reduces the taxable
   // amount before GST (IRD treatment of price reductions).
   const { GST_REGISTERED } = await getPolicy();
   const { subtotal, gstAmount, total } = calcInvoiceTotals(
     lines,
-    discount + unsuccessfulDiscountValue,
+    discount + goldCardDiscountValue + unsuccessfulDiscountValue,
     GST_REGISTERED,
   );
 
@@ -247,6 +270,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           promoId: discount > 0 ? parseObjectId(promoId) : null,
           unsuccessful: unsuccessful === true,
           unsuccessfulDiscount: unsuccessfulDiscountValue > 0 ? unsuccessfulDiscountValue : null,
+          goldCardDiscount: goldCardDiscountValue > 0 ? goldCardDiscountValue : null,
+          goldCardPercent: goldCardPercentValue || null,
           notes: notes ?? null,
           alreadyPaid: prepaid.amount,
           alreadyPaidMethod: prepaid.method,

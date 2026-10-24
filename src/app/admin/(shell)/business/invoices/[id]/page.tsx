@@ -12,6 +12,7 @@ import { InvoiceTimeline } from "@/features/business/components/invoice/InvoiceT
 import {
   balanceDue,
   formatNZD,
+  goldCardLineLabel,
   lineItemQtyLabel,
   promoLineLabel,
 } from "@/features/business/lib/business";
@@ -501,6 +502,12 @@ export default async function InvoiceViewPage({
               <div className="flex justify-between gap-3 text-amber-700">
                 <span>{promoLineLabel(invoice.promoTitle)}</span>
                 <span className="whitespace-nowrap">-{formatNZD(invoice.promoDiscount)}</span>
+              </div>
+            )}
+            {invoice.goldCardDiscount && invoice.goldCardDiscount > 0 && (
+              <div className="flex justify-between gap-3 text-amber-700">
+                <span>{goldCardLineLabel(invoice.goldCardPercent)}</span>
+                <span className="whitespace-nowrap">-{formatNZD(invoice.goldCardDiscount)}</span>
               </div>
             )}
             {invoice.unsuccessfulDiscount && invoice.unsuccessfulDiscount > 0 && (

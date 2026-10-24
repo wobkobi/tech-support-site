@@ -62,6 +62,8 @@ interface UseCalculatorSaveArgs {
   pricing: Pick<JobPricing, "minTravelCharge" | "minBillableMins">;
   activePromo: ActivePromo | null;
   skipPromo: boolean;
+  /** Gold Card share taken off labour (0.1 = 10%), or null when the box isn't ticked. */
+  goldCardPercent: number | null;
   /** Schedule-event prefill, or null; links the invoice back to the billed job. */
   eventPrefill: EventPrefill | null;
   /** Google id of the picked contact, for the contact check. */
@@ -115,6 +117,7 @@ interface UseCalculatorSave {
  * @param args.pricing - Live travel and billable minimums.
  * @param args.activePromo - Promo resolved for the job date, or null.
  * @param args.skipPromo - Whether the promo is skipped for this job.
+ * @param args.goldCardPercent - Gold Card share off labour, or null when not ticked.
  * @param args.eventPrefill - Schedule-event prefill, or null.
  * @param args.pickedContactGoogleId - Google id of the picked contact, or null.
  * @param args.renameContactTo - New name for the picked contact on invoice save, or null.
@@ -133,6 +136,7 @@ export function useCalculatorSave({
   pricing,
   activePromo,
   skipPromo,
+  goldCardPercent,
   eventPrefill,
   pickedContactGoogleId,
   renameContactTo,
@@ -381,6 +385,8 @@ export function useCalculatorSave({
           unsuccessful: totals.unsuccessfulDiscount > 0,
           unsuccessfulDiscount:
             totals.unsuccessfulDiscount > 0 ? totals.unsuccessfulDiscount : null,
+          goldCardPercent,
+          goldCardDiscount: totals.goldCardDiscount > 0 ? totals.goldCardDiscount : null,
           // Link back to the billed job from "Bill in calculator". calendarEventId is the
           // earliest event; the full set lets every merged event find this invoice.
           bookingId: eventPrefill?.bookingId ?? null,

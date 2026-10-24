@@ -54,6 +54,10 @@ export interface Invoice {
   unsuccessful?: boolean;
   /** Computed labour-half discount, persisted for audit + PDF rendering. */
   unsuccessfulDiscount?: number | null;
+  /** Gold Card share taken off labour (0.1 = 10%), or null when the client isn't a holder. */
+  goldCardPercent?: number | null;
+  /** Gold Card dollars off labour, after the promo and before the unsuccessful discount. */
+  goldCardDiscount?: number | null;
   status: InvoiceStatus;
   notes: string | null;
   contactId: string | null;
@@ -303,6 +307,12 @@ export interface EventPrefill {
    */
   travelMinsThere: number | null;
   travelMinsBack: number | null;
+  /**
+   * When the job was booked (ISO): the booking's creation, else when its calendar event was
+   * made. Promo dates are judged here, so a phone-made job keeps the rates of the day it was
+   * put in. Null when neither is known.
+   */
+  bookedAt: string | null;
 }
 
 interface ParsedTaskLine {

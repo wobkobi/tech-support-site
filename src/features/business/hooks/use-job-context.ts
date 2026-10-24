@@ -19,6 +19,8 @@ interface UseJobContextArgs {
   clientEmail: string;
   /** Booking the job was billed from, or null. */
   prefillBookingId: string | null;
+  /** When the billed job was booked (ISO), so promo dates are judged then; null for a blank job. */
+  prefillBookedAt: string | null;
   /** Server-resolved promo shown until the first lookup lands. */
   initialPromo: ActivePromo | null;
 }
@@ -40,6 +42,7 @@ interface JobContext {
  * @param args.promoCode - Applied promo code, or "".
  * @param args.clientEmail - Typed client email.
  * @param args.prefillBookingId - Booking the job was billed from, or null.
+ * @param args.prefillBookedAt - When the billed job was booked (ISO), or null.
  * @param args.initialPromo - Server-resolved promo for the first render.
  * @returns The date's surcharge and active promo.
  */
@@ -49,6 +52,7 @@ export function useJobContext({
   promoCode,
   clientEmail,
   prefillBookingId,
+  prefillBookedAt,
   initialPromo,
 }: UseJobContextArgs): JobContext {
   // Promo for the selected job date, refined by the lookup below.
@@ -67,6 +71,8 @@ export function useJobContext({
     if (clientEmail.trim()) query.set("email", clientEmail.trim());
     // A booked job keeps its promo, and its own redemption doesn't count against limits.
     if (prefillBookingId) query.set("bookingId", prefillBookingId);
+    // A phone-made job keeps the promo running the day its event was put in.
+    if (prefillBookedAt) query.set("bookedAt", prefillBookedAt);
     /** Fetches the surcharge + promo context for the current date, code and customer. */
     const run = (): void => {
       fetch(`/api/business/job-context?${query.toString()}`)
@@ -88,7 +94,7 @@ export function useJobContext({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [jobDate, jobStartTime, promoCode, clientEmail, prefillBookingId]);
+  }, [jobDate, jobStartTime, promoCode, clientEmail, prefillBookingId, prefillBookedAt]);
 
   return { surcharge, activePromo };
 }

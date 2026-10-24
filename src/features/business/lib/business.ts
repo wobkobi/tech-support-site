@@ -40,6 +40,8 @@ export {
   formatMins,
   formatMoneyCompact,
   formatNZD,
+  goldCardLineLabel,
+  goldCardOffText,
   lineItemQtyLabel,
   minsToHoursLabel,
   promoLineLabel,
@@ -340,11 +342,30 @@ export interface JobPricing {
   /** Live rate list, so a flat promo floors each line at the promo price for its tags. */
   rates?: RateConfig[];
   /**
+   * Gold Card share off home labour (0.1 = 10%), taken after the promo; business work gets
+   * none. 0 or absent when not ticked.
+   */
+  goldCardPercent?: number;
+  /**
    * Task-timing settings for {@link collapseToWindow} and {@link explicitRoundingAllowanceMins};
    * not read by {@link calcJobTotal}.
    * Falls back to {@link TASK_TIMING_FALLBACK}.
    */
   taskTiming?: TaskTimingConfig;
+}
+
+/**
+ * Whether a task carries the Business modifier: business labour, which promos and the Gold
+ * Card skip.
+ * @param task - The task line to classify.
+ * @param businessModifierId - RateConfig id of the Business modifier, or null when there's none.
+ * @returns True when the line is business labour.
+ */
+function isBusinessTask(
+  task: Pick<TaskLine, "modifierIds">,
+  businessModifierId: string | null | undefined,
+): boolean {
+  return !!businessModifierId && (task.modifierIds ?? []).includes(businessModifierId);
 }
 
 /**
@@ -389,7 +410,8 @@ export function computeJobPromoDiscount(
  * @param preDiscountSubtotal - The job's subtotal before any discount, which selects a tier.
  * @param standardRate - Undiscounted Standard $/hr, which a flat promo's per-hour cut is taken from.
  * @param rates - Live rate list, which floors each line at the promo price for its rate tags.
- * @returns The rounded discount and each task line's unrounded share of it.
+ * @returns The rounded discount, each task line's unrounded share of it, and whether it
+ * came off the drive (free travel) rather than labour.
  */
 function jobPromoBreakdown(
   job: JobCalculation,
@@ -399,27 +421,19 @@ function jobPromoBreakdown(
   preDiscountSubtotal?: number,
   standardRate?: number | null,
   rates?: RateConfig[],
-): { total: number; byTask: number[] } {
-  const none = { total: 0, byTask: job.tasks.map(() => 0) };
+): { total: number; byTask: number[]; offTravel: boolean } {
+  const none = { total: 0, byTask: job.tasks.map(() => 0), offTravel: false };
   // Narrow to the band the pre-discount subtotal earns, as the public estimate does.
   // Without a subtotal a tiered promo can't apply.
   const promo = promoForSpend(resolvedPromo, preDiscountSubtotal ?? 0);
   if (!promo) return none;
 
-  /**
-   * Whether a task carries the Business modifier.
-   * @param t - The task line to classify.
-   * @returns True when the line is business labour.
-   */
-  const isBusinessTask = (t: (typeof job.tasks)[number]): boolean =>
-    !!businessModifierId && (t.modifierIds ?? []).includes(businessModifierId);
-
   // A travel promo never touches the labour subtotal.
   if (promo.discountType === "free_travel" && promo.travelPercent != null) {
     // Any business work makes it a business visit, so the drive isn't discounted either.
-    if (job.tasks.some(isBusinessTask)) return none;
+    if (job.tasks.some((t) => isBusinessTask(t, businessModifierId))) return none;
     const charged = Math.min(1, Math.max(0, promo.travelPercent));
-    return { ...none, total: roundCents(travelTotal * (1 - charged)) };
+    return { ...none, total: roundCents(travelTotal * (1 - charged)), offTravel: true };
   }
 
   /**
@@ -429,7 +443,7 @@ function jobPromoBreakdown(
    * @returns True when the promo applies to the line.
    */
   const isDiscounted = (t: (typeof job.tasks)[number]): boolean =>
-    isHourlyTask(t) && !isBusinessTask(t);
+    isHourlyTask(t) && !isBusinessTask(t, businessModifierId);
   // Line totals in the cents jobToLineItems and calcJobTotal print. A raw sum discounts a
   // base the invoice never shows, landing the promo a cent off.
   const lineTotals = taskLineTotals(job.tasks);
@@ -483,11 +497,12 @@ function jobPromoBreakdown(
       lineTotals.reduce((s, line) => s + line, 0) -
         promoLineTotals.reduce((s, line) => s + line, 0),
     );
-    return { total, byTask };
+    return { ...none, total, byTask };
   }
   if (promo.percentDiscount !== null) {
     const pct = Math.max(0, Math.min(1, promo.percentDiscount));
     return {
+      ...none,
       total: roundCents(labourSubtotal * pct),
       byTask: shares((_, line) => line * pct),
     };
@@ -496,6 +511,7 @@ function jobPromoBreakdown(
     // Capped at the labour subtotal, as applyPromoToQuote does, so it never eats into travel.
     const amount = Math.min(Math.max(0, promo.fixedAmount), labourSubtotal);
     return {
+      ...none,
       total: roundCents(amount),
       byTask: shares((_, line) => (amount * line) / labourSubtotal),
     };
@@ -528,6 +544,7 @@ export function calcJobTotal(
   surchargeTotal: number;
   subtotal: number;
   promoDiscount: number;
+  goldCardDiscount: number;
   unsuccessfulDiscount: number;
   gstAmount: number;
   total: number;
@@ -553,7 +570,11 @@ export function calcJobTotal(
   );
   const surchargeTotal = surchargeUplift > 0 ? roundCents(hourlyTasksTotal * surchargeUplift) : 0;
   const subtotal = roundCents(tasksTotal + partsTotal + travelTotal + surchargeTotal);
-  const { total: promoDiscount, byTask: promoByTask } = jobPromoBreakdown(
+  const {
+    total: promoDiscount,
+    byTask: promoByTask,
+    offTravel: promoOffTravel,
+  } = jobPromoBreakdown(
     job,
     promo,
     // Free travel covers the drive only, not store runs, parking or tolls.
@@ -564,21 +585,44 @@ export function calcJobTotal(
     pricing.standardRate,
     pricing.rates,
   );
-  // Fraction removed from an unsuccessful line: 1 - the charged share.
-  const unsuccessfulCut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
-  // Halve what was due after the promo (35% off then half bills 32.5%, not 15%). The
-  // surcharge share halves too: 2h on a +25% holiday bills $81.25, half of $162.50.
-  const unsuccessfulBase = job.tasks.reduce(
-    (s, t, i) =>
-      isHourlyTask(t) && (job.unsuccessful || t.unsuccessful)
-        ? s + lineTotals[i]! * (1 + surchargeUplift) - (promoByTask[i] ?? 0)
-        : s,
+  // Gold Card: a share off what home labour (hourly lines plus their surcharge) still costs
+  // after the promo, so $65 flat then 10% bills $58.50. Business work gets none, and a
+  // free-travel promo leaves labour alone.
+  const goldCut = Math.min(1, Math.max(0, pricing.goldCardPercent ?? 0));
+  /**
+   * Whether a line is business labour, which the Gold Card skips.
+   * @param t - The task line to classify.
+   * @returns True when the line carries the Business modifier.
+   */
+  const isBusiness = (t: TaskLine): boolean => isBusinessTask(t, pricing.businessModifierId);
+  const goldLabour = job.tasks.reduce(
+    (s, t, i) => (isHourlyTask(t) && !isBusiness(t) ? s + lineTotals[i]! : s),
     0,
   );
+  // With no business work the printed surcharge line counts whole, so the 10% matches the
+  // invoice lines to the cent; otherwise only the home lines' share of it.
+  const goldSurcharge = job.tasks.some((t) => isHourlyTask(t) && isBusiness(t))
+    ? goldLabour * surchargeUplift
+    : surchargeTotal;
+  const labourPromo = promoOffTravel ? 0 : promoDiscount;
+  const goldCardDiscount =
+    goldCut > 0 ? Math.max(0, roundCents((goldLabour + goldSurcharge - labourPromo) * goldCut)) : 0;
+  // Fraction removed from an unsuccessful line: 1 - the charged share.
+  const unsuccessfulCut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
+  // Halve what was due after the promo and Gold Card (35% off then half bills 32.5%, not
+  // 15%). The surcharge share halves too: 2h on a +25% holiday bills $81.25, half of $162.50.
+  const unsuccessfulBase = job.tasks.reduce((s, t, i) => {
+    if (!isHourlyTask(t) || !(job.unsuccessful || t.unsuccessful)) return s;
+    const kept = isBusiness(t) ? 1 : 1 - goldCut;
+    return s + lineTotals[i]! * (1 + surchargeUplift) * kept - (promoByTask[i] ?? 0) * kept;
+  }, 0);
   const unsuccessfulDiscount = Math.max(0, roundCents(unsuccessfulBase * unsuccessfulCut));
   // GST on the discounted amount (IRD price-reduction treatment), clamped at 0 like
   // calcInvoiceTotals.
-  const taxableAmount = Math.max(0, roundCents(subtotal - promoDiscount - unsuccessfulDiscount));
+  const taxableAmount = Math.max(
+    0,
+    roundCents(subtotal - promoDiscount - goldCardDiscount - unsuccessfulDiscount),
+  );
   const gstAmount = pricing.gstRegistered ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {
     tasksTotal,
@@ -587,6 +631,7 @@ export function calcJobTotal(
     surchargeTotal,
     subtotal,
     promoDiscount,
+    goldCardDiscount,
     unsuccessfulDiscount,
     gstAmount,
     total: taxableAmount,

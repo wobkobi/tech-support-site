@@ -48,6 +48,7 @@ export interface InvoiceAiContext {
 /** The discounts re-priced for a rebuilt set of lines. */
 export interface RepricedDiscounts {
   promoDiscount: number;
+  goldCardDiscount: number;
   unsuccessfulDiscount: number;
 }
 
@@ -121,15 +122,21 @@ export function InvoiceAiBox({
         const parsed = d.result as ParseJobResponse;
         const existingTravel =
           currentItems.find((li) => li.description.startsWith("Round-trip travel")) ?? null;
-        const { lineItems, fit, windowMins, promoDiscount, unsuccessfulDiscount } =
-          parsedJobToLineItems(
-            parsed,
-            context.slots,
-            nzNowTime(),
-            context.pricing,
-            { line: existingTravel, destination: context.fallbackDestination },
-            context.promo,
-          );
+        const {
+          lineItems,
+          fit,
+          windowMins,
+          promoDiscount,
+          goldCardDiscount,
+          unsuccessfulDiscount,
+        } = parsedJobToLineItems(
+          parsed,
+          context.slots,
+          nzNowTime(),
+          context.pricing,
+          { line: existingTravel, destination: context.fallbackDestination },
+          context.promo,
+        );
         if (lineItems.length === 0) {
           setError(PARSE_ERROR);
         } else {
@@ -137,6 +144,7 @@ export function InvoiceAiBox({
           setAnswers({});
           onApply(lineItems, parsed.notes || null, parsed.cashPaid ?? null, {
             promoDiscount,
+            goldCardDiscount,
             unsuccessfulDiscount,
           });
           const fitNote = describeFit(fit, windowMins);

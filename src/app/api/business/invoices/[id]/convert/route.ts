@@ -58,7 +58,9 @@ export async function POST(
   const { GST_REGISTERED } = await getPolicy();
   const totals = calcInvoiceTotals(
     existing.lineItems,
-    (existing.promoDiscount ?? 0) + (existing.unsuccessfulDiscount ?? 0),
+    (existing.promoDiscount ?? 0) +
+      (existing.goldCardDiscount ?? 0) +
+      (existing.unsuccessfulDiscount ?? 0),
     GST_REGISTERED,
   );
   const now = new Date();

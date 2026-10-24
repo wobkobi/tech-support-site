@@ -29,10 +29,12 @@ import {
   effectiveHourlyRate,
   formatMoneyCompact,
   formatNZD,
+  goldCardOffText,
   timeDiffMins,
   todayISO,
 } from "@/features/business/lib/business";
 import { lookupAutoTravel } from "@/features/business/lib/calculator-helpers";
+import { goldCardPercent } from "@/features/business/lib/gold-card";
 import { buildIncomeDescription } from "@/features/business/lib/invoice-maths";
 import {
   clampBillableMins,
@@ -88,6 +90,8 @@ export interface QuickPrefill {
   end: string;
   /** The event's own end, shown when the priced end differs from it. */
   bookedEnd: string;
+  /** When the job was booked (ISO), the day its promo was judged at; null when unknown. */
+  bookedAt: string | null;
   /** Frozen or looked-up round trip, or null when no drive is known. */
   travel: TravelEntry | null;
 }
@@ -113,7 +117,7 @@ function parseDollars(raw: string): number {
 
 interface Props {
   rates: RateConfig[];
-  /** Automatic promo live right now, or null. */
+  /** The job's promo (its booking's, or whichever ran when it was booked), else today's, or null. */
   promo: ActivePromo | null;
   /** Today's labour surcharge (public holiday or weekend), or null. */
   surcharge: DateSurcharge | null;
@@ -157,6 +161,7 @@ export function QuickPriceView({
   const [business, setBusiness] = useState(false);
   // Couldn't fix the problem: the labour bills at the unsuccessful-visit share.
   const [unfixed, setUnfixed] = useState(false);
+  const [goldCard, setGoldCard] = useState(false);
   const [travel, setTravel] = useState<TravelEntry | null>(prefill?.travel ?? null);
   const [lookingUp, setLookingUp] = useState(false);
   const [travelNote, setTravelNote] = useState<string | null>(null);
@@ -184,6 +189,9 @@ export function QuickPriceView({
     rates.find((r) => r.label === "Business" && r.unit === "modifier") ?? null;
   const modifierIds = business && businessModifier ? [businessModifier.id] : [];
   const hourlyRate = effectiveHourlyRate(rates, standard?.id, modifierIds);
+  // The Gold Card rate from Settings > Rates; null hides the box.
+  const goldCardRate = goldCardPercent(rates);
+  const appliedGoldCard = goldCard ? goldCardRate : null;
 
   const rawMins = timeDiffMins(start, end);
   // Snap + minimum floor up front so the time shown is the time billed.
@@ -226,6 +234,7 @@ export function QuickPriceView({
     businessModifierId: businessModifier?.id ?? null,
     standardRate: standard?.ratePerHour ?? null,
     rates,
+    goldCardPercent: appliedGoldCard ?? 0,
   });
 
   /**
@@ -295,6 +304,7 @@ export function QuickPriceView({
     const description =
       buildIncomeDescription(job) +
       (unfixed ? " - couldn't fix" : "") +
+      (appliedGoldCard ? " - Gold Card" : "") +
       (noTravel ? " - no travel charged" : "") +
       totalNote;
     let sheetWarning = false;
@@ -447,6 +457,13 @@ export function QuickPriceView({
             onChange={setUnfixed}
             label={`Couldn't fix it (${unsuccessfulShareLabel(pricing.unsuccessfulFactor)})`}
           />
+          {goldCardRate != null && (
+            <AdminCheckbox
+              checked={goldCard}
+              onChange={setGoldCard}
+              label={`Gold Card (${goldCardOffText(goldCardRate)})`}
+            />
+          )}
         </div>
       </Card>
 
@@ -467,6 +484,8 @@ export function QuickPriceView({
           lookingUp={lookingUp}
           surcharge={surcharge}
           promo={promo}
+          bookedAt={prefill?.bookedAt ?? null}
+          goldCardPercent={appliedGoldCard}
           bankAccount={bankAccount}
           clientName={prefill?.clientName ?? null}
         />

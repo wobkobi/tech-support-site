@@ -74,9 +74,13 @@ export function EditInvoiceView({
   const unsuccessfulChanged =
     (discounts.unsuccessfulDiscount ?? 0) !== (preservedDiscounts.unsuccessfulDiscount ?? 0);
   const promoChanged = (discounts.promoDiscount ?? 0) !== (preservedDiscounts.promoDiscount ?? 0);
+  const goldChanged =
+    (discounts.goldCardDiscount ?? 0) !== (preservedDiscounts.goldCardDiscount ?? 0);
   // Saved lines carry no rate tags, so a hand edit can't re-price the discounts; warn.
   const discountsStale =
-    ((discounts.promoDiscount ?? 0) > 0 || (discounts.unsuccessfulDiscount ?? 0) > 0) &&
+    ((discounts.promoDiscount ?? 0) > 0 ||
+      (discounts.goldCardDiscount ?? 0) > 0 ||
+      (discounts.unsuccessfulDiscount ?? 0) > 0) &&
     JSON.stringify(preview.lineItems) !== JSON.stringify(pricedLines);
 
   /**
@@ -101,6 +105,7 @@ export function EditInvoiceView({
           alreadyPaidMethod: data.alreadyPaid.method,
           ...(unsuccessfulChanged && { unsuccessfulDiscount: discounts.unsuccessfulDiscount ?? 0 }),
           ...(promoChanged && { promoDiscount: discounts.promoDiscount ?? 0 }),
+          ...(goldChanged && { goldCardDiscount: discounts.goldCardDiscount ?? 0 }),
         }),
       });
       const d = await res.json();
@@ -172,6 +177,8 @@ export function EditInvoiceView({
           notes={preview.notes}
           promoTitle={preservedDiscounts.promoTitle ?? null}
           promoDiscount={discounts.promoDiscount ?? 0}
+          goldCardDiscount={discounts.goldCardDiscount ?? 0}
+          goldCardPercent={preservedDiscounts.goldCardPercent ?? null}
           unsuccessfulDiscount={discounts.unsuccessfulDiscount ?? 0}
           gstRegistered={gstRegistered}
           alreadyPaid={alreadyPaidAmount(preview.alreadyPaid)}

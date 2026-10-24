@@ -3,11 +3,13 @@
 // Right-rail "Client" card: inline contact search, then a Name/Company/Custom control
 // once picked. Editing the picked name switches to Custom and offers a contact rename.
 
+import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { ADMIN_CHECKBOX_CLS, ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { TEXT_ACTION_CLS } from "@/features/business/components/calculator/calculator-classes";
+import { goldCardOffText } from "@/features/business/lib/business";
 import type { GoogleContact } from "@/features/business/types/business";
 import { filterContacts } from "@/features/contacts/lib/contact-search";
 import { EmailInput } from "@/shared/components/EmailInput";
@@ -31,6 +33,10 @@ interface Props {
   renameOffer: string | null;
   renameContact: boolean;
   onRenameContactChange: (value: boolean) => void;
+  goldCard: boolean;
+  onGoldCardChange: (value: boolean) => void;
+  /** The Gold Card share off labour, or null to hide the box (no rate row, or a cancellation). */
+  goldCardPercent: number | null;
   contacts: GoogleContact[];
   onSelectContact: (contact: GoogleContact) => void;
   onClearContact: () => void;
@@ -53,6 +59,9 @@ const MAX_SUGGESTIONS = 6;
  * @param props.renameOffer - Edited name the picked contact could take, or null.
  * @param props.renameContact - Whether saving the invoice renames the contact.
  * @param props.onRenameContactChange - Ticks or unticks the rename.
+ * @param props.goldCard - Whether the client holds a Gold Card.
+ * @param props.onGoldCardChange - Ticks or unticks the Gold Card.
+ * @param props.goldCardPercent - Gold Card share off labour, or null to hide the box.
  * @param props.contacts - All saved Google contacts (loaded once by the parent).
  * @param props.onSelectContact - Fires when the operator clicks a suggestion or commits one via Enter.
  * @param props.onClearContact - Fires when the operator clears the picked contact.
@@ -70,6 +79,9 @@ export function ClientPickerSection({
   renameOffer,
   renameContact,
   onRenameContactChange,
+  goldCard,
+  onGoldCardChange,
+  goldCardPercent,
   contacts,
   onSelectContact,
   onClearContact,
@@ -251,6 +263,13 @@ export function ClientPickerSection({
           />
         </div>
       </div>
+      {goldCardPercent != null && (
+        <AdminCheckbox
+          checked={goldCard}
+          onChange={onGoldCardChange}
+          label={`Gold Card (${goldCardOffText(goldCardPercent)})`}
+        />
+      )}
     </Card>
   );
 }

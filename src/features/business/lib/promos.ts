@@ -469,6 +469,23 @@ export function resolutionInstants(
 }
 
 /**
+ * When a job was booked, for judging promo dates: its booking's creation, else when its calendar
+ * event was made (a job put straight into the calendar from the phone).
+ * @param bookingCreatedAt - The booking row's creation, when the job has one.
+ * @param eventCreated - Google's creation stamp (ISO) for the job's calendar event, if known.
+ * @returns The booked instant, or undefined so {@link resolutionInstants} falls back to the job.
+ */
+export function jobBookedAt(
+  bookingCreatedAt: Date | null | undefined,
+  eventCreated: string | null | undefined,
+): Date | undefined {
+  if (bookingCreatedAt) return bookingCreatedAt;
+  if (!eventCreated) return undefined;
+  const made = new Date(eventCreated);
+  return Number.isNaN(made.getTime()) ? undefined : made;
+}
+
+/**
  * The promo that applies to one request (uncached, unlike {@link getActivePromo}: it depends on
  * the code). Dates are judged at `bookedAt`, the weekday/time restriction at `at`. A valid code
  * wins outright; an invalid one falls through to the automatic promo.
@@ -527,6 +544,53 @@ export async function lockedInPromo(
       .catch(() => null));
   if (!terms || (at && !matchesRecurringWindow(terms, at))) return null;
   return terms;
+}
+
+/**
+ * The promo a job prices with, shared by the calculator and quick price. A code that takes wins,
+ * then the booking's locked-in promo, then whichever promo's dates covered the moment the job
+ * was booked ({@link jobBookedAt}).
+ * @param context - The job being priced.
+ * @param context.at - The appointment instant, for the weekday/time restriction.
+ * @param context.bookingId - The job's booking, if it has one.
+ * @param context.bookedAt - When the job's calendar event was made (ISO), for a job with no booking.
+ * @param context.code - A code typed for the job.
+ * @param context.email - The customer's email, so per-customer limits bind.
+ * @returns The promo, or null.
+ */
+export async function promoForJob(context: {
+  at: Date;
+  bookingId?: string | null;
+  bookedAt?: string | null;
+  code?: string | null;
+  email?: string | null;
+}): Promise<ActivePromo | null> {
+  const { at, bookingId = null, email } = context;
+  const code = normalisePromoCode(context.code);
+  const booking = bookingId
+    ? await prisma.booking
+        .findUnique({
+          where: { id: bookingId },
+          select: { promoIdAtBooking: true, promoTermsAtBooking: true, createdAt: true },
+        })
+        .catch(() => null)
+    : null;
+  // Carry the booked promo through; re-resolving live would lose a booked code.
+  const locked = booking?.promoIdAtBooking
+    ? await lockedInPromo(booking.promoIdAtBooking, at, booking.promoTermsAtBooking)
+    : null;
+  if (locked && !code) return locked;
+
+  // The booking's own redemption is left out of its limits.
+  const resolved = await resolvePromo({
+    at,
+    bookedAt: jobBookedAt(booking?.createdAt, context.bookedAt),
+    bookingId,
+    code,
+    email,
+  }).catch(() => null);
+  const codeTook = code !== null && resolved?.code === code;
+  return codeTook ? resolved : (locked ?? resolved);
 }
 
 /**

@@ -130,6 +130,8 @@ export async function PATCH(
       promoDiscount: true,
       promoId: true,
       unsuccessfulDiscount: true,
+      goldCardPercent: true,
+      goldCardDiscount: true,
       sentAt: true,
       paidAt: true,
       isQuote: true,
@@ -211,6 +213,17 @@ export async function PATCH(
       if (parsed === null) return errorResponse("Invalid promo discount", 400);
       promoDiscount = parsed;
     }
+    // Same for the Gold Card: only an invoice raised for a holder re-prices it.
+    const repricesGoldCard =
+      lineItems !== undefined &&
+      body.goldCardDiscount !== undefined &&
+      current.goldCardPercent != null;
+    let goldCardDiscount = current.goldCardDiscount ?? 0;
+    if (repricesGoldCard) {
+      const parsed = parseAmount(body.goldCardDiscount ?? 0);
+      if (parsed === null) return errorResponse("Invalid Gold Card discount", 400);
+      goldCardDiscount = parsed;
+    }
     if (status !== undefined) {
       if (!isInvoiceStatus(status)) return errorResponse("Invalid status", 400);
       const err = validateTransition(current.status, status);
@@ -221,7 +234,7 @@ export async function PATCH(
     // Keep the discounts, or recomputing would silently strip them from the total.
     const { subtotal, gstAmount, total } = calcInvoiceTotals(
       lines ?? [],
-      promoDiscount + unsuccessfulDiscount,
+      promoDiscount + goldCardDiscount + unsuccessfulDiscount,
       GST_REGISTERED,
     );
     const statusPatch = isInvoiceStatus(status) ? statusDataFor(status, current) : {};
@@ -245,6 +258,10 @@ export async function PATCH(
         }),
         // promoTitle and promoId stay, so the redemption still settles against the promo.
         ...(repricesPromo && { promoDiscount: promoDiscount > 0 ? promoDiscount : null }),
+        // goldCardPercent stays, so a later re-price still knows the client holds one.
+        ...(repricesGoldCard && {
+          goldCardDiscount: goldCardDiscount > 0 ? goldCardDiscount : null,
+        }),
         ...(notes !== undefined && { notes: notes || null }),
         ...(prepaid && { alreadyPaid: prepaid.amount, alreadyPaidMethod: prepaid.method }),
         ...statusPatch,

@@ -364,6 +364,8 @@ export interface ParsedJobPricing {
   standardRate?: number | null;
   /** Live rate list, for a flat promo's per-line floor. */
   rates?: RateConfig[];
+  /** The invoice's Gold Card share off labour (0.1 = 10%), or 0/absent when it has none. */
+  goldCardPercent?: number;
 }
 
 /** The invoice's current travel, for {@link parsedJobToLineItems} to keep when it should. */
@@ -413,7 +415,7 @@ function sameAddressKey(address: string | null | undefined): string {
  * @param pricing - Live pricing inputs.
  * @param existing - The invoice's current travel line and booked address.
  * @param promo - The invoice's promo terms, or null when it has none.
- * @returns Line items, the window fit, and the promo and unsuccessful-work discounts.
+ * @returns Line items, the window fit, and the promo, Gold Card and unsuccessful-work discounts.
  */
 export function parsedJobToLineItems(
   result: ParseJobResponse,
@@ -427,6 +429,7 @@ export function parsedJobToLineItems(
   fit: FittedTasks;
   windowMins: number;
   promoDiscount: number;
+  goldCardDiscount: number;
   unsuccessfulDiscount: number;
 } {
   const { windowMins } = parsedWindow(result, slots, now);
@@ -467,8 +470,8 @@ export function parsedJobToLineItems(
     pricing.minTravelCharge,
     pricing.minBillableMins,
   );
-  const { promoDiscount, unsuccessfulDiscount } = calcJobTotal(job, promo, {
-    // Only the discounts are read, and neither depends on GST.
+  const { promoDiscount, goldCardDiscount, unsuccessfulDiscount } = calcJobTotal(job, promo, {
+    // Only the discounts are read, and none depends on GST.
     gstRegistered: false,
     minTravelCharge: pricing.minTravelCharge,
     minBillableMins: pricing.minBillableMins,
@@ -477,6 +480,7 @@ export function parsedJobToLineItems(
     businessModifierId: pricing.businessModifierId,
     standardRate: pricing.standardRate,
     rates: pricing.rates,
+    goldCardPercent: pricing.goldCardPercent,
   });
-  return { lineItems, fit, windowMins, promoDiscount, unsuccessfulDiscount };
+  return { lineItems, fit, windowMins, promoDiscount, goldCardDiscount, unsuccessfulDiscount };
 }
