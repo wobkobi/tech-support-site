@@ -11,7 +11,7 @@ import {
 import { buildEventPrefill } from "@/features/business/lib/event-prefill.server";
 import { calcTravelCharge, dateSurcharge } from "@/features/business/lib/pricing-policy";
 import { getPolicy, lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
-import { resolvePromo } from "@/features/business/lib/promos";
+import { promoForJob } from "@/features/business/lib/promos";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import type { EventPrefill, RateConfig, TravelEntry } from "@/features/business/types/business";
 import {
@@ -57,7 +57,8 @@ const NZ_HHMM = new Intl.DateTimeFormat("en-NZ", {
 });
 
 /**
- * Today's booking-calendar events, earliest first, from the schedule cache. Never throws.
+ * Today's booking-calendar jobs, earliest first, from the schedule cache. An all-day block
+ * isn't a job, and starting at midnight it would otherwise auto-match. Never throws.
  * @param now - Reference instant.
  * @returns Today's events with their raw ISO bounds.
  */
@@ -74,7 +75,12 @@ async function loadTodayEvents(
       nzMidnightUtc(ty, tm, td).toISOString(),
     );
     return all
-      .filter((e) => e.calendarEmail === bookingCalId && nzDateKey(new Date(e.start)) === todayKey)
+      .filter(
+        (e) =>
+          e.calendarEmail === bookingCalId &&
+          !e.allDay &&
+          nzDateKey(new Date(e.start)) === todayKey,
+      )
       .sort((a, b) => a.start.localeCompare(b.start))
       .map((e) => ({ id: e.id, summary: e.summary ?? "(no title)", start: e.start, end: e.end }));
   } catch (err) {
@@ -149,12 +155,10 @@ export default async function QuickPricePage({
   await requireAdminAuth();
   const { eventId: requested } = await searchParams;
   const now = new Date();
-  const [identity, policy, rateRows, promo, holiday, todayEvents] = await Promise.all([
+  const [identity, policy, rateRows, holiday, todayEvents] = await Promise.all([
     getIdentity(),
     getPolicy(),
     prisma.rateConfig.findMany({ orderBy: { label: "asc" } }),
-    // Automatic promo only: there is no customer or code to judge limits against.
-    resolvePromo({ at: now }).catch(() => null),
     lookupPublicHoliday(now).catch(() => null),
     loadTodayEvents(now),
   ]);
@@ -162,6 +166,14 @@ export default async function QuickPricePage({
   // An explicit pick wins; "none" is the operator clearing the match.
   const matchedId = requested === "none" ? null : (requested ?? autoMatch(todayEvents, now));
   const eventPrefill = matchedId ? await buildEventPrefill([matchedId]).catch(() => null) : null;
+  // Same rule as the calculator: a booking keeps its locked-in promo, a phone-made job takes
+  // the promo running when its event was made, and a blank form takes today's.
+  const promo = await promoForJob({
+    at: now,
+    bookingId: eventPrefill?.bookingId,
+    bookedAt: eventPrefill?.bookedAt,
+    email: eventPrefill?.clientEmail || null,
+  }).catch(() => null);
   const slot = eventPrefill?.slots[0];
   const matched = todayEvents.find((e) => e.id === matchedId);
 
@@ -182,6 +194,7 @@ export default async function QuickPricePage({
       start: slot.startTime,
       end: onSite ? nzNowTime() : slot.endTime,
       bookedEnd: slot.endTime,
+      bookedAt: eventPrefill.bookedAt,
       travel: await travelForPrefill(
         eventPrefill,
         startAt,

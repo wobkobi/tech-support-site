@@ -316,6 +316,7 @@ export function CalculatorView({
     promoCode,
     clientEmail,
     prefillBookingId,
+    prefillBookedAt: eventPrefill?.bookedAt ?? null,
     initialPromo,
   });
 

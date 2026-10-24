@@ -50,6 +50,13 @@ const EVENT_STAMP = new Intl.DateTimeFormat("en-NZ", {
   minute: "2-digit",
 });
 
+/** NZ-local "20 Oct" for when the job was booked. */
+const BOOKED_ON = new Intl.DateTimeFormat("en-NZ", {
+  timeZone: NZ_TZ,
+  day: "numeric",
+  month: "short",
+});
+
 /**
  * Minutes since midnight for an HH:MM value, or null when unparseable.
  * @param hhmm - Time string from a slot input.
@@ -304,6 +311,8 @@ export function EventPickerSection({
             .filter((r) => r.startTime || r.endTime)
             .map((r) => `${r.startTime || "--:--"}-${r.endTime || "--:--"}`)
             .join(" + ") || "--:-- - --:--"}
+          {/* Promo dates are judged on this day, so say which day it was. */}
+          {prefill.bookedAt && ` · Booked ${BOOKED_ON.format(new Date(prefill.bookedAt))}`}
           {prefill.bookingId && (
             <>
               {" · "}

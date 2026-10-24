@@ -303,6 +303,12 @@ export interface EventPrefill {
    */
   travelMinsThere: number | null;
   travelMinsBack: number | null;
+  /**
+   * When the job was booked (ISO): the booking's creation, else when its calendar event was
+   * made. Promo dates are judged here, so a phone-made job keeps the rates of the day it was
+   * put in. Null when neither is known.
+   */
+  bookedAt: string | null;
 }
 
 interface ParsedTaskLine {

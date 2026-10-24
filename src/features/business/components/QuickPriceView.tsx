@@ -88,6 +88,8 @@ export interface QuickPrefill {
   end: string;
   /** The event's own end, shown when the priced end differs from it. */
   bookedEnd: string;
+  /** When the job was booked (ISO), the day its promo was judged at; null when unknown. */
+  bookedAt: string | null;
   /** Frozen or looked-up round trip, or null when no drive is known. */
   travel: TravelEntry | null;
 }
@@ -113,7 +115,7 @@ function parseDollars(raw: string): number {
 
 interface Props {
   rates: RateConfig[];
-  /** Automatic promo live right now, or null. */
+  /** The job's promo (its booking's, or whichever ran when it was booked), else today's, or null. */
   promo: ActivePromo | null;
   /** Today's labour surcharge (public holiday or weekend), or null. */
   surcharge: DateSurcharge | null;
@@ -467,6 +469,7 @@ export function QuickPriceView({
           lookingUp={lookingUp}
           surcharge={surcharge}
           promo={promo}
+          bookedAt={prefill?.bookedAt ?? null}
           bankAccount={bankAccount}
           clientName={prefill?.clientName ?? null}
         />

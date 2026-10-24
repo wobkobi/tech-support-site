@@ -5,6 +5,7 @@
 import {
   describeRecurringWindow,
   hasRecurringWindow,
+  jobBookedAt,
   matchesRecurringWindow,
   normalisePromoCode,
   pickWinningPromo,
@@ -42,10 +43,10 @@ function window(
 
 /**
  * An instant as comparable text, so a case reports the time it got.
- * @param d - The instant, or null.
+ * @param d - The instant, or null/undefined when unset.
  * @returns Its ISO string, or null.
  */
-function iso(d: Date | null): string | null {
+function iso(d: Date | null | undefined): string | null {
   return d?.toISOString() ?? null;
 }
 
@@ -144,6 +145,32 @@ function main(): void {
     "nothing given judges both at now",
     iso(resolutionInstants({}, NOW).windowAt),
     iso(NOW),
+  );
+
+  // ---- When a job was booked ----
+  // A job put straight into the calendar counts as booked when its event was made, so a
+  // promo running then still applies to the job done after it ends.
+
+  const BOOKING_MADE = new Date("2026-10-20T03:38:35Z");
+  const EVENT_MADE = "2026-10-21T22:15:00.000Z";
+  const NOV_JOB = new Date("2026-11-03T01:00:00Z");
+
+  expectEqual(
+    "a booking counts from its creation",
+    iso(jobBookedAt(BOOKING_MADE, EVENT_MADE)),
+    iso(BOOKING_MADE),
+  );
+  expectEqual(
+    "a calendar-only job counts from when its event was made",
+    iso(jobBookedAt(null, EVENT_MADE)),
+    EVENT_MADE,
+  );
+  expectEqual("neither known leaves it unset", jobBookedAt(null, null), undefined);
+  expectEqual("a garbled stamp leaves it unset", jobBookedAt(undefined, "not a date"), undefined);
+  expectEqual(
+    "an October phone job done in November judges dates in October",
+    iso(resolutionInstants({ at: NOV_JOB, bookedAt: jobBookedAt(null, EVENT_MADE) }, NOW).datesAt),
+    EVENT_MADE,
   );
 
   // ---- Recurring windows, in NZ time ----

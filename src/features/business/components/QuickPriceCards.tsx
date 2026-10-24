@@ -11,8 +11,16 @@ import type { DateSurcharge } from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
 import type { TravelEntry } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
+import { NZ_TZ } from "@/shared/lib/timezone-utils";
 import Link from "next/link";
 import type React from "react";
+
+/** NZ-local "20 Oct" for when the job was booked. */
+const BOOKED_ON = new Intl.DateTimeFormat("en-NZ", {
+  timeZone: NZ_TZ,
+  day: "numeric",
+  month: "short",
+});
 
 interface TodaysJobsProps {
   events: QuickEvent[];
@@ -81,6 +89,7 @@ interface TotalCardProps {
   lookingUp: boolean;
   surcharge: DateSurcharge | null;
   promo: ActivePromo | null;
+  bookedAt: string | null;
   bankAccount: string;
   clientName: string | null;
 }
@@ -97,7 +106,8 @@ interface TotalCardProps {
  * @param props.driveMins - Round-trip drive minutes.
  * @param props.lookingUp - True while a travel lookup is in flight.
  * @param props.surcharge - Today's labour surcharge (public holiday or weekend), or null.
- * @param props.promo - Automatic promo applied, or null.
+ * @param props.promo - Promo applied, or null.
+ * @param props.bookedAt - When the seeded job was booked (ISO), shown by its promo; null hides it.
  * @param props.bankAccount - Account number for bank transfers; empty hides the section.
  * @param props.clientName - Seeded client name for the bank particulars, or null.
  * @returns Total card element.
@@ -113,6 +123,7 @@ export function QuickTotalCard({
   lookingUp,
   surcharge,
   promo,
+  bookedAt,
   bankAccount,
   clientName,
 }: TotalCardProps): React.ReactElement {
@@ -182,7 +193,16 @@ export function QuickTotalCard({
         )}
         {totals.promoDiscount > 0 && promo && (
           <div className="flex justify-between gap-3 text-moonstone-700">
-            <dt>{promo.title}</dt>
+            <dt>
+              {promo.title}
+              {/* The promo was judged on this day, which may be before it ended. */}
+              {bookedAt && (
+                <span className="text-admin-text-secondary">
+                  {" "}
+                  - booked {BOOKED_ON.format(new Date(bookedAt))}
+                </span>
+              )}
+            </dt>
             <dd>-{formatNZD(totals.promoDiscount)}</dd>
           </div>
         )}

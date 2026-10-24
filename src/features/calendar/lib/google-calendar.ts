@@ -76,6 +76,11 @@ export interface CalendarEvent {
   htmlLink?: string;
   // Parent series ID for a recurring instance; stable across the series.
   recurringEventId?: string;
+  /**
+   * An all-day event (a blocked day, a holiday), widened to NZ midnight > midnight so it
+   * blocks booking slots. Job lists and travel skip it.
+   */
+  allDay: boolean;
 }
 
 /**
@@ -202,6 +207,8 @@ export interface BookingEventDetails {
   end: string;
   summary: string | null;
   location: string | null;
+  /** ISO time the event was made in Calendar; moving it later doesn't change this. */
+  created: string | null;
 }
 
 /** Outcome of a single booking-event lookup. */
@@ -251,6 +258,7 @@ export async function lookupBookingEvent(eventId: string): Promise<BookingEventL
         end: event.end.dateTime,
         summary: event.summary ?? null,
         location: event.location ?? null,
+        created: event.created ?? null,
       },
     };
   } catch (err) {
@@ -412,6 +420,52 @@ export async function listBlockedDayRanges(
     }));
 }
 
+/**
+ * Maps one Google event to a {@link CalendarEvent}, or null when it shouldn't block: cancelled,
+ * declined, or an all-day event on the personal calendar.
+ * @param event - Raw Google Calendar event.
+ * @param calendarId - Calendar the event came from.
+ * @param isPersonal - Whether that is the personal calendar, whose all-day events never block.
+ * @returns The mapped event, or null to skip it.
+ */
+export function toCalendarEvent(
+  event: calendar_v3.Schema$Event,
+  calendarId: string,
+  isPersonal: boolean,
+): CalendarEvent | null {
+  if (event.status === "cancelled") return null;
+  if (event.attendees?.find((a) => a.self)?.responseStatus === "declined") return null;
+
+  const shared = {
+    id: event.id!,
+    summary: event.summary || undefined,
+    description: event.description || undefined,
+    location: event.location || undefined,
+    calendarEmail: calendarId,
+    htmlLink: event.htmlLink || undefined,
+    recurringEventId: event.recurringEventId || undefined,
+  };
+
+  // Timed events block whatever calendar they're on.
+  if (event.start?.dateTime && event.end?.dateTime) {
+    return { ...shared, start: event.start.dateTime, end: event.end.dateTime, allDay: false };
+  }
+
+  // All-day: block the full NZ day(s). end.date is exclusive, and each boundary gets its own
+  // offset since a block can span a DST change.
+  if (event.start?.date && event.end?.date && !isPersonal) {
+    const [sYear, sMonth, sDay] = dateKeyParts(event.start.date);
+    const [eYear, eMonth, eDay] = dateKeyParts(event.end.date);
+    return {
+      ...shared,
+      start: nzMidnightUtc(sYear, sMonth, sDay).toISOString(),
+      end: nzMidnightUtc(eYear, eMonth, eDay).toISOString(),
+      allDay: true,
+    };
+  }
+  return null;
+}
+
 /** Events plus the calendars that failed, for callers that must tell "no events" from "no answer". */
 export interface CalendarFetchResult {
   events: CalendarEvent[];
@@ -460,53 +514,9 @@ export async function fetchAllCalendarEventsDetailed(
           pageToken = response.data.nextPageToken ?? undefined;
         } while (pageToken);
         const isPersonal = Boolean(personalCalendarId) && calendarId === personalCalendarId;
-        const processedEvents: CalendarEvent[] = [];
-
-        for (const event of events) {
-          // Skip cancelled events (organiser cancelled or event was deleted)
-          if (event.status === "cancelled") continue;
-
-          // Skip events the user has declined
-          const selfAttendee = event.attendees?.find((a) => a.self);
-          if (selfAttendee?.responseStatus === "declined") continue;
-
-          if (event.start?.dateTime && event.end?.dateTime) {
-            // Timed event - always block regardless of calendar
-            processedEvents.push({
-              id: event.id!,
-              start: event.start.dateTime,
-              end: event.end.dateTime,
-              summary: event.summary || undefined,
-              description: event.description || undefined,
-              location: event.location || undefined,
-              calendarEmail: calendarId,
-              htmlLink: event.htmlLink || undefined,
-              recurringEventId: event.recurringEventId || undefined,
-            });
-          } else if (event.start?.date && event.end?.date && !isPersonal) {
-            // Non-personal all-day event: block the full NZ day(s). end.date is
-            // exclusive; convert NZ midnight > UTC.
-            const startDateStr = event.start.date;
-            const endDateStr = event.end.date;
-            const [sYear, sMonth, sDay] = dateKeyParts(startDateStr);
-            const [eYear, eMonth, eDay] = dateKeyParts(endDateStr);
-            // Each boundary gets its own offset, since a block can span a DST change.
-            const startAt = nzMidnightUtc(sYear, sMonth, sDay);
-            const endAt = nzMidnightUtc(eYear, eMonth, eDay);
-            processedEvents.push({
-              id: event.id!,
-              start: startAt.toISOString(),
-              end: endAt.toISOString(),
-              summary: event.summary || undefined,
-              description: event.description || undefined,
-              location: event.location || undefined,
-              calendarEmail: calendarId,
-              htmlLink: event.htmlLink || undefined,
-              recurringEventId: event.recurringEventId || undefined,
-            });
-          }
-          // All-day events from the personal calendar are intentionally skipped
-        }
+        const processedEvents = events
+          .map((event) => toCalendarEvent(event, calendarId, isPersonal))
+          .filter((e): e is CalendarEvent => e !== null);
 
         console.log(`[calendar] ${calendarId}: ${processedEvents.length} events`);
         return processedEvents;

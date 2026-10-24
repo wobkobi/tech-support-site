@@ -41,7 +41,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const bookingCalId = getBookingCalendarId();
     const all = await getCachedScheduleEvents(from.toISOString(), to.toISOString());
     const events = all
-      .filter((e) => e.calendarEmail === bookingCalId)
+      // An all-day block (a blocked day) is never a job to bill.
+      .filter((e) => e.calendarEmail === bookingCalId && !e.allDay)
       // Started, or later today (a merge candidate); never a future day.
       .filter((e) => {
         const start = new Date(e.start);
