@@ -1,5 +1,8 @@
 // src/features/social/lib/targets.ts
-// Pure per-platform target helpers: initial set, status roll-up and take-down records.
+// Pure per-platform target helpers: initial set, publish outcomes, status roll-up and take-down
+// records.
+
+import { StillProcessingError, type PublishResult } from "@/features/social/lib/adapter";
 
 /** A target as stored on the post (mirrors the Prisma SocialTarget type). */
 export interface TargetState {
@@ -50,6 +53,40 @@ export function defaultTargets(): TargetState[] {
     containerId: null,
     containerCreatedAt: null,
   }));
+}
+
+/**
+ * A target once its publish settled: posted, still processing (pending, with what to check
+ * next time) or failed.
+ * @param t - The target as the run started.
+ * @param outcome - What its publish did.
+ * @param started - When the run started, the time of a container this run handed over.
+ * @param now - When it settled.
+ * @returns The target to save.
+ */
+export function afterPublish(
+  t: TargetState,
+  outcome: PromiseSettledResult<PublishResult>,
+  started: Date,
+  now: Date,
+): TargetState {
+  const done = { containerId: null, containerCreatedAt: null };
+  if (outcome.status === "fulfilled") {
+    return { ...t, status: "posted", ...outcome.value, error: null, postedAt: now, ...done };
+  }
+  const reason: unknown = outcome.reason;
+  // Accepted but still processing: stays pending with what to check, for the cron's next pass.
+  if (reason instanceof StillProcessingError) {
+    const same = reason.containerId !== null && reason.containerId === t.containerId;
+    return {
+      ...t,
+      error: reason.message,
+      containerId: reason.containerId,
+      containerCreatedAt: same ? t.containerCreatedAt : reason.containerId ? started : null,
+    };
+  }
+  const message = reason instanceof Error ? reason.message : "Posting failed.";
+  return { ...t, status: "failed", error: message.slice(0, 500), ...done };
 }
 
 /**

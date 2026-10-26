@@ -69,8 +69,10 @@ export function useDesignAutosave(
 
   const saveNow = useCallback(async (): Promise<boolean> => {
     if (stopped.current) return false;
-    // Chain behind a save already running so two PATCHes never race.
-    if (inFlight.current) await inFlight.current;
+    // Wait out every save running: two callers queued behind one save would otherwise both
+    // send the same expected time, and the second would read as a conflict.
+    while (inFlight.current) await inFlight.current;
+    if (stopped.current) return false;
     const target = latest.current;
     const changed = changedFields(target, saved.current);
     if (Object.keys(changed).length === 0) {
@@ -112,7 +114,7 @@ export function useDesignAutosave(
     })();
     inFlight.current = run;
     const ok = await run;
-    inFlight.current = null;
+    if (inFlight.current === run) inFlight.current = null;
     // Something changed while saving: stay unsaved so the timer saves it next.
     if (ok) {
       const more = Object.keys(changedFields(latest.current, saved.current)).length > 0;

@@ -156,11 +156,25 @@ expectEqual(
   "every stored file a post points at",
   mediaUrlsOf({
     imageUrl: JPEG,
-    targets: [{ imageUrl: null }, { imageUrl: PNG }],
+    imageOriginalUrl: `${HOST}/social/image-o.jpg`,
+    targets: [
+      { imageUrl: null },
+      { imageUrl: PNG, imageOriginalUrl: `${HOST}/social/image-p.png` },
+    ],
     moreImages: [{ url: `${HOST}/social/image-c.jpg` }],
     video: { url: VIDEO, coverUrl: FRAME },
   }),
-  [JPEG, null, PNG, `${HOST}/social/image-c.jpg`, VIDEO, FRAME],
+  [
+    JPEG,
+    `${HOST}/social/image-o.jpg`,
+    null,
+    null,
+    PNG,
+    `${HOST}/social/image-p.png`,
+    `${HOST}/social/image-c.jpg`,
+    VIDEO,
+    FRAME,
+  ],
 );
 
 console.log("\nApps that don't take the kind");

@@ -1052,8 +1052,12 @@ export function PostComposer({
    */
   async function publish(mode: "now" | "retry"): Promise<void> {
     setConfirming(false);
-    if (mode === "now" && !(await save())) return;
+    // Busy from the start, so a second press during the save can't send it twice.
     setBusy(mode);
+    if (mode === "now" && !(await save())) {
+      setBusy(null);
+      return;
+    }
     const res = await callApi<{ status: string; targets: SocialTargetRow[] }>(
       `/api/admin/social/${initial.id}/publish`,
       "POST",
@@ -1136,8 +1140,11 @@ export function PostComposer({
       toast("Pick a date and time.", { tone: "error" });
       return;
     }
-    if (!(await save())) return;
     setBusy("schedule");
+    if (!(await save())) {
+      setBusy(null);
+      return;
+    }
     const res = await callApi<{ scheduledAt: string }>(
       `/api/admin/social/${initial.id}/schedule`,
       "POST",
@@ -1183,7 +1190,7 @@ export function PostComposer({
     eventStartTime: content.eventStartTime || null,
     eventEndTime: content.eventEndTime || null,
   };
-  const issues = validatePost(draft, promo !== null);
+  const issues = validatePost(draft, promo !== null, promo);
   const blocked = blockingIssues(issues);
   const enabled = SOCIAL_PLATFORMS.filter((p) => issues[p] !== undefined);
   const setupMissing = enabled
@@ -1313,6 +1320,7 @@ export function PostComposer({
           }
         : { ...draft, body: text },
       promo !== null,
+      promo,
     );
     const had = new Set(
       SOCIAL_PLATFORMS.flatMap((p) => (issues[p] ?? []).map((i) => `${p}:${i.message}`)),

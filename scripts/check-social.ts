@@ -796,6 +796,22 @@ function checkFilling(): void {
     "other placeholders stay visible",
     fillPromo("{firstName} {wat}", promo) === "{firstName} {wat}",
   );
+
+  // 2,190 characters plus {promo}: inside Instagram's 2,200 as typed, over it once filled.
+  const near = draft({ body: `${"a".repeat(2190)}{promo}` });
+  const long = { ...promo, summary: "10% off every visit" };
+  /**
+   * Whether Instagram's character limit is among the issues.
+   * @param issues - Output of validatePost.
+   * @returns True when it is.
+   */
+  const limit = (issues: ReturnType<typeof validatePost>): boolean =>
+    (issues.instagram ?? []).some((i) => i.message.includes("characters"));
+  expect(
+    "limits: unfilled text passes when the wording isn't known",
+    !limit(validatePost(near, true)),
+  );
+  expect("limits: the filled promo counts once it is known", limit(validatePost(near, true, long)));
 }
 
 /** Email body to post. */

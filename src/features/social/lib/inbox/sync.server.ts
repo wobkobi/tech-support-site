@@ -29,7 +29,7 @@ import {
   type MetaConversation,
 } from "@/features/social/lib/inbox/map";
 import { metaProblem, scopeIn } from "@/features/social/lib/insights/metrics";
-import { graph, GraphError, metaConfig } from "@/features/social/lib/meta-graph";
+import { accountVisible, graph, GraphError, metaConfig } from "@/features/social/lib/meta-graph";
 import { PLATFORMS } from "@/features/social/lib/platforms";
 import { SOCIAL_PLATFORMS, type SocialPlatformKey } from "@/features/social/lib/validate";
 import { prisma } from "@/shared/lib/prisma";
@@ -415,7 +415,7 @@ async function readAll<T>(
  * @returns True when the error was the post being gone.
  */
 async function markObjectGone(
-  platform: SocialPlatformKey,
+  platform: "facebook" | "instagram",
   objectId: string,
   error: unknown,
   ctx: SyncCtx,
@@ -423,6 +423,8 @@ async function markObjectGone(
   if (!(error instanceof GraphError) || metaProblem(error.code, error.raw) !== "gone") {
     return false;
   }
+  // Lost access reads the same as a deleted post, so only a visible account confirms it.
+  if (!(await accountVisible(platform))) return false;
   await keepRows(platform, [], {
     now: ctx.now,
     firstRun: ctx.firstRun,

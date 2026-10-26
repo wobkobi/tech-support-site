@@ -76,7 +76,7 @@ export async function queueFillDue(now: Date): Promise<boolean> {
  * @param opts.now - Now.
  * @param opts.fillDays - How many days ahead to fill.
  * @param opts.queueIds - Only these schedules; every running one when left out, which also
- *   stamps the hourly fill as done.
+ *   stamps the hourly fill as done once it got through every slot.
  * @returns How it went, or null when another fill is running.
  */
 export async function fillQueues(opts: {
@@ -102,7 +102,8 @@ export async function fillQueues(opts: {
       if (one.outOfTime) result.outOfTime = true;
       await pruneSkipped(queue, opts.now);
     }
-    if (!opts.queueIds) {
+    // A fill cut short stays due, so the next 5-minute run carries on.
+    if (!opts.queueIds && !result.outOfTime) {
       const value = opts.now.toISOString();
       await prisma.setting.upsert({
         where: { key: FILLED_AT_KEY },

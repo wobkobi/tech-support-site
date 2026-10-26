@@ -145,20 +145,23 @@ export function containerExpired(createdAt: Date | null, now: Date): boolean {
  * Every stored file a post points at, for clean-up once it's gone or replaced.
  * @param post - The post's media.
  * @param post.imageUrl - Picture 1.
- * @param post.targets - Each app's own picture.
+ * @param post.imageOriginalUrl - Picture 1 before "Add my logo".
+ * @param post.targets - Each app's own picture, and its own before "Add my logo".
  * @param post.moreImages - Pictures 2 onwards.
  * @param post.video - The video and its cover frame.
  * @returns The addresses, nulls included.
  */
 export function mediaUrlsOf(post: {
   imageUrl: string | null;
-  targets: { imageUrl: string | null }[];
+  imageOriginalUrl?: string | null;
+  targets: { imageUrl: string | null; imageOriginalUrl?: string | null }[];
   moreImages?: { url: string }[] | null;
   video?: { url: string; coverUrl: string | null } | null;
 }): (string | null)[] {
   return [
     post.imageUrl,
-    ...post.targets.map((t) => t.imageUrl),
+    post.imageOriginalUrl ?? null,
+    ...post.targets.flatMap((t) => [t.imageUrl, t.imageOriginalUrl ?? null]),
     ...(post.moreImages ?? []).map((m) => m.url),
     post.video?.url ?? null,
     post.video?.coverUrl ?? null,
@@ -168,7 +171,8 @@ export function mediaUrlsOf(post: {
 /** Prisma select for {@link mediaUrlsOf}. */
 export const MEDIA_SELECT = {
   imageUrl: true,
-  targets: { select: { imageUrl: true } },
+  imageOriginalUrl: true,
+  targets: { select: { imageUrl: true, imageOriginalUrl: true } },
   moreImages: { select: { url: true } },
   video: { select: { url: true, coverUrl: true } },
 } as const;

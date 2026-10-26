@@ -51,7 +51,11 @@ import {
 } from "@/features/social/lib/insights/metrics";
 import { postHref, SOCIAL_ANALYTICS_PATH } from "@/features/social/lib/links";
 import { FORMAT_LABEL } from "@/features/social/lib/media";
-import { PLATFORM_LABEL, SOCIAL_PLATFORMS } from "@/features/social/lib/validate";
+import {
+  PLATFORM_LABEL,
+  SOCIAL_PLATFORMS,
+  type SocialPlatformKey,
+} from "@/features/social/lib/validate";
 import { Notice } from "@/shared/components/Notice";
 import { cn } from "@/shared/lib/cn";
 import { nzDateKey } from "@/shared/lib/timezone-utils";
@@ -152,17 +156,22 @@ export function SocialAnalyticsView({
   /** Reads every app's figures again, then reloads the page's data. */
   async function refresh(): Promise<void> {
     setRefreshing(true);
-    const res = await callApi<{ result: unknown }>(
-      "/api/admin/social/insights/refresh",
-      "POST",
-      {},
-    );
+    const res = await callApi<{
+      result: { days: Partial<Record<SocialPlatformKey, number | string>> };
+    }>("/api/admin/social/insights/refresh", "POST", {});
     setRefreshing(false);
     if (!res.ok) {
       toast(res.error, { tone: "error" });
       return;
     }
-    toast("Figures read again.");
+    // An app whose read failed comes back as its reason instead of a count.
+    const failed = SOCIAL_PLATFORMS.flatMap((p) => {
+      const why = res.result.days[p];
+      return typeof why === "string" ? [`${PLATFORM_LABEL[p]}: ${why}`] : [];
+    });
+    if (failed.length > 0)
+      toast(`Some figures weren't read. ${failed.join(" ")}`, { tone: "error" });
+    else toast("Figures read again.");
     router.refresh();
   }
 

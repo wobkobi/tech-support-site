@@ -13,8 +13,10 @@ import {
 } from "@/features/social/lib/adapter";
 import {
   GraphError,
+  accountVisible,
   deleteObject,
   graph,
+  isUnsure,
   metaConfig,
   rupload,
 } from "@/features/social/lib/meta-graph";
@@ -23,6 +25,11 @@ import {
 // the video id, and the cron checks on it again.
 const POLL_EVERY_MS = 3_000;
 const VIDEO_WAIT_MS = 30_000;
+
+const UNSURE_POST =
+  "Facebook didn't answer, and the post isn't on the Page yet. Check the Page before pressing Retry, as it may still show up.";
+const UNSURE_STORY =
+  "Facebook didn't answer, so the story may have gone up. Check the Page's stories before pressing Retry.";
 
 /**
  * The page id, or a thrown error when it's unset.
@@ -85,6 +92,74 @@ async function permalinkOf(postId: string): Promise<string | null> {
     return res.permalink_url ?? null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Finds a Page post whose answer was lost: the newest since it was sent, with the same words.
+ * @param page - Page id.
+ * @param message - The words it was sent with.
+ * @param since - When it was sent, in ms.
+ * @returns Where it lives, or null when it isn't there or the Page can't be read.
+ */
+async function findOnPage(
+  page: string,
+  message: string,
+  since: number,
+): Promise<PublishResult | null> {
+  try {
+    const res = await graph<{
+      data?: { id: string; message?: string; created_time?: string; permalink_url?: string }[];
+    }>(`/${page}/posts`, "GET", { fields: "id,message,created_time,permalink_url", limit: "10" });
+    // A minute's slack for the two clocks.
+    const match = (res.data ?? []).find(
+      (p) =>
+        (!p.created_time || Date.parse(p.created_time) >= since - 60_000) &&
+        (p.message ?? "").trim() === message.trim(),
+    );
+    return match ? { externalId: match.id, permalink: match.permalink_url ?? null } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Makes a post that goes up in one call. When Meta doesn't answer it may be up anyway, so the
+ * Page is checked first, and a miss says to look before Retry.
+ * @param page - Page id.
+ * @param message - The words it goes up with, to find it by.
+ * @param send - Makes the post and gives its Page post id.
+ * @returns The post id and its permalink.
+ */
+async function postOnce(
+  page: string,
+  message: string,
+  send: () => Promise<string>,
+): Promise<PublishResult> {
+  const sent = Date.now();
+  let postId: string;
+  try {
+    postId = await send();
+  } catch (error) {
+    if (!isUnsure(error)) throw error;
+    const found = await findOnPage(page, message, sent);
+    if (found) return found;
+    throw new Error(UNSURE_POST);
+  }
+  return { externalId: postId, permalink: await permalinkOf(postId) };
+}
+
+/**
+ * Swaps an unsure failure for a warning to look before Retry, for posts that can't be looked up.
+ * @param call - The call that puts it up.
+ * @param warning - What to say when Meta didn't answer.
+ * @returns What the call gave.
+ */
+async function warnIfUnsure<T>(call: Promise<T>, warning: string): Promise<T> {
+  try {
+    return await call;
+  } catch (error) {
+    throw isUnsure(error) ? new Error(warning) : error;
   }
 }
 
@@ -157,11 +232,20 @@ async function publishReel(page: string, input: PublishInput): Promise<PublishRe
     upload_phase: "start",
   });
   await rupload(start.video_id, input.video.url);
-  await graph(
-    `/${page}/video_reels`,
-    "POST",
-    reelFinishParams(start.video_id, facebookCaption(input.text, input.linkUrl)),
-  );
+  try {
+    await graph(
+      `/${page}/video_reels`,
+      "POST",
+      reelFinishParams(start.video_id, facebookCaption(input.text, input.linkUrl)),
+    );
+  } catch (error) {
+    // It may have been taken, so the next pass checks the video instead of starting again.
+    if (!isUnsure(error)) throw error;
+    throw new StillProcessingError(
+      "Facebook didn't answer in time, so the reel is checked again in a few minutes.",
+      start.video_id,
+    );
+  }
   return waitForReel(start.video_id);
 }
 
@@ -177,17 +261,21 @@ async function publishStory(page: string, input: PublishInput): Promise<PublishR
       upload_phase: "start",
     });
     await rupload(start.video_id, input.video.url);
-    const res = await graph<{ post_id?: string }>(`/${page}/video_stories`, "POST", {
-      upload_phase: "finish",
-      video_id: start.video_id,
-    });
+    const res = await warnIfUnsure(
+      graph<{ post_id?: string }>(`/${page}/video_stories`, "POST", {
+        upload_phase: "finish",
+        video_id: start.video_id,
+      }),
+      UNSURE_STORY,
+    );
     return { externalId: res.post_id ?? start.video_id, permalink: null };
   }
   if (!input.imageUrl) throw new Error("A story needs a picture or a video.");
   const photoId = await unpublishedPhoto(page, input.imageUrl);
-  const res = await graph<{ post_id?: string }>(`/${page}/photo_stories`, "POST", {
-    photo_id: photoId,
-  });
+  const res = await warnIfUnsure(
+    graph<{ post_id?: string }>(`/${page}/photo_stories`, "POST", { photo_id: photoId }),
+    UNSURE_STORY,
+  );
   return { externalId: res.post_id ?? photoId, permalink: null };
 }
 
@@ -231,24 +319,30 @@ async function publish(input: PublishInput): Promise<PublishResult> {
   if (input.images.length > 1) {
     const ids: string[] = [];
     for (const picture of input.images) ids.push(await unpublishedPhoto(page, picture.url));
-    const res = await graph<{ id: string }>(`/${page}/feed`, "POST", albumParams(caption, ids));
-    return { externalId: res.id, permalink: await permalinkOf(res.id) };
+    return postOnce(page, caption, async () => {
+      const res = await graph<{ id: string }>(`/${page}/feed`, "POST", albumParams(caption, ids));
+      return res.id;
+    });
   }
-  if (input.imageUrl) {
+  const imageUrl = input.imageUrl;
+  if (imageUrl) {
     // /photos returns the photo id and the Page post id; the permalink belongs to
     // the post, so it's looked up by post_id.
-    const res = await graph<{ id: string; post_id?: string }>(`/${page}/photos`, "POST", {
-      url: input.imageUrl,
-      caption,
+    return postOnce(page, caption, async () => {
+      const res = await graph<{ id: string; post_id?: string }>(`/${page}/photos`, "POST", {
+        url: imageUrl,
+        caption,
+      });
+      return res.post_id ?? res.id;
     });
-    const postId = res.post_id ?? res.id;
-    return { externalId: postId, permalink: await permalinkOf(postId) };
   }
-  const res = await graph<{ id: string }>(`/${page}/feed`, "POST", {
-    message: input.text,
-    ...(input.linkUrl ? { link: input.linkUrl } : {}),
+  return postOnce(page, input.text, async () => {
+    const res = await graph<{ id: string }>(`/${page}/feed`, "POST", {
+      message: input.text,
+      ...(input.linkUrl ? { link: input.linkUrl } : {}),
+    });
+    return res.id;
   });
-  return { externalId: res.id, permalink: await permalinkOf(res.id) };
 }
 
 export const facebook: PlatformAdapter = {
@@ -270,11 +364,10 @@ export const facebook: PlatformAdapter = {
    */
   async remove(postId) {
     const page = pageId();
-    await deleteObject(postId, async () => {
-      if (!postId.startsWith(`${page}_`)) return false;
-      const me = await graph<{ id: string }>("/me", "GET", { fields: "id" });
-      return me.id === page;
-    });
+    await deleteObject(
+      postId,
+      async () => postId.startsWith(`${page}_`) && (await accountVisible("facebook")),
+    );
   },
   /**
    * Proves the token is this Page's own: `/me` on a user token answers with the person's id.

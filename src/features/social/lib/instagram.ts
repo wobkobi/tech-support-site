@@ -10,7 +10,14 @@ import {
   type PublishInput,
   type PublishResult,
 } from "@/features/social/lib/adapter";
-import { GraphError, deleteObject, graph, metaConfig } from "@/features/social/lib/meta-graph";
+import {
+  GraphError,
+  accountVisible,
+  deleteObject,
+  graph,
+  isUnsure,
+  metaConfig,
+} from "@/features/social/lib/meta-graph";
 
 // Picture containers are usually FINISHED within seconds; videos take minutes. Past these the
 // target stays pending with its container, and the cron checks on it again.
@@ -206,9 +213,21 @@ async function findPublished(account: string, input: PublishInput): Promise<Publ
  * @returns The media id and its permalink.
  */
 async function publishContainer(account: string, containerId: string): Promise<PublishResult> {
-  const media = await graph<{ id: string }>(`/${account}/media_publish`, "POST", {
-    creation_id: containerId,
-  });
+  let media: { id: string };
+  try {
+    media = await graph<{ id: string }>(`/${account}/media_publish`, "POST", {
+      creation_id: containerId,
+    });
+  } catch (error) {
+    // It may have gone up, so the next pass reads the container, which says PUBLISHED if it did.
+    if (isUnsure(error)) {
+      throw new StillProcessingError(
+        "Instagram didn't answer in time, so it's checked again in a few minutes.",
+        containerId,
+      );
+    }
+    throw error;
+  }
   return { externalId: media.id, permalink: await permalinkOf(media.id) };
 }
 
@@ -249,10 +268,7 @@ async function publish(input: PublishInput): Promise<PublishResult> {
  */
 async function remove(mediaId: string): Promise<void> {
   try {
-    await deleteObject(mediaId, async () => {
-      await graph(`/${igId()}`, "GET", { fields: "id" });
-      return true;
-    });
+    await deleteObject(mediaId, () => accountVisible("instagram"));
   } catch (error) {
     const code = error instanceof GraphError ? error.code : null;
     if (code === 10 || (code !== null && code >= 200 && code < 300)) {

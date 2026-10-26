@@ -14,7 +14,8 @@ import { NextRequest, NextResponse } from "next/server";
  * GET /api/cron/sync-social
  * @param request - The incoming cron request.
  * @returns JSON `{ ok, comments, running, days, posts, left }`; comments is null when another
- *   read held its lock, and running is true when the figures' lock was held, so neither ran.
+ *   read held its lock and a message when it threw (a 500, so cron-job.org flags it), and
+ *   running is true when the figures' lock was held, so neither ran.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!isCronAuthorised(request)) {
@@ -29,10 +30,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     console.error("[cron/sync-social] comments failed:", error);
     comments = "The comments read failed.";
   }
+  const ok = typeof comments !== "string";
+  const status = ok ? 200 : 500;
   try {
     const result = await syncInsights(now);
-    if (!result) return NextResponse.json({ ok: true, comments, running: true });
-    return NextResponse.json({ ok: true, comments, running: false, ...result });
+    if (!result) return NextResponse.json({ ok, comments, running: true }, { status });
+    return NextResponse.json({ ok, comments, running: false, ...result }, { status });
   } catch (error) {
     console.error("[cron/sync-social] failed:", error);
     return errorResponse("Social stats sync failed", 503);

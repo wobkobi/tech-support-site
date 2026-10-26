@@ -154,17 +154,23 @@ across DST changes.
   Resend reports a broadcast sent, the next run deletes its segment (the free plan allows 3). That
   runs before the quiet-hours check, since it sends nothing.
 - Scheduled social posts use the same claim (`scheduled > posting`) and run before the quiet-hours
-  check, so they go out at the time picked at any hour. Each platform's outcome is stored on the
-  post, so a resumed run (including one waiting on Instagram's picture processing) only posts to the
-  platforms still pending.
+  check, so they go out at the time picked at any hour. Each platform's outcome is saved on the post
+  as soon as it lands, so a resumed run (including one waiting on Instagram's picture processing)
+  only posts to the platforms still pending, even when the run died part-way. A post that can't go
+  at its time (its promo ended, an app isn't set up, a check fails) is marked failed at its slot
+  with a push to the operator, and Retry sends it once it's fixed. When Meta doesn't answer a call
+  that puts a post up, Instagram and Facebook reels keep their upload for the next run to check
+  instead of posting again, and a Facebook post is looked for on the Page before it's called failed.
+- Any pass of this job that throws (promo, social, schedule fill) still lets the others run, but the
+  job then answers 500 with the failed passes listed, so cron-job.org flags the run.
 - Social schedules are filled by the same job, at most once an hour: a run whose last fill (the
   `social:queueFilledAt` setting) is under an hour old skips it. The fill holds the
   `social:queueFill` run lock, so an overlapping run or a "Line up posts now" click can't double up
-  a slot, and stops after 20 s, leaving any remaining slots to the next hour. It lines up postings
-  for Settings > Social & brand > "Line up posts ahead" days, never closer than 10 minutes away, and
-  treats a slot as filled when any posting from that schedule holds the time. Slots you emptied by
-  hand (unscheduled or deleted) are remembered and left empty. Nothing new needs registering on
-  cron-job.org.
+  a slot, and stops after 20 s; a fill cut short isn't stamped done, so the next 5-minute run
+  carries on with the remaining slots. It lines up postings for Settings > Social & brand > "Line up
+  posts ahead" days, never closer than 10 minutes away, and treats a slot as filled when any posting
+  from that schedule holds the time. Slots you emptied by hand (unscheduled or deleted) are
+  remembered and left empty. Nothing new needs registering on cron-job.org.
 - Social sync reads comments and reviews first, under the `social:commentsSync` run lock (a held
   lock answers `comments: null`). Facebook and Instagram posts from the last 60 days are listed with
   their comment counts, and only posts whose count moved are read again, at most 30 a run; a post
@@ -175,9 +181,11 @@ across DST changes.
   messages; a stored message missing from the read (in a longer chat, from among its newest 20) was
   unsent, so it's marked gone and its words are cleared. The first run of each app leaves threads
   older than 14 days read. A run stops starting reads after 90 s. A failed read keeps its reason for
-  the Inbox to show and never stops the figures. The Inbox's Check now is turned away within 2
-  minutes of the last read. Move the cron-job.org job to every 30 minutes after the deploy that adds
-  the Inbox.
+  the Inbox to show and never stops the figures; a comments read that throws outright still lets the
+  figures run, then the job answers 500 so cron-job.org flags it. A post or comment Meta reports as
+  missing is only marked gone while the token can still see the Page or Instagram account, since
+  lost access reads the same. The Inbox's Check now is turned away within 2 minutes of the last
+  read. Move the cron-job.org job to every 30 minutes after the deploy that adds the Inbox.
 - The figures part holds the `social:insightsSync` run lock, so an overlapping run or a Refresh
   press does nothing and answers `{ running: true }`. Each app's account days are read at most every
   6 hours: the last 30 days on the first run, then the last 3 again for Facebook and Instagram (the

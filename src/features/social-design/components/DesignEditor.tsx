@@ -414,13 +414,22 @@ export function DesignEditor({
         toast("Not every picture was stored, so the post wasn't changed.", { tone: "error" });
         return;
       }
-      const res = await callApi<{ postId: string; created: boolean; isContent: boolean }>(
-        `/api/admin/social/designs/${initial.id}/use`,
-        "POST",
-      );
+      const res = await callApi<{
+        postId: string;
+        created: boolean;
+        isContent: boolean;
+        postingProblems?: { error: string }[];
+      }>(`/api/admin/social/designs/${initial.id}/use`, "POST");
       if (!res.ok) {
         toast(res.error, { tone: "error" });
         return;
+      }
+      const stuck = res.postingProblems ?? [];
+      if (stuck.length > 0) {
+        toast(
+          `${stuck.length === 1 ? "A lined-up posting" : `${stuck.length} lined-up postings`} can't go out with the new picture: ${stuck[0]!.error}`,
+          { tone: "error" },
+        );
       }
       router.push(postHref({ id: res.postId, isContent: res.isContent }));
     } finally {

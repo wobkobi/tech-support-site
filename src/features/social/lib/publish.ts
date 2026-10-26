@@ -4,8 +4,10 @@
 
 import { promoWording } from "@/features/mailing/lib/context";
 import type { PromoWording } from "@/features/mailing/lib/render";
-import { StillProcessingError } from "@/features/social/lib/adapter";
+import { sendOwnerPush } from "@/features/notifications/lib/push";
+import type { PublishResult } from "@/features/social/lib/adapter";
 import { NOT_CONTENT } from "@/features/social/lib/filters";
+import { postHref } from "@/features/social/lib/links";
 import {
   RESUME_AFTER_MS,
   canTakeDown,
@@ -14,6 +16,7 @@ import {
 } from "@/features/social/lib/media";
 import { PLATFORMS } from "@/features/social/lib/platforms";
 import {
+  afterPublish,
   applyTakeDown,
   freshRun,
   resetFailed,
@@ -91,7 +94,7 @@ export async function readiness(
       status: 409,
     };
   }
-  const problems = blockingIssues(validatePost(post, promo !== null));
+  const problems = blockingIssues(validatePost(post, promo !== null, promo));
   if (problems.length > 0) return { ok: false, error: problems.join(" "), status: 400 };
   return { ok: true, promo };
 }
@@ -109,18 +112,31 @@ export function scheduleProblems(post: SocialPost): { error: string; status: num
 }
 
 /**
- * Puts a claimed post back to draft so it shows in Drafts instead of stuck in "posting".
- * @param id - Post id.
+ * Closes a scheduled post that can't go at its time as failed, keeping its slot, so it shows
+ * under problems with Retry, and tells the owner. Claimed from "scheduled", so one push.
+ * @param post - The post.
+ * @param error - Why it can't go.
  */
-async function releaseToDraft(id: string): Promise<void> {
-  await prisma.socialPost.update({
-    where: { id },
-    data: { status: "draft", scheduledAt: null, postingStartedAt: null },
+async function failAtSendTime(post: SocialPost, error: string): Promise<void> {
+  const targets = freshRun(post.targets).map((t): TargetState =>
+    t.status === "pending" ? { ...t, status: "failed", error } : t,
+  );
+  const closed = await prisma.socialPost.updateMany({
+    where: { id: post.id, status: "scheduled" },
+    data: { status: "failed", targets },
+  });
+  if (closed.count === 0) return;
+  await sendOwnerPush({
+    title: "A scheduled post didn't go out",
+    body: `"${post.name}" couldn't go at its time. Open it to see why.`,
+    url: postHref(post),
+    tag: `social-failed-${post.id}`,
   });
 }
 
 /**
- * Publishes every pending enabled target in parallel, then records outcomes and status.
+ * Publishes every pending enabled target in parallel, then records the status. Each target is
+ * saved as it settles, so a run that dies part-way can't post a finished app twice on resume.
  * @param post - The claimed post.
  * @param targets - Targets to run from (pending ones get published).
  * @param promo - Promo wording for the placeholders.
@@ -133,69 +149,65 @@ async function runPending(
 ): Promise<{ status: SocialPost["status"]; targets: TargetState[] }> {
   const started = new Date();
   const format = formatOf(post.format);
-  const due = targets.filter((t) => t.enabled && t.status === "pending" && isLive(t.platform));
-  const settled = await Promise.allSettled(
-    due.map(async (t) => {
-      if (t.containerId && containerExpired(t.containerCreatedAt, started)) {
-        throw new Error(
-          `${PLATFORM_LABEL[t.platform]} dropped the upload after a day of processing. Press Retry to send it again.`,
-        );
+  const next = [...targets];
+  let saving: Promise<unknown> = Promise.resolve();
+  /** Saves the targets as they stand, queued behind the last save since each writes the lot. */
+  const checkpoint = (): void => {
+    const snapshot = [...next];
+    saving = saving
+      .then(() => prisma.socialPost.update({ where: { id: post.id }, data: { targets: snapshot } }))
+      .catch((error: unknown) => console.error("[social/publish] checkpoint failed:", error));
+  };
+
+  await Promise.all(
+    next.map(async (t, i) => {
+      if (!t.enabled || t.status !== "pending" || !isLive(t.platform)) return;
+      let outcome: PromiseSettledResult<PublishResult>;
+      try {
+        if (t.containerId && containerExpired(t.containerCreatedAt, started)) {
+          throw new Error(
+            `${PLATFORM_LABEL[t.platform]} dropped the upload after a day of processing. Press Retry to send it again.`,
+          );
+        }
+        // The platform's own picture when it has one, with its own description.
+        const first = pictureFor(post, t.platform);
+        const firstAlt = t.imageUrl ? t.imageAlt : post.imageAlt;
+        const more = format === "feed" ? post.moreImages : [];
+        const value = await PLATFORMS[t.platform].publish({
+          format,
+          text: fillPromo(textFor(post, t.platform), promo).trim(),
+          imageUrl: first?.url ?? null,
+          imageAlt: firstAlt,
+          images: first
+            ? [{ url: first.url, alt: firstAlt }, ...more.map((m) => ({ url: m.url, alt: m.alt }))]
+            : [],
+          video: post.video ? { url: post.video.url, coverUrl: post.video.coverUrl } : null,
+          linkUrl: post.linkUrl,
+          containerId: t.containerId,
+          containerCreatedAt: t.containerCreatedAt,
+          google: {
+            type: post.googleType,
+            cta: post.googleCta,
+            url: post.googleUrl,
+            title: post.googleTitle,
+            start: dateKey(post.offerStart),
+            end: dateKey(post.offerEnd),
+            startTime: post.eventStartTime,
+            endTime: post.eventEndTime,
+            couponCode: post.couponCode,
+          },
+        });
+        outcome = { status: "fulfilled", value };
+      } catch (reason) {
+        outcome = { status: "rejected", reason };
       }
-      // The platform's own picture when it has one, with its own description.
-      const first = pictureFor(post, t.platform);
-      const firstAlt = t.imageUrl ? t.imageAlt : post.imageAlt;
-      const more = format === "feed" ? post.moreImages : [];
-      return PLATFORMS[t.platform].publish({
-        format,
-        text: fillPromo(textFor(post, t.platform), promo).trim(),
-        imageUrl: first?.url ?? null,
-        imageAlt: firstAlt,
-        images: first
-          ? [{ url: first.url, alt: firstAlt }, ...more.map((m) => ({ url: m.url, alt: m.alt }))]
-          : [],
-        video: post.video ? { url: post.video.url, coverUrl: post.video.coverUrl } : null,
-        linkUrl: post.linkUrl,
-        containerId: t.containerId,
-        containerCreatedAt: t.containerCreatedAt,
-        google: {
-          type: post.googleType,
-          cta: post.googleCta,
-          url: post.googleUrl,
-          title: post.googleTitle,
-          start: dateKey(post.offerStart),
-          end: dateKey(post.offerEnd),
-          startTime: post.eventStartTime,
-          endTime: post.eventEndTime,
-          couponCode: post.couponCode,
-        },
-      });
+      next[i] = afterPublish(t, outcome, started, new Date());
+      checkpoint();
     }),
   );
+  await saving;
 
   const now = new Date();
-  const outcomes = new Map(due.map((t, i) => [t.platform, settled[i]!]));
-  const next = targets.map((t): TargetState => {
-    const outcome = outcomes.get(t.platform);
-    if (!outcome) return t;
-    const done = { containerId: null, containerCreatedAt: null };
-    if (outcome.status === "fulfilled") {
-      return { ...t, status: "posted", ...outcome.value, error: null, postedAt: now, ...done };
-    }
-    const reason = outcome.reason;
-    // Accepted but still processing: stays pending with what to check, for the cron's next pass.
-    if (reason instanceof StillProcessingError) {
-      const same = reason.containerId !== null && reason.containerId === t.containerId;
-      return {
-        ...t,
-        error: reason.message,
-        containerId: reason.containerId,
-        containerCreatedAt: same ? t.containerCreatedAt : reason.containerId ? started : null,
-      };
-    }
-    const message = reason instanceof Error ? reason.message : "Posting failed.";
-    return { ...t, status: "failed", error: message.slice(0, 500), ...done };
-  });
-
   const status = rollUpStatus(next);
   await prisma.socialPost.update({
     where: { id: post.id },
@@ -205,8 +217,10 @@ async function runPending(
       ...(status === "posting"
         ? { resumeAfter: new Date(now.getTime() + RESUME_AFTER_MS) }
         : {
-            postedAt: post.postedAt ?? now,
-            postingStartedAt: null,
+            // Nothing went up on a failed run, so it keeps when it was tried instead.
+            ...(status === "failed"
+              ? {}
+              : { postedAt: post.postedAt ?? now, postingStartedAt: null }),
             scheduledAt: null,
             resumeAfter: null,
           }),
@@ -216,25 +230,38 @@ async function runPending(
 }
 
 /**
- * Publishes a draft or scheduled post now.
+ * Publishes a draft or scheduled post now. Readiness is checked before the claim, so a post
+ * that can't go is left as it was.
  * @param id - Post id.
+ * @param due - True when the cron sends it at its time: a post that can't go then fails where
+ *   it stands, with a push, rather than staying scheduled for a time that has passed.
  * @returns The outcome per platform, or the reason it didn't go.
  */
-export async function publishPost(id: string): Promise<PublishOutcome> {
+export async function publishPost(id: string, due = false): Promise<PublishOutcome> {
+  // Content items never go out themselves: their postings do.
+  const claimable = {
+    id,
+    isPreset: false,
+    status: { in: ["draft" as const, "scheduled" as const] },
+    ...NOT_CONTENT,
+  };
+  const before = await prisma.socialPost.findFirst({ where: claimable });
+  if (!before) {
+    return { ok: false, error: "This post is already posting or has been posted.", status: 409 };
+  }
+  const ready = await readiness(before);
+  if (!ready.ok) {
+    if (due) await failAtSendTime(before, ready.error);
+    return ready;
+  }
   const claimed = await prisma.socialPost.updateMany({
-    // Content items never go out themselves: their postings do.
-    where: { id, isPreset: false, status: { in: ["draft", "scheduled"] }, ...NOT_CONTENT },
+    where: claimable,
     data: { status: "posting", postingStartedAt: new Date() },
   });
   if (claimed.count === 0) {
     return { ok: false, error: "This post is already posting or has been posted.", status: 409 };
   }
   const post = await prisma.socialPost.findUniqueOrThrow({ where: { id } });
-  const ready = await readiness(post);
-  if (!ready.ok) {
-    await releaseToDraft(id);
-    return ready;
-  }
   return { ok: true, ...(await runPending(post, freshRun(post.targets), ready.promo)) };
 }
 
@@ -360,7 +387,7 @@ export async function runScheduledSocialPosts(): Promise<
     orderBy: { scheduledAt: "asc" },
   });
   for (const p of due) {
-    results.push({ id: p.id, name: p.name, result: await publishPost(p.id) });
+    results.push({ id: p.id, name: p.name, result: await publishPost(p.id, true) });
   }
 
   // A claimed run clears resumeAfter, so one still going is only picked up once it stalls.

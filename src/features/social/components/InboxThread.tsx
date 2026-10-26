@@ -90,7 +90,13 @@ export function InboxThread({
   const top = thread.messages[0];
   const answer = messageToAnswer(thread.messages);
   const ourReply = thread.messages.some((m) => m.fromUs && !m.gone);
-  const nowMs = Date.parse(now);
+  // Starts at the page's load time, so the server and first render agree, then ticks, so a
+  // reply window that closes while the page sits open closes here too.
+  const [nowMs, setNowMs] = useState(() => Date.parse(now));
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
   const problem = text.trim() ? replyProblem(thread.platform, text, direct) : null;
   const unchanged = googleReply !== undefined && text.trim() === googleReply.text.trim();
   // The apps only take a business's message within a day of the person's last one.

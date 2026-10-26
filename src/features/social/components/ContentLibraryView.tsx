@@ -96,8 +96,9 @@ export function ContentLibraryView({
     () => filterLibrary(rows, filter, sort, tagNames),
     [rows, filter, sort, tagNames],
   );
-  // Ticks on items that have since gone, from a delete or a reload, don't count.
-  const selected = rows.filter((r) => picked.has(r.item.id));
+  // Ticks on items a filter hides, or that have since gone, don't count, so a bulk action only
+  // touches what's on screen.
+  const selected = shown.filter((r) => picked.has(r.item.id));
   const allShownPicked = shown.length > 0 && shown.every((r) => picked.has(r.item.id));
   const usedTags = tags.filter((t) => rows.some((r) => r.item.tagIds.includes(t.id)));
   const linedUp = selected.reduce((n, r) => n + r.linedUp, 0);

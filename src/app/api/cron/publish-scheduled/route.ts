@@ -16,8 +16,9 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * GET /api/cron/publish-scheduled
  * @param request - The incoming cron request.
- * @returns JSON `{ ok, promoRefreshed, posted, filled, heldUntil, sent }`; filled is null when
- *   the hourly schedule fill wasn't due, and heldUntil is when quiet hours end (null outside them).
+ * @returns JSON `{ ok, failed, promoRefreshed, posted, filled, heldUntil, sent }`; failed names
+ *   the passes that threw (a 500, so cron-job.org flags it), filled is null when the hourly
+ *   schedule fill wasn't due, and heldUntil is when quiet hours end (null outside them).
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!isCronAuthorised(request)) {
@@ -25,11 +26,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   // Each pass is caught on its own, so a failing platform can't hold up the emails.
+  const failed: string[] = [];
   let promoRefreshed = false;
   try {
     promoRefreshed = await refreshPromoCacheAtBoundary();
   } catch (error) {
     console.error("[cron/publish-scheduled] Promo boundary check failed:", error);
+    failed.push("promo");
   }
 
   let posted: Awaited<ReturnType<typeof runScheduledSocialPosts>> | null = null;
@@ -37,6 +40,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     posted = await runScheduledSocialPosts();
   } catch (error) {
     console.error("[cron/publish-scheduled] Social pass failed:", error);
+    failed.push("social");
   }
 
   let filled: FillResult | null = null;
@@ -48,18 +52,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
   } catch (error) {
     console.error("[cron/publish-scheduled] Schedule fill failed:", error);
+    failed.push("fill");
   }
 
   try {
     const { heldUntil, results } = await runScheduledSends();
-    return NextResponse.json({
-      ok: posted !== null,
-      promoRefreshed,
-      posted,
-      filled,
-      heldUntil: heldUntil?.toISOString() ?? null,
-      sent: results,
-    });
+    return NextResponse.json(
+      {
+        ok: failed.length === 0,
+        failed,
+        promoRefreshed,
+        posted,
+        filled,
+        heldUntil: heldUntil?.toISOString() ?? null,
+        sent: results,
+      },
+      { status: failed.length === 0 ? 200 : 500 },
+    );
   } catch (error) {
     console.error("[cron/publish-scheduled] Error:", error);
     return errorResponse("Scheduled send failed.", 500);
