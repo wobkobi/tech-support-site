@@ -2,8 +2,7 @@
 // Check a customer-entered promo code. Public (used before sign-in), so rate limited.
 
 import {
-  describePromoOffer,
-  describeRecurringWindow,
+  describePromoTerms,
   normalisePromoCode,
   resolvePromo,
 } from "@/features/business/lib/promos";
@@ -38,12 +37,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     email: parseString(body?.email, 254),
   });
   const valid = promo?.code === normalised;
-  // Show the spend floor and weekday restriction so the code doesn't read as unconditional.
-  const restriction = valid && promo ? describeRecurringWindow(promo) : null;
-  const description =
-    valid && promo
-      ? `${describePromoOffer(promo)}${restriction ? `, ${restriction} only` : ""}`
-      : null;
+  // Name every condition (floor, new customers, days, per-customer limit) so the code
+  // doesn't read as unconditional.
+  const description = valid && promo ? describePromoTerms(promo) : null;
   return NextResponse.json({
     ok: true,
     valid,

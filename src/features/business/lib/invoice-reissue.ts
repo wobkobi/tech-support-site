@@ -3,33 +3,47 @@
 // copied, so the promo re-prices for the job date.
 
 import { formatNZD } from "@/features/business/lib/business-format";
+import { isSurchargeLine } from "@/features/business/lib/surcharge-line";
 import { nzDateKey } from "@/shared/lib/timezone-utils";
 
 /** What the calculator carries over from a voided invoice it is re-issuing. */
 export interface ReissuePrefill {
+  /** Voided invoice's id, sent with the save so its already-paid entry moves across. */
+  invoiceId: string;
   /** Voided invoice's number, named in the calculator banner. */
   invoiceNumber: string;
   /** Client details, used when no calendar event backs the job. */
   clientName: string;
   clientEmail: string;
-  /** NZ date (YYYY-MM-DD) the voided invoice was issued, the job date when no event backs it. */
-  issueDate: string;
+  /**
+   * NZ date (YYYY-MM-DD) of the voided invoice's job, else the day it was issued; the job date
+   * when no event backs it, so a Saturday job invoiced on Monday keeps its weekend rates.
+   */
+  jobDate: string;
   /** The voided invoice's lines, one per row, seeded into "Describe the job". */
   jobText: string;
   /** Invoice notes, carried into the calculator's notes. */
   notes: string;
-  /** Amount paid on the day, which stays on the voided invoice; null when none. */
+  /** Amount paid on the day, carried into the Already paid box; null when none. */
   alreadyPaid: number | null;
+  /** How that amount came in, or null. */
+  alreadyPaidMethod: string | null;
   /** The voided invoice was for a Gold Card holder, so the box starts ticked. */
   goldCard: boolean;
+  /** The voided invoice billed a surcharge line; the calculator's tick starts on or off to match. */
+  surcharge: boolean;
+  /** Code of the promo the voided invoice took, re-applied so a typed code isn't lost. */
+  promoCode: string | null;
 }
 
 /** The invoice fields a re-issue reads. */
 interface ReissueSource {
+  id: string;
   number: string;
   clientName: string;
   clientEmail: string;
   issueDate: Date;
+  jobDate: string | null;
   lineItems: readonly {
     description: string;
     qty: number;
@@ -38,6 +52,7 @@ interface ReissueSource {
   }[];
   notes: string | null;
   alreadyPaid: number | null;
+  alreadyPaidMethod: string | null;
   goldCardPercent: number | null;
 }
 
@@ -80,19 +95,39 @@ function lineText(line: ReissueSource["lineItems"][number]): string {
 }
 
 /**
- * Builds the calculator prefill for re-issuing a voided invoice.
+ * Builds the calculator prefill for re-issuing a voided invoice. The surcharge line stays out
+ * of the job text: the calculator adds it back from the date, so parsed as a part it bills twice.
  * @param invoice - The voided invoice.
+ * @param promoCode - Code of the promo it took, or null for an automatic one or none.
  * @returns What the calculator seeds from it.
  */
-export function reissuePrefill(invoice: ReissueSource): ReissuePrefill {
+export function reissuePrefill(
+  invoice: ReissueSource,
+  promoCode: string | null = null,
+): ReissuePrefill {
+  /**
+   * Whether a line is the weekend, public-holiday or after-hours surcharge.
+   * @param l - An invoice line.
+   * @returns True for the surcharge line.
+   */
+  const isSurcharge = (l: ReissueSource["lineItems"][number]): boolean =>
+    isSurchargeLine(l.description);
+  const alreadyPaid = invoice.alreadyPaid && invoice.alreadyPaid > 0 ? invoice.alreadyPaid : null;
   return {
+    invoiceId: invoice.id,
     invoiceNumber: invoice.number,
     clientName: invoice.clientName,
     clientEmail: invoice.clientEmail,
-    issueDate: nzDateKey(invoice.issueDate),
-    jobText: invoice.lineItems.map(lineText).join("\n"),
+    jobDate: invoice.jobDate ?? nzDateKey(invoice.issueDate),
+    jobText: invoice.lineItems
+      .filter((l) => !isSurcharge(l))
+      .map(lineText)
+      .join("\n"),
     notes: invoice.notes ?? "",
-    alreadyPaid: invoice.alreadyPaid && invoice.alreadyPaid > 0 ? invoice.alreadyPaid : null,
+    alreadyPaid,
+    alreadyPaidMethod: alreadyPaid === null ? null : invoice.alreadyPaidMethod,
     goldCard: (invoice.goldCardPercent ?? 0) > 0,
+    surcharge: invoice.lineItems.some(isSurcharge),
+    promoCode,
   };
 }

@@ -314,8 +314,34 @@ function withMinutes(task: TaskLine, mins: number): TaskLine {
 }
 
 /**
+ * A task line's rate tags and wording as one comparable string, for the last tie-break.
+ * @param task - Task line.
+ * @returns Base id, sorted modifier ids and description, joined.
+ */
+function tieKey(task: TaskLine): string {
+  const mods = [...(task.modifierIds ?? [])].sort().join(",");
+  return `${task.baseRateId ?? ""}|${mods}|${task.description}`;
+}
+
+/**
+ * Whether `a` takes the minimum-billable padding ahead of `b`: the longer line, then the
+ * cheaper rate, then a finished line over an unfinished one, then {@link tieKey}. Never the
+ * list order, which would let a Business and a home line at one price swap the promo.
+ * @param a - Candidate task line.
+ * @param b - Current pick.
+ * @returns True when `a` should take the padding instead of `b`.
+ */
+function padsBefore(a: TaskLine, b: TaskLine): boolean {
+  if (a.qty !== b.qty) return a.qty > b.qty;
+  if (a.unitPrice !== b.unitPrice) return a.unitPrice < b.unitPrice;
+  if (!a.unsuccessful !== !b.unsuccessful) return !a.unsuccessful;
+  return tieKey(a) < tieKey(b);
+}
+
+/**
  * Enforces the whole-job minimum-billable floor by growing the largest floating task (else
- * largest hourly). A job with no hourly time stays at 0. Used by calcJobTotal and jobToLineItems.
+ * largest hourly), ties settled by {@link padsBefore} so reordering the tasks never changes the
+ * bill. A job with no hourly time stays at 0. Used by calcJobTotal and jobToLineItems.
  * @param tasks - Task lines; flat-rate lines pass through.
  * @param minBillableMins - Live minimum billable labour minutes.
  * @returns Task list with the floor applied, or the input when already at the minimum.
@@ -332,7 +358,7 @@ export function enforceMinBillable(
   const pool = floating.length > 0 ? floating : hourly;
   let biggest = pool[0];
   if (!biggest) return tasks;
-  for (const t of pool) if (t.qty > biggest.qty) biggest = t;
+  for (const t of pool) if (padsBefore(t, biggest)) biggest = t;
   const bumped = withMinutes(biggest, biggest.qty * 60 + (minBillableMins - totalMin));
   return tasks.map((t) => (t === biggest ? bumped : t));
 }

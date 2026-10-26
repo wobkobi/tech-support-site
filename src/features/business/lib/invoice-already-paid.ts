@@ -56,6 +56,37 @@ export function balanceIncomeWhere(invoice: {
 }
 
 /**
+ * Moves a voided invoice's already-paid entry onto the invoice re-issuing it, so money
+ * handed over on the day counts once. Run before {@link syncAlreadyPaidIncome}, which then
+ * brings the entry's amount and method in line with the new invoice.
+ * @param voidedId - The voided invoice being re-issued.
+ * @param invoiceId - The new invoice.
+ * @returns Whether an entry moved.
+ */
+export async function adoptReissuedAlreadyPaid(
+  voidedId: string,
+  invoiceId: string,
+): Promise<boolean> {
+  const voided = await prisma.invoice.findUnique({
+    where: { id: voidedId },
+    select: { status: true, alreadyPaidIncomeId: true },
+  });
+  if (voided?.status !== "VOIDED" || !voided.alreadyPaidIncomeId) return false;
+  // Guarded on the old link, so two saves of one re-issue can't both take it.
+  const moved = await prisma.incomeEntry.updateMany({
+    where: { id: voided.alreadyPaidIncomeId, invoiceId: voidedId },
+    data: { invoiceId },
+  });
+  if (moved.count !== 1) return false;
+  await prisma.invoice.update({ where: { id: voidedId }, data: { alreadyPaidIncomeId: null } });
+  await prisma.invoice.update({
+    where: { id: invoiceId },
+    data: { alreadyPaidIncomeId: voided.alreadyPaidIncomeId },
+  });
+  return true;
+}
+
+/**
  * Creates, updates or deletes the already-paid income entry (and its Cashbook row) to match
  * the invoice. The sheet wins on the next import, so a sheet failure warns for a hand fix.
  * If the sheet row delete fails, the entry is unlinked instead so the import can't duplicate it.

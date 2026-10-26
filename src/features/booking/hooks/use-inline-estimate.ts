@@ -137,6 +137,8 @@ export function useInlineEstimate(inputs: InlineEstimateInputs): InlineEstimateS
       selectedMinute,
       duration,
       promoCode.trim(),
+      // Per-customer and new-customer limits price by email, so a changed one re-quotes.
+      email.trim().toLowerCase(),
     ]);
   }
 

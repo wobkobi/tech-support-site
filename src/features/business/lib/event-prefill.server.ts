@@ -51,7 +51,21 @@ interface ResolvedEvent {
     travelMinsBackAtBooking: number | null;
     createdAt: Date;
   } | null;
-  travelBlock: { rawTravelMinutes: number | null; rawTravelBackMinutes: number | null } | null;
+  travelBlock: {
+    rawTravelMinutes: number | null;
+    rawTravelBackMinutes: number | null;
+    transportMode: string | null;
+  } | null;
+}
+
+/**
+ * Whether a schedule travel block is a drive. Null reads as driving, as the calendar sync does.
+ * @param block - The event's travel block, or null.
+ * @param block.transportMode - How the trip was made.
+ * @returns True for a drive; false for a walk, bike ride or bus trip, or no block.
+ */
+function isDrive(block: { transportMode: string | null } | null): boolean {
+  return !!block && (block.transportMode ?? "driving") === "driving";
 }
 
 /**
@@ -71,7 +85,7 @@ async function resolveEvent(eventId: string): Promise<ResolvedEvent | null> {
     prisma.travelBlock
       .findFirst({
         where: { sourceEventId: eventId },
-        select: { rawTravelMinutes: true, rawTravelBackMinutes: true },
+        select: { rawTravelMinutes: true, rawTravelBackMinutes: true, transportMode: true },
       })
       .catch(() => null),
   ]);
@@ -90,18 +104,22 @@ async function resolveEvent(eventId: string): Promise<ResolvedEvent | null> {
 
 /**
  * Drive prediction for one event: the frozen TravelBlock, else a booking snapshot only when it
- * has a back leg (one-way snapshots are traffic-free quotes).
+ * has a back leg (one-way snapshots are traffic-free quotes). A walked job bills no travel, so
+ * a walk block gives nothing: not its own minutes (a 26-min walk would bill $35) and not the
+ * booking's drive snapshot behind it.
  * @param resolved - The resolved event.
  * @returns There/back raw minutes; either may be null when nothing is known.
  */
 function travelFor(resolved: ResolvedEvent): { there: number | null; back: number | null } {
+  if (resolved.travelBlock && !isDrive(resolved.travelBlock)) return { there: null, back: null };
+  const block = resolved.travelBlock;
   const snapshotIsTrafficAware = resolved.booking?.travelMinsBackAtBooking != null;
   return {
     there:
-      resolved.travelBlock?.rawTravelMinutes ??
+      block?.rawTravelMinutes ??
       (snapshotIsTrafficAware ? (resolved.booking?.travelMinsAtBooking ?? null) : null),
     back:
-      resolved.travelBlock?.rawTravelBackMinutes ??
+      block?.rawTravelBackMinutes ??
       (snapshotIsTrafficAware ? (resolved.booking?.travelMinsBackAtBooking ?? null) : null),
   };
 }
@@ -167,6 +185,7 @@ export async function buildEventPrefill(eventIds: string[]): Promise<EventPrefil
           : null,
     travelMinsThere: outbound.there,
     travelMinsBack: inbound.back ?? outbound.back,
+    walked: first.travelBlock !== null && !isDrive(first.travelBlock),
     bookedAt: jobBookedAt(booking?.createdAt, withBooking.created)?.toISOString() ?? null,
   };
 }

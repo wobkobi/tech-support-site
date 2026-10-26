@@ -27,17 +27,48 @@ export function resolveDiscountType(values: PromoDiscountValues): PromoDiscountT
   return "percent";
 }
 
+/** The value column each discount type reads; the engine ignores the rest. */
+const VALUE_COLUMN = {
+  flat_hourly: "flatHourlyRate",
+  percent: "percentDiscount",
+  fixed_amount: "fixedAmount",
+  free_travel: "travelPercent",
+} as const satisfies Record<PromoDiscountType, keyof PromoDiscountValues>;
+
+/** What the live rates add to a discount check. */
+export interface DiscountCheckOptions {
+  /** The live Standard $/hr; a flat rate at or above it takes nothing off. */
+  standardRate?: number | null;
+}
+
 /**
- * Checks that the value column matching the discount type is present and in range.
+ * Checks that the value column matching the discount type is present and in range, that the
+ * other value columns are empty, and (given the live Standard rate) that a flat rate is below it.
+ * A stray column matters: the engine reads a flat rate before a percentage, whatever the type.
  * @param values - The promo's discount fields.
+ * @param options - Live rates to check against, when the caller has them.
  * @returns An error message, or null when the discount is well formed.
  */
-export function validateDiscount(values: PromoDiscountValues): string | null {
-  switch (resolveDiscountType(values)) {
-    case "flat_hourly":
-      return typeof values.flatHourlyRate === "number" && values.flatHourlyRate > 0
-        ? null
-        : "flatHourlyRate must be a positive number";
+export function validateDiscount(
+  values: PromoDiscountValues,
+  options: DiscountCheckOptions = {},
+): string | null {
+  const type = resolveDiscountType(values);
+  const stray = Object.values(VALUE_COLUMN).find(
+    (column) => column !== VALUE_COLUMN[type] && values[column] != null,
+  );
+  if (stray) return `${stray} must be empty for a ${type} promo`;
+
+  switch (type) {
+    case "flat_hourly": {
+      if (typeof values.flatHourlyRate !== "number" || values.flatHourlyRate <= 0) {
+        return "flatHourlyRate must be a positive number";
+      }
+      const standard = options.standardRate;
+      return standard != null && values.flatHourlyRate >= standard
+        ? `flatHourlyRate must be below the Standard rate ($${standard}/hr), or it takes nothing off`
+        : null;
+    }
     case "percent":
       return typeof values.percentDiscount === "number" &&
         values.percentDiscount > 0 &&
@@ -170,12 +201,14 @@ export interface PromoTierInput {
  * @param discountType - The parent promo's resolved discount type.
  * @param minSpend - Floor for the whole promo, or null.
  * @param tiers - The spend bands, possibly empty.
+ * @param options - Live rates to check each band against, when the caller has them.
  * @returns An error message, or null when the thresholds are well formed.
  */
 export function validateTiers(
   discountType: PromoDiscountType,
   minSpend: number | null | undefined,
   tiers: PromoTierInput[] | null | undefined,
+  options: DiscountCheckOptions = {},
 ): string | null {
   if (minSpend != null && (typeof minSpend !== "number" || minSpend <= 0)) {
     return "minSpend must be a positive amount, or left empty";
@@ -190,7 +223,12 @@ export function validateTiers(
       return "every tier needs a positive spend threshold";
     }
     floors.push(tier.minSpend);
-    const valueError = validateDiscount({ discountType, ...tier });
+    // Only the value columns: a band can't carry its own type over the parent's.
+    const { flatHourlyRate, percentDiscount, fixedAmount, travelPercent } = tier;
+    const valueError = validateDiscount(
+      { discountType, flatHourlyRate, percentDiscount, fixedAmount, travelPercent },
+      options,
+    );
     if (valueError) return `tier at $${tier.minSpend}: ${valueError}`;
   }
 

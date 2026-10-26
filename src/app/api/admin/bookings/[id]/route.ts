@@ -6,8 +6,14 @@ import { BOOKING_FIELD_LIMITS, combineUnitAndAddress } from "@/features/booking/
 import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 import { assessCancellation } from "@/features/business/lib/pricing-policy";
-import { getPolicy } from "@/features/business/lib/pricing-policy.server";
-import { releaseBookingRedemptions } from "@/features/business/lib/promo-redemption";
+import { getPolicy, lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
+import {
+  applyMovedBookingPromo,
+  judgeMovedBookingPromo,
+  releaseBookingRedemptions,
+  type MovedBookingPromo,
+} from "@/features/business/lib/promo-redemption";
+import { bookingPromoColumns, describeRecurringWindow } from "@/features/business/lib/promos";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import {
   fetchAllCalendarEvents,
@@ -27,6 +33,7 @@ import { isPastEditWindow } from "@/shared/lib/edit-window";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { nzDateKey } from "@/shared/lib/timezone-utils";
 import { Prisma } from "@prisma/client";
 import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
@@ -188,6 +195,7 @@ export async function PATCH(
   // Time edit runs before the status branches so a same-request cancel still releases the slot.
   // `notify` means the customer hears about it.
   let timeChange: { startAt: Date; endAt: Date; notify: boolean } | null = null;
+  let movedPromo: MovedBookingPromo | null = null;
   if (isTimeChange) {
     if (body.startAt === undefined || body.endAt === undefined) {
       return errorResponse("Send both a start and a finish time.", 400);
@@ -230,6 +238,27 @@ export async function PATCH(
     // A moved start needs its 24h reminder again; a finish-only change doesn't.
     if (startAt.getTime() !== booking.startAt.getTime()) {
       data.emailReminderSentAt = null;
+    }
+
+    // The invoice re-checks a weekday/time promo at the job's start, so the booking (and its
+    // email) follow the new slot too. A same-request cancel releases the promo instead.
+    const cancelling = body.status === "cancelled" || body.markNoShow === true;
+    if (
+      startAt.getTime() !== booking.startAt.getTime() &&
+      booking.status !== "cancelled" &&
+      !cancelling
+    ) {
+      movedPromo = await judgeMovedBookingPromo(booking, startAt);
+      if (movedPromo.changed) Object.assign(data, bookingPromoColumns(movedPromo.promo));
+    }
+    // The holiday stamp follows the date; a failed lookup reads as no holiday, as on a new booking.
+    if (nzDateKey(startAt) !== nzDateKey(booking.startAt)) {
+      data.publicHolidayName = await lookupPublicHoliday(startAt)
+        .then((holiday) => holiday?.name ?? null)
+        .catch((err) => {
+          console.warn("[admin/bookings] public-holiday lookup failed:", err);
+          return null;
+        });
     }
 
     if (isReschedule) {
@@ -319,6 +348,24 @@ export async function PATCH(
     await cancelHeldBookingEmails(id);
   }
 
+  if (movedPromo?.changed) {
+    const contact = booking.email
+      ? await prisma.contact
+          .findFirst({
+            where: {
+              OR: [
+                { email: { equals: booking.email, mode: "insensitive" } },
+                { altEmails: { has: booking.email.toLowerCase() } },
+              ],
+              deletedAt: null,
+            },
+            select: { id: true },
+          })
+          .catch(() => null)
+      : null;
+    await applyMovedBookingPromo(id, movedPromo, contact?.id);
+  }
+
   // Keep the Google event in step; best-effort, but a failure comes back as a warning.
   let calendarWarning: string | undefined;
   if (timeChange && booking.calendarEventId) {
@@ -352,12 +399,20 @@ export async function PATCH(
           endAt: timeChange.endAt,
           cancelToken: updated.cancelToken,
           promoTitleAtBooking: updated.promoTitleAtBooking,
+          promoWindowAtBooking: movedPromo?.promo
+            ? describeRecurringWindow(movedPromo.promo)
+            : null,
           address: emailAddress,
           meetingType: updated.meetingType,
           rescheduleCount: updated.rescheduleCount,
         },
         // Operator-driven, so it waits for the quiet window.
-        { kind: "rescheduled", previousStartAt: booking.startAt, quietHours: true },
+        {
+          kind: "rescheduled",
+          previousStartAt: booking.startAt,
+          quietHours: true,
+          lapsedPromoTitle: movedPromo?.lapsedTitle ?? null,
+        },
       ),
       sendOwnerBookingNotification(
         {

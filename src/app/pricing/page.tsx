@@ -16,7 +16,12 @@ import {
   weekendCopy,
   workmanshipCopy,
 } from "@/features/business/lib/pricing-policy";
-import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
+import {
+  getPolicy,
+  getPublicPricing,
+  getRateRows,
+  toPublicRates,
+} from "@/features/business/lib/pricing-policy.server";
 import {
   describePromoOffer,
   describeRecurringWindow,
@@ -68,7 +73,7 @@ export async function generateMetadata(): Promise<Metadata> {
   // A promo title drops the brand suffix so the offer fits Google's ~60-char cut.
   const title = promoSummary
     ? `Computer Repair Prices Auckland - ${promoSummary}`
-    : `Computer Repair Prices Auckland - ${pricing.baseRate}/hr`;
+    : `Computer Repair Prices Auckland - $${pricing.baseRate}/hr`;
   const description = `Computer repair and tech support prices in Auckland. ${rateBlurb} No hidden fees, no upselling.`;
   return {
     title: promoSummary ? { absolute: title } : title,
@@ -89,12 +94,13 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function PricingPage(): Promise<React.ReactElement> {
   // A failed promo lookup shows the code box rather than hiding a code that works.
-  const [promo, pricing, policy, settings, showPromoCode] = await Promise.all([
+  const [promo, pricing, policy, settings, showPromoCode, rateRows] = await Promise.all([
     getActivePromo(),
     getPublicPricing(),
     getPolicy(),
     getSettings(),
     hasActivePromoCode().catch(() => true),
+    getRateRows(),
   ]);
   const baseRate = pricing.baseRate;
   // `promo` announces the offer; `pricedPromo` is null when a weekday/time restriction or
@@ -113,6 +119,25 @@ export default async function PricingPage(): Promise<React.ReactElement> {
   const displayMinTravel = roundCents(policy.MIN_TRAVEL_CHARGE * travelFactor);
   const rateDiscounted = displayRate !== baseRate;
   const travelDiscounted = travelFactor < 1;
+  // Each modifier's delta is read off the prices shown, so "-$15 = $50" adds up beside a
+  // promo headline even where a flat promo prices the modifier at its locked-in gap.
+  const shownModifiers = pricing.modifiers.map((mod) => {
+    const shownRate = promoModifierRate(
+      baseRate,
+      mod.effectiveRate,
+      mod.kind,
+      pricedPromo,
+      mod.label,
+    );
+    const delta = roundCents(shownRate - displayRate);
+    return {
+      ...mod,
+      shownRate,
+      shownDelta: `${delta < 0 ? "-" : "+"}${formatMoneyCompact(Math.abs(delta))}`,
+    };
+  });
+  const showWeekend = policy.WEEKEND_UPLIFT > 0;
+  const showHoliday = policy.PUBLIC_HOLIDAY_UPLIFT > 0;
   const { identity } = settings;
   return (
     <PageShell>
@@ -287,32 +312,15 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               the job:
             </p>
             <ul className="space-y-2">
-              {pricing.modifiers.map((mod) => (
+              {shownModifiers.map((mod) => (
                 <li key={mod.label} className="flex flex-col">
                   <span>
-                    <strong>{mod.label}</strong> ({mod.deltaDescription} ={" "}
+                    <strong>{mod.label}</strong> ({mod.shownDelta} ={" "}
                     <PromoPrice
-                      discounted={
-                        promoModifierRate(
-                          baseRate,
-                          mod.effectiveRate,
-                          mod.kind,
-                          pricedPromo,
-                          mod.label,
-                        ) !== mod.effectiveRate
-                      }
+                      discounted={mod.shownRate !== mod.effectiveRate}
                       className="font-bold"
                     >
-                      {formatMoneyCompact(
-                        promoModifierRate(
-                          baseRate,
-                          mod.effectiveRate,
-                          mod.kind,
-                          pricedPromo,
-                          mod.label,
-                        ),
-                      )}
-                      /hr
+                      {formatMoneyCompact(mod.shownRate)}/hr
                     </PromoPrice>
                     ) - {mod.description}
                   </span>
@@ -352,15 +360,30 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             </Disclosure>
           )}
 
-          <Disclosure
-            title={policy.WEEKEND_UPLIFT > 0 ? "Weekends and public holidays" : "Public holidays"}
-            bodyClassName="whitespace-pre-line"
-          >
-            {policy.WEEKEND_UPLIFT > 0 && (
-              <p>{renderEmphasised(weekendCopy(policy.WEEKEND_UPLIFT))}</p>
-            )}
-            <p>{renderEmphasised(publicHolidayCopy(policy.PUBLIC_HOLIDAY_UPLIFT))}</p>
-          </Disclosure>
+          {/* A 0% surcharge is off, so it gets no copy; with both off the section goes. */}
+          {(showWeekend || showHoliday) && (
+            <Disclosure
+              title={
+                showWeekend && showHoliday
+                  ? "Weekends and public holidays"
+                  : showWeekend
+                    ? "Weekends"
+                    : "Public holidays"
+              }
+              bodyClassName="whitespace-pre-line"
+            >
+              {showWeekend && (
+                <p>
+                  {renderEmphasised(
+                    weekendCopy(policy.WEEKEND_UPLIFT, baseRate, policy.PUBLIC_HOLIDAY_UPLIFT),
+                  )}
+                </p>
+              )}
+              {showHoliday && (
+                <p>{renderEmphasised(publicHolidayCopy(policy.PUBLIC_HOLIDAY_UPLIFT, baseRate))}</p>
+              )}
+            </Disclosure>
+          )}
 
           <Disclosure title="GST" bodyClassName="whitespace-pre-line">
             {renderEmphasised(gstCopy(policy.GST_REGISTERED))}
@@ -376,6 +399,10 @@ export default async function PricingPage(): Promise<React.ReactElement> {
           lead="Answer a few quick questions to get a price range. No commitment required."
         />
         <PricingWizard
+          baseRate={baseRate}
+          rates={toPublicRates(rateRows)}
+          weekendUplift={policy.WEEKEND_UPLIFT}
+          publicHolidayUplift={policy.PUBLIC_HOLIDAY_UPLIFT}
           minBillableMins={policy.MIN_BILLABLE_MINS}
           minTravelCharge={policy.MIN_TRAVEL_CHARGE}
           travelRatePerHour={policy.TRAVEL_RATE_PER_HOUR}

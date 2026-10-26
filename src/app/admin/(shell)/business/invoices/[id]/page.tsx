@@ -459,12 +459,12 @@ export default async function InvoiceViewPage({
             </div>
           </div>
 
-          {/* Clean table (matches PDF): Description 67%, Qty 9%, Price 11%, Total 13%. */}
+          {/* Clean table (matches PDF): Description 61%, Qty 15%, Price 11%, Total 13%. */}
           <table className="mb-0 w-full text-sm">
             <thead>
               <tr className="border-b-2 border-russian-violet text-slate-800">
-                <th className="w-[67%] px-2 py-2 text-left font-bold sm:px-3">Description</th>
-                <th className="w-[9%] px-2 py-2 text-center font-bold sm:px-3">Qty</th>
+                <th className="w-[61%] px-2 py-2 text-left font-bold sm:px-3">Description</th>
+                <th className="w-[15%] px-2 py-2 text-center font-bold sm:px-3">Qty</th>
                 <th className="w-[11%] px-2 py-2 text-center font-bold sm:px-3">Price</th>
                 <th className="w-[13%] px-2 py-2 text-center font-bold sm:px-3">Total</th>
               </tr>
@@ -504,6 +504,9 @@ export default async function InvoiceViewPage({
                 <span className="whitespace-nowrap">-{formatNZD(invoice.promoDiscount)}</span>
               </div>
             )}
+            {(invoice.promoDiscount ?? 0) > 0 && invoice.promoNote ? (
+              <p className="text-xs text-amber-700">{invoice.promoNote}</p>
+            ) : null}
             {invoice.goldCardDiscount && invoice.goldCardDiscount > 0 && (
               <div className="flex justify-between gap-3 text-amber-700">
                 <span>{goldCardLineLabel(invoice.goldCardPercent)}</span>

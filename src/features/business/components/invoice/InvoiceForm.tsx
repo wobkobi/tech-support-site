@@ -58,6 +58,8 @@ export interface InvoiceFormData {
 export interface PreservedDiscounts {
   promoTitle?: string | null;
   promoDiscount?: number;
+  /** The hours and rates printed under the promo row, or null when there's no single rate. */
+  promoNote?: string | null;
   unsuccessfulDiscount?: number;
   goldCardDiscount?: number;
   /** Gold Card share off labour (0.1 = 10%); the invoice's own, never today's rate. */
@@ -326,6 +328,9 @@ export function InvoiceForm({
             </span>
             <span>-{formatNZD(promoDiscount)}</span>
           </div>
+        )}
+        {promoDiscount > 0 && preservedDiscounts?.promoNote && (
+          <p className="text-xs text-amber-700">{preservedDiscounts.promoNote}</p>
         )}
         {goldCardDiscount > 0 && (
           <div className="flex justify-between gap-3 text-amber-700">

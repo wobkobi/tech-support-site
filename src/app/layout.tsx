@@ -285,6 +285,8 @@ export default async function RootLayout({
           name: "Remote Support",
           description:
             "Quick remote help for software issues, account problems and follow-up support.",
+          // Remote bills the Standard rate plus the Remote modifier.
+          price: pricing.remoteRate,
         },
       ].map((s) => ({
         "@type": "Offer",
@@ -297,7 +299,7 @@ export default async function RootLayout({
         priceCurrency: "NZD",
         priceSpecification: {
           "@type": "UnitPriceSpecification",
-          price: pricing.baseRate,
+          price: s.price ?? pricing.baseRate,
           priceCurrency: "NZD",
           unitCode: "HUR",
         },

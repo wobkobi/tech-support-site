@@ -10,6 +10,7 @@ import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { scheduleEventsToken } from "@/features/admin/lib/schedule-token";
 import { mondayOf, type WeekEvent, type WeekViewKind } from "@/features/admin/lib/schedule-types";
 import { addDays, resolveWeekStart } from "@/features/admin/lib/week";
+import { holidayTakenOn } from "@/features/business/lib/holiday-calendar";
 import { lookupPublicHolidaysForKeys } from "@/features/business/lib/pricing-policy.server";
 import { getCachedScheduleEvents } from "@/features/calendar/lib/google-calendar";
 import { requireAdminAuth } from "@/shared/lib/auth";
@@ -196,12 +197,16 @@ export default async function AdminSchedulePage({
   for (let i = -BUFFER_DAYS_BEFORE; i < BUFFER_DAYS_AFTER; i++) {
     bufferedDayKeys.push(nzDateKey(addDays(weekStartDate, i)));
   }
-  const holidaysByKey = await lookupPublicHolidaysForKeys(bufferedDayKeys).catch(
-    () => new Map<string, { name: string; region: string }>(),
-  );
+  const holidaysByKey = await lookupPublicHolidaysForKeys(bufferedDayKeys, {
+    keepMoved: true,
+  }).catch(() => new Map<string, { name: string; region: string }>());
   const holidaysByDateKey: Record<string, string> = {};
   for (const [key, h] of holidaysByKey) {
-    holidaysByDateKey[key] = h.name;
+    // A weekend holiday taken on a weekday bills weekend rates, so say where the day off went.
+    const takenOn = holidayTakenOn(key);
+    holidaysByDateKey[key] = takenOn
+      ? `${h.name} (day off ${new Date(`${takenOn}T00:00:00Z`).toLocaleDateString("en-NZ", { weekday: "long", timeZone: "UTC" })})`
+      : h.name;
   }
   // Current week's day keys, at [BUFFER_DAYS_BEFORE, BUFFER_DAYS_BEFORE+7) of the buffer.
   const dayKeysInWeek = bufferedDayKeys.slice(BUFFER_DAYS_BEFORE, BUFFER_DAYS_BEFORE + 7);

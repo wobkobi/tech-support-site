@@ -12,9 +12,11 @@ import {
 } from "@/features/business/lib/already-paid-input";
 import type { JobPromo } from "@/features/business/lib/business";
 import { buildEventPrefill } from "@/features/business/lib/event-prefill.server";
-import { dateSurcharge } from "@/features/business/lib/pricing-policy";
+import { isBusinessModifier } from "@/features/business/lib/job-modifiers";
+import { chosenSurcharge, dateSurcharge } from "@/features/business/lib/pricing-policy";
 import { getPolicy, lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { lockedInPromo } from "@/features/business/lib/promos";
+import { isSurchargeLine } from "@/features/business/lib/surcharge-line";
 import type { RateConfig } from "@/features/business/types/business";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -58,7 +60,7 @@ export default async function EditInvoicePage({
         ? [invoice.calendarEventId]
         : [];
   const promoId = (invoice.promoDiscount ?? 0) > 0 ? invoice.promoId : null;
-  const [identity, policy, prefill, rateRows, booking] = await Promise.all([
+  const [identity, policy, prefill, rateRows, booking, contact] = await Promise.all([
     getIdentity(),
     getPolicy(),
     // A deleted or unreachable event just leaves the box without a booked window.
@@ -70,6 +72,11 @@ export default async function EditInvoicePage({
             where: { id: invoice.bookingId },
             select: { promoTermsAtBooking: true },
           })
+          .catch(() => null)
+      : Promise.resolve(null),
+    invoice.contactId
+      ? prisma.contact
+          .findUnique({ where: { id: invoice.contactId }, select: { company: true } })
           .catch(() => null)
       : Promise.resolve(null),
   ]);
@@ -105,9 +112,23 @@ export default async function EditInvoicePage({
   // UTC midnight is midday in NZ, so the key's own NZ date is the one looked up.
   const jobDay = new Date(`${jobDate}T00:00:00Z`);
   const holiday = await lookupPublicHoliday(jobDay).catch(() => null);
+  const fromDate = dateSurcharge(holiday?.name ?? null, nzWeekday(jobDay), {
+    publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
+    weekendUplift: policy.WEEKEND_UPLIFT,
+  });
+  // The draft's own surcharge line decides, like the calculator's tick: one waived stays off,
+  // and one added on a weekday stays on.
+  const surcharge = chosenSurcharge(
+    fromDate,
+    invoice.lineItems.some((l) => isSurchargeLine(l.description)),
+    policy.WEEKEND_UPLIFT,
+  );
+  const company = contact?.company?.trim() ?? "";
   const aiContext: InvoiceAiContext = {
     slots: prefill?.slots ?? [],
     jobDate,
+    meetingType: prefill?.meetingType ?? null,
+    billedToCompany: company !== "" && invoice.clientName.trim() === company,
     fallbackDestination:
       prefill && prefill.meetingType !== "remote" && prefill.jobAddress ? prefill.jobAddress : null,
     pricing: {
@@ -119,14 +140,11 @@ export default async function EditInvoicePage({
       minBillableMins: policy.MIN_BILLABLE_MINS,
       travelRatePerHour: policy.TRAVEL_RATE_PER_HOUR,
       minTravelCharge: policy.MIN_TRAVEL_CHARGE,
-      surcharge: dateSurcharge(holiday?.name ?? null, nzWeekday(jobDay), {
-        publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
-        weekendUplift: policy.WEEKEND_UPLIFT,
-      }),
+      surcharge,
       unsuccessfulFactor: policy.UNSUCCESSFUL_WORK_FACTOR,
       // Picked like the calculator, so both price a promo identically.
       businessModifierId:
-        rates.find((r) => r.label === "Business" && r.unit === "modifier")?.id ?? null,
+        rates.find((r) => isBusinessModifier(r) && r.unit === "modifier")?.id ?? null,
       standardRate:
         rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
         rates.find((r) => r.ratePerHour !== null && r.unit === "hour")?.ratePerHour ??
@@ -171,6 +189,7 @@ export default async function EditInvoicePage({
         preservedDiscounts={{
           promoTitle: invoice.promoTitle,
           promoDiscount: invoice.promoDiscount ?? 0,
+          promoNote: invoice.promoNote,
           unsuccessfulDiscount: invoice.unsuccessfulDiscount ?? 0,
           goldCardDiscount: invoice.goldCardDiscount ?? 0,
           goldCardPercent: invoice.goldCardPercent,

@@ -94,7 +94,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const promo = await findAdvertisablePromo(promoId);
       if (!promo) {
         return errorResponse(
-          "Only an automatic promo that's running right now can be posted.",
+          "Only an automatic promo that's running right now, with uses left, can be posted.",
           400,
         );
       }

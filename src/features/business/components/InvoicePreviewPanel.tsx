@@ -35,6 +35,8 @@ interface Props {
   promoTitle: string | null;
   /** Dollar amount; rendered when > 0. */
   promoDiscount: number;
+  /** The hours and rates under the promo row ("1 hr 55 min at $65/hr instead of $100/hr"). */
+  promoNote?: string | null;
   /** Gold Card dollars off labour; rendered when > 0. */
   goldCardDiscount?: number;
   /** Gold Card share off labour (0.1 = 10%), for the line's wording. */
@@ -62,6 +64,7 @@ interface Props {
  * @param props.notes - Footer notes text.
  * @param props.promoTitle - Promo title (when discount > 0).
  * @param props.promoDiscount - Promo discount in dollars; renders the line when > 0.
+ * @param props.promoNote - The hours and rates printed under the promo line, or null for none.
  * @param props.goldCardDiscount - Gold Card discount in dollars; renders the line when > 0.
  * @param props.goldCardPercent - Gold Card share off labour, printed in the line's label.
  * @param props.unsuccessfulDiscount - Half-price labour discount; renders the line when > 0.
@@ -81,6 +84,7 @@ function InvoicePreviewPanelImpl({
   notes,
   promoTitle,
   promoDiscount,
+  promoNote = null,
   goldCardDiscount = 0,
   goldCardPercent = null,
   unsuccessfulDiscount = 0,
@@ -164,14 +168,14 @@ function InvoicePreviewPanelImpl({
         {/* Line items table - no zebra striping (matches the PDF + Xero/QuickBooks).
             `table-fixed` enforces the <th> percentage widths so long descriptions
             wrap inside their cell instead of blowing out the column. At sm+ the
-            widths mirror the PDF (Description 67% / Qty 9% / Price 11% / Total 13%);
+            widths mirror the PDF (Description 61% / Qty 15% / Price 11% / Total 13%);
             below sm those numeric columns widen so the right-aligned figures don't
             overflow their cell and collide on a narrow phone. */}
         <table className="mb-0 w-full table-fixed text-xs">
           <thead>
             <tr className="border-b-2 border-russian-violet text-slate-800">
-              <th className="w-[46%] px-2 py-2 text-left font-bold sm:w-[67%]">Description</th>
-              <th className="w-[10%] px-1 py-2 text-center font-bold sm:w-[9%] sm:px-2">Qty</th>
+              <th className="w-[40%] px-2 py-2 text-left font-bold sm:w-[61%]">Description</th>
+              <th className="w-[16%] px-1 py-2 text-center font-bold sm:w-[15%] sm:px-2">Qty</th>
               <th className="w-[20%] px-1 py-2 text-center font-bold sm:w-[11%] sm:px-2">Price</th>
               <th className="w-[24%] px-1 py-2 text-center font-bold sm:w-[13%] sm:px-2">Total</th>
             </tr>
@@ -226,6 +230,7 @@ function InvoicePreviewPanelImpl({
               <span className="whitespace-nowrap">-{formatNZD(promoDiscount)}</span>
             </div>
           )}
+          {showPromoLine && promoNote && <p className="text-[11px] text-amber-700">{promoNote}</p>}
           {goldCardDiscount > 0 && (
             <div className="flex justify-between gap-3 text-amber-700">
               <span>{goldCardLineLabel(goldCardPercent)}</span>

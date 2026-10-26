@@ -3,12 +3,24 @@
 // money text (e.g. a price copied off a shop page) into a plain number for numeric inputs.
 
 /**
- * Rounds dollars to cents to keep sums out of float drift (0.1 + 0.2 > 0.3).
+ * Rounds dollars to cents to keep sums out of float drift (0.1 + 0.2 > 0.3), an exact half
+ * cent going up as it would by hand: $4.02 x 25% = $1.005 > $1.01. Float noise is cleared
+ * first, since 4.02 is stored as 4.0199999... and a bare Math.round(n * 100) lands that on
+ * $1.00, and a sum's last-digit drift (533.3399999999999) can flip a cent by adding order.
  * @param n - Amount in dollars.
  * @returns The amount rounded to the nearest cent.
  */
 export function roundCents(n: number): number {
-  return Math.round(n * 100) / 100;
+  return toCents(n) / 100;
+}
+
+/**
+ * Dollars as a whole number of cents, rounded as {@link roundCents} does.
+ * @param n - Amount in dollars.
+ * @returns Integer cents.
+ */
+export function toCents(n: number): number {
+  return Math.round(Number((n * 100).toFixed(6)));
 }
 
 /**

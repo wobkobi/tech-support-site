@@ -1,6 +1,7 @@
 // src/features/business/lib/promos.ts
-// Active-promo lookup + helpers, cached until admin writes or the publish cron's
-// refreshPromoCacheAtBoundary (promos.server.ts, since client components import this) bust the tag.
+// Active-promo lookup + helpers, cached until admin writes, a redemption on a capped promo or the
+// publish cron's refreshPromoCacheAtBoundary (promos.server.ts, since client components import
+// this) bust the tag.
 
 import {
   lockedDeltaShift,
@@ -78,6 +79,10 @@ export interface ActivePromo {
   activeToMinute: number | null;
   /** New-customers-only or capped per customer: priced only once the customer is known. */
   customerLimited?: boolean;
+  /** Only for someone with no booking or invoice on file yet; named in the offer wording. */
+  newCustomersOnly?: boolean;
+  /** Uses allowed per customer, or null for no limit; named in the offer wording. */
+  perCustomerLimit?: number | null;
   /** Modifier deltas saved at creation, so a flat promo keeps those gaps after rates change. */
   lockedDeltas?: LockedDelta[];
 }
@@ -155,6 +160,8 @@ function toActivePromo(row: Promo): ActivePromo {
     activeFromMinute: row.activeFromMinute,
     activeToMinute: row.activeToMinute,
     customerLimited: row.newCustomersOnly || row.perCustomerLimit != null,
+    newCustomersOnly: row.newCustomersOnly,
+    perCustomerLimit: row.perCustomerLimit,
     lockedDeltas: row.lockedDeltas.map((d) => ({ label: d.label, hourlyDelta: d.hourlyDelta })),
   };
 }
@@ -170,34 +177,82 @@ export function inWindowWhere(kind: "automatic" | "code", now: Date): Prisma.Pro
 }
 
 /**
- * Returns the currently-active automatic promo or null. Automatic only: every caller is a
- * display surface. No time-based revalidate, as it would become every public page's ISR
- * interval; refreshPromoCacheAtBoundary in promos.server.ts handles starts and ends.
+ * The redemptions that use up a promo's caps. A $0 settlement gave nothing, and a booking-time
+ * row for a promo with a spend floor or tiers isn't earned until an invoice settles it.
+ * Null and unset are matched separately: Mongo's null match misses an unset field.
+ * @param promo - The promo whose caps are being counted.
+ * @returns Prisma where clause over PromoRedemption.
+ */
+export function countedRedemptionsWhere(
+  promo: Pick<Promo, "id" | "minSpend" | "tiers">,
+): Prisma.PromoRedemptionWhereInput {
+  const conditional = promo.minSpend != null || promo.tiers.length > 0;
+  return {
+    promoId: promo.id,
+    AND: [
+      {
+        OR: [
+          { discountValue: null },
+          { discountValue: { isSet: false } },
+          { discountValue: { gt: 0 } },
+        ],
+      },
+      ...(conditional ? [{ invoiceId: { isSet: true } }, { invoiceId: { not: null } }] : []),
+    ],
+  };
+}
+
+/**
+ * Whether a promo's total cap is used up.
+ * @param promo - The promo row.
+ * @returns True when it has a cap and the counted redemptions reach it.
+ */
+async function capReached(promo: Promo): Promise<boolean> {
+  if (promo.maxRedemptions == null) return false;
+  const used = await prisma.promoRedemption.count({ where: countedRedemptionsWhere(promo) });
+  return used >= promo.maxRedemptions;
+}
+
+/**
+ * The automatic promo the banner and /pricing advertise, uncached: the highest-priority one
+ * inside its dates whose total cap isn't used up. Per-customer limits are left to the quote.
+ * @param now - The instant to judge the dates at.
+ * @returns The promo, or null.
+ */
+export async function loadAdvertisedPromo(now: Date = new Date()): Promise<ActivePromo | null> {
+  const rows = await prisma.promo.findMany({
+    where: inWindowWhere("automatic", now),
+    orderBy: PROMO_ORDER,
+  });
+  for (const row of rows) {
+    if (!(await capReached(row))) return toActivePromo(row);
+  }
+  return null;
+}
+
+/**
+ * Cached {@link loadAdvertisedPromo}. Automatic only: every caller is a display surface. No
+ * time-based revalidate, as it would become every public page's ISR interval;
+ * refreshPromoCacheAtBoundary in promos.server.ts handles starts, ends and filled caps.
  * @returns Active automatic promo or null.
  */
 export const getActivePromo = unstable_cache(
-  async (): Promise<ActivePromo | null> => {
-    const row = await prisma.promo.findFirst({
-      where: inWindowWhere("automatic", new Date()),
-      orderBy: PROMO_ORDER,
-    });
-    return row ? toActivePromo(row) : null;
-  },
+  async (): Promise<ActivePromo | null> => loadAdvertisedPromo(),
   ["active-promo"],
   { tags: [ACTIVE_PROMO_TAG], revalidate: false },
 );
 
 /**
- * One automatic promo by id, only while switched on and inside its window. Backs the
- * mailing-list "Email this promo" link; code promos are skipped as in {@link getActivePromo}.
+ * One automatic promo by id, only while switched on, inside its window and under its cap.
+ * Backs the "Email this promo" and post links; code promos are skipped as in {@link getActivePromo}.
  * @param id - Promo id.
- * @returns The promo, or null when it is missing, a code promo, off or outside its window.
+ * @returns The promo, or null when it is missing, a code promo, off, outside its window or used up.
  */
 export async function findAdvertisablePromo(id: string): Promise<ActivePromo | null> {
   const row = await prisma.promo.findFirst({
     where: { id, ...inWindowWhere("automatic", new Date()) },
   });
-  return row ? toActivePromo(row) : null;
+  return row && !(await capReached(row)) ? toActivePromo(row) : null;
 }
 
 /**
@@ -227,21 +282,30 @@ export interface RecurringWindow {
 /**
  * Whether a promo's recurring restriction admits an appointment. Read in NZ time (a UTC
  * weekday puts the day boundary at 11am or noon NZ) and judged at the appointment, not now.
+ * The end is exclusive: "9am to 5pm" admits 4:59pm but not a 5pm start. A range that ends
+ * before it starts wraps midnight, and its small hours belong to the night before, so
+ * "Fridays 8pm to 2am" admits 1am Saturday but not 1am Friday.
  * @param window - The promo's weekday and time-of-day restriction.
  * @param at - The appointment instant.
  * @returns Whether the restriction admits it.
  */
 export function matchesRecurringWindow(window: RecurringWindow, at: Date): boolean {
-  if (window.activeWeekdays.length > 0 && !window.activeWeekdays.includes(nzWeekday(at))) {
-    return false;
-  }
+  const weekday = nzWeekday(at);
+  /**
+   * Whether the weekday list admits a day.
+   * @param day - NZ weekday, 0 = Sunday.
+   * @returns True when there is no list or it names the day.
+   */
+  const dayAllowed = (day: number): boolean =>
+    window.activeWeekdays.length === 0 || window.activeWeekdays.includes(day);
   const from = window.activeFromMinute;
   const to = window.activeToMinute;
   // Half a range is not a range; treating it as open-ended would silently widen it.
-  if (from == null || to == null) return true;
+  if (from == null || to == null) return dayAllowed(weekday);
   const minute = nzMinuteOfDay(at);
-  // A range that ends before it starts wraps midnight: 20:00-02:00 admits both sides.
-  return from <= to ? minute >= from && minute <= to : minute >= from || minute <= to;
+  if (from < to) return dayAllowed(weekday) && minute >= from && minute < to;
+  if (minute >= from) return dayAllowed(weekday);
+  return minute < to && dayAllowed((weekday + 6) % 7);
 }
 
 /**
@@ -375,8 +439,9 @@ async function resolveCustomer(context: PromoContext): Promise<CustomerIdentity>
 
 /**
  * Whether a promo's eligibility limits admit this customer. Anything uncheckable passes;
- * maxRedemptions is approximate (no lock). The priced booking's own rows are subtracted,
- * not filtered with `not`, whose SQL null semantics would also drop walk-up redemptions.
+ * maxRedemptions is approximate (no lock). Caps count {@link countedRedemptionsWhere} only.
+ * The priced booking's own rows are subtracted, not filtered with `not`, whose SQL null
+ * semantics would also drop walk-up redemptions.
  * @param promo - The promo row being considered.
  * @param customer - Who the limits are judged against.
  * @param bookingId - The booking being priced, whose own rows do not count.
@@ -387,18 +452,17 @@ async function passesLimits(
   customer: CustomerIdentity,
   bookingId: string | null,
 ): Promise<boolean> {
+  const counted = countedRedemptionsWhere(promo);
   /**
-   * Redemptions of this promo matching a filter, less the booking's own.
-   * @param where - Extra filter on top of the promo id.
+   * Counted redemptions of this promo matching a filter, less the booking's own.
+   * @param where - Extra filter on top of the counted rows.
    * @param where.contactId - Customer to count for, when counting per customer.
    * @returns The count other bookings and jobs account for.
    */
   const countOthers = async (where: { contactId?: string }): Promise<number> => {
     const [all, own] = await Promise.all([
-      prisma.promoRedemption.count({ where: { promoId: promo.id, ...where } }),
-      bookingId
-        ? prisma.promoRedemption.count({ where: { promoId: promo.id, bookingId, ...where } })
-        : 0,
+      prisma.promoRedemption.count({ where: { ...counted, ...where } }),
+      bookingId ? prisma.promoRedemption.count({ where: { ...counted, bookingId, ...where } }) : 0,
     ]);
     return all - own;
   };
@@ -412,8 +476,24 @@ async function passesLimits(
     if (used >= promo.perCustomerLimit) return false;
   }
 
-  if (promo.newCustomersOnly && customer.emails.length > 0) {
-    // Confirmed or completed only; a cancelled one would deny a first-timer.
+  if (promo.newCustomersOnly && (await hasJobOnFile(customer, bookingId))) return false;
+
+  return true;
+}
+
+/**
+ * Whether a customer already has a job on file: a confirmed or completed booking, or an
+ * invoice that isn't voided or a quote (phone and calendar jobs have no booking).
+ * @param customer - Who is being served.
+ * @param bookingId - The booking being priced, which doesn't count against itself.
+ * @returns True when an earlier booking or invoice exists.
+ */
+async function hasJobOnFile(
+  customer: CustomerIdentity,
+  bookingId: string | null,
+): Promise<boolean> {
+  if (customer.emails.length > 0) {
+    // A cancelled booking would deny a first-timer, so only these two count.
     const prior = await prisma.booking.count({
       where: {
         email: { in: customer.emails },
@@ -421,15 +501,44 @@ async function passesLimits(
         ...(bookingId ? { id: { not: bookingId } } : {}),
       },
     });
-    if (prior > 0) return false;
+    if (prior > 0) return true;
   }
 
-  return true;
+  const who: Prisma.InvoiceWhereInput[] = customer.emails.map((email) => ({
+    clientEmail: { equals: email, mode: "insensitive" },
+  }));
+  if (customer.contactId) who.push({ contactId: customer.contactId });
+  if (who.length === 0) return false;
+  const invoices = await prisma.invoice.count({
+    where: {
+      status: { not: "VOIDED" },
+      AND: [
+        { OR: who },
+        { OR: [{ isQuote: false }, { isQuote: null }, { isQuote: { isSet: false } }] },
+        // The booking's own invoice isn't an earlier job; an `id: not` filter would drop nulls.
+        ...(bookingId
+          ? [
+              {
+                OR: [
+                  { bookingId: null },
+                  { bookingId: { isSet: false } },
+                  { bookingId: { not: bookingId } },
+                ],
+              },
+            ]
+          : []),
+      ],
+    },
+  });
+  return invoices > 0;
 }
 
 /**
  * The highest-priority candidate that clears its recurring window and limits. Walked in
- * order so a promo failing its cap lets the next one apply.
+ * order so a promo failing its cap lets the next one apply. With no appointment chosen, one
+ * that applies at any time wins over a restricted one ranked above it, so a price without a
+ * slot never rests on a day the customer may not pick; the restricted one is returned only
+ * when nothing else applies, so it can still be named.
  * @param rows - Candidate promos, already ordered.
  * @param at - The appointment instant, or null when none has been chosen.
  * @param customer - Who the limits are judged against.
@@ -442,12 +551,16 @@ async function firstEligible(
   customer: CustomerIdentity,
   bookingId: string | null,
 ): Promise<ActivePromo | null> {
+  let restricted: Promo | null = null;
   for (const row of rows) {
     if (at && !matchesRecurringWindow(row, at)) continue;
+    const heldBack = !at && hasRecurringWindow(row);
+    if (heldBack && restricted) continue;
     if (!(await passesLimits(row, customer, bookingId))) continue;
-    return toActivePromo(row);
+    if (!heldBack) return toActivePromo(row);
+    restricted = row;
   }
-  return null;
+  return restricted ? toActivePromo(restricted) : null;
 }
 
 /**
@@ -591,6 +704,30 @@ export async function promoForJob(context: {
   }).catch(() => null);
   const codeTook = code !== null && resolved?.code === code;
   return codeTook ? resolved : (locked ?? resolved);
+}
+
+/**
+ * The booking columns that lock a promo in, shared by a new booking and a reschedule so the
+ * two snapshots can't drift. The full terms are what the invoice prices from.
+ * @param promo - The promo the booking gets, or null for none.
+ * @returns The promo columns to write on the booking.
+ */
+export function bookingPromoColumns(promo: ActivePromo | null): {
+  promoIdAtBooking: string | null;
+  promoTitleAtBooking: string | null;
+  promoFlatHourlyRateAtBooking: number | null;
+  promoPercentDiscountAtBooking: number | null;
+  promoTermsAtBooking: Prisma.InputJsonValue | null;
+} {
+  // A tiered promo's band is resolved against the real subtotal, so it has no single rate.
+  const untiered = promo && promo.tiers.length === 0 ? promo : null;
+  return {
+    promoIdAtBooking: promo?.id ?? null,
+    promoTitleAtBooking: promo?.title ?? null,
+    promoFlatHourlyRateAtBooking: untiered?.flatHourlyRate ?? null,
+    promoPercentDiscountAtBooking: untiered?.percentDiscount ?? null,
+    promoTermsAtBooking: promo ? (promo as unknown as Prisma.InputJsonValue) : null,
+  };
 }
 
 /**
@@ -816,7 +953,7 @@ export function describePromoDiscount(promo: ActivePromo): string {
     // 0 means nothing is charged for the drive; anything else is a part-charge.
     return promo.travelPercent === 0
       ? "Free travel"
-      : `${Math.round((1 - promo.travelPercent) * 100)}% off travel`;
+      : `${formatPercent(1 - promo.travelPercent)} off travel`;
   }
   if (promo.discountType === "fixed_amount" && promo.fixedAmount !== null) {
     return `$${promo.fixedAmount} off`;
@@ -825,9 +962,19 @@ export function describePromoDiscount(promo: ActivePromo): string {
     return `$${promo.flatHourlyRate}/hr`;
   }
   if (promo.percentDiscount !== null) {
-    return `${Math.round(promo.percentDiscount * 100)}% off`;
+    return `${formatPercent(promo.percentDiscount)} off`;
   }
   return "Limited offer";
+}
+
+/**
+ * A fraction as the percentage the engine applies, to 2dp with trailing zeros dropped, so
+ * 12.5% isn't advertised as 13%. The 2dp also cleans float noise like 0.07 * 100.
+ * @param fraction - The fraction, e.g. 0.125.
+ * @returns The percentage, e.g. "12.5%".
+ */
+function formatPercent(fraction: number): string {
+  return `${Number((fraction * 100).toFixed(2))}%`;
 }
 
 // Plural, because a recurring restriction describes every Tuesday rather than
@@ -889,16 +1036,48 @@ export function describeRecurringWindow(window: RecurringWindow): string | null 
 }
 
 /**
- * What a promo gives plus its spend floor - "20% off on jobs over $100" - so it doesn't
- * read as unconditional.
+ * The offer with its spend floor and audience - "20% off for new customers on jobs over $100".
  * @param promo - Active promo.
- * @returns The offer phrase with its floor.
+ * @returns The phrase, with no date or per-customer limit.
  */
-export function describePromoOffer(promo: ActivePromo): string {
+function describeOfferCore(promo: ActivePromo): string {
   // Untiered only: a tiered promo already names a floor per band.
   const floor =
     promo.minSpend != null && promo.tiers.length === 0 ? ` on jobs over $${promo.minSpend}` : "";
-  return `${describePromoDiscount(promo)}${floor}`;
+  const audience = promo.newCustomersOnly ? " for new customers" : "";
+  return `${describePromoDiscount(promo)}${audience}${floor}`;
+}
+
+/**
+ * How often one customer can use a promo, or "" when there is no limit.
+ * @param promo - Active promo.
+ * @returns A phrase like ", once per customer", with its leading comma.
+ */
+function describePerCustomerLimit(promo: ActivePromo): string {
+  const limit = promo.perCustomerLimit;
+  if (limit == null) return "";
+  return limit === 1 ? ", once per customer" : `, up to ${limit} times per customer`;
+}
+
+/**
+ * What a promo gives plus its spend floor and who can use it - "20% off for new customers on
+ * jobs over $100" - so it doesn't read as unconditional.
+ * @param promo - Active promo.
+ * @returns The offer phrase with its conditions.
+ */
+export function describePromoOffer(promo: ActivePromo): string {
+  return `${describeOfferCore(promo)}${describePerCustomerLimit(promo)}`;
+}
+
+/**
+ * The offer with every condition and no date, for a code check: "20% off, Tuesdays only,
+ * once per customer".
+ * @param promo - Active promo.
+ * @returns The offer phrase with its floor, audience, days and per-customer limit.
+ */
+export function describePromoTerms(promo: ActivePromo): string {
+  const restriction = describeRecurringWindow(promo);
+  return `${describeOfferCore(promo)}${restriction ? `, ${restriction} only` : ""}${describePerCustomerLimit(promo)}`;
 }
 
 /**
@@ -914,7 +1093,6 @@ export function summariseForBanner(
   { fixedDate = false }: { fixedDate?: boolean } = {},
 ): string {
   const end = formatPromoEnd(promo.endAt, new Date(), fixedDate);
-  const base = `${describePromoOffer(promo)} until ${end}`;
   const restriction = describeRecurringWindow(promo);
-  return restriction ? `${base}, ${restriction} only` : base;
+  return `${describeOfferCore(promo)} until ${end}${restriction ? `, ${restriction} only` : ""}${describePerCustomerLimit(promo)}`;
 }

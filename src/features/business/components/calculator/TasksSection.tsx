@@ -395,7 +395,9 @@ function TaskTotalsRow({
               step="1"
               inputMode="numeric"
               value={hrs || ""}
-              onChange={(e) => onQty(hoursFromHM(parseInt(e.target.value, 10) || 0, mins))}
+              onChange={(e) =>
+                onQty(hoursFromHM(Math.max(0, parseInt(e.target.value, 10) || 0), mins))
+              }
               aria-label="Hours"
               className={cn(numInput, "sm:w-14")}
             />
@@ -434,7 +436,7 @@ function TaskTotalsRow({
             step="1"
             inputMode="numeric"
             value={task.qty}
-            onChange={(e) => onQty(parseFloat(e.target.value) || 0)}
+            onChange={(e) => onQty(Math.max(0, parseFloat(e.target.value) || 0))}
             aria-label="Quantity"
             className={cn(numInput, "sm:w-20")}
           />
@@ -450,7 +452,8 @@ function TaskTotalsRow({
           step="0.01"
           inputMode="decimal"
           value={task.unitPrice || ""}
-          onChange={(e) => onPrice(parseFloat(e.target.value) || 0)}
+          // min="0" isn't enforced on typing; a negative rate would bill a negative surcharge.
+          onChange={(e) => onPrice(Math.max(0, parseFloat(e.target.value) || 0))}
           aria-label="Unit price"
           className={cn(numInput, "sm:w-24")}
         />

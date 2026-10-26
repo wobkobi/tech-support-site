@@ -1,7 +1,7 @@
 "use client";
 // src/features/business/components/calculator/TravelSection.tsx
 // Travel address input + cost list: one auto entry, manual extras lumped into one line,
-// store runs billed separately, and a Drove / Walked toggle for trip logging.
+// store runs billed separately, and a Drove / Walked toggle (a walk bills and logs no trip).
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
@@ -30,9 +30,9 @@ interface Props {
   onAddressSelected: (formattedAddress: string) => void;
   /** Whether to offer Drove / Walked (hidden for a remote job, which logs no trip). */
   showTripMode: boolean;
-  /** True when you walked, so saving the invoice logs no trip. */
+  /** True when you walked, so the job bills no travel and saving logs no trip. */
   walked: boolean;
-  /** Sets drove (false) or walked (true). */
+  /** Sets drove (false) or walked (true); walked takes the trip off the bill. */
   onWalkedChange: (walked: boolean) => void;
   travelEntries: TravelEntry[];
   onTravelEntriesChange: React.Dispatch<React.SetStateAction<TravelEntry[]>>;
@@ -52,7 +52,7 @@ interface Props {
  * @param props.onJobAddressChange - Address change handler.
  * @param props.onAddressSelected - Fired when a Places suggestion is picked.
  * @param props.showTripMode - Whether to offer the Drove / Walked toggle.
- * @param props.walked - True when you walked, so no trip is logged.
+ * @param props.walked - True when you walked, so no travel is billed or logged.
  * @param props.onWalkedChange - Sets drove or walked.
  * @param props.travelEntries - All travel charges (auto + manual).
  * @param props.onTravelEntriesChange - Replaces the entries array.
@@ -200,7 +200,9 @@ export function TravelSection({
             </button>
           </div>
           <p className="text-sm text-admin-muted">
-            {walked ? "No trip is logged." : "Saving the invoice logs the trip."}
+            {walked
+              ? "No travel is billed and no trip is logged."
+              : "Saving the invoice logs the trip."}
           </p>
         </div>
       )}
@@ -308,7 +310,8 @@ export function TravelSection({
                       }}
                       onChange={(e) =>
                         patchEntry(index, {
-                          cost: roundCents(parseFloat(e.target.value) || 0),
+                          // A typed "-" can't make a negative charge: min="0" isn't enforced.
+                          cost: roundCents(Math.max(0, parseFloat(e.target.value) || 0)),
                           isAuto: false,
                           isParsedCost: false,
                         })

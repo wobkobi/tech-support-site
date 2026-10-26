@@ -9,6 +9,7 @@ import {
   withSplitLineTotals,
 } from "@/features/business/lib/business";
 import {
+  adoptReissuedAlreadyPaid,
   parseAlreadyPaid,
   syncAlreadyPaidIncome,
 } from "@/features/business/lib/invoice-already-paid";
@@ -33,6 +34,7 @@ import {
   parseDate,
   parseObjectId,
   parseRate,
+  parseString,
 } from "@/features/business/lib/validation";
 import { attachEmailIfMissing } from "@/features/contacts/lib/find-or-create";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -103,6 +105,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     promoTitle,
     promoDiscount,
     promoId,
+    // "1 hr 55 min at $65/hr instead of $100/hr", printed under the promo row.
+    promoNote,
     // Unsuccessful-work snapshot, so the dashboard can count the half-price clause.
     unsuccessful,
     unsuccessfulDiscount,
@@ -124,6 +128,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     jobDate,
     // Sent when the job was driven to (travel charged or not), to log the trip.
     trip,
+    // Voided invoice this one re-issues; its already-paid entry moves across.
+    reissueOf,
   } = body as {
     clientName?: string;
     clientEmail?: string;
@@ -135,6 +141,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     promoTitle?: string | null;
     promoDiscount?: number | null;
     promoId?: string | null;
+    promoNote?: unknown;
     unsuccessful?: boolean;
     unsuccessfulDiscount?: number | null;
     goldCardPercent?: number | null;
@@ -149,6 +156,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     alreadyPaidDate?: string | null;
     jobDate?: string | null;
     trip?: { address?: unknown; date?: unknown } | null;
+    reissueOf?: unknown;
   };
 
   if (!clientName || !clientEmail || !Array.isArray(lineItems)) {
@@ -239,6 +247,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     discount + goldCardDiscountValue + unsuccessfulDiscountValue,
     GST_REGISTERED,
   );
+  // More than the total would book money against nothing; the calculator blocks it too.
+  if (prepaid.amount && prepaid.amount > total) {
+    return errorResponse("Already paid is more than the invoice total", 400);
+  }
 
   // A missing or deleted contact saves the invoice unlinked rather than pointing nowhere.
   const requestedContactId = parseObjectId(contactId);
@@ -279,6 +291,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           promoTitle: discount > 0 && promoTitle ? promoTitle : null,
           promoDiscount: discount > 0 ? discount : null,
           promoId: discount > 0 ? parseObjectId(promoId) : null,
+          promoNote: discount > 0 ? parseString(promoNote) : null,
           unsuccessful: unsuccessful === true,
           unsuccessfulDiscount: unsuccessfulDiscountValue > 0 ? unsuccessfulDiscountValue : null,
           goldCardDiscount: goldCardDiscountValue > 0 ? goldCardDiscountValue : null,
@@ -366,6 +379,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // Record the part payment now, so marking paid later records only the balance.
   let incomeSheetWarning = false;
   if (prepaid.amount) {
+    const voidedId = parseObjectId(reissueOf);
+    if (voidedId) await adoptReissuedAlreadyPaid(voidedId, invoice.id);
     incomeSheetWarning = (await syncAlreadyPaidIncome(invoice.id, prepaidDate)).sheetSyncWarning;
   }
 

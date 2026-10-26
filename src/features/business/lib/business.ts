@@ -13,6 +13,7 @@ import {
   GST_RATE,
   GST_REGISTERED,
   MIN_BILLABLE_MINS,
+  upliftPercent,
 } from "@/features/business/lib/pricing-policy";
 import { lockedDeltaShift, type LockedDelta } from "@/features/business/lib/promo-locked-rates";
 import { promoForSpend, type PromoTierValues } from "@/features/business/lib/promo-tiers";
@@ -27,6 +28,7 @@ import {
 import type {
   JobCalculation,
   LineItem,
+  PromoRateSummary,
   RateConfig,
   TaskLine,
   TravelEntry,
@@ -45,6 +47,7 @@ export {
   lineItemQtyLabel,
   minsToHoursLabel,
   promoLineLabel,
+  promoRateNote,
   restatesTaskLine,
   todayISO,
 } from "@/features/business/lib/business-format";
@@ -111,12 +114,13 @@ export function timeDiffMins(start: string, end: string): number {
 }
 
 /**
- * Sums every travel-entry cost into the single "Travel" total.
+ * Sums every travel-entry cost into the single "Travel" total. A negative entry counts as
+ * $0, so the calculator's total and the invoice's travel line can't part ways over it.
  * @param entries - Travel entries from the calculator (may be empty).
  * @returns Total travel charge in NZD, rounded to 2dp.
  */
 export function travelEntriesTotal(entries: TravelEntry[]): number {
-  return roundCents(entries.reduce((s, e) => s + (e.cost || 0), 0));
+  return roundCents(entries.reduce((s, e) => s + Math.max(0, e.cost || 0), 0));
 }
 
 /**
@@ -204,7 +208,9 @@ export function effectiveHourlyRate(
 
 /**
  * Task line totals in dollars, split by {@link splitLineTotals}. Timed tasks match
- * {@link jobToLineItems} so the preview and saved invoice split the same cents.
+ * {@link jobToLineItems} so the preview and saved invoice split the same cents. Ties go by
+ * the line text as the saved invoice settles them, then by what prices the line (rate tags,
+ * "Didn't finish"), which the invoice can't see but the discounts read.
  * @param tasks - Task lines, in display order.
  * @returns Each task's line total, in the same order.
  */
@@ -213,6 +219,12 @@ export function taskLineTotals(tasks: readonly TaskLine[]): number[] {
     tasks.map((t): LineAmountInput => ({
       qty: t.qty,
       unitPrice: t.unitPrice,
+      description: t.description,
+      tieKey: [
+        t.baseRateId ?? "",
+        [...(t.modifierIds ?? [])].sort().join(","),
+        t.unsuccessful ? "1" : "0",
+      ].join("|"),
       ...(t.minutes != null && isHourlyTask(t) && { minutes: t.minutes }),
     })),
   );
@@ -253,10 +265,10 @@ export function jobToLineItems(
   }
 
   if (surcharge && surcharge.uplift > 0 && labourTotal > 0) {
-    const amount = roundCents(labourTotal * surcharge.uplift);
+    const amount = roundCents(roundCents(labourTotal) * surcharge.uplift);
     if (amount > 0) {
       items.push({
-        description: `${surcharge.label} (+${Math.round(surcharge.uplift * 100)}%)`,
+        description: `${surcharge.label} (+${upliftPercent(surcharge.uplift)}%)`,
         qty: 1,
         unitPrice: amount,
         lineTotal: amount,
@@ -265,11 +277,12 @@ export function jobToLineItems(
   }
 
   for (const part of job.parts) {
+    const cost = roundCents(part.cost);
     items.push({
       description: part.description,
       qty: 1,
-      unitPrice: part.cost,
-      lineTotal: part.cost,
+      unitPrice: cost,
+      lineTotal: cost,
     });
   }
 
@@ -410,8 +423,9 @@ export function computeJobPromoDiscount(
  * @param preDiscountSubtotal - The job's subtotal before any discount, which selects a tier.
  * @param standardRate - Undiscounted Standard $/hr, which a flat promo's per-hour cut is taken from.
  * @param rates - Live rate list, which floors each line at the promo price for its rate tags.
- * @returns The rounded discount, each task line's unrounded share of it, and whether it
- * came off the drive (free travel) rather than labour.
+ * @returns The rounded discount, each task line's unrounded share of it, each line's hourly
+ * rate under the promo (null where it didn't change the rate), and whether it came off the
+ * drive (free travel) rather than labour.
  */
 function jobPromoBreakdown(
   job: JobCalculation,
@@ -421,8 +435,13 @@ function jobPromoBreakdown(
   preDiscountSubtotal?: number,
   standardRate?: number | null,
   rates?: RateConfig[],
-): { total: number; byTask: number[]; offTravel: boolean } {
-  const none = { total: 0, byTask: job.tasks.map(() => 0), offTravel: false };
+): { total: number; byTask: number[]; rateByTask: (number | null)[]; offTravel: boolean } {
+  const none = {
+    total: 0,
+    byTask: job.tasks.map(() => 0),
+    rateByTask: job.tasks.map(() => null),
+    offTravel: false,
+  };
   // Narrow to the band the pre-discount subtotal earns, as the public estimate does.
   // Without a subtotal a tiered promo can't apply.
   const promo = promoForSpend(resolvedPromo, preDiscountSubtotal ?? 0);
@@ -454,9 +473,8 @@ function jobPromoBreakdown(
    */
   const shares = (rule: (t: (typeof job.tasks)[number], line: number) => number): number[] =>
     job.tasks.map((t, i) => (isDiscounted(t) ? rule(t, lineTotals[i]!) : 0));
-  const labourSubtotal = job.tasks.reduce(
-    (s, t, i) => (isDiscounted(t) ? s + lineTotals[i]! : s),
-    0,
+  const labourSubtotal = roundCents(
+    job.tasks.reduce((s, t, i) => (isDiscounted(t) ? s + lineTotals[i]! : s), 0),
   );
   if (labourSubtotal <= 0) return none;
 
@@ -468,36 +486,48 @@ function jobPromoBreakdown(
     // Per line, never netted across the job: a line already under the flat rate stays put.
     const hourCuts = job.tasks.map((t) => {
       if (!isDiscounted(t)) return 0;
-      if (cut == null) return Math.max(0, t.unitPrice - flat);
+      // A "No base" row floors at the flat rate, never more than the cut.
+      if (t.baseRateId == null) {
+        const toFlat = Math.max(0, t.unitPrice - flat);
+        return cut == null ? toFlat : Math.min(cut, toFlat);
+      }
+      // No rate list to floor against: the line takes the plain cut.
+      if (cut != null && !rates) return cut;
+      const mods = (t.modifierIds ?? [])
+        .map((id) => rates?.find((r) => r.id === id))
+        .filter((m): m is RateConfig => !!m);
+      const shift = lockedDeltaShift(promo.lockedDeltas, mods);
       // Floor the hour at the promo price for the line's tags: live rate less the cut, with
       // its modifiers at their locked deltas. E.g. at an old $75 Standard the full $35 cut
-      // would bill $40/hr, under the $65 promised. A "No base" row floors at the promo price.
+      // would bill $40/hr, under the $65 promised.
       const live =
-        rates && t.baseRateId ? effectiveHourlyRate(rates, t.baseRateId, t.modifierIds) : 0;
-      if (live > 0) {
-        const mods = (t.modifierIds ?? [])
-          .map((id) => rates!.find((r) => r.id === id))
-          .filter((m): m is RateConfig => !!m);
-        const promoPrice = Math.max(0, live + lockedDeltaShift(promo.lockedDeltas, mods) - cut);
+        cut != null && rates ? effectiveHourlyRate(rates, t.baseRateId, t.modifierIds) : 0;
+      if (cut != null && live > 0) {
+        const promoPrice = Math.max(0, live + shift - cut);
         return Math.min(Math.max(0, live - promoPrice), Math.max(0, t.unitPrice - promoPrice));
       }
-      return t.baseRateId == null ? Math.min(cut, Math.max(0, t.unitPrice - flat)) : cut;
+      // Base row gone or no Standard to cut from: the flat rate plus the line's modifier
+      // deltas (locked where the promo locked them), so At home still bills the promised $50.
+      const deltas = mods.reduce((s, m) => s + (m.hourlyDelta ?? 0), 0);
+      const toPromo = Math.max(0, t.unitPrice - Math.max(0, flat + deltas + shift));
+      return cut == null ? toPromo : Math.min(toPromo, Math.max(0, cut - shift));
     });
     const byTask = job.tasks.map((t, i) => Math.min(lineTotals[i]!, t.qty * hourCuts[i]!));
+    const rateByTask = job.tasks.map((t, i) =>
+      hourCuts[i]! > 0 ? Math.max(0, roundCents(t.unitPrice - hourCuts[i]!)) : null,
+    );
     // Gap between the rounded lines at each rate: 4h20m is $433.33 at $100/hr and
     // $281.67 at $65/hr, so $151.66. Rounding the raw cut ($151.667) bills a cent under.
+    // Only the discounted lines are re-split, so an untouched $65 row can't share their cents.
+    const cutIdx = job.tasks.flatMap((_, i) => (rateByTask[i] != null ? [i] : []));
     const promoLineTotals = taskLineTotals(
-      job.tasks.map((t, i) =>
-        hourCuts[i]! > 0
-          ? { ...t, unitPrice: Math.max(0, roundCents(t.unitPrice - hourCuts[i]!)) }
-          : t,
-      ),
+      cutIdx.map((i) => ({ ...job.tasks[i]!, unitPrice: rateByTask[i]! })),
     );
     const total = roundCents(
-      lineTotals.reduce((s, line) => s + line, 0) -
+      cutIdx.reduce((s, i) => s + lineTotals[i]!, 0) -
         promoLineTotals.reduce((s, line) => s + line, 0),
     );
-    return { ...none, total, byTask };
+    return { ...none, total, byTask, rateByTask };
   }
   if (promo.percentDiscount !== null) {
     const pct = Math.max(0, Math.min(1, promo.percentDiscount));
@@ -505,6 +535,9 @@ function jobPromoBreakdown(
       ...none,
       total: roundCents(labourSubtotal * pct),
       byTask: shares((_, line) => line * pct),
+      rateByTask: job.tasks.map((t) =>
+        isDiscounted(t) && pct > 0 ? roundCents(t.unitPrice * (1 - pct)) : null,
+      ),
     };
   }
   if (promo.discountType === "fixed_amount" && promo.fixedAmount != null) {
@@ -526,7 +559,8 @@ function jobPromoBreakdown(
  * @param jobIn - Job calculation with tasks, parts, and travel.
  * @param promo - Optional active promo to apply.
  * @param pricing - Live pricing (GST, min travel, min billable, holiday uplift); defaults to the code consts.
- * @returns Cost breakdown with promo + unsuccessful discounts split out.
+ * @returns Cost breakdown with promo + unsuccessful discounts split out, and the rate pair
+ * the promo billed at for the invoice's promo note.
  */
 export function calcJobTotal(
   jobIn: JobCalculation,
@@ -544,6 +578,8 @@ export function calcJobTotal(
   surchargeTotal: number;
   subtotal: number;
   promoDiscount: number;
+  /** The promo's before/after hourly rate across its lines, or null when they differ or don't reproduce the bill. */
+  promoRate: PromoRateSummary | null;
   goldCardDiscount: number;
   unsuccessfulDiscount: number;
   gstAmount: number;
@@ -554,8 +590,9 @@ export function calcJobTotal(
   // Sum the per-line cents jobToLineItems prints: this preview and the saved invoice must
   // land on the same cent.
   const lineTotals = taskLineTotals(job.tasks);
-  const tasksTotal = lineTotals.reduce((s, line) => s + line, 0);
-  const partsTotal = job.parts.reduce((s, p) => s + p.cost, 0);
+  const tasksTotal = roundCents(lineTotals.reduce((s, line) => s + line, 0));
+  // Per part, as each prints on its own invoice line.
+  const partsTotal = roundCents(job.parts.reduce((s, p) => s + roundCents(p.cost), 0));
   const { driveTotal, total: travelTotal } = splitTravel(
     job.travelEntries,
     pricing.minTravelCharge,
@@ -564,15 +601,17 @@ export function calcJobTotal(
   // lines), never travel or parts. 0 when neither applies.
   const surchargeUplift = pricing.surchargeUplift ?? 0;
   // From the rounded line totals, as jobToLineItems does, or the surcharge drifts a cent.
-  const hourlyTasksTotal = job.tasks.reduce(
-    (s, t, i) => (isHourlyTask(t) ? s + lineTotals[i]! : s),
-    0,
+  const hourlyTasksTotal = roundCents(
+    job.tasks.reduce((s, t, i) => (isHourlyTask(t) ? s + lineTotals[i]! : s), 0),
   );
-  const surchargeTotal = surchargeUplift > 0 ? roundCents(hourlyTasksTotal * surchargeUplift) : 0;
+  // Never below 0: jobToLineItems prints no surcharge line on labour that nets to $0 or less.
+  const surchargeTotal =
+    surchargeUplift > 0 ? roundCents(Math.max(0, hourlyTasksTotal) * surchargeUplift) : 0;
   const subtotal = roundCents(tasksTotal + partsTotal + travelTotal + surchargeTotal);
   const {
     total: promoDiscount,
     byTask: promoByTask,
+    rateByTask: promoRateByTask,
     offTravel: promoOffTravel,
   } = jobPromoBreakdown(
     job,
@@ -595,9 +634,8 @@ export function calcJobTotal(
    * @returns True when the line carries the Business modifier.
    */
   const isBusiness = (t: TaskLine): boolean => isBusinessTask(t, pricing.businessModifierId);
-  const goldLabour = job.tasks.reduce(
-    (s, t, i) => (isHourlyTask(t) && !isBusiness(t) ? s + lineTotals[i]! : s),
-    0,
+  const goldLabour = roundCents(
+    job.tasks.reduce((s, t, i) => (isHourlyTask(t) && !isBusiness(t) ? s + lineTotals[i]! : s), 0),
   );
   // With no business work the printed surcharge line counts whole, so the 10% matches the
   // invoice lines to the cent; otherwise only the home lines' share of it.
@@ -631,9 +669,49 @@ export function calcJobTotal(
     surchargeTotal,
     subtotal,
     promoDiscount,
+    promoRate:
+      promoDiscount > 0
+        ? promoRateSummary(job.tasks, promoRateByTask, lineTotals, promoDiscount)
+        : null,
     goldCardDiscount,
     unsuccessfulDiscount,
     gstAmount,
     total: taxableAmount,
   };
+}
+
+/**
+ * The single before/after hourly pair a promo billed its lines at, summing their minutes.
+ * Null when lines started or ended at different rates, since one pair would misstate some,
+ * or when the pair times the minutes doesn't land on the billed cents: 12.5% off $65 is
+ * $56.875/hr, and "$56.88/hr" over 13 hr 10 min reads 7c over what was charged.
+ * @param tasks - The job's task lines, after the minimum-billable floor.
+ * @param rateByTask - Each line's rate under the promo, null where it didn't change the rate.
+ * @param lineTotals - Each line's printed total at its full rate.
+ * @param promoDiscount - The promo's rounded discount, all of it off these lines.
+ * @returns The pair with its minutes, or null.
+ */
+function promoRateSummary(
+  tasks: readonly TaskLine[],
+  rateByTask: readonly (number | null)[],
+  lineTotals: readonly number[],
+  promoDiscount: number,
+): PromoRateSummary | null {
+  let summary: PromoRateSummary | null = null;
+  let full = 0;
+  for (const [i, t] of tasks.entries()) {
+    const after = rateByTask[i];
+    if (after == null) continue;
+    const mins = t.minutes ?? Math.round(t.qty * 60);
+    full += lineTotals[i]!;
+    if (!summary) summary = { mins, before: t.unitPrice, after };
+    else if (summary.before !== t.unitPrice || summary.after !== after) return null;
+    else summary.mins += mins;
+  }
+  if (!summary) return null;
+  const { mins, before, after } = summary;
+  const exact =
+    roundCents((mins * before) / 60) === roundCents(full) &&
+    roundCents((mins * after) / 60) === roundCents(full - promoDiscount);
+  return exact ? summary : null;
 }

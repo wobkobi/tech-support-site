@@ -4,6 +4,7 @@
 // Auckland) plus Christmas Eve and New Year's Eve; other observances (Guy Fawkes,
 // Mother's Day...) aren't billed at the holiday rate.
 
+import { SURCHARGED_OBSERVANCES } from "@/features/business/lib/holiday-calendar";
 import { HOME_REGION, NZ_REGION } from "@/features/business/lib/pricing-policy";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorised } from "@/shared/lib/auth";
@@ -13,8 +14,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 const NZ_HOLIDAYS_CALENDAR_ID = "en.new_zealand#holiday@group.v.calendar.google.com";
 
-// Observances still billed at the holiday rate, matched on Google's event name.
-const SURCHARGED_OBSERVANCES = new Set(["Christmas Eve", "New Year's Eve"]);
+// Eves billed at the holiday rate, matched on Google's event name; the offline fallback
+// reads the same list, so the price never depends on the table being reachable.
+const SURCHARGED_NAMES = new Set(SURCHARGED_OBSERVANCES.map((o) => o.name));
 
 /**
  * Returns the region label for a holiday event. Google tags each description
@@ -74,7 +76,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         const name = event.summary;
         if (!date || !name) continue;
         const region =
-          regionFor(event.description) ?? (SURCHARGED_OBSERVANCES.has(name) ? NZ_REGION : null);
+          regionFor(event.description) ?? (SURCHARGED_NAMES.has(name) ? NZ_REGION : null);
         if (!region) continue;
         await prisma.publicHoliday.upsert({
           where: { date_region: { date, region } },

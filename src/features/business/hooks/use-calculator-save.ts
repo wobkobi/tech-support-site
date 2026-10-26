@@ -13,6 +13,7 @@ import {
   buildIncomeDescription,
   formatNZD,
   jobToLineItems,
+  promoRateNote,
   type calcJobTotal,
   type JobPricing,
   type LabourSurcharge,
@@ -82,6 +83,8 @@ interface UseCalculatorSaveArgs {
   paidCash: boolean;
   /** Already paid box: part of the bill handed over on the day. */
   alreadyPaid: AlreadyPaidState;
+  /** Voided invoice this save re-issues, or null; its already-paid entry moves across. */
+  reissueOf: string | null;
   setTaskTemplates: React.Dispatch<React.SetStateAction<TaskTemplate[]>>;
   /** Called after a successful income save to reset the form. */
   onIncomeSaved: () => void;
@@ -128,6 +131,7 @@ interface UseCalculatorSave {
  * @param args.tripAddress - Where you drove for the job, or null for no trip.
  * @param args.paidCash - Whether the client paid in cash on the day.
  * @param args.alreadyPaid - Amount and method handed over on the day, if any.
+ * @param args.reissueOf - Voided invoice being re-issued, or null.
  * @param args.setTaskTemplates - Task template setter, refreshed as templates save.
  * @param args.onIncomeSaved - Resets the form after an income save.
  * @returns Save state plus the save handlers.
@@ -148,6 +152,7 @@ export function useCalculatorSave({
   tripAddress,
   paidCash,
   alreadyPaid,
+  reissueOf,
   setTaskTemplates,
   onIncomeSaved,
 }: UseCalculatorSaveArgs): UseCalculatorSave {
@@ -283,8 +288,9 @@ export function useCalculatorSave({
    * also records the income. A failure leaves it unpaid and says so.
    * @param invoiceId - The saved invoice.
    * @param method - How the money came in (an INCOME_METHODS value).
+   * @param createIncome - False when the already-paid entry holds the money already.
    */
-  async function markPaid(invoiceId: string, method: string): Promise<void> {
+  async function markPaid(invoiceId: string, method: string, createIncome = true): Promise<void> {
     try {
       const res = await fetch(`/api/business/invoices/${invoiceId}/pay`, {
         method: "POST",
@@ -292,7 +298,7 @@ export function useCalculatorSave({
         body: JSON.stringify({
           paidAt: jobDate,
           method,
-          createIncome: true,
+          createIncome,
           sendApology: false,
         }),
       });
@@ -383,6 +389,7 @@ export function useCalculatorSave({
           notes: notes || null,
           promoTitle: promoActive ? activePromo.title : null,
           promoDiscount: promoActive ? totals.promoDiscount : null,
+          promoNote: promoActive ? promoRateNote(totals.promoRate) : null,
           // The id, not the title: redemptions are keyed by promo and titles can be edited.
           promoId: promoActive ? activePromo.id : null,
           // The server stores `unsuccessful === true`, so omitting it would record success.
@@ -400,14 +407,16 @@ export function useCalculatorSave({
           // Quote mode: server allocates a Q- number + 30-day validity.
           isQuote: quote || undefined,
           // Part payment: the invoice asks for the balance and the server records this
-          // amount in income on the job date. A full payment goes through markPaid instead.
+          // amount in income on the job date. A full payment goes through markPaid instead,
+          // except on a re-issue, where the voided invoice's entry holds it and moves across.
           ...(!quote &&
             prepaid > 0 &&
-            !prepaidCovers && {
-              alreadyPaid: prepaid,
+            (!prepaidCovers || reissueOf) && {
+              alreadyPaid: Math.min(prepaid, totals.total),
               alreadyPaidMethod: alreadyPaid.method,
               alreadyPaidDate: jobDate,
             }),
+          reissueOf,
           // The server logs the trip at Google's round-trip km, charged for or not.
           ...(!quote && tripAddress && { trip: { address: tripAddress, date: jobDate } }),
           // issueDate, dueDate, number all defaulted server-side.
@@ -449,7 +458,7 @@ export function useCalculatorSave({
       const invoiceId = d.invoice.id;
       // Before the contacts gate, which can stop here for its modal. A quote can't be paid.
       if (!quote && (paidCash || prepaidCovers)) {
-        await markPaid(invoiceId, paidCash ? CASH : alreadyPaid.method);
+        await markPaid(invoiceId, paidCash ? CASH : alreadyPaid.method, paidCash || !reissueOf);
       }
       // Add-to-contacts gate: defer nav until the modal closes so handleAddContactClose can
       // backfill contactId. Link a known contact here whether or not the prompt fires.

@@ -3,7 +3,8 @@
 
 import { BusinessEnquiryForm } from "@/features/business/components/BusinessEnquiryForm";
 import { formatMoneyCompact } from "@/features/business/lib/business";
-import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
+import { surchargeCaveat } from "@/features/business/lib/pricing-policy";
+import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { Button } from "@/shared/components/Button";
 import { ClosingCta } from "@/shared/components/ClosingCta";
 import { Disclosure } from "@/shared/components/Disclosure";
@@ -151,9 +152,18 @@ const siteUrl = getSiteUrl();
  * @returns Business page element.
  */
 export default async function BusinessPage(): Promise<React.ReactElement> {
-  const [pricing, identity] = await Promise.all([getPublicPricing(), getIdentity()]);
+  const [pricing, identity, policy] = await Promise.all([
+    getPublicPricing(),
+    getIdentity(),
+    getPolicy(),
+  ]);
   // Undiscounted: promos are a home offer and business travel is invoiced in full.
   const displayTravelRate = pricing.travelRatePerHour;
+  // Percents, not dollars: they hold at both the on-site and the remote business rate.
+  const surchargeText = surchargeCaveat({
+    weekendUplift: policy.WEEKEND_UPLIFT,
+    publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
+  });
   const businessJsonLd = {
     "@context": "https://schema.org",
     "@type": "Service",
@@ -231,10 +241,13 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
       <Section tone="grey" aria-labelledby="rates-heading">
         <SectionHeading id="rates-heading" title="Business rates" />
         <p className="mb-4">
-          Business work bills at <span className="font-bold">${pricing.businessRate}/hr</span>, on
-          site or remote. You only pay for the time the job takes.
+          Business work bills at{" "}
+          <span className="font-bold">{formatMoneyCompact(pricing.businessRate)}/hr</span> on site,
+          or <span className="font-bold">{formatMoneyCompact(pricing.businessRemoteRate)}/hr</span>{" "}
+          for a remote session. You only pay for the time the job takes.
         </p>
         <TickList>
+          {surchargeText && <TickItem>{surchargeText}</TickItem>}
           <TickItem>
             Travel billed at {formatMoneyCompact(displayTravelRate)}/hr for one round trip per visit
           </TickItem>

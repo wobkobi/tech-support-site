@@ -9,6 +9,7 @@ import {
   composeDescription,
   enforceMinBillable,
   jobToLineItems,
+  promoRateNote,
   TASK_TIMING_FALLBACK,
   timeDiffMins,
   type JobPromo,
@@ -415,7 +416,8 @@ function sameAddressKey(address: string | null | undefined): string {
  * @param pricing - Live pricing inputs.
  * @param existing - The invoice's current travel line and booked address.
  * @param promo - The invoice's promo terms, or null when it has none.
- * @returns Line items, the window fit, and the promo, Gold Card and unsuccessful-work discounts.
+ * @returns Line items, the window fit, the promo (with its rate note), Gold Card and
+ * unsuccessful-work discounts.
  */
 export function parsedJobToLineItems(
   result: ParseJobResponse,
@@ -429,6 +431,7 @@ export function parsedJobToLineItems(
   fit: FittedTasks;
   windowMins: number;
   promoDiscount: number;
+  promoNote: string | null;
   goldCardDiscount: number;
   unsuccessfulDiscount: number;
 } {
@@ -470,17 +473,29 @@ export function parsedJobToLineItems(
     pricing.minTravelCharge,
     pricing.minBillableMins,
   );
-  const { promoDiscount, goldCardDiscount, unsuccessfulDiscount } = calcJobTotal(job, promo, {
-    // Only the discounts are read, and none depends on GST.
-    gstRegistered: false,
-    minTravelCharge: pricing.minTravelCharge,
-    minBillableMins: pricing.minBillableMins,
-    surchargeUplift: pricing.surcharge?.uplift ?? 0,
-    unsuccessfulFactor: pricing.unsuccessfulFactor,
-    businessModifierId: pricing.businessModifierId,
-    standardRate: pricing.standardRate,
-    rates: pricing.rates,
-    goldCardPercent: pricing.goldCardPercent,
-  });
-  return { lineItems, fit, windowMins, promoDiscount, goldCardDiscount, unsuccessfulDiscount };
+  const { promoDiscount, promoRate, goldCardDiscount, unsuccessfulDiscount } = calcJobTotal(
+    job,
+    promo,
+    {
+      // Only the discounts are read, and none depends on GST.
+      gstRegistered: false,
+      minTravelCharge: pricing.minTravelCharge,
+      minBillableMins: pricing.minBillableMins,
+      surchargeUplift: pricing.surcharge?.uplift ?? 0,
+      unsuccessfulFactor: pricing.unsuccessfulFactor,
+      businessModifierId: pricing.businessModifierId,
+      standardRate: pricing.standardRate,
+      rates: pricing.rates,
+      goldCardPercent: pricing.goldCardPercent,
+    },
+  );
+  return {
+    lineItems,
+    fit,
+    windowMins,
+    promoDiscount,
+    promoNote: promoRateNote(promoRate),
+    goldCardDiscount,
+    unsuccessfulDiscount,
+  };
 }

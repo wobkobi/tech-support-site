@@ -40,6 +40,10 @@ export interface InvoiceAiContext {
   jobDate: string;
   /** Job address to quote travel from when the description names none. */
   fallbackDestination: string | null;
+  /** The booking's meeting type ("remote" stops a trip being billed), or null. */
+  meetingType: string | null;
+  /** The invoice is addressed to the contact's company, so labour bills at the Business rate. */
+  billedToCompany: boolean;
   pricing: ParsedJobPricing;
   /** The invoice's promo terms, re-applied to the rebuilt lines; null for none. */
   promo: JobPromo | null;
@@ -48,6 +52,8 @@ export interface InvoiceAiContext {
 /** The discounts re-priced for a rebuilt set of lines. */
 export interface RepricedDiscounts {
   promoDiscount: number;
+  /** The hours and rates under the promo row, or null when there's no single rate. */
+  promoNote: string | null;
   goldCardDiscount: number;
   unsuccessfulDiscount: number;
 }
@@ -109,6 +115,9 @@ export function InvoiceAiBox({
         jobDate: context.jobDate,
       };
       if (context.fallbackDestination) body.fallbackDestination = context.fallbackDestination;
+      // The same facts the calculator sends, so a rebuild prices like the original.
+      if (context.meetingType) body.meetingType = context.meetingType;
+      if (context.billedToCompany) body.billedToCompany = true;
       if (withAnswers && Object.keys(withAnswers).length > 0) body.answers = withAnswers;
       const res = await fetch("/api/business/parse-job", {
         method: "POST",
@@ -127,6 +136,7 @@ export function InvoiceAiBox({
           fit,
           windowMins,
           promoDiscount,
+          promoNote,
           goldCardDiscount,
           unsuccessfulDiscount,
         } = parsedJobToLineItems(
@@ -144,6 +154,7 @@ export function InvoiceAiBox({
           setAnswers({});
           onApply(lineItems, parsed.notes || null, parsed.cashPaid ?? null, {
             promoDiscount,
+            promoNote,
             goldCardDiscount,
             unsuccessfulDiscount,
           });

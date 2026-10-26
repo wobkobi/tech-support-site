@@ -11,7 +11,7 @@ import {
   priceRangeFor,
   remoteRateDelta,
 } from "@/features/business/lib/estimate-range";
-import { calcTravelCharge, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
+import { calcTravelCharge, surchargeCaveat } from "@/features/business/lib/pricing-policy";
 import type { LiveDelta } from "@/features/business/lib/promo-locked-rates";
 import {
   applyPromoToHourlyRate,
@@ -268,6 +268,14 @@ function buildPriceRange(
 }
 
 interface Props {
+  /** Live Standard hourly rate, the same figure the page headline quotes before any promo. */
+  baseRate: number;
+  /** Live customer-facing rate rows (hourly rates and the Remote/At home/Phone modifiers). */
+  rates: PublicRate[];
+  /** Weekend labour uplift (live pricing setting), for the weekday caveat. */
+  weekendUplift: number;
+  /** Public-holiday labour uplift (live pricing setting), for the weekday caveat. */
+  publicHolidayUplift: number;
   /** Minimum billable minutes (live pricing setting); floors the estimate. */
   minBillableMins: number;
   /** Travel floor (live pricing setting) for the travel estimate. */
@@ -285,6 +293,10 @@ interface Props {
 /**
  * Multi-step wizard from job description, meeting type and location to a price range.
  * @param props - Component props.
+ * @param props.baseRate - Live Standard hourly rate.
+ * @param props.rates - Live customer-facing rate rows.
+ * @param props.weekendUplift - Weekend labour uplift, for the weekday caveat.
+ * @param props.publicHolidayUplift - Public-holiday labour uplift, for the weekday caveat.
  * @param props.minBillableMins - Minimum billable minutes used to floor the estimate.
  * @param props.minTravelCharge - Travel floor for the travel estimate.
  * @param props.travelRatePerHour - Travel $/hr pricing the round trip.
@@ -294,6 +306,10 @@ interface Props {
  * @returns The rendered wizard.
  */
 export function PricingWizard({
+  baseRate,
+  rates,
+  weekendUplift,
+  publicHolidayUplift,
   minBillableMins,
   minTravelCharge,
   travelRatePerHour,
@@ -301,7 +317,6 @@ export function PricingWizard({
   lowEndFloorFactor,
   showPromoCode,
 }: Props): React.ReactElement {
-  const [rates, setRates] = useState<PublicRate[]>([]);
   const [activePromo, setActivePromo] = useState<ActivePromo | null>(null);
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<Step>("issue");
@@ -333,24 +348,14 @@ export function PricingWizard({
   };
 
   useEffect(() => {
-    // Rates + active promo in parallel; promo may be null.
-    void Promise.all([
-      fetch("/api/pricing/rates")
-        .then((r) => r.json())
-        .catch(() => ({ ok: false, rates: [] })),
-      fetch("/api/promos/active")
-        .then((r) => r.json())
-        .catch(() => ({ ok: false, promo: null })),
-    ]).then(
-      ([ratesRes, promoRes]: [
-        { ok: boolean; rates: PublicRate[] },
-        { ok: boolean; promo: ActivePromo | null },
-      ]) => {
-        setRates(ratesRes.rates ?? []);
+    // Rates arrive as props from the page; only the active promo (maybe null) is fetched.
+    void fetch("/api/promos/active")
+      .then((r) => r.json() as Promise<{ ok: boolean; promo: ActivePromo | null }>)
+      .catch(() => ({ ok: false, promo: null }))
+      .then((promoRes) => {
         setActivePromo(promoRes.promo ?? null);
         setLoading(false);
-      },
-    );
+      });
   }, []);
 
   /** Calls both APIs in parallel then computes a price range from the AI's time estimate. */
@@ -417,11 +422,8 @@ export function PricingWizard({
       setAddressNotFound(true);
     }
 
-    // Live rates even when the AI call fails (mirrors quick-estimate.ts).
-    const baseStandard =
-      rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
-      rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
-      FALLBACK_BASE_RATE;
+    // Live rates from the page, so the quote can't fall back to a stale figure.
+    const baseStandard = baseRate;
     const fullRate = baseStandard + remoteRateDelta(rates, meeting);
 
     // Fallback when the AI fails; must match the "typical one-hour job" copy.
@@ -644,6 +646,11 @@ export function PricingWizard({
     // Tiers stripped so the phrase names only the band this threshold unlocks.
     return `Jobs over $${next} get ${describePromoDiscount({ ...earned, tiers: [] })}.`;
   })();
+
+  // The quote has no date, so it prices a weekday; dollars at the quote's own full rate.
+  const weekdayCaveat = quoteInputs
+    ? surchargeCaveat({ weekendUplift, publicHolidayUplift }, quoteInputs.fullRate)
+    : null;
 
   // An applied code travels to /booking, which re-resolves it.
   const bookingHref = (() => {
@@ -884,8 +891,11 @@ export function PricingWizard({
           )}
 
           <p className="mb-5 text-base text-seasalt-700">
-            This is a rough estimate only. The actual cost depends on the complexity of the job and
-            will be confirmed before work begins. No GST is charged.
+            {weekdayCaveat
+              ? `This is a rough estimate for a weekday. ${weekdayCaveat} `
+              : "This is a rough estimate only. "}
+            The actual cost depends on the complexity of the job and will be confirmed before work
+            begins. No GST is charged.
           </p>
 
           <div className="flex flex-wrap gap-3">

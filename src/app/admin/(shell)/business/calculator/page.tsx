@@ -50,7 +50,13 @@ async function loadReissue(
   if (!id || !/^[a-f\d]{24}$/i.test(id)) return null;
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice || invoice.status !== "VOIDED" || invoice.isQuote === true) return null;
-  return { prefill: reissuePrefill(invoice), eventIds: reissueEventIds(invoice) };
+  const promo = invoice.promoId
+    ? await prisma.promo.findUnique({ where: { id: invoice.promoId }, select: { code: true } })
+    : null;
+  return {
+    prefill: reissuePrefill(invoice, promo?.code ?? null),
+    eventIds: reissueEventIds(invoice),
+  };
 }
 
 /**
@@ -88,6 +94,7 @@ export default async function CalculatorPage({
     minBillableMins: policy.MIN_BILLABLE_MINS,
     unsuccessfulFactor: policy.UNSUCCESSFUL_WORK_FACTOR,
     mergeSuggestGapMins: policy.MERGE_SUGGEST_GAP_MINS,
+    weekendUplift: policy.WEEKEND_UPLIFT,
     taskTiming: {
       snapMins: policy.BILLING_INCREMENT_MINS,
       shortTaskMins: policy.SHORT_TASK_MINS,

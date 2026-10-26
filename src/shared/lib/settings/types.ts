@@ -118,8 +118,9 @@ export interface PricingSettings {
   /** Public-holiday labour surcharge, fraction (0.25 = +25%). 0 = no surcharge. */
   publicHolidayUplift: number;
   /**
-   * Weekend labour surcharge fraction (0.1 = +10%); a weekend holiday takes the holiday surcharge
-   * instead, never both. 0 = none.
+   * Weekend labour surcharge fraction (0.1 = +10%), also billed for after hours ticked on a
+   * weekday. A weekend public holiday bills this (its holiday rate moves to the observed
+   * weekday); Christmas Eve and New Year's Eve take the holiday surcharge instead. 0 = none.
    */
   weekendUplift: number;
   /** Minimum travel charge floor (NZD). 0 = no floor. */

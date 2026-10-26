@@ -5,6 +5,7 @@
 
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
+import { upliftPercent } from "@/features/business/lib/pricing-policy";
 import type { PricingSettings } from "@/shared/lib/settings/types";
 import type React from "react";
 
@@ -43,12 +44,12 @@ export function PricingPreview({ config }: Props): React.ReactElement {
 
   if (config.publicHolidayUplift > 0) {
     lines.push(
-      `Public-holiday labour carries a +${Math.round(config.publicHolidayUplift * 100)}% surcharge.`,
+      `Public-holiday, Christmas Eve and New Year's Eve labour carries a +${upliftPercent(config.publicHolidayUplift)}% surcharge; a public holiday on a weekend carries it on the weekday it's observed.`,
     );
   }
   if (config.weekendUplift > 0) {
     lines.push(
-      `Weekend labour carries a +${Math.round(config.weekendUplift * 100)}% surcharge (a public holiday takes its own instead).`,
+      `Weekend labour carries a +${upliftPercent(config.weekendUplift)}% surcharge (Christmas Eve and New Year's Eve take the holiday one instead), and so does after-hours work when you tick it on a weekday.`,
     );
   }
   if (config.minTravelCharge > 0) {

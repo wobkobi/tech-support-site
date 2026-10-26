@@ -11,7 +11,7 @@ import {
 } from "@/features/business/components/calculator/calculator-classes";
 import type { PartLine } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
-import { parseMoney } from "@/shared/lib/money";
+import { parseMoney, roundCents } from "@/shared/lib/money";
 import type React from "react";
 
 interface Props {
@@ -87,14 +87,15 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
                   e.preventDefault();
                   onPartsChange((p) => {
                     const n = [...p];
-                    n[idx] = { ...n[idx]!, cost: value };
+                    n[idx] = { ...n[idx]!, cost: roundCents(value) };
                     return n;
                   });
                 }}
                 onChange={(e) =>
                   onPartsChange((p) => {
                     const n = [...p];
-                    n[idx] = { ...n[idx]!, cost: parseFloat(e.target.value) || 0 };
+                    // Whole cents, so the calculator and the invoice's per-line rounding agree.
+                    n[idx] = { ...n[idx]!, cost: roundCents(parseFloat(e.target.value) || 0) };
                     return n;
                   })
                 }

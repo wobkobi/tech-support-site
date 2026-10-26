@@ -31,6 +31,16 @@ export interface LineItem {
   minutes?: number | null;
 }
 
+/** The one hourly rate pair a promo billed a job's discounted labour at. */
+export interface PromoRateSummary {
+  /** Billed minutes on the lines the promo discounted. */
+  mins: number;
+  /** Their hourly rate before the promo. */
+  before: number;
+  /** Their hourly rate under the promo. */
+  after: number;
+}
+
 export type InvoiceStatus = "DRAFT" | "SENT" | "PAID" | "VOIDED";
 
 export interface Invoice {
@@ -50,6 +60,8 @@ export interface Invoice {
   promoTitle?: string | null;
   /** Dollar discount applied to the labour subtotal at creation time. */
   promoDiscount?: number | null;
+  /** The hours and rates the promo discount came from, printed under its row; null when none. */
+  promoNote?: string | null;
   /** Unsuccessful work: labour discounted by the policy factor (parts and travel unaffected). */
   unsuccessful?: boolean;
   /** Computed labour-half discount, persisted for audit + PDF rendering. */
@@ -307,6 +319,8 @@ export interface EventPrefill {
    */
   travelMinsThere: number | null;
   travelMinsBack: number | null;
+  /** The schedule has the trip on foot, by bike or by bus, so it isn't logged as a drive. */
+  walked: boolean;
   /**
    * When the job was booked (ISO): the booking's creation, else when its calendar event was
    * made. Promo dates are judged here, so a phone-made job keeps the rates of the day it was

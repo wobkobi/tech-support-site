@@ -17,6 +17,7 @@ import {
 import { ADMIN_INPUT_CLS, ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { QuickTodaysJobs, QuickTotalCard } from "@/features/business/components/QuickPriceCards";
+import { SurchargeToggle } from "@/features/business/components/SurchargeToggle";
 import { AlreadyPaidField } from "@/features/business/components/invoice/AlreadyPaidField";
 import {
   EMPTY_ALREADY_PAID,
@@ -36,8 +37,11 @@ import {
 import { lookupAutoTravel } from "@/features/business/lib/calculator-helpers";
 import { goldCardPercent } from "@/features/business/lib/gold-card";
 import { buildIncomeDescription } from "@/features/business/lib/invoice-maths";
+import { isBusinessModifier } from "@/features/business/lib/job-modifiers";
 import {
+  chosenSurcharge,
   clampBillableMins,
+  surchargeOption,
   unsuccessfulShareLabel,
   type DateSurcharge,
 } from "@/features/business/lib/pricing-policy";
@@ -68,6 +72,8 @@ interface QuickPricing {
   billingIncrementMins: number;
   /** Share of the labour still charged when the problem wasn't fixed (0.5 = half price). */
   unsuccessfulFactor: number;
+  /** Weekend labour uplift, which the surcharge tick can bill on any day (0 = off). */
+  weekendUplift: number;
 }
 
 /** One of today's booking-calendar events, with NZ-local HH:MM bounds. */
@@ -148,7 +154,7 @@ interface Props {
 export function QuickPriceView({
   rates,
   promo,
-  surcharge,
+  surcharge: todaySurcharge,
   bankAccount,
   initialEnd,
   events,
@@ -162,6 +168,10 @@ export function QuickPriceView({
   // Couldn't fix the problem: the labour bills at the unsuccessful-visit share.
   const [unfixed, setUnfixed] = useState(false);
   const [goldCard, setGoldCard] = useState(false);
+  // Surcharge tick (weekend, holiday, or after hours on a weekday); null follows today's date.
+  const [surchargeOn, setSurchargeOn] = useState<boolean | null>(null);
+  const surcharge = chosenSurcharge(todaySurcharge, surchargeOn, pricing.weekendUplift);
+  const surchargeChoice = surchargeOption(todaySurcharge, pricing.weekendUplift);
   const [travel, setTravel] = useState<TravelEntry | null>(prefill?.travel ?? null);
   const [lookingUp, setLookingUp] = useState(false);
   const [travelNote, setTravelNote] = useState<string | null>(null);
@@ -184,9 +194,9 @@ export function QuickPriceView({
     rates.find((r) => r.ratePerHour !== null && r.isDefault) ??
     rates.find((r) => r.ratePerHour !== null) ??
     null;
-  // Same predicate the calculator uses, so a promo skips business labour here too.
+  // The shared Business predicate (trimmed, any case), so a promo skips business labour here too.
   const businessModifier =
-    rates.find((r) => r.label === "Business" && r.unit === "modifier") ?? null;
+    rates.find((r) => isBusinessModifier(r) && r.unit === "modifier") ?? null;
   const modifierIds = business && businessModifier ? [businessModifier.id] : [];
   const hourlyRate = effectiveHourlyRate(rates, standard?.id, modifierIds);
   // The Gold Card rate from Settings > Rates; null hides the box.
@@ -462,6 +472,14 @@ export function QuickPriceView({
               checked={goldCard}
               onChange={setGoldCard}
               label={`Gold Card (${goldCardOffText(goldCardRate)})`}
+            />
+          )}
+          {surchargeChoice && (
+            <SurchargeToggle
+              option={surchargeChoice}
+              on={surcharge !== null}
+              fromDate={todaySurcharge !== null}
+              onChange={setSurchargeOn}
             />
           )}
         </div>

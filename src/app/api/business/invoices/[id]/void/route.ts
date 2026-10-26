@@ -54,7 +54,8 @@ export async function POST(
     }
   }
   const updated = alreadyVoided ? invoice : { ...invoice, status: "VOIDED" as const, voidedAt };
-  // A voided invoice gave no discount, so its promo use stops counting.
+  // A voided invoice gave no discount, so its promo use stops counting; the booking's goes too
+  // unless another live invoice bills it. A re-issue settles a fresh one.
   await releaseInvoiceRedemptions(id);
 
   // Lets the UI warn that linked income needs manual reversal.

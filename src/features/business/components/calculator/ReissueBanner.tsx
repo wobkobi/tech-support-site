@@ -1,6 +1,6 @@
 // src/features/business/components/calculator/ReissueBanner.tsx
 // Banner shown while the calculator rebuilds a voided invoice: names the invoice, says
-// the promo is priced again, and that any amount paid on the day stays on the voided one.
+// the promo is priced again, and that any amount paid on the day carries over.
 
 import { formatNZD } from "@/features/business/lib/business-format";
 import type { ReissuePrefill } from "@/features/business/lib/invoice-reissue";
@@ -28,7 +28,7 @@ export function ReissueBanner({
       {!fromEvent &&
         " It wasn't made from a calendar event, so check the job date and set the times by hand."}
       {reissue.alreadyPaid !== null &&
-        ` The ${formatNZD(reissue.alreadyPaid)} paid on the day stays on ${reissue.invoiceNumber}, so don't add it again here.`}
+        ` The ${formatNZD(reissue.alreadyPaid)} paid on the day is in Already paid, and its income entry moves to the new invoice when you save, so it's only counted once.`}
     </Notice>
   );
 }

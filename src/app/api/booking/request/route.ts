@@ -23,7 +23,11 @@ import {
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { recordPromoRedemption } from "@/features/business/lib/promo-redemption";
-import { resolvePromo } from "@/features/business/lib/promos";
+import {
+  bookingPromoColumns,
+  describeRecurringWindow,
+  resolvePromo,
+} from "@/features/business/lib/promos";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
@@ -329,8 +333,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return null;
       }),
     ]);
-    // Only an untiered promo has terms that are fixed at booking time.
-    const snapshotPromo = activePromo && activePromo.tiers.length === 0 ? activePromo : null;
     const baseRow = rates.find((r) => r.ratePerHour !== null && r.isDefault) ?? null;
     const baseRateAtBooking = baseRow?.ratePerHour ?? null;
     // Snapshot so later settings edits can't reprice a quoted booking.
@@ -388,15 +390,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           baseRateAtBooking,
           travelRatePerHourAtBooking,
           // Promo snapshot denormalised - survives Promo deletion before service.
-          promoIdAtBooking: activePromo?.id ?? null,
-          promoTitleAtBooking: activePromo?.title ?? null,
-          // Null for a tiered promo: its band is resolved against the real subtotal.
-          promoFlatHourlyRateAtBooking: snapshotPromo?.flatHourlyRate ?? null,
-          promoPercentDiscountAtBooking: snapshotPromo?.percentDiscount ?? null,
-          // The full terms, which is what the invoice actually prices from.
-          promoTermsAtBooking: activePromo
-            ? (activePromo as unknown as Prisma.InputJsonValue)
-            : undefined,
+          ...bookingPromoColumns(activePromo),
           publicHolidayName,
           // The public quote the customer saw and how the AI read their request.
           quotedLowAtBooking,
@@ -505,6 +499,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                 endAt: booking.endAt,
                 cancelToken: booking.cancelToken,
                 promoTitleAtBooking: booking.promoTitleAtBooking,
+                promoWindowAtBooking: activePromo ? describeRecurringWindow(activePromo) : null,
                 address: combineUnitAndAddress(booking.unit ?? "", booking.address ?? ""),
                 meetingType: booking.meetingType,
                 rescheduleCount: booking.rescheduleCount,
