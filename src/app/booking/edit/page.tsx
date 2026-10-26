@@ -9,6 +9,7 @@ import {
   DURATION_OPTIONS,
   TIME_OF_DAY_OPTIONS,
   buildAvailableDays,
+  isBookingClosed,
   parseBookingNotes,
   type AvailabilityConfig,
   type BookableDay,
@@ -140,11 +141,13 @@ export default async function EditBookingPage({
   // customer learns they can't change this booking BEFORE filling the form in,
   // instead of getting a rejection after submitting. 0 / null means "rule off".
   const { reschedule } = pricing;
-  const hoursUntilStart = (booking.startAt.getTime() - new Date().getTime()) / 3_600_000;
+  const now = new Date();
+  const closed = isBookingClosed(booking, now);
+  const hoursUntilStart = (booking.startAt.getTime() - now.getTime()) / 3_600_000;
   const cutoffBlocked = reschedule.cutoffHours > 0 && hoursUntilStart < reschedule.cutoffHours;
   const limitBlocked =
     reschedule.maxReschedules !== null && booking.rescheduleCount >= reschedule.maxReschedules;
-  const blocked = cutoffBlocked || limitBlocked;
+  const blocked = closed || cutoffBlocked || limitBlocked;
   const changesLeft =
     reschedule.maxReschedules !== null
       ? Math.max(0, reschedule.maxReschedules - booking.rescheduleCount)
@@ -245,12 +248,18 @@ export default async function EditBookingPage({
                can only fail - explain why and offer the paths that still work. */
           <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
             <h2 className="mb-2 text-lg font-bold text-russian-violet sm:text-xl">
-              {cutoffBlocked ? "Too close to your appointment" : "Change limit reached"}
+              {closed
+                ? "This appointment has passed"
+                : cutoffBlocked
+                  ? "Too close to your appointment"
+                  : "Change limit reached"}
             </h2>
             <p className="mb-4 text-base text-rich-black/80 sm:text-lg">
-              {cutoffBlocked
-                ? `Bookings can't be changed within ${reschedule.cutoffHours} hours of the appointment.`
-                : "This booking has already been changed the maximum number of times."}{" "}
+              {closed
+                ? "This appointment has already started or finished."
+                : cutoffBlocked
+                  ? `Bookings can't be changed within ${reschedule.cutoffHours} hours of the appointment.`
+                  : "This booking has already been changed the maximum number of times."}{" "}
               Give me a call or text and I'll sort it out for you.
             </p>
             <div className="flex flex-wrap gap-3">
@@ -259,13 +268,16 @@ export default async function EditBookingPage({
                   Call {identity.phone}
                 </Button>
               )}
-              <Button
-                href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}
-                variant="ghost"
-                size="md"
-              >
-                Cancel instead
-              </Button>
+              {/* A passed appointment has nothing left to cancel. */}
+              {!closed && (
+                <Button
+                  href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}
+                  variant="ghost"
+                  size="md"
+                >
+                  Cancel instead
+                </Button>
+              )}
             </div>
           </section>
         ) : (

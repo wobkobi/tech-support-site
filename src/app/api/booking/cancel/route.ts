@@ -2,6 +2,7 @@
 // Cancel a booking by cancel token. GET feeds the cancel page's fee banner; POST cancels
 // and drafts a cancellation invoice when inside the fee window.
 
+import { isBookingClosed } from "@/features/booking/lib/booking";
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 import { assessCancellation } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
@@ -91,19 +92,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return errorResponse("Booking already cancelled.", 400);
     }
 
-    // Remove the calendar event
-    if (booking.calendarEventId) {
-      try {
-        await deleteBookingEvent({ eventId: booking.calendarEventId });
-      } catch (err) {
-        // Don't block the DB cancel on a Google API hiccup.
-        console.error("[booking/cancel] Failed to delete calendar event:", err);
-      }
-    }
-
     // Server clock decides the fee flags so a skewed client can't move the boundary.
     // In-person and remote have their own windows and fees.
     const now = new Date();
+    if (isBookingClosed(booking, now)) {
+      return errorResponse(
+        "This appointment has already started or finished, so it can't be cancelled online. Please call or text me and I'll sort it.",
+        400,
+      );
+    }
     const { CANCELLATION } = await getPolicy();
     const charge = assessCancellation(booking.startAt, now, {
       reason: "late-cancellation",
@@ -113,9 +110,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const lateCancellation = charge.fee > 0;
     const travelChargeApplies = charge.travelApplies;
 
-    // Cancel the booking
-    const updated = await prisma.booking.update({
-      where: { id: booking.id },
+    // Claim the cancel: only one request can flip an active, not-yet-started booking, so a
+    // double click or a race with the operator never sends two fee invoices.
+    const claim = await prisma.booking.updateMany({
+      where: { id: booking.id, status: { in: ["held", "confirmed"] }, startAt: { gt: now } },
       data: {
         status: "cancelled",
         activeSlotKey: `released:${booking.id}`,
@@ -125,6 +123,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         travelChargeApplies,
       },
     });
+    if (claim.count === 0) {
+      return errorResponse("Booking already cancelled.", 409);
+    }
+    const updated = await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } });
+
+    // After the claim, so a refused or duplicate cancel never touches the calendar.
+    if (booking.calendarEventId) {
+      try {
+        await deleteBookingEvent({ eventId: booking.calendarEventId });
+      } catch (err) {
+        // Don't fail the committed cancel on a Google API hiccup.
+        console.error("[booking/cancel] Failed to delete calendar event:", err);
+      }
+    }
 
     // Unused promo stops counting against its caps. Both helpers never throw.
     await releaseBookingRedemptions(booking.id);

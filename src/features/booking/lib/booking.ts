@@ -616,6 +616,19 @@ export function buildAvailableDays(
 }
 
 /**
+ * True once a booking has started or been marked completed. Nothing is left to cancel or
+ * move online, and the fee maths would read a past start as a late cancel.
+ * @param booking - The booking to check.
+ * @param booking.status - Booking status.
+ * @param booking.startAt - Booking start (UTC).
+ * @param now - Clock to compare against.
+ * @returns Whether the customer links should send them to call or text instead.
+ */
+export function isBookingClosed(booking: { status: string; startAt: Date }, now: Date): boolean {
+  return booking.status === "completed" || booking.startAt.getTime() <= now.getTime();
+}
+
+/**
  * Validate booking request
  * @param dateKey - Selected date in YYYY-MM-DD format
  * @param timeOfDay - Selected time slot value

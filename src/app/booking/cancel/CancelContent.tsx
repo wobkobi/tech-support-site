@@ -3,6 +3,7 @@
 // Cancel flow: a confirmation gate with a three-state fee banner, so the customer sees
 // the cancellation cost before they fire the cancel.
 
+import { isBookingClosed } from "@/features/booking/lib/booking";
 import {
   CANCELLATION,
   isWithinCancellationWindow,
@@ -28,6 +29,7 @@ type LoadState =
   | { kind: "loading" }
   | { kind: "ready"; startAt: Date; policy: CancellationInfo }
   | { kind: "alreadyCancelled" }
+  | { kind: "closed" }
   | { kind: "error"; message: string };
 
 type SubmitState =
@@ -170,9 +172,14 @@ export function CancelContent({ phone, phoneTel }: PhoneProps): React.ReactEleme
           setLoad({ kind: "alreadyCancelled" });
           return;
         }
+        const startAt = new Date(data.startAt);
+        if (isBookingClosed({ status: data.status ?? "", startAt }, new Date())) {
+          setLoad({ kind: "closed" });
+          return;
+        }
         setLoad({
           kind: "ready",
-          startAt: new Date(data.startAt),
+          startAt,
           policy: data.cancellation ?? CANCELLATION,
         });
       } catch {
@@ -262,6 +269,14 @@ export function CancelContent({ phone, phoneTel }: PhoneProps): React.ReactEleme
                 </p>
               )}
 
+              {load.kind === "closed" && (
+                <p className="text-base text-rich-black sm:text-lg">
+                  This appointment has already started or finished, so there's nothing to cancel
+                  online. If something isn't right, call or text me on{" "}
+                  <PhoneLink phone={phone} phoneTel={phoneTel} /> and I'll sort it out.
+                </p>
+              )}
+
               {load.kind === "ready" && submit.kind === "done" && (
                 <p role="status" className="text-base text-rich-black sm:text-lg">
                   Booking cancelled. A confirmation email will follow shortly.
@@ -312,6 +327,7 @@ export function CancelContent({ phone, phoneTel }: PhoneProps): React.ReactEleme
               )}
 
               {(load.kind === "alreadyCancelled" ||
+                load.kind === "closed" ||
                 load.kind === "error" ||
                 submit.kind === "done") && (
                 <div className="mt-4 flex flex-wrap gap-3">
