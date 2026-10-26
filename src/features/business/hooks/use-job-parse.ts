@@ -47,6 +47,8 @@ interface UseJobParseArgs {
   timesSet: boolean;
   /** Whether the invoice is addressed to the picked contact's company. */
   billedToCompany: boolean;
+  /** Whether Walked is picked (by hand or from the schedule), so a parse adds no drive. */
+  walked: boolean;
   setFollowUpMins: React.Dispatch<React.SetStateAction<number>>;
   setTimeRanges: React.Dispatch<React.SetStateAction<ParsedRange[]>>;
   setTimesSet: React.Dispatch<React.SetStateAction<boolean>>;
@@ -90,6 +92,7 @@ interface UseJobParse {
  * @param args.timeRanges - The Time card's ranges.
  * @param args.timesSet - Whether the Time card's ranges are real times.
  * @param args.billedToCompany - Whether the invoice is addressed to the contact's company.
+ * @param args.walked - Whether Walked is picked, so the parsed drive is dropped.
  * @param args.setFollowUpMins - Follow-up minutes setter.
  * @param args.setTimeRanges - Time slots setter.
  * @param args.setTimesSet - Setter for whether the Time card's ranges are real times.
@@ -110,6 +113,7 @@ export function useJobParse({
   timeRanges,
   timesSet,
   billedToCompany,
+  walked,
   setFollowUpMins,
   setTimeRanges,
   setTimesSet,
@@ -160,8 +164,9 @@ export function useJobParse({
   }
 
   /**
-   * Applies a parse result to the calculator. Any drive time creates the auto travel entry;
-   * calcTravelCharge applies the $10 minimum.
+   * Applies a parse result to the calculator. Any drive time creates the auto travel entry
+   * (calcTravelCharge applies the $10 minimum), unless Walked is picked: the route still
+   * times a drive to the job address, but a walk bills no travel.
    * @param result - The parsed job response returned by the AI.
    * @param known - The known windows the description was sent with.
    * @param known.slots - Booked slots or real Time card ranges; empty when none.
@@ -186,7 +191,9 @@ export function useJobParse({
       ...parsedCostEntries(result),
       ...parsedStoreRunEntries(result, pricing.travelRatePerHour),
     ];
-    const freshAuto = parsedAutoTravel(result, pricing.travelRatePerHour, pricing.minTravelCharge);
+    const freshAuto = walked
+      ? null
+      : parsedAutoTravel(result, pricing.travelRatePerHour, pricing.minTravelCharge);
     if (freshAuto) {
       setTravelEntries((prev) => {
         // Google's predictions drift between calls, so the same destination keeps the

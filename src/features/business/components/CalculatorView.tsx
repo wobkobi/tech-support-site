@@ -402,6 +402,8 @@ export function CalculatorView({
     timeRanges,
     timesSet,
     billedToCompany: addressMode === "company",
+    // Only a picked Walked; the home-suburb guess gives way to a parsed drive.
+    walked: walkedChoice === true,
     setFollowUpMins,
     setTimeRanges,
     setTimesSet,
