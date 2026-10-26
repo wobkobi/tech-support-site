@@ -363,10 +363,20 @@ export function ContactAdminList({
         `/api/admin/contacts/${id}${deleteGoogle ? "" : "?deleteGoogle=false"}`,
         { method: "DELETE" },
       );
-      const data = (await res.json()) as { ok: boolean; error?: string };
+      const data = (await res.json()) as {
+        ok: boolean;
+        error?: string;
+        googleDeleteFailed?: boolean;
+      };
       if (data.ok) {
         setContacts((prev) => prev.filter((c) => c.id !== id));
-        toast("Contact deleted.", { tone: "success" });
+        if (data.googleDeleteFailed) {
+          toast("Deleted here, but Google Contacts still has them. Delete them there too.", {
+            tone: "warning",
+          });
+        } else {
+          toast("Contact deleted.", { tone: "success" });
+        }
       } else {
         // Report the failure, or the unchanged row reads as a dead button.
         toast(data.error ?? "Couldn't delete that contact - try again.", { tone: "error" });
@@ -399,10 +409,23 @@ export function ContactAdminList({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ primaryId, secondaryId }),
       });
-      const data = (await res.json()) as { ok: boolean; error?: string };
+      const data = (await res.json()) as {
+        ok: boolean;
+        error?: string;
+        googleDeleteFailed?: boolean;
+      };
       if (data.ok) {
         setContacts((prev) => prev.filter((c) => c.id !== secondaryId));
-        toast("Contacts merged.", { tone: "success" });
+        if (data.googleDeleteFailed) {
+          toast(
+            "Merged here, but Google Contacts still has the second person. Delete them there.",
+            {
+              tone: "warning",
+            },
+          );
+        } else {
+          toast("Contacts merged.", { tone: "success" });
+        }
       } else {
         // A silent merge failure leaves the operator unsure whether anything happened.
         toast(data.error ?? "Couldn't merge those contacts - try again.", { tone: "error" });

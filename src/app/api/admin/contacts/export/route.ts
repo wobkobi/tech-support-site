@@ -1,25 +1,12 @@
 // src/app/api/admin/contacts/export/route.ts
 // Exports all contacts as a Google Contacts-compatible CSV.
 
+import { csvCell, csvPhone } from "@/features/contacts/lib/contacts-csv";
 import { splitName } from "@/features/contacts/lib/split-name";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-
-/**
- * Escapes a value for CSV, guarding against formula injection.
- * @param value - The string to escape.
- * @returns CSV-safe string.
- */
-function csvCell(value: string | null | undefined): string {
-  let str = value ?? "";
-  // A leading =, +, - or @ runs as a formula; prefix a quote (values come from the public form).
-  if (/^[=+\-@]/.test(str)) {
-    str = `'${str}`;
-  }
-  return `"${str.replace(/"/g, '""')}"`;
-}
 
 /**
  * GET /api/admin/contacts/export
@@ -41,6 +28,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       email: true,
       phone: true,
       address: true,
+      company: true,
       altEmails: true,
       altPhones: true,
     },
@@ -110,7 +98,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
     const phoneCells: string[] = [];
     for (let i = 0; i < maxPhones; i++) {
-      phoneCells.push(csvCell(""), csvCell(phones?.[i] ?? ""));
+      phoneCells.push(csvCell(""), csvPhone(phones?.[i] ?? ""));
     }
 
     return [
@@ -124,7 +112,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       csvCell(""), // Name Suffix
       csvCell(""), // Nickname
       csvCell(""), // File As
-      csvCell(""), // Organization Name
+      csvCell(c.company), // Organization Name
       csvCell(""), // Organization Title
       csvCell(""), // Organization Department
       csvCell(""), // Birthday

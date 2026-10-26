@@ -2,6 +2,7 @@
 // Public unsubscribe endpoint for RFC 8058 one-click and the /unsubscribe page.
 // POST only: link scanners GET every URL in an email.
 
+import { followMerges } from "@/features/contacts/lib/merge-links";
 import { optOutContact, resubscribeContact } from "@/features/mailing/lib/opt-out";
 import { verifyUnsubscribeToken } from "@/features/mailing/lib/unsubscribe-token";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
@@ -38,8 +39,10 @@ export async function POST(
   if (!action) return errorResponse('action must be "unsubscribe" or "resubscribe".', 400);
   if (token === PREVIEW_TOKEN) return okResponse();
 
-  const contactId = verifyUnsubscribeToken(token);
-  if (!contactId) return errorResponse("This unsubscribe link isn't valid.", 400);
+  const tokenId = verifyUnsubscribeToken(token);
+  if (!tokenId) return errorResponse("This unsubscribe link isn't valid.", 400);
+  // A link sent before a merge carries the merged-away id.
+  const contactId = await followMerges(tokenId);
 
   try {
     if (action === "resubscribe") {

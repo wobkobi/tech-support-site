@@ -20,6 +20,7 @@ import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useRef, useState } from "react";
 import { CopyLinkButton } from "./CopyLinkButton";
+import { markReviewAskTexted } from "./use-send-review-ask";
 
 /**
  * A contact entry used to pre-fill the review link form.
@@ -77,6 +78,8 @@ export function SendReviewLinkForm({
   const [phoneInput, setPhoneInput] = useState(prefill?.phone ? formatNZPhone(prefill.phone) : "");
   const [loading, setLoading] = useState(false);
   const [smsText, setSmsText] = useState<string | null>(null);
+  /** Contact the copied text stamps as asked; cleared once it has. */
+  const [smsContactId, setSmsContactId] = useState<string | null>(null);
   /** Set when they were asked before: their link and when, so Send again can follow. */
   const [existing, setExisting] = useState<{ url: string; askedAt: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -181,6 +184,7 @@ export function SendReviewLinkForm({
         error?: string;
         reviewUrl?: string;
         smsText?: string;
+        contactId?: string;
         existing?: boolean;
         askedAt?: string | null;
       };
@@ -192,6 +196,7 @@ export function SendReviewLinkForm({
         // Composed server-side so the operator + business name come from the
         // live identity settings.
         setSmsText(data.smsText);
+        setSmsContactId(data.contactId ?? null);
         clearFields();
       }
     } catch (err) {
@@ -212,7 +217,7 @@ export function SendReviewLinkForm({
   }
 
   /**
-   * Copies the SMS text to the clipboard.
+   * Copies the SMS text to the clipboard, then records the ask once.
    * @returns Promise resolving when the copy completes.
    */
   async function handleCopy(): Promise<void> {
@@ -220,6 +225,13 @@ export function SendReviewLinkForm({
     await navigator.clipboard.writeText(smsText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+    if (!smsContactId) return;
+    const error = await markReviewAskTexted(smsContactId);
+    if (error) {
+      toast(`Copied, but it isn't marked as asked: ${error}`, { tone: "error" });
+      return;
+    }
+    setSmsContactId(null);
   }
 
   const phoneCheck = validatePhone(phoneInput);

@@ -2,6 +2,7 @@
 // Public page behind the "Stop asking me for reviews" link in every review-ask email.
 // Checks the signed token, then leaves the actual change to a button press.
 
+import { followMerges } from "@/features/contacts/lib/merge-links";
 import { verifyReviewAskStopToken } from "@/features/mailing/lib/unsubscribe-token";
 import { ReviewAskStopForm } from "@/features/reviews/components/ReviewAskStopForm";
 import { isReviewAskOptedOut } from "@/features/reviews/lib/review-ask-opt-out";
@@ -29,7 +30,8 @@ export default async function ReviewAskStopPage({
 }): Promise<React.ReactElement> {
   const { token } = await params;
   const isPreview = token === "preview";
-  const contactId = isPreview ? null : verifyReviewAskStopToken(token);
+  const tokenId = isPreview ? null : verifyReviewAskStopToken(token);
+  const contactId = tokenId ? await followMerges(tokenId) : null;
   const alreadyStopped = contactId ? await isReviewAskOptedOut(contactId) : false;
 
   return (

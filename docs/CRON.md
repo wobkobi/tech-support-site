@@ -173,7 +173,11 @@ across DST changes.
   turned away within 10 minutes of the last read. Register it on cron-job.org, every 30 minutes,
   after the deploy that adds it.
 - Contacts sync runs local dedup/merge first, then pushes only the dirty set, then pulls Google's
-  changes. The manual full sync lives at `/api/admin/contacts/sync`.
+  changes. The manual full sync lives at `/api/admin/contacts/sync`. Google calls are spaced 0.7 s
+  apart (its 90-a-minute read quota) with one retry after 10 s; a rate limit that outlasts the retry
+  ends the run, and the push stops starting contacts after 200 s. Longest-unsynced contacts go
+  first, so the next run carries on where one stopped. A field with an open conflict is left alone
+  on both sides until it's resolved.
 - Sheets sync treats the sheet as source of truth, joining rows on the hidden column-Z Sync ID, and
   self-heals site entries whose sheet append failed.
 

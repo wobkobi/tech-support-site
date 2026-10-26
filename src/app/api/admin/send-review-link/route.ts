@@ -26,7 +26,7 @@ import { NextRequest, NextResponse } from "next/server";
  * Sends a review link via email or SMS and stamps the state onto the Contact.
  * @param request - The incoming request.
  * @returns JSON with reviewUrl (`existing` and `askedAt` when already asked); SMS also
- * returns `smsText` built from live identity settings.
+ * returns `smsText` built from live identity settings and the `contactId` to stamp on copy.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
@@ -117,8 +117,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (blockedBy === "review_opt_out") {
         return errorResponse("They've asked not to get review requests.", 409);
       }
-      // No SMS provider yet: persist the token only, since nothing was actually sent.
-      // TODO: wire a real SMS provider, then stamp send-state like the email path.
+      // No SMS provider: the operator sends it from their phone, and copying it stamps the
+      // send (review-link-texted). Only the token is saved now.
       if (!contact.reviewToken) {
         await prisma.contact.update({ where: { id: contact.id }, data: { reviewToken } });
       }
@@ -136,7 +136,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           `instead: ${reviewFormUrl(reviewToken)}`
         : `${greeting} If you've got a minute, a quick review would really help other ` +
           `people find me: ${reviewUrl}`;
-      return NextResponse.json({ ok: true, reviewUrl, smsText, copyOnly: true });
+      return NextResponse.json({
+        ok: true,
+        reviewUrl,
+        smsText,
+        contactId: contact.id,
+        copyOnly: true,
+      });
     }
 
     if (blockedBy) {

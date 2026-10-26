@@ -17,35 +17,50 @@ import {
 
 /** Setting key for the run lock shared by the cron and the manual sync. */
 export const CONTACTS_SYNC_LOCK_KEY = "sync-contacts-lock";
+/** The push stops starting contacts after this long, well inside the 300 s function limit. */
+const PUSH_BUDGET_MS = 200_000;
 
 /** Outcome counts from a {@link runContactsSync} pass. */
 export interface ContactsSyncResult {
   /** True when another run held the lock and this call did nothing. */
   alreadyRunning?: boolean;
-  /** Contacts pushed to Google this run. */
+  /** Contacts synced with or created in Google this run. */
   pushed: number;
+  /** Contacts whose sync failed; they're tried again next run. */
+  failed: number;
+  /** True when Google's rate limit stopped the run early. */
+  rateLimited: boolean;
+  /** Contacts not reached before the run stopped. */
+  left: number;
   /** Contacts pulled/linked from Google this run. */
   imported: number;
   /** Unresolved contact conflicts remaining after the run. */
   conflicts: number;
-  /** Contacts skipped because they have an unresolved conflict. */
-  skipped: number;
 }
 
 /**
  * Runs a two-way contacts sync. Maintenance runs first so no duplicates are pushed;
- * the push covers never-synced or locally changed contacts (all with `full`),
- * skipping conflicted ones. Phone-only contacts are pull-only.
+ * the push covers never-synced or locally changed contacts (all with `full`), longest
+ * unsynced first so a run that stops early is carried on by the next. A rate limit ends
+ * the run: carrying on would only fail the rest. Phone-only contacts are pull-only.
  * @param options - Sync options.
  * @param options.full - Push every email-bearing contact instead of just the dirty set.
- * @returns Counts of pushed, imported, remaining conflicts, and skipped contacts.
+ * @returns Counts of pushed, failed, unreached and imported contacts and remaining conflicts.
  */
 export async function runContactsSync({
   full = false,
 }: { full?: boolean } = {}): Promise<ContactsSyncResult> {
   // DB lock: overlapping runs race on merges and deletes, across instances.
   if (!(await acquireRunLock(CONTACTS_SYNC_LOCK_KEY))) {
-    return { pushed: 0, imported: 0, conflicts: 0, skipped: 0, alreadyRunning: true };
+    return {
+      pushed: 0,
+      failed: 0,
+      rateLimited: false,
+      left: 0,
+      imported: 0,
+      conflicts: 0,
+      alreadyRunning: true,
+    };
   }
 
   try {
@@ -64,40 +79,40 @@ export async function runContactsSync({
       select: { id: true, updatedAt: true, lastSyncedAt: true, googleContactId: true },
     });
 
-    const pendingConflicts = await prisma.contactConflict.findMany({
-      where: { ...UNRESOLVED_CONFLICT_FILTER },
-      select: { contactId: true },
-    });
-    const conflictedIds = new Set(pendingConflicts.map((c) => c.contactId));
+    // A contact with an open conflict syncs too: the sync holds just the disputed field.
+    const dirty = contacts
+      .filter((c) => {
+        if (full) return true;
+        if (!c.googleContactId) return true;
+        if (!c.lastSyncedAt) return true;
+        return c.updatedAt.getTime() > c.lastSyncedAt.getTime();
+      })
+      .sort((a, b) => (a.lastSyncedAt?.getTime() ?? 0) - (b.lastSyncedAt?.getTime() ?? 0));
 
-    const dirty = contacts.filter((c) => {
-      // A full sync ignores the conflict skip, else a conflict could never clear; a
-      // genuine one is simply re-recorded.
-      if (full) return true;
-      if (conflictedIds.has(c.id)) return false;
-      if (!c.googleContactId) return true;
-      if (!c.lastSyncedAt) return true;
-      return c.updatedAt.getTime() > c.lastSyncedAt.getTime();
-    });
-
+    const deadline = Date.now() + PUSH_BUDGET_MS;
     let pushed = 0;
+    let failed = 0;
+    let rateLimited = false;
+    let reached = 0;
     for (const c of dirty) {
-      try {
-        await syncContactToGoogle(c.id);
-        pushed++;
-      } catch (err) {
-        // Guard so one bad contact cannot abort the run.
-        console.error(`[contacts-sync] push failed for ${c.id}:`, err);
+      if (Date.now() > deadline) break;
+      reached++;
+      const outcome = await syncContactToGoogle(c.id);
+      if (outcome === "synced" || outcome === "created") pushed++;
+      else if (outcome !== "skipped") failed++;
+      if (outcome === "rate-limited") {
+        rateLimited = true;
+        break;
       }
     }
 
-    // 3. Pull Google's changes back in.
-    const imported = await importFromGoogleContacts();
+    // 3. Pull Google's changes back in, unless Google is refusing calls right now.
+    const imported = rateLimited ? 0 : await importFromGoogleContacts();
 
     const conflicts = await prisma.contactConflict.count({
       where: { ...UNRESOLVED_CONFLICT_FILTER },
     });
-    return { pushed, imported, conflicts, skipped: conflictedIds.size };
+    return { pushed, failed, rateLimited, left: dirty.length - reached, imported, conflicts };
   } finally {
     await releaseRunLock(CONTACTS_SYNC_LOCK_KEY);
   }

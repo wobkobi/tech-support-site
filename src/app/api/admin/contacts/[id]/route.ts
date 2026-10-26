@@ -1,6 +1,7 @@
 // src/app/api/admin/contacts/[id]/route.ts
 // Admin API route for updating individual contacts.
 
+import { UNRESOLVED_CONFLICT_FILTER } from "@/features/contacts/lib/contact-conflicts";
 import {
   deleteContactFromGoogle,
   syncContactToGoogle,
@@ -177,7 +178,7 @@ export async function PATCH(
  * @param request - Incoming request.
  * @param params - Route parameters containing the contact ID.
  * @param params.params - Promise resolving to the dynamic route params object.
- * @returns JSON { ok: true } on success, or error.
+ * @returns JSON { ok: true, googleDeleteFailed? } on success, or error.
  */
 export async function DELETE(
   request: NextRequest,
@@ -200,16 +201,23 @@ export async function DELETE(
     return NextResponse.json({ ok: true, alreadyDeleted: true });
   }
 
-  // Unlink its reviews in the same write so they can re-match to a live contact.
+  // Unlink its reviews in the same write so they can re-match to a live contact, and close its
+  // open Google conflicts: nothing syncs a deleted contact, so they would sit in the list forever.
   await prisma.$transaction([
     prisma.review.updateMany({ where: { contactId: id }, data: { contactId: null } }),
+    prisma.contactConflict.updateMany({
+      where: { contactId: id, ...UNRESOLVED_CONFLICT_FILTER },
+      data: { resolvedAt: new Date() },
+    }),
     prisma.contact.update({ where: { id }, data: { deletedAt: new Date() } }),
   ]);
 
   // Outside the transaction: Google is best-effort and must never roll back the delete.
   const deleteGoogle = request.nextUrl.searchParams.get("deleteGoogle") !== "false";
   if (contact.googleContactId && deleteGoogle) {
-    await deleteContactFromGoogle(contact.googleContactId);
+    if (!(await deleteContactFromGoogle(contact.googleContactId))) {
+      return NextResponse.json({ ok: true, googleDeleteFailed: true });
+    }
   }
 
   return NextResponse.json({ ok: true });

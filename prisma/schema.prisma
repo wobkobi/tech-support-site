@@ -318,6 +318,10 @@ model Contact {
   // links sent under a merged-away contact keep working: the /review page,
   // submission verify, and review matcher all accept primary OR alt tokens.
   altReviewTokens       String[]        @default([])
+  // Ids of contacts merged into this one (and any merged into those). Unsubscribe
+  // and stop links carry a contact id, so one sent before a merge follows this to
+  // the person it now belongs to. No index: only those link clicks read it.
+  mergedContactIds      String[]        @default([]) @db.ObjectId
   // Bidirectional sync state: site changed iff updatedAt > lastSyncedAt,
   // Google changed iff current etag != lastGoogleEtag.
   lastSyncedAt          DateTime?

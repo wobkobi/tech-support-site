@@ -122,15 +122,28 @@ export function ContactsAdminView({
         ok: boolean;
         importedCount?: number;
         syncedCount?: number;
+        failedCount?: number;
+        leftCount?: number;
+        rateLimited?: boolean;
         error?: string;
       };
       if (data.ok) {
-        setSyncResult(
-          `Done - ${data.importedCount ?? 0} imported from Google, ${data.syncedCount ?? 0} pushed to Google.`,
-        );
-        toast(`Contacts synced - ${data.importedCount ?? 0} in, ${data.syncedCount ?? 0} out.`, {
-          tone: "success",
-        });
+        const counts = `${data.importedCount ?? 0} imported from Google, ${data.syncedCount ?? 0} pushed to Google`;
+        const missed = [
+          data.failedCount ? `${data.failedCount} couldn't sync` : null,
+          data.leftCount ? `${data.leftCount} weren't reached` : null,
+        ].filter((m): m is string => m !== null);
+        if (missed.length > 0) {
+          const why = data.rateLimited ? "Google is limiting requests. " : "";
+          const line = `${missed.join(" and ")}. ${why}Run it again in a few minutes.`;
+          setSyncResult(`Done - ${counts}, but ${line}`);
+          toast(`Contacts synced, but ${line}`, { tone: "warning" });
+        } else {
+          setSyncResult(`Done - ${counts}.`);
+          toast(`Contacts synced - ${data.importedCount ?? 0} in, ${data.syncedCount ?? 0} out.`, {
+            tone: "success",
+          });
+        }
         router.refresh();
       } else {
         setSyncResult(`Error: ${data.error ?? "unknown"}`);

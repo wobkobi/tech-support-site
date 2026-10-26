@@ -141,8 +141,12 @@ export function ReviewAskPeople({
     );
   }
 
-  const ask = useSendReviewAsk((target: ReviewAskTarget) =>
-    markAsked((p) => p.email === target.email && p.name === target.name),
+  const ask = useSendReviewAsk((target: ReviewAskTarget, channel) =>
+    markAsked(
+      (p) =>
+        p.name === target.name &&
+        (channel === "sms" ? p.phone === target.phone : p.email === target.email),
+    ),
   );
 
   const q = query.trim().toLowerCase();

@@ -2,6 +2,7 @@
 // Public "stop asking me for reviews" endpoint for RFC 8058 one-click and the stop page.
 // POST only: link scanners GET every URL in an email.
 
+import { followMerges } from "@/features/contacts/lib/merge-links";
 import { verifyReviewAskStopToken } from "@/features/mailing/lib/unsubscribe-token";
 import { allowReviewAsks, optOutOfReviewAsks } from "@/features/reviews/lib/review-ask-opt-out";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
@@ -38,8 +39,10 @@ export async function POST(
   if (!action) return errorResponse('action must be "stop" or "allow".', 400);
   if (token === PREVIEW_TOKEN) return okResponse();
 
-  const contactId = verifyReviewAskStopToken(token);
-  if (!contactId) return errorResponse("This link isn't valid.", 400);
+  const tokenId = verifyReviewAskStopToken(token);
+  if (!tokenId) return errorResponse("This link isn't valid.", 400);
+  // A link sent before a merge carries the merged-away id.
+  const contactId = await followMerges(tokenId);
 
   try {
     if (action === "allow") {
