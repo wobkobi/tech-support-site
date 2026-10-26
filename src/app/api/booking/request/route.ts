@@ -238,7 +238,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Snapshot the quote the customer saw; fields are copied so they survive the
     // estimate-log purge. priceLow/priceHigh are the all-in total.
-    let priceEstimateIdAtBooking: string | null = null;
     let quotedLowAtBooking: number | null = null;
     let quotedHighAtBooking: number | null = null;
     let quotedTravelAtBooking: number | null = null;
@@ -251,7 +250,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         .findUnique({ where: { id: estimateId } })
         .catch(() => null);
       if (est) {
-        priceEstimateIdAtBooking = est.id;
         quotedLowAtBooking = est.priceLow;
         quotedHighAtBooking = est.priceHigh;
         quotedTravelAtBooking = est.travelCharge;
@@ -390,7 +388,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           duration,
           travelMinsAtBooking,
           travelMinsBackAtBooking,
-          // complexRateAtBooking is not written; there is no Complex tier.
           baseRateAtBooking,
           travelRatePerHourAtBooking,
           // Promo snapshot denormalised - survives Promo deletion before service.
@@ -405,7 +402,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             : undefined,
           publicHolidayName,
           // The public quote the customer saw and how the AI read their request.
-          priceEstimateIdAtBooking,
           quotedLowAtBooking,
           quotedHighAtBooking,
           quotedTravelAtBooking,

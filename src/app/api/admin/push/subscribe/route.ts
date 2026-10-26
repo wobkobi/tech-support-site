@@ -47,9 +47,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const device = await prisma.pushDevice.upsert({
     where: { endpoint },
-    // Re-subscribing rotates the encryption keys, so refresh them and clear
-    // any failure count from the previous registration.
-    update: { p256dh, auth, label, userAgent, failureCount: 0 },
+    // Re-subscribing rotates the encryption keys, so refresh them.
+    update: { p256dh, auth, label, userAgent },
     create: { endpoint, p256dh, auth, label, userAgent },
   });
 

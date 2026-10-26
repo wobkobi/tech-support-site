@@ -112,11 +112,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Collision check: any held/confirmed booking or calendar event overlapping
+  // Collision check: any confirmed booking or calendar event overlapping
   // the requested window (no buffer applied - admin override).
   const conflictingBooking = await prisma.booking.findFirst({
     where: {
-      status: { in: ["held", "confirmed"] },
+      status: "confirmed",
       startAt: { lt: endAt },
       endAt: { gt: startAt },
     },

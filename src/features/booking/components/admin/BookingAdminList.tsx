@@ -23,7 +23,7 @@ import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
 import { ShowMoreButton } from "@/features/admin/components/ui/ShowMoreButton";
 import { SortableTh } from "@/features/admin/components/ui/SortableTh";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
-import { StatStrip } from "@/features/admin/components/ui/StatStrip";
+import { lastCardSpan, StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { StickyList } from "@/features/admin/components/ui/StickyList";
 import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
@@ -45,7 +45,7 @@ export interface AdminBookingRow {
   startAt: string;
   endAt: string;
   createdAt: string;
-  status: "held" | "confirmed" | "cancelled" | "completed";
+  status: "confirmed" | "cancelled" | "completed";
   cancelToken: string;
   reviewSentAt: string | null;
   cancelledAt: string | null;
@@ -59,8 +59,8 @@ export interface AdminBookingRow {
   quotedTravel: number | null;
 }
 
-type StatusFilter = "all" | "held" | "confirmed" | "cancelled" | "completed";
-const FILTERS: StatusFilter[] = ["all", "confirmed", "held", "completed", "cancelled"];
+type StatusFilter = "all" | "confirmed" | "cancelled" | "completed";
+const FILTERS: StatusFilter[] = ["all", "confirmed", "completed", "cancelled"];
 type SortKey = "name" | "start" | "status";
 type SortDir = "asc" | "desc";
 
@@ -73,13 +73,12 @@ const BATCH = 25;
  * @returns Sort direction for the start date.
  */
 function startDirFor(filter: StatusFilter): SortDir {
-  return filter === "confirmed" || filter === "held" ? "asc" : "desc";
+  return filter === "confirmed" ? "asc" : "desc";
 }
 
 /** StatusPill tone for each booking status. */
 const STATUS_TONE: Record<AdminBookingRow["status"], StatusTone> = {
   confirmed: "info",
-  held: "warning",
   completed: "success",
   cancelled: "critical",
 };
@@ -134,7 +133,6 @@ export function BookingAdminList({
   const [renderedAt] = useState(() => Date.now());
 
   const counts = {
-    held: bookings.filter((b) => b.status === "held").length,
     confirmed: bookings.filter((b) => b.status === "confirmed").length,
     cancelled: bookings.filter((b) => b.status === "cancelled").length,
     completed: bookings.filter((b) => b.status === "completed").length,
@@ -163,8 +161,8 @@ export function BookingAdminList({
         cancelledThisMonth++;
       }
     }
-    return { upcoming, completedThisMonth, cancelledThisMonth, held: counts.held };
-  }, [bookings, renderedAt, monthStart, counts.held]);
+    return { upcoming, completedThisMonth, cancelledThisMonth };
+  }, [bookings, renderedAt, monthStart]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -313,15 +311,15 @@ export function BookingAdminList({
 
   return (
     <div className="flex flex-col gap-4">
-      <StatStrip label="Booking totals" className="grid-cols-2 sm:grid-cols-4">
+      <StatStrip label="Booking totals" className="grid-cols-2 sm:grid-cols-3">
         <StatCard label="Upcoming confirmed" value={stats.upcoming} tone="default" />
         <StatCard label="Completed this month" value={stats.completedThisMonth} tone="success" />
         <StatCard
           label="Cancelled / no-show this month"
           value={stats.cancelledThisMonth}
           tone={stats.cancelledThisMonth > 0 ? "critical" : "default"}
+          className={lastCardSpan(3, { base: 2, sm: 3 })}
         />
-        <StatCard label="Held" value={stats.held} tone={stats.held > 0 ? "warning" : "default"} />
       </StatStrip>
 
       <StickyList

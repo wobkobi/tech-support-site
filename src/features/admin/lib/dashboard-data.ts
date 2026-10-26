@@ -74,7 +74,6 @@ export interface DashboardData {
   todayKey: string;
   pendingCount: number;
   approvedCount: number;
-  heldCount: number;
   confirmedCount: number;
   contactCount: number;
   unsyncedCount: number;
@@ -134,7 +133,6 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
   const [
     pendingCount,
     approvedCount,
-    heldCount,
     confirmedCount,
     contactCount,
     unsyncedCount,
@@ -159,7 +157,6 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
   ] = await Promise.all([
     prisma.review.count({ where: { status: "pending" } }),
     prisma.review.count({ where: { status: "approved" } }),
-    prisma.booking.count({ where: { status: "held" } }),
     prisma.booking.count({ where: { status: "confirmed" } }),
     prisma.contact.count({ where: { deletedAt: null } }),
     // `isSet: false` catches rows created before the field existed; `null` alone misses them.
@@ -416,7 +413,6 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     todayKey,
     pendingCount,
     approvedCount,
-    heldCount,
     confirmedCount,
     contactCount,
     unsyncedCount,

@@ -7,7 +7,7 @@ import type React from "react";
 
 export type WeekViewKind = "booking" | "work" | "personal" | "travel";
 
-export type BookingStatus = "held" | "confirmed" | "cancelled" | "completed";
+export type BookingStatus = "confirmed" | "cancelled" | "completed";
 
 /** Booking-row fields joined to a booking event by `calendarEventId`, when a row exists. */
 export interface WeekEventBooking {

@@ -113,7 +113,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Claim the cancel: only one request can flip an active, not-yet-started booking, so a
     // double click or a race with the operator never sends two fee invoices.
     const claim = await prisma.booking.updateMany({
-      where: { id: booking.id, status: { in: ["held", "confirmed"] }, startAt: { gt: now } },
+      where: { id: booking.id, status: "confirmed", startAt: { gt: now } },
       data: {
         status: "cancelled",
         activeSlotKey: `released:${booking.id}`,

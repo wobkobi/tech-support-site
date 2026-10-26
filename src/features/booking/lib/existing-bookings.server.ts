@@ -6,7 +6,7 @@ import type { ExistingBooking } from "@/features/booking/lib/booking";
 import { prisma } from "@/shared/lib/prisma";
 
 /**
- * Loads held and confirmed bookings that have not finished yet - the only ones that can conflict.
+ * Loads confirmed bookings that have not finished yet - the only ones that can conflict.
  * @param now - Cutoff instant; bookings ending before it are ignored.
  * @param options - Optional refinements.
  * @param options.excludeId - Booking to leave out, so a reschedule can reuse its own slot.
@@ -19,7 +19,7 @@ export async function loadBlockingBookings(
   return prisma.booking.findMany({
     where: {
       ...(options.excludeId ? { id: { not: options.excludeId } } : {}),
-      status: { in: ["held", "confirmed"] },
+      status: "confirmed",
       endAt: { gte: now },
     },
     // Exactly the ExistingBooking fields.

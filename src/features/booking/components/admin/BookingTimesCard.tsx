@@ -27,7 +27,7 @@ interface BookingTimesCardProps {
   /** Appointment finish (ISO). */
   endAt: string;
   /** Booking lifecycle status - a cancelled booking has no times worth moving. */
-  status: "held" | "confirmed" | "cancelled" | "completed";
+  status: "confirmed" | "cancelled" | "completed";
   /** Hours after the end before the past-edit lock closes the window. */
   lockHours: number;
 }

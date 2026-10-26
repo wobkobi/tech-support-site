@@ -85,7 +85,7 @@ export async function sendOwnerPush(input: OwnerPushInput): Promise<void> {
           );
           await prisma.pushDevice.update({
             where: { id: device.id },
-            data: { lastSeenAt: new Date(), failureCount: 0 },
+            data: { lastSeenAt: new Date() },
           });
         } catch (err) {
           const statusCode = (err as { statusCode?: number }).statusCode;
@@ -94,13 +94,8 @@ export async function sendOwnerPush(input: OwnerPushInput): Promise<void> {
             await prisma.pushDevice.delete({ where: { id: device.id } }).catch(() => null);
             return;
           }
+          // Non-fatal: the device stays, and a stale lastSeenAt shows it in the device list.
           console.error(`[push] send failed (${statusCode ?? "no status"})`, err);
-          await prisma.pushDevice
-            .update({
-              where: { id: device.id },
-              data: { failureCount: { increment: 1 } },
-            })
-            .catch(() => null);
         }
       }),
     );

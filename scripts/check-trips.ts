@@ -328,7 +328,6 @@ function main(): void {
         travelMinsBackAtBooking: null,
       }),
       candidate({ id: "b-cancelled", status: "cancelled" }),
-      candidate({ id: "b-held", status: "held" }),
       // 12:30Z on 31 Mar 2027 is 1:30am on 1 Apr in NZDT: next FY.
       candidate({
         id: "b-nextfy",

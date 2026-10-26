@@ -183,7 +183,7 @@ async function getAvailableDays(): Promise<{
   const [existingBookings, calendar] = await Promise.all([
     prisma.booking.findMany({
       where: {
-        status: { in: ["held", "confirmed"] },
+        status: "confirmed",
         endAt: { gte: now },
       },
       select: {

@@ -11,7 +11,7 @@ import type React from "react";
 /** Props for {@link BookingTimeline}. */
 interface BookingTimelineProps {
   /** Booking lifecycle status - drives the completed vs cancelled branch. */
-  status: "held" | "confirmed" | "cancelled" | "completed";
+  status: "confirmed" | "cancelled" | "completed";
   /** When the booking was created (always present). */
   createdAt: Date | string;
   /** When the 24h reminder email went out; null when never sent. */

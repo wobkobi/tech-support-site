@@ -298,7 +298,8 @@ async function captureOne(item: Due, skips: Skips, now: Date): Promise<void> {
     },
   });
   if (!keep) return;
-  const reading = { ...read.figures, extra: read.extra ?? undefined, takenAt: now };
+  // A reading keeps only what the analytics curves plot; the full set is on the stats row
+  const reading = { views: read.figures.views, engagements: read.figures.engagements };
   await prisma.socialInsight.upsert({
     where: {
       postId_platform_ageHours: {

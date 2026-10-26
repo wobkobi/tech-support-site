@@ -197,7 +197,7 @@ async function deliverPending(campaign: Campaign, parts: SharedRenderParts): Pro
         return prisma.campaignSend.update({
           where: { id: row.id },
           data: outcome.ok
-            ? { status: "sent", resendId: outcome.id, error: null, sentAt: now }
+            ? { status: "sent", error: null, sentAt: now }
             : { status: "failed", error: outcome.error.slice(0, 500) },
         });
       }),

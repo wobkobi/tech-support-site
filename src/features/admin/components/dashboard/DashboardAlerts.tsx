@@ -1,6 +1,6 @@
 // src/features/admin/components/dashboard/DashboardAlerts.tsx
-// Warning notices under the dashboard KPIs for overdue invoices and held bookings; renders
-// nothing when neither needs action.
+// Warning notice under the dashboard KPIs for overdue invoices; renders nothing when
+// none need action.
 
 import { Notice } from "@/shared/components/Notice";
 import Link from "next/link";
@@ -14,35 +14,22 @@ const ALERT_LINK_CLS = "font-bold text-russian-violet underline-offset-2 hover:u
  * filtered to what it counts. White fill (onGrey) because the admin page sits on seasalt.
  * @param props - Component props.
  * @param props.overdueCount - Sent invoices past their due date.
- * @param props.heldCount - Bookings on hold waiting for a decision.
  * @returns The notices grid, or null when there is nothing to flag.
  */
 export function DashboardAlerts({
   overdueCount,
-  heldCount,
 }: {
   overdueCount: number;
-  heldCount: number;
 }): React.ReactElement | null {
-  if (overdueCount === 0 && heldCount === 0) return null;
+  if (overdueCount === 0) return null;
   return (
     <div className="mb-6 grid grid-cols-[repeat(auto-fit,minmax(min(18rem,100%),1fr))] gap-3">
-      {overdueCount > 0 && (
-        <Notice tone="warn" onGrey>
-          <Link href="/admin/business/invoices?status=overdue" className={ALERT_LINK_CLS}>
-            <span className="font-semibold">{overdueCount}</span> overdue invoice
-            {overdueCount === 1 ? "" : "s"}
-          </Link>
-        </Notice>
-      )}
-      {heldCount > 0 && (
-        <Notice tone="warn" onGrey>
-          <Link href="/admin/bookings?status=held" className={ALERT_LINK_CLS}>
-            <span className="font-semibold">{heldCount}</span> held booking
-            {heldCount === 1 ? "" : "s"} to action
-          </Link>
-        </Notice>
-      )}
+      <Notice tone="warn" onGrey>
+        <Link href="/admin/business/invoices?status=overdue" className={ALERT_LINK_CLS}>
+          <span className="font-semibold">{overdueCount}</span> overdue invoice
+          {overdueCount === 1 ? "" : "s"}
+        </Link>
+      </Notice>
     </div>
   );
 }

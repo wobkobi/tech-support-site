@@ -19,7 +19,7 @@ interface BookingActionsProps {
   /** Booking id. */
   id: string;
   /** Booking lifecycle status. */
-  status: "held" | "confirmed" | "cancelled" | "completed";
+  status: "confirmed" | "cancelled" | "completed";
   /** Appointment start (ISO) - gates the no-show + reschedule actions. */
   startAt: string;
   /** Appointment end (ISO) - starts the past-edit lock. */

@@ -64,7 +64,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const conflicting = await prisma.booking.findFirst({
     where: {
-      status: { in: ["held", "confirmed"] },
+      status: "confirmed",
       startAt: { lt: dayEnd },
       endAt: { gt: dayStart },
     },

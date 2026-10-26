@@ -67,7 +67,7 @@ export async function clearContactConflict(contactId: string, field: ContactFiel
   try {
     await prisma.contactConflict.updateMany({
       where: { contactId, field, ...UNRESOLVED_CONFLICT_FILTER },
-      data: { resolvedAt: new Date(), resolution: "auto" },
+      data: { resolvedAt: new Date() },
     });
   } catch (err) {
     console.error("[contact-conflicts] clearContactConflict failed:", err);

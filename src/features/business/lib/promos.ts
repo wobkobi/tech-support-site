@@ -413,7 +413,7 @@ async function passesLimits(
   }
 
   if (promo.newCustomersOnly && customer.emails.length > 0) {
-    // Confirmed or completed only; a held or cancelled one would deny a first-timer.
+    // Confirmed or completed only; a cancelled one would deny a first-timer.
     const prior = await prisma.booking.count({
       where: {
         email: { in: customer.emails },

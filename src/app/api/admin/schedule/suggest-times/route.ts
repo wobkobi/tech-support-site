@@ -202,7 +202,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // Existing commitments: upcoming bookings, calendar events and travel padding.
   const [existingBookings, rawEvents, travelBlocks] = await Promise.all([
     prisma.booking.findMany({
-      where: { status: { in: ["held", "confirmed"] }, endAt: { gte: now } },
+      where: { status: "confirmed", endAt: { gte: now } },
       select: {
         id: true,
         startAt: true,

@@ -287,7 +287,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // Conditional on still being active: a cancel that landed mid-edit keeps its released
       // slot key instead of this write handing the slot back to a cancelled booking.
       const saved = await prisma.booking.updateMany({
-        where: { id: booking.id, status: { in: ["held", "confirmed"] } },
+        where: { id: booking.id, status: "confirmed" },
         data: {
           name: cleanName,
           notes: bookingNotes,

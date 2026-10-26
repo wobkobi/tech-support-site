@@ -49,7 +49,6 @@ All endpoints are **GET**. Create one cron-job.org job per row.
 | Job                     | URL path                            | Method | Schedule         | Purpose                                                                                                                                                                                                     |
 | ----------------------- | ----------------------------------- | ------ | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Calendar cache refresh  | `/api/cron/refresh-calendar-cache`  | GET    | every 30 minutes | Fetch Google Calendar events into the DB cache                                                                                                                                                              |
-| Release holds           | `/api/cron/release-holds`           | GET    | every 15 minutes | Cancel expired booking holds                                                                                                                                                                                |
 | Reconcile booking times | `/api/cron/reconcile-booking-times` | GET    | every 30 minutes | Pull corrected times back from Calendar, flag deleted events                                                                                                                                                |
 | Booking reminders       | `/api/cron/send-booking-reminders`  | GET    | every 30 minutes | Email a 24h-out reminder for confirmed bookings                                                                                                                                                             |
 | Invoice reminders       | `/api/cron/send-invoice-reminders`  | GET    | daily            | Chase overdue SENT invoices (max 2 nudges each)                                                                                                                                                             |
@@ -76,12 +75,12 @@ across DST changes.
   sync jobs make many sequential Google API calls, and a long sync run can outlive cron-job.org's 30
   s response window, so a cron-job.org "timeout" does not necessarily mean the run failed - check
   the Vercel function logs for the actual outcome.
-- Overlapping or retried runs are safe by design: release-holds guards each update on status +
-  expiry, booking reminders stamp `emailReminderSentAt` only after Resend accepts the send, invoice
-  reminders stamp `reminderLastSentAt`/`reminderCount` the same way (max 2 per invoice, offsets live
-  in the comms settings), record-subscriptions advances `nextDue` with a CAS guard, review asks
-  claim each invoice (`reviewAskOutcome` > `sending`) before sending with a per-invoice Resend
-  idempotency key, and the holidays refresh is a pure upsert.
+- Overlapping or retried runs are safe by design: booking reminders stamp `emailReminderSentAt` only
+  after Resend accepts the send, invoice reminders stamp `reminderLastSentAt`/`reminderCount` the
+  same way (max 2 per invoice, offsets live in the comms settings), record-subscriptions advances
+  `nextDue` with a CAS guard, review asks claim each invoice (`reviewAskOutcome` > `sending`) before
+  sending with a per-invoice Resend idempotency key, and the holidays refresh upserts, then prunes
+  only once every year has fetched.
 - Booking reminders send inside a window from `CANCELLATION.freeNoticeHours + 1` up to
   `comms.reminderLeadHours` before the start, so the reminder always lands while the customer can
   still cancel free.
