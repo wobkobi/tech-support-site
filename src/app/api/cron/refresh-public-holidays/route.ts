@@ -1,6 +1,8 @@
 // src/app/api/cron/refresh-public-holidays/route.ts
 // Cron endpoint to refresh the `PublicHoliday` table from Google's public NZ holidays
-// calendar. Called monthly via cron-job.org.
+// calendar. Called monthly via cron-job.org. Keeps real public holidays (nationwide and
+// Auckland) plus Christmas Eve and New Year's Eve; other observances (Guy Fawkes,
+// Mother's Day...) aren't billed at the holiday rate.
 
 import { HOME_REGION, NZ_REGION } from "@/features/business/lib/pricing-policy";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -11,25 +13,31 @@ import { NextRequest, NextResponse } from "next/server";
 
 const NZ_HOLIDAYS_CALENDAR_ID = "en.new_zealand#holiday@group.v.calendar.google.com";
 
+// Observances still billed at the holiday rate, matched on Google's event name.
+const SURCHARGED_OBSERVANCES = new Set(["Christmas Eve", "New Year's Eve"]);
+
 /**
- * Returns the region label for a holiday event; regional ones are tagged
- * "Regional holiday in <region>" in the description.
+ * Returns the region label for a holiday event. Google tags each description
+ * "Public holiday", "Regional holiday in <region>" or "Observance"; anything off
+ * that allow-list (observances, a missing description) is skipped.
  * @param description - Event description text from the Google calendar.
  * @returns NZ_REGION for nationwide, HOME_REGION for Auckland, or null to skip.
  */
 function regionFor(description: string | null | undefined): string | null {
-  if (!description) return NZ_REGION;
-  const lower = description.toLowerCase();
-  if (!lower.includes("regional holiday")) return NZ_REGION;
-  if (lower.includes("auckland")) return HOME_REGION;
+  const lower = description?.toLowerCase() ?? "";
+  if (lower.includes("regional holiday")) {
+    return lower.includes("auckland") ? HOME_REGION : null;
+  }
+  if (lower.includes("public holiday")) return NZ_REGION;
   return null;
 }
 
 /**
  * GET /api/cron/refresh-public-holidays
- * Upserts this and next year's NZ public holidays into `PublicHoliday`. Idempotent.
+ * Upserts this and next year's NZ public holidays into `PublicHoliday`, then prunes
+ * rows in those years that Google no longer lists as a public holiday. Idempotent.
  * @param request - The incoming cron request.
- * @returns JSON `{ ok, upserted, years }` or an error.
+ * @returns JSON `{ ok, upserted, pruned, years }` or an error.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!isCronAuthorised(request)) {
@@ -51,28 +59,46 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const calendar = googleCalendar({ version: "v3", auth: apiKey });
     let upserted = 0;
+    const seen = new Set<string>();
     for (const year of years) {
       const res = await calendar.events.list({
         calendarId: NZ_HOLIDAYS_CALENDAR_ID,
         timeMin: `${year}-01-01T00:00:00Z`,
         timeMax: `${year + 1}-01-01T00:00:00Z`,
         singleEvents: true,
+        // One page holds a whole year (~35 events), so pruning never sees a partial list
+        maxResults: 2500,
       });
       for (const event of res.data.items ?? []) {
         const date = event.start?.date;
         const name = event.summary;
         if (!date || !name) continue;
-        const region = regionFor(event.description);
+        const region =
+          regionFor(event.description) ?? (SURCHARGED_OBSERVANCES.has(name) ? NZ_REGION : null);
         if (!region) continue;
         await prisma.publicHoliday.upsert({
           where: { date_region: { date, region } },
           update: { name },
           create: { date, name, region },
         });
+        seen.add(`${date}|${region}`);
         upserted++;
       }
     }
-    return NextResponse.json({ ok: true, upserted, years });
+
+    // Prune only after every year fetched cleanly, so a failed list never empties the table
+    const existing = await prisma.publicHoliday.findMany({
+      where: { date: { gte: `${years[0]}-01-01`, lte: `${years[years.length - 1]}-12-31` } },
+      select: { id: true, date: true, region: true },
+    });
+    const staleIds = existing
+      .filter((row) => !seen.has(`${row.date}|${row.region}`))
+      .map((row) => row.id);
+    const pruned =
+      staleIds.length > 0
+        ? (await prisma.publicHoliday.deleteMany({ where: { id: { in: staleIds } } })).count
+        : 0;
+    return NextResponse.json({ ok: true, upserted, pruned, years });
   } catch (err) {
     console.error("[cron/refresh-public-holidays] Refresh failed:", err);
     return NextResponse.json(

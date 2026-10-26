@@ -244,6 +244,8 @@ export interface BookingPhoneFieldProps {
   required: boolean;
   /** Inline field error, if any. */
   error?: string;
+  /** Called on blur with the value as typed (the returning-customer lookup). */
+  onBlur?: (value: string) => void;
 }
 
 /**
@@ -253,6 +255,7 @@ export interface BookingPhoneFieldProps {
  * @param props.onChange - Called with the new value on every edit.
  * @param props.required - True for in-person visits.
  * @param props.error - Inline field error, if any.
+ * @param props.onBlur - Called on blur with the value as typed.
  * @returns The phone field.
  */
 export function BookingPhoneField({
@@ -260,6 +263,7 @@ export function BookingPhoneField({
   onChange,
   required,
   error,
+  onBlur,
 }: BookingPhoneFieldProps): React.ReactElement {
   return (
     <div id="booking-phone-wrap" className="flex flex-col gap-1.5">
@@ -280,6 +284,8 @@ export function BookingPhoneField({
         errorId="booking-phone-error"
         maxLength={BOOKING_FIELD_LIMITS.phone}
         errorMessages={{ invalid: PHONE_INVALID_MESSAGE }}
+        // The event's own value: the formatted onChange above hasn't re-rendered yet
+        onBlur={onBlur ? (e) => onBlur(e.target.value) : undefined}
         nzOnly
         className={cn(
           "w-full rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",

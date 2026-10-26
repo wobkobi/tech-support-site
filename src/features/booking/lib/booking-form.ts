@@ -345,21 +345,25 @@ export function removeBookingDraft(): void {
 export interface BookingContactLookup {
   ok: boolean;
   name?: string;
-  phone?: string | null;
   address?: string | null;
 }
 
 /**
- * Looks up a returning customer by email for the form's pre-fill.
+ * Looks up a returning customer by email and phone for the form's pre-fill.
  * @param email - Trimmed, lower-cased email.
+ * @param phone - Phone as typed; the server normalises it.
  * @param signal - Aborts the request when a newer lookup supersedes it.
  * @returns The lookup result, or null on a non-OK response; rejects on failure or abort.
  */
 export async function lookupBookingContact(
   email: string,
+  phone: string,
   signal: AbortSignal,
 ): Promise<BookingContactLookup | null> {
-  const res = await fetch(`/api/booking/contact-lookup?email=${encodeURIComponent(email)}`, {
+  const res = await fetch("/api/booking/contact-lookup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, phone }),
     signal,
   });
   if (!res.ok) return null;

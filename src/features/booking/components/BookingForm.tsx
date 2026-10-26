@@ -270,19 +270,20 @@ export default function BookingForm({
   );
   const lookupContact = useContactLookup();
 
-  /** On email blur (new bookings): pre-fill empty fields from a matching contact. */
-  async function handleEmailBlur(): Promise<void> {
+  /**
+   * On email or phone blur (new bookings): once both are in, pre-fill empty fields from
+   * the one contact matching both.
+   * @param emailValue - Email to look up.
+   * @param phoneValue - Phone to look up, as typed.
+   */
+  async function prefillFromContact(emailValue: string, phoneValue: string): Promise<void> {
     if (isEditMode) return;
-    const data = await lookupContact(email);
+    const data = await lookupContact(emailValue, phoneValue);
     if (!data) return;
     const filled: string[] = [];
     if (data.name && !name.trim()) {
       setName(data.name);
       filled.push("name");
-    }
-    if (data.phone && !phone.trim()) {
-      setPhone(data.phone);
-      filled.push("phone");
     }
     if (data.address && !address.trim() && !unit.trim()) {
       const split = splitUnitFromAddress(data.address);
@@ -653,7 +654,7 @@ export default function BookingForm({
               setEmailSuggestion(null);
               setEmailSuggestionAcked(false);
             }}
-            onBlur={handleEmailBlur}
+            onBlur={() => void prefillFromContact(email, phone)}
             error={fieldErrors.email}
             locked={isEditMode}
             contactHint={contactHint}
@@ -679,6 +680,7 @@ export default function BookingForm({
             setPhone(next);
             clearFieldError("phone");
           }}
+          onBlur={(typed) => void prefillFromContact(email, typed)}
           required={meetingType === "in-person"}
           error={fieldErrors.phone}
         />

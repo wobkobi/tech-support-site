@@ -4,6 +4,7 @@
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
   buildAppointmentDescription,
+  isBookingClosed,
   parseHourLabel,
   splitUnitFromAddress,
   validateBookingPayloadFields,
@@ -95,6 +96,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         { ok: false, error: "Cannot edit a cancelled booking." },
         { status: 400 },
+      );
+    }
+    // Holds even with the reschedule cutoff turned off (cutoffHours 0).
+    if (isBookingClosed(booking, new Date())) {
+      return errorResponse(
+        "This appointment has already started or finished, so it can't be changed online. Please call or text me and I'll sort it.",
+        400,
       );
     }
 
@@ -276,8 +284,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     try {
-      await prisma.booking.update({
-        where: { id: booking.id },
+      // Conditional on still being active: a cancel that landed mid-edit keeps its released
+      // slot key instead of this write handing the slot back to a cancelled booking.
+      const saved = await prisma.booking.updateMany({
+        where: { id: booking.id, status: { in: ["held", "confirmed"] } },
         data: {
           name: cleanName,
           notes: bookingNotes,
@@ -301,6 +311,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           travelMinsBackAtBooking,
         },
       });
+      if (saved.count === 0) {
+        if (calendarEventId) {
+          await deleteBookingEvent({ eventId: calendarEventId }).catch((err) =>
+            console.error("[booking/edit] Failed to delete orphaned calendar event:", err),
+          );
+        }
+        return errorResponse(
+          "This booking was cancelled or completed, so it can't be changed.",
+          409,
+        );
+      }
       console.log(`[booking/edit] Updated booking: ${booking.id}`);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
