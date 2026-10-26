@@ -39,7 +39,11 @@ import {
   sameDraftBrief,
 } from "@/features/mailing/lib/draft-brief";
 import { emailInsertGroups, emailLinkTargets } from "@/features/mailing/lib/insertables";
-import { selectRecipients, type PoolContact } from "@/features/mailing/lib/recipients";
+import {
+  planPendingRefresh,
+  selectRecipients,
+  type PoolContact,
+} from "@/features/mailing/lib/recipients";
 import {
   campaignTag,
   listProblems,
@@ -348,6 +352,39 @@ function checkRecipients(): void {
       ids(narrowed.excluded) === "d" &&
       ids(narrowed.optedOut) === "c",
     `${ids(narrowed.recipients)} / ${ids(narrowed.excluded)} / ${ids(narrowed.optedOut)}`,
+  );
+
+  // A retry re-checks its pending rows against the list as it is now.
+  const pending = [
+    { id: "1", contactId: "a", email: "a@example.com" },
+    { id: "2", contactId: "b", email: "b@example.com" },
+    { id: "3", contactId: "c", email: "c-old@example.com" },
+    { id: "4", contactId: "d", email: "d@example.com" },
+  ];
+  const now = new Map([
+    ["a", "a@example.com"],
+    ["c", "c@example.com"],
+    ["d", "shared@example.com"],
+  ]);
+  const plan = planPendingRefresh(pending, now, new Set(["shared@example.com"]), false);
+  const dropped = plan.drop.map((r) => r.id).join(",");
+  expect("someone no longer on the list is dropped", dropped.includes("2"), dropped);
+  expect(
+    "an address another row already got is dropped",
+    dropped === "2,4" && !plan.move.some((m) => m.row.id === "4"),
+    dropped,
+  );
+  expect(
+    "a changed address moves to the new one",
+    plan.move.length === 1 &&
+      plan.move[0]!.row.id === "3" &&
+      plan.move[0]!.email === "c@example.com",
+  );
+  const loaded = planPendingRefresh(pending, now, new Set(), true);
+  expect(
+    "once the list is in Resend a changed address is dropped instead",
+    loaded.move.length === 0 && loaded.drop.map((r) => r.id).join(",") === "2,3,4",
+    loaded.drop.map((r) => r.id).join(","),
   );
 }
 

@@ -139,14 +139,20 @@ across DST changes.
   overlapping runs can't send one twice, and every recipient has a `CampaignSend` row that is only
   marked sent once Resend accepts it. A send left in `sending` for over 10 minutes (a timed-out
   function) is re-claimed and only its pending rows go out, with the same Resend idempotency keys.
-  An idle run is four indexed queries, so the 5-minute cadence costs next to no Active CPU; it is
-  that tight only so a scheduled email or post goes out close to the time the operator picked.
+  Pending rows are re-checked against the list before every send, resume or retry, so anyone who
+  unsubscribed, was deleted or was unticked since is dropped and a changed address gets it at the
+  new one. A batch Resend didn't answer (no reply or a 5xx) stays pending for that resume rather
+  than failing, since Retry's new keys could send a second copy. An idle run is four indexed
+  queries, so the 5-minute cadence costs next to no Active CPU; it is that tight only so a scheduled
+  email or post goes out close to the time the operator picked.
 - A mailing-list email sent as a Resend broadcast stores each step (segment, contact import,
   broadcast, the send call) on the campaign before the next starts. A send still waiting on Resend's
   list upload is picked up 2 minutes after its run started, rather than 10, and carries on from that
-  step; the send call itself is claimed first, so two runs can never both send it. Once Resend
-  reports a broadcast sent, the next run deletes its segment (the free plan allows 3). That runs
-  before the quiet-hours check, since it sends nothing.
+  step; the send call itself is claimed first, so two runs can never both send it. An upload still
+  unfinished after 30 minutes fails the run, so Retry uploads it again, and once a list loads, rows
+  Resend left out of the segment or holds as unsubscribed are marked failed rather than sent. Once
+  Resend reports a broadcast sent, the next run deletes its segment (the free plan allows 3). That
+  runs before the quiet-hours check, since it sends nothing.
 - Scheduled social posts use the same claim (`scheduled > posting`) and run before the quiet-hours
   check, so they go out at the time picked at any hour. Each platform's outcome is stored on the
   post, so a resumed run (including one waiting on Instagram's picture processing) only posts to the

@@ -32,6 +32,7 @@ import {
   removeSegment,
   sendBroadcast,
   startContactImport,
+  type MarketingContact,
 } from "@/features/mailing/lib/resend-marketing";
 import { signUnsubscribeToken } from "@/features/mailing/lib/unsubscribe-token";
 import { prisma } from "@/shared/lib/prisma";
@@ -41,6 +42,8 @@ import type { Campaign, Prisma } from "@prisma/client";
 /** How long one run waits for Resend to finish loading the list before leaving it to the cron. */
 const IMPORT_WAIT_MS = 60_000;
 const IMPORT_POLL_MS = 3_000;
+/** Resend loads a list in seconds to minutes; one still going after this is stuck. */
+const IMPORT_MAX_AGE_MS = 30 * 60_000;
 
 /** The step fields a run claims, one at a time. */
 type StepField = "segmentId" | "importId" | "broadcastId";
@@ -181,24 +184,69 @@ async function makeSegment(name: string): Promise<string> {
 }
 
 /**
- * Waits for Resend to finish loading the list, polling every few seconds.
+ * Fails the pending rows the broadcast won't reach: addresses the import skipped, and ones
+ * Resend holds as unsubscribed. An empty or failed read of the segment leaves the rows be,
+ * rather than fail the whole list on a bad answer.
+ * @param campaign - Campaign whose list has loaded.
+ */
+async function failUnlisted(campaign: Campaign): Promise<void> {
+  let members: MarketingContact[];
+  try {
+    members = await listMarketingContacts(campaign.segmentId!);
+  } catch (err) {
+    console.warn(`[mailing] Couldn't read back campaign ${campaign.id}'s list:`, err);
+    return;
+  }
+  if (members.length === 0) return;
+  const unsubscribed = new Map(members.map((m) => [m.email, m.unsubscribed]));
+  const pending = await prisma.campaignSend.findMany({
+    where: { campaignId: campaign.id, status: "pending" },
+    select: { id: true, email: true },
+  });
+  const reasons: [string[], string][] = [
+    [
+      pending.filter((r) => !unsubscribed.has(r.email)).map((r) => r.id),
+      "Resend couldn't add this address to the list.",
+    ],
+    [
+      pending.filter((r) => unsubscribed.get(r.email) === true).map((r) => r.id),
+      "Unsubscribed in Resend, so the broadcast skips them.",
+    ],
+  ];
+  for (const [ids, error] of reasons) {
+    if (ids.length === 0) continue;
+    await prisma.campaignSend.updateMany({
+      where: { id: { in: ids }, status: "pending" },
+      data: { status: "failed", error },
+    });
+  }
+}
+
+/**
+ * Waits for Resend to finish loading the list, polling every few seconds. An import still
+ * going after {@link IMPORT_MAX_AGE_MS} counts as lost, so the run fails instead of waiting
+ * forever.
  * @param campaign - Campaign with an import id.
  * @returns "loaded", or "waiting" when it's still going at the time limit.
  */
 async function waitForImport(campaign: Campaign): Promise<"loaded" | "waiting"> {
   const until = Date.now() + IMPORT_WAIT_MS;
   for (;;) {
-    const { status, failed } = await contactImportStatus(campaign.importId!);
+    const { status, failed, createdAt } = await contactImportStatus(campaign.importId!);
     if (status === "completed") {
       if (failed > 0) {
         console.warn(`[mailing] Resend skipped ${failed} rows of campaign ${campaign.id}.`);
       }
+      await failUnlisted(campaign);
       return "loaded";
     }
-    if (status === "failed") {
+    const lost = Date.now() - createdAt.getTime() > IMPORT_MAX_AGE_MS;
+    if (status === "failed" || lost) {
       // Clear it so a retry uploads the list again.
       await prisma.campaign.update({ where: { id: campaign.id }, data: { importId: null } });
-      throw new Error("Resend couldn't load the list.");
+      throw new Error(
+        lost ? "Resend never finished loading the list." : "Resend couldn't load the list.",
+      );
     }
     if (Date.now() >= until) return "waiting";
     await new Promise((resolve) => setTimeout(resolve, IMPORT_POLL_MS));
@@ -244,8 +292,8 @@ async function sendOnce(campaign: Campaign): Promise<boolean> {
  * previous run reached. Throws when a step fails.
  * @param campaignId - The claimed campaign.
  * @param parts - Shared render parts.
- * @returns "sent" once Resend has it (pending rows become sent), or "waiting" when the
- *   list is still loading or another run is mid-send, for the cron's next pass.
+ * @returns "sent" once Resend has it (the pending rows it reaches become sent), or "waiting"
+ *   when the list is still loading or another run is mid-send, for the cron's next pass.
  */
 export async function deliverByBroadcast(
   campaignId: string,

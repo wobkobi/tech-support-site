@@ -246,8 +246,12 @@ export function sendNow(payload: MailPayload, options?: MailOptions): Promise<Ma
 /** One email in a batch. The batch API takes no attachments and no scheduledAt. */
 export type BatchMailPayload = Parameters<Resend["batch"]["send"]>[0][number];
 
-/** Per-email outcome of {@link sendBatch}, in the same order as the payloads. */
-export type BatchMailOutcome = { ok: true; id: string } | { ok: false; error: string };
+/**
+ * Per-email outcome of {@link sendBatch}, in the same order as the payloads. `uncertain`
+ * marks a whole-batch failure Resend may still have sent (no answer, or a 5xx).
+ */
+export type BatchMailOutcome =
+  { ok: true; id: string } | { ok: false; error: string; uncertain?: boolean };
 
 /**
  * Sends up to 100 mailing-list emails in one call with permissive validation. Resend
@@ -266,7 +270,10 @@ export async function sendBatch(
   });
   if (result.error || !result.data) {
     const message = result.error?.message ?? "Resend returned no response";
-    return payloads.map(() => ({ ok: false, error: message }));
+    // A null status means the request never got an answer; only a 4xx proves nothing went.
+    const status = result.error?.statusCode ?? null;
+    const uncertain = status === null || status >= 500;
+    return payloads.map(() => ({ ok: false, error: message, uncertain }));
   }
   const rejected = new Map(result.data.errors.map((e) => [e.index, e.message]));
   const ids = result.data.data.map((d) => d.id);

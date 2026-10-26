@@ -26,7 +26,7 @@ import { CampaignStatusBanner } from "@/features/mailing/components/CampaignStat
 import { SendDialog, type SendMode } from "@/features/mailing/components/SendDialog";
 import { callApi } from "@/features/mailing/lib/api-client";
 import { AUDIENCE_OPTIONS, type CampaignAudience } from "@/features/mailing/lib/audience";
-import { BROADCAST_WAITING_NOTE, type CampaignRow } from "@/features/mailing/lib/campaign-row";
+import { SEND_WAITING_NOTE, type CampaignRow } from "@/features/mailing/lib/campaign-row";
 import type { DraftBrief } from "@/features/mailing/lib/draft-brief";
 import type { LinkTarget } from "@/features/mailing/lib/insertables";
 import type { PromoWording } from "@/features/mailing/lib/render";
@@ -439,7 +439,7 @@ export function CampaignEditor({
     );
     setBusy(null);
     if (!res.ok) toast(res.error, { tone: "error" });
-    else if (res.waiting) toast(BROADCAST_WAITING_NOTE, { tone: "success" });
+    else if (res.waiting) toast(SEND_WAITING_NOTE, { tone: "success" });
     else
       toast(
         res.failed > 0

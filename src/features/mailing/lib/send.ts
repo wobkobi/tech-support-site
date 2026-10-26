@@ -1,8 +1,9 @@
 // src/features/mailing/lib/send.ts
 // Sends mailing-list emails: an atomic claim, one CampaignSend row per recipient (the record
-// of truth for resume and retry), then one Resend broadcast when the marketing key is set,
-// else batches of 100 with idempotency keys (which count toward the daily send limit).
-// Quiet hours hold every list send unless the operator chose to send anyway.
+// of truth for resume and retry, re-checked against the list before each delivery), then one
+// Resend broadcast when the marketing key is set, else batches of 100 with idempotency keys
+// (which count toward the daily send limit). Quiet hours hold every list send unless the
+// operator chose to send anyway.
 
 import { audienceOf } from "@/features/mailing/lib/audience";
 import {
@@ -18,7 +19,11 @@ import {
   unsubscribePageUrl,
   type SharedRenderParts,
 } from "@/features/mailing/lib/context";
-import { loadRecipients, loadReviewTexts } from "@/features/mailing/lib/recipients";
+import {
+  loadRecipients,
+  loadReviewTexts,
+  planPendingRefresh,
+} from "@/features/mailing/lib/recipients";
 import {
   campaignTag,
   listProblems,
@@ -26,7 +31,7 @@ import {
   SAMPLE_REVIEW_TEXT,
   type CampaignContent,
 } from "@/features/mailing/lib/render";
-import { marketingReady } from "@/features/mailing/lib/resend-marketing";
+import { marketingReady, removeFromSegment } from "@/features/mailing/lib/resend-marketing";
 import { signUnsubscribeToken } from "@/features/mailing/lib/unsubscribe-token";
 import { sendBatch, sendNow, type BatchMailPayload } from "@/features/reviews/lib/email-core";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -125,11 +130,67 @@ async function ensureSendRows(campaign: Campaign): Promise<number> {
 }
 
 /**
+ * Re-checks the pending rows against the list as it stands, so a retried or resumed run never
+ * mails someone who unsubscribed, was deleted or was unticked since the rows were written. A
+ * changed address moves the row to it, except once a broadcast's list is in Resend: then the
+ * row is dropped and the old address taken out of the segment. Skipped once the broadcast has
+ * gone, as everyone still pending already has it.
+ * @param campaign - The claimed campaign.
+ */
+async function refreshPendingRows(campaign: Campaign): Promise<void> {
+  if (campaign.broadcastSentAt) return;
+  const rows = await prisma.campaignSend.findMany({
+    where: { campaignId: campaign.id },
+    select: { id: true, contactId: true, email: true, status: true },
+  });
+  const pending = rows.filter((r) => r.status === "pending");
+  if (pending.length === 0) return;
+  const { recipients } = await loadRecipients(
+    campaign.excludedContactIds,
+    audienceOf(campaign.audience),
+  );
+  const listLoaded = Boolean(campaign.importId && campaign.segmentId);
+  const { drop: dropped, move } = planPendingRefresh(
+    pending,
+    new Map(recipients.map((r) => [r.contactId, r.email])),
+    new Set(rows.filter((r) => r.status !== "pending").map((r) => r.email)),
+    listLoaded,
+  );
+  for (const { row, email } of move) {
+    try {
+      await prisma.campaignSend.update({ where: { id: row.id }, data: { email } });
+    } catch {
+      // Two rows swapping addresses trip the unique index; leave this one out, not guess.
+      dropped.push(row);
+    }
+  }
+  if (dropped.length === 0) return;
+
+  let removed = dropped;
+  if (listLoaded) {
+    // The list is already in Resend, so a row only goes once its address is out of the
+    // segment; one that won't come out stays, as the broadcast will still reach it.
+    removed = [];
+    for (const row of dropped) {
+      try {
+        await removeFromSegment(row.email, campaign.segmentId!);
+        removed.push(row);
+      } catch (err) {
+        console.warn(`[mailing] Couldn't take send ${row.id} off its list:`, err);
+      }
+    }
+  }
+  await prisma.campaignSend.deleteMany({ where: { id: { in: removed.map((r) => r.id) } } });
+  console.log(`[mailing] Campaign ${campaign.id}: ${removed.length} pending sends left the list.`);
+}
+
+/**
  * Sends every pending row in batches and records each outcome on its row.
  * @param campaign - The claimed campaign.
  * @param parts - Shared render parts.
+ * @returns True when Resend didn't answer a batch, left pending for the cron to re-send.
  */
-async function deliverPending(campaign: Campaign, parts: SharedRenderParts): Promise<void> {
+async function deliverPending(campaign: Campaign, parts: SharedRenderParts): Promise<boolean> {
   const from = mailingFrom()!;
   const replyTo = process.env.ADMIN_EMAIL?.trim() || undefined;
   const content = contentOf(campaign);
@@ -141,7 +202,7 @@ async function deliverPending(campaign: Campaign, parts: SharedRenderParts): Pro
       orderBy: { id: "asc" },
       take: CHUNK_SIZE,
     });
-    if (rows.length === 0) return;
+    if (rows.length === 0) return false;
     if (round > 0) await new Promise((resolve) => setTimeout(resolve, CHUNK_PAUSE_MS));
 
     const contacts = await prisma.contact.findMany({
@@ -187,7 +248,16 @@ async function deliverPending(campaign: Campaign, parts: SharedRenderParts): Pro
       outcomes = await sendBatch(payloads, key);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Send failed";
-      outcomes = rows.map(() => ({ ok: false, error: message }));
+      outcomes = rows.map(() => ({ ok: false, error: message, uncertain: true }));
+    }
+    // No answer either way: the rows stay pending and the stalled-run resume re-sends them
+    // under this same key, which Resend drops if the first copy went. Failed rows would go to
+    // Retry, whose new key could send a second copy.
+    if (outcomes.every((o) => !o.ok && o.uncertain)) {
+      console.warn(
+        `[mailing] Resend didn't answer a batch of campaign ${campaign.id}; the cron re-sends it.`,
+      );
+      return true;
     }
 
     const now = new Date();
@@ -204,21 +274,21 @@ async function deliverPending(campaign: Campaign, parts: SharedRenderParts): Pro
     );
   }
   console.warn(`[mailing] Campaign ${campaign.id} hit the batch cap with rows still pending.`);
+  return false;
 }
 
 /**
- * Sends the pending rows: as one broadcast when the marketing key is set, else in batches.
- * A broadcast step that fails marks the pending rows failed with its reason, so Retry
- * failed carries on from that step.
+ * Sends the pending rows, once re-checked: as one broadcast when the marketing key is set,
+ * else in batches. A broadcast step that fails marks the pending rows failed with its
+ * reason, so Retry failed carries on from that step.
  * @param campaign - The claimed campaign.
  * @param parts - Shared render parts.
- * @returns True while a broadcast is still on its way, for the cron to finish.
+ * @returns True while a broadcast is still on its way or a batch awaits Resend's answer, for
+ *   the cron to finish.
  */
 async function deliver(campaign: Campaign, parts: SharedRenderParts): Promise<boolean> {
-  if (!marketingReady()) {
-    await deliverPending(campaign, parts);
-    return false;
-  }
+  await refreshPendingRows(campaign);
+  if (!marketingReady()) return deliverPending(campaign, parts);
   try {
     return (await deliverByBroadcast(campaign.id, parts)) === "waiting";
   } catch (err) {
