@@ -237,13 +237,16 @@ export function nextInvoiceNumber(
 
 /**
  * Advances a subscription's next due date by its frequency, in UTC to dodge DST. Month
- * steps clamp to the month's last day (31 Jan monthly > 28/29 Feb, not 3 Mar).
+ * steps clamp to the month's last day (31 Jan monthly > 28/29 Feb, not 3 Mar), then aim
+ * back at `dueDay`, so 28 Feb steps to 31 Mar instead of keeping the clamped 28th for good.
  * @param current - Current nextDue date
  * @param frequency - Billing frequency
+ * @param dueDay - Day of the month it's due on; omitted or null uses `current`'s day.
  * @returns New nextDue date
  */
-export function advanceNextDue(current: Date, frequency: string): Date {
+export function advanceNextDue(current: Date, frequency: string, dueDay?: number | null): Date {
   const d = new Date(current);
+  const day = dueDay ?? d.getUTCDate();
   switch (frequency) {
     case "weekly":
       d.setUTCDate(d.getUTCDate() + 7);
@@ -252,25 +255,26 @@ export function advanceNextDue(current: Date, frequency: string): Date {
       d.setUTCDate(d.getUTCDate() + 14);
       break;
     case "monthly":
-      addUTCMonthsClamped(d, 1);
+      addUTCMonthsClamped(d, 1, day);
       break;
     case "quarterly":
-      addUTCMonthsClamped(d, 3);
+      addUTCMonthsClamped(d, 3, day);
       break;
     case "annually":
-      addUTCMonthsClamped(d, 12);
+      addUTCMonthsClamped(d, 12, day);
       break;
   }
   return d;
 }
 
 /**
- * Adds whole months to `d` in UTC (mutating it), clamping the day to the target month's end.
+ * Adds whole months to `d` in UTC (mutating it), landing on `day` clamped to the target
+ * month's end.
  * @param d - Date to advance (mutated).
  * @param months - Whole months to add.
+ * @param day - Day of the month to land on (1-31).
  */
-function addUTCMonthsClamped(d: Date, months: number): void {
-  const day = d.getUTCDate();
+function addUTCMonthsClamped(d: Date, months: number, day: number): void {
   d.setUTCDate(1);
   d.setUTCMonth(d.getUTCMonth() + months);
   // Last day of the now-current month; clamp the original day down to it.

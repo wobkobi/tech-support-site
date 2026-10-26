@@ -14,6 +14,7 @@ import {
   GOOGLE_BUSINESS_PROFILE_URL,
   INSTAGRAM_URL,
 } from "@/shared/lib/business-profiles";
+import { jsonLdHtml } from "@/shared/lib/json-ld";
 import { SITE_OPEN_GRAPH } from "@/shared/lib/open-graph";
 import { servedSuburbGroups } from "@/shared/lib/served-suburbs";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -360,12 +361,12 @@ export default async function RootLayout({
         <script
           id="ld-business"
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdHtml(localBusinessJsonLd) }}
         />
         <script
           id="ld-website"
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdHtml(websiteJsonLd) }}
         />
       </body>
     </html>

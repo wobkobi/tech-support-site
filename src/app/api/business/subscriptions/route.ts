@@ -109,6 +109,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       method: method ?? "Business Account",
       frequency,
       nextDue: nextDueValue,
+      dueDay: nextDueValue.getUTCDate(),
       isActive: true,
       notes: notes ?? null,
     },

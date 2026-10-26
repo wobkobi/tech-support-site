@@ -249,9 +249,10 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
   }
 
   // Summary across ALL invoices. PAID rows without paidAt skip "paid this month"; quotes
-  // get their own counter and stay out of dollar stats.
+  // get their own counter and stay out of dollar stats. The month is NZ's, whatever clock the
+  // browser keeps.
   const summary = useMemo<InvoicesSummary>(() => {
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thisMonth = nzDateKey(now).slice(0, 7);
     let outstanding = 0;
     let overdue = 0;
     let overdueCount = 0;
@@ -277,7 +278,11 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
           overdueCount += 1;
         }
       }
-      if (inv.status === "PAID" && inv.paidAt && new Date(inv.paidAt) >= monthStart) {
+      if (
+        inv.status === "PAID" &&
+        inv.paidAt &&
+        nzDateKey(new Date(inv.paidAt)).slice(0, 7) === thisMonth
+      ) {
         paidThisMonth += inv.total;
         paidCount += 1;
       }

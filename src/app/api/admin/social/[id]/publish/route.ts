@@ -4,8 +4,10 @@
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import { publishPost, retryFailed } from "@/features/social/lib/publish";
+import { skipQueueSlot } from "@/features/social/lib/queue-fill.server";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -29,7 +31,22 @@ export async function POST(
   }
 
   try {
-    const result = body.mode === "retry" ? await retryFailed(id) : await publishPost(id);
+    if (body.mode === "retry") {
+      const result = await retryFailed(id);
+      return result.ok
+        ? okResponse({ status: result.status, targets: result.targets })
+        : errorResponse(result.error, result.status);
+    }
+    const slot = await prisma.socialPost.findUnique({
+      where: { id },
+      select: { queueId: true, scheduledAt: true },
+    });
+    const result = await publishPost(id);
+    // A lined-up posting sent early leaves its slot; posting clears scheduledAt, so without
+    // this the hourly fill would put a second post in the slot it already used.
+    if (result.ok && slot?.queueId && slot.scheduledAt && slot.scheduledAt > new Date()) {
+      await skipQueueSlot(slot.queueId, slot.scheduledAt);
+    }
     return result.ok
       ? okResponse({ status: result.status, targets: result.targets })
       : errorResponse(result.error, result.status);

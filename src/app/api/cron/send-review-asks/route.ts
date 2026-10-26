@@ -24,7 +24,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     console.log(
       `[cron/send-review-asks] done: ${result.sent} sent, ${result.skipped} skipped, ${result.failed} failed, ${result.waiting} waiting${result.stopped ? ` (stopped: ${result.stopped})` : ""}`,
     );
-    return NextResponse.json({ ok: true, ...result });
+    // A failed ask is retried next run; the 500 makes cron-job.org flag this one.
+    return NextResponse.json(
+      { ok: result.failed === 0, ...result },
+      { status: result.failed > 0 ? 500 : 200 },
+    );
   } catch (error) {
     console.error("[cron/send-review-asks] Error:", error);
     return errorResponse("Internal error", 500);

@@ -57,7 +57,10 @@ function tabOf(c: CampaignRow): Tab {
  * @returns Label for the date column.
  */
 function dateLabel(c: CampaignRow): string {
-  if (c.sentAt) return `Sent ${formatDateTimeShort(c.sentAt)}`;
+  // "failed" means none went, so the date is when it was tried.
+  if (c.sentAt) {
+    return `${c.status === "failed" ? "Failed" : "Sent"} ${formatDateTimeShort(c.sentAt)}`;
+  }
   if (c.scheduledAt) return `Sends ${formatDateTimeShort(c.scheduledAt)}`;
   return `Edited ${formatDateTimeShort(c.updatedAt)}`;
 }

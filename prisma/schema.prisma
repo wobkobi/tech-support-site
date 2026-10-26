@@ -936,6 +936,8 @@ model Subscription {
   method      String   @default("Business Account")
   frequency   String
   nextDue     DateTime
+  // Day of the month the admin last set nextDue to; month steps return to it after a clamp.
+  dueDay      Int?
   isActive    Boolean  @default(true)
   notes       String?
   createdAt   DateTime @default(now())

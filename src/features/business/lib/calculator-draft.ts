@@ -70,6 +70,10 @@ export interface CalculatorDraft {
   addressMode: "name" | "company" | "custom";
   /** A job draft's event date and times when saved; edited events since win over its times. */
   eventTimes?: string;
+  /** Picked Drove (false) or Walked (true); null or absent follows the job. */
+  walkedChoice?: boolean | null;
+  /** The trip a Walked pick took off the bill, put back if Drove is picked again. */
+  walkedOffTrip?: TravelEntry[];
 }
 
 /**

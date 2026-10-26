@@ -258,6 +258,7 @@ export function TaxTab({ initial, defaults }: Props): React.ReactElement {
 
       {/* A stored version from before a field existed lacks it; fill the gaps from defaults. */}
       <SettingsHistory
+        key={form.savedAt ?? 0}
         group="tax"
         onRestore={(v: TaxSettings) => setDraft({ ...defaults, ...v })}
       />

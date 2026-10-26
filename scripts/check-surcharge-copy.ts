@@ -162,12 +162,12 @@ async function main(): Promise<void> {
   expectEqual(
     "both on, in dollars at the remote rate",
     surchargeCaveat({ weekendUplift: 0.1, publicHolidayUplift: 0.25 }, 90),
-    "Weekends add $9/hr to labour, and public holidays, Christmas Eve and New Year's Eve add $22.50/hr.",
+    "Weekends add $9/hr to labour, and public holidays add $22.50/hr, as do Christmas Eve and New Year's Eve.",
   );
   expectEqual(
     "percents when no rate is given",
     surchargeCaveat({ weekendUplift: 0.1, publicHolidayUplift: 0.25 }),
-    "Weekends add 10% to labour, and public holidays, Christmas Eve and New Year's Eve add 25%.",
+    "Weekends add 10% to labour, and public holidays add 25%, as do Christmas Eve and New Year's Eve.",
   );
   expectEqual(
     "weekend only",
@@ -177,7 +177,7 @@ async function main(): Promise<void> {
   expectEqual(
     "holiday only",
     surchargeCaveat({ weekendUplift: 0, publicHolidayUplift: 0.25 }, 100),
-    "Public holidays, Christmas Eve and New Year's Eve add $25/hr to labour.",
+    "Public holidays add $25/hr to labour, as do Christmas Eve and New Year's Eve.",
   );
   expectEqual(
     "both off says nothing",

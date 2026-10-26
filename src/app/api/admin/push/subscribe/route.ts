@@ -27,7 +27,7 @@ function text(value: unknown): string | null {
 /**
  * POST /api/admin/push/subscribe - Registers or refreshes a push device.
  * @param request - Incoming request carrying the browser's subscription.
- * @returns JSON with the stored device.
+ * @returns JSON with the stored device's id.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
@@ -52,5 +52,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     create: { endpoint, p256dh, auth, label, userAgent },
   });
 
-  return NextResponse.json({ ok: true, device }, { status: 201 });
+  // Only the id goes back: the browser already holds the keys.
+  return NextResponse.json({ ok: true, id: device.id }, { status: 201 });
 }

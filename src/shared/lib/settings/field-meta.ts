@@ -616,7 +616,7 @@ export const PRICING_FIELD_META = {
   publicHolidayUplift: {
     title: "Public-holiday surcharge",
     description:
-      "Extra added to labour on NZ public holidays, Auckland Anniversary Day, Christmas Eve and New Year's Eve (25 = +25%), worked out on the full hourly rate. A public holiday on a weekend is charged on the weekday it's observed instead. Travel and parts are unchanged.",
+      "Extra added to labour on every NZ public holiday (Auckland Anniversary Day included), plus Christmas Eve and New Year's Eve (25 = +25%), worked out on the full hourly rate. A public holiday on a weekend is charged on the weekday it's observed instead. Travel and parts are unchanged.",
     unit: "%",
     off: "Set 0 to charge normal rates on public holidays.",
   },

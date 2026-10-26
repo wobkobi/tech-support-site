@@ -67,8 +67,12 @@ across DST changes.
 
 ## Notes
 
-- Routes respond synchronously with `{ ok: true, ...counts }`. The two sync jobs return 503 on
-  failure so cron-job.org flags the run; the rest return 500 with an error message.
+- Routes respond synchronously with `{ ok, ...counts }`. A run that fails outright returns 503 for
+  the two sync jobs and 500 for the rest. A run where part failed also returns 500 with `ok: false`,
+  so cron-job.org flags it while the next run retries: a reminder, review ask or contact push that
+  failed, a workbook the sheets sync couldn't read, or a reconcile that read no event at all or
+  whose delete retries threw. Sheet row problems (a duplicate Sync ID) and a Google rate limit on
+  the contacts sync recur or clear on their own, so they stay 200.
 - No route sets `maxDuration`; every function runs on the project's 300 s default. Vercel bundles
   routes together only when their function config matches, and each bundle carries its own Prisma
   engine, so a per-route value splits off an extra bundle and inflates function storage. The two

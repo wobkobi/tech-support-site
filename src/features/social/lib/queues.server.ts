@@ -199,7 +199,8 @@ export async function deleteQueue(id: string): Promise<number | null> {
 
 /**
  * Clears a schedule's lined-up postings and lines them up again, for after a change to its
- * order or gap.
+ * order or gap. The clear runs inside the fill's lock: with another fill running, nothing is
+ * cleared and the fill comes back null.
  * @param id - Schedule id.
  * @param now - Now.
  * @param fillDays - How far ahead to fill.
@@ -212,8 +213,17 @@ export async function redoQueue(
 ): Promise<{ cleared: number; fill: FillResult | null } | null> {
   const queue = await prisma.socialQueue.findUnique({ where: { id } });
   if (!queue) return null;
-  const cleared = await clearQueuePostings(id, { all: true });
-  const fill = queue.paused ? null : await fillQueues({ now, fillDays, queueIds: [id] });
+  if (queue.paused) return { cleared: await clearQueuePostings(id, { all: true }), fill: null };
+  let cleared = 0;
+  const fill = await fillQueues({
+    now,
+    fillDays,
+    queueIds: [id],
+    /** Clears the lined-up postings once the lock is held. */
+    beforeFill: async () => {
+      cleared = await clearQueuePostings(id, { all: true });
+    },
+  });
   return { cleared, fill };
 }
 

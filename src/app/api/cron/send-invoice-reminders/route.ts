@@ -96,7 +96,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     console.log(
       `[cron/send-invoice-reminders] done: ${results.sent} sent, ${results.skipped} skipped, ${results.paid} already paid, ${results.failed} failed`,
     );
-    return NextResponse.json({ ok: true, ...results });
+    // A failed reminder is retried next run; the 500 makes cron-job.org flag this one.
+    return NextResponse.json(
+      { ok: results.failed === 0, ...results },
+      { status: results.failed > 0 ? 500 : 200 },
+    );
   } catch (error) {
     console.error("[cron/send-invoice-reminders] Error:", error);
     return errorResponse("Internal error", 500);

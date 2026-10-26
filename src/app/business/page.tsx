@@ -15,6 +15,7 @@ import { RuledBlock, RuledGrid } from "@/shared/components/RuledGrid";
 import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { jsonLdHtml } from "@/shared/lib/json-ld";
 import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
@@ -190,9 +191,9 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
     <PageShell>
       <PixelEvent event="ViewContent" />
       <script
-        id="ld-business"
+        id="ld-business-offer"
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdHtml(businessJsonLd) }}
       />
       <PageHead
         crumbs={[

@@ -443,7 +443,8 @@ export function CampaignEditor({
     else
       toast(
         res.failed > 0
-          ? `${res.sent} went this time, ${res.failed} still failed.`
+          ? // The counts are the whole email's, not this retry's.
+            `${res.sent} sent in all, ${res.failed} still failed.`
           : `All ${res.sent} sent.`,
         { tone: res.failed > 0 ? "warning" : "success" },
       );

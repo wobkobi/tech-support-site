@@ -16,6 +16,7 @@ import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section"
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { GOOGLE_BUSINESS_PROFILE_URL } from "@/shared/lib/business-profiles";
 import { cn } from "@/shared/lib/cn";
+import { jsonLdHtml } from "@/shared/lib/json-ld";
 import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { prisma } from "@/shared/lib/prisma";
 import { SERVICE_AREAS } from "@/shared/lib/service-areas";
@@ -167,12 +168,12 @@ export default async function ServiceDetailPage({
       <script
         id="ld-service"
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdHtml(serviceJsonLd) }}
       />
       <script
         id="ld-faq"
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdHtml(faqJsonLd) }}
       />
       <PageHead
         crumbs={[

@@ -16,7 +16,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 /** Input styling shared by the name and review fields and the phone/email overrides. */
 const FIELD_CLASSES = cn(
-  "border-seasalt-200/60 bg-seasalt text-rich-black",
+  "border-seasalt-200 bg-white text-rich-black",
   "focus:border-russian-violet focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
 );
 
@@ -386,7 +386,7 @@ export default function ReviewFormProtected({
       </div>
 
       {/* Identity */}
-      <div className="space-y-4 rounded-xl border border-seasalt-200/80 bg-white/60 p-4">
+      <div className="space-y-4 rounded-xl border border-seasalt-200/80 bg-seasalt p-4">
         {/* Name display options */}
         <div>
           <p className="mb-2 text-base font-semibold text-rich-black">How do you want to appear?</p>
@@ -405,7 +405,7 @@ export default function ReviewFormProtected({
                   "min-h-11 rounded-lg border px-4 py-1.5 text-base font-medium whitespace-nowrap transition-colors",
                   nameDisplay === opt.value
                     ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                    : "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
+                    : "border-seasalt-200 bg-white text-rich-black hover:border-russian-violet/40",
                 )}
               >
                 {opt.label}
@@ -489,7 +489,7 @@ export default function ReviewFormProtected({
       </div>
 
       {/* Optional contact details */}
-      <div className="space-y-3 rounded-xl border border-seasalt-200/80 bg-white/60 p-4">
+      <div className="space-y-3 rounded-xl border border-seasalt-200/80 bg-seasalt p-4">
         <div>
           <p className="text-base font-semibold text-rich-black">
             Stay in touch <span className="font-normal text-rich-black/70">(optional)</span>
@@ -535,7 +535,7 @@ export default function ReviewFormProtected({
       </div>
 
       {/* Review */}
-      <div className="rounded-xl border border-seasalt-200/80 bg-white/60 p-4">
+      <div className="rounded-xl border border-seasalt-200/80 bg-seasalt p-4">
         <div className="flex items-baseline justify-between gap-3">
           <label htmlFor={textId} className="block text-base font-semibold text-rich-black">
             Review <span className="text-error">*</span>

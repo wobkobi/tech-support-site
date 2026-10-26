@@ -6,7 +6,12 @@
 
 import type { PublishInput } from "@/features/social/lib/adapter";
 import { coverOf } from "@/features/social/lib/cover";
-import { albumParams, facebookCaption, reelFinishParams } from "@/features/social/lib/facebook";
+import {
+  albumParams,
+  facebookAlt,
+  facebookCaption,
+  reelFinishParams,
+} from "@/features/social/lib/facebook";
 import { instagramContainers } from "@/features/social/lib/instagram";
 import {
   CONTAINER_TTL_MS,
@@ -398,6 +403,33 @@ console.log("\nInstagram containers");
     media_type: "CAROUSEL",
     caption: "Caption",
   });
+
+  const described = instagramContainers(input({ imageAlt: "  A phone on a desk  " }));
+  expectEqual("a picture's description goes as alt_text", described.main, {
+    image_url: JPEG,
+    caption: "Caption",
+    alt_text: "A phone on a desk",
+  });
+  const describedCarousel = instagramContainers(
+    input({
+      images: [
+        { url: JPEG, alt: "Before" },
+        { url: `${HOST}/social/image-2.jpg`, alt: " " },
+      ],
+    }),
+  );
+  expectEqual("each carousel item carries its own description", describedCarousel.children, [
+    { image_url: JPEG, is_carousel_item: "true", alt_text: "Before" },
+    { image_url: `${HOST}/social/image-2.jpg`, is_carousel_item: "true" },
+  ]);
+  expect(
+    "a picture story sends no description",
+    !("alt_text" in instagramContainers(input({ format: "story", imageAlt: "A phone" })).main),
+  );
+  expectEqual("Facebook takes it as alt_text_custom", facebookAlt(" A phone "), {
+    alt_text_custom: "A phone",
+  });
+  expectEqual("and nothing when it's blank", facebookAlt("  "), {});
 
   const reel = instagramContainers(
     input({ format: "reel", video: { url: VIDEO, coverUrl: FRAME } }),

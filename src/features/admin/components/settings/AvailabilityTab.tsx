@@ -472,7 +472,11 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
 
       <SettingsFooter form={form} />
 
-      <SettingsHistory group="availability" onRestore={(v: AvailabilitySettings) => setDraft(v)} />
+      <SettingsHistory
+        key={form.savedAt ?? 0}
+        group="availability"
+        onRestore={(v: AvailabilitySettings) => setDraft(v)}
+      />
     </SettingsTabBody>
   );
 }

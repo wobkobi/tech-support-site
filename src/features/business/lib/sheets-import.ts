@@ -81,6 +81,8 @@ export interface ImportResult {
   expensesSkipped: number;
   /** Site entries whose failed sheet append was retried successfully. */
   healed?: number;
+  /** Workbooks that couldn't be read at all this run; row-level problems aren't counted. */
+  unreadableSheets?: number;
   errors: string[];
   /** Non-fatal anomalies: unlinked legacy rows, sheet rows gone missing, etc. */
   warnings?: string[];
@@ -665,6 +667,7 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
     const warnings: string[] = [];
     let result: ImportResult;
     let allSheetsClean = true;
+    let unreadableSheets = 0;
     // A scan that skipped workbooks can't tell a deleted row from an archived one.
     let excludedCount = 0;
     let skippedCount = 0;
@@ -708,6 +711,7 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
           perSheet.push({ fileId: sheet.fileId, name: sheet.name, ...counts });
         } catch (err) {
           allSheetsClean = false;
+          unreadableSheets++;
           const message = `[${sheet.name}] ${String(err)}`;
           aggregate.errors.push(message);
           perSheet.push({ fileId: sheet.fileId, name: sheet.name, ...zero, errors: [message] });
@@ -715,7 +719,7 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
       }
 
       if (!dryRun) await writeWorkbookMtimes(seenNow);
-      result = { ok: true, source: "folder", perSheet, ...aggregate };
+      result = { ok: true, source: "folder", perSheet, unreadableSheets, ...aggregate };
     } else {
       const counts = await importFromSheet(getSheetId(), dryRun, state);
       result = { ok: true, source: "single", ...counts };

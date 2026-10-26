@@ -147,7 +147,7 @@ const MODIFIER_DESCRIPTIONS: Record<string, string> = {
   "At home": "I take the device away to fix it instead of working at your place.",
   Phone: "Help over the phone - quick calls are free; longer fixes bill at this rate.",
   "Public Holiday":
-    "Applied automatically on NZ public holidays (on the weekday it's observed when one falls on a weekend), Christmas Eve and New Year's Eve.",
+    "Applied automatically on every NZ public holiday, plus Christmas Eve and New Year's Eve. A public holiday on a weekend is charged on the weekday it's observed.",
   Weekend: "Applied automatically on Saturdays and Sundays (not on top of a holiday).",
 };
 

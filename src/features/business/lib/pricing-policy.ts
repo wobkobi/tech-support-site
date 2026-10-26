@@ -545,7 +545,7 @@ export function minimumsCopy(
  * Every day billed at holiday rates, as customer copy names them. Christmas Eve and New Year's
  * Eve aren't public holidays, so copy says "holiday rates" rather than calling them one.
  */
-const HOLIDAY_DAYS = `NZ public holidays (${HOME_REGION} Anniversary Day included), Christmas Eve and New Year's Eve`;
+const HOLIDAY_DAYS = `every NZ public holiday (${HOME_REGION} Anniversary Day included), plus Christmas Eve and New Year's Eve`;
 
 /**
  * A labour uplift as a percent, to two decimals so 12.5% never shows as 13%.
@@ -648,13 +648,13 @@ export function surchargeCaveat(
   const { weekendUplift, publicHolidayUplift } = uplifts;
   if (weekendUplift > 0 && publicHolidayUplift > 0) {
     return (
-      `Weekends add ${rise(weekendUplift)} to labour, and public holidays, Christmas Eve and ` +
-      `New Year's Eve add ${rise(publicHolidayUplift)}.`
+      `Weekends add ${rise(weekendUplift)} to labour, and public holidays add ` +
+      `${rise(publicHolidayUplift)}, as do Christmas Eve and New Year's Eve.`
     );
   }
   if (weekendUplift > 0) return `Weekends add ${rise(weekendUplift)} to labour.`;
   if (publicHolidayUplift > 0) {
-    return `Public holidays, Christmas Eve and New Year's Eve add ${rise(publicHolidayUplift)} to labour.`;
+    return `Public holidays add ${rise(publicHolidayUplift)} to labour, as do Christmas Eve and New Year's Eve.`;
   }
   return null;
 }

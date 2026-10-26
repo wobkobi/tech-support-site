@@ -67,12 +67,19 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     outstandingTotal,
     outstandingInvoices,
     overdueInvoices,
+    draftInvoiceCount,
     pendingCount,
     approvedCount,
     confirmedCount,
     contactCount,
     unsyncedCount,
   } = data;
+
+  // A draft hasn't been sent, so it isn't owed yet; the card names any still waiting.
+  const draftsLine =
+    draftInvoiceCount > 0
+      ? `; ${draftInvoiceCount} draft${draftInvoiceCount === 1 ? "" : "s"} not sent yet`
+      : "";
 
   // --- KPI row: the money and today's workload ---
   const kpis: DashboardStat[] = [
@@ -88,12 +95,14 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     {
       label: "Outstanding",
       value: formatNZD(outstandingTotal),
-      sub: `${outstandingInvoices.length} invoice${outstandingInvoices.length === 1 ? "" : "s"}${overdueInvoices.length > 0 ? `, ${overdueInvoices.length} overdue` : ""}`,
-      // Link to overdue when there are any, else the plain list.
+      sub: `${outstandingInvoices.length} invoice${outstandingInvoices.length === 1 ? "" : "s"}${overdueInvoices.length > 0 ? `, ${overdueInvoices.length} overdue` : ""}${draftsLine}`,
+      // Overdue first, then the drafts when nothing is owed, else the plain list.
       href:
         overdueInvoices.length > 0
           ? `/admin/business/invoices?status=overdue`
-          : `/admin/business/invoices`,
+          : outstandingInvoices.length === 0 && draftInvoiceCount > 0
+            ? `/admin/business/invoices?status=draft`
+            : `/admin/business/invoices`,
       urgent: overdueInvoices.length > 0,
     },
     {

@@ -7,6 +7,7 @@ import { PageShell } from "@/shared/components/PageLayout";
 import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { jsonLdHtml } from "@/shared/lib/json-ld";
 import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
@@ -65,7 +66,7 @@ export default async function AboutPage(): Promise<React.ReactElement> {
       <script
         id="ld-person"
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdHtml(personJsonLd) }}
       />
       <PageHead
         crumbs={[

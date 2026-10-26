@@ -365,7 +365,11 @@ export function IdentityTab({ initial, defaults, bookableSchedule }: Props): Rea
 
       <SettingsFooter form={form} />
 
-      <SettingsHistory group="identity" onRestore={(v: IdentitySettings) => setDraft(v)} />
+      <SettingsHistory
+        key={form.savedAt ?? 0}
+        group="identity"
+        onRestore={(v: IdentitySettings) => setDraft(v)}
+      />
     </SettingsTabBody>
   );
 }

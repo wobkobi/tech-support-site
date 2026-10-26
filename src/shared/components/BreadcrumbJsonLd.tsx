@@ -2,6 +2,7 @@
 // Emits a BreadcrumbList JSON-LD script for the current page. Including breadcrumbs lets
 // Google show a hierarchy in search results instead of just the bare URL.
 
+import { jsonLdHtml } from "@/shared/lib/json-ld";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type React from "react";
 
@@ -40,7 +41,7 @@ export function BreadcrumbJsonLd({
     <script
       id={`ld-breadcrumb-${crumbs[crumbs.length - 1]?.path ?? "root"}`}
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(json) }}
+      dangerouslySetInnerHTML={{ __html: jsonLdHtml(json) }}
     />
   );
 }

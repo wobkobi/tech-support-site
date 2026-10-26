@@ -273,7 +273,12 @@ export async function publishPost(id: string, due = false): Promise<PublishOutco
 export async function retryFailed(id: string): Promise<PublishOutcome> {
   const before = await prisma.socialPost.findUnique({ where: { id } });
   if (!before) return { ok: false, error: "Post not found.", status: 404 };
-  const ready = await readiness(before);
+  const retrying = before.targets.filter((t) => t.enabled && t.status === "failed");
+  if (retrying.length === 0) {
+    return { ok: false, error: "There's nothing to retry on this post.", status: 409 };
+  }
+  // Only the apps being retried are checked, so one that already has the post can't block them.
+  const ready = await readiness({ ...before, targets: retrying });
   if (!ready.ok) return ready;
 
   const claimed = await prisma.socialPost.updateMany({

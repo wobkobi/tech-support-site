@@ -5,6 +5,12 @@
 import { prisma } from "@/shared/lib/prisma";
 import webpush from "web-push";
 
+/**
+ * Idle cap on each push-service call. Booking and review requests await the push, so a
+ * service that never answers would otherwise hold the customer's request open.
+ */
+const PUSH_TIMEOUT_MS = 5000;
+
 /** One notification to deliver to every registered operator device. */
 export interface OwnerPushInput {
   /** Notification heading, e.g. "New booking". */
@@ -127,6 +133,7 @@ export async function sendOwnerPush(input: OwnerPushInput): Promise<OwnerPushRes
               keys: { p256dh: device.p256dh, auth: device.auth },
             },
             payload,
+            { timeout: PUSH_TIMEOUT_MS },
           );
           result.sent++;
           // Caught on its own: a failed stamp mustn't count a delivered push as failed.

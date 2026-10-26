@@ -52,6 +52,17 @@ export function facebookCaption(text: string, linkUrl: string | null): string {
 }
 
 /**
+ * A picture's description as Facebook reads it to screen readers, in place of the one it
+ * guesses itself.
+ * @param alt - The picture's description, if any.
+ * @returns `alt_text_custom`, or nothing when there's none.
+ */
+export function facebookAlt(alt: string | null): Record<string, string> {
+  const text = alt?.trim();
+  return text ? { alt_text_custom: text } : {};
+}
+
+/**
  * The /feed parameters that join unpublished photos into one post.
  * @param caption - From {@link facebookCaption}.
  * @param photoIds - The unpublished photos, in order.
@@ -167,10 +178,19 @@ async function warnIfUnsure<T>(call: Promise<T>, warning: string): Promise<T> {
  * Uploads a picture without posting it, for an album, a story or the cover.
  * @param page - Page id.
  * @param url - Public picture address.
+ * @param alt - The picture's description, for an album picture.
  * @returns The photo id.
  */
-async function unpublishedPhoto(page: string, url: string): Promise<string> {
-  const res = await graph<{ id: string }>(`/${page}/photos`, "POST", { url, published: "false" });
+async function unpublishedPhoto(
+  page: string,
+  url: string,
+  alt: string | null = null,
+): Promise<string> {
+  const res = await graph<{ id: string }>(`/${page}/photos`, "POST", {
+    url,
+    published: "false",
+    ...facebookAlt(alt),
+  });
   return res.id;
 }
 
@@ -318,7 +338,9 @@ async function publish(input: PublishInput): Promise<PublishResult> {
   const caption = facebookCaption(input.text, input.linkUrl);
   if (input.images.length > 1) {
     const ids: string[] = [];
-    for (const picture of input.images) ids.push(await unpublishedPhoto(page, picture.url));
+    for (const picture of input.images) {
+      ids.push(await unpublishedPhoto(page, picture.url, picture.alt));
+    }
     return postOnce(page, caption, async () => {
       const res = await graph<{ id: string }>(`/${page}/feed`, "POST", albumParams(caption, ids));
       return res.id;
@@ -332,6 +354,7 @@ async function publish(input: PublishInput): Promise<PublishResult> {
       const res = await graph<{ id: string; post_id?: string }>(`/${page}/photos`, "POST", {
         url: imageUrl,
         caption,
+        ...facebookAlt(input.imageAlt),
       });
       return res.post_id ?? res.id;
     });

@@ -350,6 +350,7 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
       <SettingsFooter form={form} />
 
       <SettingsHistory
+        key={form.savedAt ?? 0}
         group="pricing"
         onRestore={(v: PricingSettings) => setDraft({ ...defaults, ...v })}
       />

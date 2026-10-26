@@ -206,7 +206,11 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
 
       <SettingsFooter form={form} />
 
-      <SettingsHistory group="comms" onRestore={(v: CommsSettings) => setDraft(v)} />
+      <SettingsHistory
+        key={form.savedAt ?? 0}
+        group="comms"
+        onRestore={(v: CommsSettings) => setDraft(v)}
+      />
 
       <ConfirmDialog
         open={confirmAllOff}
