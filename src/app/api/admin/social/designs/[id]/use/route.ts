@@ -11,6 +11,8 @@ import {
 } from "@/features/social-design/lib/picture-store";
 import { autoAltText } from "@/features/social-design/lib/pictures";
 import { snapshotBeforeSave } from "@/features/social-design/lib/versions";
+import { mediaUrlsOf } from "@/features/social/lib/media";
+import { syncPostings, type PostingProblem } from "@/features/social/lib/postings.server";
 import { defaultTargets } from "@/features/social/lib/targets";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -28,7 +30,8 @@ interface Ctx {
  * @param request - Incoming request.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the design id.
- * @returns JSON `{ postId, created, isContent }`, 409 when the pictures are out of date.
+ * @returns JSON `{ postId, created, isContent, postingProblems? }` (postingProblems for a
+ *   content item whose lined-up postings were updated), 409 when the pictures are out of date.
  */
 export async function POST(request: NextRequest, { params }: Ctx): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
@@ -70,7 +73,8 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
         where: { id: design.postId, status: "draft", isPreset: false },
       })
     : null;
-  // Facebook and Instagram drop their own pictures; Google takes the 4:3 one if present.
+  // Facebook and Instagram drop their own pictures; Google takes the 4:3 one if present. A
+  // replaced picture's pre-logo original goes with it, so removing the logo can't bring it back.
   const targets = (linked?.targets ?? defaultTargets()).map((t) => {
     if (t.platform === "google" && !google) return t;
     const own = t.platform === "google" ? google : null;
@@ -80,6 +84,7 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
       imageAlt: own ? alt : null,
       imageWidth: own?.width ?? null,
       imageHeight: own?.height ?? null,
+      imageOriginalUrl: null,
       cropApprovedFor: null,
     };
   });
@@ -88,12 +93,14 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
     imageAlt: alt,
     imageWidth: feed.width,
     imageHeight: feed.height,
+    imageOriginalUrl: null,
     targets,
   };
 
   let postId: string;
+  let postingProblems: PostingProblem[] | undefined;
   if (linked) {
-    await prisma.socialPost.update({
+    const updated = await prisma.socialPost.update({
       where: { id: linked.id },
       // The caption only fills an empty post: words already written there stay. A posting
       // given a new picture by hand stops following its content item.
@@ -104,6 +111,8 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
       },
     });
     postId = linked.id;
+    // A content item's lined-up postings take the new picture too, as an edit would give them.
+    if (updated.isContent) postingProblems = await syncPostings(updated);
   } else {
     const created = await prisma.socialPost.create({
       data: { name: design.name, body: caption, ...picture },
@@ -115,8 +124,11 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
   await snapshotBeforeSave(id, true).catch((error: unknown) =>
     console.error(`[social-design] ${id} version copy failed:`, error),
   );
-  if (linked) {
-    await deleteUnusedMedia([linked.imageUrl, ...linked.targets.map((t) => t.imageUrl)]);
-  }
-  return okResponse({ postId, created: !linked, isContent: linked?.isContent === true });
+  if (linked) await deleteUnusedMedia(mediaUrlsOf(linked));
+  return okResponse({
+    postId,
+    created: !linked,
+    isContent: linked?.isContent === true,
+    ...(postingProblems ? { postingProblems } : {}),
+  });
 }

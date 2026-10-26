@@ -3,7 +3,7 @@
 
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import { recordIncome } from "@/features/business/lib/income-recording";
-import { parseAmount, parseDate } from "@/features/business/lib/validation";
+import { parseAmount, parseDate, parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -55,6 +55,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Invalid date", 400);
   }
 
+  // A malformed id would 500 in Prisma, and a dangling one would read as a payment.
+  const linkedInvoiceId = parseObjectId(invoiceId);
+  if (
+    (invoiceId != null && invoiceId !== "" && !linkedInvoiceId) ||
+    (linkedInvoiceId &&
+      !(await prisma.invoice.findUnique({ where: { id: linkedInvoiceId }, select: { id: true } })))
+  ) {
+    return errorResponse("Invoice not found", 400);
+  }
+
   const { entry, sheetRowKey, sheetSyncWarning } = await recordIncome({
     date: entryDate,
     customer,
@@ -62,7 +72,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     amount: safeAmount,
     method,
     notes,
-    invoiceId,
+    invoiceId: linkedInvoiceId,
   });
 
   // recordIncome swallows a Cashbook failure, so the flag is the only signal.

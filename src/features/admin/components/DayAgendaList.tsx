@@ -23,7 +23,6 @@ export type AgendaItem =
 /** StatusPill tone per booking status, as on the bookings list. */
 const BOOKING_STATUS_TONE: Record<BookingStatus, StatusTone> = {
   confirmed: "info",
-  held: "warning",
   completed: "success",
   cancelled: "critical",
 };

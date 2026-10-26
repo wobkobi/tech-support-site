@@ -10,11 +10,11 @@ import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { releaseBookingRedemptions } from "@/features/business/lib/promo-redemption";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import {
-  deleteBookingEvent,
   fetchAllCalendarEvents,
   patchBookingEvent,
   SCHEDULE_CALENDAR_TAG,
 } from "@/features/calendar/lib/google-calendar";
+import { removeBookingEvent } from "@/features/calendar/lib/pending-calendar-deletes";
 import {
   sendCustomerBookingConfirmation,
   sendOwnerBookingNotification,
@@ -255,12 +255,8 @@ export async function PATCH(
   if (body.markNoShow && booking.status !== "cancelled") {
     // No-show ~ a customer cancel at startAt: both windows are inside.
     if (booking.calendarEventId) {
-      try {
-        // Silent, or the cancellation email reads as the operator calling it off.
-        await deleteBookingEvent({ eventId: booking.calendarEventId, notifyAttendees: false });
-      } catch (err) {
-        console.error("[admin/bookings] Failed to delete calendar event:", err);
-      }
+      // Silent, or the cancellation email reads as the operator calling it off.
+      await removeBookingEvent({ eventId: booking.calendarEventId, notifyAttendees: false });
     }
     const noShowAt = new Date();
     const { CANCELLATION: noShowPolicy } = await getPolicy();
@@ -279,11 +275,7 @@ export async function PATCH(
     data.noShow = true;
   } else if (body.status === "cancelled" && booking.status !== "cancelled") {
     if (booking.calendarEventId) {
-      try {
-        await deleteBookingEvent({ eventId: booking.calendarEventId });
-      } catch (err) {
-        console.error("[admin/bookings] Failed to delete calendar event:", err);
-      }
+      await removeBookingEvent({ eventId: booking.calendarEventId });
     }
     const onBehalf = body.cancelMode === "on-behalf";
     data.status = "cancelled";
@@ -472,12 +464,9 @@ export async function DELETE(
     return errorResponse("Booking not found.", 404);
   }
 
+  // A Google failure is queued for the reconcile cron, so the event goes even with the row.
   if (booking.calendarEventId) {
-    try {
-      await deleteBookingEvent({ eventId: booking.calendarEventId });
-    } catch (err) {
-      console.error("[admin/bookings] Failed to delete calendar event:", err);
-    }
+    await removeBookingEvent({ eventId: booking.calendarEventId });
   }
 
   // Review.bookingId is a bare ObjectId, so clear it; the review keeps its contact link.

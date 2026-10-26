@@ -10,10 +10,10 @@ import {
 } from "@/features/booking/lib/booking";
 import {
   createBookingEvent,
-  deleteBookingEvent,
   fetchAllCalendarEvents,
   SCHEDULE_CALENDAR_TAG,
 } from "@/features/calendar/lib/google-calendar";
+import { removeBookingEvent } from "@/features/calendar/lib/pending-calendar-deletes";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { sendCustomerBookingConfirmation } from "@/features/reviews/lib/email-booking";
@@ -112,11 +112,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Collision check: any held/confirmed booking or calendar event overlapping
+  // Collision check: any confirmed booking or calendar event overlapping
   // the requested window (no buffer applied - admin override).
   const conflictingBooking = await prisma.booking.findFirst({
     where: {
-      status: { in: ["held", "confirmed"] },
+      status: "confirmed",
       startAt: { lt: endAt },
       endAt: { gt: startAt },
     },
@@ -196,8 +196,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Create the booking
+  // Create the booking. Until the row exists, a failure leaves the new event orphaned.
   const { availability } = await getSettings();
+  let bookingCreated = false;
   try {
     const booking = await prisma.booking.create({
       data: {
@@ -221,6 +222,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         bufferAfterMin: availability.bookingBufferAfterMin,
       },
     });
+
+    bookingCreated = true;
 
     // Best-effort contact upsert + Google sync; never fail the booking on errors.
     try {
@@ -254,14 +257,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     revalidateTag(SCHEDULE_CALENDAR_TAG, {});
     return NextResponse.json({ ok: true, bookingId: booking.id });
   } catch (err) {
-    // Roll back the calendar event so a failed insert leaves no orphan.
-    if (calendarEventId) {
-      try {
-        await deleteBookingEvent({ eventId: calendarEventId });
-      } catch (cleanupErr) {
-        console.error("[admin/bookings] Failed to clean up orphan calendar event:", cleanupErr);
-      }
+    // A failed insert rolls the event back. Past the insert the booking is real: keep its
+    // event and report the step that failed instead.
+    if (bookingCreated) {
+      console.error("[admin/bookings] Booking saved, but a follow-up step failed:", err);
+      return errorResponse("The booking was saved, but its confirmation step failed.", 500);
     }
+    if (calendarEventId) await removeBookingEvent({ eventId: calendarEventId });
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       return errorResponse("This slot was just taken.", 409);
     }

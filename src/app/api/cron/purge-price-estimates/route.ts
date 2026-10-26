@@ -1,5 +1,5 @@
 // src/app/api/cron/purge-price-estimates/route.ts
-// Cron endpoint to delete PriceEstimateLog rows older than 30 days. Called externally via
+// Cron endpoint to delete PriceEstimateLog rows older than the Comms retention setting. Called externally via
 // cron-job.org (daily cadence).
 
 import { errorResponse } from "@/shared/lib/api-response";

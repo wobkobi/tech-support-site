@@ -17,6 +17,18 @@ export interface OwnerPushInput {
   tag?: string;
 }
 
+/** What one {@link sendOwnerPush} call did, for the Send test button. */
+export interface OwnerPushResult {
+  /** Devices the push service accepted the notification for. */
+  sent: number;
+  /** Devices that failed for a reason that may pass (a 500 or rate limit). */
+  failed: number;
+  /** Devices dropped because their endpoint has gone for good. */
+  removed: number;
+  /** Why nothing was attempted: no VAPID keys, no devices, or the device read failed. */
+  skipped?: "not-configured" | "no-devices" | "error";
+}
+
 /**
  * Whether a push-service status means the endpoint is gone for good: only 404 and 410,
  * since a 500 or rate limit is transient.
@@ -43,6 +55,38 @@ export function buildPushPayload(input: OwnerPushInput): string {
 }
 
 /**
+ * Turns a test push result into the reply for the Send test button: an error unless at least
+ * one device took it.
+ * @param result - What the test push did.
+ * @returns The HTTP status and the message to show.
+ */
+export function pushTestReply(result: OwnerPushResult): { status: number; message: string } {
+  if (result.skipped === "not-configured") {
+    return {
+      status: 503,
+      message: "Push isn't set up on the server (the VAPID keys are missing).",
+    };
+  }
+  if (result.skipped === "no-devices") {
+    return { status: 409, message: "No devices are registered for notifications." };
+  }
+  if (result.skipped === "error" || result.sent === 0) {
+    return {
+      status: 502,
+      message: "The test didn't reach any device. Try turning notifications off and on.",
+    };
+  }
+  const total = result.sent + result.failed;
+  return {
+    status: 200,
+    message:
+      result.failed > 0
+        ? `Test sent to ${result.sent} of ${total} devices - it should appear shortly.`
+        : "Test sent - it should appear shortly.",
+  };
+}
+
+/**
  * Configures web-push from the environment.
  * @returns True when the VAPID keys are present and delivery can proceed.
  */
@@ -62,14 +106,15 @@ function configureVapid(): boolean {
  * Sends a notification to every registered operator device. Never throws; callers await
  * it only so it runs before Vercel freezes the instance.
  * @param input - Notification content.
- * @returns Promise that resolves once delivery has been attempted.
+ * @returns How many devices took it, failed or were dropped.
  */
-export async function sendOwnerPush(input: OwnerPushInput): Promise<void> {
+export async function sendOwnerPush(input: OwnerPushInput): Promise<OwnerPushResult> {
+  const result: OwnerPushResult = { sent: 0, failed: 0, removed: 0 };
   try {
-    if (!configureVapid()) return;
+    if (!configureVapid()) return { ...result, skipped: "not-configured" };
 
     const devices = await prisma.pushDevice.findMany();
-    if (devices.length === 0) return;
+    if (devices.length === 0) return { ...result, skipped: "no-devices" };
 
     const payload = buildPushPayload(input);
 
@@ -83,29 +128,29 @@ export async function sendOwnerPush(input: OwnerPushInput): Promise<void> {
             },
             payload,
           );
-          await prisma.pushDevice.update({
-            where: { id: device.id },
-            data: { lastSeenAt: new Date(), failureCount: 0 },
-          });
+          result.sent++;
+          // Caught on its own: a failed stamp mustn't count a delivered push as failed.
+          await prisma.pushDevice
+            .update({ where: { id: device.id }, data: { lastSeenAt: new Date() } })
+            .catch((err: unknown) => console.error("[push] lastSeenAt update failed", err));
         } catch (err) {
           const statusCode = (err as { statusCode?: number }).statusCode;
           if (isGoneStatus(statusCode)) {
             // Gone for good - drop the row so it isn't retried on every booking.
             await prisma.pushDevice.delete({ where: { id: device.id } }).catch(() => null);
+            result.removed++;
             return;
           }
+          // Non-fatal: the device stays, and a stale lastSeenAt shows it in the device list.
+          result.failed++;
           console.error(`[push] send failed (${statusCode ?? "no status"})`, err);
-          await prisma.pushDevice
-            .update({
-              where: { id: device.id },
-              data: { failureCount: { increment: 1 } },
-            })
-            .catch(() => null);
         }
       }),
     );
   } catch (err) {
     // Nothing here may propagate: this runs inside a customer's booking.
     console.error("[push] owner push failed", err);
+    if (result.sent + result.failed + result.removed === 0) return { ...result, skipped: "error" };
   }
+  return result;
 }

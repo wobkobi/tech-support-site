@@ -95,6 +95,44 @@ export function selectRecipients(
   return result;
 }
 
+/** A campaign row still to send, as {@link planPendingRefresh} reads it. */
+export interface PendingSend {
+  id: string;
+  contactId: string;
+  email: string;
+}
+
+/**
+ * What to do with a run's pending rows given the list as it stands: drop anyone no longer on
+ * it or whose address another row already covers, and move a changed address to the new one.
+ * Once the list is in Resend a changed address is dropped too, as the upload can't change.
+ * @param pending - The pending rows.
+ * @param current - Each current recipient's contact id and address.
+ * @param taken - Addresses the campaign's other rows hold.
+ * @param listLoaded - The broadcast's list is already uploaded.
+ * @returns Rows to drop, and rows to move with their new address.
+ */
+export function planPendingRefresh(
+  pending: PendingSend[],
+  current: ReadonlyMap<string, string>,
+  taken: ReadonlySet<string>,
+  listLoaded: boolean,
+): { drop: PendingSend[]; move: { row: PendingSend; email: string }[] } {
+  const held = new Set(taken);
+  const drop: PendingSend[] = [];
+  const move: { row: PendingSend; email: string }[] = [];
+  for (const row of pending) {
+    const email = current.get(row.contactId);
+    if (!email || held.has(email) || (listLoaded && email !== row.email)) {
+      drop.push(row);
+      continue;
+    }
+    held.add(email);
+    if (email !== row.email) move.push({ row, email });
+  }
+  return { drop, move };
+}
+
 /**
  * Each live contact's latest site review, matched by contactId or by customerRef against
  * the contact's current or merged review tokens.

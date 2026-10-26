@@ -1,4 +1,7 @@
 // prisma/schema.prisma
+// MongoDB schema. No relations: models link through plain `xxxId` ObjectId fields.
+// Sections: Bookings, Calendar and travel, Contacts, Reviews, Pricing and promos,
+// Invoices and money, Tax records, Mailing, Social, Post maker, App state.
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,8 +11,9 @@ datasource db {
   url      = env("MONGODB_URI")
 }
 
+// --- Bookings ---
+
 enum BookingStatus {
-  held
   confirmed
   cancelled
   completed
@@ -38,56 +42,13 @@ enum CancelledBy {
   operator
 }
 
-enum ReviewStatus {
-  pending
-  approved
-}
-
-// Google Distance Matrix travel mode. Null on TravelBlock is treated as transit.
-enum TransportMode {
-  transit
-  driving
-  walking
-  bicycling
-}
-
-// Single-value Contact fields tracked by the Google sync conflict flow.
-// Phones are merged as a union, not conflicted.
-enum ContactField {
-  name
-  email
-  address
-}
-
-// Admin choice when resolving a ContactConflict.
-// "auto" is stamped by clearContactConflict when both sides converge on their own.
-enum ConflictResolution {
-  site
-  google
-  custom
-  auto
-}
-
-// NODE_ENV value at the time of a PriceEstimateLog write. The admin page hides
-// non-production rows by default.
-enum AppEnvironment {
-  production
-  development
-  test
-}
-
-// AI-assigned rate band for a PriceEstimateLog. "complex" jobs are priced at
-// the higher hourly rate; "standard" covers routine work.
-enum AiEstimateCategory {
-  standard
-  complex
-}
-
-// Channel used to send a contact their review link. Set on Contact when an
-// admin clicks "Send a review link".
-enum ReviewLinkMode {
-  email
-  sms
+// A customer email Resend accepted with a scheduledAt, recallable until then.
+// Embedded in Booking.heldEmails.
+type HeldEmail {
+  // Resend's email id, what emails.cancel takes.
+  id     String
+  // When Resend will send it; past this there is nothing left to recall.
+  sendAt DateTime
 }
 
 model Booking {
@@ -116,16 +77,16 @@ model Booking {
   // the optional max-reschedules pricing setting.
   rescheduleCount Int @default(0)
 
-  // Booking lifecycle state and hold expiry.
-  status        BookingStatus @default(confirmed)
-  holdExpiresAt DateTime?
+  // Booking lifecycle state.
+  status BookingStatus @default(confirmed)
 
   // Secret tokens for cancel and review magic links.
   cancelToken String @unique
   reviewToken String @unique @default(uuid())
 
-  // Double-booking prevention: set to startAt.toISOString() when active (held/confirmed),
-  // set to "released:<id>" when cancelled or expired so the slot is freed without null collisions.
+  // Double-booking prevention: set to startAt.toISOString() while the booking is confirmed,
+  // set to "released:<id>" when it is cancelled, completed or marked no-show, so the slot
+  // is freed without null collisions.
   // Invariant: every creation path MUST set this. It is nullable only for schema
   // history - a null must never be written, because MongoDB's unique index treats
   // a second null as a duplicate and would P2002 as a spurious "slot taken".
@@ -185,21 +146,18 @@ model Booking {
   // does not reprice bookings already made under it.
   promoTermsAtBooking           Json?
   baseRateAtBooking             Float?
-  complexRateAtBooking          Float?
   travelRatePerHourAtBooking    Float?
 
   // Public price-estimate snapshot - the quote the customer saw (on /pricing or
   // the inline booking estimate) before booking, so the operator can compare it
   // to the final job. The estimate row is purged 30 days after it is written,
-  // so everything worth keeping is copied onto the booking here; the id is kept
-  // only to tie the two together while the log still exists.
-  priceEstimateIdAtBooking String? @db.ObjectId
-  quotedLowAtBooking       Int?
-  quotedHighAtBooking      Int?
+  // so everything worth keeping is copied onto the booking here.
+  quotedLowAtBooking    Int?
+  quotedHighAtBooking   Int?
   // Round-trip travel slice of the quoted total, so the admin card shows the
   // same labour + travel split as the booking notes. Null on rows written
   // before travel was broken out, 0 on remote bookings.
-  quotedTravelAtBooking    Int?
+  quotedTravelAtBooking Int?
 
   // What the customer typed into the estimator and how the AI read it, so the
   // reasoning behind a quoted range outlives the estimate log. Category and
@@ -226,45 +184,110 @@ model Booking {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Expired hold cleanup cron: WHERE status="held" AND holdExpiresAt <= now
-  @@index([status, holdExpiresAt])
-  // Slot availability (slots, days, request, booking page): WHERE status IN [held,confirmed] AND endAt >= now
+  // Slot availability (slots, days, request, booking page): WHERE status="confirmed" AND endAt >= now
   @@index([status, endAt])
   // Admin reviews page and review-ask lookups: filter/sort on reviewSentAt
   @@index([reviewSentAt])
   // Email reminder cron: WHERE status="confirmed" AND startAt in window AND emailReminderSentAt=null
   @@index([status, startAt, emailReminderSentAt])
-  // Contact/admin lookup by phone
-  @@index([phone])
 }
 
-model Review {
-  id          String  @id @default(auto()) @map("_id") @db.ObjectId
-  text        String
-  firstName   String?
-  lastName    String?
-  isAnonymous Boolean @default(false)
+// --- Calendar and travel ---
 
-  // Moderation state.
-  status ReviewStatus @default(pending)
+// Cached Google Calendar events for fast booking page loads.
+model CalendarEventCache {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  // Optional reference used for magic-link edit/auth.
-  customerRef String?
+  eventId       String // Google Calendar event ID
+  calendarEmail String // Which calendar this event belongs to
+  startAt       DateTime // Event start (UTC)
+  endAt         DateTime // Event end (UTC)
 
-  // Optional link to the originating booking (verified reviews only).
-  bookingId String? @db.ObjectId
-  verified  Boolean @default(false)
+  fetchedAt DateTime @default(now()) // When this entry was cached
+  expiresAt DateTime // When this entry should be refreshed
 
-  // Optional link to a Contact record (matched by email or set manually).
-  contactId String? @db.ObjectId
+  // Upsert by natural key
+  @@unique([eventId, calendarEmail])
+  // Cache cleanup cron: WHERE expiresAt < now
+  @@index([expiresAt])
+  // Booking edit page: WHERE endAt >= now AND expiresAt > now (the booking page filters
+  // fetchedAt instead)
+  @@index([endAt, expiresAt])
+}
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// Google Distance Matrix travel mode. Null on TravelBlock is treated as transit.
+enum TransportMode {
+  transit
+  driving
+  walking
+  bicycling
+}
 
-  // Public and admin review listing: WHERE status="approved" ORDER BY createdAt DESC
-  @@index([status, createdAt(sort: Desc)])
-  // Contacts tab: group reviews by contactId
-  @@index([contactId])
+// Travel time blocks created for external calendar events with a location.
+model TravelBlock {
+  id                          String         @id @default(auto()) @map("_id") @db.ObjectId
+  sourceEventId               String
+  calendarEmail               String
+  recurringEventId            String? // Parent series ID when source event is a recurring instance
+  summary                     String? // Google Calendar event title (e.g. "Dentist", "Mario Movie")
+  eventStartAt                DateTime // Source event start - used to detect time changes
+  eventEndAt                  DateTime // Source event end - used to detect time changes
+  rawTravelMinutes            Int? // Raw travel-to time from Distance Matrix API
+  roundedMinutes              Int? // Rounded travel-to value used for block window
+  rawTravelBackMinutes        Int? // Raw return-trip travel time (to home or chained venue)
+  roundedBackMinutes          Int? // Rounded return-trip value used for block window
+  beforeEventId               String? // Synthetic CalendarEventCache ID blocking travel-to
+  afterEventId                String? // Synthetic CalendarEventCache ID blocking travel-back
+  transportMode               TransportMode? // Null treated as transit at read time
+  customOrigin                String? // Manual override for travel-to origin address
+  detectedOrigin              String? // Auto-detected origin from preceding event or home address
+  destination                 String? // Destination address (event.location ?? event.summary)
+  customTravelBackDestination String? // Manual override for travel-back destination (defaults to home)
+  travelBackSuppressed        Boolean        @default(false) // True when chaining to next event beats going home
+  chainedNextEventId          String? // Identity of next event evaluated for chaining (for change detection)
+  chainedNextEventStartAt     DateTime? // Start of that next event (rebuild when it shifts)
+  createdAt                   DateTime       @default(now())
+
+  @@unique([sourceEventId, calendarEmail])
+  // Sibling cascade on admin transport-mode override
+  @@index([recurringEventId, calendarEmail])
+  // Calendar-cache refresh stale scan (eventEndAt < window) and schedule range queries
+  @@index([eventEndAt])
+}
+
+// Series-level transport mode preference for recurring Google Calendar events.
+// One row per (recurringEventId, calendarEmail). Survives TravelBlock stale-cleanup
+// so a new instance entering the fetch window picks up the admin's chosen mode.
+model RecurringTravelPreference {
+  id               String         @id @default(auto()) @map("_id") @db.ObjectId
+  recurringEventId String
+  calendarEmail    String
+  transportMode    TransportMode?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([recurringEventId, calendarEmail])
+}
+
+// A booking-calendar event that a cancel, reschedule or rolled-back booking couldn't delete.
+// Left there it blocks the slot and stays in the customer's calendar, so the reconcile cron
+// retries the delete and drops the row once the event is gone.
+model PendingCalendarDelete {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  eventId         String   @unique
+  // Whether the retry emails attendees the cancellation, as the original delete would have.
+  notifyAttendees Boolean  @default(true)
+  attempts        Int      @default(0)
+  createdAt       DateTime @default(now())
+}
+
+// --- Contacts ---
+
+// Channel used to send a contact their review link. Set on Contact when an
+// admin clicks "Send a review link".
+enum ReviewLinkMode {
+  email
+  sms
 }
 
 // Contacts built from booking submissions.
@@ -307,6 +330,10 @@ model Contact {
   // links sent under a merged-away contact keep working: the /review page,
   // submission verify, and review matcher all accept primary OR alt tokens.
   altReviewTokens       String[]        @default([])
+  // Ids of contacts merged into this one (and any merged into those). Unsubscribe
+  // and stop links carry a contact id, so one sent before a merge follows this to
+  // the person it now belongs to. No index: only those link clicks read it.
+  mergedContactIds      String[]        @default([]) @db.ObjectId
   // Bidirectional sync state: site changed iff updatedAt > lastSyncedAt,
   // Google changed iff current etag != lastGoogleEtag.
   lastSyncedAt          DateTime?
@@ -344,86 +371,65 @@ model Contact {
   @@index([reviewLinkSentAt])
 }
 
+// Single-value Contact fields tracked by the Google sync conflict flow.
+// Phones are merged as a union, not conflicted.
+enum ContactField {
+  name
+  email
+  address
+}
+
 // Sync conflicts admin resolves at /admin/contacts/conflicts.
 model ContactConflict {
-  id          String              @id @default(auto()) @map("_id") @db.ObjectId
-  contactId   String              @db.ObjectId
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  contactId   String       @db.ObjectId
   field       ContactField
   siteValue   String?
   googleValue String?
   resolvedAt  DateTime?
-  resolution  ConflictResolution?
-  createdAt   DateTime            @default(now())
+  createdAt   DateTime     @default(now())
 
   @@index([resolvedAt, createdAt(sort: Desc)])
   @@index([contactId, field, resolvedAt])
 }
 
-// Travel time blocks created for external calendar events with a location.
-model TravelBlock {
-  id                          String         @id @default(auto()) @map("_id") @db.ObjectId
-  sourceEventId               String
-  calendarEmail               String
-  recurringEventId            String? // Parent series ID when source event is a recurring instance
-  summary                     String? // Google Calendar event title (e.g. "Dentist", "Mario Movie")
-  eventStartAt                DateTime // Source event start - used to detect time changes
-  eventEndAt                  DateTime // Source event end - used to detect time changes
-  rawTravelMinutes            Int? // Raw travel-to time from Distance Matrix API
-  roundedMinutes              Int? // Rounded travel-to value used for block window
-  rawTravelBackMinutes        Int? // Raw return-trip travel time (to home or chained venue)
-  roundedBackMinutes          Int? // Rounded return-trip value used for block window
-  beforeEventId               String? // Synthetic CalendarEventCache ID blocking travel-to
-  afterEventId                String? // Synthetic CalendarEventCache ID blocking travel-back
-  transportMode               TransportMode? // Null treated as transit at read time
-  customOrigin                String? // Manual override for travel-to origin address
-  detectedOrigin              String? // Auto-detected origin from preceding event or home address
-  destination                 String? // Destination address (event.location ?? event.summary)
-  customTravelBackDestination String? // Manual override for travel-back destination (defaults to home)
-  travelBackSuppressed        Boolean        @default(false) // True when chaining to next event beats going home
-  chainedNextEventId          String? // Identity of next event evaluated for chaining (for change detection)
-  chainedNextEventStartAt     DateTime? // Start of that next event (rebuild when it shifts)
-  createdAt                   DateTime       @default(now())
+// --- Reviews ---
 
-  @@unique([sourceEventId, calendarEmail])
-  // Sibling cascade on admin transport-mode override
-  @@index([recurringEventId, calendarEmail])
+enum ReviewStatus {
+  pending
+  approved
 }
 
-// Series-level transport mode preference for recurring Google Calendar events.
-// One row per (recurringEventId, calendarEmail). Survives TravelBlock stale-cleanup
-// so a new instance entering the fetch window picks up the admin's chosen mode.
-model RecurringTravelPreference {
-  id               String         @id @default(auto()) @map("_id") @db.ObjectId
-  recurringEventId String
-  calendarEmail    String
-  transportMode    TransportMode?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+model Review {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  text        String
+  firstName   String?
+  lastName    String?
+  isAnonymous Boolean @default(false)
 
-  @@unique([recurringEventId, calendarEmail])
+  // Moderation state.
+  status ReviewStatus @default(pending)
+
+  // Optional reference used for magic-link edit/auth.
+  customerRef String?
+
+  // Optional link to the originating booking (verified reviews only).
+  bookingId String? @db.ObjectId
+  verified  Boolean @default(false)
+
+  // Optional link to a Contact record (matched by email or set manually).
+  contactId String? @db.ObjectId
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Public and admin review listing: WHERE status="approved" ORDER BY createdAt DESC
+  @@index([status, createdAt(sort: Desc)])
+  // Contacts tab: group reviews by contactId
+  @@index([contactId])
 }
 
-// Cached Google Calendar events for fast booking page loads.
-model CalendarEventCache {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-
-  eventId       String // Google Calendar event ID
-  calendarEmail String // Which calendar this event belongs to
-  startAt       DateTime // Event start (UTC)
-  endAt         DateTime // Event end (UTC)
-
-  fetchedAt DateTime @default(now()) // When this entry was cached
-  expiresAt DateTime // When this entry should be refreshed
-
-  // Upsert by natural key
-  @@unique([eventId, calendarEmail])
-  // Cache cleanup cron: WHERE expiresAt < now
-  @@index([expiresAt])
-  // Booking page query: WHERE endAt >= now AND expiresAt > now
-  @@index([endAt, expiresAt])
-}
-
-// --- Business module ---
+// --- Pricing and promos ---
 
 // A RateConfig row is exactly one of three kinds, distinguished by which
 // numeric field is set:
@@ -454,14 +460,267 @@ model RateConfig {
   updatedAt    DateTime? @updatedAt
 }
 
-// Where an invoice's automatic review ask stands. Null on the invoice = not decided.
-enum ReviewAskOutcome {
-  sending
-  sent
-  skipped
-  cancelled
-  failed
+model TaskTemplate {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  description  String
+  defaultPrice Float
+  usageCount   Int      @default(1)
+  // Free-text device the task targets (e.g. "Laptop", "Phone", "Email account").
+  // Open vocabulary - any string the operator types or the AI emits is accepted.
+  device       String?
+  // Free-text action describing what was done (e.g. "Setup", "Repair", "Recovery").
+  // Same open vocabulary as device. Combined with device to compose the
+  // line-item description: "<device> <action lowercased>".
+  action       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // No device/action indexes: every lookup is case-insensitive or filters in memory.
 }
+
+// NZ public holiday occurrences. Region distinguishes nationwide holidays
+// ("NZ") from regional ones (e.g. "Auckland" for Auckland Anniversary Day).
+// A monthly refresh job populates this table; manual updates are fine too.
+model PublicHoliday {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  // ISO YYYY-MM-DD, treated as the NZ-local date of the holiday.
+  date      String
+  name      String
+  // "NZ" for nationwide, region name for regional anniversaries.
+  region    String
+  updatedAt DateTime @updatedAt
+
+  // Also serves the date-only lookups (date is the prefix)
+  @@unique([date, region])
+}
+
+// How a customer comes by a promo. Automatic promos apply to everyone inside
+// the window; a code promo applies only when the customer enters it, and must
+// never be advertised on the banner.
+enum PromoKind {
+  automatic
+  code
+}
+
+// What a promo does to a quote. Each type acts on a different stage of the
+// pricing pipeline, which is why one hourly-rate modifier could not express
+// them all: flat_hourly and percent change the labour rate, free_travel
+// changes the travel line, and fixed_amount comes off the total after both.
+enum PromoDiscountType {
+  flat_hourly
+  percent
+  fixed_amount
+  free_travel
+}
+
+// One band of a tiered promo. Embedded rather than a model: tiers are owned
+// entirely by their promo and are never queried on their own.
+type PromoTier {
+  // Inclusive floor for this band, against the pre-discount total.
+  minSpend        Float
+  // Exactly one is set, matching the parent promo's discountType. Same reason
+  // as the parent's columns: a misconfigured tier is visible in the data.
+  flatHourlyRate  Float?
+  percentDiscount Float?
+  fixedAmount     Float?
+  travelPercent   Float?
+}
+
+type PromoLockedDelta {
+  label       String
+  hourlyDelta Float
+}
+
+// Customer-facing promotional discount that applies during a date window. When two
+// overlap, the higher priority wins, then the newest. PromoDiscountType says what it
+// does to a quote.
+model Promo {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  startAt     DateTime
+  endAt       DateTime
+
+  kind PromoKind @default(automatic)
+  // Uppercased on write so lookups are exact. Deliberately NOT @unique:
+  // MongoDB's unique index treats a second null as a duplicate, and every
+  // automatic promo has a null code, so the second one would P2002 - the same
+  // trap documented on Booking.activeSlotKey and Contact.reviewToken.
+  // Uniqueness is enforced in promo-validation instead.
+  code String?
+
+  // Which value column below carries this promo's terms.
+  discountType PromoDiscountType
+
+  // Exactly one is set, matching discountType. Separate nullable columns
+  // rather than one polymorphic value, so a misconfigured promo is visible in
+  // the data rather than surfacing as a wrong price.
+  flatHourlyRate  Float?
+  percentDiscount Float?
+  fixedAmount     Float?
+  // Fraction of the normal travel charge to bill, 0 for free travel.
+  travelPercent   Float?
+
+  isActive Boolean @default(true)
+
+  // Higher wins when two promos' windows overlap. Replaces the implicit
+  // "newest createdAt wins", which could not be overridden. Existing promos
+  // sit at 0, so the createdAt tie-break still decides them exactly as before.
+  priority Int @default(0)
+
+  // Tiered thresholds. When non-empty the highest band the job reaches supplies
+  // the discount and the columns above are ignored; when the job reaches none,
+  // the promo does not apply at all rather than falling back to a smaller
+  // discount. Empty is the ordinary single-value promo.
+  //
+  // Bands are selected against the LOW end of the pre-discount total, so the
+  // customer is quoted the discount they are certain to get and a job that
+  // lands higher simply earns more at invoice time. Advertising the high band
+  // would promise a discount the job may not reach.
+  tiers PromoTier[]
+
+  // Every $/hr modifier's delta when the promo was created. A flat promo prices
+  // a modified rate at its flat Standard plus these, so "lock in current rates"
+  // still bills the old At home rate after the deltas change. Keyed by label.
+  lockedDeltas PromoLockedDelta[]
+
+  // Eligibility limits. Null means no limit.
+  //
+  // maxRedemptions is approximate by design: two customers can pass the count
+  // check concurrently and both redeem. A distributed lock is not worth it for
+  // a one-operator business, so a promo can go one or two past its cap under
+  // concurrent load.
+  maxRedemptions   Int?
+  perCustomerLimit Int?
+  // Floor for the pre-discount total, read the same way a tier's is.
+  minSpend         Float?
+  // Only for someone with no prior completed booking.
+  newCustomersOnly Boolean @default(false)
+
+  // Recurring window. Inside [startAt, endAt], optionally restrict to these NZ
+  // weekdays (0 = Sunday) and this NZ time-of-day range. An empty list and null
+  // times mean the whole window, which is what every existing promo has.
+  //
+  // Both are matched against the APPOINTMENT, not against when the customer is
+  // browsing: a Tuesday promo exists to fill Tuesday slots, so booking on
+  // Monday for a Tuesday job earns it and booking on Tuesday for a Thursday job
+  // does not.
+  activeWeekdays   Int[]
+  // Minutes since NZ midnight, 0-1439. Both set or both null.
+  activeFromMinute Int?
+  activeToMinute   Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // getActivePromo() filters by these three; covers most lookups.
+  @@index([isActive, startAt, endAt])
+  // Code lookup on the customer-entered path.
+  @@index([kind, code])
+}
+
+// One recorded use of a promo. Booking.promoIdAtBooking already snapshots the
+// promo per booking, but only for bookings - a redemption row also covers
+// calculator jobs and invoices, and is what the caps in a later phase count.
+model PromoRedemption {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  promoId String @db.ObjectId
+
+  // Whichever surface the redemption came from.
+  bookingId String? @db.ObjectId
+  invoiceId String? @db.ObjectId
+  contactId String? @db.ObjectId
+
+  // Dollar value of the discount at redemption time, stored rather than
+  // recomputed because the promo's terms can change afterwards. Null on rows
+  // created by the backfill: the realised discount was never recorded, and a
+  // number reconstructed from a quoted range would be a guess.
+  discountValue Float?
+
+  redeemedAt DateTime @default(now())
+
+  // Per-customer and per-promo caps (promoId alone uses the prefix)
+  @@index([promoId, contactId])
+  // Booking and invoice redemption lookups (record, release, void)
+  @@index([bookingId])
+  @@index([invoiceId])
+}
+
+// AI-assigned rate band for a PriceEstimateLog. "complex" jobs are priced at
+// the higher hourly rate; "standard" covers routine work.
+enum AiEstimateCategory {
+  standard
+  complex
+}
+
+// NODE_ENV value at the time of a PriceEstimateLog write. The admin page hides
+// non-production rows by default.
+enum AppEnvironment {
+  production
+  development
+  test
+}
+
+// Per-task split returned by the public price estimator AI (one entry per
+// distinct task in a multi-task description). `mins` is the task's STACKED
+// contribution to the combined visit, not its standalone benchmark.
+type EstimateTask {
+  label String
+  mins  Int
+}
+
+// Audit log for the public price estimator. Captures what the user typed,
+// how the AI interpreted it, and the exact range shown on screen so disputes
+// can be reviewed. Purged after 30 days by /api/cron/purge-price-estimates.
+model PriceEstimateLog {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Raw user input from the wizard step 1.
+  description String
+
+  // AI output captured verbatim.
+  aiEstimatedMins Int
+  aiCategory      AiEstimateCategory
+  aiExplanation   String
+  aiTasks         EstimateTask[]
+
+  // Address + drive time (step 2 is optional - skipped values stay null).
+  // travelMins is the outbound leg (semantic continuity with legacy rows);
+  // travelMinsBack is the return leg, null on rows logged before two-leg quoting.
+  address        String?
+  travelMins     Int?
+  travelMinsBack Int?
+
+  // Meeting modality picked in the wizard. Lets disputes confirm whether
+  // the customer was quoted an on-site rate (with travel) or remote.
+  meetingType MeetingType?
+
+  // Final price range shown to the user, post-promo. priceLow/priceHigh are the
+  // all-in total (labour + travel); travelCharge is the round-trip travel slice
+  // of that total (null on rows logged before travel was broken out, 0 for
+  // remote), letting the booking notes show the labour/travel split.
+  hourlyRate   Float
+  priceLow     Int
+  priceHigh    Int
+  travelCharge Int?
+
+  // Promo snapshot so old quotes remain reconstructable after promos change.
+  promoTitle String?
+  promoLabel String?
+
+  // NODE_ENV at the time of the request. The admin page hides non-production
+  // rows by default and exposes a toggle for auditing test submissions.
+  environment AppEnvironment @default(production)
+
+  createdAt DateTime @default(now())
+
+  // Cron cleanup: WHERE createdAt < now - 30d
+  @@index([createdAt])
+  // Admin page default view: WHERE environment="production" ORDER BY createdAt DESC
+  @@index([environment, createdAt(sort: Desc)])
+}
+
+// --- Invoices and money ---
 
 enum InvoiceStatus {
   DRAFT
@@ -483,6 +742,15 @@ type LineItem {
   // fractional value can't turn into that same rejection. Unset on flat rows
   // (travel, parts, surcharges) and on invoices issued before the switch.
   minutes     Float?
+}
+
+// Where an invoice's automatic review ask stands. Null on the invoice = not decided.
+enum ReviewAskOutcome {
+  sending
+  sent
+  skipped
+  cancelled
+  failed
 }
 
 model Invoice {
@@ -592,7 +860,8 @@ model Invoice {
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
-  @@index([clientEmail, reviewLinkSentAt])
+  // Review-ask run: WHERE reviewAskOutcome = ... (clientEmail lookups are
+  // case-insensitive regex, which an index can't serve)
   @@index([reviewAskOutcome, sentAt])
 }
 
@@ -618,6 +887,10 @@ model IncomeEntry {
   updatedAt   DateTime? @updatedAt
 
   @@index([sheetRowKey])
+  // Invoice page, void and payment matching look up an invoice's income rows
+  @@index([invoiceId])
+  // Dashboard and tax date-range totals
+  @@index([date])
 }
 
 model ExpenseEntry {
@@ -640,264 +913,8 @@ model ExpenseEntry {
   updatedAt   DateTime? @updatedAt
 
   @@index([sheetRowKey])
-}
-
-// Key/value store for small cross-app state: the admin settings groups
-// (`settings:<group>`), run locks, seed markers and small caches.
-model Setting {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  key       String   @unique
-  value     String
-  updatedAt DateTime @updatedAt
-}
-
-// Append-only history of settings-group writes, backing the admin audit log
-// and one-click revert. One row per saveSettingsGroup call where the value
-// actually changed. `oldValue` is null on the first write for a group.
-model SettingAudit {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  group     String
-  oldValue  String?
-  newValue  String
-  changedAt DateTime @default(now())
-
-  @@index([group, changedAt])
-}
-
-// NZ public holiday occurrences. Region distinguishes nationwide holidays
-// ("NZ") from regional ones (e.g. "Auckland" for Auckland Anniversary Day).
-// A monthly refresh job populates this table; manual updates are fine too.
-model PublicHoliday {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  // ISO YYYY-MM-DD, treated as the NZ-local date of the holiday.
-  date      String
-  name      String
-  // "NZ" for nationwide, region name for regional anniversaries.
-  region    String
-  updatedAt DateTime @updatedAt
-
-  @@unique([date, region])
+  // Dashboard, tax and business-page date-range totals
   @@index([date])
-}
-
-model TaskTemplate {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  description  String
-  defaultPrice Float
-  usageCount   Int      @default(1)
-  // Free-text device the task targets (e.g. "Laptop", "Phone", "Email account").
-  // Open vocabulary - any string the operator types or the AI emits is accepted.
-  device       String?
-  // Free-text action describing what was done (e.g. "Setup", "Repair", "Recovery").
-  // Same open vocabulary as device. Combined with device to compose the
-  // line-item description: "<device> <action lowercased>".
-  action       String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  // Calculator filters by device/action, so index both for fast lookups.
-  @@index([device])
-  @@index([action])
-}
-
-// Customer-facing promotional discount that applies during a date window.
-// At any time, at most one Promo is "currently active" (isActive AND startAt
-// <= now < endAt); when multiple overlap the most recently created wins.
-//
-// Exactly one of `flatHourlyRate` / `percentDiscount` must be set:
-//   - flatHourlyRate: replaces the labor $/hr while active (e.g. 50 = $50/hr).
-//   - percentDiscount: 0..1, multiplied against the labor subtotal.
-// The active promo is applied to labor only (tasks + top-level Time charge);
-// parts and Travel are never discounted.
-// How a customer comes by a promo. Automatic promos apply to everyone inside
-// the window; a code promo applies only when the customer enters it, and must
-// never be advertised on the banner.
-enum PromoKind {
-  automatic
-  code
-}
-
-// What a promo does to a quote. Each type acts on a different stage of the
-// pricing pipeline, which is why one hourly-rate modifier could not express
-// them all: flat_hourly and percent change the labour rate, free_travel
-// changes the travel line, and fixed_amount comes off the total after both.
-enum PromoDiscountType {
-  flat_hourly
-  percent
-  fixed_amount
-  free_travel
-}
-
-// One band of a tiered promo. Embedded rather than a model: tiers are owned
-// entirely by their promo and are never queried on their own.
-type PromoTier {
-  // Inclusive floor for this band, against the pre-discount total.
-  minSpend        Float
-  // Exactly one is set, matching the parent promo's discountType. Same reason
-  // as the parent's columns: a misconfigured tier is visible in the data.
-  flatHourlyRate  Float?
-  percentDiscount Float?
-  fixedAmount     Float?
-  travelPercent   Float?
-}
-
-type PromoLockedDelta {
-  label       String
-  hourlyDelta Float
-}
-
-model Promo {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  title       String
-  description String?
-  startAt     DateTime
-  endAt       DateTime
-
-  kind PromoKind @default(automatic)
-  // Uppercased on write so lookups are exact. Deliberately NOT @unique:
-  // MongoDB's unique index treats a second null as a duplicate, and every
-  // automatic promo has a null code, so the second one would P2002 - the same
-  // trap documented on Booking.activeSlotKey and Contact.reviewToken.
-  // Uniqueness is enforced in promo-validation instead.
-  code String?
-
-  // Which value column below carries this promo's terms. Optional only so
-  // existing rows load before the backfill stamps them; treat it as required.
-  discountType PromoDiscountType?
-
-  // Exactly one is set, matching discountType. Separate nullable columns
-  // rather than one polymorphic value, so a misconfigured promo is visible in
-  // the data rather than surfacing as a wrong price.
-  flatHourlyRate  Float?
-  percentDiscount Float?
-  fixedAmount     Float?
-  // Fraction of the normal travel charge to bill, 0 for free travel.
-  travelPercent   Float?
-
-  isActive Boolean @default(true)
-
-  // Higher wins when two promos' windows overlap. Replaces the implicit
-  // "newest createdAt wins", which could not be overridden. Existing promos
-  // sit at 0, so the createdAt tie-break still decides them exactly as before.
-  priority Int @default(0)
-
-  // Tiered thresholds. When non-empty the highest band the job reaches supplies
-  // the discount and the columns above are ignored; when the job reaches none,
-  // the promo does not apply at all rather than falling back to a smaller
-  // discount. Empty is the ordinary single-value promo.
-  //
-  // Bands are selected against the LOW end of the pre-discount total, so the
-  // customer is quoted the discount they are certain to get and a job that
-  // lands higher simply earns more at invoice time. Advertising the high band
-  // would promise a discount the job may not reach.
-  tiers PromoTier[]
-
-  // Every $/hr modifier's delta when the promo was created. A flat promo prices
-  // a modified rate at its flat Standard plus these, so "lock in current rates"
-  // still bills the old At home rate after the deltas change. Keyed by label.
-  lockedDeltas PromoLockedDelta[]
-
-  // Eligibility limits. Null means no limit.
-  //
-  // maxRedemptions is approximate by design: two customers can pass the count
-  // check concurrently and both redeem. A distributed lock is not worth it for
-  // a one-operator business, so a promo can go one or two past its cap under
-  // concurrent load.
-  maxRedemptions   Int?
-  perCustomerLimit Int?
-  // Floor for the pre-discount total, read the same way a tier's is.
-  minSpend         Float?
-  // Only for someone with no prior completed booking.
-  newCustomersOnly Boolean @default(false)
-
-  // Recurring window. Inside [startAt, endAt], optionally restrict to these NZ
-  // weekdays (0 = Sunday) and this NZ time-of-day range. An empty list and null
-  // times mean the whole window, which is what every existing promo has.
-  //
-  // Both are matched against the APPOINTMENT, not against when the customer is
-  // browsing: a Tuesday promo exists to fill Tuesday slots, so booking on
-  // Monday for a Tuesday job earns it and booking on Tuesday for a Thursday job
-  // does not.
-  activeWeekdays   Int[]
-  // Minutes since NZ midnight, 0-1439. Both set or both null.
-  activeFromMinute Int?
-  activeToMinute   Int?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // getActivePromo() filters by these three; covers most lookups.
-  @@index([isActive, startAt, endAt])
-  // Code lookup on the customer-entered path.
-  @@index([kind, code])
-}
-
-// Per-task split returned by the public price estimator AI (one entry per
-// distinct task in a multi-task description). `mins` is the task's STACKED
-// contribution to the combined visit, not its standalone benchmark.
-type EstimateTask {
-  label String
-  mins  Int
-}
-
-// A customer email Resend accepted with a scheduledAt, recallable until then.
-// Embedded in Booking.heldEmails.
-type HeldEmail {
-  // Resend's email id, what emails.cancel takes.
-  id     String
-  // When Resend will send it; past this there is nothing left to recall.
-  sendAt DateTime
-}
-
-// Audit log for the public price estimator. Captures what the user typed,
-// how the AI interpreted it, and the exact range shown on screen so disputes
-// can be reviewed. Purged after 30 days by /api/cron/purge-price-estimates.
-model PriceEstimateLog {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-
-  // Raw user input from the wizard step 1.
-  description String
-
-  // AI output captured verbatim.
-  aiEstimatedMins Int
-  aiCategory      AiEstimateCategory
-  aiExplanation   String
-  aiTasks         EstimateTask[]
-
-  // Address + drive time (step 2 is optional - skipped values stay null).
-  // travelMins is the outbound leg (semantic continuity with legacy rows);
-  // travelMinsBack is the return leg, null on rows logged before two-leg quoting.
-  address        String?
-  travelMins     Int?
-  travelMinsBack Int?
-
-  // Meeting modality picked in the wizard. Lets disputes confirm whether
-  // the customer was quoted an on-site rate (with travel) or remote.
-  meetingType MeetingType?
-
-  // Final price range shown to the user, post-promo. priceLow/priceHigh are the
-  // all-in total (labour + travel); travelCharge is the round-trip travel slice
-  // of that total (null on rows logged before travel was broken out, 0 for
-  // remote), letting the booking notes show the labour/travel split.
-  hourlyRate   Float
-  priceLow     Int
-  priceHigh    Int
-  travelCharge Int?
-
-  // Promo snapshot so old quotes remain reconstructable after promos change.
-  promoTitle String?
-  promoLabel String?
-
-  // NODE_ENV at the time of the request. The admin page hides non-production
-  // rows by default and exposes a toggle so I can audit test submissions.
-  environment AppEnvironment @default(production)
-
-  createdAt DateTime @default(now())
-
-  // Cron cleanup: WHERE createdAt < now - 30d
-  @@index([createdAt])
-  // Admin page default view: WHERE environment="production" ORDER BY createdAt DESC
-  @@index([environment, createdAt(sort: Desc)])
 }
 
 model Subscription {
@@ -918,57 +935,107 @@ model Subscription {
   @@index([isActive, nextDue])
 }
 
-// One registered browser-on-device that receives operator push notifications.
-// Rows are created by /api/admin/push/subscribe and removed automatically when
-// the push service reports the endpoint is gone (404/410).
-model PushDevice {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
+// --- Tax records ---
 
-  // Push service URL. Unique: re-subscribing the same browser must update the
-  // existing row rather than accumulate a duplicate every time.
-  endpoint String @unique
+// One entry in the depreciable asset register (/admin/business/assets). Site-only, like
+// Subscription: nothing here syncs to the Google Sheets workbook. Money is NZD on the GST
+// basis at entry; rates are fractions.
+model Asset {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  // IR265 class key from ASSET_CLASSES in src/features/business/lib/tax/asset-classes.ts.
+  classKey        String
+  // "purchased" (bought for the business) or "introduced" (brought in from private use
+  // at market value).
+  origin          String
+  // First used or available for business use: where depreciation starts (NZ ledger date).
+  inServiceDate   DateTime
+  // Purchase cost, or market value on inServiceDate for an introduced asset.
+  costBase        Float
+  // For the low-value same-supplier same-day grouping; null for introduced assets.
+  supplier        String?
+  // How an introduced asset's market value was worked out (listing, quote, receipt).
+  valuationNote   String?
+  // "DV" (diminishing value) or "SL" (straight line).
+  method          String    @default("DV")
+  // Annual depreciation rate as a fraction (0.5 = 50%).
+  rate            Float
+  // Business share, 0-100.
+  businessUsePct  Float     @default(100)
+  // Claims the 20% Investment Boost in the first year.
+  investmentBoost Boolean   @default(false)
+  // "km" for a vehicle claimed on IRD kilometre rates: never depreciated or written off.
+  vehicleMethod   String?
+  // ExpenseEntry the asset was bought through; that expense is left out of deductions.
+  expenseId       String?   @db.ObjectId
+  disposedAt      DateTime?
+  disposalAmount  Float?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  // Encryption material from the browser's PushSubscription.
-  p256dh String
-  auth   String
-
-  // Operator-facing device name, plus the UA it was registered from.
-  label     String?
-  userAgent String?
-
-  createdAt DateTime @default(now())
-
-  // Stamped on every successful send. The device list surfaces it, so a
-  // subscription iOS dropped silently shows up as a stale timestamp.
-  lastSeenAt DateTime?
-
-  // Consecutive non-fatal send failures. Fatal ones delete the row instead.
-  failureCount Int @default(0)
+  @@index([expenseId])
 }
 
-// One recorded use of a promo. Booking.promoIdAtBooking already snapshots the
-// promo per booking, but only for bookings - a redemption row also covers
-// calculator jobs and invoices, and is what the caps in a later phase count.
-model PromoRedemption {
-  id      String @id @default(auto()) @map("_id") @db.ObjectId
-  promoId String @db.ObjectId
+// One business trip in the km log (/admin/business/trips), claimed at IRD kilometre
+// rates. Site-only; one round trip per job.
+model Trip {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  // NZ ledger date of the trip.
+  date            DateTime
+  // Business kilometres for the whole trip (there and back).
+  km              Float
+  purpose         String
+  // Address driven to, kept as it was on the day so a contact moving later never
+  // rewrites where an old trip went.
+  destination     String?
+  // Contact the trip was to, when picked in the trip form or logged from an invoice.
+  contactId       String?  @db.ObjectId
+  // Booking the trip was for, when it came from "Jobs without a trip" or an invoice.
+  bookingId       String?  @db.ObjectId
+  // First calendar event of the invoiced job the trip was logged from, so a job with no
+  // Booking row (a bare calendar entry) still gets only one trip.
+  calendarEventId String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  // Whichever surface the redemption came from.
-  bookingId String? @db.ObjectId
-  invoiceId String? @db.ObjectId
-  contactId String? @db.ObjectId
-
-  // Dollar value of the discount at redemption time, stored rather than
-  // recomputed because the promo's terms can change afterwards. Null on rows
-  // created by the backfill: the realised discount was never recorded, and a
-  // number reconstructed from a quoted range would be a guess.
-  discountValue Float?
-
-  redeemedAt DateTime @default(now())
-
-  @@index([promoId, redeemedAt])
-  @@index([promoId, contactId])
+  @@index([date])
+  @@index([bookingId])
+  @@index([calendarEventId])
 }
+
+// Per-financial-year inputs for the Tax page plus the filed snapshot. Blank rate fields
+// fall back to IRD_YEAR_RATES for the year. Site-only.
+model TaxYear {
+  id                     String    @id @default(auto()) @map("_id") @db.ObjectId
+  // "YYYY-YY", e.g. "2026-27".
+  fyKey                  String    @unique
+  // Home office floor area and whole-house floor area (square metres).
+  officeSqm              Float?
+  houseSqm               Float?
+  // Overrides IRD's square-metre rate for the year.
+  sqmRate                Float?
+  // Override the IRD kilometre rates for the year (first 14,000 km, then beyond).
+  kmTier1                Float?
+  kmTier2                Float?
+  // The car's total km for the FY, read from the odometer; sets the km Tier 1 split.
+  totalVehicleKm         Float?
+  // The year's ACC levy rate as a fraction (2025-26 was 0.0167); null uses the Settings rate.
+  accRate                Float?
+  // Whole-house mortgage interest or rent, and council rates, for the year.
+  mortgageInterestOrRent Float?
+  rates                  Float?
+  // Set when the year's return is filed; the figures are then frozen.
+  filedAt                DateTime?
+  // Figures frozen at filing (closing ATV per asset and the year's totals), so later edits
+  // can't change a filed year.
+  snapshot               Json?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+}
+
+// --- Mailing ---
 
 // Lifecycle of a mailing-list email. Presets never leave draft: they are
 // starting points, copied into a fresh draft before anything is sent.
@@ -1061,7 +1128,6 @@ model CampaignSend {
   // Lowercased address the email went to.
   email      String
   status     CampaignSendStatus @default(pending)
-  resendId   String?
   error      String?
   sentAt     DateTime?
 
@@ -1113,6 +1179,8 @@ model ReviewAskOptOut {
 
   @@index([contactId])
 }
+
+// --- Social ---
 
 // Lifecycle of a social post. "partial" is a run where some platforms posted and
 // others failed; Retry re-runs only the failed ones. Presets never leave draft.
@@ -1313,6 +1381,17 @@ model SocialPost {
   @@index([queueId, scheduledAt])
 }
 
+// A label for sorting social posts. key is the name lowercased, so "Tips" and "tips" are one tag;
+// colour is a swatch key from src/features/social/lib/tags.ts.
+model SocialTag {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  key       String   @unique
+  colour    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // How a schedule picks the next content item for a time slot.
 enum SocialQueueOrder {
   oldest_first
@@ -1346,17 +1425,6 @@ model SocialQueue {
   updatedAt  DateTime         @updatedAt
 }
 
-// A label for sorting social posts. key is the name lowercased, so "Tips" and "tips" are one tag;
-// colour is a swatch key from src/features/social/lib/tags.ts.
-model SocialTag {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  name      String
-  key       String   @unique
-  colour    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 // One reading of a published post's figures on one app, taken at a set age so posts compare
 // like for like. Kept apart from SocialPost so a stats sync never touches the post. Filled by
 // src/features/social/lib/insights/sync.server.ts.
@@ -1366,17 +1434,9 @@ model SocialInsight {
   platform    SocialPlatform
   // The age this reading stands for: 1, 24, 72, 168 or 672 hours (1, 6 or 23 for a story).
   ageHours    Int
-  takenAt     DateTime
+  // Only the figures the analytics curves read; the full latest set lives on SocialPostStats.
   views       Int?
-  reach       Int?
-  likes       Int?
-  comments    Int?
-  shares      Int?
-  saves       Int?
-  clicks      Int?
   engagements Int?
-  // Any other figure the app gave, under its own name.
-  extra       Json?
 
   @@unique([postId, platform, ageHours])
 }
@@ -1493,6 +1553,8 @@ model SocialComment {
   @@index([lastActivityAt])
 }
 
+// --- Post maker ---
+
 // One exported size of a post maker design. docHash is the design's fingerprint when it
 // was exported; a different hash now means the picture is out of date.
 type DesignRender {
@@ -1528,6 +1590,10 @@ model SocialDesign {
   updatedAt    DateTime       @updatedAt
 
   @@index([isTemplate, updatedAt])
+  // Email step and open-post find the design handed to a post
+  @@index([postId])
+  // Draft with AI redraws the pictures it drew for an email
+  @@index([campaignId])
 }
 
 // A saved copy of a post maker design, for its History menu. Written by the save route
@@ -1543,100 +1609,51 @@ model SocialDesignVersion {
   @@index([designId, createdAt])
 }
 
-// One entry in the depreciable asset register (/admin/business/assets). Site-only, like
-// Subscription: nothing here syncs to the Google Sheets workbook. Money is NZD on the GST
-// basis at entry; rates are fractions.
-model Asset {
-  id              String    @id @default(auto()) @map("_id") @db.ObjectId
-  name            String
-  // IR265 class key from ASSET_CLASSES in src/features/business/lib/tax/asset-classes.ts.
-  classKey        String
-  // "purchased" (bought for the business) or "introduced" (brought in from private use
-  // at market value).
-  origin          String
-  // First used or available for business use: where depreciation starts (NZ ledger date).
-  inServiceDate   DateTime
-  // Purchase cost, or market value on inServiceDate for an introduced asset.
-  costBase        Float
-  // For the low-value same-supplier same-day grouping; null for introduced assets.
-  supplier        String?
-  // How an introduced asset's market value was worked out (listing, quote, receipt).
-  valuationNote   String?
-  // "DV" (diminishing value) or "SL" (straight line).
-  method          String    @default("DV")
-  // Annual depreciation rate as a fraction (0.5 = 50%).
-  rate            Float
-  // Business share, 0-100.
-  businessUsePct  Float     @default(100)
-  // Claims the 20% Investment Boost in the first year.
-  investmentBoost Boolean   @default(false)
-  // "km" for a vehicle claimed on IRD kilometre rates: never depreciated or written off.
-  vehicleMethod   String?
-  // ExpenseEntry the asset was bought through; that expense is left out of deductions.
-  expenseId       String?   @db.ObjectId
-  disposedAt      DateTime?
-  disposalAmount  Float?
-  notes           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+// --- App state ---
 
-  @@index([expenseId])
+// Key/value store for small cross-app state: the admin settings groups
+// (`settings:<group>`), run locks, seed markers and small caches.
+model Setting {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
-// One business trip in the km log (/admin/business/trips), claimed at IRD kilometre
-// rates. Site-only; one round trip per job.
-model Trip {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  // NZ ledger date of the trip.
-  date            DateTime
-  // Business kilometres for the whole trip (there and back).
-  km              Float
-  purpose         String
-  // Address driven to, kept as it was on the day so a contact moving later never
-  // rewrites where an old trip went.
-  destination     String?
-  // Contact the trip was to, when picked in the trip form or logged from an invoice.
-  contactId       String?  @db.ObjectId
-  // Booking the trip was for, when it came from "Jobs without a trip" or an invoice.
-  bookingId       String?  @db.ObjectId
-  // First calendar event of the invoiced job the trip was logged from, so a job with no
-  // Booking row (a bare calendar entry) still gets only one trip.
-  calendarEventId String?
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+// Append-only history of settings-group writes, backing the admin audit log
+// and one-click revert. One row per saveSettingsGroup call where the value
+// actually changed. `oldValue` is null on the first write for a group.
+model SettingAudit {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  group     String
+  oldValue  String?
+  newValue  String
+  changedAt DateTime @default(now())
 
-  @@index([date])
-  @@index([bookingId])
-  @@index([calendarEventId])
+  @@index([group, changedAt])
 }
 
-// Per-financial-year inputs for the Tax page plus the filed snapshot. Blank rate fields
-// fall back to IRD_YEAR_RATES for the year. Site-only.
-model TaxYear {
-  id                     String    @id @default(auto()) @map("_id") @db.ObjectId
-  // "YYYY-YY", e.g. "2026-27".
-  fyKey                  String    @unique
-  // Home office floor area and whole-house floor area (square metres).
-  officeSqm              Float?
-  houseSqm               Float?
-  // Overrides IRD's square-metre rate for the year.
-  sqmRate                Float?
-  // Override the IRD kilometre rates for the year (first 14,000 km, then beyond).
-  kmTier1                Float?
-  kmTier2                Float?
-  // The car's total km for the FY, read from the odometer; sets the km Tier 1 split.
-  totalVehicleKm         Float?
-  // The year's ACC levy rate as a fraction (2025-26 was 0.0167); null uses the Settings rate.
-  accRate                Float?
-  // Whole-house mortgage interest or rent, and council rates, for the year.
-  mortgageInterestOrRent Float?
-  rates                  Float?
-  // Set when the year's return is filed; the figures are then frozen.
-  filedAt                DateTime?
-  // Figures frozen at filing (closing ATV per asset and the year's totals), so later edits
-  // can't change a filed year.
-  snapshot               Json?
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+// One registered browser-on-device that receives operator push notifications.
+// Rows are created by /api/admin/push/subscribe and removed automatically when
+// the push service reports the endpoint is gone (404/410).
+model PushDevice {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Push service URL. Unique: re-subscribing the same browser must update the
+  // existing row rather than accumulate a duplicate every time.
+  endpoint String @unique
+
+  // Encryption material from the browser's PushSubscription.
+  p256dh String
+  auth   String
+
+  // Operator-facing device name, plus the UA it was registered from.
+  label     String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  // Stamped on every successful send. The device list surfaces it, so a
+  // subscription iOS dropped silently shows up as a stale timestamp.
+  lastSeenAt DateTime?
 }

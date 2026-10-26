@@ -28,7 +28,7 @@ import {
   type Skips,
 } from "@/features/social/lib/insights/metrics";
 import type { SocialFormatKey } from "@/features/social/lib/media";
-import { graph, GraphError, metaConfig } from "@/features/social/lib/meta-graph";
+import { accountVisible, graph, GraphError, metaConfig } from "@/features/social/lib/meta-graph";
 import { addDaysToDateKey, dateKeyParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
 
 /** A problem that ends this app's run: a bad token or a rate limit. */
@@ -41,6 +41,17 @@ export class MetaStop extends Error {
     super(message);
     this.name = "MetaStop";
   }
+}
+
+/**
+ * Confirms a "gone" answer. Meta words a deleted post and lost access alike, so while the token
+ * can't see the account the app's run stops instead of writing the post off.
+ * @param platform - The app.
+ */
+async function confirmGone(platform: "facebook" | "instagram"): Promise<void> {
+  if (await accountVisible(platform)) return;
+  const account = platform === "facebook" ? "Facebook Page" : "Instagram account";
+  throw new MetaStop(`The Meta token can't see the ${account} - check the Page token.`);
 }
 
 interface Problem {
@@ -197,6 +208,7 @@ export async function readPost(
     now,
   );
   if (insights.problem?.kind === "gone") {
+    await confirmGone(platform);
     return {
       figures: { ...NO_FIGURES },
       extra: null,
@@ -232,6 +244,7 @@ export async function readPost(
     now,
   );
   if (counts.problem?.kind === "gone") {
+    await confirmGone(platform);
     return {
       figures: { ...NO_FIGURES },
       extra: null,

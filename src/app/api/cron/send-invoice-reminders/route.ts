@@ -85,6 +85,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         console.log(
           `[cron/send-invoice-reminders] sent reminder ${res.reminderNumber} for ${inv.number}`,
         );
+      } else if (res.alreadyClaimed) {
+        results.skipped++;
       } else {
         results.failed++;
         results.errors.push(`${inv.number}: ${res.error ?? "unknown"}`);

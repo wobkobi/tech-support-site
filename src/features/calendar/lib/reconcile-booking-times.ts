@@ -118,7 +118,7 @@ export async function reconcileBookingTimes(options: {
   const bookings = await prisma.booking.findMany({
     where: {
       calendarEventId: { not: null },
-      status: { in: ["held", "confirmed", "completed"] },
+      status: { in: ["confirmed", "completed"] },
       startAt: { gte: since },
     },
     select: {

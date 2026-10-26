@@ -125,7 +125,7 @@ async function renderCase(name: string, send: () => Promise<unknown>): Promise<v
     return;
   }
 
-  const { subject, html, text } = sent[sent.length - 1];
+  const { subject, html, text } = sent[sent.length - 1]!;
   console.log(`    subject: ${subject}`);
 
   check(html.length > 200, "html is empty or truncated");

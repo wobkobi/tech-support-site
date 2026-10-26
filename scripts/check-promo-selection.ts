@@ -54,7 +54,7 @@ function iso(d: Date | null | undefined): string | null {
 function main(): void {
   console.log("promo selection fixtures\n");
 
-  expectEqual("no candidates", pickWinningPromo([])?.id ?? null, null);
+  expectEqual("no candidates", pickWinningPromo<PromoCandidate>([])?.id ?? null, null);
 
   expectEqual(
     "single candidate wins",

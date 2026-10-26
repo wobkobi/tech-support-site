@@ -8,7 +8,7 @@ import { assessCancellation } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { releaseBookingRedemptions } from "@/features/business/lib/promo-redemption";
 import { parseString } from "@/features/business/lib/validation";
-import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
+import { removeBookingEvent } from "@/features/calendar/lib/pending-calendar-deletes";
 import { sendOwnerPush } from "@/features/notifications/lib/push";
 import { sendOwnerBookingCancellation } from "@/features/reviews/lib/email-booking";
 import { cancelHeldBookingEmails } from "@/features/reviews/lib/email-core";
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Claim the cancel: only one request can flip an active, not-yet-started booking, so a
     // double click or a race with the operator never sends two fee invoices.
     const claim = await prisma.booking.updateMany({
-      where: { id: booking.id, status: { in: ["held", "confirmed"] }, startAt: { gt: now } },
+      where: { id: booking.id, status: "confirmed", startAt: { gt: now } },
       data: {
         status: "cancelled",
         activeSlotKey: `released:${booking.id}`,
@@ -128,14 +128,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     const updated = await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } });
 
-    // After the claim, so a refused or duplicate cancel never touches the calendar.
-    if (booking.calendarEventId) {
-      try {
-        await deleteBookingEvent({ eventId: booking.calendarEventId });
-      } catch (err) {
-        // Don't fail the committed cancel on a Google API hiccup.
-        console.error("[booking/cancel] Failed to delete calendar event:", err);
-      }
+    // After the claim, so a refused or duplicate cancel never touches the calendar. The
+    // re-read row has the event a reschedule just made; a Google failure is queued for retry.
+    if (updated.calendarEventId) {
+      await removeBookingEvent({ eventId: updated.calendarEventId });
     }
 
     // Unused promo stops counting against its caps. Both helpers never throw.

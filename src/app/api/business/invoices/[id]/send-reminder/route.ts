@@ -34,7 +34,7 @@ export async function POST(
   }
 
   const res = await sendOverdueReminder(invoice);
-  if (!res.ok) return errorResponse(res.error ?? "Reminder failed", 502);
+  if (!res.ok) return errorResponse(res.error ?? "Reminder failed", res.alreadyClaimed ? 409 : 502);
 
   return NextResponse.json({ ok: true, reminderNumber: res.reminderNumber });
 }

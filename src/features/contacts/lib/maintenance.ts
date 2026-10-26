@@ -2,7 +2,7 @@
 // Contact maintenance: booking backfill, duplicate merges (Google link, email, mobile), review
 // linking and conflict surfacing. Every merge folds through one helper; readers skip soft-deleted rows.
 
-import { optOutRepointOps } from "@/features/reviews/lib/review-ask-opt-out";
+import { contactRepointOps, mergedIdsAfter } from "@/features/contacts/lib/merge-links";
 import { isNZMobileKey, normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import type { ReviewLinkMode } from "@prisma/client";
@@ -60,6 +60,7 @@ const MERGE_SELECT = {
   googleContactId: true,
   reviewToken: true,
   altReviewTokens: true,
+  mergedContactIds: true,
   reviewLinkSentAt: true,
   reviewLinkSentMode: true,
   reviewLinkSubmittedAt: true,
@@ -78,14 +79,15 @@ interface MergeableContact {
   googleContactId: string | null;
   reviewToken: string | null;
   altReviewTokens: string[];
+  mergedContactIds: string[];
   reviewLinkSentAt: Date | null;
   reviewLinkSentMode: ReviewLinkMode | null;
   reviewLinkSubmittedAt: Date | null;
 }
 
 /**
- * Folds `dup` into `keeper` (blank-fill, union phones/emails/tokens) and hard-deletes it in one
- * transaction, since Review.contactId is a bare ObjectId nothing cleans up. Google is never
+ * Folds `dup` into `keeper` (blank-fill, union phones/emails/tokens), moves its records over
+ * ({@link contactRepointOps}) and hard-deletes it, all in one transaction. Google is never
  * touched: dupes often share the keeper's googleContactId.
  * @param keeper - The row that survives; updated in place to reflect the merge.
  * @param dup - The row being merged away.
@@ -157,21 +159,14 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
     fill.altReviewTokens = { set: [...tokenSet] };
   }
 
+  // Links sent under the dup's id (unsubscribe, stop asking) find the keeper through this.
+  const mergedIds = mergedIdsAfter(keeper.mergedContactIds, dup);
+  fill.mergedContactIds = { set: mergedIds };
+
   try {
     await prisma.$transaction([
-      prisma.review.updateMany({
-        where: { contactId: dup.id },
-        data: { contactId: keeper.id },
-      }),
-      // ContactConflict.contactId has no relation, so nothing cascades on delete.
-      prisma.contactConflict.updateMany({
-        where: { contactId: dup.id },
-        data: { contactId: keeper.id },
-      }),
-      ...optOutRepointOps(dup.id, keeper.id),
-      ...(Object.keys(fill).length > 0
-        ? [prisma.contact.update({ where: { id: keeper.id }, data: fill })]
-        : []),
+      ...(await contactRepointOps(dup.id, keeper.id)),
+      prisma.contact.update({ where: { id: keeper.id }, data: fill }),
       prisma.contact.delete({ where: { id: dup.id } }),
     ]);
   } catch (err) {
@@ -195,6 +190,7 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
   if (fill.altPhones) keeper.altPhones = [...altSet];
   if (fill.altEmails) keeper.altEmails = mergedAltEmails;
   if (fill.altReviewTokens) keeper.altReviewTokens = [...tokenSet];
+  keeper.mergedContactIds = mergedIds;
   return true;
 }
 

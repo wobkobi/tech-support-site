@@ -2,6 +2,7 @@
 // Public page behind the unsubscribe link in every mailing-list email. Checks the
 // signed token, then leaves the actual change to a button press.
 
+import { followMerges } from "@/features/contacts/lib/merge-links";
 import { UnsubscribeForm } from "@/features/mailing/components/UnsubscribeForm";
 import { isContactOptedOut } from "@/features/mailing/lib/opt-out";
 import { verifyUnsubscribeToken } from "@/features/mailing/lib/unsubscribe-token";
@@ -29,7 +30,8 @@ export default async function UnsubscribePage({
 }): Promise<React.ReactElement> {
   const { token } = await params;
   const isPreview = token === "preview";
-  const contactId = isPreview ? null : verifyUnsubscribeToken(token);
+  const tokenId = isPreview ? null : verifyUnsubscribeToken(token);
+  const contactId = tokenId ? await followMerges(tokenId) : null;
   const alreadyOut = contactId ? await isContactOptedOut(contactId) : false;
 
   return (

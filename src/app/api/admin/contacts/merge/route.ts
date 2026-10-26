@@ -1,9 +1,9 @@
 // src/app/api/admin/contacts/merge/route.ts
-// Admin API to merge a duplicate Contact into another: reviews move, blanks fill, and the
+// Admin API to merge a duplicate Contact into another: its records move, blanks fill, and the
 // secondary is soft-deleted (its Google contact removed best-effort).
 
 import { deleteContactFromGoogle } from "@/features/contacts/lib/google-contacts";
-import { optOutRepointOps } from "@/features/reviews/lib/review-ask-opt-out";
+import { contactRepointOps, mergedIdsAfter } from "@/features/contacts/lib/merge-links";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { normaliseEmailOrNull } from "@/shared/lib/normalise-email";
@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 interface MergeBody {
   /** The contact to keep. Its non-blank fields win. */
   primaryId: string;
-  /** The contact to merge away. Soft-deleted after its data/reviews move over. */
+  /** The contact to merge away. Soft-deleted after its data and records move over. */
   secondaryId: string;
 }
 
@@ -23,7 +23,7 @@ interface MergeBody {
  * POST /api/admin/contacts/merge
  * Merges the secondary contact into the primary and soft-deletes the secondary.
  * @param request - Incoming request with primaryId and secondaryId.
- * @returns JSON { ok: true } on success, or an error response.
+ * @returns JSON { ok: true, googleDeleteFailed? } on success, or an error response.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
@@ -70,7 +70,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     altEmails: { set: string[] };
     altPhones: { set: string[] };
     altReviewTokens: { set: string[] };
-  } = { altEmails: { set: [] }, altPhones: { set: [] }, altReviewTokens: { set: [] } };
+    mergedContactIds: { set: string[] };
+  } = {
+    altEmails: { set: [] },
+    altPhones: { set: [] },
+    altReviewTokens: { set: [] },
+    // Links sent under the secondary's id (unsubscribe, stop asking) find the primary through this.
+    mergedContactIds: { set: mergedIdsAfter(primary.mergedContactIds, secondary) },
+  };
   if (!primary.phone && secondary.phone) data.phone = secondary.phone;
   if (!primary.email && secondary.email) data.email = secondary.email;
   if (!primary.address && secondary.address) data.address = secondary.address;
@@ -132,11 +139,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     await prisma.$transaction([
-      prisma.review.updateMany({
-        where: { contactId: secondaryId },
-        data: { contactId: primaryId },
-      }),
-      ...optOutRepointOps(secondaryId, primaryId),
+      ...(await contactRepointOps(secondaryId, primaryId)),
       prisma.contact.update({ where: { id: primaryId }, data }),
       prisma.contact.update({ where: { id: secondaryId }, data: { deletedAt: new Date() } }),
     ]);
@@ -147,7 +150,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Best-effort Google removal, skipped when both rows share one Google contact.
   if (secondary.googleContactId && secondary.googleContactId !== primary.googleContactId) {
-    await deleteContactFromGoogle(secondary.googleContactId);
+    if (!(await deleteContactFromGoogle(secondary.googleContactId))) {
+      return NextResponse.json({ ok: true, googleDeleteFailed: true });
+    }
   }
 
   return NextResponse.json({ ok: true });

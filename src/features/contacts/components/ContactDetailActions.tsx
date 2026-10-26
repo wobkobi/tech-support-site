@@ -178,7 +178,7 @@ export function ContactDetailActions({
     }
   }
 
-  /** Pushes this contact to Google People. Best-effort - the server logs failures. */
+  /** Syncs this contact with Google Contacts, toasting why when it didn't. */
   async function syncGoogle(): Promise<void> {
     setBusy("sync");
     try {
@@ -202,9 +202,19 @@ export function ContactDetailActions({
         `/api/admin/contacts/${id}${deleteGoogle ? "" : "?deleteGoogle=false"}`,
         { method: "DELETE" },
       );
-      const data = (await res.json()) as { ok?: boolean; error?: string };
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        googleDeleteFailed?: boolean;
+      };
       if (!res.ok) throw new Error(data.error ?? "Request failed");
-      toast("Contact deleted.", { tone: "success" });
+      if (data.googleDeleteFailed) {
+        toast("Deleted here, but Google Contacts still has them. Delete them there too.", {
+          tone: "warning",
+        });
+      } else {
+        toast("Contact deleted.", { tone: "success" });
+      }
       router.push("/admin/contacts");
     } catch (err) {
       toast(err instanceof Error ? err.message : "Delete failed.", { tone: "error" });

@@ -54,16 +54,21 @@ export interface MarketingContact {
 }
 
 /**
- * Every contact on the Resend account, 100 a page.
+ * Every contact on the Resend account, or in one segment, 100 a page.
+ * @param segmentId - Only this segment's contacts; omitted for the whole account.
  * @returns The contacts.
  */
-export async function listMarketingContacts(): Promise<MarketingContact[]> {
+export async function listMarketingContacts(segmentId?: string): Promise<MarketingContact[]> {
   const out: MarketingContact[] = [];
   let after: string | undefined;
   // 20 pages is 2,000 contacts, twice the free plan's cap.
   for (let page = 0; page < 20; page++) {
     const data = await paced("list contacts", (r) =>
-      r.contacts.list(after ? { limit: 100, after } : { limit: 100 }),
+      r.contacts.list({
+        limit: 100,
+        ...(after ? { after } : {}),
+        ...(segmentId ? { segmentId } : {}),
+      }),
     );
     for (const c of data.data) {
       out.push({ id: c.id, email: c.email.toLowerCase(), unsubscribed: c.unsubscribed });
@@ -81,6 +86,17 @@ export async function listMarketingContacts(): Promise<MarketingContact[]> {
  */
 export async function removeMarketingContact(id: string): Promise<void> {
   await paced("remove a contact", (r) => r.contacts.remove(id));
+}
+
+/**
+ * Takes one address out of a segment, so a broadcast to it skips them; the contact stays.
+ * @param email - Lowercased address.
+ * @param segmentId - Segment id.
+ */
+export async function removeFromSegment(email: string, segmentId: string): Promise<void> {
+  await paced("take a contact off the list", (r) =>
+    r.contacts.segments.remove({ email, segmentId }),
+  );
 }
 
 /**
@@ -171,13 +187,15 @@ export async function startContactImport(
 /**
  * Where a contact import has got to.
  * @param id - Import id.
- * @returns Its status and how many rows failed.
+ * @returns Its status, how many rows failed, and when it started.
  */
-export async function contactImportStatus(
-  id: string,
-): Promise<{ status: "queued" | "in_progress" | "completed" | "failed"; failed: number }> {
+export async function contactImportStatus(id: string): Promise<{
+  status: "queued" | "in_progress" | "completed" | "failed";
+  failed: number;
+  createdAt: Date;
+}> {
   const data = await paced("check the list upload", (r) => r.contacts.imports.get(id));
-  return { status: data.status, failed: data.counts.failed };
+  return { status: data.status, failed: data.counts.failed, createdAt: new Date(data.created_at) };
 }
 
 /** What a broadcast is made of. */

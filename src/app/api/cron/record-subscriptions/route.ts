@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
  * GET /api/cron/record-subscriptions
  * Records all active subscriptions due today or earlier (NZ time).
  * @param request - Incoming cron request.
- * @returns JSON with count of recorded subscriptions and any errors.
+ * @returns JSON with count of recorded subscriptions and any errors; 500 when any failed.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!isCronAuthorised(request)) {
@@ -46,10 +46,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  return NextResponse.json({
-    ok: true,
-    recorded: recorded.length,
-    skipped: skipped.length,
-    errors,
-  });
+  // A failure comes after the claim moved nextDue, so it needs recording by hand; the 500
+  // makes cron-job.org flag the run instead of reading it as done.
+  return NextResponse.json(
+    { ok: errors.length === 0, recorded: recorded.length, skipped: skipped.length, errors },
+    { status: errors.length > 0 ? 500 : 200 },
+  );
 }

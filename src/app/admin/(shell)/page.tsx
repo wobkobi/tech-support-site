@@ -70,7 +70,6 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     pendingCount,
     approvedCount,
     confirmedCount,
-    heldCount,
     contactCount,
     unsyncedCount,
   } = data;
@@ -118,12 +117,6 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       value: confirmedCount,
       href: `/admin/bookings?status=confirmed`,
       urgent: false,
-    },
-    {
-      label: "Held bookings",
-      value: heldCount,
-      href: `/admin/bookings?status=held`,
-      urgent: heldCount > 0,
     },
     {
       label: "Approved reviews",
@@ -198,7 +191,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
         ))}
       </StatStrip>
 
-      <DashboardAlerts overdueCount={overdueInvoices.length} heldCount={heldCount} />
+      <DashboardAlerts overdueCount={overdueInvoices.length} />
 
       {/* What needs doing first; history below. */}
       <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
@@ -238,7 +231,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
         </StickyRail>
       </div>
 
-      <StatStrip label="Running totals" className="mb-6 grid-cols-2 lg:grid-cols-5">
+      <StatStrip label="Running totals" className="mb-6 grid-cols-2 lg:grid-cols-4">
         {secondaryStats.map((s, i) => (
           <StatCard
             key={s.label}
@@ -248,7 +241,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
             tone={s.urgent ? "critical" : "violet"}
             className={
               i === secondaryStats.length - 1
-                ? lastCardSpan(secondaryStats.length, { base: 2, lg: 5 })
+                ? lastCardSpan(secondaryStats.length, { base: 2, lg: 4 })
                 : undefined
             }
           />

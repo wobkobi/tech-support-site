@@ -33,7 +33,8 @@ export async function writeKeepingUpdatedAt(
 
 /**
  * Deletes exported pictures, uploaded videos and their cover frames from Blob once nothing points
- * at them: no post (any of its pictures or its video), design, email or email preset. Uploaded
+ * at them: no post (any of its pictures, the ones "Add my logo" kept, or its video), design,
+ * email or email preset. Uploaded
  * photos are never touched. Failures are logged, never thrown.
  * @param urls - Addresses that may have fallen out of use.
  */
@@ -48,7 +49,9 @@ export async function deleteUnusedMedia(urls: (string | null | undefined)[]): Pr
           where: {
             OR: [
               { imageUrl: url },
+              { imageOriginalUrl: url },
               { targets: { some: { imageUrl: url } } },
+              { targets: { some: { imageOriginalUrl: url } } },
               { moreImages: { some: { url } } },
               { video: { is: { url } } },
               { video: { is: { coverUrl: url } } },

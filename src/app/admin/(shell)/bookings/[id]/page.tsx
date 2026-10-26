@@ -37,7 +37,6 @@ export const metadata: Metadata = {
 /** StatusPill tone for each booking status. */
 const STATUS_TONE: Record<string, StatusTone> = {
   confirmed: "info",
-  held: "warning",
   completed: "success",
   cancelled: "critical",
 };
@@ -239,9 +238,6 @@ export default async function BookingDetailPage({
                 {promoSummary && <Fact label="Promo">{promoSummary}</Fact>}
                 {booking.baseRateAtBooking != null && (
                   <Fact label="Base rate">{formatNZD(booking.baseRateAtBooking)}/hr</Fact>
-                )}
-                {booking.complexRateAtBooking != null && (
-                  <Fact label="Complex rate">{formatNZD(booking.complexRateAtBooking)}/hr</Fact>
                 )}
                 {booking.travelRatePerHourAtBooking != null && (
                   <Fact label="Travel rate">

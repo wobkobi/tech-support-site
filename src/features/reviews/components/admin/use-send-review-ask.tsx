@@ -23,7 +23,13 @@ export interface ReviewAskTarget {
 type DialogState =
   | { kind: "closed" }
   | { kind: "email"; target: ReviewAskTarget; html: string | null }
-  | { kind: "sms"; target: ReviewAskTarget; text: string | null };
+  | {
+      kind: "sms";
+      target: ReviewAskTarget;
+      text: string | null;
+      /** Contact the copy stamps as asked; cleared once it has. */
+      contactId: string | null;
+    };
 
 /** What {@link useSendReviewAsk} hands back. */
 export interface SendReviewAsk {
@@ -34,11 +40,27 @@ export interface SendReviewAsk {
 }
 
 /**
+ * Records a copied review text as sent: there's no SMS provider, so the copy is the last step
+ * the site sees.
+ * @param contactId - Contact the text is for.
+ * @returns The error to show, or null once it's recorded.
+ */
+export async function markReviewAskTexted(contactId: string): Promise<string | null> {
+  const res = await apiFetch(`/api/admin/contacts/${contactId}/review-link-texted`, {
+    method: "POST",
+  });
+  return res.ok ? null : res.error;
+}
+
+/**
  * Hand-send a review ask from a list row: preview then send for email, copy for text.
- * @param onSent - Called after an email ask goes out, with the person it went to.
+ * @param onSent - Called after an ask goes out (a text once it's copied and recorded), with the
+ *   person and the channel.
  * @returns The opener and the dialog element.
  */
-export function useSendReviewAsk(onSent?: (target: ReviewAskTarget) => void): SendReviewAsk {
+export function useSendReviewAsk(
+  onSent?: (target: ReviewAskTarget, channel: "email" | "sms") => void,
+): SendReviewAsk {
   const { toast } = useToast();
   const [state, setState] = useState<DialogState>({ kind: "closed" });
   const [sending, setSending] = useState(false);
@@ -65,17 +87,20 @@ export function useSendReviewAsk(onSent?: (target: ReviewAskTarget) => void): Se
       setState({ kind: "email", target, html: res.data.html });
       return;
     }
-    setState({ kind: "sms", target, text: null });
-    const res = await apiFetch<{ smsText: string }>("/api/admin/send-review-link", {
-      method: "POST",
-      json: { name: target.name, phone: target.phone, mode: "sms", resend: true },
-    });
+    setState({ kind: "sms", target, text: null, contactId: null });
+    const res = await apiFetch<{ smsText: string; contactId: string }>(
+      "/api/admin/send-review-link",
+      {
+        method: "POST",
+        json: { name: target.name, phone: target.phone, mode: "sms", resend: true },
+      },
+    );
     if (!res.ok) {
       toast(res.error, { tone: "error" });
       setState({ kind: "closed" });
       return;
     }
-    setState({ kind: "sms", target, text: res.data.smsText });
+    setState({ kind: "sms", target, text: res.data.smsText, contactId: res.data.contactId });
   }
 
   /** Sends the previewed email. */
@@ -94,14 +119,22 @@ export function useSendReviewAsk(onSent?: (target: ReviewAskTarget) => void): Se
     }
     toast(`Review ask sent to ${target.name}.`, { tone: "success" });
     setState({ kind: "closed" });
-    onSent?.(target);
+    onSent?.(target, "email");
   }
 
-  /** Copies the composed text. */
+  /** Copies the composed text, then records the ask once. */
   async function copyText(): Promise<void> {
     if (state.kind !== "sms" || !state.text) return;
     await navigator.clipboard.writeText(state.text);
     setCopied(true);
+    if (!state.contactId) return;
+    const error = await markReviewAskTexted(state.contactId);
+    if (error) {
+      toast(`Copied, but it isn't marked as asked: ${error}`, { tone: "error" });
+      return;
+    }
+    setState({ ...state, contactId: null });
+    onSent?.(state.target, "sms");
   }
 
   /** Closes whichever dialog is open. */

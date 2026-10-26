@@ -22,7 +22,7 @@ export async function flagBouncedBookings(emails: string[], now = new Date()): P
     const bookings = await prisma.booking.findMany({
       where: {
         email: { in: emails },
-        status: { in: ["held", "confirmed"] },
+        status: "confirmed",
         createdAt: { gte: new Date(now.getTime() - RECENT_BOOKING_MS) },
       },
       select: { id: true, name: true, startAt: true },

@@ -22,6 +22,13 @@ const TRAVEL_ROUND_INCREMENT_MIN = 5;
 // Forward window for chaining a travel-back leg into the next event's travel-to.
 const RETURN_CHAINING_LOOKAHEAD_MS = 2 * 60 * 60 * 1000;
 
+// A cache row's TTL: twice the 30-minute cron, so one late or missed run doesn't expire the
+// table and push booking onto the live API.
+export const CALENDAR_CACHE_TTL_MS = 60 * 60 * 1000;
+
+// How long after its fetch a row stays servable once expired; covers missed cron runs.
+export const CALENDAR_CACHE_STALE_MS = 2 * 60 * 60 * 1000;
+
 /**
  * Rounds raw Distance Matrix minutes up with a buffer for overrun and traffic.
  * @param raw - Raw travel time in minutes from the Distance Matrix API.
@@ -233,8 +240,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     },
   });
 
-  // 30-min TTL over a 15-min cron: one missed run won't push booking onto the live API.
-  const cacheExpiry = new Date(now.getTime() + 30 * 60 * 1000);
+  const cacheExpiry = new Date(now.getTime() + CALENDAR_CACHE_TTL_MS);
   const upsertPromises = rawEvents.map((event) =>
     prisma.calendarEventCache.upsert({
       where: {

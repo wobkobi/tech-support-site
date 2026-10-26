@@ -3,8 +3,10 @@
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
+  bookingWindowEnd,
   buildAppointmentDescription,
   combineUnitAndAddress,
+  isSlotFree,
   parseHourLabel,
   PHONE_INVALID_MESSAGE,
   splitUnitFromAddress,
@@ -14,18 +16,18 @@ import {
   type StartMinute,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
-import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
+import {
+  loadBlockingBookings,
+  loadBlockingEvents,
+} from "@/features/booking/lib/existing-bookings.server";
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { recordPromoRedemption } from "@/features/business/lib/promo-redemption";
 import { resolvePromo } from "@/features/business/lib/promos";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import { parseObjectId } from "@/features/business/lib/validation";
-import {
-  createBookingEvent,
-  deleteBookingEvent,
-  fetchAllCalendarEvents,
-} from "@/features/calendar/lib/google-calendar";
+import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
+import { removeBookingEvent } from "@/features/calendar/lib/pending-calendar-deletes";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { optOutByEmail, optOutContact } from "@/features/mailing/lib/opt-out";
@@ -181,19 +183,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         { status: 400 },
       );
     }
-    const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
-
     const existingForValidation = await loadBlockingBookings(now);
 
-    // Fail closed: without the calendar read a collision can't be ruled out.
+    // Fail closed: without every calendar read a collision can't be ruled out.
     let calendarEvents: Array<{ id: string; start: string; end: string }>;
     try {
-      const rawEvents = await fetchAllCalendarEvents(now, maxDate);
-      calendarEvents = rawEvents.map((e) => ({
-        id: e.id,
-        start: e.start,
-        end: e.end,
-      }));
+      calendarEvents = await loadBlockingEvents(now, bookingWindowEnd(now, config));
     } catch (error) {
       console.error("[booking/request] Failed to fetch calendar events:", error);
       return NextResponse.json(
@@ -238,7 +233,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Snapshot the quote the customer saw; fields are copied so they survive the
     // estimate-log purge. priceLow/priceHigh are the all-in total.
-    let priceEstimateIdAtBooking: string | null = null;
     let quotedLowAtBooking: number | null = null;
     let quotedHighAtBooking: number | null = null;
     let quotedTravelAtBooking: number | null = null;
@@ -251,7 +245,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         .findUnique({ where: { id: estimateId } })
         .catch(() => null);
       if (est) {
-        priceEstimateIdAtBooking = est.id;
         quotedLowAtBooking = est.priceLow;
         quotedHighAtBooking = est.priceHigh;
         quotedTravelAtBooking = est.travelCharge;
@@ -366,6 +359,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
     const publicHolidayName = holiday?.name ?? null;
 
+    // Until the row exists, a failure leaves the new event orphaned.
+    let bookingCreated = false;
     try {
       const booking = await prisma.booking.create({
         data: {
@@ -390,7 +385,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           duration,
           travelMinsAtBooking,
           travelMinsBackAtBooking,
-          // complexRateAtBooking is not written; there is no Complex tier.
           baseRateAtBooking,
           travelRatePerHourAtBooking,
           // Promo snapshot denormalised - survives Promo deletion before service.
@@ -405,7 +399,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             : undefined,
           publicHolidayName,
           // The public quote the customer saw and how the AI read their request.
-          priceEstimateIdAtBooking,
           quotedLowAtBooking,
           quotedHighAtBooking,
           quotedTravelAtBooking,
@@ -416,7 +409,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         },
       });
 
+      bookingCreated = true;
       console.log(`[booking/request] Created ${duration} booking: ${booking.id}`);
+
+      // activeSlotKey only stops an identical start, so two overlapping requests checked
+      // in the same moment both get here. Re-check now this row is in: of two that clash,
+      // whichever reads last sees the other and backs out.
+      const others = await loadBlockingBookings(now, { excludeId: booking.id });
+      if (!isSlotFree(startAt, endAt, others, [], 0)) {
+        console.warn(
+          `[booking/request] ${booking.id} overlaps a booking made alongside it; backing out`,
+        );
+        await prisma.booking.delete({ where: { id: booking.id } });
+        if (calendarEventId) await removeBookingEvent({ eventId: calendarEventId });
+        return NextResponse.json(
+          { ok: false, error: "This time slot is no longer available." },
+          { status: 409 },
+        );
+      }
 
       // Best-effort contact upsert. The id feeds the redemption below, or a
       // per-customer promo limit would never bind.
@@ -510,18 +520,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         cancelToken: booking.cancelToken,
       });
     } catch (error) {
+      // No booking row, so take the new event back off the calendar: no ghost invite.
+      if (!bookingCreated && calendarEventId) {
+        await removeBookingEvent({ eventId: calendarEventId });
+      }
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         console.warn("[booking/request] Concurrent booking conflict", {
           activeSlotKey: startAt.toISOString(),
           email: normalisedEmail,
           timestamp: new Date().toISOString(),
         });
-        // Lost the slot race; delete the orphaned event so no ghost invite lingers.
-        if (calendarEventId) {
-          await deleteBookingEvent({ eventId: calendarEventId }).catch((err) =>
-            console.error("[booking/request] Failed to delete orphaned calendar event:", err),
-          );
-        }
         return NextResponse.json(
           { ok: false, error: "This time slot is no longer available." },
           { status: 409 },

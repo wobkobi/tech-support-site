@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
  * same-named people the email would go onto.
  * @param request - Incoming request.
  * @returns JSON { ok, exists, contactId, linkedContactId, existingContactId?, existingContactName?,
- *   existingContactPhone?, existingContactAddress? }.
+ *   existingContactPhone?, existingContactAddress? }, or 502 when Google couldn't be checked.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // The local table lags Google by a cron cycle, so ask Google; a hit is reconciled now.
   const reconciled = await importGoogleContactByEmail(email);
-  if (reconciled) {
+  if (reconciled.found) {
     return NextResponse.json({
       ok: true,
       exists: true,
@@ -58,6 +58,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       linkedContactId,
     });
   }
+  // Unknown, not absent: answering "not a contact" would prompt adding someone Google has.
+  if (reconciled.failed) return errorResponse("Couldn't check Google Contacts just now.", 502);
 
   // Picked from Google but email unknown: report the contact so the email gets added to it.
   return NextResponse.json({

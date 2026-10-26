@@ -8,11 +8,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/admin/contacts/[id]/sync-google
- * Syncs the contact to Google Contacts; errors come back as { ok: false, error }.
+ * Syncs the contact with Google Contacts.
  * @param request - Incoming request.
  * @param params - Route segment params wrapper.
  * @param params.params - Promise resolving to the route segment containing the contact ID.
- * @returns JSON with { ok: true } on success, or { ok: false, error } on failure.
+ * @returns JSON `{ ok: true }`; 409 when the contact isn't one that syncs, 429 when Google is
+ *   rate-limiting, 502 when the Google call failed.
  */
 export async function POST(
   request: NextRequest,
@@ -24,11 +25,13 @@ export async function POST(
 
   const { id } = await params;
 
-  try {
-    await syncContactToGoogle(id);
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error(`[admin/contacts/${id}/sync-google] POST error:`, error);
-    return errorResponse("Sync failed", 500);
+  const outcome = await syncContactToGoogle(id);
+  if (outcome === "skipped") {
+    return errorResponse("Only a live contact with an email syncs with Google.", 409);
   }
+  if (outcome === "rate-limited") {
+    return errorResponse("Google is limiting requests. Try again in a few minutes.", 429);
+  }
+  if (outcome === "failed") return errorResponse("Couldn't sync with Google just now.", 502);
+  return NextResponse.json({ ok: true });
 }

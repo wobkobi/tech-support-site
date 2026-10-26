@@ -98,25 +98,25 @@ console.log("Facebook comments");
     "page1",
   );
   expectEqual("rows kept", rows.length, 4);
-  expectEqual("top-level comment", [rows[0].kind, rows[0].threadExternalId], ["comment", null]);
-  expectEqual("text trimmed", rows[0].text, "Do you fix Macs?");
+  expectEqual("top-level comment", [rows[0]!.kind, rows[0]!.threadExternalId], ["comment", null]);
+  expectEqual("text trimmed", rows[0]!.text, "Do you fix Macs?");
   expectEqual(
     "reply threads under its comment",
-    [rows[1].kind, rows[1].threadExternalId],
+    [rows[1]!.kind, rows[1]!.threadExternalId],
     ["reply", "c1"],
   );
-  expect("our Page's reply is ours", rows[1].fromUs);
-  expectEqual("a reply to a reply threads under the top comment", rows[2].threadExternalId, "c1");
-  expect("their reply isn't ours", !rows[2].fromUs);
-  expectEqual("no writer named", [rows[3].authorName, rows[3].fromUs], [null, false]);
-  expectEqual("object kept", rows[0].objectExternalId, "page1_post1");
+  expect("our Page's reply is ours", rows[1]!.fromUs);
+  expectEqual("a reply to a reply threads under the top comment", rows[2]!.threadExternalId, "c1");
+  expect("their reply isn't ours", !rows[2]!.fromUs);
+  expectEqual("no writer named", [rows[3]!.authorName, rows[3]!.fromUs], [null, false]);
+  expectEqual("object kept", rows[0]!.objectExternalId, "page1_post1");
   expect(
     "nothing is ours without a Page id",
     facebookRows(
       [{ id: "x", created_time: "2026-10-21T01:00:00+0000", from: { id: "page1" } }],
       "p",
       null,
-    )[0].fromUs === false,
+    )[0]!.fromUs === false,
   );
 }
 
@@ -148,12 +148,12 @@ console.log("Instagram comments");
   expectEqual("comment and timed reply", rows.length, 2);
   expectEqual(
     "comment",
-    [rows[0].kind, rows[0].authorName, rows[0].fromUs],
+    [rows[0]!.kind, rows[0]!.authorName, rows[0]!.fromUs],
     ["comment", "kiwi_nan", false],
   );
   expectEqual(
     "reply by username is ours",
-    [rows[1].kind, rows[1].threadExternalId, rows[1].fromUs],
+    [rows[1]!.kind, rows[1]!.threadExternalId, rows[1]!.fromUs],
     ["reply", "ig1", true],
   );
   const byId = instagramRows(
@@ -161,7 +161,7 @@ console.log("Instagram comments");
     "m",
     { id: "us1", username: null },
   );
-  expect("ours by account id", byId[0].fromUs);
+  expect("ours by account id", byId[0]!.fromUs);
   expectEqual(
     "a comment with no id is dropped",
     instagramRows({ text: "x" }, "m", { id: null, username: null }),
@@ -180,6 +180,7 @@ console.log("Google reviews");
     updateTime: "2026-10-01T00:00:00Z",
     reviewReply: { comment: "Thanks John!", updateTime: "2026-10-02T00:00:00Z" },
   });
+  if (!review || !reply) throw new Error("A replied review should give two rows.");
   expectEqual("stars as a number", review.rating, 4);
   expectEqual(
     "review row",
@@ -205,11 +206,11 @@ console.log("Google reviews");
     createTime: "2026-10-01T00:00:00Z",
     updateTime: "2026-10-05T00:00:00Z",
   });
-  expectEqual("anonymous writer has no name", anon[0].authorName, null);
-  expectEqual("stars only, no words", anon[0].text, "");
+  expectEqual("anonymous writer has no name", anon[0]!.authorName, null);
+  expectEqual("stars only, no words", anon[0]!.text, "");
   expectEqual(
     "changed later is an edit",
-    anon[0].editedAt?.toISOString(),
+    anon[0]!.editedAt?.toISOString(),
     "2026-10-05T00:00:00.000Z",
   );
   expectEqual("no reply, no reply row", anon.length, 1);
@@ -221,14 +222,14 @@ console.log("Google reviews");
     updateTime: "2026-10-03T00:01:00Z",
     reviewReply: { comment: "Thanks", updateTime: "2026-10-03T00:00:00Z" },
   });
-  expectEqual("a change with our reply isn't an edit", bumped[0].editedAt, null);
+  expectEqual("a change with our reply isn't an edit", bumped[0]!.editedAt, null);
   expectEqual(
     "unknown stars",
     googleRows({
       name: "n",
       createTime: "2026-10-01T00:00:00Z",
       starRating: "STAR_RATING_UNSPECIFIED",
-    })[0].rating,
+    })[0]!.rating,
     null,
   );
   expectEqual(

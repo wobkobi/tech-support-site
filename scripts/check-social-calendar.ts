@@ -71,14 +71,14 @@ const CTX: ColourContext = {
 function checkDays(): void {
   console.log("Days");
   const oct = monthGrid("2026-10-22");
-  expectEqual("Oct 2026 starts on Mon 28 Sep", oct[0][0], "2026-09-28");
+  expectEqual("Oct 2026 starts on Mon 28 Sep", oct[0]![0], "2026-09-28");
   expectEqual("Oct 2026 takes 5 rows", oct.length, 5);
-  expectEqual("Oct 2026 ends on Sun 1 Nov", oct[4][6], "2026-11-01");
+  expectEqual("Oct 2026 ends on Sun 1 Nov", oct[4]![6], "2026-11-01");
   expectEqual("Feb 2027 (starts Monday, 28 days) takes 4 rows", monthGrid("2027-02-10").length, 4);
   const feb28 = monthGrid("2028-02-01");
-  expectEqual("Feb 2028 starts on Mon 31 Jan", feb28[0][0], "2028-01-31");
+  expectEqual("Feb 2028 starts on Mon 31 Jan", feb28[0]![0], "2028-01-31");
   expectEqual("Feb 2028 takes 5 rows", feb28.length, 5);
-  expectEqual("Feb 2028's last row holds the 29th", feb28[4].slice(0, 3), [
+  expectEqual("Feb 2028's last row holds the 29th", feb28[4]!.slice(0, 3), [
     "2028-02-28",
     "2028-02-29",
     "2028-03-01",
@@ -86,7 +86,7 @@ function checkDays(): void {
   expectEqual("Nov 2026 (starts Sunday) takes 6 rows", monthGrid("2026-11-05").length, 6);
   expect(
     "every row is a Monday-first week",
-    [...oct, ...feb28].every((row) => row.length === 7 && mondayKey(row[0]) === row[0]),
+    [...oct, ...feb28].every((row) => row.length === 7 && mondayKey(row[0]!) === row[0]),
   );
 
   expectEqual("Monday of a Thursday", mondayKey("2026-10-22"), "2026-10-19");

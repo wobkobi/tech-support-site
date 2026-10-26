@@ -6,7 +6,7 @@ import "server-only";
 import type { BarGroup } from "@/features/admin/components/charts/BarChart";
 import { meetingTypeFromNotes } from "@/features/booking/lib/booking";
 import { balanceDue, formatNZD } from "@/features/business/lib/business";
-import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
+import { isInvoiceOverdue, NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
 import {
   basisExpenseRows,
   basisIncomeRows,
@@ -74,7 +74,6 @@ export interface DashboardData {
   todayKey: string;
   pendingCount: number;
   approvedCount: number;
-  heldCount: number;
   confirmedCount: number;
   contactCount: number;
   unsyncedCount: number;
@@ -134,7 +133,6 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
   const [
     pendingCount,
     approvedCount,
-    heldCount,
     confirmedCount,
     contactCount,
     unsyncedCount,
@@ -159,7 +157,6 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
   ] = await Promise.all([
     prisma.review.count({ where: { status: "pending" } }),
     prisma.review.count({ where: { status: "approved" } }),
-    prisma.booking.count({ where: { status: "held" } }),
     prisma.booking.count({ where: { status: "confirmed" } }),
     prisma.contact.count({ where: { deletedAt: null } }),
     // `isSet: false` catches rows created before the field existed; `null` alone misses them.
@@ -350,9 +347,8 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
   const monthRevenue = monthIncome._sum.amount ?? 0;
   // Money handed over on the day is already in, so only the balance is outstanding.
   const outstandingTotal = outstandingInvoices.reduce((s, inv) => s + balanceDue(inv), 0);
-  const overdueInvoices = outstandingInvoices.filter(
-    (inv) => inv.status === "SENT" && inv.dueDate < now,
-  );
+  // Same rule as the invoice list, so the alert count matches what its link opens.
+  const overdueInvoices = outstandingInvoices.filter((inv) => isInvoiceOverdue(inv, now));
   const todayKey = nzDateKey(now);
 
   // --- Next job ---
@@ -416,7 +412,6 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     todayKey,
     pendingCount,
     approvedCount,
-    heldCount,
     confirmedCount,
     contactCount,
     unsyncedCount,

@@ -37,18 +37,31 @@ export class GraphError extends Error {
   readonly code: number | null;
   /** Meta's own message, which tells apart errors that share a code. */
   readonly raw: string | null;
+  /** A POST Meta may still have acted on: it never answered, or answered with a server error. */
+  readonly unsure: boolean;
   /**
    * Creates the error.
    * @param message - Operator-readable message.
    * @param code - Meta's error code, or null.
    * @param raw - Meta's own message, or null.
+   * @param unsure - True when the request may have gone through anyway.
    */
-  constructor(message: string, code: number | null, raw: string | null = null) {
+  constructor(message: string, code: number | null, raw: string | null = null, unsure = false) {
     super(message);
     this.name = "GraphError";
     this.code = code;
     this.raw = raw;
+    this.unsure = unsure;
   }
+}
+
+/**
+ * Whether a failed POST may have gone through, so sending it again could make a second copy.
+ * @param error - What the call threw.
+ * @returns True for an unanswered or server-error POST.
+ */
+export function isUnsure(error: unknown): boolean {
+  return error instanceof GraphError && error.unsure;
 }
 
 interface GraphErrorBody {
@@ -103,14 +116,47 @@ export async function graph<T>(
   if (!token) throw new GraphError("META_PAGE_ACCESS_TOKEN isn't set.", null);
   const all = new URLSearchParams({ ...params, access_token: token });
   const url = method === "POST" ? `${GRAPH_BASE}${path}` : `${GRAPH_BASE}${path}?${all}`;
-  const res = await fetch(url, {
-    method,
-    body: method === "POST" ? all : undefined,
-    signal: AbortSignal.timeout(20_000),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method,
+      body: method === "POST" ? all : undefined,
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (error) {
+    // Timed out or cut off: Meta may have acted on a POST before the answer was lost.
+    if (method !== "POST") throw error;
+    throw new GraphError("Meta didn't answer in time.", null, null, true);
+  }
   const body = (await res.json().catch(() => null)) as (T & GraphErrorBody) | null;
-  if (!res.ok || !body || body.error) throw toGraphError(body, res.status);
+  if (!res.ok || !body || body.error) {
+    const error = toGraphError(body, res.status);
+    const unsure = method === "POST" && (res.status >= 500 || (res.ok && !body));
+    throw unsure ? new GraphError(error.message, error.code, error.raw, true) : error;
+  }
   return body;
+}
+
+/**
+ * Whether the token can still see the Page or Instagram account. Meta's error 100 reads "does
+ * not exist, cannot be loaded due to missing permissions", so a missing object only counts as
+ * deleted while its owner is still readable.
+ * @param platform - Which account.
+ * @returns True when the account answers as itself.
+ */
+export async function accountVisible(platform: "facebook" | "instagram"): Promise<boolean> {
+  const { pageId, igAccountId } = metaConfig();
+  const id = platform === "facebook" ? pageId : igAccountId;
+  if (!id) return false;
+  try {
+    // A Page token's /me is the Page itself; a user token answers with the person.
+    const me = await graph<{ id: string }>(platform === "facebook" ? "/me" : `/${id}`, "GET", {
+      fields: "id",
+    });
+    return me.id === id;
+  } catch {
+    return false;
+  }
 }
 
 /**

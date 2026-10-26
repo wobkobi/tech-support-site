@@ -17,9 +17,12 @@ export const CAMPAIGN_STATUS_PILL: Record<CampaignStatus, { tone: StatusTone; la
   failed: { tone: "critical", label: "Failed" },
 };
 
-/** Toast for a send or retry that left a broadcast waiting on Resend's list upload. */
-export const BROADCAST_WAITING_NOTE =
-  "Resend is still loading the list. It goes out within 10 minutes, and this page shows it once it has.";
+/**
+ * Toast for a send or retry still waiting on Resend: a broadcast whose list is loading, or a
+ * batch Resend didn't answer, which the cron re-sends under the same key.
+ */
+export const SEND_WAITING_NOTE =
+  "Resend hasn't confirmed the send yet. It finishes within 15 minutes, and this page shows it once it has.";
 
 /** A campaign as the admin UI sees it. */
 export interface CampaignRow {

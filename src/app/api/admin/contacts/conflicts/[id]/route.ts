@@ -72,7 +72,7 @@ export async function POST(
 
     await prisma.contactConflict.update({
       where: { id },
-      data: { resolvedAt: new Date(), resolution: winner },
+      data: { resolvedAt: new Date() },
     });
 
     // Push the chosen value to Google; syncContactToGoogle never throws.

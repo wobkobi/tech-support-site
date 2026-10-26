@@ -112,6 +112,19 @@ export async function POST(
     return errorResponse("PDF generation failed", 500);
   }
 
+  // Claim on updatedAt: a second tab or double click finds it moved and stops, and nothing
+  // edited since the read goes out stale. The invoice PATCH has no check this bump could trip.
+  const claimed = await prisma.invoice.updateMany({
+    where: { id, updatedAt: invoice.updatedAt },
+    data: { updatedAt: new Date() },
+  });
+  if (claimed.count === 0) {
+    return errorResponse(
+      "This invoice changed or is already being sent. Reload and try again.",
+      409,
+    );
+  }
+
   const ok = await sendInvoiceEmail({
     invoice: await toInvoiceEmailPayload(sending),
     pdfBytes,

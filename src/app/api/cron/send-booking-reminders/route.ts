@@ -1,8 +1,8 @@
 // src/app/api/cron/send-booking-reminders/route.ts
 // Cron (every 30 min, must not be slowed) sending a 24h-out reminder for confirmed
-// bookings, idempotent via emailReminderSentAt. The lower bound (freeNoticeHours + 1)
-// keeps reminders inside free cancellation. The window can be just 1 hour wide and a
-// stepped-over booking is never revisited.
+// bookings, idempotent via emailReminderSentAt (claimed before the send). The lower bound
+// (freeNoticeHours + 1) keeps reminders inside free cancellation. The window can be just
+// 1 hour wide and a stepped-over booking is never revisited.
 
 import {
   CALENDAR_EVENT_PRESENT_FILTER,
@@ -39,15 +39,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const fromTime = new Date(now.getTime() + lowerHours * 60 * 60 * 1000);
     const upperTime = new Date(now.getTime() + comms.reminderLeadHours * 60 * 60 * 1000);
 
+    const unsent = {
+      OR: [{ emailReminderSentAt: null }, { emailReminderSentAt: { isSet: false } }],
+    };
     const emailCandidates = await prisma.booking.findMany({
       where: {
         status: "confirmed",
         startAt: { gt: fromTime, lte: upperTime },
         // Under AND: a second top-level OR would overwrite the first.
-        AND: [
-          { OR: [{ emailReminderSentAt: null }, { emailReminderSentAt: { isSet: false } }] },
-          CALENDAR_EVENT_PRESENT_FILTER,
-        ],
+        AND: [unsent, CALENDAR_EVENT_PRESENT_FILTER],
       },
       select: {
         id: true,
@@ -71,8 +71,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const results = { emailsSent: 0, failed: 0, errors: [] as string[] };
 
     for (const b of emailCandidates) {
+      // Claim before sending, so an overlapping run skips this booking; a failed send hands
+      // the claim back for the next run.
+      const claimed = await prisma.booking.updateMany({
+        where: { id: b.id, status: "confirmed", ...unsent },
+        data: { emailReminderSentAt: now },
+      });
+      if (claimed.count === 0) continue;
+      let ok = false;
       try {
-        const ok = await sendBookingReminderEmail({
+        ok = await sendBookingReminderEmail({
           id: b.id,
           name: b.name,
           email: b.email,
@@ -86,21 +94,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           meetingType: b.meetingType,
           rescheduleCount: b.rescheduleCount,
         });
-        // Stamp only after Resend accepts: a duplicate is recoverable, a missed reminder isn't.
-        if (ok) {
-          await prisma.booking.update({
-            where: { id: b.id },
-            data: { emailReminderSentAt: now },
-          });
-          results.emailsSent++;
-        } else {
-          results.failed++;
-        }
       } catch (error) {
-        results.failed++;
         results.errors.push(`email ${b.id}: ${String(error)}`);
         console.error(`[cron/send-booking-reminders] email for ${b.id} failed:`, error);
       }
+      if (ok) {
+        results.emailsSent++;
+        continue;
+      }
+      results.failed++;
+      await prisma.booking
+        .updateMany({
+          where: { id: b.id, emailReminderSentAt: now },
+          data: { emailReminderSentAt: null },
+        })
+        .catch((err: unknown) =>
+          console.error(`[cron/send-booking-reminders] Couldn't release ${b.id}:`, err),
+        );
     }
 
     console.log(

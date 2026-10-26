@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run db:push && npm run build",
+  "buildCommand": "if [ \"$VERCEL_ENV\" = production ]; then npm run db:push; fi && npm run build",
   "regions": ["syd1"],
   "ignoreCommand": "case \"$VERCEL_GIT_COMMIT_REF\" in dependabot/*) exit 0 ;; *) exit 1 ;; esac"
 }

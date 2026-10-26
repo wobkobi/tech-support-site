@@ -9,7 +9,12 @@ import { addressCovers, resolveAddress } from "@/shared/lib/normalise-address";
 import { isNZMobileKey, normaliseContactPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { people as googlePeople, type people_v1 } from "@googleapis/people";
-import { clearContactConflict, recordContactConflict } from "./contact-conflicts";
+import type { ContactField } from "@prisma/client";
+import {
+  clearContactConflict,
+  recordContactConflict,
+  UNRESOLVED_CONFLICT_FILTER,
+} from "./contact-conflicts";
 import { splitName } from "./split-name";
 
 /**
@@ -19,6 +24,75 @@ import { splitName } from "./split-name";
 function getPeopleClient(): people_v1.People {
   const auth = getOAuth2Client();
   return googlePeople({ version: "v1", auth });
+}
+
+/** Google allows 90 contact reads a minute per user; calls 700ms apart stay under it. */
+const CALL_GAP_MS = 700;
+/** Wait before the one retry: the per-minute quota refills gradually, not all at once. */
+const RETRY_WAIT_MS = 10_000;
+let lastCallAt = 0;
+
+/**
+ * HTTP status of a People API error, when it carries one.
+ * @param err - Caught error.
+ * @returns The status, or null for a network error or anything else.
+ */
+export function googleErrorStatus(err: unknown): number | null {
+  const e = err as { status?: unknown; code?: unknown; response?: { status?: unknown } } | null;
+  for (const v of [e?.response?.status, e?.status, e?.code]) {
+    if (typeof v === "number") return v;
+  }
+  return null;
+}
+
+/**
+ * Whether a failed People API call may work on a retry: a rate limit or a server error.
+ * @param status - HTTP status from {@link googleErrorStatus}.
+ * @returns True for 429 and 5xx.
+ */
+export function isRetryableStatus(status: number | null): boolean {
+  return status === 429 || (status !== null && status >= 500);
+}
+
+/**
+ * Runs a People API call spaced {@link CALL_GAP_MS} after the last one, retrying once on a rate
+ * limit or server error by default. The spacing is per instance; the sync's run lock keeps a
+ * second instance from bursting alongside.
+ * @param call - The API call.
+ * @param retryOn - Which failure statuses get the retry.
+ * @returns The call's result; throws its last error.
+ */
+async function peopleCall<T>(
+  call: () => Promise<T>,
+  retryOn: (status: number | null) => boolean = isRetryableStatus,
+): Promise<T> {
+  /** Waits out the gap since the last call, then claims the slot. */
+  const space = async (): Promise<void> => {
+    const wait = lastCallAt + CALL_GAP_MS - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastCallAt = Date.now();
+  };
+  await space();
+  try {
+    return await call();
+  } catch (err) {
+    if (!retryOn(googleErrorStatus(err))) throw err;
+    await new Promise((r) => setTimeout(r, RETRY_WAIT_MS));
+    await space();
+    return await call();
+  }
+}
+
+/** What {@link syncContactToGoogle} did with one contact. */
+export type ContactSyncOutcome = "synced" | "created" | "skipped" | "failed" | "rate-limited";
+
+/**
+ * The outcome for a People API failure.
+ * @param err - Caught error.
+ * @returns "rate-limited" when Google is still refusing after the retry, else "failed".
+ */
+function failureOutcome(err: unknown): ContactSyncOutcome {
+  return googleErrorStatus(err) === 429 ? "rate-limited" : "failed";
 }
 
 /**
@@ -49,12 +123,16 @@ async function addressFields(raw: string): Promise<{
  * Best-effort deletion of a Google contact by resource name. Never throws, so the
  * local delete or merge still succeeds.
  * @param resourceName - Google People API resource name (e.g. "people/c123").
+ * @returns False when Google still has the contact; one already gone counts as deleted.
  */
-export async function deleteContactFromGoogle(resourceName: string): Promise<void> {
+export async function deleteContactFromGoogle(resourceName: string): Promise<boolean> {
   try {
-    await getPeopleClient().people.deleteContact({ resourceName });
+    await peopleCall(() => getPeopleClient().people.deleteContact({ resourceName }));
+    return true;
   } catch (err) {
+    if (googleErrorStatus(err) === 404) return true;
     console.error(`[google-contacts] deleteContactFromGoogle failed for ${resourceName}:`, err);
+    return false;
   }
 }
 
@@ -63,25 +141,28 @@ export async function deleteContactFromGoogle(resourceName: string): Promise<voi
  * the last sync cron. Uses `connections.list` because `searchContacts` reads a cache that
  * can miss on a cold call. Matching goes through {@link findOrCreateContactByEmail}. Never throws.
  * @param email - Address to match, compared case-insensitively.
- * @returns The local contact id, or null when Google has no such person.
+ * @returns The local contact id when found; otherwise whether the lookup failed, since a failure
+ *   is not the same as Google having no such person.
  */
 export async function importGoogleContactByEmail(
   email: string,
-): Promise<{ contactId: string } | null> {
+): Promise<{ found: true; contactId: string } | { found: false; failed: boolean }> {
   const needle = email.trim().toLowerCase();
-  if (!needle) return null;
+  if (!needle) return { found: false, failed: false };
   try {
     const people = getPeopleClient();
 
     let pageToken: string | undefined;
     let person: people_v1.Schema$Person | null = null;
     do {
-      const response = await people.people.connections.list({
-        resourceName: "people/me",
-        personFields: "names,emailAddresses,phoneNumbers,addresses,organizations",
-        pageSize: 1000,
-        ...(pageToken ? { pageToken } : {}),
-      });
+      const response = await peopleCall(() =>
+        people.people.connections.list({
+          resourceName: "people/me",
+          personFields: "names,emailAddresses,phoneNumbers,addresses,organizations",
+          pageSize: 1000,
+          ...(pageToken ? { pageToken } : {}),
+        }),
+      );
       person =
         (response.data.connections ?? []).find((p) =>
           (p.emailAddresses ?? []).some((e) => e.value?.trim().toLowerCase() === needle),
@@ -91,7 +172,7 @@ export async function importGoogleContactByEmail(
     } while (pageToken);
 
     const resourceName = person?.resourceName;
-    if (!person || !resourceName) return null;
+    if (!person || !resourceName) return { found: false, failed: false };
 
     const rawPhone = person.phoneNumbers?.[0]?.value?.trim() ?? null;
     const rawAddress = person.addresses?.[0]?.formattedValue?.trim() ?? null;
@@ -120,11 +201,11 @@ export async function importGoogleContactByEmail(
         },
       });
     }
-    return { contactId: contact.id };
+    return { found: true, contactId: contact.id };
   } catch (err) {
     // Not interpolated: the address comes from a query string and arg 1 is a format string.
     console.error("[google-contacts] importGoogleContactByEmail failed for %s:", needle, err);
-    return null;
+    return { found: false, failed: true };
   }
 }
 
@@ -169,6 +250,16 @@ export async function importFromGoogleContacts(): Promise<number> {
       },
     });
 
+    // A Google person linked only to a deleted contact stays out: a delete that kept Google's
+    // copy (by choice, or a failed Google delete) must not come back as a new contact.
+    const deletedLinks = await prisma.contact.findMany({
+      where: { deletedAt: { not: null }, googleContactId: { not: null } },
+      select: { googleContactId: true },
+    });
+    const deletedGoogleIds = new Set(deletedLinks.map((c) => c.googleContactId));
+    // A field with an open conflict waits for the operator, so Google's value can't settle it.
+    const heldFields = await openConflictFields();
+
     const byGoogleId = new Map<string, MatchRow>();
     const byEmail = new Map<string, MatchRow>();
     const byPhoneKey = new Map<string, MatchRow>();
@@ -210,12 +301,14 @@ export async function importFromGoogleContacts(): Promise<number> {
 
     do {
       // Fetch one page of connections
-      const response = await people.people.connections.list({
-        resourceName: "people/me",
-        personFields: "names,emailAddresses,phoneNumbers,addresses,organizations",
-        pageSize: 100,
-        ...(pageToken ? { pageToken } : {}),
-      });
+      const response = await peopleCall(() =>
+        people.people.connections.list({
+          resourceName: "people/me",
+          personFields: "names,emailAddresses,phoneNumbers,addresses,organizations",
+          pageSize: 100,
+          ...(pageToken ? { pageToken } : {}),
+        }),
+      );
 
       const connections = response.data.connections ?? [];
       pageToken = response.data.nextPageToken ?? undefined;
@@ -270,8 +363,13 @@ export async function importFromGoogleContacts(): Promise<number> {
               lastGoogleEtag: etag,
             };
             // Fill a placeholder name freely; overwrite a real one only on a trusted match.
+            const held = heldFields.get(existing.id);
             const namePlaceholder = existing.name === phone || existing.name === normPhone;
-            if (name && (namePlaceholder || (name !== existing.name && renameTrusted))) {
+            if (
+              name &&
+              !held?.has("name") &&
+              (namePlaceholder || (name !== existing.name && renameTrusted))
+            ) {
               updates.name = name;
             }
             // Adopt Google's email when the row has none, so the twins can't drift apart.
@@ -287,7 +385,7 @@ export async function importFromGoogleContacts(): Promise<number> {
             const newAlts = emailList.filter((e) => !knownEmails.has(e));
             if (newAlts.length > 0) updates.altEmails = { push: newAlts };
             // Geocode only a changed address, keeping repeat imports near zero calls.
-            if (address && address !== existing.address) {
+            if (address && address !== existing.address && !held?.has("address")) {
               Object.assign(updates, await addressFields(address));
             }
             if (company && company !== existing.company) updates.company = company;
@@ -307,6 +405,7 @@ export async function importFromGoogleContacts(): Promise<number> {
             // Skip a person with no matchable key; no later run could link it.
             const displayName = name ?? email ?? phone;
             if ((!email && !normPhone) || !displayName) continue;
+            if (deletedGoogleIds.has(resourceName)) continue;
             // Same-instant stamp as the update branch above.
             const stampedAt = new Date();
             const addressData = address
@@ -362,6 +461,39 @@ export async function importFromGoogleContacts(): Promise<number> {
 }
 
 /**
+ * Fields with an open conflict, for every contact or just one.
+ * @param contactId - One contact to read, else all of them.
+ * @returns Contact id > the fields waiting on the operator.
+ */
+async function openConflictFields(contactId?: string): Promise<Map<string, Set<ContactField>>> {
+  const open = await prisma.contactConflict.findMany({
+    where: { ...(contactId ? { contactId } : {}), ...UNRESOLVED_CONFLICT_FILTER },
+    select: { contactId: true, field: true },
+  });
+  const byContact = new Map<string, Set<ContactField>>();
+  for (const c of open) {
+    const fields = byContact.get(c.contactId) ?? new Set<ContactField>();
+    fields.add(c.field);
+    byContact.set(c.contactId, fields);
+  }
+  return byContact;
+}
+
+/** A single-value field's sync action; "held" waits on an open conflict. */
+export type FieldAction = "noop" | "push" | "pull" | "conflict" | "held";
+
+/**
+ * Holds a field that already has an open conflict: neither side may settle it until the
+ * operator picks a value. Values that now agree go through, so the conflict clears.
+ * @param open - Whether the field has an open conflict.
+ * @param action - What the comparison decided.
+ * @returns The action to take.
+ */
+export function holdOpenConflict(open: boolean, action: Exclude<FieldAction, "held">): FieldAction {
+  return open && action !== "noop" ? "held" : action;
+}
+
+/**
  * Decides the sync action for a single-value field from which sides changed since the last sync.
  * @param siteValue - Current site value (possibly null).
  * @param googleValue - Current Google value (possibly null).
@@ -374,7 +506,7 @@ function compareSingleField(
   googleValue: string | null,
   siteChanged: boolean,
   googleChanged: boolean,
-): "noop" | "push" | "pull" | "conflict" {
+): Exclude<FieldAction, "held"> {
   const a = siteValue?.trim() || null;
   const b = googleValue?.trim() || null;
   if (a === b) return "noop";
@@ -418,28 +550,32 @@ function mergePhones(sitePhones: Array<string | null>, googlePhones: string[]): 
 
 /**
  * Two-way sync between a site Contact and its Google counterpart (policy in the file header).
- * Company only flows Google > site, except on first create. Never throws.
+ * Company only flows Google > site, except on first create. A field with an open conflict is
+ * left alone on both sides until it's resolved. Never throws.
  * @param contactId - The local DB contact ID to sync.
+ * @returns What happened. A read that fails (rather than finding nobody) never creates a contact.
  */
-export async function syncContactToGoogle(contactId: string): Promise<void> {
+export async function syncContactToGoogle(contactId: string): Promise<ContactSyncOutcome> {
   try {
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
     });
     if (!contact) {
       console.warn(`[google-contacts] syncContactToGoogle: contact ${contactId} not found`);
-      return;
+      return "skipped";
     }
     if (contact.deletedAt) {
       // Pushing a soft-deleted contact would re-create it in Google and the import would revive it.
-      return;
+      return "skipped";
     }
-    if (!contact.email) {
+    const email = contact.email;
+    if (!email) {
       // Phone-only contacts have no email - they are imported FROM Google, not pushed to it.
-      return;
+      return "skipped";
     }
 
     const people = getPeopleClient();
+    const held = (await openConflictFields(contactId)).get(contactId) ?? new Set<ContactField>();
 
     // Find by stored resource name, then email search; else create from site values.
     let resourceName = contact.googleContactId;
@@ -453,40 +589,49 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
     } | null = null;
 
     if (resourceName) {
+      const stored = resourceName;
       try {
-        const fetched = await people.people.get({
-          resourceName,
-          personFields: "names,emailAddresses,phoneNumbers,addresses,organizations",
-        });
+        const fetched = await peopleCall(() =>
+          people.people.get({
+            resourceName: stored,
+            personFields: "names,emailAddresses,phoneNumbers,addresses,organizations",
+          }),
+        );
         googlePerson = fetched.data;
       } catch (err) {
-        console.error(
-          `[google-contacts] Stored googleContactId ${resourceName} not fetchable, will search by email:`,
-          err,
-        );
+        // Only a 404 means they're gone. Searching and creating after a rate limit or an
+        // outage made a second Google contact for someone Google still had.
+        if (googleErrorStatus(err) !== 404) {
+          console.error(`[google-contacts] Couldn't read ${stored}:`, err);
+          return failureOutcome(err);
+        }
+        console.warn(`[google-contacts] ${stored} is gone from Google, searching by email`);
         resourceName = null;
       }
     }
 
     if (!resourceName) {
-      // Search Google by email
       try {
-        const searchResult = await people.people.searchContacts({
-          query: contact.email,
-          readMask: "names,emailAddresses,phoneNumbers,addresses,organizations",
-          pageSize: 5,
-        });
+        // Google's search reads a cache that an empty query warms; a cold search can miss.
+        await peopleCall(() => people.people.searchContacts({ query: "", readMask: "names" }));
+        const searchResult = await peopleCall(() =>
+          people.people.searchContacts({
+            query: email,
+            readMask: "names,emailAddresses,phoneNumbers,addresses,organizations",
+            pageSize: 5,
+          }),
+        );
         const match = searchResult.data.results?.find((r) =>
-          r.person?.emailAddresses?.some(
-            (e) => e.value?.toLowerCase() === contact.email!.toLowerCase(),
-          ),
+          r.person?.emailAddresses?.some((e) => e.value?.toLowerCase() === email.toLowerCase()),
         );
         if (match?.person?.resourceName) {
           resourceName = match.person.resourceName;
           googlePerson = match.person;
         }
       } catch (err) {
+        // A failed search isn't "nobody": creating now could duplicate them.
         console.error("[google-contacts] Search by email failed:", err);
+        return failureOutcome(err);
       }
     }
 
@@ -494,15 +639,20 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       // No Google contact found - create a new one with all site values.
       try {
         const { givenName, familyName } = splitName(contact.name);
-        const created = await people.people.createContact({
-          requestBody: {
-            names: [{ displayName: contact.name, givenName, familyName }],
-            emailAddresses: [{ value: contact.email }],
-            ...(contact.phone ? { phoneNumbers: [{ value: contact.phone }] } : {}),
-            ...(contact.address ? { addresses: [{ formattedValue: contact.address }] } : {}),
-            ...(contact.company ? { organizations: [{ name: contact.company }] } : {}),
-          },
-        });
+        // Retried only on a rate limit: after a server error Google may have made it anyway.
+        const created = await peopleCall(
+          () =>
+            people.people.createContact({
+              requestBody: {
+                names: [{ displayName: contact.name, givenName, familyName }],
+                emailAddresses: [{ value: email }],
+                ...(contact.phone ? { phoneNumbers: [{ value: contact.phone }] } : {}),
+                ...(contact.address ? { addresses: [{ formattedValue: contact.address }] } : {}),
+                ...(contact.company ? { organizations: [{ name: contact.company }] } : {}),
+              },
+            }),
+          (status) => status === 429,
+        );
         if (created.data.resourceName) {
           // Same-instant stamp: see the pushOk stamp below for why.
           const stampedAt = new Date();
@@ -516,10 +666,11 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
             },
           });
         }
+        return "created";
       } catch (err) {
         console.error("[google-contacts] Failed to create new Google contact:", err);
+        return failureOutcome(err);
       }
-      return;
     }
 
     // Both sides exist - decide who changed since last sync, then act.
@@ -547,14 +698,22 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       mergedPhones.some((p, i) => p !== googlePhoneList[i]);
 
     // Single-value fields - latest-wins or conflict
-    const nameAction = compareSingleField(contact.name, googleName, siteChanged, googleChanged);
-    // Lowercased: a case-only difference is not a change.
-    const emailAction = compareSingleField(
-      contact.email?.toLowerCase() ?? null,
-      googleEmail?.toLowerCase() ?? null,
-      siteChanged,
-      googleChanged,
+    const nameAction = holdOpenConflict(
+      held.has("name"),
+      compareSingleField(contact.name, googleName, siteChanged, googleChanged),
     );
+    // Lowercased: a case-only difference is not a change.
+    const emailAction = holdOpenConflict(
+      held.has("email"),
+      compareSingleField(
+        email.toLowerCase(),
+        googleEmail?.toLowerCase() ?? null,
+        siteChanged,
+        googleChanged,
+      ),
+    );
+    // A disputed primary leaves the email lists alone too, or the union push would settle it.
+    const emailSettled = emailAction !== "conflict" && emailAction !== "held";
     // Emails union like phones, but emailAction picks the primary (the send address).
     const primaryEmail =
       emailAction === "pull" && googleEmail ? googleEmail : (contact.email ?? googleEmail);
@@ -569,9 +728,12 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
 
     // Compare by meaning: the site stores the geocoded form, Google the typed one.
     // Push when the site's form only states the same place more fully.
-    const addressAction = addressCovers(contact.address, googleAddress)
+    const addressAction: FieldAction = addressCovers(contact.address, googleAddress)
       ? "push"
-      : compareSingleField(contact.address, googleAddress, siteChanged, googleChanged);
+      : holdOpenConflict(
+          held.has("address"),
+          compareSingleField(contact.address, googleAddress, siteChanged, googleChanged),
+        );
 
     // Build the Google update body from the actions
     const updateBody: Record<string, unknown> = {};
@@ -585,7 +747,7 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       updateBody.names = [{ displayName: contact.name, givenName, familyName }];
       updateFields.push("names");
     }
-    if ((emailAction === "push" || emailsChanged) && mergedEmails.length > 0) {
+    if (emailSettled && (emailAction === "push" || emailsChanged) && mergedEmails.length > 0) {
       updateBody.emailAddresses = mergedEmails.map((value) => ({ value }));
       updateFields.push("emailAddresses");
     }
@@ -595,21 +757,25 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
     }
 
     // A failed push must not be stamped as synced, or the local edit never retries.
-    let pushOk = true;
+    let pushError: unknown = null;
     if (updateFields.length > 0 && currentEtag) {
+      const target = resourceName;
       try {
-        const updated = await people.people.updateContact({
-          resourceName,
-          updatePersonFields: updateFields.join(","),
-          requestBody: { etag: currentEtag, ...updateBody },
-        });
+        const updated = await peopleCall(() =>
+          people.people.updateContact({
+            resourceName: target,
+            updatePersonFields: updateFields.join(","),
+            requestBody: { etag: currentEtag, ...updateBody },
+          }),
+        );
         // Refresh etag from the response - the write above changed it.
         googlePerson.etag = updated.data.etag ?? currentEtag;
       } catch (err) {
-        console.error(`[google-contacts] updateContact failed for ${resourceName}:`, err);
-        pushOk = false;
+        console.error(`[google-contacts] updateContact failed for ${target}:`, err);
+        pushError = err ?? new Error("updateContact failed");
       }
     }
+    const pushOk = pushError === null;
 
     // Build the site update from pull actions + the merged phones
     const siteUpdate: Record<string, unknown> = {
@@ -629,8 +795,9 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
     // Primary stays on Contact.email; every other address goes to altEmails so it still matches.
     const emailTail = mergedEmails.filter((e) => e !== primaryEmail?.trim().toLowerCase());
     if (
-      emailTail.length !== contact.altEmails.length ||
-      contact.altEmails.some((e) => !emailTail.includes(e.toLowerCase()))
+      emailSettled &&
+      (emailTail.length !== contact.altEmails.length ||
+        contact.altEmails.some((e) => !emailTail.includes(e.toLowerCase())))
     ) {
       siteUpdate.altEmails = { set: emailTail };
     }
@@ -659,38 +826,22 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
 
     await prisma.contact.update({ where: { id: contactId }, data: siteUpdate });
 
-    // Record / clear conflicts per single-value field
-    if (nameAction === "conflict") {
-      await recordContactConflict({
-        contactId,
-        field: "name",
-        siteValue: contact.name,
-        googleValue: googleName,
-      });
-    } else {
-      await clearContactConflict(contactId, "name");
+    // Record / clear conflicts per single-value field; a held one stays open
+    const fields = [
+      ["name", nameAction, contact.name, googleName],
+      ["email", emailAction, email, googleEmail],
+      ["address", addressAction, contact.address, googleAddress],
+    ] as const;
+    for (const [field, action, siteValue, googleValue] of fields) {
+      if (action === "conflict") {
+        await recordContactConflict({ contactId, field, siteValue, googleValue });
+      } else if (action !== "held") {
+        await clearContactConflict(contactId, field);
+      }
     }
-    if (emailAction === "conflict") {
-      await recordContactConflict({
-        contactId,
-        field: "email",
-        siteValue: contact.email,
-        googleValue: googleEmail,
-      });
-    } else {
-      await clearContactConflict(contactId, "email");
-    }
-    if (addressAction === "conflict") {
-      await recordContactConflict({
-        contactId,
-        field: "address",
-        siteValue: contact.address,
-        googleValue: googleAddress,
-      });
-    } else {
-      await clearContactConflict(contactId, "address");
-    }
+    return pushOk ? "synced" : failureOutcome(pushError);
   } catch (error) {
     console.error(`[google-contacts] syncContactToGoogle failed for ${contactId}:`, error);
+    return "failed";
   }
 }

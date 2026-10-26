@@ -24,7 +24,7 @@ function median(xs: number[]): number {
   if (xs.length === 0) return 0;
   const s = [...xs].sort((a, b) => a - b);
   const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
+  return s.length % 2 ? s[mid]! : Math.round((s[mid - 1]! + s[mid]!) / 2);
 }
 
 /**
@@ -34,7 +34,7 @@ function median(xs: number[]): number {
  * @returns The task head, trimmed and case-folded for grouping.
  */
 function taskKey(description: string): string {
-  const head = description.split(" - ")[0].trim();
+  const head = description.split(" - ")[0]!.trim();
   return head.charAt(0).toUpperCase() + head.slice(1).toLowerCase();
 }
 

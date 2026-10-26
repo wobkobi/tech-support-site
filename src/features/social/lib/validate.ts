@@ -805,11 +805,13 @@ function coverIssues(post: PostDraft): Issue[] {
  * error of its own, and kinds that show no words skip the placeholder checks.
  * @param post - The post.
  * @param hasPromo - Whether a promo will be there to fill the promo placeholders.
+ * @param promo - The promo wording when it's known, so the app's limits count the filled words.
  * @returns Issues per enabled platform; disabled platforms are left out.
  */
 export function validatePost(
   post: PostDraft,
   hasPromo: boolean,
+  promo?: PromoWording | null,
 ): Partial<Record<SocialPlatformKey, Issue[]>> {
   const format = formatOf(post.format);
   const out: Partial<Record<SocialPlatformKey, Issue[]>> = {};
@@ -825,14 +827,15 @@ export function validatePost(
       continue;
     }
     const text = textFor(post, platform);
+    const filled = promo === undefined ? text : fillPromo(text, promo);
     const rules =
       format === "reel"
-        ? reelIssues(text, post, platform)
+        ? reelIssues(filled, post, platform)
         : format === "story"
           ? storyIssues(post, platform)
           : format === "cover"
             ? coverIssues(post)
-            : PLATFORM_RULES[platform](text, post);
+            : PLATFORM_RULES[platform](filled, post);
     out[platform] = [...(usesText(format) ? placeholderIssues(text, hasPromo) : []), ...rules];
   }
   return out;

@@ -54,6 +54,8 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
+      # Check only: a fixable problem fails the run rather than being fixed on
+      # the runner, where the fix is thrown away and the run passes.
       - name: Run linter
         run: npm run lint
 

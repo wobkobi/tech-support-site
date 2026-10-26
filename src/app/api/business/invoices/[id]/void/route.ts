@@ -43,12 +43,17 @@ export async function POST(
   // Already voided: keep the original voidedAt and just re-send / re-sync.
   const alreadyVoided = invoice.status === "VOIDED";
   const voidedAt = alreadyVoided ? invoice.voidedAt : new Date();
-  const updated = alreadyVoided
-    ? invoice
-    : await prisma.invoice.update({
-        where: { id },
-        data: { status: "VOIDED", voidedAt: voidedAt ?? new Date() },
-      });
+  if (!alreadyVoided) {
+    // Only the request that flips the status carries on, so two tabs send one notice.
+    const claimed = await prisma.invoice.updateMany({
+      where: { id, status: { not: "VOIDED" } },
+      data: { status: "VOIDED", voidedAt },
+    });
+    if (claimed.count === 0) {
+      return errorResponse("This invoice was just voided from another tab. Reload to see it.", 409);
+    }
+  }
+  const updated = alreadyVoided ? invoice : { ...invoice, status: "VOIDED" as const, voidedAt };
   // A voided invoice gave no discount, so its promo use stops counting.
   await releaseInvoiceRedemptions(id);
 

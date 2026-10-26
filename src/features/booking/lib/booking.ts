@@ -8,6 +8,7 @@ import {
   NZ_TZ,
   dateKeyParts,
   getPacificAucklandOffset,
+  nzMidnightUtc,
   nzWallClockUtc,
   weekdayOf,
 } from "@/shared/lib/timezone-utils";
@@ -218,26 +219,6 @@ export const DURATION_OPTIONS: ReadonlyArray<DurationOption> = [
   },
 ] as const;
 
-export interface TimeOfDayOption {
-  value: string;
-  label: string;
-  startHour: number;
-  endHour: number;
-}
-
-// Hourly time slots (10am-6pm, last slot needs 2hrs for long jobs)
-export const TIME_OF_DAY_OPTIONS: ReadonlyArray<TimeOfDayOption> = [
-  { value: "10am", label: "10am", startHour: 10, endHour: 11 },
-  { value: "11am", label: "11am", startHour: 11, endHour: 12 },
-  { value: "12pm", label: "12pm", startHour: 12, endHour: 13 },
-  { value: "1pm", label: "1pm", startHour: 13, endHour: 14 },
-  { value: "2pm", label: "2pm", startHour: 14, endHour: 15 },
-  { value: "3pm", label: "3pm", startHour: 15, endHour: 16 },
-  { value: "4pm", label: "4pm", startHour: 16, endHour: 17 },
-  { value: "5pm", label: "5pm", startHour: 17, endHour: 18 },
-  { value: "6pm", label: "6pm", startHour: 18, endHour: 19 },
-] as const;
-
 // Hour labels ("10am" ... "8pm") generated per day from the schedule.
 export type TimeOfDay = string;
 
@@ -343,7 +324,9 @@ export interface ExistingBooking {
 }
 
 /**
- * Check if a time slot conflicts with existing bookings/events
+ * Whether a slot is clear of bookings (padded by their own buffers) and calendar events
+ * (padded by `bufferMin`). Judged from the new slot's side, as the grid and the submit check
+ * judge it; the slot's own buffer is never tested against what follows it.
  * @param slotStart - Slot start time
  * @param slotEnd - Slot end time
  * @param existingBookings - Database bookings
@@ -351,7 +334,7 @@ export interface ExistingBooking {
  * @param bufferMin - Buffer time in minutes
  * @returns True if slot is free
  */
-function isSlotFree(
+export function isSlotFree(
   slotStart: Date,
   slotEnd: Date,
   existingBookings: ExistingBooking[],
@@ -629,6 +612,22 @@ export function isBookingClosed(booking: { status: string; startAt: Date }, now:
 }
 
 /**
+ * End of the bookable window: NZ midnight after the last day the grid offers (today +
+ * maxAdvanceDays). Now + N days would stop at the current time of day on that last day, so
+ * its later slots were checked against no calendar events.
+ * @param now - Current instant.
+ * @param config - Live availability settings.
+ * @returns UTC instant the window ends at.
+ */
+export function bookingWindowEnd(
+  now: Date,
+  config: Pick<AvailabilityConfig, "maxAdvanceDays" | "timeZone">,
+): Date {
+  const [y, m, d] = dateKeyParts(now.toLocaleDateString("en-CA", { timeZone: config.timeZone }));
+  return nzMidnightUtc(y, m, d + config.maxAdvanceDays + 1);
+}
+
+/**
  * Validate booking request
  * @param dateKey - Selected date in YYYY-MM-DD format
  * @param timeOfDay - Selected time slot value
@@ -650,8 +649,13 @@ export function validateBookingRequest(
   now: Date,
   config: AvailabilityConfig,
 ): { valid: true } | { valid: false; error: string } {
+  // A real YYYY-MM-DD only: "2026-02-31" would roll into March, and the daily-cap check
+  // below matches bookings on the key string.
   const [year, month, day] = dateKeyParts(dateKey);
-  if (!year || !month || !day) {
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(dateKey) ||
+    new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10) !== dateKey
+  ) {
     return { valid: false, error: "Invalid date format" };
   }
 

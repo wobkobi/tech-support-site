@@ -126,14 +126,14 @@ function parseArgs(): ExportOptions {
   };
 
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+    const arg = args[i]!;
 
     if (arg === "--local") {
       options.url = LOCAL_URL;
     } else if (arg.startsWith("--url=")) {
       options.url = arg.substring(6);
     } else if (arg === "--url" && args[i + 1]) {
-      options.url = args[++i];
+      options.url = args[++i]!;
     } else if (arg.startsWith("--variant=")) {
       const variant = arg.substring(10) as PosterVariant;
       if (["digital", "print", "both"].includes(variant)) {

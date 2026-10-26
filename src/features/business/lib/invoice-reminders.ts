@@ -18,11 +18,14 @@ export interface ReminderSendResult {
   /** Which reminder this was (1 or 2) when sent; unset on failure. */
   reminderNumber?: number;
   error?: string;
+  /** Another run claimed this reminder first, so nothing was sent. */
+  alreadyClaimed?: boolean;
 }
 
 /**
- * Emails the overdue nudge with its PDF, stamping the reminder fields only after Resend
- * accepts so a failed send is retried.
+ * Emails the overdue nudge with its PDF. The reminder fields are claimed before the send, so
+ * the cron and the manual button can't both send the same nudge, and put back if it fails so
+ * the next run retries.
  * @param invoice - The full invoice row (must be SENT and past due; callers gate).
  * @returns Whether the send happened and which reminder number it was.
  */
@@ -41,17 +44,45 @@ export async function sendOverdueReminder(invoice: PrismaInvoice): Promise<Remin
     return { ok: false, error: "PDF generation failed" };
   }
 
-  const accepted = await sendInvoiceReminderEmail({
-    invoice: await toInvoiceEmailPayload(invoice),
-    pdfBytes,
-    reminderNumber,
-  });
-  if (!accepted) return { ok: false, error: "Email send failed" };
-
-  await prisma.invoice.update({
-    where: { id: invoice.id },
+  // Compare-and-set on the count this run read; an unset count matches null or a missing key.
+  const claimed = await prisma.invoice.updateMany({
+    where: {
+      id: invoice.id,
+      status: "SENT",
+      ...(invoice.reminderCount === null
+        ? { OR: [{ reminderCount: null }, { reminderCount: { isSet: false } }] }
+        : { reminderCount: invoice.reminderCount }),
+    },
     data: { reminderLastSentAt: new Date(), reminderCount: reminderNumber },
   });
+  if (claimed.count === 0) {
+    return { ok: false, error: "This invoice was just chased or paid", alreadyClaimed: true };
+  }
+
+  let accepted = false;
+  try {
+    accepted = await sendInvoiceReminderEmail({
+      invoice: await toInvoiceEmailPayload(invoice),
+      pdfBytes,
+      reminderNumber,
+    });
+  } catch (err) {
+    console.error(`[invoice-reminders] Reminder send threw for ${invoice.number}:`, err);
+  }
+  if (!accepted) {
+    await prisma.invoice
+      .updateMany({
+        where: { id: invoice.id, reminderCount: reminderNumber },
+        data: {
+          reminderCount: invoice.reminderCount,
+          reminderLastSentAt: invoice.reminderLastSentAt,
+        },
+      })
+      .catch((err: unknown) =>
+        console.error(`[invoice-reminders] Couldn't release the claim on ${invoice.number}:`, err),
+      );
+    return { ok: false, error: "Email send failed" };
+  }
 
   return { ok: true, reminderNumber };
 }

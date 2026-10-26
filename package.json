@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "5.10.1",
+  "version": "5.11.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,7 +22,8 @@
     "eval:ai": "dotenv -e .env.local -- tsx scripts/eval-ai/index.ts",
     "format": "prettier --write \"**/*.{js,ts,jsx,tsx,mjs,css,html,md,json,yml,yaml}\"",
     "postinstall": "prisma generate",
-    "lint": "eslint --fix --cache \"{src,scripts}/**/*.{js,ts,jsx,tsx}\"",
+    "lint": "eslint --cache --max-warnings=0 \"{src,scripts}/**/*.{js,ts,jsx,tsx}\"",
+    "lint:fix": "eslint --fix --cache \"{src,scripts}/**/*.{js,ts,jsx,tsx}\"",
     "prepare": "simple-git-hooks",
     "probe:meta": "dotenv -e .env.local -- tsx scripts/probe-meta.ts",
     "reconcile:times:apply": "dotenv -e .env.local -- tsx scripts/reconcile-booking-times.ts --apply",
@@ -31,7 +32,7 @@
     "smoke": "dotenv -e .env.local -- tsx scripts/smoke-test.ts",
     "start": "next start",
     "test": "tsx scripts/run-checks.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p scripts --noEmit"
   },
   "simple-git-hooks": {
     "pre-commit": "if ! find node_modules/.npm-update-stamp -mmin -1440 2>/dev/null | grep -q .; then npm update --package-lock-only --allow-remote=all --no-audit --no-fund && touch node_modules/.npm-update-stamp; fi && npm install --package-lock-only --allow-remote=all --no-audit --no-fund && git add package-lock.json package.json && npx lint-staged --max-arg-length 4096 && npm run typecheck && npm test",

@@ -130,7 +130,7 @@ export interface TripCandidate {
   address: string | null;
   startAt: Date;
   endAt: Date;
-  status: "held" | "confirmed" | "cancelled" | "completed";
+  status: "confirmed" | "cancelled" | "completed";
   meetingType: "in_person" | "remote" | null;
   noShow: boolean;
   calendarEventMissingAt: Date | null;
@@ -367,7 +367,7 @@ export function kmByAddressFrom(
 
 /**
  * Whether a booking was driven to: completed, ended confirmed (calendar event not gone), or
- * a no-show. Remote jobs and holds never count.
+ * a no-show. Remote jobs never count.
  * @param b - The booking.
  * @param now - Reference time.
  * @returns True when the job needs a trip.
@@ -381,8 +381,6 @@ function isDrivenJob(b: TripCandidate, now: Date): boolean {
       return b.endAt < now && b.calendarEventMissingAt === null;
     case "cancelled":
       return b.noShow;
-    case "held":
-      return false;
   }
 }
 

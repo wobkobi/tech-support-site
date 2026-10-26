@@ -257,11 +257,7 @@ function main(): void {
   console.log("\nWindow from a parse reply");
   expectEqual(
     "ranges are stated",
-    parsedWindow(
-      reply({ ranges: [{ startTime: "16:30", endTime: "17:40", durationMins: 70 }] }),
-      [],
-      "12:00",
-    ),
+    parsedWindow(reply({ ranges: [{ startTime: "16:30", endTime: "17:40" }] }), [], "12:00"),
     {
       timeRanges: [{ startTime: "16:30", endTime: "17:40" }],
       stated: true,
@@ -324,9 +320,9 @@ function main(): void {
       reply({
         durationMins: 139,
         ranges: [
-          { startTime: "09:00", endTime: "10:00", durationMins: 60 },
-          { startTime: "14:00", endTime: "15:00", durationMins: 60 },
-          { startTime: "13:46", endTime: "14:05", durationMins: 19 },
+          { startTime: "09:00", endTime: "10:00" },
+          { startTime: "14:00", endTime: "15:00" },
+          { startTime: "13:46", endTime: "14:05" },
         ],
       }),
       twoSlots,
@@ -348,7 +344,7 @@ function main(): void {
     parsedWindow(
       reply({
         durationMins: 80,
-        ranges: [{ startTime: "09:00", endTime: "10:20", durationMins: 80 }],
+        ranges: [{ startTime: "09:00", endTime: "10:20" }],
       }),
       twoSlots,
       "16:00",
@@ -361,8 +357,8 @@ function main(): void {
       reply({
         durationMins: 90,
         ranges: [
-          { startTime: "09:00", endTime: "10:00", durationMins: 60 },
-          { startTime: "14:00", endTime: "15:00", durationMins: 60 },
+          { startTime: "09:00", endTime: "10:00" },
+          { startTime: "14:00", endTime: "15:00" },
         ],
       }),
       twoSlots,

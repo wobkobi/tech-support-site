@@ -166,7 +166,6 @@ const API_CHECKS: ReadonlyArray<ApiCheck> = [
   { path: "/api/promos/active", okFlag: true },
   { path: "/api/pricing/rates", okFlag: true, arrayField: "rates" },
   { path: "/api/reviews", arrayField: "reviews" },
-  { path: "/api/booking/days", arrayField: "days" },
 ];
 
 /**

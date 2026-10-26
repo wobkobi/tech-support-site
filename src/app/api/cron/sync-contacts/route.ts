@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
  * GET /api/cron/sync-contacts
  * Runs an incremental two-way Google Contacts sync.
  * @param request - Incoming cron request.
- * @returns JSON with pushed/imported/conflicts/skipped counts.
+ * @returns JSON with the pushed, failed, unreached, imported and conflict counts.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!isCronAuthorised(request)) {

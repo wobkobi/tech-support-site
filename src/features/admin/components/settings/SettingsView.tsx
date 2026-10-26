@@ -4,7 +4,10 @@
 // for the RateConfig rows, which live in their own collection.
 
 import { SettingsSearch } from "@/features/admin/components/settings/SettingsSearch";
-import { SettingsAllContext } from "@/features/admin/components/settings/useSettingsForm";
+import {
+  SettingsAllContext,
+  type SettingsStore,
+} from "@/features/admin/components/settings/useSettingsForm";
 import { type AdminTab, AdminTabs } from "@/features/admin/components/ui/AdminTabs";
 import { Card } from "@/features/admin/components/ui/Card";
 import type { RateConfig } from "@/features/business/types/business";
@@ -24,7 +27,7 @@ import type {
 } from "@/shared/lib/settings/types";
 import dynamic from "next/dynamic";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 /**
  * Placeholder shown while a tab editor chunk loads.
@@ -178,6 +181,20 @@ export function SettingsView({
   socialDefaults,
 }: Props): React.ReactElement {
   const [active, setActive] = useState<SettingsTabKey>(initialTab ?? "availability");
+  // Saved values live here, not in the tabs: switching tabs unmounts the editor, and one
+  // reopened from the page-load props would show (and re-save) values already changed.
+  const [saved, setSaved] = useState<Settings>(() => ({
+    availability,
+    pricing,
+    estimator,
+    comms,
+    reviews,
+    identity,
+    tax,
+    scheduling,
+    social,
+  }));
+  const [savedRates, setSavedRates] = useState<RateConfig[]>(rates);
   const [focusTarget, setFocusTarget] = useState<{ id: string; nonce: number } | null>(null);
   const meta = active === "rates" ? RATES_META : GROUP_META[active];
 
@@ -207,21 +224,13 @@ export function SettingsView({
     return () => clearTimeout(t);
   }, [focusTarget]);
 
-  // Full current settings for the live cross-setting guardrail check in each tab.
-  const current: Settings = {
-    availability,
-    pricing,
-    estimator,
-    comms,
-    reviews,
-    identity,
-    tax,
-    scheduling,
-    social,
-  };
+  const markSaved = useCallback<SettingsStore["markSaved"]>((group, value) => {
+    setSaved((prev) => ({ ...prev, [group]: value }));
+  }, []);
+  const store = useMemo<SettingsStore>(() => ({ all: saved, markSaved }), [saved, markSaved]);
 
   return (
-    <SettingsAllContext.Provider value={current}>
+    <SettingsAllContext.Provider value={store}>
       <div>
         <SettingsSearch onJump={handleJump} />
 
@@ -240,30 +249,30 @@ export function SettingsView({
           <div className="mt-1">
             {active === "rates" ? (
               <div className="mt-3">
-                <RatesTab initialRates={rates} />
+                <RatesTab rates={savedRates} setRates={setSavedRates} />
               </div>
             ) : active === "availability" ? (
-              <AvailabilityTab initial={availability} defaults={availabilityDefaults} />
+              <AvailabilityTab initial={saved.availability} defaults={availabilityDefaults} />
             ) : active === "pricing" ? (
-              <PricingTab initial={pricing} defaults={pricingDefaults} />
+              <PricingTab initial={saved.pricing} defaults={pricingDefaults} />
             ) : active === "estimator" ? (
-              <EstimatorTab initial={estimator} defaults={estimatorDefaults} />
+              <EstimatorTab initial={saved.estimator} defaults={estimatorDefaults} />
             ) : active === "identity" ? (
               <IdentityTab
-                initial={identity}
+                initial={saved.identity}
                 defaults={identityDefaults}
-                bookableSchedule={availability.schedule}
+                bookableSchedule={saved.availability.schedule}
               />
             ) : active === "comms" ? (
-              <CommsTab initial={comms} defaults={commsDefaults} />
+              <CommsTab initial={saved.comms} defaults={commsDefaults} />
             ) : active === "reviews" ? (
-              <ReviewsTab initial={reviews} defaults={reviewsDefaults} />
+              <ReviewsTab initial={saved.reviews} defaults={reviewsDefaults} />
             ) : active === "tax" ? (
-              <TaxTab initial={tax} defaults={taxDefaults} />
+              <TaxTab initial={saved.tax} defaults={taxDefaults} />
             ) : active === "scheduling" ? (
-              <SchedulingTab initial={scheduling} defaults={schedulingDefaults} />
+              <SchedulingTab initial={saved.scheduling} defaults={schedulingDefaults} />
             ) : active === "social" ? (
-              <SocialTab initial={social} defaults={socialDefaults} />
+              <SocialTab initial={saved.social} defaults={socialDefaults} />
             ) : null}
           </div>
         </Card>

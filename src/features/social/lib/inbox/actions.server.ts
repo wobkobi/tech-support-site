@@ -20,7 +20,7 @@ import {
 } from "@/features/social/lib/inbox/map";
 import { readableError, refreshThreads } from "@/features/social/lib/inbox/sync.server";
 import { metaProblem } from "@/features/social/lib/insights/metrics";
-import { graph, GraphError, metaConfig } from "@/features/social/lib/meta-graph";
+import { accountVisible, graph, GraphError, metaConfig } from "@/features/social/lib/meta-graph";
 import { PLATFORM_LABEL, type SocialPlatformKey } from "@/features/social/lib/validate";
 import { errorResponse } from "@/shared/lib/api-response";
 import { prisma } from "@/shared/lib/prisma";
@@ -115,10 +115,14 @@ async function failed(message: Message, error: unknown, now: Date): Promise<Inbo
   if (error instanceof GraphError && isWindowError(error.raw)) {
     return new InboxActionError(windowClosedText(message.platform, true), 400);
   }
+  // Lost access reads the same as a deleted comment, so only a visible account confirms it.
   const gone =
     !isDirect(message.kind) &&
     (error instanceof GoogleGoneError ||
-      (error instanceof GraphError && metaProblem(error.code, error.raw) === "gone"));
+      (error instanceof GraphError &&
+        message.platform !== "google" &&
+        metaProblem(error.code, error.raw) === "gone" &&
+        (await accountVisible(message.platform))));
   if (gone) {
     await markGone(message, now);
     return new InboxActionError(`That's no longer on ${PLATFORM_LABEL[message.platform]}.`, 410);
@@ -147,6 +151,25 @@ async function markGone(message: Message, now: Date): Promise<void> {
     data: { goneAt: now, syncedAt: now },
   });
   await refreshThreads(message.platform, [rootOf(message)], { now, firstRun: false });
+}
+
+/**
+ * Saves what was just sent. The app has it by now, so a failed save says so rather than reading
+ * as a failed send, which would invite a second copy; the next sync picks it up.
+ * @param platform - The app it went to.
+ * @param save - The saving.
+ * @returns Our id for what was sent.
+ */
+async function keepSent(platform: SocialPlatformKey, save: () => Promise<string>): Promise<string> {
+  try {
+    return await save();
+  } catch (error) {
+    console.error(`[inbox/actions] ${platform} sent but not saved:`, error);
+    throw new InboxActionError(
+      "It was sent, but couldn't be saved here. It shows after the next sync, so don't send it again.",
+      500,
+    );
+  }
 }
 
 /**
@@ -182,51 +205,53 @@ export async function replyTo(id: string, text: string, now: Date): Promise<stri
     throw await failed(message, error, now);
   }
 
-  const kept = await prisma.socialComment.upsert({
-    where: { platform_externalId: { platform: message.platform, externalId } },
-    create: {
-      platform: message.platform,
-      kind: "reply",
-      externalId,
-      threadExternalId: root,
-      objectExternalId: null,
-      postId: null,
-      objectText: null,
-      objectImageUrl: null,
-      objectUrl: null,
-      authorName: null,
-      authorId: null,
-      fromUs: true,
-      text: reply,
-      rating: null,
-      postedAt,
-      editedAt: null,
-      hidden: null,
-      lastActivityAt: null,
-      needsReply: null,
-      repliedAt: null,
-      readAt: null,
-      archivedAt: null,
-      goneAt: null,
-      syncedAt: now,
-    },
-    update: { text: reply, postedAt, goneAt: null, syncedAt: now },
-    select: { id: true },
-  });
-  // Copy the post fields from the thread's top so the reply reads like the sync's own rows.
-  const top = await prisma.socialComment.findUnique({
-    where: { platform_externalId: { platform: message.platform, externalId: root } },
-    select: { objectExternalId: true, postId: true },
-  });
-  if (top) {
-    await prisma.socialComment.update({
-      where: { id: kept.id },
-      data: { objectExternalId: top.objectExternalId, postId: top.postId },
+  return keepSent(message.platform, async () => {
+    const kept = await prisma.socialComment.upsert({
+      where: { platform_externalId: { platform: message.platform, externalId } },
+      create: {
+        platform: message.platform,
+        kind: "reply",
+        externalId,
+        threadExternalId: root,
+        objectExternalId: null,
+        postId: null,
+        objectText: null,
+        objectImageUrl: null,
+        objectUrl: null,
+        authorName: null,
+        authorId: null,
+        fromUs: true,
+        text: reply,
+        rating: null,
+        postedAt,
+        editedAt: null,
+        hidden: null,
+        lastActivityAt: null,
+        needsReply: null,
+        repliedAt: null,
+        readAt: null,
+        archivedAt: null,
+        goneAt: null,
+        syncedAt: now,
+      },
+      update: { text: reply, postedAt, goneAt: null, syncedAt: now },
+      select: { id: true },
     });
-  }
-  await refreshThreads(message.platform, [root], { now, firstRun: false });
-  await setMarks(id, { read: true }, now);
-  return kept.id;
+    // Copy the post fields from the thread's top so the reply reads like the sync's own rows.
+    const top = await prisma.socialComment.findUnique({
+      where: { platform_externalId: { platform: message.platform, externalId: root } },
+      select: { objectExternalId: true, postId: true },
+    });
+    if (top) {
+      await prisma.socialComment.update({
+        where: { id: kept.id },
+        data: { objectExternalId: top.objectExternalId, postId: top.postId },
+      });
+    }
+    await refreshThreads(message.platform, [root], { now, firstRun: false });
+    await setMarks(id, { read: true }, now);
+    return kept.id;
+  });
 }
 
 /**
@@ -281,45 +306,47 @@ async function sendMessage(message: Message, text: string, now: Date): Promise<s
     throw await failed(message, error, now);
   }
 
-  const kept = await prisma.socialComment.upsert({
-    where: { platform_externalId: { platform: message.platform, externalId } },
-    create: {
-      platform: message.platform,
-      kind: "message",
-      externalId,
-      threadExternalId: root,
-      objectExternalId: null,
-      postId: null,
-      objectText: null,
-      objectImageUrl: null,
-      objectUrl: null,
-      authorName: null,
-      authorId: null,
-      fromUs: true,
-      text: reply,
-      rating: null,
-      postedAt: now,
-      editedAt: null,
-      hidden: null,
-      lastActivityAt: null,
-      needsReply: null,
-      repliedAt: null,
-      readAt: null,
-      archivedAt: null,
-      goneAt: null,
-      syncedAt: now,
-    },
-    update: { text: reply, goneAt: null, syncedAt: now },
-    select: { id: true },
+  return keepSent(message.platform, async () => {
+    const kept = await prisma.socialComment.upsert({
+      where: { platform_externalId: { platform: message.platform, externalId } },
+      create: {
+        platform: message.platform,
+        kind: "message",
+        externalId,
+        threadExternalId: root,
+        objectExternalId: null,
+        postId: null,
+        objectText: null,
+        objectImageUrl: null,
+        objectUrl: null,
+        authorName: null,
+        authorId: null,
+        fromUs: true,
+        text: reply,
+        rating: null,
+        postedAt: now,
+        editedAt: null,
+        hidden: null,
+        lastActivityAt: null,
+        needsReply: null,
+        repliedAt: null,
+        readAt: null,
+        archivedAt: null,
+        goneAt: null,
+        syncedAt: now,
+      },
+      update: { text: reply, goneAt: null, syncedAt: now },
+      select: { id: true },
+    });
+    // The list shows a conversation's latest message, as the sync writes it.
+    await prisma.socialComment.updateMany({
+      where: { platform: message.platform, externalId: root },
+      data: { text: `You: ${reply}` },
+    });
+    await refreshThreads(message.platform, [root], { now, firstRun: false });
+    await setMarks(message.id, { read: true }, now);
+    return kept.id;
   });
-  // The list shows a conversation's latest message, as the sync writes it.
-  await prisma.socialComment.updateMany({
-    where: { platform: message.platform, externalId: root },
-    data: { text: `You: ${reply}` },
-  });
-  await refreshThreads(message.platform, [root], { now, firstRun: false });
-  await setMarks(message.id, { read: true }, now);
-  return kept.id;
 }
 
 /**

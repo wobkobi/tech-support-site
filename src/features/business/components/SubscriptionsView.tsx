@@ -192,11 +192,13 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
    * @param sub - Subscription to toggle.
    */
   async function handleToggleActive(sub: Subscription): Promise<void> {
-    await fetch(`/api/business/subscriptions/${sub.id}`, {
+    const res = await fetch(`/api/business/subscriptions/${sub.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ isActive: !sub.isActive }),
-    });
+    }).catch(() => null);
+    if (!res?.ok)
+      toast(sub.isActive ? "Couldn't pause it." : "Couldn't activate it.", { tone: "error" });
     await load();
   }
 
@@ -208,10 +210,11 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
     setConfirmDeleteSub(null);
     setDeleting(sub.id);
     try {
-      await fetch(`/api/business/subscriptions/${sub.id}`, {
+      const res = await fetch(`/api/business/subscriptions/${sub.id}`, {
         method: "DELETE",
-      });
-      toast("Deleted.", { tone: "success" });
+      }).catch(() => null);
+      if (res?.ok) toast("Deleted.", { tone: "success" });
+      else toast("Couldn't delete it.", { tone: "error" });
       await load();
     } finally {
       setDeleting(null);

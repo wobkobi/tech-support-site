@@ -1,6 +1,7 @@
 "use client";
 // src/features/admin/components/AdminSidebar.tsx
-// Admin navigation sidebar: fixed (collapsible to icons) at lg+, a drawer below lg.
+// Admin navigation sidebar: fixed (collapsible to icons) at lg+, a drawer below lg. The most-used
+// links stay pinned; the rest sit in sections with one open at a time, so the list fits.
 
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
 import { useDialogKeys } from "@/features/admin/hooks/use-dialog-keys";
@@ -10,7 +11,7 @@ import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import {
   FaAddressBook,
   FaArrowRightFromBracket,
@@ -19,10 +20,13 @@ import {
   FaBell,
   FaBoxesStacked,
   FaBriefcase,
+  FaBullhorn,
   FaCalculator,
   FaCalendarDays,
   FaCalendarWeek,
   FaCar,
+  FaChevronDown,
+  FaClock,
   FaEnvelope,
   FaFileInvoiceDollar,
   FaFileSignature,
@@ -33,6 +37,7 @@ import {
   FaPalette,
   FaReceipt,
   FaRoute,
+  FaSackDollar,
   FaScaleBalanced,
   FaShareNodes,
   FaStar,
@@ -74,8 +79,8 @@ interface NavItem {
   badge?: number;
 }
 
-// Ordered by how often each page is opened.
-const NAV_ITEMS: NavItem[] = [
+// Always shown above the sections, ordered by how often each page is opened.
+const PINNED_NAV_ITEMS: NavItem[] = [
   {
     page: "dashboard",
     label: "Dashboard",
@@ -101,6 +106,27 @@ const NAV_ITEMS: NavItem[] = [
     path: "/admin/contacts",
   },
   {
+    page: "business-calculator",
+    label: "Calculator",
+    icon: <FaCalculator className="shrink-0" />,
+    path: "/admin/business/calculator",
+  },
+  {
+    page: "business-invoices",
+    label: "Invoices",
+    icon: <FaFileInvoiceDollar className="shrink-0" />,
+    path: "/admin/business/invoices",
+  },
+  {
+    page: "social",
+    label: "Social",
+    icon: <FaShareNodes className="shrink-0" />,
+    path: "/admin/social",
+  },
+];
+
+const DAY_NAV_ITEMS: NavItem[] = [
+  {
     page: "reviews",
     label: "Reviews",
     icon: <FaStar className="shrink-0" />,
@@ -120,7 +146,7 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-// Overview first, then the billing flow: price, invoice, ledger, tax, assets, km.
+// Overview first, then the billing flow: price, quote, ledger, tax, assets, km.
 const BUSINESS_NAV_ITEMS: NavItem[] = [
   {
     page: "business",
@@ -129,22 +155,10 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
     path: "/admin/business",
   },
   {
-    page: "business-calculator",
-    label: "Calculator",
-    icon: <FaCalculator className="shrink-0" />,
-    path: "/admin/business/calculator",
-  },
-  {
     page: "business-quick",
     label: "Quick price",
     icon: <FaHandHoldingDollar className="shrink-0" />,
     path: "/admin/business/quick",
-  },
-  {
-    page: "business-invoices",
-    label: "Invoices",
-    icon: <FaFileInvoiceDollar className="shrink-0" />,
-    path: "/admin/business/invoices",
   },
   {
     page: "business-quotes",
@@ -184,60 +198,84 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
   },
 ];
 
-const PROMOS_NAV_ITEM: NavItem = {
-  page: "promos",
-  label: "Promos",
-  icon: <FaTags className="shrink-0" />,
-  path: "/admin/promos",
-};
+const MARKETING_NAV_ITEMS: NavItem[] = [
+  {
+    page: "promos",
+    label: "Promos",
+    icon: <FaTags className="shrink-0" />,
+    path: "/admin/promos",
+  },
+  {
+    page: "mailing",
+    label: "Mailing list",
+    icon: <FaEnvelope className="shrink-0" />,
+    path: "/admin/mailing",
+  },
+  {
+    page: "post-maker",
+    label: "Post maker",
+    icon: <FaPalette className="shrink-0" />,
+    path: "/admin/social/design",
+  },
+];
 
-const MAILING_NAV_ITEM: NavItem = {
-  page: "mailing",
-  label: "Mailing list",
-  icon: <FaEnvelope className="shrink-0" />,
-  path: "/admin/mailing",
-};
+/** Set-up pages, always shown in the footer above Back to site. */
+const FOOTER_NAV_ITEMS: NavItem[] = [
+  {
+    page: "notifications",
+    label: "Notifications",
+    icon: <FaBell className="shrink-0" />,
+    path: "/admin/notifications",
+  },
+  {
+    page: "settings",
+    label: "Settings",
+    icon: <FaGear className="shrink-0" />,
+    path: "/admin/settings",
+  },
+];
 
-const SOCIAL_NAV_ITEM: NavItem = {
-  page: "social",
-  label: "Social",
-  icon: <FaShareNodes className="shrink-0" />,
-  path: "/admin/social",
-};
+type SectionKey = "day" | "business" | "marketing";
 
-const POST_MAKER_NAV_ITEM: NavItem = {
-  page: "post-maker",
-  label: "Post maker",
-  icon: <FaPalette className="shrink-0" />,
-  path: "/admin/social/design",
-};
+interface NavSection {
+  key: SectionKey;
+  label: string;
+  /** Stands in for the label on the collapsed icon rail. */
+  icon: React.ReactNode;
+  items: NavItem[];
+}
 
-const NOTIFICATIONS_NAV_ITEM: NavItem = {
-  page: "notifications",
-  label: "Notifications",
-  icon: <FaBell className="shrink-0" />,
-  path: "/admin/notifications",
-};
-
-const SETTINGS_NAV_ITEM: NavItem = {
-  page: "settings",
-  label: "Settings",
-  icon: <FaGear className="shrink-0" />,
-  path: "/admin/settings",
-};
-
-/** The occasional tools listed under the divider, in order. */
-const TOOL_NAV_ITEMS: NavItem[] = [
-  PROMOS_NAV_ITEM,
-  MAILING_NAV_ITEM,
-  SOCIAL_NAV_ITEM,
-  POST_MAKER_NAV_ITEM,
-  NOTIFICATIONS_NAV_ITEM,
-  SETTINGS_NAV_ITEM,
+const NAV_SECTIONS: NavSection[] = [
+  { key: "day", label: "Day to day", icon: <FaClock className="shrink-0" />, items: DAY_NAV_ITEMS },
+  {
+    key: "business",
+    label: "Business",
+    icon: <FaSackDollar className="shrink-0" />,
+    items: BUSINESS_NAV_ITEMS,
+  },
+  {
+    key: "marketing",
+    label: "Marketing",
+    icon: <FaBullhorn className="shrink-0" />,
+    items: MARKETING_NAV_ITEMS,
+  },
 ];
 
 /** Every nav path, for {@link activeNavPath}. */
-const ALL_NAV_PATHS = [...NAV_ITEMS, ...BUSINESS_NAV_ITEMS, ...TOOL_NAV_ITEMS].map((i) => i.path);
+const ALL_NAV_PATHS = [
+  ...PINNED_NAV_ITEMS,
+  ...NAV_SECTIONS.flatMap((s) => s.items),
+  ...FOOTER_NAV_ITEMS,
+].map((i) => i.path);
+
+/**
+ * The section holding a nav path.
+ * @param path - The active nav path, or null.
+ * @returns Its section, or null for a pinned or footer page or no match.
+ */
+function sectionOf(path: string | null): SectionKey | null {
+  return NAV_SECTIONS.find((s) => s.items.some((i) => i.path === path))?.key ?? null;
+}
 
 /**
  * The nav path that best matches the URL: exact for "/admin", else the longest prefix.
@@ -274,14 +312,15 @@ function activeNavPath(pathname: string, search: URLSearchParams, paths: string[
 
 /**
  * Classes for one sidebar row. The active rule is a pseudo-element so the label
- * doesn't shift; the collapse applies at lg+ only.
+ * doesn't shift; the collapse applies at lg+ only. Rows keep 44px touch targets in
+ * the drawer and drop to 30px on desktop, so a laptop screen fits the list.
  * @param active - Whether the row is the current page.
  * @param collapsed - Whether the desktop sidebar is collapsed to icons.
  * @returns Class string.
  */
 function rowClasses(active: boolean, collapsed: boolean): string {
   return cn(
-    "relative flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[0.9375rem] font-semibold transition-colors select-none",
+    "relative flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[0.9375rem] font-semibold transition-colors select-none lg:min-h-8 lg:py-1",
     active
       ? "bg-white/10 text-white before:absolute before:inset-y-2 before:left-0 before:w-0.75 before:rounded-r-sm before:bg-moonstone-400"
       : "text-white/75 hover:bg-white/10 hover:text-white",
@@ -340,8 +379,25 @@ export function AdminSidebar({
   const searchParams = useSearchParams();
   const active = activeNavPath(pathname, searchParams, ALL_NAV_PATHS);
   const unread = useInboxUnread();
+  const pageSection = sectionOf(active);
+  const [openSection, setOpenSection] = useState<SectionKey | null>(pageSection);
+  const [openedFor, setOpenedFor] = useState(active);
+  // A new page opens its own section; a pinned or footer page leaves the open one as it was.
+  if (openedFor !== active) {
+    setOpenedFor(active);
+    if (pageSection) setOpenSection(pageSection);
+  }
 
   useDialogKeys(asideRef, drawerOpen, () => onDrawerClose(true));
+
+  /**
+   * Adds the Inbox's unread count to the Social link.
+   * @param item - The nav item.
+   * @returns The item, with its badge when it's Social.
+   */
+  function withBadge(item: NavItem): NavItem {
+    return item.page === "social" ? { ...item, badge: unread } : item;
+  }
 
   /**
    * Renders one nav link with the active styling and the collapsed tooltip.
@@ -418,7 +474,7 @@ export function AdminSidebar({
         {/* Brand. Collapsed, only the eyebrow stays. */}
         <div
           className={cn(
-            "flex items-center justify-between border-b border-white/10 px-5 py-4",
+            "flex items-center justify-between border-b border-white/10 px-5 py-4 lg:py-3",
             collapsed && "lg:justify-center lg:px-0",
           )}
         >
@@ -448,34 +504,56 @@ export function AdminSidebar({
         {/* Nav */}
         <nav
           aria-label="Admin"
-          className="flex flex-1 flex-col gap-1 overflow-y-auto overscroll-contain px-3 py-4"
+          className="flex flex-1 flex-col gap-1 overflow-y-auto overscroll-contain px-3 py-4 lg:py-3"
         >
-          {NAV_ITEMS.map(navLink)}
-
-          {/* Collapsed, the heading is read by screen readers only and a rule marks the group. */}
-          <p
-            className={cn(
-              ADMIN_EYEBROW_CLS,
-              "mt-4 mb-1 px-3 text-moonstone-300",
-              collapsed && "lg:sr-only",
-            )}
-          >
-            Business
-          </p>
-          {collapsed && (
-            <div aria-hidden className="my-2 hidden border-t border-white/10 lg:block" />
-          )}
-          {BUSINESS_NAV_ITEMS.map(navLink)}
-
-          <div className="my-2 border-t border-white/10" />
-
-          {TOOL_NAV_ITEMS.map((item) =>
-            navLink(item.page === "social" ? { ...item, badge: unread } : item),
-          )}
+          {PINNED_NAV_ITEMS.map(withBadge).map(navLink)}
+          <div aria-hidden className="border-t border-white/10" />
+          {NAV_SECTIONS.map((section) => {
+            const isOpen = openSection === section.key;
+            const listId = `admin-nav-${section.key}`;
+            return (
+              <div key={section.key} className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={() => setOpenSection(isOpen ? null : section.key)}
+                  aria-expanded={isOpen}
+                  aria-controls={listId}
+                  title={collapsed ? section.label : undefined}
+                  className={cn(
+                    "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-moonstone-300 transition-colors select-none hover:bg-white/10 hover:text-white lg:min-h-8",
+                    collapsed && "lg:justify-center lg:px-0",
+                  )}
+                >
+                  <span className={cn("hidden", collapsed && "lg:inline-flex")}>
+                    {section.icon}
+                  </span>
+                  <span
+                    className={cn(ADMIN_EYEBROW_CLS, "text-inherit", collapsed && "lg:sr-only")}
+                  >
+                    {section.label}
+                  </span>
+                  <FaChevronDown
+                    aria-hidden
+                    className={cn(
+                      "ml-auto shrink-0 text-sm transition-[rotate]",
+                      !isOpen && "-rotate-90",
+                      collapsed && "lg:hidden",
+                    )}
+                  />
+                </button>
+                {isOpen && (
+                  <div id={listId} className="flex flex-col gap-1">
+                    {section.items.map(navLink)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
-        {/* Footer - link back to the public site + sign-out trigger. */}
-        <div className="flex flex-col gap-1 border-t border-white/10 px-3 py-3">
+        {/* Footer - set-up pages, the link back to the public site and sign-out. */}
+        <div className="flex flex-col gap-1 border-t border-white/10 px-3 py-3 lg:py-2">
+          {FOOTER_NAV_ITEMS.map(navLink)}
           <Link
             href="/"
             onClick={() => onDrawerClose(false)}

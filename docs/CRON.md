@@ -49,8 +49,7 @@ All endpoints are **GET**. Create one cron-job.org job per row.
 | Job                     | URL path                            | Method | Schedule         | Purpose                                                                                                                                                                                                     |
 | ----------------------- | ----------------------------------- | ------ | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Calendar cache refresh  | `/api/cron/refresh-calendar-cache`  | GET    | every 30 minutes | Fetch Google Calendar events into the DB cache                                                                                                                                                              |
-| Release holds           | `/api/cron/release-holds`           | GET    | every 15 minutes | Cancel expired booking holds                                                                                                                                                                                |
-| Reconcile booking times | `/api/cron/reconcile-booking-times` | GET    | every 30 minutes | Pull corrected times back from Calendar, flag deleted events                                                                                                                                                |
+| Reconcile booking times | `/api/cron/reconcile-booking-times` | GET    | every 30 minutes | Pull corrected times back from Calendar, flag deleted events, retry booking-event deletes Google refused                                                                                                    |
 | Booking reminders       | `/api/cron/send-booking-reminders`  | GET    | every 30 minutes | Email a 24h-out reminder for confirmed bookings                                                                                                                                                             |
 | Invoice reminders       | `/api/cron/send-invoice-reminders`  | GET    | daily            | Chase overdue SENT invoices (max 2 nudges each)                                                                                                                                                             |
 | Review asks             | `/api/cron/send-review-asks`        | GET    | daily 10:00 NZ   | Email the Google review ask N days after an invoice is sent                                                                                                                                                 |
@@ -76,12 +75,14 @@ across DST changes.
   sync jobs make many sequential Google API calls, and a long sync run can outlive cron-job.org's 30
   s response window, so a cron-job.org "timeout" does not necessarily mean the run failed - check
   the Vercel function logs for the actual outcome.
-- Overlapping or retried runs are safe by design: release-holds guards each update on status +
-  expiry, booking reminders stamp `emailReminderSentAt` only after Resend accepts the send, invoice
-  reminders stamp `reminderLastSentAt`/`reminderCount` the same way (max 2 per invoice, offsets live
-  in the comms settings), record-subscriptions advances `nextDue` with a CAS guard, review asks
-  claim each invoice (`reviewAskOutcome` > `sending`) before sending with a per-invoice Resend
-  idempotency key, and the holidays refresh is a pure upsert.
+- Overlapping or retried runs don't double-send: booking reminders claim `emailReminderSentAt` and
+  invoice reminders claim `reminderCount`/`reminderLastSentAt` (compare-and-set) before sending, and
+  hand the claim back when Resend refuses so the next run retries (max 2 invoice nudges, offsets
+  live in the comms settings). A function killed between claim and send skips that reminder.
+  record-subscriptions advances `nextDue` with a CAS guard and returns 500 when a record failed
+  after its claim (record that one by hand), review asks claim each invoice (`reviewAskOutcome` >
+  `sending`) before sending with a per-invoice Resend idempotency key, and the holidays refresh
+  upserts, then prunes only once every year has fetched.
 - Booking reminders send inside a window from `CANCELLATION.freeNoticeHours + 1` up to
   `comms.reminderLeadHours` before the start, so the reminder always lands while the customer can
   still cancel free.
@@ -106,9 +107,9 @@ across DST changes.
   never followed - so reminders were timed off a stale start, or went out for a visit that never
   happened. This job copies corrected times back and stamps `calendarEventMissingAt` on a row whose
   event is gone; the reminder job skips a flagged booking until it is cancelled properly, and the
-  flag clears itself if the event reads back. Only a 404 or an explicit `cancelled` status counts as
-  gone, so a quota or auth blip never pauses mail. It uses a 7-day lookback, and the query has no
-  upper bound, so every future booking is covered; `npm run reconcile:times:dry` and
+  flag clears itself if the event reads back. Only a 404, a 410 or an explicit `cancelled` status
+  counts as gone, so a quota or auth blip never pauses mail. It uses a 7-day lookback, and the query
+  has no upper bound, so every future booking is covered; `npm run reconcile:times:dry` and
   `npm run reconcile:times:apply` are the same pass by hand, with the wider 60-day default.
 - It also re-arms a reminder stamp that cannot belong to a booking's current times.
   `emailReminderSentAt` is one-way - nothing else in the codebase clears it - so a row that has been
@@ -119,6 +120,15 @@ across DST changes.
   widest lead the settings validator allows, so it cannot have been sent for these times whatever
   the setting is; that also keeps the check free of a settings read, which the CLI script could not
   do anyway. Review asks hang off invoices, not booking times, so nothing here touches them.
+- The same run retries `PendingCalendarDelete`. A cancel, a reschedule's old event or a rolled-back
+  booking whose Google delete failed queues the event there rather than leaving it to block the slot
+  and sit in the customer's calendar. Each run retries the queue oldest first with the original
+  notify setting; an event already gone (404/410) clears its row. After 48 tries (a day) the row is
+  dropped and the owner gets a push to delete the event by hand.
+- Calendar cache rows live 60 minutes, twice the refresh cadence, so one late or missed run never
+  expires the table. The booking page also serves rows up to 2 hours past their fetch while it
+  refreshes in the background; the submit-time check always reads the calendars live, and adds the
+  cached travel blocks so it refuses the same slots the grid greys out.
 - Invoice reminders hold off on an invoice whose payment is already in the income ledger. Money
   entered straight into the Cashbook sheet never reaches the invoice (only `POST /pay` links the
   two), so a paid invoice can still read as SENT. A linked entry is proof; an unlinked entry
@@ -129,26 +139,38 @@ across DST changes.
   overlapping runs can't send one twice, and every recipient has a `CampaignSend` row that is only
   marked sent once Resend accepts it. A send left in `sending` for over 10 minutes (a timed-out
   function) is re-claimed and only its pending rows go out, with the same Resend idempotency keys.
-  An idle run is four indexed queries, so the 5-minute cadence costs next to no Active CPU; it is
-  that tight only so a scheduled email or post goes out close to the time the operator picked.
+  Pending rows are re-checked against the list before every send, resume or retry, so anyone who
+  unsubscribed, was deleted or was unticked since is dropped and a changed address gets it at the
+  new one. A batch Resend didn't answer (no reply or a 5xx) stays pending for that resume rather
+  than failing, since Retry's new keys could send a second copy. An idle run is four indexed
+  queries, so the 5-minute cadence costs next to no Active CPU; it is that tight only so a scheduled
+  email or post goes out close to the time the operator picked.
 - A mailing-list email sent as a Resend broadcast stores each step (segment, contact import,
   broadcast, the send call) on the campaign before the next starts. A send still waiting on Resend's
   list upload is picked up 2 minutes after its run started, rather than 10, and carries on from that
-  step; the send call itself is claimed first, so two runs can never both send it. Once Resend
-  reports a broadcast sent, the next run deletes its segment (the free plan allows 3). That runs
-  before the quiet-hours check, since it sends nothing.
+  step; the send call itself is claimed first, so two runs can never both send it. An upload still
+  unfinished after 30 minutes fails the run, so Retry uploads it again, and once a list loads, rows
+  Resend left out of the segment or holds as unsubscribed are marked failed rather than sent. Once
+  Resend reports a broadcast sent, the next run deletes its segment (the free plan allows 3). That
+  runs before the quiet-hours check, since it sends nothing.
 - Scheduled social posts use the same claim (`scheduled > posting`) and run before the quiet-hours
-  check, so they go out at the time picked at any hour. Each platform's outcome is stored on the
-  post, so a resumed run (including one waiting on Instagram's picture processing) only posts to the
-  platforms still pending.
+  check, so they go out at the time picked at any hour. Each platform's outcome is saved on the post
+  as soon as it lands, so a resumed run (including one waiting on Instagram's picture processing)
+  only posts to the platforms still pending, even when the run died part-way. A post that can't go
+  at its time (its promo ended, an app isn't set up, a check fails) is marked failed at its slot
+  with a push to the operator, and Retry sends it once it's fixed. When Meta doesn't answer a call
+  that puts a post up, Instagram and Facebook reels keep their upload for the next run to check
+  instead of posting again, and a Facebook post is looked for on the Page before it's called failed.
+- Any pass of this job that throws (promo, social, schedule fill) still lets the others run, but the
+  job then answers 500 with the failed passes listed, so cron-job.org flags the run.
 - Social schedules are filled by the same job, at most once an hour: a run whose last fill (the
   `social:queueFilledAt` setting) is under an hour old skips it. The fill holds the
   `social:queueFill` run lock, so an overlapping run or a "Line up posts now" click can't double up
-  a slot, and stops after 20 s, leaving any remaining slots to the next hour. It lines up postings
-  for Settings > Social & brand > "Line up posts ahead" days, never closer than 10 minutes away, and
-  treats a slot as filled when any posting from that schedule holds the time. Slots you emptied by
-  hand (unscheduled or deleted) are remembered and left empty. Nothing new needs registering on
-  cron-job.org.
+  a slot, and stops after 20 s; a fill cut short isn't stamped done, so the next 5-minute run
+  carries on with the remaining slots. It lines up postings for Settings > Social & brand > "Line up
+  posts ahead" days, never closer than 10 minutes away, and treats a slot as filled when any posting
+  from that schedule holds the time. Slots you emptied by hand (unscheduled or deleted) are
+  remembered and left empty. Nothing new needs registering on cron-job.org.
 - Social sync reads comments and reviews first, under the `social:commentsSync` run lock (a held
   lock answers `comments: null`). Facebook and Instagram posts from the last 60 days are listed with
   their comment counts, and only posts whose count moved are read again, at most 30 a run; a post
@@ -159,9 +181,11 @@ across DST changes.
   messages; a stored message missing from the read (in a longer chat, from among its newest 20) was
   unsent, so it's marked gone and its words are cleared. The first run of each app leaves threads
   older than 14 days read. A run stops starting reads after 90 s. A failed read keeps its reason for
-  the Inbox to show and never stops the figures. The Inbox's Check now is turned away within 2
-  minutes of the last read. Move the cron-job.org job to every 30 minutes after the deploy that adds
-  the Inbox.
+  the Inbox to show and never stops the figures; a comments read that throws outright still lets the
+  figures run, then the job answers 500 so cron-job.org flags it. A post or comment Meta reports as
+  missing is only marked gone while the token can still see the Page or Instagram account, since
+  lost access reads the same. The Inbox's Check now is turned away within 2 minutes of the last
+  read. Move the cron-job.org job to every 30 minutes after the deploy that adds the Inbox.
 - The figures part holds the `social:insightsSync` run lock, so an overlapping run or a Refresh
   press does nothing and answers `{ running: true }`. Each app's account days are read at most every
   6 hours: the last 30 days on the first run, then the last 3 again for Facebook and Instagram (the
@@ -174,7 +198,11 @@ across DST changes.
   turned away within 10 minutes of the last read. Register it on cron-job.org, every 30 minutes,
   after the deploy that adds it.
 - Contacts sync runs local dedup/merge first, then pushes only the dirty set, then pulls Google's
-  changes. The manual full sync lives at `/api/admin/contacts/sync`.
+  changes. The manual full sync lives at `/api/admin/contacts/sync`. Google calls are spaced 0.7 s
+  apart (its 90-a-minute read quota) with one retry after 10 s; a rate limit that outlasts the retry
+  ends the run, and the push stops starting contacts after 200 s. Longest-unsynced contacts go
+  first, so the next run carries on where one stopped. A field with an open conflict is left alone
+  on both sides until it's resolved.
 - Sheets sync treats the sheet as source of truth, joining rows on the hidden column-Z Sync ID, and
   self-heals site entries whose sheet append failed.
 

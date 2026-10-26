@@ -10,7 +10,7 @@ import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { callApi } from "@/features/mailing/lib/api-client";
-import { BROADCAST_WAITING_NOTE, type CampaignRow } from "@/features/mailing/lib/campaign-row";
+import { SEND_WAITING_NOTE, type CampaignRow } from "@/features/mailing/lib/campaign-row";
 import type { Recipient } from "@/features/mailing/lib/recipients";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { nextSendTime, type QuietHours } from "@/shared/lib/quiet-hours";
@@ -198,7 +198,7 @@ export function SendDialog({
         toast(res.error, { tone: "error" });
         return;
       }
-      if (res.waiting) toast(BROADCAST_WAITING_NOTE, { tone: "success" });
+      if (res.waiting) toast(SEND_WAITING_NOTE, { tone: "success" });
       else
         toast(
           res.failed > 0

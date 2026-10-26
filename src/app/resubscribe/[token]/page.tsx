@@ -2,6 +2,7 @@
 // Public page behind the button in the "Do you want my emails again?" email. Checks the
 // signed token, then leaves the actual change to a button press.
 
+import { followMerges } from "@/features/contacts/lib/merge-links";
 import { ResubscribeForm } from "@/features/mailing/components/ResubscribeForm";
 import { isContactOptedOut } from "@/features/mailing/lib/opt-out";
 import { verifyUnsubscribeToken } from "@/features/mailing/lib/unsubscribe-token";
@@ -28,7 +29,8 @@ export default async function ResubscribePage({
   params: Promise<{ token: string }>;
 }): Promise<React.ReactElement> {
   const { token } = await params;
-  const contactId = verifyUnsubscribeToken(token);
+  const tokenId = verifyUnsubscribeToken(token);
+  const contactId = tokenId ? await followMerges(tokenId) : null;
   const onList = contactId ? !(await isContactOptedOut(contactId)) : false;
 
   return (

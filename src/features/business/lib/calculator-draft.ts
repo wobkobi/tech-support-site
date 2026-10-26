@@ -1,6 +1,7 @@
 // src/features/business/lib/calculator-draft.ts
 // localStorage draft persistence for the job calculator: the persisted shape, the
-// read/write/clear helpers, and the "Draft restored" age label.
+// read/write/clear helpers, and the "Draft restored" age label. A calendar job or re-issue
+// keeps its own draft, so its work restores only on that job and keeps the booking link.
 
 import type { AlreadyPaidState } from "@/features/business/lib/already-paid-input";
 import { timeDiffMins } from "@/features/business/lib/business";
@@ -13,6 +14,9 @@ import type {
 
 /** localStorage key for the calculator draft; bump the version when its shape changes. */
 const DRAFT_KEY = "calculator-draft-v2";
+
+/** A job draft nobody came back to for this long is dropped on the next load. */
+const JOB_DRAFT_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
  * sessionStorage key carrying a part-typed "Describe the job" across the remount that
@@ -52,6 +56,8 @@ export interface CalculatorDraft {
   pickedContactCompany: string | null;
   pickedContactGoogleId: string | null;
   addressMode: "name" | "company" | "custom";
+  /** A job draft's event date and times when saved; edited events since win over its times. */
+  eventTimes?: string;
 }
 
 /**
@@ -91,13 +97,49 @@ export function isPlaceholderHour(ranges: ParsedRange[] | undefined): boolean {
 }
 
 /**
- * Reads the saved draft from localStorage.
+ * The draft scope for a calculator opened on calendar events or a re-issue.
+ * @param eventIds - Calendar event ids the job bills; order doesn't matter.
+ * @param reissueNumber - The voided invoice's number when re-issuing, else null.
+ * @returns A scope for the draft helpers, or null for the plain calculator.
+ */
+export function draftScopeFor(eventIds: string[], reissueNumber: string | null): string | null {
+  if (reissueNumber) return `reissue:${reissueNumber}`;
+  return eventIds.length > 0 ? `events:${[...eventIds].sort().join(",")}` : null;
+}
+
+/**
+ * The storage key for a scope.
+ * @param scope - From {@link draftScopeFor}; null is the plain calculator.
+ * @returns The localStorage key.
+ */
+function keyFor(scope: string | null): string {
+  return scope ? `${DRAFT_KEY}:${scope}` : DRAFT_KEY;
+}
+
+/** Drops job drafts past {@link JOB_DRAFT_MAX_AGE_MS}, plus any that no longer parse. */
+function pruneJobDrafts(): void {
+  const cutoff = Date.now() - JOB_DRAFT_MAX_AGE_MS;
+  for (const key of Object.keys(window.localStorage)) {
+    if (!key.startsWith(`${DRAFT_KEY}:`)) continue;
+    try {
+      const saved = (JSON.parse(window.localStorage.getItem(key) ?? "") as CalculatorDraft).savedAt;
+      if (!(saved > cutoff)) window.localStorage.removeItem(key);
+    } catch {
+      window.localStorage.removeItem(key);
+    }
+  }
+}
+
+/**
+ * Reads a saved draft from localStorage.
+ * @param scope - From {@link draftScopeFor}; null is the plain calculator.
  * @returns Parsed draft, or null when missing, corrupt or an old version.
  */
-export function loadDraft(): CalculatorDraft | null {
+export function loadDraft(scope: string | null = null): CalculatorDraft | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(DRAFT_KEY);
+    pruneJobDrafts();
+    const raw = window.localStorage.getItem(keyFor(scope));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CalculatorDraft;
     if (parsed?.v !== 2) return null;
@@ -110,22 +152,29 @@ export function loadDraft(): CalculatorDraft | null {
 /**
  * Writes the draft to localStorage with a fresh savedAt; failures are swallowed.
  * @param draft - Form-state fields to persist (savedAt + v are added here).
+ * @param scope - From {@link draftScopeFor}; null is the plain calculator.
  */
-export function saveDraft(draft: Omit<CalculatorDraft, "v" | "savedAt">): void {
+export function saveDraft(
+  draft: Omit<CalculatorDraft, "v" | "savedAt">,
+  scope: string | null = null,
+): void {
   if (typeof window === "undefined") return;
   try {
     const payload: CalculatorDraft = { v: 2, savedAt: Date.now(), ...draft };
-    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
+    window.localStorage.setItem(keyFor(scope), JSON.stringify(payload));
   } catch {
     /* QuotaExceeded or private mode - silently degrade */
   }
 }
 
-/** Drops the saved draft so the next mount starts clean. */
-export function clearDraft(): void {
+/**
+ * Drops a saved draft so the next mount starts clean.
+ * @param scope - From {@link draftScopeFor}; null is the plain calculator.
+ */
+export function clearDraft(scope: string | null = null): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.removeItem(DRAFT_KEY);
+    window.localStorage.removeItem(keyFor(scope));
   } catch {
     /* ignore */
   }

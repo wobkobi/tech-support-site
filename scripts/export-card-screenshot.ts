@@ -119,12 +119,13 @@ function readFlag(
   index: number,
   name: string,
 ): { value: string; consumed: number } | null {
-  const arg = args[index];
+  const arg = args[index] ?? "";
   if (arg.startsWith(`--${name}=`)) {
     return { value: arg.substring(name.length + 3), consumed: 0 };
   }
-  if (arg === `--${name}` && args[index + 1]) {
-    return { value: args[index + 1], consumed: 1 };
+  const next = args[index + 1];
+  if (arg === `--${name}` && next) {
+    return { value: next, consumed: 1 };
   }
   return null;
 }

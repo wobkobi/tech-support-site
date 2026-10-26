@@ -233,12 +233,12 @@ function checkParse(): void {
   const extra = JSON.parse(JSON.stringify(withText)) as Record<string, unknown> & {
     layers: Record<string, unknown>[];
   };
-  extra.layers[1].sneaky = "<script>";
+  extra.layers[1]!.sneaky = "<script>";
   extra.sneaky = 1;
   const stripped = parseDesignDoc(extra);
   expect(
     "unknown fields are dropped",
-    "doc" in stripped && !("sneaky" in stripped.doc) && !("sneaky" in stripped.doc.layers[1]),
+    "doc" in stripped && !("sneaky" in stripped.doc) && !("sneaky" in stripped.doc.layers[1]!),
   );
 
   /**
@@ -563,13 +563,13 @@ function checkHash(): void {
   expect("editing text changes the hash", docHash(edited, NO_BOUND) !== h);
 
   const moved = structuredClone(doc);
-  moved.layouts.square!.head1.x += 5;
+  moved.layouts.square!.head1!.x += 5;
   expect("moving a layer changes the hash", docHash(moved, NO_BOUND) !== h);
 
   const offSize = structuredClone(doc);
   offSize.formats = offSize.formats.filter((f) => f !== "story");
   const offHash = docHash(offSize, NO_BOUND);
-  offSize.layouts.story!.head1.x += 50;
+  offSize.layouts.story!.head1!.x += 50;
   expect(
     "a layout on a size not exported doesn't change the hash",
     docHash(offSize, NO_BOUND) === offHash,
@@ -1005,6 +1005,7 @@ function checkTemplates(): void {
       t.doc.formats.join(", "),
     );
     const [backdrop, card] = t.doc.layers;
+    if (!backdrop || !card) throw new Error(`${t.name} has no backdrop and card.`);
     expect(
       `${t.name}: starts with a brand backdrop and a frosted card`,
       backdrop.type === "backdrop" && backdrop.source === "brand" && card.type === "frosted",
@@ -1014,9 +1015,9 @@ function checkTemplates(): void {
       const missing = t.doc.layers.filter((l) => !layout[l.id]).map((l) => l.name);
       expect(`${t.name} on ${f}: every layer is laid out`, missing.length === 0, missing.join());
       const content = t.doc.layers.slice(2).filter((l) => layout[l.id]);
-      const cardG = layout[card.id];
+      const cardG = layout[card.id]!;
       const outside = content.filter((l) => {
-        const g = layout[l.id];
+        const g = layout[l.id]!;
         return (
           g.x < cardG.x - 1 ||
           g.y < cardG.y - 1 ||
@@ -1042,13 +1043,14 @@ function checkTemplates(): void {
       const clashes: string[] = [];
       for (let i = 0; i < content.length; i++) {
         for (let j = i + 1; j < content.length; j++) {
-          if (overlaps(layout[content[i].id], layout[content[j].id]))
-            clashes.push(`${content[i].name}/${content[j].name}`);
+          const a = content[i]!;
+          const b = content[j]!;
+          if (overlaps(layout[a.id]!, layout[b.id]!)) clashes.push(`${a.name}/${b.name}`);
         }
       }
       expect(`${t.name} on ${f}: nothing overlaps`, clashes.length === 0, clashes.join(", "));
       const tiny = content.filter((l) => {
-        const size = layout[l.id].fontSize;
+        const size = layout[l.id]!.fontSize;
         return size !== undefined && size < 18;
       });
       expect(
@@ -1110,6 +1112,7 @@ function checkPictures(): void {
   const [promo] = starterTemplates({ bookingUrl: "https://example.co.nz/booking" }).filter(
     (t) => t.kind === "promo",
   );
+  if (!promo) throw new Error("No promo template.");
   const doc = promo.doc;
   const hash = docHash(doc, NO_BOUND);
   const none = pictureState(doc, NO_BOUND, []);

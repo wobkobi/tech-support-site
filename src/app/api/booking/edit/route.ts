@@ -3,8 +3,10 @@
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
+  bookingWindowEnd,
   buildAppointmentDescription,
   isBookingClosed,
+  isSlotFree,
   parseHourLabel,
   splitUnitFromAddress,
   validateBookingPayloadFields,
@@ -13,14 +15,14 @@ import {
   type StartMinute,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
-import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
+import {
+  loadBlockingBookings,
+  loadBlockingEvents,
+} from "@/features/booking/lib/existing-bookings.server";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import { parseString } from "@/features/business/lib/validation";
-import {
-  createBookingEvent,
-  deleteBookingEvent,
-  fetchAllCalendarEvents,
-} from "@/features/calendar/lib/google-calendar";
+import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
+import { removeBookingEvent } from "@/features/calendar/lib/pending-calendar-deletes";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { sendOwnerPush } from "@/features/notifications/lib/push";
@@ -156,19 +158,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Edits stay open while new-booking intake is paused.
     const { config } = await getAvailabilityConfig();
-    const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
-    // Excluding the one being edited, so it can keep its own slot.
+    // Excluding the one being edited (and its event and travel), so it can keep its own slot.
     const existingForValidation = await loadBlockingBookings(now, { excludeId: booking.id });
 
-    let calendarEvents: Array<{ id: string; start: string; end: string }> = [];
+    // Fail closed, as a new booking does: a missed calendar would read as free time.
+    let calendarEvents: Array<{ id: string; start: string; end: string }>;
     try {
-      const rawEvents = await fetchAllCalendarEvents(now, maxDate);
-      calendarEvents = rawEvents
-        .filter((e) => e.id !== booking.calendarEventId)
-        .map((e) => ({ id: e.id, start: e.start, end: e.end }));
+      calendarEvents = await loadBlockingEvents(
+        now,
+        bookingWindowEnd(now, config),
+        booking.calendarEventId,
+      );
     } catch (error) {
       console.error("[booking/edit] Failed to fetch calendar events:", error);
+      return errorResponse(
+        "We couldn't verify availability just now. Please try again in a moment, or contact us directly.",
+        503,
+      );
     }
 
     const validation = validateBookingRequest(
@@ -230,8 +237,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       cancelUrl: `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`,
     });
 
-    // Create the replacement BEFORE retiring the old event, so a Google failure leaves a
-    // recoverable duplicate, not a booking pointing at a dead calendarEventId.
+    // The replacement goes in first and the old event comes out only once the row points at
+    // the new one, so a failure on the way leaves the original booking and event as they were.
     let calendarEventId: string | null = null;
     try {
       const summary = `Tech Support: ${cleanName} - ${cleanDurationLabel}`;
@@ -256,17 +263,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Best-effort: a failure leaves a stale duplicate for the operator to clear.
-    if (booking.calendarEventId) {
-      try {
-        await deleteBookingEvent({ eventId: booking.calendarEventId });
-      } catch (err) {
-        console.error("[booking/edit] Failed to delete old calendar event:", err);
-      }
-    }
-
     // For the "was: <old time>" line in the rescheduled emails.
     const previousStartAt = booking.startAt;
+    const slotMoved =
+      startAt.getTime() !== booking.startAt.getTime() ||
+      endAt.getTime() !== booking.endAt.getTime();
 
     // Re-snapshot drive legs so a late cancel bills the right travel; remote leaves both null.
     let travelMinsAtBooking: number | null = null;
@@ -283,40 +284,38 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    const update = {
+      name: cleanName,
+      notes: bookingNotes,
+      accessNotes: cleanAccessNotes,
+      startAt,
+      endAt,
+      calendarEventId,
+      activeSlotKey: startAt.toISOString(),
+      bufferAfterMin: config.bookingBufferAfterMin,
+      rescheduleCount: booking.rescheduleCount + 1,
+      // Clear the reminder stamp so the 24h nudge fires again, but only when the
+      // start moved - a notes-only edit shouldn't re-send it.
+      ...(startAt.getTime() !== booking.startAt.getTime() ? { emailReminderSentAt: null } : {}),
+      phone: phoneE164,
+      // Keep snapshots current for the cancellation invoice.
+      address: canonicalAddress ? splitUnitFromAddress(canonicalAddress).rest : null,
+      unit: canonicalAddress ? splitUnitFromAddress(canonicalAddress).unit || null : null,
+      meetingType: meetingType === "in-person" ? "in_person" : "remote",
+      duration,
+      travelMinsAtBooking,
+      travelMinsBackAtBooking,
+    } satisfies Prisma.BookingUpdateManyMutationInput;
+
     try {
       // Conditional on still being active: a cancel that landed mid-edit keeps its released
       // slot key instead of this write handing the slot back to a cancelled booking.
       const saved = await prisma.booking.updateMany({
-        where: { id: booking.id, status: { in: ["held", "confirmed"] } },
-        data: {
-          name: cleanName,
-          notes: bookingNotes,
-          accessNotes: cleanAccessNotes,
-          startAt,
-          endAt,
-          calendarEventId,
-          activeSlotKey: startAt.toISOString(),
-          bufferAfterMin: config.bookingBufferAfterMin,
-          rescheduleCount: { increment: 1 },
-          // Clear the reminder stamp so the 24h nudge fires again, but only when the
-          // start moved - a notes-only edit shouldn't re-send it.
-          ...(startAt.getTime() !== booking.startAt.getTime() ? { emailReminderSentAt: null } : {}),
-          phone: phoneE164,
-          // Keep snapshots current for the cancellation invoice.
-          address: canonicalAddress ? splitUnitFromAddress(canonicalAddress).rest : null,
-          unit: canonicalAddress ? splitUnitFromAddress(canonicalAddress).unit || null : null,
-          meetingType: meetingType === "in-person" ? "in_person" : "remote",
-          duration,
-          travelMinsAtBooking,
-          travelMinsBackAtBooking,
-        },
+        where: { id: booking.id, status: "confirmed" },
+        data: update,
       });
       if (saved.count === 0) {
-        if (calendarEventId) {
-          await deleteBookingEvent({ eventId: calendarEventId }).catch((err) =>
-            console.error("[booking/edit] Failed to delete orphaned calendar event:", err),
-          );
-        }
+        if (calendarEventId) await removeBookingEvent({ eventId: calendarEventId });
         return errorResponse(
           "This booking was cancelled or completed, so it can't be changed.",
           409,
@@ -324,19 +323,63 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
       console.log(`[booking/edit] Updated booking: ${booking.id}`);
     } catch (error) {
+      // The row still points at the old event, so take the new one back off.
+      if (calendarEventId) await removeBookingEvent({ eventId: calendarEventId });
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        // Lost the slot race; remove the now-orphaned new event.
-        if (calendarEventId) {
-          await deleteBookingEvent({ eventId: calendarEventId }).catch((err) =>
-            console.error("[booking/edit] Failed to delete orphaned calendar event:", err),
-          );
-        }
         return NextResponse.json(
           { ok: false, error: "This time slot is no longer available." },
           { status: 409 },
         );
       }
       throw error;
+    }
+
+    // Same re-check as a new booking: a request checked in the same moment can take an
+    // overlapping start. Of two that clash, whichever reads last backs out.
+    if (slotMoved) {
+      const others = await loadBlockingBookings(now, { excludeId: booking.id });
+      if (!isSlotFree(startAt, endAt, others, [], 0)) {
+        console.warn(
+          `[booking/edit] ${booking.id} overlaps a booking made alongside it; reverting`,
+        );
+        // Every field the update wrote, back to its earlier value.
+        const revert = Object.fromEntries(
+          Object.keys(update).map((key) => [key, booking[key as keyof typeof update]]),
+        ) as Prisma.BookingUpdateManyMutationInput;
+        let reverted: { count: number } | null = null;
+        try {
+          reverted = await prisma.booking.updateMany({
+            where: { id: booking.id, status: "confirmed" },
+            data: revert,
+          });
+        } catch (err) {
+          // The old start's slot key went to another booking meanwhile: keep the move and
+          // leave the overlap for the operator rather than strand the row without an event.
+          console.error(`[booking/edit] ${booking.id} couldn't be reverted:`, err);
+          await sendOwnerPush({
+            title: "Bookings overlap",
+            body: `${cleanName}'s reschedule overlaps another booking. Check the schedule.`,
+            url: `/admin/bookings/${booking.id}`,
+            tag: `booking-overlap-${booking.id}`,
+          });
+        }
+        if (reverted) {
+          if (calendarEventId) await removeBookingEvent({ eventId: calendarEventId });
+          // Cancelled in the meantime: nothing points at the old event either.
+          if (reverted.count === 0 && booking.calendarEventId) {
+            await removeBookingEvent({ eventId: booking.calendarEventId });
+          }
+          return NextResponse.json(
+            { ok: false, error: "This time slot is no longer available." },
+            { status: 409 },
+          );
+        }
+      }
+    }
+
+    // Only now retire the old event; a failed delete is queued for the reconcile cron.
+    if (booking.calendarEventId) {
+      await removeBookingEvent({ eventId: booking.calendarEventId });
     }
 
     // Held emails name the old time. Same gate as the reminder-stamp clear above,

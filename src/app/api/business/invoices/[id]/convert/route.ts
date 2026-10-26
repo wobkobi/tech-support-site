@@ -75,8 +75,10 @@ export async function POST(
     sheetNextCount = alloc.sheetNextCount;
     sheetSyncWarning = alloc.sheetSyncWarning;
     try {
+      // Still a quote: a second tab converting at once matches nothing (P2025 below), so
+      // it can't take a second number and leave a gap in the sequence.
       converted = await prisma.invoice.update({
-        where: { id },
+        where: { id, isQuote: true },
         data: {
           number: alloc.number,
           isQuote: null,
@@ -100,6 +102,9 @@ export async function POST(
       });
       break;
     } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+        return errorResponse("This quote was just converted. Reload to see the invoice.", 409);
+      }
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002" &&
