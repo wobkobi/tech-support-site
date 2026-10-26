@@ -539,7 +539,7 @@ export default function BookingForm({
           setSlotStale(true);
           setError(null);
         } else {
-          setError(data.error || "Could not submit request.");
+          setError(data.error || "Couldn't send your booking. Please try again.");
         }
         requestAttention("summary");
         submittingRef.current = false;

@@ -4,7 +4,7 @@
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import { buildAvailableDays, type ExistingBooking } from "@/features/booking/lib/booking";
-import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
+import { fetchAllCalendarEventsStrict } from "@/features/calendar/lib/google-calendar";
 import { calculateTravelMinutes } from "@/features/calendar/lib/travel-time";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -213,7 +213,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         notes: true,
       },
     }),
-    fetchAllCalendarEvents(now, maxDate).catch(() => []),
+    // A calendar that did not answer would read as free time, so suggest nothing instead.
+    fetchAllCalendarEventsStrict(now, maxDate).catch((err: unknown) => {
+      console.error("[suggest-times] Calendar read failed:", err);
+      return null;
+    }),
     prisma.travelBlock.findMany({
       where: { eventStartAt: { lt: maxDate }, eventEndAt: { gte: now } },
       select: {
@@ -228,6 +232,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     }),
   ]);
+
+  if (!rawEvents) {
+    return errorResponse(
+      "Couldn't read your calendars, so there are no times to suggest right now. Try again in a minute.",
+      503,
+    );
+  }
 
   const existingForSlots: ExistingBooking[] = existingBookings.map((b) => ({
     id: b.id,

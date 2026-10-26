@@ -22,13 +22,13 @@ import { withDateSurcharges } from "@/features/business/lib/pricing-policy.serve
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import { Button } from "@/shared/components/Button";
 import { CARD, CardPage } from "@/shared/components/PageLayout";
+import { PhoneLink } from "@/shared/components/PhoneLink";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NZ_TZ, nzDateKey, nzMinuteOfDay, nzWeekday } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import type React from "react";
 
 export const dynamic = "force-dynamic";
@@ -98,6 +98,60 @@ async function getAvailableDays(
 }
 
 /**
+ * The page for a link that can't open a booking, with the ways that still work: fresh links
+ * by email (the cancel page offers the same), the phone, or a new booking.
+ * @param props - Component props.
+ * @param props.cancelled - The booking exists but was cancelled.
+ * @param props.phone - Display phone number.
+ * @param props.phoneTel - tel: URI for the same number.
+ * @returns The page element.
+ */
+function LinkProblem({
+  cancelled,
+  phone,
+  phoneTel,
+}: {
+  cancelled: boolean;
+  phone: string;
+  phoneTel: string;
+}): React.ReactElement {
+  return (
+    <CardPage>
+      <section className={cn(CARD, "animate-fade-in")}>
+        <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+          {cancelled ? "This booking was cancelled" : "I couldn't find that booking"}
+        </h1>
+        <p className="mb-4 text-base text-rich-black sm:text-lg">
+          {cancelled ? (
+            "There's nothing left to change on it, but you're welcome to book a new time."
+          ) : (
+            <>
+              This link may be from an older email. I can email you fresh links to change or cancel,
+              or you can call or text me on <PhoneLink phone={phone} phoneTel={phoneTel} /> and
+              I&apos;ll sort it out.
+            </>
+          )}
+        </p>
+        <div className="flex flex-wrap gap-3">
+          {cancelled ? (
+            <Button href="/booking" variant="secondary" size="md">
+              Book a new time
+            </Button>
+          ) : (
+            <Button href="/booking/manage" variant="secondary" size="md">
+              Email me fresh links
+            </Button>
+          )}
+          <Button href="/" variant="ghost" size="md">
+            Back to home
+          </Button>
+        </div>
+      </section>
+    </CardPage>
+  );
+}
+
+/**
  * Edit booking page.
  * @param props - Page props.
  * @param props.searchParams - URL search params containing the cancel token.
@@ -112,27 +166,37 @@ export default async function EditBookingPage({
   const tokenValue = params.token;
   const cancelToken = Array.isArray(tokenValue) ? tokenValue[0] : tokenValue;
 
-  if (!cancelToken) notFound();
-
   // Load the booking by token
-  const booking = await prisma.booking.findFirst({
-    where: { cancelToken },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      notes: true,
-      accessNotes: true,
-      startAt: true,
-      endAt: true,
-      status: true,
-      rescheduleCount: true,
-      calendarEventId: true,
-    },
-  });
+  const booking = cancelToken
+    ? await prisma.booking.findFirst({
+        where: { cancelToken },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          notes: true,
+          accessNotes: true,
+          startAt: true,
+          endAt: true,
+          status: true,
+          rescheduleCount: true,
+          calendarEventId: true,
+          duration: true,
+        },
+      })
+    : null;
 
-  if (!booking || booking.status === "cancelled") notFound();
+  if (!cancelToken || !booking || booking.status === "cancelled") {
+    const identity = await getIdentity();
+    return (
+      <LinkProblem
+        cancelled={booking?.status === "cancelled"}
+        phone={identity.phone}
+        phoneTel={identity.phoneTel}
+      />
+    );
+  }
 
   // Load in parallel; the day list starts once the config is in (blocked bookings
   // waste one lookup, which is rare).
@@ -158,9 +222,10 @@ export default async function EditBookingPage({
       ? Math.max(0, reschedule.maxReschedules - booking.rescheduleCount)
       : null;
 
-  // Derive form values from stored booking
+  // The booked length, not the event's span: the operator may have moved the finish since.
+  // Legacy rows without the column fall back to the span.
   const durationMinutes = (booking.endAt.getTime() - booking.startAt.getTime()) / 60000;
-  const duration: JobDuration = durationMinutes <= 60 ? "short" : "long";
+  const duration: JobDuration = booking.duration ?? (durationMinutes <= 60 ? "short" : "long");
 
   // The grid labels every hour the schedule opens, so any start maps to its own label.
   const dateKey = nzDateKey(booking.startAt);
@@ -243,7 +308,7 @@ export default async function EditBookingPage({
           <p className="text-base text-rich-black">
             {blocked
               ? "This booking can no longer be changed online."
-              : "Update your appointment details below. A new calendar invite will be sent when you save."}
+              : "Update your appointment details below. If you pick a new time, a new calendar invite is sent when you save."}
           </p>
         </section>
 
@@ -256,14 +321,14 @@ export default async function EditBookingPage({
                 ? "This appointment has passed"
                 : cutoffBlocked
                   ? "Too close to your appointment"
-                  : "Change limit reached"}
+                  : "Move limit reached"}
             </h2>
             <p className="mb-4 text-base text-rich-black/80 sm:text-lg">
               {closed
                 ? "This appointment has already started or finished."
                 : cutoffBlocked
                   ? `Bookings can't be changed within ${reschedule.cutoffHours} hours of the appointment.`
-                  : "This booking has already been changed the maximum number of times."}{" "}
+                  : "This booking has already been moved the maximum number of times."}{" "}
               Give me a call or text and I'll sort it out for you.
             </p>
             <div className="flex flex-wrap gap-3">
@@ -291,11 +356,11 @@ export default async function EditBookingPage({
               <p className="mb-4 rounded-lg border border-mustard-400 bg-mustard-50 px-4 py-3 text-base text-rich-black/80">
                 {changesLeft !== null && (
                   <>
-                    You can change this booking{" "}
+                    You can move this booking to a new time{" "}
                     <strong>
                       {changesLeft} more {changesLeft === 1 ? "time" : "times"}
                     </strong>
-                    .{" "}
+                    . Changing only your details doesn&apos;t count.{" "}
                   </>
                 )}
                 {reschedule.cutoffHours > 0 && (

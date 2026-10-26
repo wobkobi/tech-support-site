@@ -411,11 +411,11 @@ export default async function BookingPage(): Promise<React.ReactElement> {
         {/* Header */}
         <section className={cn(CARD, "animate-fade-in")}>
           <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
-            Request an appointment
+            Book an appointment
           </h1>
           <p className="text-base text-rich-black">
-            Pick a time that works for you and tell me what you need help with. I'll confirm the
-            details and send you a calendar invite.
+            Pick a time that works for you and tell me what you need help with. The time is yours as
+            soon as you book, and I'll email you the details and a calendar invite.
             <br />
             Prefer to call or text? Reach me on{" "}
             <PhoneLink phone={identity.phone} phoneTel={identity.phoneTel} />.

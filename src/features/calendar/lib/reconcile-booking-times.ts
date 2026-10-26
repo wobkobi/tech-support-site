@@ -71,26 +71,28 @@ export interface ReconcileResult {
 }
 
 /**
- * Send stamps that cannot belong to the booking's times. Judged against the
- * times, not this pass's drift, so rows corrected earlier get repaired too.
- * @param booking - The row's current stamps.
+ * Send stamps that cannot belong to the booking's times. A start this pass moves always
+ * invalidates the reminder (it named the old time); otherwise a reminder older than the
+ * widest lead window catches rows corrected before this check existed.
+ * @param booking - The row's current start and stamps.
+ * @param booking.startAt - The start the row holds before this pass.
  * @param booking.emailReminderSentAt - When the 24h reminder went out.
  * @param startAt - The start the row holds after this pass.
  * @param now - Reference instant.
  * @returns The stamps worth clearing, in report order.
  */
 function staleSendStamps(
-  booking: { emailReminderSentAt: Date | null },
+  booking: { startAt: Date; emailReminderSentAt: Date | null },
   startAt: Date,
   now: Date,
 ): RearmedStamp[] {
   const stale: RearmedStamp[] = [];
 
-  // A reminder older than the widest lead window was for an earlier date.
+  const startMoved = startAt.getTime() !== booking.startAt.getTime();
   if (
     booking.emailReminderSentAt &&
     startAt > now &&
-    startAt.getTime() - booking.emailReminderSentAt.getTime() > MAX_REMINDER_LEAD_MS
+    (startMoved || startAt.getTime() - booking.emailReminderSentAt.getTime() > MAX_REMINDER_LEAD_MS)
   ) {
     stale.push("reminder");
   }

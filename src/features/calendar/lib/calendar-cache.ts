@@ -1,6 +1,7 @@
 // src/features/calendar/lib/calendar-cache.ts
 // Background task to fetch and cache Google Calendar events.
 
+import { bookingWindowEnd } from "@/features/booking/lib/booking";
 import {
   fetchAllCalendarEventsDetailed,
   getBookingCalendarId,
@@ -9,10 +10,15 @@ import {
 import { calculateTravelMinutes } from "@/features/calendar/lib/travel-time";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { NZ_TZ } from "@/shared/lib/timezone-utils";
 
 interface RefreshResult {
   cachedCount: number;
   deletedCount: number;
+  /** The calendar read failed outright, so nothing was refreshed. */
+  fetchFailed: boolean;
+  /** Calendars that failed to read; their travel blocks were left as they were. */
+  failedCalendars: number;
 }
 
 // Travel block padding rounds up to the next 5-min step after adding the
@@ -189,16 +195,24 @@ function findNextChainedEvent(
 
 /**
  * Fetches calendar events into the database cache, off the page-load path.
- * @returns Object with counts of cached and deleted events
+ * @param options - Optional flags.
+ * @param options.forceTravel - Recompute travel for every event still to finish, even
+ * unchanged ones (the admin Recalculate button). Finished jobs keep their travel.
+ * @returns Counts of cached and deleted events, and whether the calendar read failed.
  */
-export async function refreshCalendarCache(): Promise<RefreshResult> {
+export async function refreshCalendarCache(options?: {
+  forceTravel?: boolean;
+}): Promise<RefreshResult> {
   const now = new Date();
 
   // Live settings: the booking horizon + advanced travel-engine buffers.
   const settings = await getSettings();
-  const maxDate = new Date(
-    now.getTime() + settings.availability.maxAdvanceDays * 24 * 60 * 60 * 1000,
-  );
+  // The booking grid runs to the end of its last NZ day, so the cache must too, or late slots
+  // that day read as free here and get refused at submit.
+  const maxDate = bookingWindowEnd(now, {
+    maxAdvanceDays: settings.availability.maxAdvanceDays,
+    timeZone: NZ_TZ,
+  });
   // Keep recent past jobs so their travel bars stay; also the TravelBlock retention cutoff,
   // since nothing refreshes a block once its event leaves this window.
   const TRAVEL_RETENTION_DAYS = 7;
@@ -230,7 +244,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   } catch (error) {
     console.error("[refreshCalendarCache] Failed to fetch calendar events:", error);
     // Don't throw - the stale cache covers the gap when the API fails
-    return { cachedCount: 0, deletedCount: 0 };
+    return { cachedCount: 0, deletedCount: 0, fetchFailed: true, failedCalendars: 0 };
   }
 
   // Delete expired cache entries (older than now)
@@ -276,7 +290,12 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   const homeAddress = settings.identity.baseAddress.line || process.env.HOME_ADDRESS;
   if (!homeAddress) {
     console.warn("[refreshCalendarCache] No base address set - skipping travel blocks");
-    return { cachedCount: rawEvents.length, deletedCount: deleteResult.count };
+    return {
+      cachedCount: rawEvents.length,
+      deletedCount: deleteResult.count,
+      fetchFailed: false,
+      failedCalendars: failedCalendarIds.length,
+    };
   }
 
   const bookingCalId = getBookingCalendarId();
@@ -403,6 +422,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     // Row to drop once a replacement is ready (deferred delete below).
     let staleBlockId: string | null = null;
 
+    // A forced recalculation skips the "unchanged" shortcut and the stored raw minutes.
+    const forced = options?.forceTravel === true && eventEnd.getTime() > now.getTime();
+
     if (existing) {
       const eventTimesMatch =
         existing.eventStartAt.getTime() === eventStart.getTime() &&
@@ -422,7 +444,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
 
       // A back-destination change nulls back minutes in the admin route, so !backOk rebuilds.
 
-      if (eventTimesMatch && !originChanged && !chainingChanged) {
+      if (eventTimesMatch && !originChanged && !chainingChanged && !forced) {
         // null means the direction was never successfully calculated - treat as needing retry
         const toOk =
           existing.rawTravelMinutes !== null &&
@@ -447,11 +469,13 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
         }
       } else {
         if (isDev) {
-          const reason = originChanged
-            ? "origin changed"
-            : chainingChanged
-              ? "chained next event changed"
-              : "event times changed";
+          const reason = forced
+            ? "recalculation requested"
+            : originChanged
+              ? "origin changed"
+              : chainingChanged
+                ? "chained next event changed"
+                : "event times changed";
           console.log(`[travel] Rebuilding "${event.summary}" - ${reason}`);
         }
       }
@@ -839,5 +863,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   return {
     cachedCount: rawEvents.length,
     deletedCount: deleteResult.count,
+    fetchFailed: false,
+    failedCalendars: failedCalendarIds.length,
   };
 }

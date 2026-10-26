@@ -38,7 +38,7 @@ interface BookingInfoCardProps {
   email: string;
   /** Customer phone (nullable). */
   phone: string | null;
-  /** Address column; legacy rows carry it only in the notes "Address:" line. */
+  /** Address with any unit ("12/160 Kepa Rd"); legacy rows carry it only in the notes. */
   address: string | null;
   /** Raw booking notes blob (nullable): free text plus the metadata mirror. */
   notes: string | null;
@@ -75,7 +75,7 @@ function Row({
  * @param props.name - Customer name.
  * @param props.email - Customer email.
  * @param props.phone - Customer phone (nullable).
- * @param props.address - Address column (nullable).
+ * @param props.address - Address with any unit (nullable).
  * @param props.notes - Booking notes (nullable).
  * @param props.accessNotes - Visit notes (nullable).
  * @returns The info card element.

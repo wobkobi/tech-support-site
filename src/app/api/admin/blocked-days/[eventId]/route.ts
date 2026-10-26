@@ -61,6 +61,10 @@ export async function DELETE(
     return errorResponse("Missing eventId.", 400);
   }
   const removedDay = request.nextUrl.searchParams.get("date");
+  // A malformed day compares wrongly against the block's date keys and could split it oddly.
+  if (removedDay !== null && !/^\d{4}-\d{2}-\d{2}$/.test(removedDay)) {
+    return errorResponse("Invalid date - expected YYYY-MM-DD.", 400);
+  }
 
   const { scheduling } = await getSettings();
   if (
@@ -83,17 +87,21 @@ export async function DELETE(
   }
 
   try {
-    // No usable day, or the day is outside the block: delete the whole event.
+    // No day asked for, or the event isn't an all-day block: delete the whole event.
     const range = removedDay ? await getBlockedDayRange(eventId) : null;
-    if (
-      !removedDay ||
-      !range ||
-      removedDay < range.startDateKey ||
-      removedDay >= range.endDateKey
-    ) {
+    if (!removedDay || !range) {
       await deleteBookingEvent({ eventId });
       revalidateTag(SCHEDULE_CALENDAR_TAG, {});
       return NextResponse.json({ ok: true, action: "deleted" });
+    }
+    // The block was changed since the page loaded; unblocking a day it no longer covers must
+    // not take the rest of the block with it.
+    if (removedDay < range.startDateKey || removedDay >= range.endDateKey) {
+      revalidateTag(SCHEDULE_CALENDAR_TAG, {});
+      return errorResponse(
+        "That day isn't part of this block any more. Refresh and try again.",
+        409,
+      );
     }
 
     const segments = splitBlockedRange(range.startDateKey, range.endDateKey, removedDay);
