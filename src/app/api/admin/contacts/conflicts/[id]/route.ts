@@ -2,9 +2,11 @@
 // Admin endpoint to resolve a ContactConflict: writes the winning value to the Contact,
 // marks it resolved, and re-syncs to Google.
 
+import { validateEmail } from "@/features/booking/lib/booking";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { normaliseEmailOrNull } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -47,16 +49,21 @@ export async function POST(
     return errorResponse("Conflict not found or already resolved", 404);
   }
 
-  // Decide the chosen value
-  const chosenValue =
+  // conflict.field is the ContactField enum: name, email or address.
+  const field = conflict.field;
+
+  // Stored in the one form every lookup matches on: emails trimmed and lowercased, the rest
+  // trimmed. A typed email must look like one.
+  const picked =
     winner === "site"
       ? conflict.siteValue
       : winner === "google"
         ? conflict.googleValue
         : customValue;
-
-  // conflict.field is the ContactField enum: name, email or address.
-  const field = conflict.field;
+  const chosenValue = field === "email" ? normaliseEmailOrNull(picked) : picked?.trim() || null;
+  if (field === "email" && winner === "custom" && validateEmail(customValue ?? "") !== "ok") {
+    return errorResponse("That email address doesn't look right.", 400);
+  }
 
   // Contact.name is required, so a blank name would make Prisma throw.
   if (field === "name" && !chosenValue?.trim()) {

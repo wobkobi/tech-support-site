@@ -580,7 +580,8 @@ export async function enrichContactsFromBookings(): Promise<ConflictEntry[]> {
   }
 
   /**
-   * Finds a contact by email (primary) or normalised phone (fallback).
+   * Finds a contact by email (primary) or NZ mobile (fallback). A landline is shared by a
+   * household, so it would fill one person's contact from another's booking.
    * @param email - Email to look up.
    * @param phone - Phone to fall back to.
    * @returns Matching contact or undefined.
@@ -594,7 +595,7 @@ export async function enrichContactsFromBookings(): Promise<ConflictEntry[]> {
       if (c) return c;
     }
     const norm = normaliseContactPhone(phone);
-    if (norm) return contactByPhone.get(norm);
+    if (norm && isNZMobileKey(norm)) return contactByPhone.get(norm);
     return undefined;
   }
 

@@ -174,6 +174,27 @@ export async function importGoogleContactByEmail(
     const resourceName = person?.resourceName;
     if (!person || !resourceName) return { found: false, failed: false };
 
+    // As in the full import: a person linked only to a deleted contact stays out, so a delete
+    // whose Google side failed can't come back through this lookup. A live match still counts.
+    const deletedLink = await prisma.contact.findFirst({
+      where: { googleContactId: resourceName, deletedAt: { not: null } },
+      select: { id: true },
+    });
+    if (deletedLink) {
+      const live = await prisma.contact.findFirst({
+        where: {
+          deletedAt: null,
+          OR: [
+            { googleContactId: resourceName },
+            { email: { equals: needle, mode: "insensitive" } },
+            { altEmails: { has: needle } },
+          ],
+        },
+        select: { id: true },
+      });
+      return live ? { found: true, contactId: live.id } : { found: false, failed: false };
+    }
+
     const rawPhone = person.phoneNumbers?.[0]?.value?.trim() ?? null;
     const rawAddress = person.addresses?.[0]?.formattedValue?.trim() ?? null;
     const { contact, created } = await findOrCreateContactByEmail(needle, {
