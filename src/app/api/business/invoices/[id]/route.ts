@@ -1,6 +1,6 @@
 // src/app/api/business/invoices/[id]/route.ts
-// Admin single invoice. PATCH handles status-only, contactId backfill or full updates
-// (VOIDED is terminal); DELETE removes DRAFTs only.
+// Admin single invoice. PATCH handles a contactId backfill or a content edit (VOIDED is
+// terminal; payment and voiding go through /pay and /void); DELETE removes DRAFTs only.
 
 import {
   calcInvoiceTotals,
@@ -21,66 +21,7 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
-import { InvoiceStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
-
-/** The lifecycle-timestamp patch {@link statusDataFor} returns for a status change. */
-interface StatusPatch {
-  status: InvoiceStatus;
-  voidedAt: Date | null;
-  sentAt?: Date;
-  paidAt?: Date | null;
-  paymentMethod?: null;
-  paymentReference?: null;
-}
-
-/**
- * Lifecycle timestamps for a status change. sentAt/paidAt stamp on first arrival;
- * leaving PAID clears the whole payment record so a re-opened invoice carries none.
- * @param next - Target InvoiceStatus.
- * @param current - The invoice's current lifecycle timestamps.
- * @param current.sentAt - Current sentAt (null until first SENT); keeps an existing stamp.
- * @param current.paidAt - Current paidAt (null until first PAID); keeps an existing stamp.
- * @returns Partial update payload to splat into prisma.invoice.update data.
- */
-function statusDataFor(
-  next: InvoiceStatus,
-  current: { sentAt: Date | null; paidAt: Date | null },
-): StatusPatch {
-  const now = new Date();
-  const data: StatusPatch = { status: next, voidedAt: next === "VOIDED" ? now : null };
-  if (next === "SENT" && current.sentAt === null) data.sentAt = now;
-  if (next === "PAID") {
-    if (current.paidAt === null) data.paidAt = now;
-  } else {
-    data.paidAt = null;
-    data.paymentMethod = null;
-    data.paymentReference = null;
-  }
-  return data;
-}
-
-/**
- * Narrow an untrusted status, so a bad value is a 400 rather than a Prisma 500.
- * @param value - Raw status from a request body.
- * @returns True when the value is one of the invoice statuses.
- */
-function isInvoiceStatus(value: unknown): value is InvoiceStatus {
-  return typeof value === "string" && Object.values(InvoiceStatus).includes(value as InvoiceStatus);
-}
-
-/**
- * Check a status transition. VOIDED is terminal (NZ IRD record-retention).
- * @param current - The invoice's current status.
- * @param next - The requested target status.
- * @returns Error message, or null when allowed.
- */
-function validateTransition(current: InvoiceStatus, next: InvoiceStatus): string | null {
-  if (current === "VOIDED" && next !== "VOIDED") {
-    return "Voided invoices are terminal; issue a new invoice instead of re-opening this one.";
-  }
-  return null;
-}
 
 /**
  * GET /api/business/invoices/[id] - Returns a single invoice by ID.
@@ -104,8 +45,7 @@ export async function GET(
 }
 
 /**
- * PATCH /api/business/invoices/[id] - Updates an invoice.
- * Accepts a status-only patch or a full invoice update.
+ * PATCH /api/business/invoices/[id] - Updates an invoice's content or links its contact.
  * @param request - Incoming Next.js request
  * @param root0 - Route context
  * @param root0.params - Route params containing the invoice ID
@@ -122,7 +62,7 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
-  // Current row, for transition rules and the VOIDED-is-immutable invariant.
+  // Current row, for the edit rules and the VOIDED-is-immutable invariant.
   const current = await prisma.invoice.findUnique({
     where: { id },
     select: {
@@ -132,8 +72,6 @@ export async function PATCH(
       unsuccessfulDiscount: true,
       goldCardPercent: true,
       goldCardDiscount: true,
-      sentAt: true,
-      paidAt: true,
       isQuote: true,
     },
   });
@@ -141,7 +79,7 @@ export async function PATCH(
     return errorResponse("Invoice not found", 404);
   }
 
-  // Full update, including notes-only edits, which the status branch would 400.
+  // Content edit, including notes-only edits.
   if (
     body.clientName !== undefined ||
     body.clientEmail !== undefined ||
@@ -171,7 +109,7 @@ export async function PATCH(
         { status: 409 },
       );
     }
-    const { clientName, clientEmail, issueDate, dueDate, lineItems, notes, status } = body;
+    const { clientName, clientEmail, issueDate, dueDate, lineItems, notes } = body;
     // A non-finite numeric would persist NaN totals.
     if (
       lineItems !== undefined &&
@@ -224,11 +162,6 @@ export async function PATCH(
       if (parsed === null) return errorResponse("Invalid Gold Card discount", 400);
       goldCardDiscount = parsed;
     }
-    if (status !== undefined) {
-      if (!isInvoiceStatus(status)) return errorResponse("Invalid status", 400);
-      const err = validateTransition(current.status, status);
-      if (err) return errorResponse(err, 409);
-    }
     // GST mode comes from live settings, never the body.
     const { GST_REGISTERED } = await getPolicy();
     // Keep the discounts, or recomputing would silently strip them from the total.
@@ -237,7 +170,6 @@ export async function PATCH(
       promoDiscount + goldCardDiscount + unsuccessfulDiscount,
       GST_REGISTERED,
     );
-    const statusPatch = isInvoiceStatus(status) ? statusDataFor(status, current) : {};
     const invoice = await prisma.invoice.update({
       where: { id },
       data: {
@@ -264,7 +196,6 @@ export async function PATCH(
         }),
         ...(notes !== undefined && { notes: notes || null }),
         ...(prepaid && { alreadyPaid: prepaid.amount, alreadyPaidMethod: prepaid.method }),
-        ...statusPatch,
       },
     });
     // The settled redemption follows a re-priced discount; failure is only logged.
@@ -280,9 +211,19 @@ export async function PATCH(
     return NextResponse.json({ ok: true, invoice, incomeSheetWarning });
   }
 
-  // contactId-only backfill from the calculator; before the status branch, which would 400 it.
-  if (body.contactId !== undefined && body.status === undefined) {
+  // contactId-only backfill from the calculator and the send modal.
+  if (body.contactId !== undefined) {
     const contactId = parseObjectId(body.contactId);
+    // A well-formed id for a missing or deleted contact would leave the invoice orphaned.
+    if (
+      contactId &&
+      !(await prisma.contact.findFirst({
+        where: { id: contactId, deletedAt: null },
+        select: { id: true },
+      }))
+    ) {
+      return errorResponse("Contact not found", 404);
+    }
     const invoice = await prisma.invoice.update({ where: { id }, data: { contactId } });
     // The redemption was settled before the contact existed; link it so per-customer
     // limits bind. Clearing the contact never unlinks it.
@@ -297,25 +238,7 @@ export async function PATCH(
     return NextResponse.json({ ok: true, invoice });
   }
 
-  // Status-only patch (list dropdown). Does NOT send the void notice - that's /void.
-  const { status } = body;
-  if (!isInvoiceStatus(status)) {
-    return errorResponse("Invalid status", 400);
-  }
-  // Conversion is the only path to a payable invoice.
-  if (current.isQuote && status === "PAID") {
-    return errorResponse("Convert the quote to an invoice before recording payment.", 409);
-  }
-  const transitionErr = validateTransition(current.status, status);
-  if (transitionErr) {
-    return errorResponse(transitionErr, 409);
-  }
-  const invoice = await prisma.invoice.update({
-    where: { id },
-    data: statusDataFor(status, current),
-  });
-  await syncInvoicePdfToDriveById(id, "[invoice-patch]");
-  return NextResponse.json({ ok: true, invoice });
+  return errorResponse("Nothing to update", 400);
 }
 
 /**

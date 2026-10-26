@@ -240,6 +240,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     GST_REGISTERED,
   );
 
+  // A missing or deleted contact saves the invoice unlinked rather than pointing nowhere.
+  const requestedContactId = parseObjectId(contactId);
+  const linkedContactId =
+    requestedContactId &&
+    (await prisma.contact.findFirst({
+      where: { id: requestedContactId, deletedAt: null },
+      select: { id: true },
+    }))
+      ? requestedContactId
+      : null;
+
   // Retry on a number collision (concurrent creates or a stale sheet counter).
   let invoice: Awaited<ReturnType<typeof prisma.invoice.create>> | null = null;
   let sheetNextCount: number | null = null;
@@ -276,7 +287,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           alreadyPaid: prepaid.amount,
           alreadyPaidMethod: prepaid.method,
           // Prisma throws on a malformed ObjectId; calendarEventId is a free-form Google id.
-          contactId: parseObjectId(contactId),
+          contactId: linkedContactId,
           bookingId: parseObjectId(bookingId),
           calendarEventId:
             typeof calendarEventId === "string" && calendarEventId ? calendarEventId : null,
@@ -310,7 +321,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       promoId,
       invoiceId: invoice.id,
       bookingId: billedBookingId,
-      contactId: parseObjectId(contactId),
+      contactId: linkedContactId,
       discountValue: discount,
     });
   } else if (!isQuote && billedBookingId) {

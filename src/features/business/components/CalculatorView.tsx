@@ -48,6 +48,7 @@ import {
 import {
   AI_INPUT_HANDOFF_KEY,
   clearDraft,
+  draftScopeFor,
   isMeaningfulDraft,
   isPlaceholderHour,
   loadDraft,
@@ -141,6 +142,19 @@ export function CalculatorView({
   // Draft restore runs in the mount effect to keep hydration consistent. The ref marks a
   // restored draft for async callbacks without becoming a dependency.
   const draftLoadedRef = useRef(false);
+  // Set once this calculator's work has moved to another job, so the writer stops saving it.
+  const leavingRef = useRef(false);
+  // A calendar job or re-issue drafts under its own key, so a plain calculator never
+  // restores its work without the booking link and booked-date promo.
+  const draftScope = draftScopeFor(
+    eventPrefill?.slots.map((s) => s.calendarEventId) ?? [],
+    reissue?.invoiceNumber ?? null,
+  );
+  // The events' times as this draft sees them; the operator moves an event's end to the
+  // actual finish, so a draft from before that edit mustn't restore the old times.
+  const eventTimes = eventPrefill
+    ? JSON.stringify(eventPrefill.slots.map((s) => [s.date, s.startTime, s.endTime]))
+    : undefined;
   // Captured once to keep timeAgo() pure for the toast label.
   const [mountedAt] = useState(() => Date.now());
   const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null);
@@ -256,6 +270,11 @@ export function CalculatorView({
       if (aiInput.trim()) sessionStorage.setItem(AI_INPUT_HANDOFF_KEY, aiInput);
     } catch {
       // Storage unavailable; the description won't carry over.
+    }
+    // The work moves to the picked job; left here it would restore again on this one.
+    if (draftScopeFor(eventIds, null) !== draftScope) {
+      leavingRef.current = true;
+      clearDraft(draftScope);
     }
     // No events left: fall back to a blank calculator.
     if (eventIds.length === 0) {
@@ -428,22 +447,25 @@ export function CalculatorView({
   // Mount seeding + contacts fetch. "now" seeds in an effect to avoid a hydration mismatch;
   // contacts stay a client fetch as the People API is too slow to block on.
   useEffect(() => {
-    // Restore the draft after mount. An event prefill outranks it; a draft of only seeded
-    // times reseeds "now".
-    const draft = eventPrefill || reissue ? null : loadDraft();
-    if (draft && isMeaningfulDraft(draft)) {
+    // Restore this job's (or the plain calculator's) draft after mount, over any prefill;
+    // a draft of only seeded times reseeds "now".
+    const draft = loadDraft(draftScope);
+    const restored = !!draft && isMeaningfulDraft(draft);
+    if (draft && restored) {
       draftLoadedRef.current = true;
       /* eslint-disable react-hooks/set-state-in-effect -- one-shot restore from
          localStorage (an external store); doing this during render caused the
          hydration mismatch this effect replaces */
       setDraftRestoredAt(draft.savedAt ?? null);
       setAiInput(draft.aiInput ?? "");
-      setJobDate(draft.jobDate ?? todayISO());
       setPromoCode(draft.promoCode ?? "");
       setPromoCodeInput(draft.promoCode ?? "");
-      setTimeRanges(draft.timeRanges ?? [{ startTime: "", endTime: "" }]);
-      // Without the flag, times count as real unless they're the lone seeded one-hour row.
-      setTimesSet(draft.timesSet ?? !isPlaceholderHour(draft.timeRanges));
+      if (!eventPrefill || draft.eventTimes === eventTimes) {
+        setJobDate(draft.jobDate ?? todayISO());
+        setTimeRanges(draft.timeRanges ?? [{ startTime: "", endTime: "" }]);
+        // Without the flag, times count as real unless they're the lone seeded one-hour row.
+        setTimesSet(draft.timesSet ?? !isPlaceholderHour(draft.timeRanges));
+      }
       setFollowUpMins(draft.followUpMins ?? 0);
       setTravelEntries(draft.travelEntries ?? []);
       setJobAddress(draft.jobAddress ?? "");
@@ -465,16 +487,19 @@ export function CalculatorView({
       setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
     }
     // The description survives a prefill: prefer the picker's sessionStorage stash (fresher
-    // than the debounced draft), else the draft text. Read before the writer's first tick.
+    // than the debounced draft), else this job's restored text, else the plain draft's.
+    // Read before the writer's first tick.
     try {
       const handoff = sessionStorage.getItem(AI_INPUT_HANDOFF_KEY);
       if (handoff) sessionStorage.removeItem(AI_INPUT_HANDOFF_KEY);
+      const plainText = draftScope && !handoff && !restored ? loadDraft()?.aiInput : undefined;
       // A re-issue seeds the voided invoice's lines instead of any saved draft text.
-      const carried =
-        handoff ?? (reissue ? reissue.jobText : eventPrefill ? (loadDraft()?.aiInput ?? "") : "");
+      const carried = handoff ?? (restored ? "" : reissue ? reissue.jobText : (plainText ?? ""));
       if (carried) {
         setAiInput(carried);
       }
+      // The plain draft's text moved into this job; left there it would come back later.
+      if (plainText) clearDraft();
     } catch {
       // Storage unavailable; nothing to restore.
     }
@@ -505,28 +530,33 @@ export function CalculatorView({
   // Debounced draft writer (500ms).
   useEffect(() => {
     const t = setTimeout(() => {
-      saveDraft({
-        aiInput,
-        jobDate,
-        promoCode,
-        timeRanges,
-        timesSet,
-        followUpMins,
-        travelEntries,
-        jobAddress,
-        tasks,
-        parts,
-        notes,
-        paidCash,
-        goldCard,
-        alreadyPaid,
-        clientName,
-        clientEmail,
-        pickedContactName,
-        pickedContactCompany,
-        pickedContactGoogleId,
-        addressMode,
-      });
+      if (leavingRef.current) return;
+      saveDraft(
+        {
+          aiInput,
+          jobDate,
+          promoCode,
+          timeRanges,
+          timesSet,
+          followUpMins,
+          travelEntries,
+          jobAddress,
+          tasks,
+          parts,
+          notes,
+          paidCash,
+          goldCard,
+          alreadyPaid,
+          clientName,
+          clientEmail,
+          pickedContactName,
+          pickedContactCompany,
+          pickedContactGoogleId,
+          addressMode,
+          eventTimes,
+        },
+        draftScope,
+      );
     }, 500);
     return () => clearTimeout(t);
   }, [
@@ -550,6 +580,8 @@ export function CalculatorView({
     pickedContactCompany,
     pickedContactGoogleId,
     addressMode,
+    eventTimes,
+    draftScope,
   ]);
 
   // Auto-dismiss the "Draft restored" toast 8s after it appears.
@@ -656,6 +688,7 @@ export function CalculatorView({
     skipPromo,
     goldCardPercent: appliedGoldCard,
     eventPrefill,
+    draftScope,
     pickedContactGoogleId,
     jobDate,
     tripAddress,
@@ -721,7 +754,7 @@ export function CalculatorView({
     resetSaveState();
     // Transient dialog state.
     setShowTaxonomyModal(false);
-    clearDraft();
+    clearDraft(draftScope);
     // The prefill is a server prop, so drop the query param to remount blank.
     if (eventPrefill || reissue) {
       router.replace(

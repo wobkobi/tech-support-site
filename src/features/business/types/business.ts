@@ -285,7 +285,7 @@ export interface EventPrefillSlot {
 
 /**
  * Job prefill built server-side from one or more calendar events (times are actual on-site)
- * and their Booking rows. Wins over any saved draft.
+ * and their Booking rows. Its date and times win over a job draft saved against other times.
  */
 export interface EventPrefill {
   /** Earliest event's id, saved on the invoice; the rest live in {@link EventPrefill.slots}. */

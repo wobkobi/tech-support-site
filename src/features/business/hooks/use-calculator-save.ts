@@ -66,6 +66,8 @@ interface UseCalculatorSaveArgs {
   goldCardPercent: number | null;
   /** Schedule-event prefill, or null; links the invoice back to the billed job. */
   eventPrefill: EventPrefill | null;
+  /** The calculator's draft scope (draftScopeFor), cleared once the job is saved. */
+  draftScope: string | null;
   /** Google id of the picked contact, for the contact check. */
   pickedContactGoogleId: string | null;
   /** New name for the picked contact, set when the operator edited it and kept the box ticked. */
@@ -119,6 +121,7 @@ interface UseCalculatorSave {
  * @param args.skipPromo - Whether the promo is skipped for this job.
  * @param args.goldCardPercent - Gold Card share off labour, or null when not ticked.
  * @param args.eventPrefill - Schedule-event prefill, or null.
+ * @param args.draftScope - The calculator's draft scope, cleared on save.
  * @param args.pickedContactGoogleId - Google id of the picked contact, or null.
  * @param args.renameContactTo - New name for the picked contact on invoice save, or null.
  * @param args.jobDate - Job date for the income entry and the logged trip.
@@ -138,6 +141,7 @@ export function useCalculatorSave({
   skipPromo,
   goldCardPercent,
   eventPrefill,
+  draftScope,
   pickedContactGoogleId,
   renameContactTo,
   jobDate,
@@ -266,7 +270,7 @@ export function useCalculatorSave({
     if (contactDbId) {
       await linkInvoiceToContact(invoiceId, contactDbId);
     }
-    clearDraft();
+    clearDraft(draftScope);
     router.push(`/admin/business/invoices/${invoiceId}${pendingSend ? "?send=1" : ""}`);
   }
 
@@ -492,7 +496,7 @@ export function useCalculatorSave({
         }
       }
       // Drop the saved draft so the calculator starts blank (handleAddContactClose does too).
-      clearDraft();
+      clearDraft(draftScope);
       router.push(`/admin/business/invoices/${invoiceId}${send ? "?send=1" : ""}`);
     } catch (err) {
       setSaveInvoiceError(err instanceof Error ? err.message : "Could not save invoice");

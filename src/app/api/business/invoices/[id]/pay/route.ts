@@ -1,6 +1,6 @@
 // src/app/api/business/invoices/[id]/pay/route.ts
-// Records a payment: atomically claims the PAID stamp, then best-effort income entry,
-// Drive PDF and reminder apology - none of which roll back the payment.
+// Records a payment: atomically claims the PAID stamp, then the income entry (a failed
+// ledger write hands the claim back), Drive PDF and reminder apology (best-effort).
 
 import { balanceDue } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
@@ -18,6 +18,7 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import type { IncomeEntry } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -93,78 +94,102 @@ export async function POST(
   }
 
   // Only the claim winner reaches here. The already-paid entry is never touched.
-  let existingIncome = await prisma.incomeEntry.findFirst({
-    where: balanceIncomeWhere(invoice),
-  });
-  // Adopt the operator-confirmed sheet row; only an unlinked row can be taken.
-  if (!existingIncome && adoptIncomeId) {
-    const adopted = await prisma.incomeEntry.updateMany({
-      where: { id: adoptIncomeId, OR: [{ invoiceId: null }, { invoiceId: { isSet: false } }] },
-      data: { invoiceId: id },
-    });
-    if (adopted.count === 1) {
-      existingIncome = await prisma.incomeEntry.findUnique({ where: { id: adoptIncomeId } });
-    }
-  }
   const balance = balanceDue(invoice);
-  let incomeEntry = existingIncome;
+  let incomeEntry: IncomeEntry | null = null;
   let incomeAction: "created" | "updated" | "skipped" = "skipped";
   let sheetWarning = false;
-
-  if (existingIncome) {
-    // Only the dialog's fields; amount/customer/description may have been hand-edited.
-    incomeEntry = await prisma.incomeEntry.update({
-      where: { id: existingIncome.id },
-      // A blank reference keeps whatever note the row already has (often typed in the sheet).
-      data: { date: paidAt, method, notes: reference ?? existingIncome.notes },
+  try {
+    let existingIncome = await prisma.incomeEntry.findFirst({
+      where: balanceIncomeWhere(invoice),
     });
-    // Null cells preserve the sheet's own values.
-    try {
-      const spreadsheetId = await resolveSheetIdForDate(incomeEntry.date);
-      if (!spreadsheetId) {
-        sheetWarning = true;
-      } else if (incomeEntry.sheetRowKey) {
-        const cells: (string | number | null)[] = [
-          formatDateForSheet(incomeEntry.date), // A: date
-          null, // B: customer - preserve
-          null, // C: description - preserve
-          incomeEntry.method, // D: method
-          null, // E: amount - preserve
-          null, // F: sheet-managed
-          null, // G: sheet-managed
-          incomeEntry.notes ?? "", // H: notes / reference
-        ];
-        const result = await updateRowBySyncId(
-          spreadsheetId,
-          "Cashbook",
-          incomeEntry.sheetRowKey,
-          cells,
-        );
-        if (result.syncId !== incomeEntry.sheetRowKey) {
-          incomeEntry = await prisma.incomeEntry.update({
-            where: { id: incomeEntry.id },
-            data: { sheetRowKey: result.syncId },
-          });
-        }
+    // Adopt the operator-confirmed sheet row; only an unlinked row can be taken.
+    if (!existingIncome && adoptIncomeId) {
+      const adopted = await prisma.incomeEntry.updateMany({
+        where: { id: adoptIncomeId, OR: [{ invoiceId: null }, { invoiceId: { isSet: false } }] },
+        data: { invoiceId: id },
+      });
+      if (adopted.count === 1) {
+        existingIncome = await prisma.incomeEntry.findUnique({ where: { id: adoptIncomeId } });
       }
-    } catch (err) {
-      console.error(`[invoice-pay] Sheet write-through failed for income ${incomeEntry.id}:`, err);
-      sheetWarning = true;
     }
-    incomeAction = "updated";
-  } else if (createIncome && balance > 0) {
-    const result = await recordIncome({
-      date: paidAt,
-      customer: invoice.clientName,
-      description: `Invoice ${invoice.number}`,
-      amount: balance,
-      method,
-      notes: reference,
-      invoiceId: id,
-    });
-    incomeEntry = result.entry;
-    sheetWarning = result.sheetSyncWarning;
-    incomeAction = "created";
+    incomeEntry = existingIncome;
+
+    if (existingIncome) {
+      // Only the dialog's fields; amount/customer/description may have been hand-edited.
+      incomeEntry = await prisma.incomeEntry.update({
+        where: { id: existingIncome.id },
+        // A blank reference keeps whatever note the row already has (often typed in the sheet).
+        data: { date: paidAt, method, notes: reference ?? existingIncome.notes },
+      });
+      // Null cells preserve the sheet's own values.
+      try {
+        const spreadsheetId = await resolveSheetIdForDate(incomeEntry.date);
+        if (!spreadsheetId) {
+          sheetWarning = true;
+        } else if (incomeEntry.sheetRowKey) {
+          const cells: (string | number | null)[] = [
+            formatDateForSheet(incomeEntry.date), // A: date
+            null, // B: customer - preserve
+            null, // C: description - preserve
+            incomeEntry.method, // D: method
+            null, // E: amount - preserve
+            null, // F: sheet-managed
+            null, // G: sheet-managed
+            incomeEntry.notes ?? "", // H: notes / reference
+          ];
+          const result = await updateRowBySyncId(
+            spreadsheetId,
+            "Cashbook",
+            incomeEntry.sheetRowKey,
+            cells,
+          );
+          if (result.syncId !== incomeEntry.sheetRowKey) {
+            incomeEntry = await prisma.incomeEntry.update({
+              where: { id: incomeEntry.id },
+              data: { sheetRowKey: result.syncId },
+            });
+          }
+        }
+      } catch (err) {
+        console.error(
+          `[invoice-pay] Sheet write-through failed for income ${incomeEntry.id}:`,
+          err,
+        );
+        sheetWarning = true;
+      }
+      incomeAction = "updated";
+    } else if (createIncome && balance > 0) {
+      const result = await recordIncome({
+        date: paidAt,
+        customer: invoice.clientName,
+        description: `Invoice ${invoice.number}`,
+        amount: balance,
+        method,
+        notes: reference,
+        invoiceId: id,
+      });
+      incomeEntry = result.entry;
+      sheetWarning = result.sheetSyncWarning;
+      incomeAction = "created";
+    }
+  } catch (err) {
+    // Hand the claim back, or the retry would read it as paid and never record the income.
+    console.error(`[invoice-pay] Income write failed for ${invoice.number}:`, err);
+    await prisma.invoice
+      .updateMany({
+        where: { id, paidAt },
+        data: {
+          status: invoice.status,
+          paidAt: null,
+          paymentMethod: invoice.paymentMethod,
+          paymentReference: invoice.paymentReference,
+        },
+      })
+      .catch((e: unknown) => console.error(`[invoice-pay] Couldn't release ${invoice.number}:`, e));
+    return errorResponse(
+      "Couldn't record the payment in the income ledger. The invoice is still unpaid - try again.",
+      500,
+    );
   }
 
   // Re-sync the PAID-watermarked PDF to Drive (awaited; best-effort).

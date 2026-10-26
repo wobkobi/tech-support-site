@@ -181,9 +181,8 @@ export function InvoiceAiBox({
         {context.slots.length > 0 && ` ${JOB_DESCRIPTION_BOOKED_HINT}`}
       </p>
       <p className="mb-2 text-sm text-admin-muted">
-        Parsing replaces every line item below, so check them before you save. The promo discount
-        already on this invoice stays as it is. The unsuccessful-work discount is worked out again
-        from the new lines.
+        Parsing replaces every line item below, so check them before you save. The promo, Gold Card
+        and unsuccessful-work discounts are all worked out again from the new lines.
       </p>
       <AdminTextarea
         id="invoice-ai-input"

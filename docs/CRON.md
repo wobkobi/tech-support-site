@@ -75,12 +75,14 @@ across DST changes.
   sync jobs make many sequential Google API calls, and a long sync run can outlive cron-job.org's 30
   s response window, so a cron-job.org "timeout" does not necessarily mean the run failed - check
   the Vercel function logs for the actual outcome.
-- Overlapping or retried runs are safe by design: booking reminders stamp `emailReminderSentAt` only
-  after Resend accepts the send, invoice reminders stamp `reminderLastSentAt`/`reminderCount` the
-  same way (max 2 per invoice, offsets live in the comms settings), record-subscriptions advances
-  `nextDue` with a CAS guard, review asks claim each invoice (`reviewAskOutcome` > `sending`) before
-  sending with a per-invoice Resend idempotency key, and the holidays refresh upserts, then prunes
-  only once every year has fetched.
+- Overlapping or retried runs don't double-send: booking reminders claim `emailReminderSentAt` and
+  invoice reminders claim `reminderCount`/`reminderLastSentAt` (compare-and-set) before sending, and
+  hand the claim back when Resend refuses so the next run retries (max 2 invoice nudges, offsets
+  live in the comms settings). A function killed between claim and send skips that reminder.
+  record-subscriptions advances `nextDue` with a CAS guard and returns 500 when a record failed
+  after its claim (record that one by hand), review asks claim each invoice (`reviewAskOutcome` >
+  `sending`) before sending with a per-invoice Resend idempotency key, and the holidays refresh
+  upserts, then prunes only once every year has fetched.
 - Booking reminders send inside a window from `CANCELLATION.freeNoticeHours + 1` up to
   `comms.reminderLeadHours` before the start, so the reminder always lands while the customer can
   still cancel free.
