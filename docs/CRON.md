@@ -49,7 +49,7 @@ All endpoints are **GET**. Create one cron-job.org job per row.
 | Job                     | URL path                            | Method | Schedule         | Purpose                                                                                                                                                                                                     |
 | ----------------------- | ----------------------------------- | ------ | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Calendar cache refresh  | `/api/cron/refresh-calendar-cache`  | GET    | every 30 minutes | Fetch Google Calendar events into the DB cache                                                                                                                                                              |
-| Reconcile booking times | `/api/cron/reconcile-booking-times` | GET    | every 30 minutes | Pull corrected times back from Calendar, flag deleted events                                                                                                                                                |
+| Reconcile booking times | `/api/cron/reconcile-booking-times` | GET    | every 30 minutes | Pull corrected times back from Calendar, flag deleted events, retry booking-event deletes Google refused                                                                                                    |
 | Booking reminders       | `/api/cron/send-booking-reminders`  | GET    | every 30 minutes | Email a 24h-out reminder for confirmed bookings                                                                                                                                                             |
 | Invoice reminders       | `/api/cron/send-invoice-reminders`  | GET    | daily            | Chase overdue SENT invoices (max 2 nudges each)                                                                                                                                                             |
 | Review asks             | `/api/cron/send-review-asks`        | GET    | daily 10:00 NZ   | Email the Google review ask N days after an invoice is sent                                                                                                                                                 |
@@ -105,9 +105,9 @@ across DST changes.
   never followed - so reminders were timed off a stale start, or went out for a visit that never
   happened. This job copies corrected times back and stamps `calendarEventMissingAt` on a row whose
   event is gone; the reminder job skips a flagged booking until it is cancelled properly, and the
-  flag clears itself if the event reads back. Only a 404 or an explicit `cancelled` status counts as
-  gone, so a quota or auth blip never pauses mail. It uses a 7-day lookback, and the query has no
-  upper bound, so every future booking is covered; `npm run reconcile:times:dry` and
+  flag clears itself if the event reads back. Only a 404, a 410 or an explicit `cancelled` status
+  counts as gone, so a quota or auth blip never pauses mail. It uses a 7-day lookback, and the query
+  has no upper bound, so every future booking is covered; `npm run reconcile:times:dry` and
   `npm run reconcile:times:apply` are the same pass by hand, with the wider 60-day default.
 - It also re-arms a reminder stamp that cannot belong to a booking's current times.
   `emailReminderSentAt` is one-way - nothing else in the codebase clears it - so a row that has been
@@ -118,6 +118,15 @@ across DST changes.
   widest lead the settings validator allows, so it cannot have been sent for these times whatever
   the setting is; that also keeps the check free of a settings read, which the CLI script could not
   do anyway. Review asks hang off invoices, not booking times, so nothing here touches them.
+- The same run retries `PendingCalendarDelete`. A cancel, a reschedule's old event or a rolled-back
+  booking whose Google delete failed queues the event there rather than leaving it to block the slot
+  and sit in the customer's calendar. Each run retries the queue oldest first with the original
+  notify setting; an event already gone (404/410) clears its row. After 48 tries (a day) the row is
+  dropped and the owner gets a push to delete the event by hand.
+- Calendar cache rows live 60 minutes, twice the refresh cadence, so one late or missed run never
+  expires the table. The booking page also serves rows up to 2 hours past their fetch while it
+  refreshes in the background; the submit-time check always reads the calendars live, and adds the
+  cached travel blocks so it refuses the same slots the grid greys out.
 - Invoice reminders hold off on an invoice whose payment is already in the income ledger. Money
   entered straight into the Cashbook sheet never reaches the invoice (only `POST /pay` links the
   two), so a paid invoice can still read as SENT. A linked entry is proof; an unlinked entry

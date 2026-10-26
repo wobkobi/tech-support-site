@@ -103,7 +103,7 @@ export default async function AdminTravelPage(): Promise<React.ReactElement> {
     <>
       <PageHeader
         title="Travel blocks"
-        description="Travel time blocks computed for calendar events with a location. Refreshed every 15 minutes by the cron job."
+        description="Travel time blocks computed for calendar events with a location. Refreshed every 30 minutes by the cron job."
         actions={<RecalculateButton />}
       />
 

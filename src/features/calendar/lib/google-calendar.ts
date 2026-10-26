@@ -221,15 +221,15 @@ export type BookingEventLookup =
   | { state: "unreadable" };
 
 /**
- * True for a Google API 404. googleapis puts the status in one of three shapes
- * depending on the transport; anything else must not read as a deletion.
+ * True for a Google API 404 or 410 (the event is gone). googleapis puts the status in one of
+ * three shapes depending on the transport; anything else must not read as a deletion.
  * @param err - The thrown value.
- * @returns Whether the error is a 404.
+ * @returns Whether the error says the event no longer exists.
  */
-function isEventNotFound(err: unknown): boolean {
+export function isEventGone(err: unknown): boolean {
   if (typeof err !== "object" || err === null) return false;
   const e = err as { code?: unknown; status?: unknown; response?: { status?: unknown } };
-  return e.code === 404 || e.status === 404 || e.response?.status === 404;
+  return [e.code, e.status, e.response?.status].some((s) => s === 404 || s === 410);
 }
 
 /**
@@ -262,7 +262,7 @@ export async function lookupBookingEvent(eventId: string): Promise<BookingEventL
       },
     };
   } catch (err) {
-    if (isEventNotFound(err)) return { state: "gone" };
+    if (isEventGone(err)) return { state: "gone" };
     console.warn("[calendar] lookupBookingEvent failed:", err);
     return { state: "unreadable" };
   }
@@ -312,8 +312,9 @@ export interface BlockedDayRange {
 }
 
 /**
- * Reads an all-day block's date span; null when missing, cancelled or timed,
- * so callers fall back to a whole-event delete.
+ * Reads an all-day block's date span; null when missing, cancelled or timed, so callers fall
+ * back to a whole-event delete. Any other failure throws: read as null, one unblocked day
+ * would delete the whole block.
  * @param eventId - Google Calendar event id.
  * @returns The block's date span, or null.
  */
@@ -331,8 +332,8 @@ export async function getBlockedDayRange(eventId: string): Promise<BlockedDayRan
       summary: event.summary ?? null,
     };
   } catch (err) {
-    console.warn("[calendar] getBlockedDayRange failed:", err);
-    return null;
+    if (isEventGone(err)) return null;
+    throw err;
   }
 }
 
@@ -559,6 +560,24 @@ export async function fetchAllCalendarEvents(
   endDate: Date,
 ): Promise<CalendarEvent[]> {
   return (await fetchAllCalendarEventsDetailed(startDate, endDate)).events;
+}
+
+/**
+ * {@link fetchAllCalendarEvents} for a booking check: throws when any calendar failed, since
+ * its missing events would read as free time.
+ * @param startDate - Start of range
+ * @param endDate - End of range
+ * @returns Events from every configured calendar.
+ */
+export async function fetchAllCalendarEventsStrict(
+  startDate: Date,
+  endDate: Date,
+): Promise<CalendarEvent[]> {
+  const { events, failedCalendarIds } = await fetchAllCalendarEventsDetailed(startDate, endDate);
+  if (failedCalendarIds.length > 0) {
+    throw new Error(`Couldn't read calendar(s) ${failedCalendarIds.join(", ")}`);
+  }
+  return events;
 }
 
 /**

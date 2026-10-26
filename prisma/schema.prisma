@@ -269,6 +269,18 @@ model RecurringTravelPreference {
   @@unique([recurringEventId, calendarEmail])
 }
 
+// A booking-calendar event that a cancel, reschedule or rolled-back booking couldn't delete.
+// Left there it blocks the slot and stays in the customer's calendar, so the reconcile cron
+// retries the delete and drops the row once the event is gone.
+model PendingCalendarDelete {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  eventId         String   @unique
+  // Whether the retry emails attendees the cancellation, as the original delete would have.
+  notifyAttendees Boolean  @default(true)
+  attempts        Int      @default(0)
+  createdAt       DateTime @default(now())
+}
+
 // --- Contacts ---
 
 // Channel used to send a contact their review link. Set on Contact when an

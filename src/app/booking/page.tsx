@@ -5,6 +5,7 @@
 import BookingForm from "@/features/booking/components/BookingForm";
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
+  bookingWindowEnd,
   buildAvailableDays,
   hourLabel,
   type BookableDay,
@@ -12,6 +13,10 @@ import {
 } from "@/features/booking/lib/booking";
 import { withDateSurcharges } from "@/features/business/lib/pricing-policy.server";
 import { hasActivePromoCode } from "@/features/business/lib/promos";
+import {
+  CALENDAR_CACHE_STALE_MS,
+  CALENDAR_CACHE_TTL_MS,
+} from "@/features/calendar/lib/calendar-cache";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, CardPage, SOFT_CARD } from "@/shared/components/PageLayout";
@@ -48,10 +53,6 @@ interface CalendarFetchResult {
   degraded: boolean;
 }
 
-// How long past its TTL a cached event stays servable; covers missed cron runs.
-// The submit-time conflict check still guards double-booking.
-const STALE_SERVE_WINDOW_MS = 2 * 60 * 60 * 1000;
-
 /**
  * Fetch live calendar events and repopulate the cache in the background.
  * @param now - Current date
@@ -65,8 +66,7 @@ async function fetchLiveAndCache(
   const liveEvents = await fetchAllCalendarEvents(now, maxDate);
   console.log(`[booking/page] Fetched ${liveEvents.length} live calendar events`);
 
-  // Matches the cron writer's 30-min TTL (cron runs every 15 min).
-  const cacheExpiry = new Date(now.getTime() + 30 * 60 * 1000);
+  const cacheExpiry = new Date(now.getTime() + CALENDAR_CACHE_TTL_MS);
   void Promise.all(
     liveEvents.map((e) =>
       prisma.calendarEventCache.upsert({
@@ -100,10 +100,11 @@ async function fetchLiveAndCache(
  * @returns Events plus a `degraded` flag for the no-data state.
  */
 async function getCalendarEvents(now: Date, maxDate: Date): Promise<CalendarFetchResult> {
-  // One read covers fresh and stale rows; expiresAt decides which path below.
+  // One read covers fresh and stale rows; expiresAt decides which path below. The
+  // submit-time check reads the calendars live, so a stale row can't let a clash through.
   const cachedEvents = await prisma.calendarEventCache.findMany({
     where: {
-      fetchedAt: { gt: new Date(now.getTime() - STALE_SERVE_WINDOW_MS) },
+      fetchedAt: { gt: new Date(now.getTime() - CALENDAR_CACHE_STALE_MS) },
       endAt: { gte: now },
     },
     select: {
@@ -177,7 +178,7 @@ async function getAvailableDays(): Promise<{
     };
   }
 
-  const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
+  const maxDate = bookingWindowEnd(now, config);
 
   // Load blocking bookings and calendar events
   const [existingBookings, calendar] = await Promise.all([

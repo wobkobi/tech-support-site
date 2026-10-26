@@ -7,8 +7,9 @@ import BookingForm, {
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
   DURATION_OPTIONS,
-  TIME_OF_DAY_OPTIONS,
+  bookingWindowEnd,
   buildAvailableDays,
+  hourLabel,
   isBookingClosed,
   parseBookingNotes,
   type AvailabilityConfig,
@@ -25,7 +26,7 @@ import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
-import { NZ_TZ, nzDateKey, nzWeekday } from "@/shared/lib/timezone-utils";
+import { NZ_TZ, nzDateKey, nzMinuteOfDay, nzWeekday } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type React from "react";
@@ -39,34 +40,32 @@ export const metadata: Metadata = {
 };
 
 /**
- * Derive NZ local hour (24h) from a UTC Date.
- * @param date - UTC date object.
- * @returns NZ hour as a number.
- */
-function getNZHour(date: Date): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: NZ_TZ,
-    hour: "numeric",
-    hour12: false,
-  }).formatToParts(date);
-  return parseInt(parts.find((p) => p.type === "hour")?.value ?? "0");
-}
-
-/**
  * Fetch available days excluding the booking being edited.
- * @param excludeBookingId - The booking being edited (freed up for re-selection).
+ * @param booking - The booking being edited, freed up for re-selection.
+ * @param booking.id - Its id, left out of the blocking bookings.
+ * @param booking.calendarEventId - Its event, left out with the travel cached around it.
  * @param config - Live availability settings.
  * @returns Array of bookable days.
  */
 async function getAvailableDays(
-  excludeBookingId: string,
+  booking: { id: string; calendarEventId: string | null },
   config: AvailabilityConfig,
 ): Promise<BookableDay[]> {
   const now = new Date();
-  const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
+  const maxDate = bookingWindowEnd(now, config);
+  // The booking's own event and travel would grey out the slot it already holds.
+  const own = new Set(
+    booking.calendarEventId
+      ? [
+          booking.calendarEventId,
+          `travel-before:${booking.calendarEventId}`,
+          `travel-after:${booking.calendarEventId}`,
+        ]
+      : [],
+  );
 
   const [existing, cachedEvents] = await Promise.all([
-    loadBlockingBookings(now, { excludeId: excludeBookingId }),
+    loadBlockingBookings(now, { excludeId: booking.id }),
     prisma.calendarEventCache.findMany({
       where: { expiresAt: { gt: now }, endAt: { gte: now } },
       select: { eventId: true, startAt: true, endAt: true },
@@ -90,7 +89,12 @@ async function getAvailableDays(
     }
   }
 
-  return buildAvailableDays(existing, calendarEvents, now, config).days;
+  return buildAvailableDays(
+    existing,
+    calendarEvents.filter((e) => !own.has(e.id)),
+    now,
+    config,
+  ).days;
 }
 
 /**
@@ -124,6 +128,7 @@ export default async function EditBookingPage({
       endAt: true,
       status: true,
       rescheduleCount: true,
+      calendarEventId: true,
     },
   });
 
@@ -136,7 +141,7 @@ export default async function EditBookingPage({
     getIdentity(),
     getAvailabilityConfig(),
   ]);
-  const availableDaysPromise = getAvailableDays(booking.id, availabilityConfig);
+  const availableDaysPromise = getAvailableDays(booking, availabilityConfig);
   // Mirror the POST route's reschedule gate (api/booking/edit/route.ts) so the
   // customer learns they can't change this booking BEFORE filling the form in,
   // instead of getting a rejection after submitting. 0 / null means "rule off".
@@ -157,12 +162,12 @@ export default async function EditBookingPage({
   const durationMinutes = (booking.endAt.getTime() - booking.startAt.getTime()) / 60000;
   const duration: JobDuration = durationMinutes <= 60 ? "short" : "long";
 
+  // The grid labels every hour the schedule opens, so any start maps to its own label.
   const dateKey = nzDateKey(booking.startAt);
-  const nzHour = getNZHour(booking.startAt);
-  const matchedSlot = TIME_OF_DAY_OPTIONS.find((t) => t.startHour === nzHour);
-  const timeOfDay: TimeOfDay = matchedSlot?.value ?? "10am";
-  // Minutes are timezone-independent - preserve the sub-slot offset
-  const startMinute = booking.startAt.getUTCMinutes() ?? 0;
+  const startMinuteOfDay = nzMinuteOfDay(booking.startAt);
+  const nzHour = Math.floor(startMinuteOfDay / 60);
+  const timeOfDay: TimeOfDay = hourLabel(nzHour);
+  const startMinute = startMinuteOfDay % 60;
 
   const { userNotes, meetingType, address } = parseBookingNotes(booking.notes);
 
@@ -189,6 +194,7 @@ export default async function EditBookingPage({
   const hasCurrentDay = availableDays.some((d) => d.dateKey === dateKey);
   if (!hasCurrentDay) {
     const durationOption = DURATION_OPTIONS.find((d) => d.value === duration);
+    const isLong = (durationOption?.durationMinutes ?? 60) >= 120;
     availableDays.unshift({
       dateKey,
       dayLabel: new Intl.DateTimeFormat("en-NZ", {
@@ -207,23 +213,21 @@ export default async function EditBookingPage({
       isTomorrow: false,
       isWeekend: [0, 6].includes(nzWeekday(booking.startAt)),
       hasAnySlots: true,
-      timeWindows: TIME_OF_DAY_OPTIONS.map((t) => {
-        const isSelected = t.value === timeOfDay;
-        const subSlots = availabilityConfig.subSlotMinutes.map((m) => ({
-          minute: m,
-          availableShort: isSelected && m === startMinute,
-          availableLong:
-            isSelected && m === startMinute && (durationOption?.durationMinutes ?? 60) >= 120,
-        }));
-        return {
-          value: t.value,
-          label: t.label,
-          startHour: t.startHour,
-          availableShort: isSelected,
-          availableLong: isSelected && (durationOption?.durationMinutes ?? 60) >= 120,
-          subSlots,
-        };
-      }),
+      // Only the slot it already holds: nothing else on the day was free.
+      timeWindows: [
+        {
+          value: timeOfDay,
+          label: timeOfDay,
+          startHour: nzHour,
+          availableShort: true,
+          availableLong: isLong,
+          subSlots: availabilityConfig.subSlotMinutes.map((m) => ({
+            minute: m,
+            availableShort: m === startMinute,
+            availableLong: m === startMinute && isLong,
+          })),
+        },
+      ],
     });
   }
   // A reschedule onto a weekend or public holiday shows the same surcharge note as a new booking.
