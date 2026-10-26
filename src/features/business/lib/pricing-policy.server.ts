@@ -235,16 +235,20 @@ function matchInHolidayList(
 
 /**
  * Returns the `date-holidays` match for an NZ-local YYYY-MM-DD, nationwide first, then Auckland.
+ * The package names every province's anniversary "Provincial anniversary day", so the home
+ * region's is renamed after it.
  * @param key - NZ-local YYYY-MM-DD date string.
  * @returns `{ name, region }` or null.
  */
 function holidayFromPackage(key: string): { name: string; region: string } | null {
   const [year = ""] = key.split("-");
   const yearInt = parseInt(year, 10);
-  return (
-    matchInHolidayList(hdNz.getHolidays(yearInt), key, NZ_REGION) ??
-    matchInHolidayList(hdAuckland.getHolidays(yearInt), key, HOME_REGION)
-  );
+  const nz = matchInHolidayList(hdNz.getHolidays(yearInt), key, NZ_REGION);
+  if (nz) return nz;
+  const home = matchInHolidayList(hdAuckland.getHolidays(yearInt), key, HOME_REGION);
+  return home && /anniversary/i.test(home.name)
+    ? { ...home, name: `${HOME_REGION} Anniversary Day` }
+    : home;
 }
 
 /**
