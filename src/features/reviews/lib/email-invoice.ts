@@ -38,6 +38,8 @@ export interface InvoiceEmailData {
   isQuote?: boolean | null;
   /** Quote validity end; shown in place of the due date. */
   quoteValidUntil?: Date | null;
+  /** Voided invoice this one replaces; named in the subject and the details block. */
+  replacesNumber?: string | null;
   /** Default greeting target (person behind a company invoice); unset uses the client's first name. */
   defaultGreeting?: string | null;
 }
@@ -112,10 +114,17 @@ export async function buildInvoiceEmail({
       Code: <strong>${escapeHtml(bankCode(invoice.number))}</strong>
     </p>`;
 
+  // A replacement says so up front, so it doesn't read as a second bill for the same job.
+  const replaces = !isQuote && invoice.replacesNumber ? invoice.replacesNumber : null;
+  const replacesLine = replaces
+    ? `<p style="margin:0 0 4px"><strong>Replaces:</strong> ${escapeHtml(replaces)} (voided, nothing to pay on it)</p>`
+    : "";
   // Append " Tech" to match the signature and body brand name.
   const subject = isQuote
     ? `Your quote from ${brandName(identity)} (${invoice.number})`
-    : `Your invoice from ${brandName(identity)} (${invoice.number})`;
+    : replaces
+      ? `Your corrected invoice from ${brandName(identity)} (${invoice.number})`
+      : `Your invoice from ${brandName(identity)} (${invoice.number})`;
   const html = renderDocumentEmail(`
     <h1 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0c0a3e">Hi ${safeGreeting},</h1>
 
@@ -123,6 +132,7 @@ export async function buildInvoiceEmail({
 
     <div style="margin:0 0 16px;padding:12px 16px;background:#f3f4f6;border-radius:8px;font-size:14px;color:#333">
       <p style="margin:0 0 4px"><strong>${isQuote ? "Quote" : "Invoice"}:</strong> ${safeNumber}</p>
+      ${replacesLine}
       <p style="margin:0 0 4px"><strong>Total:</strong> ${totalLabel}</p>
       ${prepaidLines}
       ${dateLine}

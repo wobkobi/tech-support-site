@@ -1202,10 +1202,13 @@ export function CalculatorView({
             clientEmail={clientEmail}
             issueDate={todayISO()}
             dueDate={addDaysISO(identity.paymentTermsDays)}
+            jobDate={jobDate}
+            replacesNumber={reissue?.invoiceNumber ?? null}
             lineItems={previewLineItems}
             notes={notes}
             gstRegistered={pricing.gstRegistered}
             unsuccessfulDiscount={totals.unsuccessfulDiscount}
+            unsuccessfulNote={totals.unsuccessfulNote}
             goldCardDiscount={totals.goldCardDiscount}
             goldCardPercent={appliedGoldCard}
             alreadyPaid={paidCash || quoteMode ? 0 : alreadyPaidAmount(alreadyPaid)}

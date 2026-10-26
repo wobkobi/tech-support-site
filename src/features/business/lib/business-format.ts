@@ -3,6 +3,8 @@
 // views. Re-exported through business.ts.
 
 import type { PromoRateSummary } from "@/features/business/types/business";
+import { formatDateShort } from "@/shared/lib/date-format";
+import { roundCents } from "@/shared/lib/money";
 import { nzTodayKey } from "@/shared/lib/timezone-utils";
 
 /**
@@ -165,4 +167,100 @@ export function goldCardOffText(percent: number): string {
  */
 export function goldCardLineLabel(percent: number | null | undefined): string {
   return `Gold Card discount (${percent ? goldCardOffText(percent) : "labour only"})`;
+}
+
+/** Totals-block label for the discount on work that couldn't be fixed. */
+export const UNSUCCESSFUL_LINE_LABEL = "Discount for work that couldn't be fixed";
+
+/**
+ * The line under an invoice's couldn't-fix row, so the customer can check the discount:
+ * "Couldn't be fixed: Laptop repair, so $25.00 of labour is half price." The colon form
+ * reads right for verb-phrase lines too ("Install Office").
+ * @param tasks - The lines that couldn't be fixed; empty when the whole visit couldn't.
+ * @param base - Labour the discount came off, after any promo and Gold Card.
+ * @param factor - Share of that labour still charged (0.5 = half).
+ * @returns The note, or null when there's no labour to name.
+ */
+export function unsuccessfulNote(tasks: string[], base: number, factor: number): string | null {
+  if (!(base > 0)) return null;
+  const names = [...new Set(tasks.map((t) => t.trim()).filter(Boolean))];
+  const subject =
+    names.length === 0
+      ? "The problem couldn't be fixed"
+      : names.length === 1
+        ? `Couldn't be fixed: ${names[0]}`
+        : `Couldn't be fixed: ${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  const share =
+    factor <= 0
+      ? "isn't charged"
+      : factor === 0.5
+        ? "is half price"
+        : `is charged at ${Math.round(factor * 100)}%`;
+  return `${subject}, so ${formatNZD(base)} of labour ${share}.`;
+}
+
+/** The invoice fields that say what's been paid. */
+interface SettlementSource {
+  status: string;
+  total: number;
+  alreadyPaid?: number | null;
+  paidAt?: Date | string | null;
+  voidedAt?: Date | string | null;
+}
+
+/** One totals row under Total. */
+export interface SettlementRow {
+  label: string;
+  value: string;
+  /** The closing Balance due row, drawn like Total. */
+  bold?: boolean;
+}
+
+/**
+ * The rows under Total that show what's been paid: money handed over on the day, then the
+ * payment that cleared a paid invoice, then a Balance due that reads $0.00 once paid.
+ * @param invoice - The invoice's status and payment fields.
+ * @returns The rows, or empty when nothing has been paid (Total is then what's owed).
+ */
+export function settlementRows(invoice: SettlementSource): SettlementRow[] {
+  if (invoice.status === "VOIDED") return [];
+  const already = invoice.alreadyPaid && invoice.alreadyPaid > 0 ? invoice.alreadyPaid : 0;
+  const paid = invoice.status === "PAID";
+  if (!paid && already === 0) return [];
+  const balance = Math.max(0, roundCents(invoice.total - already));
+  const rows: SettlementRow[] = [];
+  if (already > 0) rows.push({ label: "Already paid", value: `-${formatNZD(already)}` });
+  if (paid && balance > 0) {
+    const label = invoice.paidAt ? `Paid ${formatDateShort(invoice.paidAt)}` : "Paid";
+    rows.push({ label, value: `-${formatNZD(balance)}` });
+  }
+  rows.push({ label: "Balance due", value: formatNZD(paid ? 0 : balance), bold: true });
+  return rows;
+}
+
+/**
+ * The box that takes the bank details' place once nothing is owed.
+ * @param invoice - The invoice's status and dates.
+ * @returns Heading and line, or null while the invoice still asks for payment.
+ */
+export function settledCallout(
+  invoice: SettlementSource,
+): { heading: string; text: string } | null {
+  if (invoice.status === "PAID") {
+    return {
+      heading: "Paid, thank you",
+      text: invoice.paidAt
+        ? `Paid in full on ${formatDateShort(invoice.paidAt)}. There's nothing more to pay.`
+        : "Paid in full. There's nothing more to pay.",
+    };
+  }
+  if (invoice.status === "VOIDED") {
+    return {
+      heading: "Voided",
+      text: invoice.voidedAt
+        ? `This invoice was voided on ${formatDateShort(invoice.voidedAt)}, so there's nothing to pay.`
+        : "This invoice has been voided, so there's nothing to pay.",
+    };
+  }
+  return null;
 }

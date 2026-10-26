@@ -56,6 +56,8 @@ export interface RepricedDiscounts {
   promoNote: string | null;
   goldCardDiscount: number;
   unsuccessfulDiscount: number;
+  /** What couldn't be fixed and the labour it came off, or null when there's no discount. */
+  unsuccessfulNote: string | null;
 }
 
 /** Props for {@link InvoiceAiBox}. */
@@ -139,6 +141,7 @@ export function InvoiceAiBox({
           promoNote,
           goldCardDiscount,
           unsuccessfulDiscount,
+          unsuccessfulNote,
         } = parsedJobToLineItems(
           parsed,
           context.slots,
@@ -157,6 +160,7 @@ export function InvoiceAiBox({
             promoNote,
             goldCardDiscount,
             unsuccessfulDiscount,
+            unsuccessfulNote,
           });
           const fitNote = describeFit(fit, windowMins);
           if (fitNote) toast(fitNote, { tone: "info" });

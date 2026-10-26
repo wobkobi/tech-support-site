@@ -2,6 +2,7 @@
 // Core business maths: billable minutes, hourly rates, travel, line items, promo discounts
 // and job totals. Also re-exports the format, task-timing and invoice-maths helpers.
 
+import { unsuccessfulNote } from "@/features/business/lib/business-format";
 import {
   calcGstFromInclusive,
   calcInvoiceTotals,
@@ -49,8 +50,13 @@ export {
   promoLineLabel,
   promoRateNote,
   restatesTaskLine,
+  settledCallout,
+  settlementRows,
   todayISO,
+  UNSUCCESSFUL_LINE_LABEL,
+  unsuccessfulNote,
 } from "@/features/business/lib/business-format";
+export type { SettlementRow } from "@/features/business/lib/business-format";
 export {
   advanceNextDue,
   balanceDue,
@@ -59,6 +65,7 @@ export {
   calcInvoiceTotals,
   isValidLineItem,
   nextInvoiceNumber,
+  numberSequence,
   splitGstInclusive,
   splitLineTotals,
   withSplitLineTotals,
@@ -582,6 +589,8 @@ export function calcJobTotal(
   promoRate: PromoRateSummary | null;
   goldCardDiscount: number;
   unsuccessfulDiscount: number;
+  /** What couldn't be fixed and the labour the discount came off, or null when there's none. */
+  unsuccessfulNote: string | null;
   gstAmount: number;
   total: number;
 } {
@@ -655,6 +664,10 @@ export function calcJobTotal(
     return s + lineTotals[i]! * (1 + surchargeUplift) * kept - (promoByTask[i] ?? 0) * kept;
   }, 0);
   const unsuccessfulDiscount = Math.max(0, roundCents(unsuccessfulBase * unsuccessfulCut));
+  // A whole visit that failed names no lines: all its labour is the base.
+  const unsuccessfulLines = job.unsuccessful
+    ? []
+    : job.tasks.filter((t) => isHourlyTask(t) && t.unsuccessful).map((t) => t.description);
   // GST on the discounted amount (IRD price-reduction treatment), clamped at 0 like
   // calcInvoiceTotals.
   const taxableAmount = Math.max(
@@ -675,6 +688,14 @@ export function calcJobTotal(
         : null,
     goldCardDiscount,
     unsuccessfulDiscount,
+    unsuccessfulNote:
+      unsuccessfulDiscount > 0
+        ? unsuccessfulNote(
+            unsuccessfulLines,
+            roundCents(unsuccessfulBase),
+            pricing.unsuccessfulFactor ?? 0.5,
+          )
+        : null,
     gstAmount,
     total: taxableAmount,
   };

@@ -205,23 +205,34 @@ export function isValidLineItem(item: unknown): item is LineItem {
 }
 
 /**
- * Generates the next sequential invoice number in TTP-YYYY-XXXX format.
- * @param lastNumber - Last used invoice number, or null for first
- * @param yearCode - Financial year code (e.g. "2627")
- * @param prefix - Invoice prefix (default "TTP")
- * @returns Next formatted invoice number
+ * The sequence at the end of an invoice or quote number ("TTP-202627-0042" > 42).
+ * @param number - A saved number, or null when there's none.
+ * @returns The sequence, or 0 when there's no number or no trailing digits.
+ */
+export function numberSequence(number: string | null | undefined): number {
+  const match = number?.match(/-(\d+)$/);
+  return match ? parseInt(match[1] ?? "", 10) : 0;
+}
+
+/**
+ * Next number in a financial year's run, e.g. TTP-202627-0098. Each 1 April starts again at
+ * 0001, so only this year's numbers count. The sheet's counter (SETTINGS!B19, or B12 for
+ * quotes) still holds last year's final count until this year's first number is written
+ * back, so it only counts once this year has a number of its own.
+ * @param prefix - "TTP" for invoices, "Q" for quotes.
+ * @param yearCode - Financial year code ("202627").
+ * @param dbLast - Highest sequence already saved this year; 0 when none.
+ * @param sheetLast - The sheet counter's last issued number; null when the sheet wasn't read.
+ * @returns The formatted number and its sequence, for the counter write-back.
  */
 export function nextInvoiceNumber(
-  lastNumber: string | null,
+  prefix: string,
   yearCode: string,
-  prefix: string = "TTP",
-): string {
-  if (!lastNumber) return `${prefix}-${yearCode}-0001`;
-  // 4+ digits so a 5-digit counter (10000+) still increments.
-  const match = lastNumber.match(/-(\d{4,})$/);
-  if (!match) return `${prefix}-${yearCode}-0001`;
-  const next = parseInt(match[1] ?? "", 10) + 1;
-  return `${prefix}-${yearCode}-${String(next).padStart(4, "0")}`;
+  dbLast: number,
+  sheetLast: number | null,
+): { number: string; sequence: number } {
+  const sequence = Math.max(dbLast, dbLast > 0 ? (sheetLast ?? 0) : 0) + 1;
+  return { number: `${prefix}-${yearCode}-${String(sequence).padStart(4, "0")}`, sequence };
 }
 
 /**

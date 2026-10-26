@@ -185,12 +185,15 @@ export default async function EditInvoicePage({
       <EditInvoiceView
         invoiceId={invoice.id}
         invoiceNumber={invoice.number}
+        jobDate={invoice.jobDate}
+        replacesNumber={invoice.replacesNumber}
         initial={initial}
         preservedDiscounts={{
           promoTitle: invoice.promoTitle,
           promoDiscount: invoice.promoDiscount ?? 0,
           promoNote: invoice.promoNote,
           unsuccessfulDiscount: invoice.unsuccessfulDiscount ?? 0,
+          unsuccessfulNote: invoice.unsuccessfulNote,
           goldCardDiscount: invoice.goldCardDiscount ?? 0,
           goldCardPercent: invoice.goldCardPercent,
         }}

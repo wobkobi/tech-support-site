@@ -110,6 +110,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Unsuccessful-work snapshot, so the dashboard can count the half-price clause.
     unsuccessful,
     unsuccessfulDiscount,
+    // "Couldn't be fixed: Laptop repair, so $25.00 of labour is half price.", under its row.
+    unsuccessfulNote,
     // Gold Card holder: the share off labour and the dollars it came to.
     goldCardPercent,
     goldCardDiscount,
@@ -144,6 +146,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     promoNote?: unknown;
     unsuccessful?: boolean;
     unsuccessfulDiscount?: number | null;
+    unsuccessfulNote?: unknown;
     goldCardPercent?: number | null;
     goldCardDiscount?: number | null;
     bookingId?: string | null;
@@ -263,6 +266,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ? requestedContactId
       : null;
 
+  // The voided invoice this re-issues, named under the new number so the customer knows
+  // which one it replaces.
+  const reissuedId = parseObjectId(reissueOf);
+  const replaced = reissuedId
+    ? await prisma.invoice.findFirst({
+        where: { id: reissuedId, status: "VOIDED" },
+        select: { number: true },
+      })
+    : null;
+
   // Retry on a number collision (concurrent creates or a stale sheet counter).
   let invoice: Awaited<ReturnType<typeof prisma.invoice.create>> | null = null;
   let sheetNextCount: number | null = null;
@@ -283,6 +296,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           dueDate: dueDateValue,
           jobDate:
             typeof jobDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(jobDate) ? jobDate : null,
+          replacesNumber: replaced?.number ?? null,
           lineItems: lines,
           gst: gstAmount > 0,
           subtotal,
@@ -294,6 +308,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           promoNote: discount > 0 ? parseString(promoNote) : null,
           unsuccessful: unsuccessful === true,
           unsuccessfulDiscount: unsuccessfulDiscountValue > 0 ? unsuccessfulDiscountValue : null,
+          unsuccessfulNote: unsuccessfulDiscountValue > 0 ? parseString(unsuccessfulNote) : null,
           goldCardDiscount: goldCardDiscountValue > 0 ? goldCardDiscountValue : null,
           goldCardPercent: goldCardPercentValue || null,
           notes: notes ?? null,
@@ -379,8 +394,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // Record the part payment now, so marking paid later records only the balance.
   let incomeSheetWarning = false;
   if (prepaid.amount) {
-    const voidedId = parseObjectId(reissueOf);
-    if (voidedId) await adoptReissuedAlreadyPaid(voidedId, invoice.id);
+    if (reissuedId) await adoptReissuedAlreadyPaid(reissuedId, invoice.id);
     incomeSheetWarning = (await syncAlreadyPaidIncome(invoice.id, prepaidDate)).sheetSyncWarning;
   }
 

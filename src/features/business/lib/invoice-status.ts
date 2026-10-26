@@ -1,9 +1,10 @@
 // src/features/business/lib/invoice-status.ts
 // Single source of truth for an invoice's derived OVERDUE / QUOTE / EXPIRED display state.
-// "Today" is the runtime's local zone (UTC on Vercel), so server-side OVERDUE can differ
-// from NZ by up to ~13h; accepted to keep this helper isomorphic.
+// Days are NZ calendar days on both server (UTC on Vercel) and browser, so the dashboard,
+// the list and the PDF all flip to OVERDUE at NZ midnight.
 
 import type { InvoiceStatus } from "@/features/business/types/business";
+import { nzDateKey } from "@/shared/lib/timezone-utils";
 
 /** The minimal invoice shape the overdue check needs. */
 export interface OverdueCheckInput {
@@ -30,8 +31,8 @@ export const NOT_A_QUOTE_FILTER = {
 };
 
 /**
- * Whether an invoice is SENT with a due date before the start of `now`'s day. Quotes never
- * are; their dueDate is a placeholder.
+ * Whether an invoice is SENT with a due date before `now`'s NZ day. Quotes never are;
+ * their dueDate is a placeholder.
  * @param invoice - Invoice status + due date.
  * @param now - Reference instant (defaults to the current time).
  * @returns True when the invoice is SENT and past due.
@@ -39,9 +40,10 @@ export const NOT_A_QUOTE_FILTER = {
 export function isInvoiceOverdue(invoice: OverdueCheckInput, now: Date = new Date()): boolean {
   if (invoice.isQuote) return false;
   if (invoice.status !== "SENT") return false;
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  return new Date(invoice.dueDate) < startOfToday;
+  const due = new Date(invoice.dueDate);
+  if (Number.isNaN(due.getTime())) return false;
+  // YYYY-MM-DD keys compare as text.
+  return nzDateKey(due) < nzDateKey(now);
 }
 
 /**

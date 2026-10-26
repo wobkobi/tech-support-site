@@ -20,7 +20,7 @@ const TSX_CLI = fileURLToPath(import.meta.resolve("tsx/cli"));
 
 // These import a module behind `server-only`, which throws under the default export
 // condition and is empty under `react-server`, the condition Next builds with.
-const REACT_SERVER = new Set(["email-render", "mailing", "social", "tax-load"]);
+const REACT_SERVER = new Set(["email-render", "invoice-pdf", "mailing", "social", "tax-load"]);
 
 interface CheckResult {
   name: string;

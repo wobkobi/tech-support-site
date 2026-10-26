@@ -1,6 +1,7 @@
 // src/app/api/business/invoices/[id]/pay/route.ts
 // Records a payment: atomically claims the PAID stamp, then the income entry (a failed
 // ledger write hands the claim back), Drive PDF and reminder apology (best-effort).
+// GET returns the already-recorded checks the Pay dialog opens with.
 
 import { balanceDue } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
@@ -8,6 +9,7 @@ import { recordIncome } from "@/features/business/lib/income-recording";
 import { balanceIncomeWhere } from "@/features/business/lib/invoice-already-paid";
 import { reminderChasedPaidInvoice } from "@/features/business/lib/invoice-apology";
 import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";
+import { findRecordedPayment } from "@/features/business/lib/invoice-payment-match";
 import { sendReminderApology } from "@/features/business/lib/invoice-reminders";
 import {
   formatDateForSheet,
@@ -20,6 +22,47 @@ import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { IncomeEntry } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
+
+/**
+ * GET /api/business/invoices/[id]/pay
+ * The checks the Pay dialog opens with, the same ones the detail page runs: whether income
+ * is already linked, and an unlinked Cashbook row that looks like this payment.
+ * @param request - Next.js request (admin-auth gated).
+ * @param ctx - Route ctx with the invoice id.
+ * @param ctx.params - Resolved Next.js dynamic route params.
+ * @returns JSON `{ ok, hasLinkedIncome, likelyIncome }` or an error.
+ */
+export async function GET(
+  request: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  if (!(await isAdminRequest(request))) {
+    return errorResponse("Unauthorized", 401);
+  }
+
+  const { id } = await ctx.params;
+  const invoice = await prisma.invoice.findUnique({ where: { id } });
+  if (!invoice) return errorResponse("Invoice not found", 404);
+
+  const [linked, recorded] = await Promise.all([
+    prisma.incomeEntry.findMany({ where: { invoiceId: id }, select: { id: true } }),
+    invoice.status === "SENT" && !invoice.isQuote ? findRecordedPayment(invoice) : null,
+  ]);
+  return NextResponse.json({
+    ok: true,
+    // The already-paid deposit row isn't the payment.
+    hasLinkedIncome: linked.some((e) => e.id !== invoice.alreadyPaidIncomeId),
+    likelyIncome:
+      recorded?.strength === "likely"
+        ? {
+            id: recorded.entryId,
+            amount: recorded.amount,
+            date: recorded.date.toISOString(),
+            method: recorded.method,
+          }
+        : null,
+  });
+}
 
 /**
  * POST /api/business/invoices/[id]/pay

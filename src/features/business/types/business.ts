@@ -50,6 +50,10 @@ export interface Invoice {
   clientEmail: string;
   issueDate: string;
   dueDate: string;
+  /** NZ date the work was done (YYYY-MM-DD), printed as "Work done"; null on older invoices. */
+  jobDate?: string | null;
+  /** Number of the voided invoice this one replaces, printed under its own number. */
+  replacesNumber?: string | null;
   lineItems: LineItem[];
   /** @deprecated Storage shape only; GST mode comes from pricing-policy.ts, renderers gate on `gstAmount > 0`. */
   gst: boolean;
@@ -66,6 +70,8 @@ export interface Invoice {
   unsuccessful?: boolean;
   /** Computed labour-half discount, persisted for audit + PDF rendering. */
   unsuccessfulDiscount?: number | null;
+  /** What couldn't be fixed and the labour it came off, printed under its row; null when none. */
+  unsuccessfulNote?: string | null;
   /** Gold Card share taken off labour (0.1 = 10%), or null when the client isn't a holder. */
   goldCardPercent?: number | null;
   /** Gold Card dollars off labour, after the promo and before the unsuccessful discount. */
@@ -77,6 +83,8 @@ export interface Invoice {
   sentAt?: string | null;
   /** ISO timestamp when payment was recorded (status>PAID). Null on legacy PAID rows. */
   paidAt?: string | null;
+  /** ISO timestamp when the invoice was voided; null when it never was. */
+  voidedAt?: string | null;
   /** Payment method recorded at pay time (an INCOME_METHODS value). */
   paymentMethod?: string | null;
   /** Optional operator reference/note recorded with the payment. */

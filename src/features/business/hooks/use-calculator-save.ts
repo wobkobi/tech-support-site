@@ -181,7 +181,9 @@ export function useCalculatorSave({
   const [savedIncomeRows, setSavedIncomeRows] = useState<string[]>([]);
 
   /**
-   * Saves custom task descriptions to the template library for future reuse.
+   * Saves custom task descriptions to the template library for future reuse. Best-effort:
+   * a failed request (an error page, a dropped connection) never stops the invoice or
+   * income save that called it.
    * @param taskList - Tasks from the current job to persist as templates
    */
   async function saveTaskTemplates(taskList: TaskLine[]): Promise<void> {
@@ -193,7 +195,7 @@ export function useCalculatorSave({
     for (const t of tagged) {
       byPair.set(`${t.device?.toLowerCase()}|${t.action?.toLowerCase()}`, t);
     }
-    await Promise.all(
+    await Promise.allSettled(
       [...byPair.values()].map((t) =>
         fetch("/api/business/task-templates", {
           method: "POST",
@@ -396,6 +398,7 @@ export function useCalculatorSave({
           unsuccessful: totals.unsuccessfulDiscount > 0,
           unsuccessfulDiscount:
             totals.unsuccessfulDiscount > 0 ? totals.unsuccessfulDiscount : null,
+          unsuccessfulNote: totals.unsuccessfulNote,
           goldCardPercent,
           goldCardDiscount: totals.goldCardDiscount > 0 ? totals.goldCardDiscount : null,
           // Link back to the billed job from "Bill in calculator". calendarEventId is the

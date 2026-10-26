@@ -21,6 +21,7 @@ function main(): void {
     bankParticulars("Supercalifragilistic Ltd"),
     "Supercalifra",
   );
+  expectEqual("macrons fold to plain letters", bankParticulars("Hēmi Pōhatu"), "Pohatu");
   expectEqual("empty name", bankParticulars("  "), "Payment");
   expectEqual("code drops the prefix", bankCode("TTP-202627-0078"), "202627-0078");
 
