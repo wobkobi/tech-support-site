@@ -2,6 +2,7 @@
 // Display helpers for money, durations and dates on the calculator, invoice and admin
 // views. Re-exported through business.ts.
 
+import type { PromoRateSummary } from "@/features/business/types/business";
 import { nzTodayKey } from "@/shared/lib/timezone-utils";
 
 /**
@@ -47,18 +48,22 @@ export function todayISO(): string {
 }
 
 /**
- * Formats billed time for an invoice's quantity column as h:mm ("2:20", "0:45"), so the
- * column visibly sums to the session length.
+ * Formats billed time for an invoice's quantity column ("2 hr 20 min", "45 min", "1 hr").
+ * Spelled out because customers read h:mm "1:55" as 1.55 hours.
  * @param mins - Billed minutes.
- * @returns h:mm string.
+ * @returns The time in hours and minutes.
  */
 export function formatBilledTime(mins: number): string {
   const whole = Math.max(0, Math.round(mins));
-  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+  const h = Math.floor(whole / 60);
+  const m = whole % 60;
+  if (h === 0) return `${m} min`;
+  return m === 0 ? `${h} hr` : `${h} hr ${m} min`;
 }
 
 /**
- * Quantity column text for one invoice line: h:mm for hourly labour, else the plain count.
+ * Quantity column text for one invoice line: hours and minutes for hourly labour, else the
+ * plain count.
  * @param item - Invoice line item.
  * @param item.qty - Decimal quantity (hours on labour rows, a count on flat rows).
  * @param item.minutes - Billed minutes; present only on hourly labour rows. Null on rows Prisma read back without the field.
@@ -130,6 +135,17 @@ export function restatesTaskLine(
  */
 export function promoLineLabel(title: string | null | undefined): string {
   return title ? `Promo: ${title}` : "Promo discount";
+}
+
+/**
+ * The line under an invoice's promo row, e.g. "1 hr 55 min at $65/hr instead of $100/hr",
+ * so the customer can check the discount against the hours.
+ * @param rate - The rate pair the promo billed at, or null when the lines had no single pair.
+ * @returns The note, or null when there's no single rate to name.
+ */
+export function promoRateNote(rate: PromoRateSummary | null): string | null {
+  if (!rate || rate.mins <= 0 || rate.after >= rate.before) return null;
+  return `${formatBilledTime(rate.mins)} at ${formatMoneyCompact(rate.after)}/hr instead of ${formatMoneyCompact(rate.before)}/hr`;
 }
 
 /**

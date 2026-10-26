@@ -542,14 +542,48 @@ export function minimumsCopy(
 }
 
 /**
- * Public-holiday surcharge text.
- * @param uplift - Surcharge multiplier (defaults to the module constant).
- * @returns Copy describing the stat-day surcharge.
+ * Every day billed at holiday rates, as customer copy names them. Christmas Eve and New Year's
+ * Eve aren't public holidays, so copy says "holiday rates" rather than calling them one.
  */
-export function publicHolidayCopy(uplift: number = PUBLIC_HOLIDAY_UPLIFT): string {
+const HOLIDAY_DAYS = `NZ public holidays (${HOME_REGION} Anniversary Day included), Christmas Eve and New Year's Eve`;
+
+/**
+ * A labour uplift as a percent, to two decimals so 12.5% never shows as 13%.
+ * @param uplift - Uplift as a fraction (0.125 = 12.5%).
+ * @returns The percent, e.g. 12.5.
+ */
+export function upliftPercent(uplift: number): number {
+  return Math.round(uplift * 10000) / 100;
+}
+
+/**
+ * The labour rise a surcharge adds, worked out on the full rate: a promo never discounts it,
+ * so a dollar figure stays right under a promo where a percent of the promo rate wouldn't.
+ * @param fullRate - Full hourly rate before any promo.
+ * @param uplift - Uplift as a fraction.
+ * @returns The rise, e.g. "$10/hr".
+ */
+function risePerHour(fullRate: number, uplift: number): string {
+  return `${formatMoneyCompact(roundCents(fullRate * uplift))}/hr`;
+}
+
+/**
+ * Public-holiday surcharge text, naming every day billed at holiday rates.
+ * @param uplift - Surcharge multiplier (defaults to the module constant).
+ * @param fullRate - Full on-site hourly rate, to add the rise in dollars; omitted gives the percent only.
+ * @returns Copy describing the holiday surcharge.
+ */
+export function publicHolidayCopy(
+  uplift: number = PUBLIC_HOLIDAY_UPLIFT,
+  fullRate?: number,
+): string {
+  const dollars =
+    fullRate === undefined ? "" : ` (**${risePerHour(fullRate, uplift)}** for an on-site visit)`;
   return (
-    `Available on NZ public holidays; a **${Math.round(uplift * 100)}% surcharge** ` +
-    `applies to labour. **Travel and parts are unchanged.**`
+    `Available on ${HOLIDAY_DAYS}. When a public holiday falls on a weekend, holiday rates ` +
+    `apply on the weekday it's observed instead (ANZAC Day on a Saturday means the Monday). ` +
+    `Holiday rates add **${upliftPercent(uplift)}% of the full hourly rate** to labour${dollars}. ` +
+    `**Travel and parts are unchanged.**`
   );
 }
 
@@ -568,19 +602,66 @@ export function unsuccessfulShareLabel(factor: number): string {
 /**
  * Weekend surcharge text, shown with the public-holiday copy.
  * @param uplift - Surcharge multiplier (defaults to the module constant).
+ * @param fullRate - Full on-site hourly rate, to add the rise in dollars; omitted gives the percent only.
+ * @param holidayUplift - Public-holiday uplift; at 0 Christmas Eve or New Year's Eve on a
+ * weekend bills normal rates.
  * @returns Copy describing the weekend surcharge.
  */
-export function weekendCopy(uplift: number = WEEKEND_UPLIFT): string {
+export function weekendCopy(
+  uplift: number = WEEKEND_UPLIFT,
+  fullRate?: number,
+  holidayUplift: number = PUBLIC_HOLIDAY_UPLIFT,
+): string {
+  const dollars =
+    fullRate === undefined ? "" : ` (**${risePerHour(fullRate, uplift)}** for an on-site visit)`;
+  // A weekend public holiday is observed on a weekday, so the day itself is a plain weekend.
+  // The eves aren't moved, and win over a weekend even at 0%, leaving that day at normal rates.
+  const onHoliday =
+    holidayUplift > 0
+      ? "A public holiday that falls on a weekend is charged weekend rates on the day, and holiday rates on the weekday it's observed. Christmas Eve and New Year's Eve take holiday rates even at a weekend - the two never add together."
+      : "A public holiday that falls on a weekend is charged weekend rates. Christmas Eve and New Year's Eve are charged at normal rates, even at a weekend.";
   return (
-    `Saturday and Sunday appointments carry a **${Math.round(uplift * 100)}% surcharge** on labour. ` +
-    `A public holiday that falls on a weekend takes the public-holiday surcharge instead - ` +
-    `the two never add together. **Travel and parts are unchanged.**`
+    `Saturday and Sunday appointments add **${upliftPercent(uplift)}% of the full hourly rate** ` +
+    `to labour${dollars}. ${onHoliday} **Travel and parts are unchanged.**`
   );
 }
 
-/** A date-based labour surcharge: a public holiday or a weekend. */
+/**
+ * One-line caveat for copy that quotes a weekday rate: what weekends and holidays add.
+ * @param uplifts - Live surcharge fractions from the pricing settings.
+ * @param uplifts.publicHolidayUplift - Public-holiday labour uplift (0 = off).
+ * @param uplifts.weekendUplift - Weekend labour uplift (0 = off).
+ * @param fullRate - Full hourly rate being quoted, to state the rise in dollars; omitted states percents.
+ * @returns The sentence, or null when neither surcharge is on.
+ */
+export function surchargeCaveat(
+  uplifts: { publicHolidayUplift: number; weekendUplift: number },
+  fullRate?: number,
+): string | null {
+  /**
+   * States one surcharge in dollars at the quoted rate, else as a percent.
+   * @param uplift - Labour uplift as a fraction.
+   * @returns The rise, e.g. "$10/hr" or "10%".
+   */
+  const rise = (uplift: number): string =>
+    fullRate === undefined ? `${upliftPercent(uplift)}%` : risePerHour(fullRate, uplift);
+  const { weekendUplift, publicHolidayUplift } = uplifts;
+  if (weekendUplift > 0 && publicHolidayUplift > 0) {
+    return (
+      `Weekends add ${rise(weekendUplift)} to labour, and public holidays, Christmas Eve and ` +
+      `New Year's Eve add ${rise(publicHolidayUplift)}.`
+    );
+  }
+  if (weekendUplift > 0) return `Weekends add ${rise(weekendUplift)} to labour.`;
+  if (publicHolidayUplift > 0) {
+    return `Public holidays, Christmas Eve and New Year's Eve add ${rise(publicHolidayUplift)} to labour.`;
+  }
+  return null;
+}
+
+/** A labour surcharge: a public holiday, a weekend, or after hours ticked on a weekday. */
 export interface DateSurcharge {
-  /** Why it applies, for the calculator strip: the holiday's name, or "Weekend". */
+  /** Why it applies, for the calculator strip: the holiday's name, "Weekend" or "After hours". */
   reason: string;
   /** Invoice-line wording without the percent, e.g. "Weekend surcharge". */
   label: string;
@@ -613,22 +694,82 @@ export function dateSurcharge(
       : null;
   }
   if ((weekday === 0 || weekday === 6) && uplifts.weekendUplift > 0) {
-    return { reason: "Weekend", label: "Weekend surcharge", uplift: uplifts.weekendUplift };
+    return weekendSurcharge(uplifts.weekendUplift);
   }
   return null;
 }
 
 /**
- * Customer-facing note shown when a surcharged booking day is picked.
- * @param surcharge - The day's surcharge from {@link dateSurcharge}.
- * @returns One plain sentence naming the reason, the percent and what it leaves alone.
+ * The weekend surcharge at a given uplift.
+ * @param uplift - Weekend labour uplift as a fraction.
+ * @returns The surcharge, or null when weekend rates are off (0).
  */
-export function dateSurchargeNote(surcharge: DateSurcharge): string {
-  const pct = Math.round(surcharge.uplift * 100);
+function weekendSurcharge(uplift: number): DateSurcharge | null {
+  return uplift > 0 ? { reason: "Weekend", label: "Weekend surcharge", uplift } : null;
+}
+
+/**
+ * The surcharge an operator's tick switches: the date's own, else the weekend uplift billed
+ * as after hours, so an evening call on a weekday reads right on the invoice.
+ * @param fromDate - The date's surcharge from {@link dateSurcharge}, or null.
+ * @param weekendUplift - Weekend labour uplift (0 = off), which after hours shares.
+ * @returns The surcharge the tick controls, or null when there's nothing to switch on.
+ */
+export function surchargeOption(
+  fromDate: DateSurcharge | null,
+  weekendUplift: number,
+): DateSurcharge | null {
+  if (fromDate) return fromDate;
+  return weekendUplift > 0
+    ? { reason: "After hours", label: "After-hours surcharge", uplift: weekendUplift }
+    : null;
+}
+
+/**
+ * The surcharge a job bills once the operator's tick is applied.
+ * @param fromDate - The date's surcharge from {@link dateSurcharge}, or null.
+ * @param on - The tick: true bills {@link surchargeOption}, false bills none, null follows the date.
+ * @param weekendUplift - Weekend labour uplift (0 = off).
+ * @returns The surcharge to bill, or null.
+ */
+export function chosenSurcharge(
+  fromDate: DateSurcharge | null,
+  on: boolean | null,
+  weekendUplift: number,
+): DateSurcharge | null {
+  if (on === null) return fromDate;
+  return on ? surchargeOption(fromDate, weekendUplift) : null;
+}
+
+/** A booking day's surcharge with its rise in $/hr at the full rates, for the day-picker note. */
+export interface PricedDateSurcharge extends DateSurcharge {
+  /** Labour rise in $/hr at the full on-site rate. */
+  perHour: number;
+  /** Labour rise in $/hr at the full remote rate. */
+  perHourRemote: number;
+}
+
+/**
+ * Customer-facing note shown when a surcharged booking day is picked. Holidays read "holiday
+ * rates apply", since Christmas Eve and New Year's Eve bill them without being public holidays.
+ * @param surcharge - The day's surcharge; priced ones (from withDateSurcharges) state dollars.
+ * @returns One plain sentence naming the reason, the rise and what it leaves alone.
+ */
+export function dateSurchargeNote(surcharge: DateSurcharge | PricedDateSurcharge): string {
+  let rise: string;
+  if ("perHour" in surcharge) {
+    const remote =
+      surcharge.perHourRemote !== surcharge.perHour
+        ? ` (${formatMoneyCompact(surcharge.perHourRemote)}/hr for remote support)`
+        : "";
+    rise = `labour costs ${formatMoneyCompact(surcharge.perHour)}/hr more${remote}`;
+  } else {
+    rise = `labour costs an extra ${upliftPercent(surcharge.uplift)}% of the full hourly rate`;
+  }
   const lead =
     surcharge.reason === "Weekend"
-      ? `Weekend rates apply: labour costs ${pct}% more on Saturdays and Sundays.`
-      : `${surcharge.reason} is a public holiday, so labour costs ${pct}% more.`;
+      ? `Weekend rates apply on Saturdays and Sundays: ${rise}.`
+      : `${surcharge.reason}: holiday rates apply, so ${rise}.`;
   return `${lead} Travel and parts cost the same.`;
 }
 
@@ -638,9 +779,8 @@ export function dateSurchargeNote(surcharge: DateSurcharge): string {
  * @returns One short sentence naming the surcharge and its percent.
  */
 export function quoteSurchargeNote(surcharge: DateSurcharge): string {
-  const pct = Math.round(surcharge.uplift * 100);
-  const kind = surcharge.reason === "Weekend" ? "weekend" : "public holiday";
-  return `Includes the ${pct}% ${kind} surcharge on labour.`;
+  const kind = surcharge.reason === "Weekend" ? "weekend" : "holiday";
+  return `Includes the ${upliftPercent(surcharge.uplift)}% ${kind} surcharge on labour.`;
 }
 
 /**

@@ -59,7 +59,7 @@ const RATE_NOTES: Record<string, string> = {
   remote: "Screen-share sessions. One of At home, Remote or Phone per task.",
   phone: "Help over the phone. One of At home, Remote or Phone per task.",
   "public holiday":
-    "Charged on its own on public holidays, at the uplift on the Pricing tab. This % is only for ticking by hand.",
+    "Lists the holiday surcharge on the pricing page. Holidays bill the public-holiday surcharge on the Pricing tab, so this % is never charged.",
 };
 
 /**

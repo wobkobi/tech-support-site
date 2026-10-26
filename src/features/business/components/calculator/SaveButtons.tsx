@@ -49,6 +49,8 @@ interface SaveButtonsProps {
   quoteMode: boolean;
   savingIncome: boolean;
   parsing: boolean;
+  /** The job date's surcharge and promo are still being looked up. */
+  checkingDate: boolean;
   subtotal: number;
   total: number;
   paidCash: boolean;
@@ -71,6 +73,7 @@ interface SaveButtonsProps {
  * instead after it, and Save & send and the income save are left out.
  * @param props.savingIncome - True while an income save is in flight.
  * @param props.parsing - True while an AI parse is in flight (blocks invoice saves).
+ * @param props.checkingDate - True until the job date's surcharge and promo land (blocks every save).
  * @param props.subtotal - Job subtotal; zero disables the income save.
  * @param props.total - Job total after discounts; an Already paid amount covering it saves as paid.
  * @param props.paidCash - Whether "Paid in cash" is ticked.
@@ -88,6 +91,7 @@ export function SaveButtons({
   quoteMode,
   savingIncome,
   parsing,
+  checkingDate,
   subtotal,
   total,
   paidCash,
@@ -98,6 +102,8 @@ export function SaveButtons({
   className,
 }: SaveButtonsProps): React.ReactElement {
   const { paidInFull, overpaid } = savePaymentState(total, paidCash, alreadyPaid);
+  // A save before the date lookup lands would price the job without its surcharge or promo.
+  const busy = parsing || checkingDate;
   const buttonCls = inline ? undefined : "w-full";
   const wrapperCls = cn(inline ? "flex flex-wrap items-center gap-2" : "space-y-2", className);
 
@@ -108,7 +114,7 @@ export function SaveButtons({
           variant="primary"
           className={buttonCls}
           onClick={() => onSaveInvoice(false, true)}
-          disabled={savingInvoice || parsing}
+          disabled={savingInvoice || busy}
           suppressHydrationWarning
           title="Save as a Q-numbered quote - convert it to an invoice once the client accepts."
         >
@@ -118,7 +124,7 @@ export function SaveButtons({
           variant="outline"
           className={buttonCls}
           onClick={() => onSaveInvoice(false)}
-          disabled={savingInvoice || parsing || overpaid}
+          disabled={savingInvoice || busy || overpaid}
           suppressHydrationWarning
         >
           {savingInvoice && !saveQuoteMode ? "Saving..." : "Save as invoice instead"}
@@ -132,7 +138,7 @@ export function SaveButtons({
         variant="primary"
         className={buttonCls}
         onClick={() => onSaveInvoice(false)}
-        disabled={savingInvoice || parsing || overpaid}
+        disabled={savingInvoice || busy || overpaid}
         suppressHydrationWarning
       >
         {savingInvoice && !saveSendMode && !saveQuoteMode
@@ -145,7 +151,7 @@ export function SaveButtons({
         variant="outline"
         className={buttonCls}
         onClick={() => onSaveInvoice(true)}
-        disabled={savingInvoice || parsing || overpaid}
+        disabled={savingInvoice || busy || overpaid}
         suppressHydrationWarning
         title="Save the invoice and jump straight to the send-to-client step."
       >
@@ -159,7 +165,7 @@ export function SaveButtons({
         variant="outline"
         className={buttonCls}
         onClick={() => onSaveInvoice(false, true)}
-        disabled={savingInvoice || parsing}
+        disabled={savingInvoice || busy}
         suppressHydrationWarning
         title="Save as a Q-numbered quote - convert it to an invoice once the client accepts."
       >
@@ -170,7 +176,7 @@ export function SaveButtons({
         className={buttonCls}
         onClick={onSaveIncome}
         suppressHydrationWarning
-        disabled={savingIncome || subtotal === 0 || savingInvoice || overpaid}
+        disabled={savingIncome || subtotal === 0 || savingInvoice || overpaid || checkingDate}
         title="For jobs handled outside the invoice flow."
       >
         {savingIncome

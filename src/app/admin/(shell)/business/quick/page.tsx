@@ -1,6 +1,6 @@
 // src/app/admin/(shell)/business/quick/page.tsx
-// Quick price page for settling up on site: address and times in, one total out, priced as
-// today. The job in progress (or `?eventId=`) prefills via buildEventPrefill.
+// Quick price page for settling up on site: address and times in, one total out, priced at
+// the job's start. The job in progress (or `?eventId=`) prefills via buildEventPrefill.
 
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import {
@@ -28,7 +28,9 @@ import {
   nzDateKey,
   nzMidnightUtc,
   nzNowTime,
+  nzWallClockUtc,
   nzWeekday,
+  timeParts,
 } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import type React from "react";
@@ -121,7 +123,8 @@ async function travelForPrefill(
   let there = prefill.travelMinsThere ?? 0;
   let back = prefill.travelMinsBack ?? there;
   let distanceKm: number | undefined;
-  if (there <= 0 && prefill.jobAddress) {
+  // A walked job with no drive on record bills no trip rather than a fresh drive lookup.
+  if (there <= 0 && prefill.jobAddress && !prefill.walked) {
     const result = await lookupDriveRoundTrip(prefill.jobAddress, start, end);
     if (result.status !== "ok") return null;
     there = result.data.there.durationMins;
@@ -142,7 +145,30 @@ async function travelForPrefill(
 }
 
 /**
- * Quick price page: resolves today's pricing and calendar match for the client view.
+ * When the job's holiday, weekday and promo are judged: the matched event's live start, else
+ * the prefill's own date and start, else now for a blank form.
+ * @param matchedStart - ISO start of the event matched in today's list, if any.
+ * @param slot - The prefill's first slot, if any.
+ * @param slot.date - NZ-local YYYY-MM-DD.
+ * @param slot.startTime - NZ-local HH:MM start.
+ * @param now - Reference instant.
+ * @returns The instant to price at.
+ */
+function jobStartAt(
+  matchedStart: string | undefined,
+  slot: { date: string; startTime: string } | undefined,
+  now: Date,
+): Date {
+  if (matchedStart) return new Date(matchedStart);
+  if (!slot) return now;
+  const [year, month, day] = dateKeyParts(slot.date);
+  const [hour, minute] = timeParts(slot.startTime);
+  const at = nzWallClockUtc(year, month, day, hour, minute);
+  return Number.isNaN(at.getTime()) ? now : at;
+}
+
+/**
+ * Quick price page: resolves the job's pricing and today's calendar match for the client view.
  * @param props - Page props.
  * @param props.searchParams - Optional `eventId` to price a specific event, or "none" for a blank form.
  * @returns Quick price page element.
@@ -155,27 +181,32 @@ export default async function QuickPricePage({
   await requireAdminAuth();
   const { eventId: requested } = await searchParams;
   const now = new Date();
-  const [identity, policy, rateRows, holiday, todayEvents] = await Promise.all([
+  const [identity, policy, rateRows, todayEvents] = await Promise.all([
     getIdentity(),
     getPolicy(),
     prisma.rateConfig.findMany({ orderBy: { label: "asc" } }),
-    lookupPublicHoliday(now).catch(() => null),
     loadTodayEvents(now),
   ]);
 
   // An explicit pick wins; "none" is the operator clearing the match.
   const matchedId = requested === "none" ? null : (requested ?? autoMatch(todayEvents, now));
   const eventPrefill = matchedId ? await buildEventPrefill([matchedId]).catch(() => null) : null;
-  // Same rule as the calculator: a booking keeps its locked-in promo, a phone-made job takes
-  // the promo running when its event was made, and a blank form takes today's.
-  const promo = await promoForJob({
-    at: now,
-    bookingId: eventPrefill?.bookingId,
-    bookedAt: eventPrefill?.bookedAt,
-    email: eventPrefill?.clientEmail || null,
-  }).catch(() => null);
   const slot = eventPrefill?.slots[0];
   const matched = todayEvents.find((e) => e.id === matchedId);
+  // Priced at the job's start, so a job settled after midnight or picked from another day
+  // keeps its own date's surcharge and promo.
+  const jobStart = jobStartAt(matched?.start, slot, now);
+  // Same rule as the calculator: a booking keeps its locked-in promo, a phone-made job takes
+  // the promo running when its event was made, and a blank form takes today's.
+  const [holiday, promo] = await Promise.all([
+    lookupPublicHoliday(jobStart).catch(() => null),
+    promoForJob({
+      at: jobStart,
+      bookingId: eventPrefill?.bookingId,
+      bookedAt: eventPrefill?.bookedAt,
+      email: eventPrefill?.clientEmail || null,
+    }).catch(() => null),
+  ]);
 
   let prefill: QuickPrefill | null = null;
   if (eventPrefill && slot) {
@@ -235,7 +266,7 @@ export default async function QuickPricePage({
         key={prefill?.eventId ?? "blank"}
         rates={rates}
         promo={promo}
-        surcharge={dateSurcharge(holiday?.name ?? null, nzWeekday(now), {
+        surcharge={dateSurcharge(holiday?.name ?? null, nzWeekday(jobStart), {
           publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
           weekendUplift: policy.WEEKEND_UPLIFT,
         })}
@@ -250,6 +281,7 @@ export default async function QuickPricePage({
           minBillableMins: policy.MIN_BILLABLE_MINS,
           billingIncrementMins: policy.BILLING_INCREMENT_MINS,
           unsuccessfulFactor: policy.UNSUCCESSFUL_WORK_FACTOR,
+          weekendUplift: policy.WEEKEND_UPLIFT,
         }}
       />
     </>

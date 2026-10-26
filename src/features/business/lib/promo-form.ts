@@ -4,6 +4,12 @@
 
 import type { PromoRow } from "@/app/admin/(shell)/promos/page";
 import type { ActivePromo } from "@/features/business/lib/promos";
+import {
+  addDaysToDateKey,
+  dateKeyParts,
+  nzDateKey,
+  nzMidnightUtc,
+} from "@/shared/lib/timezone-utils";
 
 /** Shared classes for the promo form inputs. */
 export const PROMO_INPUT_CLASS =
@@ -104,9 +110,9 @@ function amountFor(p: PromoRow): number | string {
 export interface FormState {
   title: string;
   description: string;
-  /** Start date in YYYY-MM-DD form. Internally widened to local-midnight when sent. */
+  /** Start date in YYYY-MM-DD form. Widened to NZ midnight when sent. */
   startDate: string;
-  /** End date (inclusive) in YYYY-MM-DD form. Internally widened to start-of-next-day. */
+  /** End date (inclusive) in YYYY-MM-DD form. Widened to NZ midnight of the next day. */
   endDate: string;
   type: PromoType;
   amount: string;
@@ -162,7 +168,8 @@ function fromMinuteOfDay(minute: number | null): string {
 export const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /**
- * ISO timestamp > "YYYY-MM-DD" (local date parts) for <input type="date">.
+ * ISO timestamp > its NZ calendar date as "YYYY-MM-DD" for <input type="date">. NZ, not the
+ * browser's zone: promo days are NZ days wherever the form is edited.
  * @param iso - ISO 8601 timestamp.
  * @returns Date-input string, or empty for invalid input.
  */
@@ -170,46 +177,38 @@ export function toDateInput(iso: string): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
-  /**
-   * Left-pads a single digit with a leading zero.
-   * @param n - Number to pad.
-   * @returns Two-character string.
-   */
-  const pad = (n: number): string => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return nzDateKey(d);
 }
 
 /**
- * YYYY-MM-DD > ISO timestamp at local-midnight (start of day).
+ * YYYY-MM-DD > ISO timestamp at NZ midnight (start of that NZ day).
  * @param date - YYYY-MM-DD string.
  * @returns ISO timestamp.
  */
 export function startOfDayISO(date: string): string {
-  return new Date(`${date}T00:00:00`).toISOString();
+  const [y, m, d] = dateKeyParts(date);
+  return nzMidnightUtc(y, m, d).toISOString();
 }
 
 /**
- * YYYY-MM-DD > ISO timestamp at start of next day (so end is inclusive).
+ * YYYY-MM-DD > ISO timestamp at NZ midnight of the next day, so the end date is inclusive.
  * @param date - YYYY-MM-DD string.
  * @returns ISO timestamp.
  */
 export function endOfDayISO(date: string): string {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() + 1);
-  return d.toISOString();
+  return startOfDayISO(addDaysToDateKey(date, 1));
 }
 
 /**
- * `endAt` ISO > inclusive YYYY-MM-DD (subtracts the day added on save).
+ * `endAt` ISO > the inclusive NZ date it ends on: the NZ day of the instant before `endAt`.
  * @param iso - ISO 8601 timestamp.
  * @returns Date-input string.
  */
 export function endIsoToInclusiveDate(iso: string): string {
   if (!iso) return "";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  d.setDate(d.getDate() - 1);
-  return toDateInput(d.toISOString());
+  const end = Date.parse(iso);
+  if (isNaN(end)) return "";
+  return nzDateKey(new Date(end - 1));
 }
 
 /**
@@ -222,6 +221,8 @@ export function previewPromo(form: FormState): ActivePromo | null {
   const amount = parseFloat(form.amount);
   if (isNaN(amount) || amount <= 0) return null;
   if (!form.endDate) return null;
+  const parsedLimit = parseInt(form.perCustomerLimit, 10);
+  const perCustomerLimit = Number.isNaN(parsedLimit) ? null : parsedLimit;
   return {
     id: "preview",
     title: form.title,
@@ -242,6 +243,9 @@ export function previewPromo(form: FormState): ActivePromo | null {
     activeWeekdays: form.activeWeekdays,
     activeFromMinute: toMinuteOfDay(form.activeFrom),
     activeToMinute: toMinuteOfDay(form.activeTo),
+    customerLimited: form.newCustomersOnly || perCustomerLimit != null,
+    newCustomersOnly: form.newCustomersOnly,
+    perCustomerLimit,
   };
 }
 

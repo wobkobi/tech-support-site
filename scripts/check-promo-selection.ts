@@ -227,9 +227,15 @@ function main(): void {
     false,
   );
   expectEqual(
-    "the closing minute is included",
-    matchesRecurringWindow(OFFICE, new Date("2026-06-02T05:00:00Z")),
+    "16:59 NZ is the last minute inside it",
+    matchesRecurringWindow(OFFICE, new Date("2026-06-02T04:59:00Z")),
     true,
+  );
+  // The end is when the offer stops: "9am to 5pm" doesn't cover a 5pm start.
+  expectEqual(
+    "the closing minute is excluded",
+    matchesRecurringWindow(OFFICE, new Date("2026-06-02T05:00:00Z")),
+    false,
   );
 
   // A range that ends before it starts wraps midnight.
@@ -248,6 +254,39 @@ function main(): void {
     "but not the afternoon between them",
     matchesRecurringWindow(OVERNIGHT, new Date("2026-06-01T03:00:00Z")),
     false,
+  );
+  expectEqual(
+    "an overnight range stops at its end minute",
+    matchesRecurringWindow(OVERNIGHT, new Date("2026-06-01T14:00:00Z")),
+    false,
+  );
+
+  // Past midnight belongs to the night it started, so its day is judged as the day before.
+  const FRIDAY_NIGHT = window([5], 20 * 60, 2 * 60);
+  expectEqual(
+    "Friday night: 21:00 Friday is in",
+    matchesRecurringWindow(FRIDAY_NIGHT, new Date("2026-06-05T09:00:00Z")),
+    true,
+  );
+  expectEqual(
+    "Friday night: 01:00 Saturday is in",
+    matchesRecurringWindow(FRIDAY_NIGHT, new Date("2026-06-05T13:00:00Z")),
+    true,
+  );
+  expectEqual(
+    "Friday night: 01:00 Friday is Thursday's night, so out",
+    matchesRecurringWindow(FRIDAY_NIGHT, new Date("2026-06-04T13:00:00Z")),
+    false,
+  );
+  expectEqual(
+    "Friday night: 21:00 Saturday is out",
+    matchesRecurringWindow(FRIDAY_NIGHT, new Date("2026-06-06T09:00:00Z")),
+    false,
+  );
+  expectEqual(
+    "Sunday night reaches 01:00 Monday across the week boundary",
+    matchesRecurringWindow(window([0], 20 * 60, 2 * 60), new Date("2026-06-07T13:00:00Z")),
+    true,
   );
 
   // Half a range is no restriction, never an open-ended one.

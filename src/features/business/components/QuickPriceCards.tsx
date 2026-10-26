@@ -6,13 +6,13 @@
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import type { QuickEvent } from "@/features/business/components/QuickPriceView";
 import {
-  type calcJobTotal,
   formatMins,
   formatNZD,
   goldCardLineLabel,
+  type calcJobTotal,
 } from "@/features/business/lib/business";
 import { bankParticulars } from "@/features/business/lib/payment-fields";
-import type { DateSurcharge } from "@/features/business/lib/pricing-policy";
+import { upliftPercent, type DateSurcharge } from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
 import type { TravelEntry } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
@@ -192,7 +192,7 @@ export function QuickTotalCard({
               {surcharge && (
                 <span className="text-admin-text-secondary">
                   {" "}
-                  - labour +{Math.round(surcharge.uplift * 100)}%
+                  - labour +{upliftPercent(surcharge.uplift)}%
                 </span>
               )}
             </dt>

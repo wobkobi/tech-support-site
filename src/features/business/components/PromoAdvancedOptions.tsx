@@ -203,12 +203,15 @@ export function PromoAdvancedOptions({
           <AdminCheckbox
             checked={form.newCustomersOnly}
             onChange={(checked) => setForm((p) => ({ ...p, newCustomersOnly: checked }))}
-            label="New customers only (nobody with a completed job on file)"
+            label="New customers only (no earlier booking or invoice on file)"
           />
           <p className="text-sm text-admin-muted">
             The total cap is approximate: two people can pass it at the same moment and both redeem.
-            Per-customer and new-customer rules need someone the site can identify, so an
-            unrecognised email is allowed through rather than refused.
+            A booking holds a use from the moment it is made, except on a promo with a minimum spend
+            or tiers, which counts only once an invoice gives the discount. Per-customer and
+            new-customer rules need someone the site can identify, so an unrecognised email is
+            allowed through rather than refused. A booking that is confirmed or done, or an invoice
+            that isn't voided or a quote, makes someone a returning customer.
           </p>
         </fieldset>
 
@@ -269,8 +272,10 @@ export function PromoAdvancedOptions({
           <p className="text-sm text-admin-muted">
             Leave blank to run the whole window. These are matched against the appointment in NZ
             time, not against when the customer is browsing, so a Tuesday offer is earned by booking
-            a Tuesday job on any day. The banner still advertises the promo throughout and names the
-            restriction.
+            a Tuesday job on any day. The end time is when it stops: 9am to 5pm covers a 4:30pm
+            start but not a 5pm one. A range past midnight belongs to the night it starts, so Friday
+            8pm to 2am covers 1am Saturday. The banner still advertises the promo throughout and
+            names the restriction.
           </p>
         </fieldset>
       </div>

@@ -15,6 +15,8 @@ import {
 } from "@/features/business/components/invoice/InvoiceForm";
 import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
 import { alreadyPaidAmount } from "@/features/business/lib/already-paid-input";
+import { pricedLinesKey } from "@/features/business/lib/invoice-maths";
+import { isSurchargeLine } from "@/features/business/lib/surcharge-line";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -73,15 +75,24 @@ export function EditInvoiceView({
   // Only sent when the AI box re-priced them, so a hand edit never rewrites the stored ones.
   const unsuccessfulChanged =
     (discounts.unsuccessfulDiscount ?? 0) !== (preservedDiscounts.unsuccessfulDiscount ?? 0);
-  const promoChanged = (discounts.promoDiscount ?? 0) !== (preservedDiscounts.promoDiscount ?? 0);
+  // Price edits by hand since the discounts were last worked out; wording-only edits don't count.
+  const handEdited = pricedLinesKey(preview.lineItems) !== pricedLinesKey(pricedLines);
+  // The note states hours and rates, so a hand edit of the prices drops it.
+  const promoNote = handEdited ? null : (discounts.promoNote ?? null);
+  // The note rides with the discount: a re-split of the same hours can move one without the other.
+  const promoChanged =
+    (discounts.promoDiscount ?? 0) !== (preservedDiscounts.promoDiscount ?? 0) ||
+    promoNote !== (preservedDiscounts.promoNote ?? null);
   const goldChanged =
     (discounts.goldCardDiscount ?? 0) !== (preservedDiscounts.goldCardDiscount ?? 0);
-  // Saved lines carry no rate tags, so a hand edit can't re-price the discounts; warn.
+  // Saved lines carry no rate tags, so a hand edit of the prices can't re-price the discounts
+  // or the surcharge line; warn.
   const discountsStale =
+    handEdited &&
     ((discounts.promoDiscount ?? 0) > 0 ||
       (discounts.goldCardDiscount ?? 0) > 0 ||
-      (discounts.unsuccessfulDiscount ?? 0) > 0) &&
-    JSON.stringify(preview.lineItems) !== JSON.stringify(pricedLines);
+      (discounts.unsuccessfulDiscount ?? 0) > 0 ||
+      preview.lineItems.some((l) => isSurchargeLine(l.description)));
 
   /**
    * PATCHes the full-update branch, then routes back to the detail page.
@@ -104,7 +115,10 @@ export function EditInvoiceView({
           alreadyPaid: alreadyPaidAmount(data.alreadyPaid) || null,
           alreadyPaidMethod: data.alreadyPaid.method,
           ...(unsuccessfulChanged && { unsuccessfulDiscount: discounts.unsuccessfulDiscount ?? 0 }),
-          ...(promoChanged && { promoDiscount: discounts.promoDiscount ?? 0 }),
+          ...(promoChanged && {
+            promoDiscount: discounts.promoDiscount ?? 0,
+            promoNote,
+          }),
           ...(goldChanged && { goldCardDiscount: discounts.goldCardDiscount ?? 0 }),
         }),
       });
@@ -137,7 +151,7 @@ export function EditInvoiceView({
           preservedDiscounts={discounts}
           discountNote={
             discountsStale
-              ? "The discounts were worked out on the lines before your edits. Describe the job above to re-price them."
+              ? "The discounts and any weekend or holiday surcharge were worked out on the prices before your edits. Describe the job above to re-price them."
               : null
           }
           gstRegistered={gstRegistered}
@@ -177,6 +191,7 @@ export function EditInvoiceView({
           notes={preview.notes}
           promoTitle={preservedDiscounts.promoTitle ?? null}
           promoDiscount={discounts.promoDiscount ?? 0}
+          promoNote={promoNote}
           goldCardDiscount={discounts.goldCardDiscount ?? 0}
           goldCardPercent={preservedDiscounts.goldCardPercent ?? null}
           unsuccessfulDiscount={discounts.unsuccessfulDiscount ?? 0}

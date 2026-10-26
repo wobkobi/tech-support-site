@@ -2,6 +2,7 @@
 // Admin promo collection endpoint: GET lists promos, POST validates and creates one and
 // revalidates the active-promo cache tag.
 
+import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { snapshotDeltas } from "@/features/business/lib/promo-locked-rates";
 import {
   resolveDiscountType,
@@ -10,6 +11,7 @@ import {
   validateLimits,
   validateRecurringWindow,
   validateTiers,
+  type DiscountCheckOptions,
   type PromoKind,
   type PromoTierInput,
 } from "@/features/business/lib/promo-validation";
@@ -53,9 +55,10 @@ interface PromoBody {
  * Validates a {@link PromoBody}. Enforces the per-type discount fields, the
  * kind/code pairing, and start < end.
  * @param body - Parsed request body.
+ * @param rates - The live Standard rate a flat promo must come in under.
  * @returns Error message or null when valid.
  */
-function validatePromo(body: PromoBody): string | null {
+function validatePromo(body: PromoBody, rates: DiscountCheckOptions): string | null {
   if (!body.title || typeof body.title !== "string") return "title is required";
   if (!body.startAt || !body.endAt) return "startAt and endAt are required";
   // Parse first: an Invalid Date passes `start >= end` and 500s the Prisma create.
@@ -66,7 +69,7 @@ function validatePromo(body: PromoBody): string | null {
     return "startAt must be before endAt";
   }
   // Shared with the edit route so the two can't drift.
-  const discountError = validateDiscount(body);
+  const discountError = validateDiscount(body, rates);
   if (discountError) return discountError;
   const kindError = validateKind({ kind: body.kind, code: normalisePromoCode(body.code) });
   if (kindError) return kindError;
@@ -74,7 +77,7 @@ function validatePromo(body: PromoBody): string | null {
   if (limitError) return limitError;
   const windowError = validateRecurringWindow(body);
   if (windowError) return windowError;
-  const tierError = validateTiers(resolveDiscountType(body), body.minSpend, body.tiers);
+  const tierError = validateTiers(resolveDiscountType(body), body.minSpend, body.tiers, rates);
   if (tierError) return tierError;
   // A fractional priority would order unpredictably against the integer column.
   if (body.priority !== undefined && !Number.isInteger(body.priority)) {
@@ -106,7 +109,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
   const body = (await request.json()) as PromoBody;
-  const err = validatePromo(body);
+  const { baseRate } = await getPublicPricing();
+  const err = validatePromo(body, { standardRate: baseRate });
   if (err) return errorResponse(err, 400);
 
   // Stored uppercase so a customer's lowercase typing still matches.

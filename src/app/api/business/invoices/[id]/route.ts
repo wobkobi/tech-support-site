@@ -13,8 +13,17 @@ import {
 } from "@/features/business/lib/invoice-already-paid";
 import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
-import { releaseInvoiceRedemptions } from "@/features/business/lib/promo-redemption";
-import { parseAmount, parseDate, parseObjectId } from "@/features/business/lib/validation";
+import {
+  releaseBookingRedemptions,
+  releaseInvoiceRedemptions,
+  settlePromoRedemption,
+} from "@/features/business/lib/promo-redemption";
+import {
+  parseAmount,
+  parseDate,
+  parseObjectId,
+  parseString,
+} from "@/features/business/lib/validation";
 import type { LineItem } from "@/features/business/types/business";
 import { attachEmailIfMissing } from "@/features/contacts/lib/find-or-create";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -22,6 +31,42 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+
+/**
+ * Brings a draft's promo use in line with its re-priced discount: a discount down to $0 frees
+ * the use, and one back above $0 counts it again.
+ * @param invoiceId - The draft invoice.
+ * @param promoId - The promo it was raised with.
+ * @param discount - The re-priced promo discount.
+ */
+async function syncPromoRedemption(
+  invoiceId: string,
+  promoId: string | null,
+  discount: number,
+): Promise<void> {
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: invoiceId },
+    select: { bookingId: true, contactId: true },
+  });
+  if (discount <= 0) {
+    // Billed without the promo now, so the booking-time use goes too, as on a POST.
+    await releaseInvoiceRedemptions(invoiceId);
+    if (invoice?.bookingId) await releaseBookingRedemptions(invoice.bookingId);
+    return;
+  }
+  const updated = await prisma.promoRedemption.updateMany({
+    where: { invoiceId },
+    data: { discountValue: discount },
+  });
+  if (updated.count > 0 || !promoId) return;
+  await settlePromoRedemption({
+    promoId,
+    invoiceId,
+    bookingId: invoice?.bookingId ?? null,
+    contactId: invoice?.contactId ?? null,
+    discountValue: discount,
+  });
+}
 
 /**
  * GET /api/business/invoices/[id] - Returns a single invoice by ID.
@@ -73,6 +118,8 @@ export async function PATCH(
       goldCardPercent: true,
       goldCardDiscount: true,
       isQuote: true,
+      total: true,
+      alreadyPaid: true,
     },
   });
   if (!current) {
@@ -170,6 +217,12 @@ export async function PATCH(
       promoDiscount + goldCardDiscount + unsuccessfulDiscount,
       GST_REGISTERED,
     );
+    // More than the total would book money against nothing.
+    const paidAfter = prepaid ? (prepaid.amount ?? 0) : (current.alreadyPaid ?? 0);
+    if (paidAfter > (lines !== undefined ? total : current.total)) {
+      return errorResponse("Already paid is more than the invoice total", 400);
+    }
+
     const invoice = await prisma.invoice.update({
       where: { id },
       data: {
@@ -189,7 +242,10 @@ export async function PATCH(
           unsuccessfulDiscount: unsuccessfulDiscount > 0 ? unsuccessfulDiscount : null,
         }),
         // promoTitle and promoId stay, so the redemption still settles against the promo.
-        ...(repricesPromo && { promoDiscount: promoDiscount > 0 ? promoDiscount : null }),
+        ...(repricesPromo && {
+          promoDiscount: promoDiscount > 0 ? promoDiscount : null,
+          promoNote: promoDiscount > 0 ? parseString(body.promoNote) : null,
+        }),
         // goldCardPercent stays, so a later re-price still knows the client holds one.
         ...(repricesGoldCard && {
           goldCardDiscount: goldCardDiscount > 0 ? goldCardDiscount : null,
@@ -200,11 +256,9 @@ export async function PATCH(
     });
     // The settled redemption follows a re-priced discount; failure is only logged.
     if (repricesPromo && !current.isQuote && promoDiscount !== (current.promoDiscount ?? 0)) {
-      await prisma.promoRedemption
-        .updateMany({ where: { invoiceId: id }, data: { discountValue: promoDiscount } })
-        .catch((err: unknown) => {
-          console.error("[invoice-patch] Failed to update promo redemption value:", err);
-        });
+      await syncPromoRedemption(id, current.promoId, promoDiscount).catch((err: unknown) => {
+        console.error("[invoice-patch] Failed to update promo redemption:", err);
+      });
     }
     const incomeSheetWarning = prepaid ? (await syncAlreadyPaidIncome(id)).sheetSyncWarning : false;
     await syncInvoicePdfToDriveById(id, "[invoice-patch]");

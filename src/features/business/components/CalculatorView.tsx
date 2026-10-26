@@ -34,6 +34,7 @@ import { useJobParse } from "@/features/business/hooks/use-job-parse";
 import {
   alreadyPaidAmount,
   EMPTY_ALREADY_PAID,
+  toAlreadyPaidMethod,
   type AlreadyPaidState,
 } from "@/features/business/lib/already-paid-input";
 import {
@@ -41,6 +42,7 @@ import {
   formatNZD,
   isTripDrive,
   jobToLineItems,
+  promoRateNote,
   timeDiffMins,
   todayISO,
   type JobPricing,
@@ -53,6 +55,7 @@ import {
   isPlaceholderHour,
   loadDraft,
   saveDraft,
+  type SurchargeTick,
 } from "@/features/business/lib/calculator-draft";
 import {
   addDaysISO,
@@ -66,8 +69,14 @@ import {
 } from "@/features/business/lib/calculator-helpers";
 import { goldCardPercent } from "@/features/business/lib/gold-card";
 import type { ReissuePrefill } from "@/features/business/lib/invoice-reissue";
+import { isBusinessModifier } from "@/features/business/lib/job-modifiers";
 import { fitTasksToWindow } from "@/features/business/lib/parse-hydrate";
-import { calcTravelCharge, type CancellationPolicy } from "@/features/business/lib/pricing-policy";
+import {
+  calcTravelCharge,
+  chosenSurcharge,
+  surchargeOption,
+  type CancellationPolicy,
+} from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
 import type {
   EventPrefill,
@@ -81,6 +90,7 @@ import type {
   TravelEntry,
 } from "@/features/business/types/business";
 import { matchedByCompanyOnly } from "@/features/contacts/lib/contact-search";
+import { Notice } from "@/shared/components/Notice";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import { nzNowTime } from "@/shared/lib/timezone-utils";
@@ -92,7 +102,12 @@ interface CalculatorViewProps {
   /** Live business identity, threaded into the invoice preview. */
   identity: IdentitySettings;
   /** Live pricing for the job calculations, plus the event picker's merge-suggestion window. */
-  pricing: JobPricing & { travelRatePerHour: number; mergeSuggestGapMins: number };
+  pricing: JobPricing & {
+    travelRatePerHour: number;
+    mergeSuggestGapMins: number;
+    /** Weekend labour uplift, which the surcharge tick can bill on any day (0 = off). */
+    weekendUplift: number;
+  };
   /** Live cancellation policy for cancel mode; not part of {@link JobPricing}. */
   cancellation: CancellationPolicy;
   /** Rate configs resolved server-side so the calculator renders without a fetch waterfall. */
@@ -215,8 +230,16 @@ export function CalculatorView({
   const [paidCash, setPaidCash] = useState(false);
   // Gold Card holder: labour comes down by the Gold Card rate. A re-issue keeps the tick.
   const [goldCard, setGoldCard] = useState(() => reissue?.goldCard ?? false);
-  // Part of the bill handed over on the day: shown on the invoice, recorded in income.
-  const [alreadyPaid, setAlreadyPaid] = useState<AlreadyPaidState>(EMPTY_ALREADY_PAID);
+  // Part of the bill handed over on the day: shown on the invoice, recorded in income. A
+  // re-issue starts with what was paid against the voided invoice.
+  const [alreadyPaid, setAlreadyPaid] = useState<AlreadyPaidState>(() =>
+    reissue?.alreadyPaid
+      ? {
+          amount: reissue.alreadyPaid.toFixed(2),
+          method: toAlreadyPaidMethod(reissue.alreadyPaidMethod),
+        }
+      : EMPTY_ALREADY_PAID,
+  );
   // Client, save buttons and preview; the phone total bar hides while any is on screen.
   const finishRef = useRef<HTMLDivElement>(null);
   const [finishInView, setFinishInView] = useState(false);
@@ -298,9 +321,13 @@ export function CalculatorView({
 
   // Travel lookup
   const [jobAddress, setJobAddress] = useState(() => eventPrefill?.jobAddress ?? "");
-  // Drove or walked, for the logged trip. null follows the job: charged travel means drove,
-  // otherwise the base suburb counts as walked.
-  const [walkedChoice, setWalkedChoice] = useState<boolean | null>(null);
+  // Drove or walked, for the logged trip and the bill. null follows the job: charged travel
+  // means drove, otherwise the base suburb counts as walked.
+  const [walkedChoice, setWalkedChoice] = useState<boolean | null>(() =>
+    eventPrefill?.walked ? true : null,
+  );
+  // The trip a Walked click took off the bill, put back if Drove is picked again.
+  const [walkedOffTrip, setWalkedOffTrip] = useState<TravelEntry[]>([]);
   const homeLocality = identity.baseAddress.locality.trim().toLowerCase();
   const travelCharged = travelEntries.some((e) => e.kind !== "storeRun" && e.cost > 0);
   const walked =
@@ -311,16 +338,21 @@ export function CalculatorView({
   // Contacts
   const [contacts, setContacts] = useState<GoogleContact[]>([]);
 
-  // Per-job promo skip flag (not persisted).
+  // Per-job promo skip flag.
   const [skipPromo, setSkipPromo] = useState(false);
+  // Surcharge tick; null follows the job date. A re-issue starts as the voided invoice billed:
+  // a dropped surcharge stays off, and an after-hours one on a weekday stays on.
+  const [surchargeTick, setSurchargeTick] = useState<SurchargeTick | null>(() =>
+    reissue ? { date: eventPrefill?.jobDate ?? reissue.jobDate, on: reissue.surcharge } : null,
+  );
   // Typed box and applied code are separate so the job isn't repriced on every keystroke.
-  const [promoCodeInput, setPromoCodeInput] = useState("");
-  const [promoCode, setPromoCode] = useState("");
+  const [promoCodeInput, setPromoCodeInput] = useState(() => reissue?.promoCode ?? "");
+  const [promoCode, setPromoCode] = useState(() => reissue?.promoCode ?? "");
 
   // Job date drives the surcharge + promo lookup, so a past job is priced by what applied
-  // then. Defaults to today (NZ), or a re-issue's voided invoice date.
+  // then. Defaults to today (NZ), or the voided invoice's job date on a re-issue.
   const [jobDate, setJobDate] = useState<string>(
-    () => eventPrefill?.jobDate ?? reissue?.issueDate ?? todayISO(),
+    () => eventPrefill?.jobDate ?? reissue?.jobDate ?? todayISO(),
   );
 
   // Earliest start, for time-of-day promos; HH:MM strings sort as times.
@@ -332,7 +364,12 @@ export function CalculatorView({
   const prefillBookingId = eventPrefill?.bookingId ?? null;
 
   // Date surcharge (public holiday or weekend) + date-resolved promo for the job date.
-  const { surcharge: dateSurcharge, activePromo } = useJobContext({
+  const {
+    surcharge: dateSurcharge,
+    activePromo,
+    pending: checkingDate,
+    failed: dateCheckFailed,
+  } = useJobContext({
     jobDate,
     jobStartTime,
     promoCode,
@@ -365,6 +402,8 @@ export function CalculatorView({
     timeRanges,
     timesSet,
     billedToCompany: addressMode === "company",
+    // Only a picked Walked; the home-suburb guess gives way to a parsed drive.
+    walked: walkedChoice === true,
     setFollowUpMins,
     setTimeRanges,
     setTimesSet,
@@ -429,11 +468,37 @@ export function CalculatorView({
   function changeJobAddress(value: string): void {
     setJobAddress(value);
     setWalkedChoice(null);
+    setWalkedOffTrip([]);
+  }
+
+  /**
+   * Sets drove or walked. A walk bills no travel, so Walked takes the trip and its parking off
+   * (store runs stay), and Drove puts them back, or looks the drive up when there's none.
+   * @param next - True for walked.
+   */
+  function changeWalked(next: boolean): void {
+    setWalkedChoice(next);
+    const trip = travelEntries.filter((e) => e.kind !== "storeRun");
+    if (next) {
+      if (trip.length > 0) setWalkedOffTrip(trip);
+      setTravelEntries(travelEntries.filter((e) => e.kind === "storeRun"));
+      return;
+    }
+    if (trip.length > 0) return;
+    if (walkedOffTrip.length > 0) {
+      setTravelEntries([...walkedOffTrip, ...travelEntries]);
+      setWalkedOffTrip([]);
+    } else if (jobAddress.trim()) {
+      void handleTravelLookup();
+    }
   }
 
   // A cancellation fee is flat: no date surcharge and no promo redemption.
   const pricedPromo = cancelMode ? null : activePromo;
-  const surcharge = cancelMode ? null : dateSurcharge;
+  const surchargeOn = surchargeTick?.date === jobDate ? surchargeTick.on : null;
+  const surcharge = cancelMode
+    ? null
+    : chosenSurcharge(dateSurcharge, surchargeOn, pricing.weekendUplift);
 
   /**
    * Applies a picked Places suggestion and drops the stale trip (manual entries survive).
@@ -460,6 +525,8 @@ export function CalculatorView({
       setAiInput(draft.aiInput ?? "");
       setPromoCode(draft.promoCode ?? "");
       setPromoCodeInput(draft.promoCode ?? "");
+      setSkipPromo(draft.skipPromo ?? false);
+      setSurchargeTick(draft.surchargeTick ?? null);
       if (!eventPrefill || draft.eventTimes === eventTimes) {
         setJobDate(draft.jobDate ?? todayISO());
         setTimeRanges(draft.timeRanges ?? [{ startTime: "", endTime: "" }]);
@@ -536,6 +603,8 @@ export function CalculatorView({
           aiInput,
           jobDate,
           promoCode,
+          skipPromo,
+          surchargeTick,
           timeRanges,
           timesSet,
           followUpMins,
@@ -563,6 +632,8 @@ export function CalculatorView({
     aiInput,
     jobDate,
     promoCode,
+    skipPromo,
+    surchargeTick,
     timeRanges,
     timesSet,
     followUpMins,
@@ -623,7 +694,7 @@ export function CalculatorView({
   // Date surcharge on labour, and the business modifier a (home-rate) promo skips - the
   // same predicate getPublicPricing uses.
   const businessModifierId =
-    rates.find((r) => r.label === "Business" && r.unit === "modifier")?.id ?? null;
+    rates.find((r) => isBusinessModifier(r) && r.unit === "modifier")?.id ?? null;
   // The Standard rate a flat promo cuts from, picked as getPublicPricing does.
   const standardRate =
     rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
@@ -694,6 +765,7 @@ export function CalculatorView({
     tripAddress,
     paidCash,
     alreadyPaid,
+    reissueOf: reissue?.invoiceId ?? null,
     setTaskTemplates,
     onIncomeSaved: resetFormState,
   });
@@ -724,6 +796,7 @@ export function CalculatorView({
     const now = nzNowTime();
     setJobDate(todayISO());
     setSkipPromo(false);
+    setSurchargeTick(null);
     setPromoCode("");
     setPromoCodeInput("");
     setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
@@ -784,6 +857,9 @@ export function CalculatorView({
       });
       if (entry) {
         setTravelEntries((prev) => [entry, ...prev.filter((e) => !isTripDrive(e))]);
+        // A looked-up drive means you drove, even after Walked was picked.
+        setWalkedChoice(null);
+        setWalkedOffTrip([]);
       }
     } catch {
       // silently ignore - travel is optional
@@ -799,6 +875,7 @@ export function CalculatorView({
     quoteMode,
     savingIncome,
     parsing,
+    checkingDate,
     subtotal: totals.subtotal,
     total: totals.total,
     paidCash,
@@ -855,12 +932,21 @@ export function CalculatorView({
         promoCode={promoCode}
         onApplyPromoCode={() => setPromoCode(promoCodeInput.trim())}
         onClearForm={() => setConfirmClearOpen(true)}
-
-        surcharge={surcharge}
+        surchargeOption={cancelMode ? null : surchargeOption(dateSurcharge, pricing.weekendUplift)}
+        surchargeOn={surcharge !== null}
+        surchargeFromDate={dateSurcharge !== null}
+        onSurchargeChange={(on) => setSurchargeTick({ date: jobDate, on })}
         activePromo={pricedPromo}
         skipPromo={skipPromo}
         onSkipPromoChange={setSkipPromo}
       />
+
+      {dateCheckFailed && (
+        <Notice tone="warn" onGrey className="mb-4" role="alert">
+          Couldn&apos;t check this date&apos;s weekend or holiday rates and promo. Check the rates
+          tick and the promo before saving.
+        </Notice>
+      )}
 
       {reissue && <ReissueBanner reissue={reissue} fromEvent={eventPrefill !== null} />}
 
@@ -1011,7 +1097,7 @@ export function CalculatorView({
               onAddressSelected={handleAddressSelected}
               showTripMode={eventPrefill?.meetingType !== "remote"}
               walked={walked}
-              onWalkedChange={setWalkedChoice}
+              onWalkedChange={changeWalked}
               travelEntries={travelEntries}
               onTravelEntriesChange={setTravelEntries}
               lookingUpTravel={lookingUpTravel}
@@ -1128,6 +1214,11 @@ export function CalculatorView({
             }
             promoDiscount={
               pricedPromo && !skipPromo && totals.promoDiscount > 0 ? totals.promoDiscount : 0
+            }
+            promoNote={
+              pricedPromo && !skipPromo && totals.promoDiscount > 0
+                ? promoRateNote(totals.promoRate)
+                : null
             }
           />
         </div>

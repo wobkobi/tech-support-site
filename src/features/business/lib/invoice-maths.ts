@@ -6,7 +6,7 @@ import { minsToHoursLabel } from "@/features/business/lib/business-format";
 import { GST_RATE, GST_REGISTERED } from "@/features/business/lib/pricing-policy";
 import type { JobCalculation, LineItem } from "@/features/business/types/business";
 import { formatDateSlash } from "@/shared/lib/date-format";
-import { roundCents } from "@/shared/lib/money";
+import { roundCents, toCents } from "@/shared/lib/money";
 
 /**
  * Extracts GST from a GST-inclusive amount.
@@ -24,6 +24,21 @@ export interface LineAmountInput {
   unitPrice: number;
   /** Billed minutes on a timed (hourly) line; null on flat, part and travel lines. */
   minutes?: number | null;
+  /** Line text, which settles who takes a leftover cent between otherwise equal lines. */
+  description?: string;
+  /** Second tie-break after the text, for lines that read the same but price differently. */
+  tieKey?: string;
+}
+
+/**
+ * Orders two tie-break strings by code unit, so the result never depends on locale.
+ * @param a - First key.
+ * @param b - Second key.
+ * @returns Negative when `a` comes first, positive when `b` does, 0 when equal.
+ */
+function compareKeys(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
 }
 
 /**
@@ -31,13 +46,15 @@ export interface LineAmountInput {
  * time billed at once (35+35+20 min at $100/hr = $58.34 + $58.33 + $33.33 = $150.00).
  *
  * Timed lines group by unit price: each takes its floored cents, then leftover cents go to
- * the largest fractions, ties to the bigger then earlier line. Untimed lines round
- * qty x unitPrice alone. Uses only qty, unitPrice and minutes, so saved invoices re-total.
+ * the largest fractions, ties to the bigger line, then by description and tieKey, and only
+ * then the earlier line. Settling ties by content keeps a discount read off one line (a
+ * "Didn't finish" half, business labour) the same whatever order the lines were typed in.
+ * Untimed lines round qty x unitPrice alone. Saved invoices re-total from these fields.
  * @param lines - Line items or task lines, in display order.
  * @returns Each line's total in dollars, in the same order.
  */
 export function splitLineTotals(lines: readonly LineAmountInput[]): number[] {
-  const cents = lines.map((l) => Math.round(l.qty * l.unitPrice * 100));
+  const cents = lines.map((l) => toCents(l.qty * l.unitPrice));
   const byRate = new Map<number, number[]>();
   lines.forEach((l, i) => {
     if (l.minutes == null) return;
@@ -46,19 +63,30 @@ export function splitLineTotals(lines: readonly LineAmountInput[]): number[] {
   for (const [rate, idx] of byRate) {
     const exact = idx.map((i) => (lines[i]!.minutes! * rate * 100) / 60);
     const totalMins = idx.reduce((s, i) => s + lines[i]!.minutes!, 0);
-    const target = Math.round((totalMins * rate * 100) / 60);
+    const target = toCents((totalMins * rate) / 60);
     // The epsilon keeps float noise (5833.9999999) from flooring a whole cent away.
     const floors = exact.map((x) => Math.floor(x + 1e-9));
     let leftover = target - floors.reduce((s, x) => s + x, 0);
     // Fractions within float noise are a tie (.33333333333348 vs .333333333333), so the
-    // tie-break decides: bigger line, then earlier.
+    // tie-break decides: bigger line, then its text and tieKey, then earlier.
     const fraction = exact.map((x, k) => x - floors[k]!);
+    /**
+     * The line at a position within this rate's group.
+     * @param k - Position in `idx`.
+     * @returns The line it points at.
+     */
+    const line = (k: number): LineAmountInput => lines[idx[k]!]!;
     const order = idx
       .map((_, k) => k)
       .sort((a, b) => {
         const d = fraction[b]! - fraction[a]!;
         if (Math.abs(d) > 1e-6) return d;
-        return exact[b]! - exact[a]! || a - b;
+        return (
+          exact[b]! - exact[a]! ||
+          compareKeys(line(a).description ?? "", line(b).description ?? "") ||
+          compareKeys(line(a).tieKey ?? "", line(b).tieKey ?? "") ||
+          a - b
+        );
       });
     for (const k of order) {
       if (leftover <= 0) break;
@@ -122,6 +150,17 @@ export function calcInvoiceTotals(
     gstAmount,
     total: taxableAmount,
   };
+}
+
+/**
+ * The fields that set a line's price, so a description-only edit isn't read as a re-price.
+ * @param lines - Invoice lines.
+ * @returns A comparable key.
+ */
+export function pricedLinesKey(
+  lines: readonly { qty: number; unitPrice: number; minutes?: number | null }[],
+): string {
+  return JSON.stringify(lines.map((l) => [l.qty, l.unitPrice, l.minutes ?? null]));
 }
 
 /**

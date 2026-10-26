@@ -418,7 +418,8 @@ export const IDENTITY_FIELD_META = {
   },
   homeRegion: {
     title: "Home region",
-    description: "Your region for the regional anniversary public holiday (e.g. Auckland).",
+    description:
+      "Region named in the site's map data and the AI assistant's business facts (e.g. Auckland). Holiday rates always follow Auckland's anniversary day, whatever this says.",
   },
   serviceRadiusKm: {
     title: "Service-area radius",
@@ -615,14 +616,14 @@ export const PRICING_FIELD_META = {
   publicHolidayUplift: {
     title: "Public-holiday surcharge",
     description:
-      "Extra added to labour on NZ public holidays (25 = +25%). Travel and parts are unchanged.",
+      "Extra added to labour on NZ public holidays, Auckland Anniversary Day, Christmas Eve and New Year's Eve (25 = +25%), worked out on the full hourly rate. A public holiday on a weekend is charged on the weekday it's observed instead. Travel and parts are unchanged.",
     unit: "%",
     off: "Set 0 to charge normal rates on public holidays.",
   },
   weekendUplift: {
     title: "Weekend surcharge",
     description:
-      "Extra added to labour on Saturdays and Sundays (10 = +10%). A public holiday on a weekend takes the public-holiday surcharge instead. Travel and parts are unchanged.",
+      "Extra added to labour on Saturdays and Sundays (10 = +10%), worked out on the full hourly rate, and on a weekday job when you tick after-hours rates in the calculator. A public holiday on a weekend bills this; its holiday surcharge moves to the weekday it's observed. Christmas Eve and New Year's Eve take the public-holiday surcharge instead. Travel and parts are unchanged.",
     unit: "%",
     off: "Set 0 to charge normal rates at weekends.",
   },

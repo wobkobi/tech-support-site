@@ -430,12 +430,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           details = kept.join(", ") || null;
         }
 
+        // A modifier named as the base ("At home") would price the task at its delta alone,
+        // so it moves to the modifiers and the default rate takes the base.
+        const namedBase = findRateByLabel(t.baseRateLabel);
+        const baseIsModifier =
+          namedBase !== null && namedBase.ratePerHour === null && namedBase.hourlyDelta !== null;
         const baseRate =
-          findRateByLabel(t.baseRateLabel) ??
+          (baseIsModifier ? null : namedBase) ??
           ratesForLookup.find((r) => r.ratePerHour !== null && r.isDefault) ??
           ratesForLookup.find((r) => r.ratePerHour !== null) ??
           null;
-        const modifierRates = (t.modifierLabels ?? [])
+        const modifierRates = [
+          ...(t.modifierLabels ?? []),
+          ...(baseIsModifier && namedBase ? [namedBase.label] : []),
+        ]
           .map((label) => {
             const rate = findRateByLabel(label);
             if (!rate) unresolvedModifierLabels.add(label);

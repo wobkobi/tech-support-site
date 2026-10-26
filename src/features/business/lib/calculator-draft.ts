@@ -24,6 +24,14 @@ const JOB_DRAFT_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
  */
 export const AI_INPUT_HANDOFF_KEY = "calculator-ai-input-handoff";
 
+/** The weekend/holiday surcharge tick, tied to the date it was set on so a new date follows its own. */
+export interface SurchargeTick {
+  /** Job date (YYYY-MM-DD) the tick was set for. */
+  date: string;
+  /** True bills the surcharge, false drops it. */
+  on: boolean;
+}
+
 /** CalculatorView form state persisted across refreshes (no server data or UI flags). */
 export interface CalculatorDraft {
   v: 2;
@@ -34,6 +42,10 @@ export interface CalculatorDraft {
   jobDate: string;
   /** Applied promo code, uppercase, or "" for none. */
   promoCode: string;
+  /** "Skip promo for this job" tick. */
+  skipPromo?: boolean;
+  /** Surcharge tick, or null/absent to follow the job date. */
+  surchargeTick?: SurchargeTick | null;
   timeRanges: ParsedRange[];
   /** False while `timeRanges` is the blank form's placeholder hour; missing reads as true. */
   timesSet?: boolean;

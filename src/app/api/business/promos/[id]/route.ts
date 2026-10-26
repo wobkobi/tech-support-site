@@ -2,6 +2,7 @@
 // Admin single-promo endpoint: sparse PATCH and DELETE (invoice snapshots stay). Both
 // revalidate the active-promo cache tag.
 
+import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import {
   resolveDiscountType,
   validateDiscount,
@@ -93,7 +94,14 @@ export async function PATCH(
     fixedAmount: body.fixedAmount !== undefined ? body.fixedAmount : existing.fixedAmount,
     travelPercent: body.travelPercent !== undefined ? body.travelPercent : existing.travelPercent,
   };
-  const discountError = validateDiscount(merged);
+  // Judged against the live Standard rate only when the discount itself is edited, so
+  // switching a promo on or off still works after a rate change.
+  const touchesDiscount =
+    body.discountType !== undefined ||
+    body.flatHourlyRate !== undefined ||
+    body.tiers !== undefined;
+  const rates = touchesDiscount ? { standardRate: (await getPublicPricing()).baseRate } : {};
+  const discountError = validateDiscount(merged, rates);
   if (discountError) {
     return errorResponse(discountError, 400);
   }
@@ -141,6 +149,7 @@ export async function PATCH(
     resolveDiscountType(merged),
     body.minSpend !== undefined ? body.minSpend : existing.minSpend,
     body.tiers !== undefined ? body.tiers : existing.tiers,
+    rates,
   );
   if (tierError) {
     return errorResponse(tierError, 400);

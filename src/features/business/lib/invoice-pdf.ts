@@ -134,6 +134,7 @@ export function serialiseInvoice(inv: PrismaInvoice): Invoice {
     total: inv.total,
     promoTitle: inv.promoTitle,
     promoDiscount: inv.promoDiscount,
+    promoNote: inv.promoNote,
     unsuccessful: inv.unsuccessful,
     unsuccessfulDiscount: inv.unsuccessfulDiscount,
     goldCardPercent: inv.goldCardPercent,
@@ -368,10 +369,10 @@ function drawBillToBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
  * @returns Y coordinate below the bottom border, including the totals gap.
  */
 function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
-  // Description 67%, Qty 9%, Unit price 11%, Total 13%.
+  // Description 61%, Qty 15%, Unit price 11%, Total 13%. Qty fits "10 hr 55 min" at 11pt.
   const COL = {
     desc: MARGIN,
-    qty: MARGIN + CONTENT_W * 0.67,
+    qty: MARGIN + CONTENT_W * 0.61,
     price: MARGIN + CONTENT_W * 0.76,
     total: MARGIN + CONTENT_W * 0.87,
   };
@@ -520,6 +521,26 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
     drawRow(promoLineLabel(invoice.promoTitle), `-${formatNZD(invoice.promoDiscount)}`, {
       isPromo: true,
     });
+    // Smaller note tucked under the promo row: drawRow already stepped 19pt down, so y + 4
+    // sits 15pt below the row's baseline.
+    if (invoice.promoNote) {
+      const NOTE_SIZE = 10;
+      for (const line of wrapText(
+        invoice.promoNote,
+        totalsValueX - totalsLabelX,
+        NOTE_SIZE,
+        ctx.font,
+      )) {
+        ctx.page.drawText(line, {
+          x: totalsLabelX,
+          y: y + 4,
+          size: NOTE_SIZE,
+          font: ctx.font,
+          color: AMBER,
+        });
+        y -= 14;
+      }
+    }
   }
   // Promo, Gold Card, then unsuccessful: the order calcJobTotal takes them off.
   if (invoice.goldCardDiscount && invoice.goldCardDiscount > 0) {

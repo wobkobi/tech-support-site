@@ -8,9 +8,10 @@ import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * GET /api/promos/active - Public, returns the automatic promo an anonymous
- * visitor would get right now, or null. Its weekday restriction is left for the
- * caller to judge once a slot is picked.
+ * GET /api/promos/active - Public, returns the automatic promo an anonymous visitor would
+ * get right now, or null. With no slot yet, the best promo without a weekday/time restriction
+ * wins; a restricted one comes back only when nothing else applies, for the caller to judge
+ * once a slot is picked.
  * @returns JSON with the promo or null.
  */
 export async function GET(): Promise<NextResponse> {

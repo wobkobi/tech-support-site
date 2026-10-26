@@ -594,7 +594,7 @@ model Promo {
   perCustomerLimit Int?
   // Floor for the pre-discount total, read the same way a tier's is.
   minSpend         Float?
-  // Only for someone with no prior completed booking.
+  // Only for someone with no earlier confirmed or completed booking, and no invoice that isn't voided or a quote.
   newCustomersOnly Boolean @default(false)
 
   // Recurring window. Inside [startAt, endAt], optionally restrict to these NZ
@@ -771,6 +771,9 @@ model Invoice {
   // Promo snapshot at creation time (kept stable if the source promo changes).
   promoTitle           String?
   promoDiscount        Float?
+  // "1 hr 55 min at $65/hr instead of $100/hr", printed under the promo row; null when the
+  // promo had no single rate to name (mixed rates, fixed amount, free travel).
+  promoNote            String?
   // The promo behind promoDiscount. Only read when a quote converts: a quote does not
   // settle a redemption (it may never happen), so conversion settles it from this.
   promoId              String?           @db.ObjectId

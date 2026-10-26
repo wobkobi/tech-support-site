@@ -7,10 +7,19 @@ import {
   calcInvoiceTotals,
   calcJobTotal,
   computeJobPromoDiscount,
+  formatBilledTime,
   formatMoneyCompact,
+  promoRateNote,
   splitLineTotals,
 } from "@/features/business/lib/business";
-import { DEFAULT_RATE_ROWS, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
+import { reissuePrefill } from "@/features/business/lib/invoice-reissue";
+import {
+  chosenSurcharge,
+  dateSurcharge,
+  DEFAULT_RATE_ROWS,
+  FALLBACK_BASE_RATE,
+  surchargeOption,
+} from "@/features/business/lib/pricing-policy";
 import { validateDiscount, validateKind } from "@/features/business/lib/promo-validation";
 import {
   applyPromoToHourlyRate,
@@ -1081,6 +1090,67 @@ function main(): void {
     NO_FLOOR,
   );
   expectEqual("free travel covers the drive, not the parking", freeTravel.promoDiscount, 30);
+  expectEqual("free travel names no rate", freeTravel.promoRate, null);
+
+  // The invoice's promo note: 1 hr 55 min at $100/hr under the $65 promo read as 1.55 hrs.
+  console.log("\nthe promo row names the hours and rates\n");
+  const lockedIn = calcJobTotal(
+    failedJob([{ qty: 115 / 60, unitPrice: 100 }], false),
+    promo("flat_hourly", 65),
+    NO_FLOOR,
+  );
+  expectEqual("the flat promo's discount", lockedIn.promoDiscount, 67.09);
+  expectEqual(
+    "it names the time at both rates",
+    promoRateNote(lockedIn.promoRate),
+    "1 hr 55 min at $65/hr instead of $100/hr",
+  );
+  expectEqual(
+    "two lines at the same rates sum their time",
+    promoRateNote(
+      calcJobTotal(
+        failedJob(
+          [
+            { qty: 1, unitPrice: 100 },
+            { qty: 0.5, unitPrice: 100 },
+          ],
+          false,
+        ),
+        promo("percent", 0.2),
+        NO_FLOOR,
+      ).promoRate,
+    ),
+    "1 hr 30 min at $80/hr instead of $100/hr",
+  );
+  expectEqual(
+    "lines at different rates name none, since one pair would misstate some",
+    calcJobTotal(
+      failedJob(
+        [
+          { qty: 1, unitPrice: 100 },
+          { qty: 1, unitPrice: 90 },
+        ],
+        false,
+      ),
+      promo("percent", 0.2),
+      NO_FLOOR,
+    ).promoRate,
+    null,
+  );
+  expectEqual(
+    "a fixed amount names no rate",
+    calcJobTotal(
+      failedJob([{ qty: 1, unitPrice: 100 }], false),
+      promo("fixed_amount", 20),
+      NO_FLOOR,
+    ).promoRate,
+    null,
+  );
+  expectEqual(
+    "billed time is spelled out, never h:mm",
+    [45, 60, 115, 120, 655].map(formatBilledTime),
+    ["45 min", "1 hr", "1 hr 55 min", "2 hr", "10 hr 55 min"],
+  );
 
   // Timed lines share cents: 35 + 35 + 20 min at $100/hr must total $150, not $149.99
   console.log("\nline totals split cents across timed lines\n");
@@ -1123,6 +1193,102 @@ function main(): void {
     "lines without minutes and lone timed lines round on their own",
     splitLineTotals([timed(35, 65), { qty: 1, unitPrice: 10 }, timed(20, 55)]),
     [37.92, 10, 18.33],
+  );
+
+  console.log("\nthe surcharge tick\n");
+  const uplifts = { publicHolidayUplift: 0.25, weekendUplift: 0.1 };
+  const saturday = dateSurcharge(null, 6, uplifts);
+  const holiday = dateSurcharge("Labour Day", 1, uplifts);
+  expectEqual(
+    "untouched, a Saturday bills weekend rates",
+    chosenSurcharge(saturday, null, 0.1),
+    saturday,
+  );
+  expectEqual("unticked, a Saturday bills none", chosenSurcharge(saturday, false, 0.1), null);
+  expectEqual("unticked, a holiday bills none", chosenSurcharge(holiday, false, 0.1), null);
+  expectEqual("ticked, a holiday keeps its own rate", chosenSurcharge(holiday, true, 0.1), holiday);
+  expectEqual("untouched, a weekday bills none", chosenSurcharge(null, null, 0.1), null);
+  expectEqual(
+    "ticked, a weekday bills the weekend uplift as after hours",
+    chosenSurcharge(null, true, 0.1),
+    {
+      reason: "After hours",
+      label: "After-hours surcharge",
+      uplift: 0.1,
+    },
+  );
+  expectEqual("with weekend rates off there is nothing to tick", surchargeOption(null, 0), null);
+
+  console.log("\na re-issue carries the surcharge as a tick, not a line\n");
+  /**
+   * Re-issue prefill for a voided invoice with these lines.
+   * @param descriptions - The voided invoice's line descriptions.
+   * @param extra - Invoice fields to override.
+   * @returns What the calculator would seed.
+   */
+  const voided = (
+    descriptions: string[],
+    extra: Partial<Parameters<typeof reissuePrefill>[0]> = {},
+  ): ReturnType<typeof reissuePrefill> =>
+    reissuePrefill({
+      id: "0123456789abcdef01234567",
+      number: "TTP-1",
+      clientName: "A",
+      clientEmail: "a@b.nz",
+      issueDate: new Date("2026-10-25T00:00:00Z"),
+      jobDate: null,
+      lineItems: descriptions.map((description) => ({ description, qty: 1, unitPrice: 10 })),
+      notes: null,
+      alreadyPaid: null,
+      alreadyPaidMethod: null,
+      goldCardPercent: null,
+      ...extra,
+    });
+  const withLine = voided(["Email setup", "Weekend surcharge (+10%)", "Round-trip travel"]);
+  expectEqual(
+    "the surcharge line leaves the job text",
+    withLine.jobText.includes("surcharge"),
+    false,
+  );
+  expectEqual("and is remembered", withLine.surcharge, true);
+  expectEqual("a dropped surcharge starts the tick off", voided(["Email setup"]).surcharge, false);
+  expectEqual(
+    "a holiday surcharge line is spotted too",
+    voided(["Public holiday surcharge (+25%)"]).surcharge,
+    true,
+  );
+  expectEqual(
+    "and an after-hours one, so a weekday re-issue keeps it ticked",
+    voided(["After-hours surcharge (+10%)"]).surcharge,
+    true,
+  );
+  // 2026-10-26T00:00Z is Mon 26 Oct in NZ; the job was the Saturday before.
+  const lateInvoice = { issueDate: new Date("2026-10-26T00:00:00Z") };
+  expectEqual(
+    "no job date falls back to the issue day",
+    voided([], lateInvoice).jobDate,
+    "2026-10-26",
+  );
+  expectEqual(
+    "a stored job date wins, so a Saturday job keeps weekend rates",
+    voided([], { ...lateInvoice, jobDate: "2026-10-24" }).jobDate,
+    "2026-10-24",
+  );
+  const prepaid = voided([], { alreadyPaid: 40, alreadyPaidMethod: "Bank" });
+  expectEqual(
+    "money paid on the day carries over",
+    [prepaid.alreadyPaid, prepaid.alreadyPaidMethod],
+    [40, "Bank"],
+  );
+  expectEqual(
+    "with the voided invoice's id to move its entry",
+    prepaid.invoiceId,
+    "0123456789abcdef01234567",
+  );
+  expectEqual(
+    "nothing paid carries no method",
+    voided([], { alreadyPaid: 0, alreadyPaidMethod: "Cash" }).alreadyPaidMethod,
+    null,
   );
 
   finish();

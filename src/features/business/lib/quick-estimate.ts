@@ -7,7 +7,7 @@ import {
   priceRangeFor,
   remoteRateDelta,
 } from "@/features/business/lib/estimate-range";
-import { calcTravelCharge, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
+import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
 import {
   applyPromoToHourlyRate,
   applyPromoToQuote,
@@ -64,6 +64,7 @@ export interface QuickEstimateResult {
  * computes the confidence-scaled range, logs it, and returns the range + log id.
  * @param input - Description, meeting mode, address, and live pricing settings.
  * @returns The price range, the logged estimate id, and the AI confidence/explanation.
+ * @throws {Error} When the live rates can't be read, so the form shows no figure rather than a stale one.
  */
 export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<QuickEstimateResult> {
   const {
@@ -162,11 +163,12 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
         ? (travelRes.value.durationMinsBack ?? travelMins)
         : 0;
 
-  // Live base + remote delta, resolved even when the AI duration call fails.
+  // Live base + remote delta, resolved even when the AI duration call fails. No live rate
+  // means no figure: a hardcoded fallback could quote well under what the job bills.
   const baseStandard =
     rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
-    rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
-    FALLBACK_BASE_RATE;
+    rates.find((r) => r.ratePerHour !== null)?.ratePerHour;
+  if (baseStandard == null) throw new Error("Live rates unavailable");
   const fullRate = baseStandard + remoteRateDelta(rates, meeting);
 
   let estimatedMins = 60;

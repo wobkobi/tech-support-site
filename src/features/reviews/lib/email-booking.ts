@@ -41,6 +41,8 @@ export interface BookingNotificationData {
   cancelToken: string;
   /** Promo title snapshotted at booking time, or null when none was active. */
   promoTitleAtBooking?: string | null;
+  /** The days or times that promo covers ("Tuesdays 9am to 5pm"), or null when it has no limit. */
+  promoWindowAtBooking?: string | null;
   /** Address with any unit; drives the map link and calendar LOCATION. Omit for remote jobs. */
   address?: string | null;
   /** Null on older bookings; only an explicit "remote" suppresses the address ({@link onSiteAddress}). */
@@ -49,6 +51,40 @@ export interface BookingNotificationData {
   rescheduleCount?: number;
   /** Parking, directions and other visit details from the booking form's second box. */
   accessNotes?: string | null;
+}
+
+/**
+ * Amber promo panel for a booking email, or "" when there is nothing to say. A lapsed title
+ * (a reschedule onto a day or time the offer doesn't cover) says so rather than going quiet.
+ * @param booking - The booking being emailed about.
+ * @param lapsedTitle - The offer the new time lost, when it lost one.
+ * @returns HTML fragment.
+ */
+function promoPanel(booking: BookingNotificationData, lapsedTitle?: string | null): string {
+  /**
+   * Wraps a heading and a line in the amber panel.
+   * @param heading - Bold first line, already escaped.
+   * @param body - Second line, already escaped.
+   * @returns HTML fragment.
+   */
+  const box = (heading: string, body: string): string =>
+    `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0c0a3e">🏷 ${heading}</p><p style="margin:0;font-size:13px;color:#444;line-height:1.5">${body}</p></div>`;
+  if (booking.promoTitleAtBooking) {
+    const windowNote = booking.promoWindowAtBooking
+      ? ` It only covers ${escapeHtml(booking.promoWindowAtBooking)}, so moving to another day or time drops it.`
+      : "";
+    return box(
+      `Rate locked in: ${escapeHtml(booking.promoTitleAtBooking)}`,
+      `This offer applies to your appointment even if it ends before your visit.${windowNote}`,
+    );
+  }
+  if (lapsedTitle) {
+    return box(
+      `${escapeHtml(lapsedTitle)} no longer applies`,
+      "That offer doesn't cover your new day or time, so it won't come off this appointment.",
+    );
+  }
+  return "";
 }
 
 /**
@@ -278,10 +314,17 @@ export async function sendOwnerBookingCancellation(
  * @param options.previousStartAt - Original start time, shown crossed-out when rescheduled.
  * @param options.quietHours - Hold for the quiet window. Set only by operator-driven
  * moves; customer self-service confirmations stay immediate.
+ * @param options.lapsedPromoTitle - The offer a reschedule lost because the new time falls
+ * outside its days or times, so the email says it no longer applies.
  */
 export async function sendCustomerBookingConfirmation(
   booking: BookingNotificationData,
-  options?: { kind?: "new" | "rescheduled"; previousStartAt?: Date; quietHours?: boolean },
+  options?: {
+    kind?: "new" | "rescheduled";
+    previousStartAt?: Date;
+    quietHours?: boolean;
+    lapsedPromoTitle?: string | null;
+  },
 ): Promise<void> {
   const send = options?.quietHours
     ? (payload: MailPayload) => sendOutreach(payload, booking.id)
@@ -334,9 +377,7 @@ export async function sendCustomerBookingConfirmation(
       ? `<p style="margin:0 0 20px;color:#888;font-size:13px"><s>${escapeHtml(previous)}</s></p>`
       : "";
   const attachments = await bookingIcsAttachment(booking);
-  const promoLine = booking.promoTitleAtBooking
-    ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0c0a3e">🏷 Rate locked in: ${escapeHtml(booking.promoTitleAtBooking)}</p><p style="margin:0;font-size:13px;color:#444;line-height:1.5">This rate applies to your appointment even if the offer ends before your visit.</p></div>`
-    : "";
+  const promoLine = promoPanel(booking, options?.lapsedPromoTitle);
 
   // Render the email body
   const html = renderNotificationEmail(`
@@ -428,9 +469,7 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
         : "";
   const cancellationText = await liveCancellationCopy(booking);
   const identity = await getIdentity();
-  const promoLine = booking.promoTitleAtBooking
-    ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0c0a3e">🏷 Rate locked in: ${escapeHtml(booking.promoTitleAtBooking)}</p><p style="margin:0;font-size:13px;color:#444;line-height:1.5">This rate applies to your appointment even if the offer ends before your visit.</p></div>`
-    : "";
+  const promoLine = promoPanel(booking);
   const attachments = await bookingIcsAttachment(booking);
 
   // "Tomorrow" wording assumes comms.reminderLeadHours stays near 24h.

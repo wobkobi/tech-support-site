@@ -120,7 +120,8 @@ export function updateTaskField(
 }
 
 /**
- * Toggles a modifier rate on a task and re-prices it from base + modifiers.
+ * Toggles a modifier rate on a task and re-prices it from base + modifiers. A line with no
+ * live base keeps its typed price.
  * @param prev - Current task lines.
  * @param idx - Task index.
  * @param modifierId - Modifier rate ID being toggled on/off.
@@ -147,6 +148,13 @@ export function toggleTaskModifierLine(
     next = [...current.filter((m) => !channelIds.has(m)), modifierId];
   } else {
     next = [...current, modifierId];
+  }
+  // A "No base" row (or one whose base row is gone) has no rate to rebuild from, so its
+  // typed $/hr stays rather than dropping to $0.
+  const hasBase = rates.some((r) => r.id === target.baseRateId && r.ratePerHour !== null);
+  if (!hasBase) {
+    arr[idx] = { ...target, modifierIds: next };
+    return arr;
   }
   const newPrice = effectiveHourlyRate(rates, target.baseRateId, next);
   arr[idx] = {

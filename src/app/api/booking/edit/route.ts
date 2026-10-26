@@ -19,6 +19,12 @@ import {
   loadBlockingBookings,
   loadBlockingEvents,
 } from "@/features/booking/lib/existing-bookings.server";
+import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
+import {
+  applyMovedBookingPromo,
+  judgeMovedBookingPromo,
+} from "@/features/business/lib/promo-redemption";
+import { bookingPromoColumns, describeRecurringWindow } from "@/features/business/lib/promos";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import { parseString } from "@/features/business/lib/validation";
 import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
@@ -41,7 +47,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
-import { dateKeyParts, nzWallClockUtc } from "@/shared/lib/timezone-utils";
+import { dateKeyParts, nzDateKey, nzWallClockUtc } from "@/shared/lib/timezone-utils";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -265,9 +271,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // For the "was: <old time>" line in the rescheduled emails.
     const previousStartAt = booking.startAt;
-    const slotMoved =
-      startAt.getTime() !== booking.startAt.getTime() ||
-      endAt.getTime() !== booking.endAt.getTime();
+    const startMoved = startAt.getTime() !== booking.startAt.getTime();
+    const slotMoved = startMoved || endAt.getTime() !== booking.endAt.getTime();
+
+    // A weekday/time promo is earned by the slot, so a new start can drop or gain one.
+    const movedPromo = startMoved ? await judgeMovedBookingPromo(booking, startAt) : null;
+
+    // The holiday stamp follows the date; a failed lookup reads as no holiday, as on a new booking.
+    const dateMoved = nzDateKey(startAt) !== nzDateKey(booking.startAt);
+    const holidayName = dateMoved
+      ? await lookupPublicHoliday(startAt)
+          .then((holiday) => holiday?.name ?? null)
+          .catch((err) => {
+            console.warn("[booking/edit] public-holiday lookup failed:", err);
+            return null;
+          })
+      : undefined;
 
     // Re-snapshot drive legs so a late cancel bills the right travel; remote leaves both null.
     let travelMinsAtBooking: number | null = null;
@@ -296,7 +315,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       rescheduleCount: booking.rescheduleCount + 1,
       // Clear the reminder stamp so the 24h nudge fires again, but only when the
       // start moved - a notes-only edit shouldn't re-send it.
-      ...(startAt.getTime() !== booking.startAt.getTime() ? { emailReminderSentAt: null } : {}),
+      ...(startMoved ? { emailReminderSentAt: null } : {}),
+      ...(movedPromo?.changed ? bookingPromoColumns(movedPromo.promo) : {}),
+      ...(holidayName !== undefined ? { publicHolidayName: holidayName } : {}),
       phone: phoneE164,
       // Keep snapshots current for the cancellation invoice.
       address: canonicalAddress ? splitUnitFromAddress(canonicalAddress).rest : null,
@@ -384,11 +405,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Held emails name the old time. Same gate as the reminder-stamp clear above,
     // or a recalled reminder would never re-send.
-    if (startAt.getTime() !== booking.startAt.getTime()) {
+    if (startMoved) {
       await cancelHeldBookingEmails(booking.id);
     }
 
     // Best-effort contact upsert + Google sync; the booking is already saved.
+    let contactId: string | undefined;
     try {
       // Shared helper: case-insensitive and never resurrects a deleted contact.
       const { contact } = await findOrCreateContactByEmail(booking.email, {
@@ -396,6 +418,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         phone: phoneE164,
         address: canonicalAddress,
       });
+      contactId = contact.id;
       await prisma.contact.update({
         where: { id: contact.id },
         data: {
@@ -408,6 +431,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } catch (contactError) {
       console.error("[booking/edit] Failed to upsert/sync contact:", contactError);
     }
+    if (movedPromo) await applyMovedBookingPromo(booking.id, movedPromo, contactId);
+    const promoNow = movedPromo?.promo ?? null;
 
     // Helpers never throw. Only the settings read can, so its failure just drops the push.
     const comms = await getSettings()
@@ -424,13 +449,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           startAt,
           endAt,
           cancelToken: booking.cancelToken,
-          promoTitleAtBooking: booking.promoTitleAtBooking,
+          promoTitleAtBooking: movedPromo?.changed
+            ? (movedPromo.promo?.title ?? null)
+            : booking.promoTitleAtBooking,
+          promoWindowAtBooking: promoNow ? describeRecurringWindow(promoNow) : null,
           address: canonicalAddress ?? "",
           meetingType: meetingType === "in-person" ? "in_person" : "remote",
           // Post-increment value, or the invite's SEQUENCE won't rise and clients ignore it.
           rescheduleCount: booking.rescheduleCount + 1,
         },
-        { kind: "rescheduled", previousStartAt },
+        {
+          kind: "rescheduled",
+          previousStartAt,
+          lapsedPromoTitle: movedPromo?.lapsedTitle ?? null,
+        },
       ),
       sendOwnerBookingNotification(
         {
