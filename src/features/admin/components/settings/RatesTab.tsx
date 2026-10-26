@@ -161,18 +161,19 @@ interface RowDraft {
 }
 
 interface Props {
-  initialRates: RateConfig[];
+  rates: RateConfig[];
+  setRates: React.Dispatch<React.SetStateAction<RateConfig[]>>;
 }
 
 /**
  * Settings tab for editing rate rows in place.
  * @param props - Component props.
- * @param props.initialRates - Rate rows resolved server-side.
+ * @param props.rates - Rate rows as last saved, held by SettingsView so they outlive a tab switch.
+ * @param props.setRates - Updates the saved rate rows.
  * @returns Rates tab element.
  */
-export function RatesTab({ initialRates }: Props): React.ReactElement {
+export function RatesTab({ rates, setRates }: Props): React.ReactElement {
   const { toast } = useToast();
-  const [rates, setRates] = useState<RateConfig[]>(initialRates);
   // Unsaved edits by rate id; a row with no entry shows its saved values.
   const [drafts, setDrafts] = useState<Record<string, RowDraft>>({});
   const [savingId, setSavingId] = useState<string | null>(null);

@@ -9,11 +9,19 @@ import { checkGuardrails, type FieldError } from "@/shared/lib/settings/validate
 import type React from "react";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
-/**
- * Full resolved settings from SettingsView, so each tab can run the cross-setting
- * guardrails live. Null without a provider, leaving the live banner empty.
- */
-export const SettingsAllContext = createContext<Settings | null>(null);
+/** SettingsView's saved settings, shared with every tab. */
+export interface SettingsStore {
+  /** Every group as last saved, for the live cross-setting guardrails. */
+  all: Settings;
+  /**
+   * Records a successful save, so a tab reopened later starts from it rather than the
+   * page-load value (whose stale fields a second save would write back).
+   */
+  markSaved: <G extends SettingsGroup>(group: G, value: Settings[G]) => void;
+}
+
+/** The settings store from SettingsView. Null without a provider: no live banner, no sharing. */
+export const SettingsAllContext = createContext<SettingsStore | null>(null);
 
 /**
  * Collects the dotted paths at which two settings values differ. Recurses only into plain
@@ -86,7 +94,8 @@ export function useSettingsForm<G extends SettingsGroup>(
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
   // Live cross-setting guardrails: the save route's own check, run as the operator types.
-  const all = useContext(SettingsAllContext);
+  const store = useContext(SettingsAllContext);
+  const all = store?.all ?? null;
   const live = useMemo(() => {
     if (!all) return { blocks: [] as string[], warns: [] as string[] };
     const proposed = { ...all, [group]: draft };
@@ -134,6 +143,7 @@ export function useSettingsForm<G extends SettingsGroup>(
           setSavedAt(Date.now());
           setServerWarns([]);
           setBaseline(draft);
+          store?.markSaved(group, draft);
           return true;
         }
         const data = (await res.json().catch(() => ({}))) as {
@@ -161,7 +171,7 @@ export function useSettingsForm<G extends SettingsGroup>(
         setSaving(false);
       }
     },
-    [group, draft],
+    [group, draft, store],
   );
 
   const resetToDefault = useCallback(() => setDraft(defaults), [defaults]);

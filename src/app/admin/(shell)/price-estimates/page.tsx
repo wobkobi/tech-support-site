@@ -1,6 +1,6 @@
 // src/app/admin/(shell)/price-estimates/page.tsx
 // Audit page for the public price estimator: the last 500 logs with counts. Dev rows hidden
-// unless `?showDev=1`; entries purge after 30 days.
+// unless `?showDev=1`; entries purge after the Comms retention setting.
 
 import { Card } from "@/features/admin/components/ui/Card";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
@@ -13,6 +13,8 @@ import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
+import { nzDateParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
 import { AppEnvironment, type Prisma } from "@prisma/client";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -41,7 +43,7 @@ export default async function AdminPriceEstimatesPage({
   const includeDev = showDev === "1";
 
   const now = new Date();
-  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayStart = nzMidnightUtc(...nzDateParts(now));
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -50,7 +52,8 @@ export default async function AdminPriceEstimatesPage({
     ? {}
     : { environment: AppEnvironment.production };
 
-  const [logs, todayCount, weekCount, monthCount, devCount] = await Promise.all([
+  const [{ comms }, logs, todayCount, weekCount, monthCount, devCount] = await Promise.all([
+    getSettings(),
     prisma.priceEstimateLog.findMany({
       where: envFilter,
       orderBy: { createdAt: "desc" },
@@ -79,7 +82,7 @@ export default async function AdminPriceEstimatesPage({
     <>
       <PageHeader
         title="Price estimates"
-        description={`Read-only audit log of public pricing wizard submissions. Rows are deleted after 30 days.${includeDev ? " Showing dev submissions too." : ""}`}
+        description={`Read-only audit log of public pricing wizard submissions. Rows are deleted after ${comms.priceEstimateRetentionDays} days.${includeDev ? " Showing dev submissions too." : ""}`}
         actions={
           <Link
             href={toggleHref}

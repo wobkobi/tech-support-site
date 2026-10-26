@@ -150,11 +150,13 @@ export function NotificationsView(): React.ReactElement {
       const registration = await navigator.serviceWorker.ready;
       const sub = await registration.pushManager.getSubscription();
       if (sub) {
-        await fetch("/api/admin/push/unsubscribe", {
+        // Server first: a browser unsubscribed while its row stays would still be pushed to.
+        const res = await fetch("/api/admin/push/unsubscribe", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ endpoint: sub.endpoint }),
         });
+        if (!res.ok) throw new Error("unregister failed");
         await sub.unsubscribe();
       }
       setState("off");
@@ -172,8 +174,13 @@ export function NotificationsView(): React.ReactElement {
     setBusy(true);
     try {
       const res = await fetch("/api/admin/push/test", { method: "POST" });
-      if (!res.ok) throw new Error("test failed");
-      toast("Test sent - it should appear shortly.", { tone: "success" });
+      const d = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
+      if (!res.ok) {
+        toast(d.error ?? "Couldn't send the test notification.", { tone: "error" });
+        return;
+      }
+      toast(d.message ?? "Test sent - it should appear shortly.", { tone: "success" });
+      await loadDevices();
     } catch {
       toast("Couldn't send the test notification.", { tone: "error" });
     } finally {
@@ -187,11 +194,12 @@ export function NotificationsView(): React.ReactElement {
    */
   async function removeDevice(endpoint: string): Promise<void> {
     try {
-      await fetch("/api/admin/push/unsubscribe", {
+      const res = await fetch("/api/admin/push/unsubscribe", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ endpoint }),
       });
+      if (!res.ok) throw new Error("remove failed");
       await loadDevices();
       toast("Device removed.", { tone: "success" });
     } catch {
