@@ -315,7 +315,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               {shownModifiers.map((mod) => (
                 <li key={mod.label} className="flex flex-col">
                   <span>
-                    <strong>{mod.label}</strong> ({mod.shownDelta} ={" "}
+                    <strong>{mod.publicLabel}</strong> ({mod.shownDelta} ={" "}
                     <PromoPrice
                       discounted={mod.shownRate !== mod.effectiveRate}
                       className="font-bold"

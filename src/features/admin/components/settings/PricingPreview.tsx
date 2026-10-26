@@ -26,7 +26,7 @@ export function PricingPreview({ config }: Props): React.ReactElement {
   // In person and remote are priced separately, so show both.
   lines.push(
     c.travelChargeHours > 0
-      ? `In person: free more than ${c.freeNoticeHours}h out. Inside that, a $${c.callOutFee} fee. Within ${c.travelChargeHours}h, or a no-show, the full $${c.fullCallOutFee} call-out plus round-trip travel.`
+      ? `In person: free more than ${c.freeNoticeHours}h out. Inside that, a $${c.callOutFee} fee. Within ${c.travelChargeHours}h, or a no-show, a $${c.fullCallOutFee} late-cancellation fee plus round-trip travel.`
       : `In person: free more than ${c.freeNoticeHours}h out. Inside that, a $${c.callOutFee} fee.`,
   );
   lines.push(

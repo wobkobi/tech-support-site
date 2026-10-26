@@ -5,9 +5,10 @@
 
 import { isBookingClosed } from "@/features/booking/lib/booking";
 import {
+  assessCancellation,
   CANCELLATION,
-  isWithinCancellationWindow,
-  isWithinTravelWindow,
+  type CancellationPolicy,
+  type CancelMeetingType,
 } from "@/features/business/lib/pricing-policy";
 import { Button } from "@/shared/components/Button";
 import { CARD } from "@/shared/components/PageLayout";
@@ -19,15 +20,19 @@ import type React from "react";
 import { useEffect, useState } from "react";
 
 /** Live cancellation figures handed down from the cancel-info API. */
-interface CancellationInfo {
-  freeNoticeHours: number;
-  travelChargeHours: number;
-  callOutFee: number;
-}
+type CancellationInfo = Pick<
+  CancellationPolicy,
+  | "freeNoticeHours"
+  | "travelChargeHours"
+  | "callOutFee"
+  | "fullCallOutFee"
+  | "remoteFreeNoticeHours"
+  | "remoteFee"
+>;
 
 type LoadState =
   | { kind: "loading" }
-  | { kind: "ready"; startAt: Date; policy: CancellationInfo }
+  | { kind: "ready"; startAt: Date; meetingType: CancelMeetingType; policy: CancellationInfo }
   | { kind: "alreadyCancelled" }
   | { kind: "closed" }
   | { kind: "error"; message: string };
@@ -44,10 +49,12 @@ interface PhoneProps {
 }
 
 /**
- * Pre-cancellation fee banner. Green = no fee, amber = call-out fee,
- * red = call-out fee + round-trip travel. Figures come from the live policy.
+ * Pre-cancellation fee banner. Green = no fee, amber = the cancellation fee, red = the
+ * late-cancellation fee plus round-trip travel. Runs the same assessment as the cancel itself,
+ * so the figure shown is the one charged, remote bookings included.
  * @param props - Component props.
  * @param props.startAt - Booking start time.
+ * @param props.meetingType - Whether the booking is on site or remote.
  * @param props.policy - Live cancellation figures from the cancel-info API.
  * @param props.phone - Display phone number.
  * @param props.phoneTel - tel: URI for the same number.
@@ -55,34 +62,43 @@ interface PhoneProps {
  */
 function FeeBanner({
   startAt,
+  meetingType,
   policy,
   phone,
   phoneTel,
-}: PhoneProps & { startAt: Date; policy: CancellationInfo }): React.ReactElement {
-  const now = new Date();
-  const inTravel = isWithinTravelWindow(startAt, now, policy.travelChargeHours);
-  const inCancel = isWithinCancellationWindow(startAt, now, policy.freeNoticeHours);
-  if (inTravel) {
+}: PhoneProps & {
+  startAt: Date;
+  meetingType: CancelMeetingType;
+  policy: CancellationInfo;
+}): React.ReactElement {
+  const charge = assessCancellation(startAt, new Date(), {
+    reason: "late-cancellation",
+    meetingType,
+    policy: { ...CANCELLATION, ...policy },
+  });
+  if (charge.travelApplies) {
     return (
       <div
         role="alert"
         className="rounded-lg border-2 border-coquelicot-500/60 bg-coquelicot-50 p-4 text-base text-rich-black sm:text-lg"
       >
-        <strong>${policy.callOutFee} call-out fee plus round-trip travel</strong> will apply - we're
-        inside the {policy.travelChargeHours}-hour window when I would normally be on the way to
-        you. If anything has changed, call or text me on{" "}
+        <strong>${charge.fee} late-cancellation fee plus round-trip travel</strong> will apply -
+        we're inside the {policy.travelChargeHours}-hour window when I would normally be on the way
+        to you. If anything has changed, call or text me on{" "}
         <PhoneLink phone={phone} phoneTel={phoneTel} /> first.
       </div>
     );
   }
-  if (inCancel) {
+  if (charge.fee > 0) {
+    const windowHours =
+      meetingType === "remote" ? policy.remoteFreeNoticeHours : policy.freeNoticeHours;
     return (
       <div
         role="alert"
         className="rounded-lg border-2 border-mustard-300/60 bg-mustard-50/40 p-4 text-base text-rich-black sm:text-lg"
       >
-        <strong>${policy.callOutFee} call-out fee</strong> will apply - you're inside the{" "}
-        {policy.freeNoticeHours}-hour cancellation window.
+        <strong>${charge.fee} cancellation fee</strong> will apply - you're inside the {windowHours}
+        -hour cancellation window.
       </div>
     );
   }
@@ -154,6 +170,7 @@ export function CancelContent({ phone, phoneTel }: PhoneProps): React.ReactEleme
           ok?: boolean;
           startAt?: string;
           status?: string;
+          meetingType?: CancelMeetingType;
           cancellation?: CancellationInfo;
           error?: string;
         };
@@ -180,6 +197,7 @@ export function CancelContent({ phone, phoneTel }: PhoneProps): React.ReactEleme
         setLoad({
           kind: "ready",
           startAt,
+          meetingType: data.meetingType === "remote" ? "remote" : "in-person",
           policy: data.cancellation ?? CANCELLATION,
         });
       } catch {
@@ -291,6 +309,7 @@ export function CancelContent({ phone, phoneTel }: PhoneProps): React.ReactEleme
                   </p>
                   <FeeBanner
                     startAt={load.startAt}
+                    meetingType={load.meetingType}
                     policy={load.policy}
                     phone={phone}
                     phoneTel={phoneTel}

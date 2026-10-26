@@ -2,6 +2,7 @@
 // Public, rate-limited log of what the price estimator showed a user; returns the
 // PriceEstimateLog id so the booking can snapshot the quote seen.
 
+import { getRateRows } from "@/features/business/lib/pricing-policy.server";
 import { errorResponse } from "@/shared/lib/api-response";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
@@ -85,6 +86,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const priceHigh = Math.max(0, Math.round(Number(body.priceHigh) || 0));
   const travelCharge =
     body.travelCharge == null ? null : Math.max(0, Math.round(Number(body.travelCharge) || 0));
+
+  // The figures come from the visitor's browser, and a booking made after it shows them to
+  // you as its quote. Shapes the estimator can't produce (a low above the high, travel above
+  // the whole quote, a total under half a quarter-hour at the cheapest rate) are refused, so
+  // a hand-made "$1" never reaches a booking.
+  const rates = await getRateRows().catch(() => []);
+  const cheapestRate = Math.min(
+    ...rates.flatMap((r) => (r.ratePerHour && r.ratePerHour > 0 ? [r.ratePerHour] : [])),
+  );
+  const floor = Number.isFinite(cheapestRate) ? (cheapestRate * 0.25) / 2 : 0;
+  if (priceLow > priceHigh || (travelCharge ?? 0) > priceLow || priceLow < floor) {
+    console.warn(
+      `[log-estimate] refused an estimate that doesn't add up: ${priceLow}-${priceHigh}, travel ${travelCharge}`,
+    );
+    return errorResponse("estimate figures don't add up", 400);
+  }
 
   const promoTitle =
     typeof body.promoTitle === "string" && body.promoTitle.trim()

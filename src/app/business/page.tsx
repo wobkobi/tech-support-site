@@ -83,7 +83,7 @@ const retainerTiers: ReadonlyArray<RetainerTier> = [
     inclusions: [
       "Priority response when something breaks",
       "Monthly check-in on backups and updates",
-      "Discounted callout rate",
+      "Discounted rate for on-site visits",
     ],
   },
   {
@@ -251,7 +251,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
           <TickItem>
             Travel billed at {formatMoneyCompact(displayTravelRate)}/hr for one round trip per visit
           </TickItem>
-          <TickItem>Quick phone questions are usually free</TickItem>
+          <TickItem>Quick phone questions are free</TickItem>
           <TickItem>Itemised invoice after every job</TickItem>
         </TickList>
       </Section>

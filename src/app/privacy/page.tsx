@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 /** Date this policy was last reviewed; shown to visitors in the header. */
-const LAST_UPDATED = "23 October 2026";
+const LAST_UPDATED = "27 October 2026";
 
 const H2 = "mb-4 text-[1.75rem] font-extrabold";
 
@@ -147,6 +147,11 @@ export default async function PrivacyPage(): Promise<React.ReactElement> {
                 readable text and can&apos;t be reversed by me.
               </TickItem>
               <TickItem variant="dot">
+                <strong>Thryv</strong> - my marketing service. Its tag measures how visitors find
+                the site and, if you came from one of my Thryv ads, shows a tracking phone number so
+                I can tell which ads lead to calls. Calls to that number still come straight to me.
+              </TickItem>
+              <TickItem variant="dot">
                 <strong>Vercel Analytics</strong> - privacy-friendly performance statistics.
               </TickItem>
             </TickList>
@@ -183,6 +188,7 @@ export default async function PrivacyPage(): Promise<React.ReactElement> {
             <TickList>
               <TickItem variant="dot">Google (Analytics, Ads, Maps and Calendar)</TickItem>
               <TickItem variant="dot">Meta Platforms (advertising pixel)</TickItem>
+              <TickItem variant="dot">Thryv (marketing and call tracking)</TickItem>
               <TickItem variant="dot">
                 An AI service (OpenAI or Anthropic), which reads what you describe in the price
                 estimate, my notes about your job, and your message, comment or review when I ask it

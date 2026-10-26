@@ -98,7 +98,7 @@ export async function loadBusinessFacts(): Promise<BusinessFacts> {
   // A "delta" sets its own hourly rate; an "uplift" is a surcharge on top of labour.
   const modifiers = pricing.modifiers.map((m) =>
     m.kind === "delta"
-      ? `- ${m.label} rate: ${formatMoneyCompact(m.effectiveRate)}/hr. ${m.description}`
+      ? `- ${m.publicLabel} rate: ${formatMoneyCompact(m.effectiveRate)}/hr. ${m.description}`
       : `- ${m.label} surcharge: ${m.deltaDescription}/hr on labour. ${m.description}`,
   );
 

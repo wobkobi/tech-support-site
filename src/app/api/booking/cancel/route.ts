@@ -27,7 +27,7 @@ interface CancelPayload {
  * GET /api/booking/cancel?token=...
  * Booking info for the confirmation gate. Never mutates state.
  * @param request - Incoming request, expects ?token=... in the query string.
- * @returns JSON `{ ok, startAt, status }` or `{ ok: false, error }`.
+ * @returns JSON `{ ok, startAt, status, meetingType, cancellation }` or `{ ok: false, error }`.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const limited = rateLimitOrReject(request, "booking-cancel-info", 10, 60_000);
@@ -40,22 +40,27 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const booking = await prisma.booking.findFirst({
     where: { cancelToken: token },
-    select: { startAt: true, status: true },
+    select: { startAt: true, status: true, meetingType: true },
   });
   if (!booking) {
     return errorResponse("Booking not found.", 404);
   }
 
-  // Live policy, so the fee banner quotes the figures actually charged.
+  // Live policy and the booking's own meeting type, so the fee banner runs the same
+  // assessment as the cancel below and quotes the figure actually charged.
   const { CANCELLATION } = await getPolicy();
   return NextResponse.json({
     ok: true,
     startAt: booking.startAt.toISOString(),
     status: booking.status,
+    meetingType: booking.meetingType === "remote" ? "remote" : "in-person",
     cancellation: {
       freeNoticeHours: CANCELLATION.freeNoticeHours,
       travelChargeHours: CANCELLATION.travelChargeHours,
       callOutFee: CANCELLATION.callOutFee,
+      fullCallOutFee: CANCELLATION.fullCallOutFee,
+      remoteFreeNoticeHours: CANCELLATION.remoteFreeNoticeHours,
+      remoteFee: CANCELLATION.remoteFee,
     },
   });
 }

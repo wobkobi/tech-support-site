@@ -35,9 +35,11 @@ export interface BusinessEnquiryData {
  * Sends the operator a notification email for a new business enquiry.
  * Failures are caught and logged - never throws.
  * @param enquiry - The enquiry details.
- * @returns Promise that resolves when the email is sent (or silently fails).
+ * @returns True once the email has gone; false when it couldn't be sent or email isn't set up.
  */
-export async function sendBusinessEnquiryNotification(enquiry: BusinessEnquiryData): Promise<void> {
+export async function sendBusinessEnquiryNotification(
+  enquiry: BusinessEnquiryData,
+): Promise<boolean> {
   const adminEmail = process.env.ADMIN_EMAIL;
   const from = process.env.EMAIL_FROM;
 
@@ -45,7 +47,7 @@ export async function sendBusinessEnquiryNotification(enquiry: BusinessEnquiryDa
     console.warn(
       `[email] Not configured (${missingEmailEnv("ADMIN_EMAIL", "EMAIL_FROM", "RESEND_API_KEY")}) - skipping business enquiry notification.`,
     );
-    return;
+    return false;
   }
 
   const safeName = escapeHtml(enquiry.name);
@@ -80,7 +82,7 @@ export async function sendBusinessEnquiryNotification(enquiry: BusinessEnquiryDa
 `);
 
   try {
-    await sendNow({
+    const { error } = await sendNow({
       from,
       // Reply goes straight back to the enquirer, not the owner inbox.
       replyTo: enquiry.email,
@@ -91,8 +93,12 @@ export async function sendBusinessEnquiryNotification(enquiry: BusinessEnquiryDa
       html,
       text: htmlToText(html),
     });
+    // Resend reports a refused send in the result rather than throwing.
+    if (error) throw new Error(error.message);
+    return true;
   } catch (error) {
     console.error("[email] Failed to send business enquiry notification:", error);
+    return false;
   }
 }
 

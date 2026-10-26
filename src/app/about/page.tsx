@@ -115,8 +115,8 @@ export default async function AboutPage(): Promise<React.ReactElement> {
             happening and ask questions.
           </TickItem>
           <TickItem>
-            <strong>Leave clear notes.</strong> After every visit, you get a simple summary of what
-            changed and any tips for next time.
+            <strong>Leave clear notes.</strong> If you'd like them, I write down what changed and
+            any tips for next time.
           </TickItem>
         </TickList>
         <p className="text-seasalt-700">
