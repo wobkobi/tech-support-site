@@ -946,7 +946,7 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
       });
       continue;
     }
-    const first = r.durations[0];
+    const first = r.durations[0] ?? -1;
 
     // Family 1: single-task estimate must reflect the live benchmark.
     if (r.kind === "estimate-single") {
@@ -1055,7 +1055,7 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
         canonical === null
           ? null
           : clampBillableMins(canonical, ctx.minBillableMins, inc, ctx.maxJobMins);
-      const estMins = r.durations[0];
+      const estMins = r.durations[0] ?? -1;
       const parseMins = r.parseMins ?? -1;
       out.push({
         id: r.id,

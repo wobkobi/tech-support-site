@@ -385,7 +385,7 @@ export function replyProblems(
     const used = req.author
       .split(/[^\p{L}]+/u)
       .filter((part) => part.length >= 3)
-      .map((part) => part[0].toUpperCase() + part.slice(1).toLowerCase())
+      .map((part) => part[0]!.toUpperCase() + part.slice(1).toLowerCase())
       .find((part) => new RegExp(`\\b${part}\\b`, "u").test(text));
     if (used) hard.push(`calls them "${used}" from their username`);
   }

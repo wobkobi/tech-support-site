@@ -361,10 +361,15 @@ function checkGoogle(): void {
   );
 
   const base = {
+    format: "feed" as const,
     text: "Hello",
     imageUrl: BLOB,
     imageAlt: null,
+    images: [{ url: BLOB, alt: null }],
+    video: null,
     linkUrl: "https://example.co.nz/booking",
+    containerId: null,
+    containerCreatedAt: null,
   };
   const noGoogle = {
     url: null,
@@ -949,6 +954,7 @@ function target(
     enabled,
     textOverride: null,
     imageUrl: null,
+    imageOriginalUrl: null,
     imageAlt: null,
     imageWidth: null,
     imageHeight: null,
@@ -959,6 +965,8 @@ function target(
     error: status === "failed" ? "boom" : null,
     postedAt: null,
     removedAt: null,
+    containerId: null,
+    containerCreatedAt: null,
   };
 }
 
