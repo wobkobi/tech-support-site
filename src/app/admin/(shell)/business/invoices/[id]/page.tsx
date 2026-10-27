@@ -15,6 +15,9 @@ import {
   goldCardLineLabel,
   lineItemQtyLabel,
   promoLineLabel,
+  settledCallout,
+  settlementRows,
+  UNSUCCESSFUL_LINE_LABEL,
 } from "@/features/business/lib/business";
 import { findRecordedPayment } from "@/features/business/lib/invoice-payment-match";
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
@@ -320,6 +323,8 @@ export default async function InvoiceViewPage({
   // Cashbook sheet income never reaches the invoice, so a SENT row may already be paid.
   const recordedPayment =
     invoice.status === "SENT" && !invoice.isQuote ? await findRecordedPayment(invoice) : null;
+  // A paid or voided invoice asks for nothing, so its box says so instead of the bank details.
+  const settled = settledCallout(invoice);
 
   return (
     <div>
@@ -351,7 +356,10 @@ export default async function InvoiceViewPage({
           </span>
         }
         actions={
+          // Converting a quote renumbers it, so the key remounts the actions with the
+          // invoice's DRAFT status and email copy instead of the quote's sent state.
           <InvoiceActions
+            key={invoice.number}
             driveWebUrl={invoice.driveWebUrl}
             invoiceId={invoice.id}
             invoiceNumber={invoice.number}
@@ -405,6 +413,9 @@ export default async function InvoiceViewPage({
               <p className="mt-2 font-mono text-sm font-semibold text-slate-700">
                 {invoice.number}
               </p>
+              {invoice.replacesNumber && (
+                <p className="mt-0.5 text-xs text-slate-500">Replaces {invoice.replacesNumber}</p>
+              )}
               <p
                 className={cn(
                   "mt-1 text-xs",
@@ -446,16 +457,38 @@ export default async function InvoiceViewPage({
               <p className="text-sm wrap-break-word text-slate-500">{invoice.clientEmail}</p>
             </div>
             <div className="space-y-1 self-start text-sm whitespace-nowrap">
+              {invoice.jobDate && !invoice.isQuote && (
+                <p className="flex justify-between gap-4">
+                  <span className="text-slate-500">Work done:</span>
+                  <span className="font-bold text-slate-800">
+                    {formatDateShort(invoice.jobDate)}
+                  </span>
+                </p>
+              )}
               <p className="flex justify-between gap-4">
                 <span className="text-slate-500">Issued:</span>
                 <span className="font-bold text-slate-800">
                   {formatDateShort(invoice.issueDate)}
                 </span>
               </p>
-              <p className="flex justify-between gap-4">
-                <span className="text-slate-500">Due:</span>
-                <span className="font-bold text-slate-800">{formatDateShort(invoice.dueDate)}</span>
-              </p>
+              {/* A quote has no due date; it shows how long its prices hold. */}
+              {invoice.isQuote ? (
+                invoice.quoteValidUntil && (
+                  <p className="flex justify-between gap-4">
+                    <span className="text-slate-500">Valid to:</span>
+                    <span className="font-bold text-slate-800">
+                      {formatDateShort(invoice.quoteValidUntil)}
+                    </span>
+                  </p>
+                )
+              ) : (
+                <p className="flex justify-between gap-4">
+                  <span className="text-slate-500">Due:</span>
+                  <span className="font-bold text-slate-800">
+                    {formatDateShort(invoice.dueDate)}
+                  </span>
+                </p>
+              )}
             </div>
           </div>
 
@@ -498,29 +531,34 @@ export default async function InvoiceViewPage({
                 {formatNZD(invoice.subtotal)}
               </span>
             </div>
-            {invoice.promoDiscount && invoice.promoDiscount > 0 && (
+            {(invoice.promoDiscount ?? 0) > 0 && (
               <div className="flex justify-between gap-3 text-amber-700">
                 <span>{promoLineLabel(invoice.promoTitle)}</span>
-                <span className="whitespace-nowrap">-{formatNZD(invoice.promoDiscount)}</span>
+                <span className="whitespace-nowrap">-{formatNZD(invoice.promoDiscount ?? 0)}</span>
               </div>
             )}
             {(invoice.promoDiscount ?? 0) > 0 && invoice.promoNote ? (
               <p className="text-xs text-amber-700">{invoice.promoNote}</p>
             ) : null}
-            {invoice.goldCardDiscount && invoice.goldCardDiscount > 0 && (
+            {(invoice.goldCardDiscount ?? 0) > 0 && (
               <div className="flex justify-between gap-3 text-amber-700">
                 <span>{goldCardLineLabel(invoice.goldCardPercent)}</span>
-                <span className="whitespace-nowrap">-{formatNZD(invoice.goldCardDiscount)}</span>
-              </div>
-            )}
-            {invoice.unsuccessfulDiscount && invoice.unsuccessfulDiscount > 0 && (
-              <div className="flex justify-between gap-3 text-amber-700">
-                <span>Unsuccessful-visit discount (labour only)</span>
                 <span className="whitespace-nowrap">
-                  -{formatNZD(invoice.unsuccessfulDiscount)}
+                  -{formatNZD(invoice.goldCardDiscount ?? 0)}
                 </span>
               </div>
             )}
+            {(invoice.unsuccessfulDiscount ?? 0) > 0 && (
+              <div className="flex justify-between gap-3 text-amber-700">
+                <span>{UNSUCCESSFUL_LINE_LABEL}</span>
+                <span className="whitespace-nowrap">
+                  -{formatNZD(invoice.unsuccessfulDiscount ?? 0)}
+                </span>
+              </div>
+            )}
+            {(invoice.unsuccessfulDiscount ?? 0) > 0 && invoice.unsuccessfulNote ? (
+              <p className="text-xs text-amber-700">{invoice.unsuccessfulNote}</p>
+            ) : null}
             {invoice.gstAmount > 0 && (
               <div className="flex justify-between gap-3">
                 <span className="text-slate-500">Includes GST</span>
@@ -535,38 +573,66 @@ export default async function InvoiceViewPage({
                 {formatNZD(invoice.total)}
               </span>
             </div>
-            {invoice.alreadyPaid != null && invoice.alreadyPaid > 0 && (
-              <>
-                <div className="flex justify-between gap-3">
-                  <span className="text-slate-500">Already paid</span>
-                  <span className="font-medium whitespace-nowrap text-slate-700">
-                    -{formatNZD(invoice.alreadyPaid)}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-3 border-t border-slate-200 pt-1">
-                  <span className="font-semibold text-slate-800">Balance due</span>
+            {/* Paid and left to pay, as the PDF prints them: a paid invoice ends at $0.00,
+                never at the balance it had before payment. */}
+            {settlementRows(invoice).map((row) =>
+              row.bold ? (
+                <div
+                  key={row.label}
+                  className="flex justify-between gap-3 border-t border-slate-200 pt-1"
+                >
+                  <span className="font-semibold text-slate-800">{row.label}</span>
                   <span className="font-extrabold whitespace-nowrap text-russian-violet">
-                    {formatNZD(balanceDue(invoice))}
+                    {row.value}
                   </span>
                 </div>
-              </>
+              ) : (
+                <div key={row.label} className="flex justify-between gap-3">
+                  <span className="text-slate-500">{row.label}</span>
+                  <span className="font-medium whitespace-nowrap text-slate-700">{row.value}</span>
+                </div>
+              ),
             )}
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-            <p className="mb-1 text-sm font-bold text-russian-violet">Bank transfer</p>
-            <p>Payee: {identity.name}</p>
-            <p className="font-semibold text-slate-700">Account: {identity.bankAccount}</p>
-            <p className="font-semibold text-slate-700">
-              Particulars: {bankParticulars(invoice.clientName)}
+          {/* The PDF's box: accept a quote, a settled note, or the bank details to pay. */}
+          {invoice.isQuote ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+              <p className="mb-1 text-sm font-bold text-russian-violet">Accepting this quote</p>
+              <p className="text-slate-700">
+                Reply to the email or ring {identity.phone} to go ahead.
+              </p>
+              <p>
+                {invoice.quoteValidUntil
+                  ? `Prices are held until ${formatDateShort(invoice.quoteValidUntil)}.`
+                  : "Prices may change if the scope does - anything extra is agreed first."}
+              </p>
+            </div>
+          ) : settled ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+              <p className="mb-1 text-sm font-bold text-russian-violet">{settled.heading}</p>
+              <p className="text-slate-700">{settled.text}</p>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+              <p className="mb-1 text-sm font-bold text-russian-violet">Bank transfer</p>
+              <p>Payee: {identity.name}</p>
+              <p className="font-semibold text-slate-700">Account: {identity.bankAccount}</p>
+              <p className="font-semibold text-slate-700">
+                Particulars: {bankParticulars(invoice.clientName)}
+              </p>
+              <p className="font-semibold text-slate-700">Code: {bankCode(invoice.number)}</p>
+              <p>
+                Due within {identity.paymentTermsDays} days of issue (by{" "}
+                {formatDateShort(invoice.dueDate)}).
+              </p>
+            </div>
+          )}
+          {invoice.notes && (
+            <p className="mt-3 text-xs whitespace-pre-line text-slate-500 italic">
+              {invoice.notes}
             </p>
-            <p className="font-semibold text-slate-700">Code: {bankCode(invoice.number)}</p>
-            <p>
-              Due within {identity.paymentTermsDays} days of issue (by{" "}
-              {formatDateShort(invoice.dueDate)}).
-            </p>
-          </div>
-          {invoice.notes && <p className="mt-3 text-xs text-slate-500 italic">{invoice.notes}</p>}
+          )}
 
           {/* Sender contact footer (matches the page-bottom footer in the PDF). */}
           <div className="mt-8 border-t border-slate-200 pt-3 text-center text-xs wrap-break-word text-slate-500">

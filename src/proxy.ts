@@ -43,7 +43,7 @@ async function hasAdminAccess(request: NextRequest): Promise<boolean> {
  * @returns A 401 / redirect / next response depending on auth state.
  */
 export async function proxy(request: NextRequest): Promise<NextResponse> {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
 
   if (PUBLIC_EXCEPTIONS.some((p) => pathname === p)) {
     return NextResponse.next();
@@ -56,10 +56,10 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   if (pathname === PROTECTED_PAGE_PREFIX || pathname.startsWith(`${PROTECTED_PAGE_PREFIX}/`)) {
     if (await hasAdminAccess(request)) return NextResponse.next();
-    // Bounce the operator to the login page with a `next=` so they land back
-    // on the page they were trying to reach after sign-in.
+    // Bounce the operator to the login page with a `next=` so they land back on the page
+    // they were trying to reach after sign-in, its filters and tab included.
     const loginUrl = new URL("/admin/login", request.url);
-    loginUrl.searchParams.set("next", pathname);
+    loginUrl.searchParams.set("next", `${pathname}${search}`);
     return NextResponse.redirect(loginUrl);
   }
 

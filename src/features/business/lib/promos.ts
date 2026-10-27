@@ -1081,7 +1081,8 @@ export function describePromoTerms(promo: ActivePromo): string {
 }
 
 /**
- * Customer-facing one-line summary for banner + pricing hero.
+ * Customer-facing one-line summary for banner + pricing hero. Says "if you book by", since a
+ * promo's dates are judged when the booking is made, so a visit after the end still gets it.
  * @param promo - Active promo.
  * @param options - Formatting options.
  * @param options.fixedDate - Name the end date ("Fri, 17 Oct") instead of "this Friday",
@@ -1094,5 +1095,5 @@ export function summariseForBanner(
 ): string {
   const end = formatPromoEnd(promo.endAt, new Date(), fixedDate);
   const restriction = describeRecurringWindow(promo);
-  return `${describeOfferCore(promo)} until ${end}${restriction ? `, ${restriction} only` : ""}${describePerCustomerLimit(promo)}`;
+  return `${describeOfferCore(promo)} if you book by ${end}${restriction ? `, ${restriction} only` : ""}${describePerCustomerLimit(promo)}`;
 }

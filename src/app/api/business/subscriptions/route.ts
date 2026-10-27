@@ -3,6 +3,9 @@
 // creates, refusing a duplicate active supplier+description.
 
 import { VALID_FREQUENCIES } from "@/features/business/lib/constants";
+import { GST_RATE } from "@/features/business/lib/pricing-policy";
+import { expenseGstRateOn } from "@/features/business/lib/tax/gst-basis";
+import { loadGstStatus } from "@/features/business/lib/tax/load";
 import { parseAmount, parseDate, parseRate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -79,14 +82,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (safeAmount === null) {
     return errorResponse("Invalid amount", 400);
   }
-  const safeRate = gstRate === undefined ? 0.15 : parseRate(gstRate);
-  if (safeRate === null) {
-    return errorResponse("Invalid GST rate", 400);
-  }
-
   const nextDueValue = parseDate(nextDue);
   if (nextDueValue === null) {
     return errorResponse("Invalid nextDue date", 400);
+  }
+
+  // No rate given follows registration on the first due date, as a one-off expense does.
+  const safeRate =
+    gstRate === undefined
+      ? expenseGstRateOn(nextDueValue, await loadGstStatus(), GST_RATE)
+      : parseRate(gstRate);
+  if (safeRate === null) {
+    return errorResponse("Invalid GST rate", 400);
   }
 
   // Refuse only an exact supplier+description copy, which the cron would book twice.
@@ -109,6 +116,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       method: method ?? "Business Account",
       frequency,
       nextDue: nextDueValue,
+      dueDay: nextDueValue.getUTCDate(),
       isActive: true,
       notes: notes ?? null,
     },

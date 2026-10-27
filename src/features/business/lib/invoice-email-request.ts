@@ -34,6 +34,7 @@ export type InvoiceEmailPayload = Pick<
   | "driveWebUrl"
   | "isQuote"
   | "quoteValidUntil"
+  | "replacesNumber"
 > & {
   /** Who the email greets by default - the person behind a company invoice. */
   defaultGreeting: string;
@@ -89,6 +90,7 @@ export async function toInvoiceEmailPayload(invoice: Invoice): Promise<InvoiceEm
     driveWebUrl: invoice.driveWebUrl,
     isQuote: invoice.isQuote,
     quoteValidUntil: invoice.quoteValidUntil,
+    replacesNumber: invoice.replacesNumber,
     defaultGreeting: invoiceRecipient(invoice.clientName, contact).greetingName,
   };
 }

@@ -6,6 +6,7 @@
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import type React from "react";
+import { useEffect } from "react";
 import { FaArrowRotateRight, FaHouse } from "react-icons/fa6";
 
 /**
@@ -22,7 +23,16 @@ export default function GlobalError({
   error: Error;
   reset: () => void;
 }): React.ReactElement {
-  const msg = (error?.message || "").trim().slice(0, 300) || "An unexpected error occurred.";
+  // Client-render exceptions aren't redacted by Next, so the message and stack show only in
+  // development, as on the route error page; production logs them to the console instead.
+  const showDetails = process.env.NODE_ENV !== "production";
+  const msg =
+    (showDetails && (error?.message || "").trim().slice(0, 300)) ||
+    "Sorry, the page didn't load properly. Please try again, or head back to the home page.";
+
+  useEffect(() => {
+    console.error("[global error]:", error);
+  }, [error]);
 
   return (
     <html lang="en-NZ">
@@ -63,12 +73,14 @@ export default function GlobalError({
               </Link>
             </div>
 
-            <details className="mt-4 text-base text-rich-black/80">
-              <summary className="cursor-pointer">Technical details</summary>
-              <pre className="mt-2 overflow-auto rounded-md border border-seasalt-200/60 bg-white p-3">
-                {String(error?.stack || error)}
-              </pre>
-            </details>
+            {showDetails && (
+              <details className="mt-4 text-base text-rich-black/80">
+                <summary className="cursor-pointer">Technical details</summary>
+                <pre className="mt-2 overflow-auto rounded-md border border-seasalt-200/60 bg-white p-3">
+                  {String(error?.stack || error)}
+                </pre>
+              </details>
+            )}
           </div>
         </main>
       </body>

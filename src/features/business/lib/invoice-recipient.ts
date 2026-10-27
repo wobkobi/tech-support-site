@@ -21,12 +21,15 @@ export interface InvoiceRecipient {
 }
 
 /**
- * Reduces a name to a form two spellings can agree on ("68 LTD." vs "68 Ltd").
+ * Reduces a name to a form two spellings can agree on ("68 LTD." vs "68 Ltd", "Ōrākei
+ * Ltd" vs "Orakei Ltd").
  * @param name - Raw name.
- * @returns Lowercased, punctuation-free, single-spaced form.
+ * @returns Lowercased, macron-free, punctuation-free, single-spaced form.
  */
 function comparable(name: string): string {
   return name
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, "")
     .replace(/\s+/g, " ")

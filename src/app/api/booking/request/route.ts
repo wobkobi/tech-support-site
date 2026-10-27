@@ -16,19 +16,20 @@ import {
   type StartMinute,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
+import { lookupBookingSnapshots } from "@/features/booking/lib/booking-snapshots.server";
 import {
   loadBlockingBookings,
   loadBlockingEvents,
 } from "@/features/booking/lib/existing-bookings.server";
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
-import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
+
 import { recordPromoRedemption } from "@/features/business/lib/promo-redemption";
 import {
   bookingPromoColumns,
   describeRecurringWindow,
   resolvePromo,
 } from "@/features/business/lib/promos";
-import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
+
 import { parseObjectId } from "@/features/business/lib/validation";
 import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { removeBookingEvent } from "@/features/calendar/lib/pending-calendar-deletes";
@@ -320,46 +321,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Snapshot rates + promo so the quote survives later edits; failures degrade to null.
-    // Promo dates are judged at booking time, weekday/time-of-day at startAt; the email
-    // lets per-customer limits bind before a Contact exists.
-    const [rates, activePromo] = await Promise.all([
-      prisma.rateConfig.findMany().catch((err) => {
-        console.warn("[booking/request] RateConfig snapshot fetch failed:", err);
-        return [] as Awaited<ReturnType<typeof prisma.rateConfig.findMany>>;
+    // Snapshot rates, travel, holiday and promo so the quote survives later edits. Promo
+    // dates are judged at booking time, weekday/time-of-day at startAt; the email lets
+    // per-customer limits bind before a Contact exists.
+    const [snapshots, activePromo] = await Promise.all([
+      lookupBookingSnapshots({
+        startAt,
+        endAt,
+        address: meetingType === "in-person" ? canonicalAddress : null,
+        travelRatePerHour: settings.pricing.travelRatePerHour,
+        logTag: "booking/request",
       }),
       resolvePromo({ at: startAt, bookedAt: new Date(), code: promoCode, email }).catch((err) => {
         console.warn("[booking/request] promo resolution failed:", err);
         return null;
       }),
     ]);
-    const baseRow = rates.find((r) => r.ratePerHour !== null && r.isDefault) ?? null;
-    const baseRateAtBooking = baseRow?.ratePerHour ?? null;
-    // Snapshot so later settings edits can't reprice a quoted booking.
-    const travelRatePerHourAtBooking = settings.pricing.travelRatePerHour;
-
-    // Drive-time snapshot (outbound at start, return at end) so a late cancel bills
-    // travel without a re-lookup.
-    let travelMinsAtBooking: number | null = null;
-    let travelMinsBackAtBooking: number | null = null;
-    if (meetingType === "in-person" && canonicalAddress) {
-      try {
-        const drive = await lookupDriveRoundTrip(canonicalAddress, startAt, endAt);
-        if (drive.status === "ok") {
-          travelMinsAtBooking = drive.data.there.durationMins;
-          travelMinsBackAtBooking = drive.data.back.durationMins;
-        }
-      } catch (err) {
-        console.warn("[booking/request] travel-time snapshot failed:", err);
-      }
-    }
-
-    // Stamp the holiday name so disputes can quote what drove the uplift.
-    const holiday = await lookupPublicHoliday(startAt).catch((err) => {
-      console.warn("[booking/request] public-holiday lookup failed:", err);
-      return null;
-    });
-    const publicHolidayName = holiday?.name ?? null;
 
     // Until the row exists, a failure leaves the new event orphaned.
     let bookingCreated = false;
@@ -385,13 +362,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           unit: canonicalAddress ? splitUnitFromAddress(canonicalAddress).unit || null : null,
           meetingType: meetingType === "in-person" ? "in_person" : "remote",
           duration,
-          travelMinsAtBooking,
-          travelMinsBackAtBooking,
-          baseRateAtBooking,
-          travelRatePerHourAtBooking,
+          ...snapshots,
           // Promo snapshot denormalised - survives Promo deletion before service.
           ...bookingPromoColumns(activePromo),
-          publicHolidayName,
           // The public quote the customer saw and how the AI read their request.
           quotedLowAtBooking,
           quotedHighAtBooking,

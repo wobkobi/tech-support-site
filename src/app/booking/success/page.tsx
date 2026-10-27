@@ -1,5 +1,5 @@
 // src/app/booking/success/page.tsx
-// Booking request success page.
+// Booking success page.
 
 import {
   buildAppointmentDescription,
@@ -31,7 +31,7 @@ import { BookingConversion } from "./BookingConversion";
 
 // Only reachable after submitting the form: keep it out of search results.
 export const metadata: Metadata = {
-  title: "Booking request received",
+  title: "Booking confirmed",
   robots: { index: false, follow: false },
 };
 

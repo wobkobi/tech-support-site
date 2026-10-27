@@ -240,6 +240,7 @@ export async function PATCH(
         ...(repricesUnsuccessful && {
           unsuccessful: unsuccessfulDiscount > 0,
           unsuccessfulDiscount: unsuccessfulDiscount > 0 ? unsuccessfulDiscount : null,
+          unsuccessfulNote: unsuccessfulDiscount > 0 ? parseString(body.unsuccessfulNote) : null,
         }),
         // promoTitle and promoId stay, so the redemption still settles against the promo.
         ...(repricesPromo && {

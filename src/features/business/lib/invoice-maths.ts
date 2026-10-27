@@ -205,34 +205,48 @@ export function isValidLineItem(item: unknown): item is LineItem {
 }
 
 /**
- * Generates the next sequential invoice number in TTP-YYYY-XXXX format.
- * @param lastNumber - Last used invoice number, or null for first
- * @param yearCode - Financial year code (e.g. "2627")
- * @param prefix - Invoice prefix (default "TTP")
- * @returns Next formatted invoice number
+ * The sequence at the end of an invoice or quote number ("TTP-202627-0042" > 42).
+ * @param number - A saved number, or null when there's none.
+ * @returns The sequence, or 0 when there's no number or no trailing digits.
+ */
+export function numberSequence(number: string | null | undefined): number {
+  const match = number?.match(/-(\d+)$/);
+  return match ? parseInt(match[1] ?? "", 10) : 0;
+}
+
+/**
+ * Next number in a financial year's run, e.g. TTP-202627-0098. Each 1 April starts again at
+ * 0001, so only this year's numbers count. The sheet's counter (SETTINGS!B19, or B12 for
+ * quotes) still holds last year's final count until this year's first number is written
+ * back, so it only counts once this year has a number of its own.
+ * @param prefix - "TTP" for invoices, "Q" for quotes.
+ * @param yearCode - Financial year code ("202627").
+ * @param dbLast - Highest sequence already saved this year; 0 when none.
+ * @param sheetLast - The sheet counter's last issued number; null when the sheet wasn't read.
+ * @returns The formatted number and its sequence, for the counter write-back.
  */
 export function nextInvoiceNumber(
-  lastNumber: string | null,
+  prefix: string,
   yearCode: string,
-  prefix: string = "TTP",
-): string {
-  if (!lastNumber) return `${prefix}-${yearCode}-0001`;
-  // 4+ digits so a 5-digit counter (10000+) still increments.
-  const match = lastNumber.match(/-(\d{4,})$/);
-  if (!match) return `${prefix}-${yearCode}-0001`;
-  const next = parseInt(match[1] ?? "", 10) + 1;
-  return `${prefix}-${yearCode}-${String(next).padStart(4, "0")}`;
+  dbLast: number,
+  sheetLast: number | null,
+): { number: string; sequence: number } {
+  const sequence = Math.max(dbLast, dbLast > 0 ? (sheetLast ?? 0) : 0) + 1;
+  return { number: `${prefix}-${yearCode}-${String(sequence).padStart(4, "0")}`, sequence };
 }
 
 /**
  * Advances a subscription's next due date by its frequency, in UTC to dodge DST. Month
- * steps clamp to the month's last day (31 Jan monthly > 28/29 Feb, not 3 Mar).
+ * steps clamp to the month's last day (31 Jan monthly > 28/29 Feb, not 3 Mar), then aim
+ * back at `dueDay`, so 28 Feb steps to 31 Mar instead of keeping the clamped 28th for good.
  * @param current - Current nextDue date
  * @param frequency - Billing frequency
+ * @param dueDay - Day of the month it's due on; omitted or null uses `current`'s day.
  * @returns New nextDue date
  */
-export function advanceNextDue(current: Date, frequency: string): Date {
+export function advanceNextDue(current: Date, frequency: string, dueDay?: number | null): Date {
   const d = new Date(current);
+  const day = dueDay ?? d.getUTCDate();
   switch (frequency) {
     case "weekly":
       d.setUTCDate(d.getUTCDate() + 7);
@@ -241,25 +255,26 @@ export function advanceNextDue(current: Date, frequency: string): Date {
       d.setUTCDate(d.getUTCDate() + 14);
       break;
     case "monthly":
-      addUTCMonthsClamped(d, 1);
+      addUTCMonthsClamped(d, 1, day);
       break;
     case "quarterly":
-      addUTCMonthsClamped(d, 3);
+      addUTCMonthsClamped(d, 3, day);
       break;
     case "annually":
-      addUTCMonthsClamped(d, 12);
+      addUTCMonthsClamped(d, 12, day);
       break;
   }
   return d;
 }
 
 /**
- * Adds whole months to `d` in UTC (mutating it), clamping the day to the target month's end.
+ * Adds whole months to `d` in UTC (mutating it), landing on `day` clamped to the target
+ * month's end.
  * @param d - Date to advance (mutated).
  * @param months - Whole months to add.
+ * @param day - Day of the month to land on (1-31).
  */
-function addUTCMonthsClamped(d: Date, months: number): void {
-  const day = d.getUTCDate();
+function addUTCMonthsClamped(d: Date, months: number, day: number): void {
   d.setUTCDate(1);
   d.setUTCMonth(d.getUTCMonth() + months);
   // Last day of the now-current month; clamp the original day down to it.

@@ -3,6 +3,7 @@
 
 import { parseObjectId, parseString } from "@/features/business/lib/validation";
 import { sendOwnerPush } from "@/features/notifications/lib/push";
+import { fillBlankContactDetails } from "@/features/reviews/lib/contact-details.server";
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
 import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
 import { reviewTextError } from "@/features/reviews/lib/validation";
@@ -92,10 +93,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // Read before any claim below, so a failed read leaves nothing to undo.
+    const { reviews: reviewSettings, comms } = await getSettings();
+
     let verified = false;
     let bookingId = null;
     let customerRef = null;
     let autoContactId: string | null = null;
+    // Undoes the "reviewed" stamp if the review then can't be saved, so the link still
+    // offers the form rather than an empty "edit your review".
+    let releaseClaim: (() => Promise<unknown>) | null = null;
+    /**
+     * The one-review-per-link refusal.
+     * @returns A 409 pointing them at their review link.
+     */
+    const alreadyReviewed = (): NextResponse =>
+      errorResponse("You've already left a review - open your review link to edit it.", 409);
 
     // Validate before any reaches a `where`: Prisma accepts a filter object in place of
     // a scalar, which would let a caller match a booking without its token.
@@ -115,12 +128,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           where: { bookingId: booking.id },
           select: { id: true },
         });
-        if (existing) {
-          return errorResponse(
-            "You've already left a review - open your review link to edit it.",
-            409,
-          );
-        }
+        if (existing) return alreadyReviewed();
+        // Claimed before the review is written: of two quick submits, only one gets past.
+        const claim = await prisma.booking.updateMany({
+          where: {
+            id: booking.id,
+            OR: [{ reviewSubmittedAt: null }, { reviewSubmittedAt: { isSet: false } }],
+          },
+          data: { reviewSubmittedAt: new Date() },
+        });
+        if (claim.count === 0) return alreadyReviewed();
+        /**
+         * Clears the booking's reviewed stamp.
+         * @returns The cleared booking.
+         */
+        releaseClaim = () =>
+          prisma.booking.update({ where: { id: booking.id }, data: { reviewSubmittedAt: null } });
         verified = true;
         bookingId = booking.id;
         customerRef = booking.reviewToken;
@@ -142,10 +165,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         } catch {
           // best-effort
         }
-        await prisma.booking.update({
-          where: { id: booking.id },
-          data: { reviewSubmittedAt: new Date() },
-        });
       } else {
         // Booking gone: keep the token so the review stays identifiable.
         customerRef = claimedToken;
@@ -162,7 +181,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           id: claimedContactId,
           OR: [{ reviewToken: claimedToken }, { altReviewTokens: { has: claimedToken } }],
         },
-        select: { id: true, email: true, phone: true, deletedAt: true },
+        select: { id: true, deletedAt: true },
       });
 
       if (contact && !contact.deletedAt) {
@@ -171,25 +190,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           where: { contactId: contact.id },
           select: { id: true },
         });
-        if (existing) {
-          return errorResponse(
-            "You've already left a review - open your review link to edit it.",
-            409,
-          );
-        }
+        if (existing) return alreadyReviewed();
+        const claim = await prisma.contact.updateMany({
+          where: {
+            id: contact.id,
+            OR: [{ reviewLinkSubmittedAt: null }, { reviewLinkSubmittedAt: { isSet: false } }],
+          },
+          data: { reviewLinkSubmittedAt: new Date() },
+        });
+        if (claim.count === 0) return alreadyReviewed();
+        /**
+         * Clears the contact's reviewed stamp.
+         * @returns The cleared contact.
+         */
+        releaseClaim = () =>
+          prisma.contact.update({
+            where: { id: contact.id },
+            data: { reviewLinkSubmittedAt: null },
+          });
         verified = true;
         customerRef = claimedToken;
         autoContactId = contact.id;
-
-        // Fill blank Contact fields only; never overwrite.
-        const submittedEmail = normaliseEmailOrNull(body.contactEmail);
-        const submittedPhone = normaliseContactPhone(body.contactPhone);
-        const contactUpdate: { email?: string; phone?: string; reviewLinkSubmittedAt: Date } = {
-          reviewLinkSubmittedAt: new Date(),
-        };
-        if (!contact.email && submittedEmail) contactUpdate.email = submittedEmail;
-        if (!contact.phone && submittedPhone) contactUpdate.phone = submittedPhone;
-        await prisma.contact.update({ where: { id: contact.id }, data: contactUpdate });
       } else if (contact) {
         // Contact soft-deleted: keep the token for re-linking, but not verified.
         customerRef = claimedToken;
@@ -200,28 +221,51 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Verified reviews auto-approve only when the operator opts in.
-    const { reviews: reviewSettings, comms } = await getSettings();
     const status = verified && reviewSettings.autoApproveVerified ? "approved" : "pending";
 
-    const review = await prisma.review.create({
-      data: {
-        text,
-        firstName: isAnonymous ? null : firstName,
-        lastName: isAnonymous ? null : lastName,
-        isAnonymous,
-        verified,
-        bookingId,
-        customerRef,
-        contactId: autoContactId,
-        status,
-      },
-    });
+    let review;
+    try {
+      review = await prisma.review.create({
+        data: {
+          text,
+          firstName: isAnonymous ? null : firstName,
+          lastName: isAnonymous ? null : lastName,
+          isAnonymous,
+          verified,
+          bookingId,
+          customerRef,
+          contactId: autoContactId,
+          status,
+        },
+      });
+    } catch (error) {
+      await releaseClaim?.().catch((err: unknown) =>
+        console.error("[reviews] Couldn't clear the reviewed stamp after a failed save:", err),
+      );
+      throw error;
+    }
 
     // Shared helper covers every review surface, including the home-page marquee.
     revalidateReviewPaths();
 
+    const contactEmail = normaliseEmailOrNull(body.contactEmail);
+    const contactPhone = normaliseContactPhone(body.contactPhone);
+    if (autoContactId) {
+      await fillBlankContactDetails(autoContactId, { email: contactEmail, phone: contactPhone });
+    }
+
     // Awaited: Vercel freezes the instance after the response. Swallows its own errors.
-    await sendOwnerReviewNotification(review);
+    await sendOwnerReviewNotification({
+      id: review.id,
+      text: review.text,
+      firstName: review.firstName,
+      lastName: review.lastName,
+      isAnonymous: review.isAnonymous,
+      verified,
+      status,
+      contactEmail,
+      contactPhone,
+    });
 
     if (comms.pushOnReview) {
       await sendOwnerPush({

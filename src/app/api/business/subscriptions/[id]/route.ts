@@ -67,6 +67,17 @@ export async function PATCH(
   if (nextDueValue === null) {
     return errorResponse("Invalid nextDue date", 400);
   }
+  // The edit form resends an unchanged date, so the due day moves only with a new date; a
+  // clamped 28 Feb resent as-is keeps a 31st subscription on the 31st.
+  let dueDay: number | undefined;
+  if (nextDueValue) {
+    const current = await prisma.subscription.findUnique({
+      where: { id },
+      select: { nextDue: true },
+    });
+    if (!current) return errorResponse("Subscription not found", 404);
+    if (current.nextDue.getTime() !== nextDueValue.getTime()) dueDay = nextDueValue.getUTCDate();
+  }
 
   try {
     const subscription = await prisma.subscription.update({
@@ -80,6 +91,7 @@ export async function PATCH(
         ...(method !== undefined && { method }),
         ...(frequency !== undefined && { frequency }),
         ...(nextDueValue && { nextDue: nextDueValue }),
+        ...(dueDay !== undefined && { dueDay }),
         ...(isActive !== undefined && { isActive }),
         ...(notes !== undefined && { notes }),
       },

@@ -321,7 +321,8 @@ export default async function ContactDetailPage({
                 </InfoRow>
               )}
               <InfoRow label="Reviewed">
-                {contact.reviewLinkSubmittedAt ? (
+                {/* A review from a booking link counts too; only contact-link reviews stamp the contact. */}
+                {contact.reviewLinkSubmittedAt || totals.reviews > 0 ? (
                   <StatusPill tone="success">Yes</StatusPill>
                 ) : (
                   <StatusPill tone="neutral">Not yet</StatusPill>

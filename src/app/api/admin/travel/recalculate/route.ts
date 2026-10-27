@@ -1,18 +1,17 @@
 // src/app/api/admin/travel/recalculate/route.ts
-// Admin endpoint to force-recalculate all travel blocks. Clears stored TravelBlock
-// records so the next cache refresh recomputes fresh travel times.
+// Admin endpoint to recalculate travel for every event still to finish. Finished jobs keep
+// the travel they had, and a failed lookup keeps the block it would have replaced.
 
 import { refreshCalendarCache } from "@/features/calendar/lib/calendar-cache";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { prisma } from "@/shared/lib/prisma";
 import { type NextRequest, NextResponse } from "next/server";
 
 /**
- * Force-deletes all TravelBlock records and runs a full calendar cache refresh
- * so stale travel times are replaced with freshly-fetched values.
+ * Runs a full calendar cache refresh that recomputes upcoming travel from fresh lookups.
  * @param request - Incoming admin request.
- * @returns JSON with ok and cachedCount, or an error response.
+ * @returns JSON `{ ok, cachedCount, failedCalendars }`, or an error when the calendars
+ * couldn't be read at all.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
@@ -20,18 +19,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    // Zero out raw minutes on all existing blocks so refreshCalendarCache treats them as stale
-    // and makes fresh API calls. Transport modes are preserved so they are used during recalculation.
-    await prisma.travelBlock.updateMany({
-      data: {
-        rawTravelMinutes: null,
-        roundedMinutes: null,
-        rawTravelBackMinutes: null,
-        roundedBackMinutes: null,
-      },
+    const result = await refreshCalendarCache({ forceTravel: true });
+    if (result.fetchFailed) {
+      return errorResponse(
+        "Couldn't read Google Calendar, so nothing was recalculated. Try again in a minute.",
+        502,
+      );
+    }
+    return NextResponse.json({
+      ok: true,
+      cachedCount: result.cachedCount,
+      failedCalendars: result.failedCalendars,
     });
-    const result = await refreshCalendarCache();
-    return NextResponse.json({ ok: true, cachedCount: result.cachedCount });
   } catch (error) {
     console.error("[travel/recalculate] Error:", error);
     return errorResponse("Recalculation failed", 500);

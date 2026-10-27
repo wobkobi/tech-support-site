@@ -101,7 +101,11 @@ export function ReviewsTab({ initial, defaults }: Props): React.ReactElement {
 
       <SettingsFooter form={form} />
 
-      <SettingsHistory group="reviews" onRestore={(v: ReviewsSettings) => setDraft(v)} />
+      <SettingsHistory
+        key={form.savedAt ?? 0}
+        group="reviews"
+        onRestore={(v: ReviewsSettings) => setDraft(v)}
+      />
     </SettingsTabBody>
   );
 }

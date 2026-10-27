@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "5.12.1",
+  "version": "5.15.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -67,6 +67,7 @@
     "@googleapis/drive": "^27.0.0",
     "@googleapis/people": "^12.0.1",
     "@googleapis/sheets": "^18.1.1",
+    "@pdf-lib/fontkit": "^1.1.1",
     "@prisma/client": "6.19.3",
     "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.8.2",

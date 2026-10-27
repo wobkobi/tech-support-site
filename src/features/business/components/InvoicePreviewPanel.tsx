@@ -9,6 +9,7 @@ import {
   goldCardLineLabel,
   lineItemQtyLabel,
   promoLineLabel,
+  UNSUCCESSFUL_LINE_LABEL,
 } from "@/features/business/lib/business";
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
 import type { LineItem } from "@/features/business/types/business";
@@ -30,6 +31,10 @@ interface Props {
   issueDate: string;
   /** ISO YYYY-MM-DD. */
   dueDate: string;
+  /** NZ date the work was done (YYYY-MM-DD), printed as "Work done"; null hides the row. */
+  jobDate?: string | null;
+  /** Number of the voided invoice this one replaces, printed under the number. */
+  replacesNumber?: string | null;
   lineItems: LineItem[];
   notes: string;
   promoTitle: string | null;
@@ -43,6 +48,8 @@ interface Props {
   goldCardPercent?: number | null;
   /** Half-price labour discount when operator ticked unsuccessful; rendered when > 0. */
   unsuccessfulDiscount?: number;
+  /** What couldn't be fixed and the labour it came off, printed under the discount row. */
+  unsuccessfulNote?: string | null;
   /** Live GST-registration flag; controls the "Includes GST" line so the preview matches the saved invoice. */
   gstRegistered?: boolean;
   /** Money handed over before the invoice went out; adds Already paid and Balance due when > 0. */
@@ -60,6 +67,8 @@ interface Props {
  * @param props.clientEmail - Client email shown on the invoice header.
  * @param props.issueDate - ISO YYYY-MM-DD issue date.
  * @param props.dueDate - ISO YYYY-MM-DD due date.
+ * @param props.jobDate - NZ date the work was done, or null to hide the "Work done" row.
+ * @param props.replacesNumber - Voided invoice this one replaces, or null.
  * @param props.lineItems - Line items to render.
  * @param props.notes - Footer notes text.
  * @param props.promoTitle - Promo title (when discount > 0).
@@ -68,6 +77,7 @@ interface Props {
  * @param props.goldCardDiscount - Gold Card discount in dollars; renders the line when > 0.
  * @param props.goldCardPercent - Gold Card share off labour, printed in the line's label.
  * @param props.unsuccessfulDiscount - Half-price labour discount; renders the line when > 0.
+ * @param props.unsuccessfulNote - What couldn't be fixed, printed under the discount line.
  * @param props.gstRegistered - Live GST-registration flag; controls the "Includes GST" line.
  * @param props.alreadyPaid - Amount already paid; renders Already paid and Balance due when > 0.
  * @param props.isQuote - Render as an unsaved quote with no validity date, as the PDF draws one.
@@ -80,6 +90,8 @@ function InvoicePreviewPanelImpl({
   clientEmail,
   issueDate,
   dueDate,
+  jobDate = null,
+  replacesNumber = null,
   lineItems,
   notes,
   promoTitle,
@@ -88,6 +100,7 @@ function InvoicePreviewPanelImpl({
   goldCardDiscount = 0,
   goldCardPercent = null,
   unsuccessfulDiscount = 0,
+  unsuccessfulNote = null,
   gstRegistered,
   alreadyPaid = 0,
   isQuote = false,
@@ -100,8 +113,8 @@ function InvoicePreviewPanelImpl({
   const showPromoLine = promoDiscount > 0;
   const showUnsuccessfulLine = unsuccessfulDiscount > 0;
   return (
-    // Only this frame is admin chrome; the body keeps its own palette and Helvetica to
-    // match the PDF (invoice-pdf.ts embeds Helvetica).
+    // Only this frame is admin chrome; the body keeps its own palette and Helvetica, whose
+    // letters are as wide as the Arimo the PDF embeds, so lines wrap the same.
     <div
       className={cn(
         "flex flex-col overflow-hidden rounded-lg border border-admin-border bg-admin-surface",
@@ -126,6 +139,9 @@ function InvoicePreviewPanelImpl({
               {isQuote ? "QUOTE" : identity.gstNumber ? "TAX INVOICE" : "INVOICE"}
             </p>
             <p className="mt-2 font-mono text-sm text-slate-700">{number || "TTP-XXXX-0000"}</p>
+            {replacesNumber && (
+              <p className="mt-1 text-[11px] text-slate-500">Replaces {replacesNumber}</p>
+            )}
             {number === "DRAFT" && (
               <p className="mt-1 text-[11px] font-bold text-slate-400 uppercase">DRAFT</p>
             )}
@@ -145,6 +161,12 @@ function InvoicePreviewPanelImpl({
             <p className="text-xs text-slate-500">{clientEmail || "client@email.com"}</p>
           </div>
           <div className="space-y-1 text-[11px]">
+            {jobDate && !isQuote && (
+              <p className="flex justify-between gap-4">
+                <span className="text-slate-500">Work done:</span>
+                <span className="font-bold text-slate-800">{formatDateShort(jobDate)}</span>
+              </p>
+            )}
             <p className="flex justify-between gap-4">
               <span className="text-slate-500">Issued:</span>
               <span className="font-bold text-slate-800">
@@ -239,9 +261,12 @@ function InvoicePreviewPanelImpl({
           )}
           {showUnsuccessfulLine && (
             <div className="flex justify-between gap-3 text-amber-700">
-              <span>Unsuccessful-visit discount (labour only)</span>
+              <span>{UNSUCCESSFUL_LINE_LABEL}</span>
               <span className="whitespace-nowrap">-{formatNZD(unsuccessfulDiscount)}</span>
             </div>
+          )}
+          {showUnsuccessfulLine && unsuccessfulNote && (
+            <p className="text-[11px] text-amber-700">{unsuccessfulNote}</p>
           )}
           {totals.gstAmount > 0 && (
             <div className="flex justify-between gap-3">
@@ -302,7 +327,7 @@ function InvoicePreviewPanelImpl({
           </div>
         )}
 
-        {notes && <p className="mb-6 text-[11px] text-slate-500">{notes}</p>}
+        {notes && <p className="mb-6 text-[11px] whitespace-pre-line text-slate-500">{notes}</p>}
 
         {/* Sender contact footer. */}
         <div className="mt-auto border-t border-slate-200 pt-3 text-center text-[10px] wrap-break-word text-slate-500">

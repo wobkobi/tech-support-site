@@ -106,7 +106,11 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
 
       <SettingsFooter form={form} />
 
-      <SettingsHistory group="scheduling" onRestore={(v: SchedulingSettings) => setDraft(v)} />
+      <SettingsHistory
+        key={form.savedAt ?? 0}
+        group="scheduling"
+        onRestore={(v: SchedulingSettings) => setDraft(v)}
+      />
     </SettingsTabBody>
   );
 }

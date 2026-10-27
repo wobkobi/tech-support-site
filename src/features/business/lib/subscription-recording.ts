@@ -31,7 +31,7 @@ export async function recordSubscriptionPayment(
   on?: Date,
 ): Promise<RecordSubscriptionResult> {
   const date = on ?? new Date(`${nzTodayKey()}T00:00:00.000Z`);
-  const nextDue = advanceNextDue(sub.nextDue, sub.frequency);
+  const nextDue = advanceNextDue(sub.nextDue, sub.frequency, sub.dueDay);
 
   // Claim first: a post-claim failure means a manual re-record, safer than a duplicate.
   const claim = await prisma.subscription.updateMany({

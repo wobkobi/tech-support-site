@@ -1,8 +1,9 @@
 // src/features/business/lib/invoice-numbering.ts
 // Shared invoice/quote numbering so every create flow agrees on the unique `Invoice.number`.
-// Sheets is the source of truth when reachable; Prisma is the fallback.
+// Numbers run per financial year (TTP-202728-0001 on 1 April 2027); the highest saved this
+// year and the Sheets counter both count, so neither can reuse a number.
 
-import { nextInvoiceNumber } from "@/features/business/lib/business";
+import { nextInvoiceNumber, numberSequence } from "@/features/business/lib/business";
 import { nzFinancialYearCode } from "@/features/business/lib/financial-year";
 import {
   getInvoiceCounter,
@@ -13,7 +14,7 @@ import {
 import { prisma } from "@/shared/lib/prisma";
 
 export interface NextInvoiceNumber {
-  /** Formatted number ready to drop on the new invoice (e.g. TTP-2627-0042). */
+  /** Formatted number ready to drop on the new invoice (e.g. TTP-202627-0042). */
   number: string;
   /** Counter to write back to Sheets after the row is created; null when Sheets was unreachable. */
   sheetNextCount: number | null;
@@ -22,37 +23,38 @@ export interface NextInvoiceNumber {
 }
 
 /**
- * Next invoice number as `max(sheet counter, highest DB number)`, so a stale Sheets B19
- * can't reuse a number; DB max alone when Sheets is down. Pass `sheetNextCount` to
- * {@link writeBackInvoiceCounter} after the row is created.
+ * Highest sequence saved so far this financial year under a prefix. The zero-padded
+ * sequence sorts as text, so the last row by number is the highest.
+ * @param prefix - "TTP" for invoices, "Q" for quotes.
+ * @param yearCode - Financial year code ("202627").
+ * @returns The sequence, or 0 when this year has none yet.
+ */
+async function lastSequenceThisYear(prefix: string, yearCode: string): Promise<number> {
+  const last = await prisma.invoice.findFirst({
+    where: { number: { startsWith: `${prefix}-${yearCode}-` } },
+    orderBy: { number: "desc" },
+    select: { number: true },
+  });
+  return numberSequence(last?.number);
+}
+
+/**
+ * Next invoice number for this financial year, from the highest saved this year and the
+ * SETTINGS!B19 counter (see {@link nextInvoiceNumber}); the saved rows alone when Sheets
+ * is down. Pass `sheetNextCount` to {@link writeBackInvoiceCounter} after the row is created.
  * @returns Next number plus the write-back counter (or null on fallback).
  */
 export async function getNextInvoiceNumber(): Promise<NextInvoiceNumber> {
+  const yearCode = nzFinancialYearCode();
   try {
     const data = await getInvoiceCounter();
-    // Quotes share the table but have their own counter; keep Q- numbers out of this one.
-    const last = await prisma.invoice.findFirst({
-      where: { NOT: { number: { startsWith: "Q-" } } },
-      orderBy: { number: "desc" },
-      select: { number: true },
-    });
-    // Trailing "-NNNN" is the sequence; no match > 0 so the sheet counter wins.
-    const dbMatch = last?.number.match(/-(\d+)$/);
-    const dbNext = (dbMatch ? parseInt(dbMatch[1] ?? "", 10) : 0) + 1;
-    const nextNumber = Math.max(data.nextNumber, dbNext);
-    const number =
-      nextNumber === data.nextNumber
-        ? data.nextFormatted
-        : `${data.prefix}-${data.yearCode}-${String(nextNumber).padStart(4, "0")}`;
-    return { number, sheetNextCount: nextNumber, sheetSyncWarning: false };
+    const dbLast = await lastSequenceThisYear(data.prefix, yearCode);
+    const next = nextInvoiceNumber(data.prefix, yearCode, dbLast, data.lastNumber);
+    return { number: next.number, sheetNextCount: next.sequence, sheetSyncWarning: false };
   } catch {
-    const last = await prisma.invoice.findFirst({
-      where: { NOT: { number: { startsWith: "Q-" } } },
-      orderBy: { number: "desc" },
-    });
-    const yearCode = nzFinancialYearCode();
+    const dbLast = await lastSequenceThisYear("TTP", yearCode);
     return {
-      number: nextInvoiceNumber(last?.number ?? null, yearCode),
+      number: nextInvoiceNumber("TTP", yearCode, dbLast, null).number,
       sheetNextCount: null,
       sheetSyncWarning: true,
     };
@@ -65,26 +67,15 @@ export async function getNextInvoiceNumber(): Promise<NextInvoiceNumber> {
  * @returns Next Q- number plus the write-back counter (or null on fallback).
  */
 export async function getNextQuoteNumber(): Promise<NextInvoiceNumber> {
-  // Highest existing Q- row; shared by both paths below.
-  const last = await prisma.invoice.findFirst({
-    where: { number: { startsWith: "Q-" } },
-    orderBy: { number: "desc" },
-    select: { number: true },
-  });
-  const dbMatch = last?.number.match(/-(\d+)$/);
-  const dbNext = (dbMatch ? parseInt(dbMatch[1] ?? "", 10) : 0) + 1;
+  const yearCode = nzFinancialYearCode();
+  const dbLast = await lastSequenceThisYear("Q", yearCode);
   try {
     const data = await getQuoteCounter();
-    const nextNumber = Math.max(data.nextNumber, dbNext);
-    const number =
-      nextNumber === data.nextNumber
-        ? data.nextFormatted
-        : `Q-${data.yearCode}-${String(nextNumber).padStart(4, "0")}`;
-    return { number, sheetNextCount: nextNumber, sheetSyncWarning: false };
+    const next = nextInvoiceNumber("Q", yearCode, dbLast, data.lastNumber);
+    return { number: next.number, sheetNextCount: next.sequence, sheetSyncWarning: false };
   } catch {
-    const yearCode = nzFinancialYearCode();
     return {
-      number: `Q-${yearCode}-${String(dbNext).padStart(4, "0")}`,
+      number: nextInvoiceNumber("Q", yearCode, dbLast, null).number,
       sheetNextCount: null,
       sheetSyncWarning: true,
     };

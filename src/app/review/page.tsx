@@ -136,6 +136,10 @@ export default async function ReviewPage({
       if (alreadyReviewed) existingReview = contactReview;
     }
   }
+  // A contact saved under their address would be greeted, and have the form's name filled,
+  // as "jo@x.nz", which would then be published as the reviewer's name.
+  if (prefillName && (prefillName.includes("@") || !prefillName.trim())) prefillName = null;
+  const greeting = `Hi ${prefillName ?? "there"}!`;
 
   return (
     <CardPage maxWidth="56rem">
@@ -174,9 +178,9 @@ export default async function ReviewPage({
                 How was your appointment?
               </h1>
               <p className="mb-4 text-base text-rich-black/80">
-                Hi {prefillName}! Thanks for choosing To the Point Tech. If you&apos;ve got a
-                minute, a review on Google is the biggest help - it&apos;s where most people look
-                for local tech help.
+                {greeting} Thanks for choosing To the Point Tech. If you&apos;ve got a minute, a
+                review on Google is the biggest help - it&apos;s where most people look for local
+                tech help.
               </p>
               <GoogleReviewButton url={googleUrl} label="Leave a review on Google" />
             </section>
@@ -190,7 +194,7 @@ export default async function ReviewPage({
                   bookingId={sourceType === "booking" ? sourceId! : undefined}
                   contactId={sourceType === "contact" ? sourceId! : undefined}
                   token={token}
-                  prefillName={prefillName!}
+                  prefillName={prefillName ?? undefined}
                   prefillEmail={prefillEmail ?? undefined}
                   prefillPhone={prefillPhone ?? undefined}
                   phone={identity.phone}
@@ -211,8 +215,8 @@ export default async function ReviewPage({
               </h1>
               <p className="text-base text-rich-black/80">
                 {alreadyReviewed
-                  ? `Hi ${prefillName}! You can update your review any time using this link.`
-                  : `Hi ${prefillName}! Thanks for choosing To the Point Tech. I'd love to hear about your experience.`}
+                  ? `${greeting} You can update your review any time using this link.`
+                  : `${greeting} Thanks for choosing To the Point Tech. I'd love to hear about your experience.`}
               </p>
             </section>
 
@@ -235,7 +239,7 @@ export default async function ReviewPage({
                 bookingId={sourceType === "booking" ? sourceId! : undefined}
                 contactId={sourceType === "contact" ? sourceId! : undefined}
                 token={token}
-                prefillName={prefillName!}
+                prefillName={prefillName ?? undefined}
                 prefillEmail={prefillEmail ?? undefined}
                 prefillPhone={prefillPhone ?? undefined}
                 existingReview={existingReview ?? undefined}

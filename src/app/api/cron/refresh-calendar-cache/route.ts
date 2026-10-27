@@ -20,6 +20,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   try {
     const result = await refreshCalendarCache();
+    // A failed read keeps the stale cache, but cron-job.org should still see the failure.
+    if (result.fetchFailed) {
+      return NextResponse.json(
+        { ok: false, error: "Couldn't read the calendars; the cache was left as it was" },
+        { status: 502 },
+      );
+    }
 
     return NextResponse.json({
       ok: true,

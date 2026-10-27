@@ -199,7 +199,11 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
 
       <SettingsFooter form={form} />
 
-      <SettingsHistory group="estimator" onRestore={(v: EstimatorSettings) => setDraft(v)} />
+      <SettingsHistory
+        key={form.savedAt ?? 0}
+        group="estimator"
+        onRestore={(v: EstimatorSettings) => setDraft(v)}
+      />
     </SettingsTabBody>
   );
 }

@@ -27,6 +27,7 @@ import { PageShell } from "@/shared/components/PageLayout";
 import { PromoPrice } from "@/shared/components/PromoPrice";
 import { renderEmphasised } from "@/shared/components/renderEmphasised";
 import { Section, TEXT_LINK } from "@/shared/components/Section";
+import { jsonLdHtml } from "@/shared/lib/json-ld";
 import { roundCents } from "@/shared/lib/money";
 import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -398,7 +399,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       <script
         id="ld-faq"
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdHtml(faqJsonLd) }}
       />
       <PageHead
         crumbs={[

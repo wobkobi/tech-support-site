@@ -26,11 +26,21 @@ export function RecalculateButton(): React.ReactElement {
       const res = await fetch("/api/admin/travel/recalculate", {
         method: "POST",
       });
-      const data = (await res.json()) as { ok: boolean; cachedCount?: number; error?: string };
+      const data = (await res.json()) as {
+        ok: boolean;
+        cachedCount?: number;
+        failedCalendars?: number;
+        error?: string;
+      };
       if (data.ok) {
-        setResult(`Done - ${data.cachedCount ?? 0} events cached.`);
-        toast(`Travel times recalculated - ${data.cachedCount ?? 0} events cached.`, {
-          tone: "success",
+        const failed = data.failedCalendars ?? 0;
+        // A calendar that failed to read kept its old blocks, so say so rather than "done".
+        const skipped = failed
+          ? ` ${failed} calendar${failed === 1 ? "" : "s"} couldn't be read and kept the old times.`
+          : "";
+        setResult(`Done - ${data.cachedCount ?? 0} events cached.${skipped}`);
+        toast(`Travel times recalculated - ${data.cachedCount ?? 0} events cached.${skipped}`, {
+          tone: failed ? "warning" : "success",
         });
         router.refresh();
       } else {

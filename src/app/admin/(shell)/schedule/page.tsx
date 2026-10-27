@@ -12,7 +12,8 @@ import { mondayOf, type WeekEvent, type WeekViewKind } from "@/features/admin/li
 import { addDays, resolveWeekStart } from "@/features/admin/lib/week";
 import { holidayTakenOn } from "@/features/business/lib/holiday-calendar";
 import { lookupPublicHolidaysForKeys } from "@/features/business/lib/pricing-policy.server";
-import { getCachedScheduleEvents } from "@/features/calendar/lib/google-calendar";
+import { getCachedScheduleCalendar } from "@/features/calendar/lib/google-calendar";
+import { Notice } from "@/shared/components/Notice";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -66,9 +67,18 @@ export default async function AdminSchedulePage({
   const workCalId = process.env.WORK_CALENDAR_ID ?? process.env.CAR_CALENDAR_ID ?? "";
   const personalCalId = process.env.PERSONAL_CALENDAR_ID ?? "";
 
-  // All calendars across the buffer; travel blocks are queried separately.
-  const [rawEvents, travelBlocks] = await Promise.all([
-    getCachedScheduleEvents(bufferStartIso, bufferEndIso).catch(() => []),
+  // All calendars across the buffer; travel blocks are queried separately. A calendar that
+  // didn't answer shows as free time, so the page says so instead of looking clear.
+  const [{ events: rawEvents, unread }, travelBlocks] = await Promise.all([
+    getCachedScheduleCalendar(bufferStartIso, bufferEndIso)
+      .then((r) => ({
+        events: r.events,
+        unread: r.failedCalendarIds.length > 0 ? ("some" as const) : null,
+      }))
+      .catch((err: unknown) => {
+        console.error("[admin/schedule] Couldn't read any calendar:", err);
+        return { events: [], unread: "all" as const };
+      }),
     prisma.travelBlock.findMany({
       where: {
         eventStartAt: { lt: bufferEndDate },
@@ -230,6 +240,13 @@ export default async function AdminSchedulePage({
         token={scheduleEventsToken(rawEvents)}
       />
       <PageHeader title="Schedule" />
+      {unread && (
+        <Notice tone="warn" onGrey className="mb-4 text-[0.9375rem] text-admin-text">
+          {unread === "all"
+            ? "Couldn't read Google Calendar, so the schedule below is missing its events. Refresh in a minute to try again."
+            : "One of your Google calendars didn't load, so some events may be missing below. Refresh in a minute to try again."}
+        </Notice>
+      )}
       {/* Next-open-times bar - shared across the mobile agenda + desktop grid. */}
       <ScheduleFindTimes />
       <div className={"lg:hidden"}>

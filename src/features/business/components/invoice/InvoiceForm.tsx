@@ -28,6 +28,7 @@ import {
   formatNZD,
   goldCardLineLabel,
   isValidLineItem,
+  UNSUCCESSFUL_LINE_LABEL,
 } from "@/features/business/lib/business";
 import type { LineItem } from "@/features/business/types/business";
 import {
@@ -61,6 +62,8 @@ export interface PreservedDiscounts {
   /** The hours and rates printed under the promo row, or null when there's no single rate. */
   promoNote?: string | null;
   unsuccessfulDiscount?: number;
+  /** What couldn't be fixed and the labour it came off, printed under the discount row. */
+  unsuccessfulNote?: string | null;
   goldCardDiscount?: number;
   /** Gold Card share off labour (0.1 = 10%); the invoice's own, never today's rate. */
   goldCardPercent?: number | null;
@@ -340,9 +343,12 @@ export function InvoiceForm({
         )}
         {unsuccessfulDiscount > 0 && (
           <div className="flex justify-between gap-3 text-amber-700">
-            <span>Unsuccessful-visit discount</span>
+            <span>{UNSUCCESSFUL_LINE_LABEL}</span>
             <span>-{formatNZD(unsuccessfulDiscount)}</span>
           </div>
+        )}
+        {unsuccessfulDiscount > 0 && preservedDiscounts?.unsuccessfulNote && (
+          <p className="text-xs text-amber-700">{preservedDiscounts.unsuccessfulNote}</p>
         )}
         {discountNote && <p className="text-sm text-amber-700">{discountNote}</p>}
         {totals.gstAmount > 0 && (

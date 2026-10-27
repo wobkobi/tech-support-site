@@ -12,6 +12,7 @@ import { RuledBlock, RuledGrid } from "@/shared/components/RuledGrid";
 import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
 import { TickItem, TickList } from "@/shared/components/TickList";
 import { cn } from "@/shared/lib/cn";
+import { jsonLdHtml } from "@/shared/lib/json-ld";
 import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { servedSuburbGroups } from "@/shared/lib/served-suburbs";
 import { SERVICE_AREAS } from "@/shared/lib/service-areas";
@@ -101,7 +102,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
       <script
         id="ld-services"
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(servicesJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdHtml(servicesJsonLd) }}
       />
       <PageHead
         crumbs={[

@@ -33,12 +33,15 @@ export interface PaymentMatchInput {
 }
 
 /**
- * Normalises case, spacing and punctuation so hand-typed names compare.
+ * Normalises case, macrons, spacing and punctuation so hand-typed names compare ("Hēmi"
+ * matches "Hemi").
  * @param name - Raw customer or client name.
  * @returns Comparable form.
  */
 function normaliseCustomerName(name: string): string {
   return name
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, "")
     .replace(/\s+/g, " ")

@@ -535,6 +535,10 @@ export function CalculatorView({
       }
       setFollowUpMins(draft.followUpMins ?? 0);
       setTravelEntries(draft.travelEntries ?? []);
+      // A Walked pick took the trip off the bill, so the restored travel only reads right
+      // with the pick; a draft without one keeps the event's own walked flag.
+      if (draft.walkedChoice !== undefined) setWalkedChoice(draft.walkedChoice);
+      setWalkedOffTrip(draft.walkedOffTrip ?? []);
       setJobAddress(draft.jobAddress ?? "");
       setTasks(repriceHourlyTasks(draft.tasks ?? [], rates));
       setParts(draft.parts ?? []);
@@ -623,6 +627,8 @@ export function CalculatorView({
           pickedContactGoogleId,
           addressMode,
           eventTimes,
+          walkedChoice,
+          walkedOffTrip,
         },
         draftScope,
       );
@@ -652,6 +658,8 @@ export function CalculatorView({
     pickedContactGoogleId,
     addressMode,
     eventTimes,
+    walkedChoice,
+    walkedOffTrip,
     draftScope,
   ]);
 
@@ -1202,10 +1210,13 @@ export function CalculatorView({
             clientEmail={clientEmail}
             issueDate={todayISO()}
             dueDate={addDaysISO(identity.paymentTermsDays)}
+            jobDate={jobDate}
+            replacesNumber={reissue?.invoiceNumber ?? null}
             lineItems={previewLineItems}
             notes={notes}
             gstRegistered={pricing.gstRegistered}
             unsuccessfulDiscount={totals.unsuccessfulDiscount}
+            unsuccessfulNote={totals.unsuccessfulNote}
             goldCardDiscount={totals.goldCardDiscount}
             goldCardPercent={appliedGoldCard}
             alreadyPaid={paidCash || quoteMode ? 0 : alreadyPaidAmount(alreadyPaid)}

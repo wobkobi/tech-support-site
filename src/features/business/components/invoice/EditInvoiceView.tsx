@@ -27,6 +27,10 @@ interface EditInvoiceViewProps {
   invoiceId: string;
   /** Real invoice number, shown on the preview. */
   invoiceNumber: string;
+  /** NZ date the work was done, shown on the preview; null when not recorded. */
+  jobDate: string | null;
+  /** Voided invoice this one replaces, shown on the preview; null when none. */
+  replacesNumber: string | null;
   /** Initial form values (dates already ISO YYYY-MM-DD). */
   initial: InvoiceFormData;
   /** Discounts from creation; only an AI box rebuild re-prices them. */
@@ -46,6 +50,8 @@ interface EditInvoiceViewProps {
  * @param props - Component props.
  * @param props.invoiceId - Invoice id to PATCH.
  * @param props.invoiceNumber - Real invoice number for the preview.
+ * @param props.jobDate - NZ date the work was done, for the preview.
+ * @param props.replacesNumber - Voided invoice this one replaces, for the preview.
  * @param props.initial - Initial form values.
  * @param props.preservedDiscounts - Preserved discount snapshot.
  * @param props.identity - Live business identity for the preview.
@@ -57,6 +63,8 @@ interface EditInvoiceViewProps {
 export function EditInvoiceView({
   invoiceId,
   invoiceNumber,
+  jobDate,
+  replacesNumber,
   initial,
   preservedDiscounts,
   identity,
@@ -72,11 +80,14 @@ export function EditInvoiceView({
   const [discounts, setDiscounts] = useState<PreservedDiscounts>(preservedDiscounts);
   // The lines the discounts were last worked out on: the saved ones, then each AI rebuild.
   const [pricedLines, setPricedLines] = useState(initial.lineItems);
-  // Only sent when the AI box re-priced them, so a hand edit never rewrites the stored ones.
-  const unsuccessfulChanged =
-    (discounts.unsuccessfulDiscount ?? 0) !== (preservedDiscounts.unsuccessfulDiscount ?? 0);
   // Price edits by hand since the discounts were last worked out; wording-only edits don't count.
   const handEdited = pricedLinesKey(preview.lineItems) !== pricedLinesKey(pricedLines);
+  // Names the labour the discount came off, so a hand edit of the prices drops it too.
+  const unsuccessfulNote = handEdited ? null : (discounts.unsuccessfulNote ?? null);
+  // Only sent when the AI box re-priced them, so a hand edit never rewrites the stored ones.
+  const unsuccessfulChanged =
+    (discounts.unsuccessfulDiscount ?? 0) !== (preservedDiscounts.unsuccessfulDiscount ?? 0) ||
+    unsuccessfulNote !== (preservedDiscounts.unsuccessfulNote ?? null);
   // The note states hours and rates, so a hand edit of the prices drops it.
   const promoNote = handEdited ? null : (discounts.promoNote ?? null);
   // The note rides with the discount: a re-split of the same hours can move one without the other.
@@ -114,7 +125,10 @@ export function EditInvoiceView({
           // Null clears a part payment and removes its income entry.
           alreadyPaid: alreadyPaidAmount(data.alreadyPaid) || null,
           alreadyPaidMethod: data.alreadyPaid.method,
-          ...(unsuccessfulChanged && { unsuccessfulDiscount: discounts.unsuccessfulDiscount ?? 0 }),
+          ...(unsuccessfulChanged && {
+            unsuccessfulDiscount: discounts.unsuccessfulDiscount ?? 0,
+            unsuccessfulNote,
+          }),
           ...(promoChanged && {
             promoDiscount: discounts.promoDiscount ?? 0,
             promoNote,
@@ -187,6 +201,8 @@ export function EditInvoiceView({
           clientEmail={preview.clientEmail}
           issueDate={preview.issueDate}
           dueDate={preview.dueDate}
+          jobDate={jobDate}
+          replacesNumber={replacesNumber}
           lineItems={preview.lineItems}
           notes={preview.notes}
           promoTitle={preservedDiscounts.promoTitle ?? null}
@@ -195,6 +211,7 @@ export function EditInvoiceView({
           goldCardDiscount={discounts.goldCardDiscount ?? 0}
           goldCardPercent={preservedDiscounts.goldCardPercent ?? null}
           unsuccessfulDiscount={discounts.unsuccessfulDiscount ?? 0}
+          unsuccessfulNote={unsuccessfulNote}
           gstRegistered={gstRegistered}
           alreadyPaid={alreadyPaidAmount(preview.alreadyPaid)}
         />

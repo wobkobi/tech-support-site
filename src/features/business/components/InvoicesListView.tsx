@@ -10,7 +10,10 @@ import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StickyList } from "@/features/admin/components/ui/StickyList";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
-import { PaymentDialog } from "@/features/business/components/invoice/PaymentDialog";
+import {
+  type LikelyIncome,
+  PaymentDialog,
+} from "@/features/business/components/invoice/PaymentDialog";
 import {
   COLUMNS,
   FILTER_OPTIONS,
@@ -42,6 +45,15 @@ type SyncMode = "import" | "sync" | null;
 
 /** Rows shown per page before pagination kicks in. */
 const PAGE_SIZE = 25;
+
+/** The already-recorded checks the Pay dialog opens with (GET .../pay). */
+interface PayChecks {
+  hasLinkedIncome: boolean;
+  likelyIncome: LikelyIncome | null;
+}
+
+/** Checks when the lookup fails: the dialog opens as if nothing is recorded. */
+const NO_PAY_CHECKS: PayChecks = { hasLinkedIncome: false, likelyIncome: null };
 
 /**
  * Fetches the full invoice list.
@@ -94,6 +106,7 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
     page: page > 1 ? String(page) : "",
   });
   const [payTarget, setPayTarget] = useState<Invoice | null>(null);
+  const [payChecks, setPayChecks] = useState<PayChecks>(NO_PAY_CHECKS);
 
   // One "now" per mount so the OVERDUE derivation stays stable across renders.
   const now = useMemo(() => new Date(), []);
@@ -146,6 +159,27 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
       // The payment itself saved; only this row is stale.
       setLoadError(true);
     }
+  }
+
+  /**
+   * Opens the Pay dialog once the already-recorded checks are back, so a Cashbook row that
+   * looks like this payment is offered for linking instead of being entered twice.
+   * @param inv - Invoice to record a payment on.
+   */
+  async function openPay(inv: Invoice): Promise<void> {
+    let checks = NO_PAY_CHECKS;
+    try {
+      const r = await fetch(`/api/business/invoices/${inv.id}/pay`);
+      const d = await r.json();
+      if (!d.ok) throw new Error(`pay checks failed (${r.status})`);
+      checks = { hasLinkedIncome: d.hasLinkedIncome === true, likelyIncome: d.likelyIncome };
+    } catch {
+      toast("Couldn't check the Cashbook for this payment. Look there before adding income.", {
+        tone: "error",
+      });
+    }
+    setPayChecks(checks);
+    setPayTarget(inv);
   }
 
   /** Imports new invoices from Google Drive PDFs and refreshes the list. */
@@ -215,9 +249,10 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
   }
 
   // Summary across ALL invoices. PAID rows without paidAt skip "paid this month"; quotes
-  // get their own counter and stay out of dollar stats.
+  // get their own counter and stay out of dollar stats. The month is NZ's, whatever clock the
+  // browser keeps.
   const summary = useMemo<InvoicesSummary>(() => {
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thisMonth = nzDateKey(now).slice(0, 7);
     let outstanding = 0;
     let overdue = 0;
     let overdueCount = 0;
@@ -243,7 +278,11 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
           overdueCount += 1;
         }
       }
-      if (inv.status === "PAID" && inv.paidAt && new Date(inv.paidAt) >= monthStart) {
+      if (
+        inv.status === "PAID" &&
+        inv.paidAt &&
+        nzDateKey(new Date(inv.paidAt)).slice(0, 7) === thisMonth
+      ) {
         paidThisMonth += inv.total;
         paidCount += 1;
       }
@@ -427,13 +466,13 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
           </Card>
         ) : (
           <>
-            <InvoicesListCards rows={paged} onPay={setPayTarget} />
+            <InvoicesListCards rows={paged} onPay={(inv) => void openPay(inv)} />
             <InvoicesListTable
               rows={paged}
               sortKey={sortKey}
               sortDir={sortDir}
               onSort={toggleSort}
-              onPay={setPayTarget}
+              onPay={(inv) => void openPay(inv)}
             />
           </>
         )}
@@ -482,6 +521,8 @@ export function InvoicesListView({ query }: { query: PageQuery }): React.ReactEl
             reminderLastSentAt: payTarget.reminderLastSentAt,
             apologySentAt: payTarget.apologySentAt,
           }}
+          hasLinkedIncome={payChecks.hasLinkedIncome}
+          likelyIncome={payChecks.likelyIncome}
           onClose={(recorded) => {
             const id = payTarget.id;
             setPayTarget(null);

@@ -7,12 +7,14 @@ export const BANK_FIELD_MAX = 12;
 
 /**
  * Trims a value to what a bank field accepts: letters, digits, spaces and hyphens, capped at
- * {@link BANK_FIELD_MAX}.
+ * {@link BANK_FIELD_MAX}. Macrons fold to the plain letter ("Pōhatu" > "Pohatu").
  * @param value - Raw value to clean.
  * @returns The cleaned value, 12 characters or fewer.
  */
 function toBankField(value: string): string {
   return value
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
     .replace(/[^A-Za-z0-9 -]/g, "")
     .trim()
     .slice(0, BANK_FIELD_MAX)

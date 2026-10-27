@@ -382,10 +382,10 @@ function minutes(n: number): string {
  * The three in-person cancellation tiers as a short inline list, for the FAQ
  * line that tells people the cancel page shows which tier they are in.
  * @param p - Cancellation policy (defaults to the module constant).
- * @returns e.g. "free / $35 cancellation fee / $65 call-out + travel".
+ * @returns e.g. "free / $35 cancellation fee / $65 late-cancellation fee + travel".
  */
 export function cancellationTiersCopy(p: CancellationPolicy = CANCELLATION): string {
-  return `free / $${p.callOutFee} cancellation fee / $${p.fullCallOutFee} call-out + travel`;
+  return `free / $${p.callOutFee} cancellation fee / $${p.fullCallOutFee} late-cancellation fee + travel`;
 }
 
 /**
@@ -401,7 +401,7 @@ export function noShowCopy(p: CancellationPolicy = CANCELLATION): {
   return {
     charge:
       `A missed in-person appointment is billed like a cancellation inside ` +
-      `${hours(p.travelChargeHours)}: the $${p.fullCallOutFee} call-out plus the round-trip ` +
+      `${hours(p.travelChargeHours)}: the $${p.fullCallOutFee} late-cancellation fee plus the round-trip ` +
       `travel I would have made to your address. A missed remote session is the $${p.remoteFee} ` +
       `remote fee.`,
     notice:
@@ -426,8 +426,8 @@ export function cancellationCopy(
     `**In-person visits:** free if cancelled at least **${hours(p.freeNoticeHours)}** before your ` +
     `appointment. Inside that window, a **$${p.callOutFee} cancellation fee** applies. If ` +
     `cancelled within **${hours(p.travelChargeHours)}** of the appointment (when I would already ` +
-    `be on the way), or if nobody is there when I arrive, the full **$${p.fullCallOutFee} ` +
-    `call-out** applies plus **round-trip travel**.`;
+    `be on the way), or if nobody is there when I arrive, a **$${p.fullCallOutFee} ` +
+    `late-cancellation fee** applies instead, plus **round-trip travel**.`;
   const remote =
     `**Remote sessions:** free if cancelled at least **${hours(p.remoteFreeNoticeHours)}** before ` +
     `your appointment. Inside that window, or if you are not there, a **$${p.remoteFee} fee** ` +
@@ -517,7 +517,7 @@ export function travelCopy(
   return (
     // Formatted: a promo can halve these into cents, and raw maths prints "$7.5".
     `Travel is **one round trip** billed at **${formatMoneyCompact(travelRatePerHour)}/hr** - a separate, ` +
-    `lower rate than labour. ` +
+    `lower rate than labour, with the total **rounded to the nearest $5**. ` +
     `**Minimum ${formatMoneyCompact(minTravelCharge)}** when there is any travel at all. ` +
     `If a job runs long and needs a second visit, **that second trip is on me**.`
   );
@@ -545,7 +545,7 @@ export function minimumsCopy(
  * Every day billed at holiday rates, as customer copy names them. Christmas Eve and New Year's
  * Eve aren't public holidays, so copy says "holiday rates" rather than calling them one.
  */
-const HOLIDAY_DAYS = `NZ public holidays (${HOME_REGION} Anniversary Day included), Christmas Eve and New Year's Eve`;
+const HOLIDAY_DAYS = `every NZ public holiday (${HOME_REGION} Anniversary Day included), plus Christmas Eve and New Year's Eve`;
 
 /**
  * A labour uplift as a percent, to two decimals so 12.5% never shows as 13%.
@@ -648,13 +648,13 @@ export function surchargeCaveat(
   const { weekendUplift, publicHolidayUplift } = uplifts;
   if (weekendUplift > 0 && publicHolidayUplift > 0) {
     return (
-      `Weekends add ${rise(weekendUplift)} to labour, and public holidays, Christmas Eve and ` +
-      `New Year's Eve add ${rise(publicHolidayUplift)}.`
+      `Weekends add ${rise(weekendUplift)} to labour, and public holidays add ` +
+      `${rise(publicHolidayUplift)}, as do Christmas Eve and New Year's Eve.`
     );
   }
   if (weekendUplift > 0) return `Weekends add ${rise(weekendUplift)} to labour.`;
   if (publicHolidayUplift > 0) {
-    return `Public holidays, Christmas Eve and New Year's Eve add ${rise(publicHolidayUplift)} to labour.`;
+    return `Public holidays add ${rise(publicHolidayUplift)} to labour, as do Christmas Eve and New Year's Eve.`;
   }
   return null;
 }

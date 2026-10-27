@@ -166,6 +166,10 @@ async function main(): Promise<void> {
       lastName: "<b>Lovelace</b>",
       isAnonymous: false,
       verified: false,
+      status: "pending",
+      edited: true,
+      contactPhone: "+64211234567",
+      contactEmail: `ada${PAYLOAD}@example.com`,
     }),
   );
   await renderCase("owner booking notification", () => sendOwnerBookingNotification(booking));

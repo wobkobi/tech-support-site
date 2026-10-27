@@ -1,7 +1,8 @@
 "use client";
 // src/features/admin/components/settings/SettingsHistory.tsx
 // Collapsible per-group change-history panel. Lazily fetches SettingAudit rows and loads a
-// prior version into the draft; re-saving it records its own audit row.
+/// prior version into the draft; re-saving it records its own audit row. Tabs key it on their
+// last save, since a save adds a row and moves "current": the remount drops the stale list.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { TEXT_ACTION_CLS } from "@/features/business/components/calculator/calculator-classes";

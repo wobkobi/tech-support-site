@@ -19,7 +19,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
   try {
     const result = await runSheetsImport(false);
-    return NextResponse.json(result);
+    // A workbook Google wouldn't read is retried next run; the 500 makes cron-job.org flag
+    // this one. Row problems (a duplicate Sync ID) recur every run, so they stay a 200.
+    const failed = (result.unreadableSheets ?? 0) > 0;
+    return NextResponse.json(result, { status: failed ? 500 : 200 });
   } catch (err) {
     console.error("[cron/sync-sheets] failed:", err);
     return errorResponse("Sync failed", 503);

@@ -6,8 +6,10 @@ import {
   BOOKING_FIELD_LIMITS,
   buildAppointmentDescription,
   combineUnitAndAddress,
+  splitUnitFromAddress,
   validateEmail,
 } from "@/features/booking/lib/booking";
+import { lookupBookingSnapshots } from "@/features/booking/lib/booking-snapshots.server";
 import {
   createBookingEvent,
   fetchAllCalendarEvents,
@@ -196,8 +198,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // Same snapshots as a public booking, so a late cancel bills the drive and rates as booked.
+  const { availability, pricing } = await getSettings();
+  const snapshots = await lookupBookingSnapshots({
+    startAt,
+    endAt,
+    address,
+    travelRatePerHour: pricing.travelRatePerHour,
+    logTag: "admin/bookings",
+  });
+
   // Create the booking. Until the row exists, a failure leaves the new event orphaned.
-  const { availability } = await getSettings();
   let bookingCreated = false;
   try {
     const booking = await prisma.booking.create({
@@ -205,11 +216,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         name,
         email,
         phone: phoneE164,
-        // Address gets its own column too, for Maps links and cancellation invoices.
-        address,
+        // Unit in its own column, as the public flow stores it, so emails join it back once.
+        address: address ? splitUnitFromAddress(address).rest : null,
+        unit: address ? splitUnitFromAddress(address).unit || null : null,
         // Same structured columns as the public flow, for the meeting-type and duration chips.
         meetingType: address ? "in_person" : "remote",
         duration: durationMinutes === 60 ? "short" : "long",
+        ...snapshots,
         notes: bookingNotes,
         startAt,
         endAt,

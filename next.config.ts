@@ -165,6 +165,12 @@ const nextConfig: NextConfig = {
       "node_modules/.prisma/client/index-browser.js",
     ],
   },
+
+  // The invoice PDF reads its fonts with readFileSync at run time, which the trace can't
+  // see. Every route: invoice, payment, booking-cancel and cron routes all render PDFs.
+  outputFileTracingIncludes: {
+    "*": ["src/features/business/assets/fonts/*.ttf"],
+  },
 } satisfies NextConfig;
 
 const withBundleAnalyzer = bundleAnalyzer({

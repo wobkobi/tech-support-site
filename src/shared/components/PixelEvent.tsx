@@ -20,9 +20,24 @@ interface PixelEventProps {
  */
 export function PixelEvent({ event }: PixelEventProps): null {
   useEffect(() => {
-    if (PIXEL_ID && typeof window.fbq === "function") {
+    if (!PIXEL_ID) return;
+    /**
+     * Tracks the event if the Pixel has loaded.
+     * @returns Whether it was sent.
+     */
+    const fire = (): boolean => {
+      if (typeof window.fbq !== "function") return false;
       window.fbq("track", event);
-    }
+      return true;
+    };
+    if (fire()) return;
+    // The Pixel loads after the page does (lazyOnload), so on a direct landing this mounts
+    // first; wait up to 30s for it rather than drop the event.
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      if (fire() || ++tries >= 60) window.clearInterval(timer);
+    }, 500);
+    return () => window.clearInterval(timer);
   }, [event]);
 
   return null;

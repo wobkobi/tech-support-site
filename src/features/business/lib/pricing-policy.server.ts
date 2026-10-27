@@ -100,6 +100,8 @@ export const getPolicy = cache(async (): Promise<Policy> => {
 /** One labour modifier as rendered on the pricing page accordion. */
 interface PublicModifier {
   label: string;
+  /** Name shown to customers; differs from the rate label where the rate's own name misleads. */
+  publicLabel: string;
   /**
    * A "delta" changes the task's own $/hr (a promo discounts it); an "uplift" is a surcharge
    * on full labour that a promo doesn't touch.
@@ -131,13 +133,21 @@ export interface PublicPricing {
   ratesUpdatedAt: Date | null;
 }
 
+/**
+ * Customer-facing names for rate labels that read wrong on a public page. "At home" is my
+ * bench, but under "Home rates" a customer takes it as their own home.
+ */
+const MODIFIER_PUBLIC_LABELS: Record<string, string> = {
+  "At home": "Bench repair at my place",
+};
+
 /** Per-label description shown under each modifier on the accordion. */
 const MODIFIER_DESCRIPTIONS: Record<string, string> = {
   Remote: "Screen-share session - I log in instead of visiting.",
-  "At home": "Bench repair at my place - I take the device home to fix it instead of visiting.",
-  Phone: "Help over the phone - quick calls are often free; longer fixes bill at this rate.",
+  "At home": "I take the device away to fix it instead of working at your place.",
+  Phone: "Help over the phone - quick calls are free; longer fixes bill at this rate.",
   "Public Holiday":
-    "Applied automatically on NZ public holidays (on the weekday it's observed when one falls on a weekend), Christmas Eve and New Year's Eve.",
+    "Applied automatically on every NZ public holiday, plus Christmas Eve and New Year's Eve. A public holiday on a weekend is charged on the weekday it's observed.",
   Weekend: "Applied automatically on Saturdays and Sundays (not on top of a holiday).",
 };
 
@@ -210,6 +220,7 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
     if (PUBLIC_DELTA_LABELS.has(row.label) && row.hourlyDelta !== null) {
       modifiers.push({
         label: row.label,
+        publicLabel: MODIFIER_PUBLIC_LABELS[row.label] ?? row.label,
         kind: "delta",
         effectiveRate: roundCents(baseRate + row.hourlyDelta),
         deltaDescription: row.hourlyDelta > 0 ? `+$${row.hourlyDelta}` : `-$${-row.hourlyDelta}`,
@@ -222,6 +233,7 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
       const upliftPerHour = roundCents(baseRate * uplift);
       modifiers.push({
         label: row.label,
+        publicLabel: row.label,
         kind: "uplift",
         effectiveRate: roundCents(baseRate + upliftPerHour),
         deltaDescription: `+${formatMoneyCompact(upliftPerHour)}`,
@@ -234,6 +246,7 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
     const upliftPerHour = roundCents(baseRate * pricing.weekendUplift);
     modifiers.push({
       label: "Weekend",
+      publicLabel: "Weekend",
       kind: "uplift",
       effectiveRate: roundCents(baseRate + upliftPerHour),
       deltaDescription: `+${formatMoneyCompact(upliftPerHour)}`,

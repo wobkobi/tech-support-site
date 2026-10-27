@@ -86,18 +86,24 @@ async function contactEmails(contactId: string): Promise<string[]> {
 }
 
 /**
- * Re-subscribes a contact by removing every opt-out tied to their id or any address.
+ * Re-subscribes a contact by removing the opt-outs tied to their id or any address. A
+ * bounce stays: the address doesn't exist, and with a second address on the contact the
+ * "keep getting emails" click came from the other one.
  * @param contactId - Contact id.
  */
 export async function resubscribeContact(contactId: string): Promise<void> {
   const emails = await contactEmails(contactId);
-  await prisma.emailOptOut.deleteMany({
-    where: { OR: [{ contactId }, { email: { in: emails } }] },
+  const where = { OR: [{ contactId }, { email: { in: emails } }] };
+  const bounced = await prisma.emailOptOut.findMany({
+    where: { ...where, source: "bounce" },
+    select: { email: true },
   });
+  await prisma.emailOptOut.deleteMany({ where: { ...where, source: { not: "bounce" } } });
   // Left set, Resend's own flag from an inbox Unsubscribe button would opt them out again
   // at the next send's sync.
   if (marketingReady()) {
-    for (const email of emails) await clearMarketingUnsubscribe(email);
+    const dead = new Set(bounced.map((b) => normaliseEmail(b.email)));
+    for (const email of emails) if (!dead.has(email)) await clearMarketingUnsubscribe(email);
   }
 }
 

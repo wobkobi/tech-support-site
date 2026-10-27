@@ -276,7 +276,11 @@ export function SocialTab({ initial, defaults }: Props): React.ReactElement {
       </SettingsWithPreview>
 
       <SettingsFooter form={form} />
-      <SettingsHistory group="social" onRestore={(v: SocialSettings) => setDraft(v)} />
+      <SettingsHistory
+        key={form.savedAt ?? 0}
+        group="social"
+        onRestore={(v: SocialSettings) => setDraft(v)}
+      />
     </SettingsTabBody>
   );
 }

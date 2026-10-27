@@ -161,10 +161,10 @@ export function BookingSubmitBar({
         {submitting
           ? isEditMode
             ? "Saving..."
-            : "Sending..."
+            : "Booking..."
           : isEditMode
             ? "Save changes"
-            : "Submit request"}
+            : "Book appointment"}
       </Button>
       {showIssuesLink && firstErrorKey && (
         <a

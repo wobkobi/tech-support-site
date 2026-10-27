@@ -434,6 +434,7 @@ export function parsedJobToLineItems(
   promoNote: string | null;
   goldCardDiscount: number;
   unsuccessfulDiscount: number;
+  unsuccessfulNote: string | null;
 } {
   const { windowMins } = parsedWindow(result, slots, now);
   const fit = fitTasksToWindow(
@@ -473,10 +474,8 @@ export function parsedJobToLineItems(
     pricing.minTravelCharge,
     pricing.minBillableMins,
   );
-  const { promoDiscount, promoRate, goldCardDiscount, unsuccessfulDiscount } = calcJobTotal(
-    job,
-    promo,
-    {
+  const { promoDiscount, promoRate, goldCardDiscount, unsuccessfulDiscount, unsuccessfulNote } =
+    calcJobTotal(job, promo, {
       // Only the discounts are read, and none depends on GST.
       gstRegistered: false,
       minTravelCharge: pricing.minTravelCharge,
@@ -487,8 +486,7 @@ export function parsedJobToLineItems(
       standardRate: pricing.standardRate,
       rates: pricing.rates,
       goldCardPercent: pricing.goldCardPercent,
-    },
-  );
+    });
   return {
     lineItems,
     fit,
@@ -497,5 +495,6 @@ export function parsedJobToLineItems(
     promoNote: promoRateNote(promoRate),
     goldCardDiscount,
     unsuccessfulDiscount,
+    unsuccessfulNote,
   };
 }

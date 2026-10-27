@@ -1,5 +1,6 @@
 // src/app/api/enquiry/business/route.ts
-// Public business enquiry: validate, then email the operator and an ack to the enquirer (no DB).
+// Public business enquiry: validate, then email the operator and, once that's gone, an ack to
+// the enquirer (no DB).
 // Outside /api/business/*, which is admin-guarded.
 
 import { validateEmail } from "@/features/booking/lib/booking";
@@ -9,6 +10,7 @@ import {
   type BusinessEnquiryData,
 } from "@/features/reviews/lib/email-enquiry";
 import { errorResponse } from "@/shared/lib/api-response";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { checkEmailDomain } from "@/shared/lib/email-domain.server";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { validatePhone } from "@/shared/lib/normalise-phone";
@@ -111,8 +113,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       urgency: pickOption(body.urgency, URGENCY_OPTIONS),
     };
 
-    // Senders warn-and-skip without email env; still report success.
-    await Promise.all([sendBusinessEnquiryNotification(enquiry), sendBusinessEnquiryAck(enquiry)]);
+    // The owner's email is the only record of the enquiry, so when it doesn't go the customer
+    // is asked to try again (the form keeps what they typed) and gets no "got it" ack.
+    const delivered = await sendBusinessEnquiryNotification(enquiry);
+    if (!delivered) {
+      const { phone } = await getIdentity().catch(() => ({ phone: "" }));
+      return errorResponse(
+        phone
+          ? `Your enquiry couldn't be sent just now. Please try again in a minute, or call or text me on ${phone}.`
+          : "Your enquiry couldn't be sent just now. Please try again in a minute.",
+        502,
+      );
+    }
+    await sendBusinessEnquiryAck(enquiry);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

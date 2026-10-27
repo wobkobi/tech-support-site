@@ -75,6 +75,7 @@ export default async function AdminReviewsPage({
           status: true,
           customerRef: true,
           bookingId: true,
+          verified: true,
           contactId: true,
           createdAt: true,
         },
@@ -380,12 +381,32 @@ export default async function AdminReviewsPage({
     }),
   ].sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
 
-  // Over the soft-capped sets. Linked and Legacy rows aren't sends, so they'd flatter conversion.
-  const trackedSends = linkHistory.filter((e) => e.source !== "Legacy" && e.source !== "Linked");
-  const sentLast30 = trackedSends.filter((e) => new Date(e.sentAt) >= thirtyDaysAgo);
-  const reviewedLast30 = sentLast30.filter((e) => e.reviewed).length;
-  const conversion =
-    sentLast30.length > 0 ? Math.round((reviewedLast30 / sentLast30.length) * 100) : null;
+  // Over the soft-capped sets, one entry per person asked in the last 30 days. Only a review
+  // left after that ask counts, so someone who reviewed last year doesn't flatter the rate.
+  // Linked and Legacy rows aren't sends, so they stay out.
+  const latestReviewAt = new Map<string, Date>();
+  for (const r of reviews) {
+    if (!r.contactId) continue;
+    const prev = latestReviewAt.get(r.contactId);
+    if (!prev || r.createdAt > prev) latestReviewAt.set(r.contactId, r.createdAt);
+  }
+  const askedLast30 = new Map<string, boolean>();
+  for (const b of sentBookings) {
+    if (!b.reviewSentAt || b.reviewSentAt < thirtyDaysAgo) continue;
+    const key = contactByEmail.get(b.email.toLowerCase())?.id ?? `email:${b.email.toLowerCase()}`;
+    askedLast30.set(key, (askedLast30.get(key) ?? false) || !!b.reviewSubmittedAt);
+  }
+  for (const { contact: c, sentAt } of askByContact.values()) {
+    if (sentAt < thirtyDaysAgo) continue;
+    const latest = latestReviewAt.get(c.id);
+    const reviewedSince =
+      (!!c.reviewLinkSubmittedAt && c.reviewLinkSubmittedAt >= sentAt) ||
+      (!!latest && latest >= sentAt);
+    askedLast30.set(c.id, (askedLast30.get(c.id) ?? false) || reviewedSince);
+  }
+  const sentLast30 = askedLast30.size;
+  const reviewedLast30 = [...askedLast30.values()].filter(Boolean).length;
+  const conversion = sentLast30 > 0 ? Math.round((reviewedLast30 / sentLast30) * 100) : null;
 
   // From a contact's "Send review link": prefill the send form (missing ids give null).
   // Review asks: what's coming and what happened lately
@@ -395,7 +416,12 @@ export default async function AdminReviewsPage({
       invoiceId: c.invoice.id,
       number: c.invoice.number,
       name: c.contact?.name || c.invoice.clientName,
-      when: d.action === "wait" ? `Due ${formatDateShort(d.dueAt)}` : "Goes out at the next run",
+      when:
+        d.action === "wait"
+          ? `Due ${formatDateShort(d.dueAt)}`
+          : d.action === "skip"
+            ? "Skipped at the next run"
+            : "Goes out at the next run",
       warning:
         d.action === "wait"
           ? reviewAskNoteLabel(d.forecast)
@@ -432,14 +458,14 @@ export default async function AdminReviewsPage({
 
       <StatStrip label="Review totals" className="mb-6 grid-cols-2 lg:grid-cols-4">
         <StatCard label="Ready to ask" value={readyCount} sub="not asked lately" />
-        <StatCard label="Links sent" value={sentLast30.length} sub="last 30 days" />
+        <StatCard label="People asked" value={sentLast30} sub="last 30 days" />
         <StatCard
           label="Turned into reviews"
           value={conversion === null ? "-" : `${conversion}%`}
           sub={
             conversion === null
               ? "no sends in the last 30 days"
-              : `${reviewedLast30} of ${sentLast30.length} sent`
+              : `${reviewedLast30} of ${sentLast30} asked`
           }
           tone={conversion !== null && conversion >= 50 ? "success" : "default"}
         />

@@ -12,9 +12,13 @@ import { NextRequest, NextResponse } from "next/server";
  * get right now, or null. With no slot yet, the best promo without a weekday/time restriction
  * wins; a restricted one comes back only when nothing else applies, for the caller to judge
  * once a slot is picked.
+ * @param request - Incoming request, for the rate limit.
  * @returns JSON with the promo or null.
  */
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  // Each call reads the database; the estimator asks once per page, so this only stops a flood.
+  const limited = rateLimitOrReject(request, "promo-active-get", 30, 60_000);
+  if (limited) return limited;
   const promo = await resolvePromo({ at: null, bookedAt: new Date() });
   return NextResponse.json({ ok: true, promo });
 }

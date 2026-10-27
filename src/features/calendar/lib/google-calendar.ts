@@ -180,6 +180,37 @@ export async function patchBookingEvent(params: {
 }
 
 /**
+ * Brings a booking event's title, invite text and location up to date without moving it.
+ * Silent: Google emails nobody, so the caller sends its own notice when one is due.
+ * @param params - Patch parameters; an omitted field is left as it is.
+ * @param params.eventId - Calendar event ID (Booking.calendarEventId).
+ * @param params.summary - New title.
+ * @param params.description - New customer-facing invite text.
+ * @param params.location - New location; null clears it (remote session).
+ * @returns Promise that resolves when patched.
+ */
+export async function patchBookingEventDetails(params: {
+  eventId: string;
+  summary?: string;
+  description?: string;
+  location?: string | null;
+}): Promise<void> {
+  const calendar = getCalendarClient();
+
+  await calendar.events.patch({
+    calendarId: getBookingCalendarId(),
+    eventId: params.eventId,
+    requestBody: {
+      ...(params.summary !== undefined ? { summary: params.summary } : {}),
+      ...(params.description !== undefined ? { description: params.description } : {}),
+      // A patch skips a missing field, so an empty string is what clears it.
+      ...(params.location !== undefined ? { location: params.location ?? "" } : {}),
+    },
+    sendUpdates: "none",
+  });
+}
+
+/**
  * Deletes a calendar event
  * @param params - Delete parameters
  * @param params.eventId - Calendar event ID to delete
@@ -581,16 +612,30 @@ export async function fetchAllCalendarEventsStrict(
 }
 
 /**
- * Cached {@link fetchAllCalendarEvents} for the schedule page: 30s TTL, busted via
+ * Cached {@link fetchAllCalendarEventsDetailed} for the schedule page: 30s TTL, busted via
  * {@link SCHEDULE_CALENDAR_TAG}. ISO string args keep the cache key serialisable.
+ * @param startIso - ISO 8601 start of range.
+ * @param endIso - ISO 8601 end of range.
+ * @returns Cached events plus the calendars that didn't answer.
+ */
+export const getCachedScheduleCalendar = unstable_cache(
+  async (startIso: string, endIso: string): Promise<CalendarFetchResult> => {
+    return fetchAllCalendarEventsDetailed(new Date(startIso), new Date(endIso));
+  },
+  ["schedule-calendar-events-detailed"],
+  { tags: [SCHEDULE_CALENDAR_TAG], revalidate: 30 },
+);
+
+/**
+ * {@link getCachedScheduleCalendar} without the failure info, for callers that only list
+ * today's jobs.
  * @param startIso - ISO 8601 start of range.
  * @param endIso - ISO 8601 end of range.
  * @returns Cached array of calendar events.
  */
-export const getCachedScheduleEvents = unstable_cache(
-  async (startIso: string, endIso: string): Promise<CalendarEvent[]> => {
-    return fetchAllCalendarEvents(new Date(startIso), new Date(endIso));
-  },
-  ["schedule-calendar-events"],
-  { tags: [SCHEDULE_CALENDAR_TAG], revalidate: 30 },
-);
+export async function getCachedScheduleEvents(
+  startIso: string,
+  endIso: string,
+): Promise<CalendarEvent[]> {
+  return (await getCachedScheduleCalendar(startIso, endIso)).events;
+}

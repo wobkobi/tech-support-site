@@ -763,6 +763,9 @@ model Invoice {
   // NZ date the work was done (YYYY-MM-DD), from the calculator. Editing a draft
   // judges the weekend or holiday surcharge on it rather than on the issue date.
   jobDate              String?
+  // Number of the voided invoice this one re-issues, printed under its own number so the
+  // customer knows which one it replaces. Null when it replaces nothing.
+  replacesNumber       String?
   lineItems            LineItem[]
   gst                  Boolean           @default(false)
   subtotal             Float
@@ -783,6 +786,9 @@ model Invoice {
   // clause was invoked so a pattern of abuse is spottable.
   unsuccessful         Boolean           @default(false)
   unsuccessfulDiscount Float?
+  // "Couldn't be fixed: Laptop repair, so $25.00 of labour is half price.", printed under
+  // the discount row so it can be checked. Null when there's no discount to explain.
+  unsuccessfulNote     String?
   // Gold Card holder: goldCardPercent (0.1 = 10%) came off labour after the promo,
   // goldCardDiscount dollars. Both null when the box wasn't ticked.
   goldCardPercent      Float?
@@ -930,6 +936,8 @@ model Subscription {
   method      String   @default("Business Account")
   frequency   String
   nextDue     DateTime
+  // Day of the month the admin last set nextDue to; month steps return to it after a clamp.
+  dueDay      Int?
   isActive    Boolean  @default(true)
   notes       String?
   createdAt   DateTime @default(now())

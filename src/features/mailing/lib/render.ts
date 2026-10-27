@@ -51,11 +51,11 @@ export const SAMPLE_REVIEW_TEXT =
 
 /** Promo wording the {promo} placeholders expand to. */
 export interface PromoWording {
-  /** Banner one-liner: "$10 off until this Saturday". */
+  /** Banner one-liner: "$10 off if you book by this Saturday". */
   summary: string;
   /** Just the offer: "$10 off on jobs over $100". */
   offer: string;
-  /** When it ends: "this Saturday" or "Sat 16 May". */
+  /** The last day to book it: "this Saturday" or "Sat 16 May". */
   ends: string;
   /** Weekday or time-of-day limit, like "weekdays" or "Tuesdays 9am to 5pm"; null when none. */
   restriction?: string | null;
@@ -91,7 +91,7 @@ export const PLACEHOLDERS = [
   { key: "name", help: 'Full name, or "there" when unknown' },
   { key: "promo", help: "The promo in one line, with its end date" },
   { key: "promoOffer", help: 'Just the offer, like "$10 off"' },
-  { key: "promoEnds", help: "When the promo ends" },
+  { key: "promoEnds", help: "The last day to book it" },
   { key: "reviewText", help: "Their own review from your site (reviewers only)" },
 ] as const;
 
@@ -269,7 +269,7 @@ function directiveHtml(word: string, promo: PromoWording | null): string {
   if (word === "social") return SOCIAL_HTML;
   if (!promo) return "";
   const limit = promo.restriction ? `, ${escapeHtml(promo.restriction)} only` : "";
-  return `${BOX_TABLE}<tr><td style="${PROMO_CELL_STYLE}"><p style="${PROMO_OFFER_STYLE}">${escapeHtml(promo.offer)}</p><p style="${PROMO_ENDS_STYLE}">Ends ${escapeHtml(promo.ends)}${limit}</p></td></tr></table>`;
+  return `${BOX_TABLE}<tr><td style="${PROMO_CELL_STYLE}"><p style="${PROMO_OFFER_STYLE}">${escapeHtml(promo.offer)}</p><p style="${PROMO_ENDS_STYLE}">Book by ${escapeHtml(promo.ends)}${limit}</p></td></tr></table>`;
 }
 
 /**

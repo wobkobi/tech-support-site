@@ -2,7 +2,15 @@
 // Admin API for editing and cancelling bookings by ID.
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
-import { BOOKING_FIELD_LIMITS, combineUnitAndAddress } from "@/features/booking/lib/booking";
+import {
+  BOOKING_FIELD_LIMITS,
+  combineUnitAndAddress,
+  splitUnitFromAddress,
+} from "@/features/booking/lib/booking";
+import {
+  bookingEventDetails,
+  bookingEventSummary,
+} from "@/features/booking/lib/booking-event.server";
 import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 import { assessCancellation } from "@/features/business/lib/pricing-policy";
@@ -18,6 +26,7 @@ import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import {
   fetchAllCalendarEvents,
   patchBookingEvent,
+  patchBookingEventDetails,
   SCHEDULE_CALENDAR_TAG,
 } from "@/features/calendar/lib/google-calendar";
 import { removeBookingEvent } from "@/features/calendar/lib/pending-calendar-deletes";
@@ -117,7 +126,8 @@ async function findScheduleConflict(
 /**
  * PATCH /api/admin/bookings/[id]
  * Updates a booking. Cancelling frees the slot. A past-to-past time move records what
- * happened silently; any other move is a full reschedule. The Google event always follows.
+ * happened silently, a finish-only change on a live booking is a quiet correction, and a new
+ * start is a full reschedule. The Google event always follows, details included.
  * @param request - Incoming request.
  * @param params - Route params.
  * @param params.params - Destructured route params containing booking id.
@@ -176,8 +186,13 @@ export async function PATCH(
   if (body.accessNotes !== undefined) {
     data.accessNotes = body.accessNotes.trim().slice(0, BOOKING_FIELD_LIMITS.accessNotes) || null;
   }
-  // The column is what the detail page, its Maps button and the emails read.
-  if (body.address !== undefined) data.address = body.address.trim() || null;
+  // The columns are what the detail page, its Maps button and the emails read; the unit has
+  // its own, or the emails print it twice ("12/12/160 Kepa Rd").
+  if (body.address !== undefined) {
+    const { unit, rest } = splitUnitFromAddress(body.address);
+    data.address = rest || null;
+    data.unit = unit || null;
+  }
 
   if (body.address !== undefined && body.notes === undefined) {
     const currentNotes = booking.notes ?? "";
@@ -193,8 +208,8 @@ export async function PATCH(
   }
 
   // Time edit runs before the status branches so a same-request cancel still releases the slot.
-  // `notify` means the customer hears about it.
-  let timeChange: { startAt: Date; endAt: Date; notify: boolean } | null = null;
+  // `notify` means the customer hears about it; `live` means the booking is still to run.
+  let timeChange: { startAt: Date; endAt: Date; notify: boolean; live: boolean } | null = null;
   let movedPromo: MovedBookingPromo | null = null;
   if (isTimeChange) {
     if (body.startAt === undefined || body.endAt === undefined) {
@@ -215,14 +230,17 @@ export async function PATCH(
       );
     }
 
-    // Silent only when BOTH times are past; anything else notifies.
+    // A past-to-past move records what happened. On a live booking a new start is a
+    // reschedule; a finish-only change is a quiet correction (no email, same invite version)
+    // that still has to fit the schedule.
     const alreadyRun =
       booking.startAt.getTime() <= now.getTime() && startAt.getTime() <= now.getTime();
-    const isReschedule = !alreadyRun && booking.status !== "cancelled";
+    const live = !alreadyRun && booking.status !== "cancelled";
+    const isReschedule = live && startAt.getTime() !== booking.startAt.getTime();
     // Muting only skips emails; everything below still runs.
     const notify = isReschedule && body.notifyCustomer !== false;
 
-    if (isReschedule && !body.force) {
+    if (live && !body.force) {
       const conflict = await findScheduleConflict(id, booking.calendarEventId, startAt, endAt);
       if (conflict) {
         return errorResponse(`That overlaps ${conflict}.`, 409);
@@ -261,32 +279,39 @@ export async function PATCH(
         });
     }
 
-    if (isReschedule) {
-      // The ICS SEQUENCE comes from rescheduleCount and must rise to supersede.
-      data.rescheduleCount = { increment: 1 };
-      // Re-snapshot travel at the new times; past jobs keep their frozen travel.
-      if (booking.meetingType === "in_person" && booking.address) {
-        try {
-          const drive = await lookupDriveRoundTrip(booking.address, startAt, endAt);
-          if (drive.status === "ok") {
-            data.travelMinsAtBooking = drive.data.there.durationMins;
-            data.travelMinsBackAtBooking = drive.data.back.durationMins;
-          }
-        } catch (err) {
-          console.warn("[admin/bookings] travel-time snapshot failed:", err);
-        }
-      }
-    }
+    // The ICS SEQUENCE comes from rescheduleCount and must rise to supersede.
+    if (isReschedule) data.rescheduleCount = { increment: 1 };
 
-    timeChange = { startAt, endAt, notify };
+    timeChange = { startAt, endAt, notify, live };
+  }
+
+  // Re-snapshot travel when a live booking's times or address change, so a late cancel bills
+  // the drive as it now stands; past jobs keep their frozen travel.
+  const visitAddress =
+    data.address !== undefined ? (data.address as string | null) : booking.address;
+  const liveVisit = booking.status !== "cancelled" && booking.startAt.getTime() > now.getTime();
+  if (
+    booking.meetingType === "in_person" &&
+    visitAddress &&
+    (timeChange?.live || (body.address !== undefined && liveVisit))
+  ) {
+    try {
+      const drive = await lookupDriveRoundTrip(
+        visitAddress,
+        timeChange?.startAt ?? booking.startAt,
+        timeChange?.endAt ?? booking.endAt,
+      );
+      if (drive.status === "ok") {
+        data.travelMinsAtBooking = drive.data.there.durationMins;
+        data.travelMinsBackAtBooking = drive.data.back.durationMins;
+      }
+    } catch (err) {
+      console.warn("[admin/bookings] travel-time snapshot failed:", err);
+    }
   }
 
   if (body.markNoShow && booking.status !== "cancelled") {
     // No-show ~ a customer cancel at startAt: both windows are inside.
-    if (booking.calendarEventId) {
-      // Silent, or the cancellation email reads as the operator calling it off.
-      await removeBookingEvent({ eventId: booking.calendarEventId, notifyAttendees: false });
-    }
     const noShowAt = new Date();
     const { CANCELLATION: noShowPolicy } = await getPolicy();
     // A no-show always charges; the policy still decides whether a drive is billed.
@@ -303,9 +328,6 @@ export async function PATCH(
     data.travelChargeApplies = noShowCharge.travelApplies;
     data.noShow = true;
   } else if (body.status === "cancelled" && booking.status !== "cancelled") {
-    if (booking.calendarEventId) {
-      await removeBookingEvent({ eventId: booking.calendarEventId });
-    }
     const onBehalf = body.cancelMode === "on-behalf";
     data.status = "cancelled";
     data.activeSlotKey = `released:${id}`;
@@ -328,16 +350,25 @@ export async function PATCH(
     data.status = "confirmed";
   }
 
-  // activeSlotKey is unique: P2002 means another live booking holds that start (can't be forced).
-  const updated = await prisma.booking.update({ where: { id }, data }).catch((error: unknown) => {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return null;
-    }
-    throw error;
-  });
-  if (!updated) {
+  // Claimed on the status this request read, so a second tab's cancel can't draft a second
+  // fee invoice. activeSlotKey is unique: P2002 means another live booking holds that start
+  // (can't be forced); P2025 means the status moved since this request loaded the booking.
+  const saved = await prisma.booking
+    .update({ where: { id, status: booking.status }, data })
+    .catch((error: unknown) => {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2002") return "slot-taken" as const;
+        if (error.code === "P2025") return "changed" as const;
+      }
+      throw error;
+    });
+  if (saved === "slot-taken") {
     return errorResponse("Another booking already starts at that time.", 409);
   }
+  if (saved === "changed") {
+    return errorResponse("This booking was changed elsewhere just now. Reload and try again.", 409);
+  }
+  const updated = saved;
 
   // Recall now-wrong held Resend emails (reminders, earlier "moved" notices) before holding
   // the new one. Only on a moved start, matching the reminder reset above.
@@ -346,6 +377,15 @@ export async function PATCH(
     timeChange !== null && timeChange.startAt.getTime() !== booking.startAt.getTime();
   if (cancelledNow || startMoved) {
     await cancelHeldBookingEmails(id);
+  }
+
+  // The event comes off only once the save holds, so a refused save leaves it in place.
+  // A no-show is silent, or the cancellation email reads as the operator calling it off.
+  if (cancelledNow && booking.calendarEventId) {
+    await removeBookingEvent({
+      eventId: booking.calendarEventId,
+      notifyAttendees: body.markNoShow !== true,
+    });
   }
 
   if (movedPromo?.changed) {
@@ -368,7 +408,7 @@ export async function PATCH(
 
   // Keep the Google event in step; best-effort, but a failure comes back as a warning.
   let calendarWarning: string | undefined;
-  if (timeChange && booking.calendarEventId) {
+  if (timeChange && booking.calendarEventId && !cancelledNow) {
     try {
       const { config } = await getAvailabilityConfig();
       await patchBookingEvent({
@@ -381,6 +421,38 @@ export async function PATCH(
     } catch (err) {
       console.error("[admin/bookings] Failed to move calendar event:", err);
       calendarWarning = "Saved, but the calendar event didn't move - check Google Calendar.";
+    }
+  }
+
+  // Name, notes and address edits reach the customer's invite too, silently: the edit is the
+  // operator's correction, not news for the customer.
+  const detailsChanged =
+    body.name !== undefined ||
+    body.notes !== undefined ||
+    body.accessNotes !== undefined ||
+    body.address !== undefined;
+  if (detailsChanged && updated.status === "confirmed" && booking.calendarEventId) {
+    try {
+      const { config } = await getAvailabilityConfig();
+      const details = await bookingEventDetails(updated);
+      await patchBookingEventDetails({
+        eventId: booking.calendarEventId,
+        ...(body.name !== undefined && updated.duration
+          ? {
+              summary: bookingEventSummary(
+                updated.name,
+                updated.duration,
+                config.durations[updated.duration],
+              ),
+            }
+          : {}),
+        description: details.description,
+        location: details.location,
+      });
+    } catch (err) {
+      console.error("[admin/bookings] Failed to update calendar event details:", err);
+      calendarWarning =
+        "Saved, but the calendar event still shows the old details - check Google Calendar.";
     }
   }
 

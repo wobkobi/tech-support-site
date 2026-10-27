@@ -3,7 +3,7 @@
 
 /** Default text rendered between the greeting and the auto-generated invoice details block. */
 export const DEFAULT_INVOICE_EMAIL_BODY =
-  "Thanks so much for the work - I really appreciate you choosing me for your tech support. Your invoice is attached below.";
+  "Thanks for choosing me for your tech support - I really appreciate it. Your invoice is attached below.";
 
 /** Default intro for quote emails - acceptance instructions live in the details block + PDF. */
 export const DEFAULT_QUOTE_EMAIL_BODY =
@@ -11,6 +11,6 @@ export const DEFAULT_QUOTE_EMAIL_BODY =
 
 /** Default body for the "your invoice has been voided" email (PDF attached with a VOID stamp). */
 export const DEFAULT_VOID_EMAIL_BODY =
-  "I'm writing to let you know that the invoice I sent you has been voided and should be disregarded. " +
-  "Please ignore the previous PDF and email. If you've already paid, please reply so I can sort out a refund. " +
-  "A corrected invoice will follow shortly. Sorry for the confusion - thanks for your patience.";
+  "I'm writing to let you know that the invoice I sent you has been voided, so please ignore it and its PDF - there's nothing to pay on it. " +
+  "A corrected invoice will follow shortly. If you've already paid it, just reply and let me know, and I'll take what you paid off the corrected invoice or refund you. " +
+  "Sorry for the confusion - thanks for your patience.";

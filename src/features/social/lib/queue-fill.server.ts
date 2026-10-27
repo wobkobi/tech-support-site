@@ -77,15 +77,19 @@ export async function queueFillDue(now: Date): Promise<boolean> {
  * @param opts.fillDays - How many days ahead to fill.
  * @param opts.queueIds - Only these schedules; every running one when left out, which also
  *   stamps the hourly fill as done once it got through every slot.
- * @returns How it went, or null when another fill is running.
+ * @param opts.beforeFill - Runs once the lock is held, so work it does can't be left half
+ *   done by a fill that's already running.
+ * @returns How it went, or null when another fill is running (and `beforeFill` didn't run).
  */
 export async function fillQueues(opts: {
   now: Date;
   fillDays: number;
   queueIds?: string[];
+  beforeFill?: () => Promise<void>;
 }): Promise<FillResult | null> {
   if (!(await acquireRunLock(LOCK_KEY, 5 * 60_000))) return null;
   try {
+    await opts.beforeFill?.();
     const deadline = Date.now() + FILL_BUDGET_MS;
     const queues = await prisma.socialQueue.findMany({
       where: { paused: false, ...(opts.queueIds ? { id: { in: opts.queueIds } } : {}) },
@@ -139,13 +143,20 @@ async function fillQueue(
   const instants = slotInstants(queue.slots, from, fillDays);
   if (instants.length === 0) return done;
 
-  // The schedule's own postings: the one before the window (for In the order below) and
-  // every one in it, whatever its status, since a slot with any posting is taken.
-  const [before, inWindow] = await Promise.all([
+  // The schedule's own postings: the latest before the window (for In the order below) and
+  // every one in it, whatever its status, since a slot with any posting is taken. Posting
+  // clears scheduledAt, so what already went out is found by postedAt; read only by slot,
+  // In the order would start again at item 1 once every lined-up posting had gone.
+  const [before, lastPosted, inWindow] = await Promise.all([
     prisma.socialPost.findFirst({
       where: { queueId: queue.id, scheduledAt: { lt: from } },
       orderBy: { scheduledAt: "desc" },
       select: { sourceId: true, scheduledAt: true },
+    }),
+    prisma.socialPost.findFirst({
+      where: { queueId: queue.id, postedAt: { lt: from } },
+      orderBy: { postedAt: "desc" },
+      select: { sourceId: true, postedAt: true },
     }),
     prisma.socialPost.findMany({
       where: { queueId: queue.id, scheduledAt: { gte: from } },
@@ -156,6 +167,10 @@ async function fillQueue(
     p?.scheduledAt ? [{ ms: p.scheduledAt.getTime(), itemId: p.sourceId }] : [],
   );
   const taken = new Set(used.map((u) => u.ms));
+  // Added after `taken`: a posted time marks the order, not a slot.
+  if (lastPosted?.postedAt) {
+    used.push({ ms: lastPosted.postedAt.getTime(), itemId: lastPosted.sourceId });
+  }
   const skipped = new Set(queue.skipped.map((d) => d.getTime()));
   const free = instants.filter((at) => !taken.has(at.getTime()) && !skipped.has(at.getTime()));
   if (free.length === 0) return done;

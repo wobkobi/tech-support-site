@@ -21,6 +21,9 @@ import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateTimeLong } from "@/shared/lib/date-format";
 import { getSiteUrl } from "@/shared/lib/site-url";
 
+/** Why a booking email goes out: a new booking, a moved time, or an edit that kept the time. */
+export type BookingEmailKind = "new" | "rescheduled" | "updated";
+
 /**
  * Booking data used for owner/customer booking emails.
  */
@@ -174,17 +177,18 @@ async function bookingIcsAttachment(
 }
 
 /**
- * Sends the site owner a notification email for a new or rescheduled booking.
+ * Sends the site owner a notification email for a new, rescheduled or edited booking.
  * Failures are caught and logged - never throws.
  * @param booking - The booking details.
  * @param options - Optional flags.
- * @param options.kind - "new" (default) for fresh bookings, "rescheduled" for edits.
+ * @param options.kind - "new" (default) for fresh bookings, "rescheduled" for a moved time,
+ * "updated" for an edit that kept the time.
  * @param options.previousStartAt - Original start time, shown in the body when rescheduled.
  * @returns Promise that resolves when the email is sent (or silently fails).
  */
 export async function sendOwnerBookingNotification(
   booking: BookingNotificationData,
-  options?: { kind?: "new" | "rescheduled"; previousStartAt?: Date },
+  options?: { kind?: BookingEmailKind; previousStartAt?: Date },
 ): Promise<void> {
   const adminEmail = process.env.ADMIN_EMAIL;
   const from = process.env.EMAIL_FROM;
@@ -205,11 +209,18 @@ export async function sendOwnerBookingNotification(
   const safeEmail = escapeHtml(booking.email);
   const safeMailto = encodeURIComponent(booking.email);
 
-  const heading = kind === "rescheduled" ? "🔄 Booking rescheduled" : "New booking";
+  const heading =
+    kind === "rescheduled"
+      ? "🔄 Booking rescheduled"
+      : kind === "updated"
+        ? "Booking details changed"
+        : "New booking";
   const subject =
     kind === "rescheduled"
       ? `🔄 Booking rescheduled - ${booking.name} (${start})`
-      : `New booking - ${booking.name} (${start})`;
+      : kind === "updated"
+        ? `Booking details changed - ${booking.name} (${start})`
+        : `New booking - ${booking.name} (${start})`;
   const previousLine =
     kind === "rescheduled" && previous
       ? `<p style="margin:0 0 16px;color:#555;font-size:13px">Was: <s>${escapeHtml(previous)}</s></p>`
@@ -306,11 +317,12 @@ export async function sendOwnerBookingCancellation(
 }
 
 /**
- * Sends the customer a booking confirmation or reschedule notification.
+ * Sends the customer a booking confirmation, reschedule or edit notice.
  * Failures are caught and logged - never throws.
  * @param booking - The booking details.
  * @param options - Optional flags.
- * @param options.kind - "new" (default) for a fresh booking; "rescheduled" for an edit.
+ * @param options.kind - "new" (default) for a fresh booking, "rescheduled" for a moved time,
+ * "updated" for an edit that kept the time (no calendar file: the invite hasn't changed).
  * @param options.previousStartAt - Original start time, shown crossed-out when rescheduled.
  * @param options.quietHours - Hold for the quiet window. Set only by operator-driven
  * moves; customer self-service confirmations stay immediate.
@@ -320,7 +332,7 @@ export async function sendOwnerBookingCancellation(
 export async function sendCustomerBookingConfirmation(
   booking: BookingNotificationData,
   options?: {
-    kind?: "new" | "rescheduled";
+    kind?: BookingEmailKind;
     previousStartAt?: Date;
     quietHours?: boolean;
     lapsedPromoTitle?: string | null;
@@ -364,19 +376,28 @@ export async function sendCustomerBookingConfirmation(
   const heading =
     kind === "rescheduled"
       ? `🔄 Appointment updated, ${safeFirstName}!`
-      : `Booking confirmed, ${safeFirstName}!`;
+      : kind === "updated"
+        ? `Changes saved, ${safeFirstName}`
+        : `Booking confirmed, ${safeFirstName}!`;
   const identity = await getIdentity();
   const intro =
     kind === "rescheduled"
       ? "Your appointment has been rescheduled. The Google Calendar invite has been updated to match."
-      : `Thanks for choosing ${escapeHtml(brandName(identity))} - I'm looking forward to helping you out.`;
+      : kind === "updated"
+        ? "I've saved the changes to your booking. Your appointment time is the same."
+        : `Thanks for choosing ${escapeHtml(brandName(identity))} - I'm looking forward to helping you out.`;
   const subject =
-    kind === "rescheduled" ? `🔄 Appointment updated - ${start}` : `Booking confirmed - ${start}`;
+    kind === "rescheduled"
+      ? `🔄 Appointment updated - ${start}`
+      : kind === "updated"
+        ? `Booking details updated - ${start}`
+        : `Booking confirmed - ${start}`;
   const previousLine =
     kind === "rescheduled" && previous
       ? `<p style="margin:0 0 20px;color:#888;font-size:13px"><s>${escapeHtml(previous)}</s></p>`
       : "";
-  const attachments = await bookingIcsAttachment(booking);
+  // A second file with an unchanged SEQUENCE is ignored or added twice by calendar apps.
+  const attachments = kind === "updated" ? undefined : await bookingIcsAttachment(booking);
   const promoLine = promoPanel(booking, options?.lapsedPromoTitle);
 
   // Render the email body

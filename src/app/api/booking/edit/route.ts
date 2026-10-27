@@ -1,10 +1,12 @@
 // src/app/api/booking/edit/route.ts
-// API route to edit an existing booking by cancel token.
+// API route to edit an existing booking by cancel token. A new time is a reschedule (new
+// invite, counts toward the change limit); an edit that keeps the time updates the details.
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
   bookingWindowEnd,
   buildAppointmentDescription,
+  combineUnitAndAddress,
   isBookingClosed,
   isSlotFree,
   parseHourLabel,
@@ -15,10 +17,12 @@ import {
   type StartMinute,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
+import { bookingEventSummary } from "@/features/booking/lib/booking-event.server";
 import {
   loadBlockingBookings,
   loadBlockingEvents,
 } from "@/features/booking/lib/existing-bookings.server";
+import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import {
   applyMovedBookingPromo,
@@ -27,7 +31,10 @@ import {
 import { bookingPromoColumns, describeRecurringWindow } from "@/features/business/lib/promos";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import { parseString } from "@/features/business/lib/validation";
-import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
+import {
+  createBookingEvent,
+  patchBookingEventDetails,
+} from "@/features/calendar/lib/google-calendar";
 import { removeBookingEvent } from "@/features/calendar/lib/pending-calendar-deletes";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
@@ -67,7 +74,8 @@ interface EditBookingPayload {
 
 /**
  * POST /api/booking/edit
- * Updates an existing booking's details and reschedules the calendar event.
+ * Updates an existing booking. A new time replaces the calendar event and emails a
+ * reschedule; the same time patches the event's details and emails an update.
  * @param request - Next.js request containing edit payload.
  * @returns JSON response with ok flag or error.
  */
@@ -152,65 +160,77 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         { status: 400 },
       );
     }
-    if (
-      reschedule.maxReschedules !== null &&
-      booking.rescheduleCount >= reschedule.maxReschedules
-    ) {
-      return errorResponse(
-        "This booking has already been changed the maximum number of times. Please call or text me to reschedule.",
-        400,
-      );
-    }
 
     // Edits stay open while new-booking intake is paused.
     const { config } = await getAvailabilityConfig();
 
-    // Excluding the one being edited (and its event and travel), so it can keep its own slot.
-    const existingForValidation = await loadBlockingBookings(now, { excludeId: booking.id });
-
-    // Fail closed, as a new booking does: a missed calendar would read as free time.
-    let calendarEvents: Array<{ id: string; start: string; end: string }>;
-    try {
-      calendarEvents = await loadBlockingEvents(
-        now,
-        bookingWindowEnd(now, config),
-        booking.calendarEventId,
-      );
-    } catch (error) {
-      console.error("[booking/edit] Failed to fetch calendar events:", error);
-      return errorResponse(
-        "We couldn't verify availability just now. Please try again in a moment, or contact us directly.",
-        503,
-      );
-    }
-
-    const validation = validateBookingRequest(
-      dateKey,
-      timeOfDay,
-      startMinute,
-      duration,
-      existingForValidation,
-      calendarEvents,
-      now,
-      config,
-    );
-
-    if (!validation.valid) {
-      return errorResponse(validation.error, 400);
-    }
-
-    // Resolve the new slot from the validated hour label + live durations.
+    // Resolve the requested slot from the hour label + live durations.
     const startHour = parseHourLabel(timeOfDay);
     if (startHour === null) {
       return errorResponse("Invalid time or duration.", 400);
     }
     const durationMinutes = duration === "short" ? config.durations.short : config.durations.long;
     const durationLabel = `${duration === "short" ? "Standard" : "Extended"} (${durationMinutes} min)`;
-    const cleanDurationLabel = `${duration === "short" ? "Standard" : "Extended"} ${durationMinutes} min`;
-
     const [year, month, day] = dateKeyParts(dateKey);
     const startAt = nzWallClockUtc(year, month, day, startHour, startMinute);
-    const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
+
+    // Same start and length is the same slot, even when the operator has since moved the
+    // finish: the edit keeps that finish rather than snapping it back to the booked length.
+    const startMoved = startAt.getTime() !== booking.startAt.getTime();
+    const requestedEnd = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
+    const slotMoved =
+      startMoved ||
+      (booking.duration
+        ? duration !== booking.duration
+        : requestedEnd.getTime() !== booking.endAt.getTime());
+    const endAt = slotMoved ? requestedEnd : booking.endAt;
+
+    // Only a new time is a reschedule. Fixing the notes or a phone number keeps the slot as
+    // booked, even one today's new-booking rules (notice, morning guard) would turn down.
+    if (slotMoved) {
+      if (
+        reschedule.maxReschedules !== null &&
+        booking.rescheduleCount >= reschedule.maxReschedules
+      ) {
+        return errorResponse(
+          "This booking has already been moved the maximum number of times. Please call or text me to reschedule.",
+          400,
+        );
+      }
+
+      // Excluding the one being edited (and its event and travel), so it can keep its own slot.
+      const existingForValidation = await loadBlockingBookings(now, { excludeId: booking.id });
+
+      // Fail closed, as a new booking does: a missed calendar would read as free time.
+      let calendarEvents: Array<{ id: string; start: string; end: string }>;
+      try {
+        calendarEvents = await loadBlockingEvents(
+          now,
+          bookingWindowEnd(now, config),
+          booking.calendarEventId,
+        );
+      } catch (error) {
+        console.error("[booking/edit] Failed to fetch calendar events:", error);
+        return errorResponse(
+          "We couldn't verify availability just now. Please try again in a moment, or contact us directly.",
+          503,
+        );
+      }
+
+      const validation = validateBookingRequest(
+        dateKey,
+        timeOfDay,
+        startMinute,
+        duration,
+        existingForValidation,
+        calendarEvents,
+        now,
+        config,
+      );
+      if (!validation.valid) {
+        return errorResponse(validation.error, 400);
+      }
+    }
 
     const cleanAccessNotes = typeof accessNotes === "string" ? accessNotes.trim() || null : null;
 
@@ -224,6 +244,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     bookingNotes += `Meeting type: ${meetingType === "in-person" ? "In-person" : "Remote"}\n`;
     if (meetingType === "in-person" && canonicalAddress) {
       bookingNotes += `Address: ${canonicalAddress}\n`;
+    }
+    // The booking's own quote, as the request route wrote it; an edit doesn't re-quote.
+    if (booking.quotedLowAtBooking !== null && booking.quotedHighAtBooking !== null) {
+      bookingNotes += `Quoted: ${formatQuotedRange(booking.quotedLowAtBooking, booking.quotedHighAtBooking, booking.quotedTravelAtBooking)}\n`;
     }
     if (phoneE164) {
       bookingNotes += `Phone: ${phoneE164}\n`;
@@ -242,37 +266,40 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       manageUrl: `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`,
       cancelUrl: `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`,
     });
+    const eventSummary = bookingEventSummary(cleanName, duration, durationMinutes);
+    const eventLocation = meetingType === "in-person" && canonicalAddress ? canonicalAddress : null;
 
-    // The replacement goes in first and the old event comes out only once the row points at
-    // the new one, so a failure on the way leaves the original booking and event as they were.
-    let calendarEventId: string | null = null;
-    try {
-      const summary = `Tech Support: ${cleanName} - ${cleanDurationLabel}`;
-      const calendarResult = await createBookingEvent({
-        summary,
-        description: calendarDescription,
-        startAt,
-        endAt,
-        timeZone: config.timeZone,
-        attendeeEmail: booking.email,
-        attendeeName: cleanName,
-        location: meetingType === "in-person" && canonicalAddress ? canonicalAddress : undefined,
-      });
-      calendarEventId = calendarResult.eventId;
-      console.log(`[booking/edit] Created new calendar event: ${calendarEventId}`);
-    } catch (calendarError) {
-      console.error("[booking/edit] Failed to create new calendar event:", calendarError);
-      // The original event is untouched, so the customer can simply retry.
-      return NextResponse.json(
-        { ok: false, error: "Failed to update calendar event. Please try again." },
-        { status: 500 },
-      );
+    // A new time gets a new event. It goes in first and the old one comes out only once the
+    // row points at it, so a failure on the way leaves the booking and its event as they were.
+    // A kept time updates the existing event after the save instead, so no new invite goes out.
+    let newEventId: string | null = null;
+    if (slotMoved || !booking.calendarEventId) {
+      try {
+        const calendarResult = await createBookingEvent({
+          summary: eventSummary,
+          description: calendarDescription,
+          startAt,
+          endAt,
+          timeZone: config.timeZone,
+          attendeeEmail: booking.email,
+          attendeeName: cleanName,
+          location: eventLocation ?? undefined,
+        });
+        newEventId = calendarResult.eventId;
+        console.log(`[booking/edit] Created new calendar event: ${newEventId}`);
+      } catch (calendarError) {
+        console.error("[booking/edit] Failed to create new calendar event:", calendarError);
+        // The original event is untouched, so the customer can simply retry.
+        return NextResponse.json(
+          { ok: false, error: "Failed to update calendar event. Please try again." },
+          { status: 500 },
+        );
+      }
     }
+    const calendarEventId = newEventId ?? booking.calendarEventId;
 
     // For the "was: <old time>" line in the rescheduled emails.
     const previousStartAt = booking.startAt;
-    const startMoved = startAt.getTime() !== booking.startAt.getTime();
-    const slotMoved = startMoved || endAt.getTime() !== booking.endAt.getTime();
 
     // A weekday/time promo is earned by the slot, so a new start can drop or gain one.
     const movedPromo = startMoved ? await judgeMovedBookingPromo(booking, startAt) : null;
@@ -288,18 +315,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           })
       : undefined;
 
-    // Re-snapshot drive legs so a late cancel bills the right travel; remote leaves both null.
-    let travelMinsAtBooking: number | null = null;
-    let travelMinsBackAtBooking: number | null = null;
-    if (meetingType === "in-person" && canonicalAddress) {
-      try {
-        const drive = await lookupDriveRoundTrip(canonicalAddress, startAt, endAt);
-        if (drive.status === "ok") {
-          travelMinsAtBooking = drive.data.there.durationMins;
-          travelMinsBackAtBooking = drive.data.back.durationMins;
+    // Re-snapshot the drive legs when the time or the visit changed, so a late cancel bills the
+    // right travel; remote leaves both null. An unchanged visit keeps the legs it was booked with.
+    const nextMeetingType = meetingType === "in-person" ? "in_person" : "remote";
+    const visitChanged =
+      nextMeetingType !== booking.meetingType ||
+      (canonicalAddress ?? "") !== combineUnitAndAddress(booking.unit ?? "", booking.address ?? "");
+    let travel: {
+      travelMinsAtBooking: number | null;
+      travelMinsBackAtBooking: number | null;
+    } | null = null;
+    if (slotMoved || visitChanged || booking.travelMinsAtBooking === null) {
+      travel = { travelMinsAtBooking: null, travelMinsBackAtBooking: null };
+      if (meetingType === "in-person" && canonicalAddress) {
+        try {
+          const drive = await lookupDriveRoundTrip(canonicalAddress, startAt, endAt);
+          if (drive.status === "ok") {
+            travel = {
+              travelMinsAtBooking: drive.data.there.durationMins,
+              travelMinsBackAtBooking: drive.data.back.durationMins,
+            };
+          }
+        } catch (err) {
+          console.warn("[booking/edit] travel-time snapshot failed:", err);
         }
-      } catch (err) {
-        console.warn("[booking/edit] travel-time snapshot failed:", err);
       }
     }
 
@@ -311,8 +350,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       endAt,
       calendarEventId,
       activeSlotKey: startAt.toISOString(),
-      bufferAfterMin: config.bookingBufferAfterMin,
-      rescheduleCount: booking.rescheduleCount + 1,
+      // The ICS SEQUENCE comes from rescheduleCount and must rise when the time moves.
+      ...(slotMoved
+        ? {
+            bufferAfterMin: config.bookingBufferAfterMin,
+            rescheduleCount: booking.rescheduleCount + 1,
+          }
+        : {}),
       // Clear the reminder stamp so the 24h nudge fires again, but only when the
       // start moved - a notes-only edit shouldn't re-send it.
       ...(startMoved ? { emailReminderSentAt: null } : {}),
@@ -322,10 +366,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // Keep snapshots current for the cancellation invoice.
       address: canonicalAddress ? splitUnitFromAddress(canonicalAddress).rest : null,
       unit: canonicalAddress ? splitUnitFromAddress(canonicalAddress).unit || null : null,
-      meetingType: meetingType === "in-person" ? "in_person" : "remote",
+      meetingType: nextMeetingType,
       duration,
-      travelMinsAtBooking,
-      travelMinsBackAtBooking,
+      ...travel,
     } satisfies Prisma.BookingUpdateManyMutationInput;
 
     try {
@@ -336,7 +379,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         data: update,
       });
       if (saved.count === 0) {
-        if (calendarEventId) await removeBookingEvent({ eventId: calendarEventId });
+        if (newEventId) await removeBookingEvent({ eventId: newEventId });
         return errorResponse(
           "This booking was cancelled or completed, so it can't be changed.",
           409,
@@ -345,7 +388,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.log(`[booking/edit] Updated booking: ${booking.id}`);
     } catch (error) {
       // The row still points at the old event, so take the new one back off.
-      if (calendarEventId) await removeBookingEvent({ eventId: calendarEventId });
+      if (newEventId) await removeBookingEvent({ eventId: newEventId });
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         return NextResponse.json(
           { ok: false, error: "This time slot is no longer available." },
@@ -385,7 +428,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           });
         }
         if (reverted) {
-          if (calendarEventId) await removeBookingEvent({ eventId: calendarEventId });
+          if (newEventId) await removeBookingEvent({ eventId: newEventId });
           // Cancelled in the meantime: nothing points at the old event either.
           if (reverted.count === 0 && booking.calendarEventId) {
             await removeBookingEvent({ eventId: booking.calendarEventId });
@@ -398,9 +441,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Only now retire the old event; a failed delete is queued for the reconcile cron.
-    if (booking.calendarEventId) {
-      await removeBookingEvent({ eventId: booking.calendarEventId });
+    if (newEventId) {
+      // Only now retire the old event; a failed delete is queued for the reconcile cron.
+      if (booking.calendarEventId) await removeBookingEvent({ eventId: booking.calendarEventId });
+    } else if (booking.calendarEventId) {
+      // Best-effort: the invite's time is still right, and the booking holds the new details.
+      await patchBookingEventDetails({
+        eventId: booking.calendarEventId,
+        summary: eventSummary,
+        description: calendarDescription,
+        location: eventLocation,
+      }).catch((err: unknown) =>
+        console.warn("[booking/edit] Couldn't update the calendar event's details:", err),
+      );
     }
 
     // Held emails name the old time. Same gate as the reminder-stamp clear above,
@@ -454,15 +507,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             : booking.promoTitleAtBooking,
           promoWindowAtBooking: promoNow ? describeRecurringWindow(promoNow) : null,
           address: canonicalAddress ?? "",
-          meetingType: meetingType === "in-person" ? "in_person" : "remote",
+          meetingType: nextMeetingType,
           // Post-increment value, or the invite's SEQUENCE won't rise and clients ignore it.
-          rescheduleCount: booking.rescheduleCount + 1,
+          rescheduleCount: booking.rescheduleCount + (slotMoved ? 1 : 0),
         },
-        {
-          kind: "rescheduled",
-          previousStartAt,
-          lapsedPromoTitle: movedPromo?.lapsedTitle ?? null,
-        },
+        slotMoved
+          ? {
+              kind: "rescheduled",
+              previousStartAt,
+              lapsedPromoTitle: movedPromo?.lapsedTitle ?? null,
+            }
+          : { kind: "updated" },
       ),
       sendOwnerBookingNotification(
         {
@@ -475,16 +530,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           endAt,
           cancelToken: booking.cancelToken,
           address: canonicalAddress ?? "",
-          meetingType: meetingType === "in-person" ? "in_person" : "remote",
+          meetingType: nextMeetingType,
         },
-        { kind: "rescheduled", previousStartAt },
+        slotMoved ? { kind: "rescheduled", previousStartAt } : { kind: "updated" },
       ),
       ...(comms?.pushOnBooking
         ? [
             sendOwnerPush({
-              title: "Booking rescheduled",
+              title: slotMoved ? "Booking rescheduled" : "Booking details changed",
               // Name and time only - this renders on a lock screen.
-              body: `${cleanName} - now ${formatDateTimeShort(startAt)}`,
+              body: `${cleanName} - ${slotMoved ? "now " : ""}${formatDateTimeShort(startAt)}`,
               url: `/admin/bookings/${booking.id}`,
               tag: `booking-${booking.id}`,
             }),

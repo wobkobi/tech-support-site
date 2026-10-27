@@ -53,7 +53,7 @@ export type PastConfirmedBooking = Pick<
 /** A retainer client, as the retainers-due panel reads it. */
 export type RetainerContact = Pick<Contact, "id" | "name" | "retainerTier" | "retainerPrice">;
 
-/** An unpaid invoice (DRAFT or SENT, quotes excluded). */
+/** An unpaid invoice (quotes excluded), as the Outstanding card reads it. */
 export type OutstandingInvoice = Pick<
   Invoice,
   "id" | "number" | "total" | "alreadyPaid" | "dueDate" | "status" | "clientName"
@@ -93,10 +93,13 @@ export interface DashboardData {
   /** Retainer clients with no "retainer" invoice issued this month. */
   retainersDue: RetainerContact[];
   contactsWithoutReviewLinks: ReviewLinkCandidate[];
+  /** SENT invoices not yet paid; a draft hasn't asked the customer for anything yet. */
   outstandingInvoices: OutstandingInvoice[];
   overdueInvoices: OutstandingInvoice[];
   /** Sum of the balance still owed across {@link DashboardData.outstandingInvoices}. */
   outstandingTotal: number;
+  /** Draft invoices not sent yet, counted apart so one left unsent still shows. */
+  draftInvoiceCount: number;
   /** This NZ month's income total. */
   monthRevenue: number;
   recentInvoices: RecentInvoice[];
@@ -145,7 +148,8 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     bookingsWithReviewSent,
     todaysBookings,
     monthIncome,
-    outstandingInvoices,
+    unpaidInvoices,
+    recentBookings,
     recentInvoices,
     latestCacheEntry,
     retainerContacts,
@@ -235,7 +239,7 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
       where: { date: { gte: monthStart, lt: monthEnd } },
       _sum: { amount: true },
     }),
-    // Outstanding (DRAFT or SENT), quotes excluded.
+    // Unpaid (DRAFT or SENT), quotes excluded; split into outstanding and drafts below.
     prisma.invoice.findMany({
       where: { status: { in: ["DRAFT", "SENT"] }, ...NOT_A_QUOTE_FILTER },
       orderBy: { dueDate: "asc" },
@@ -248,6 +252,13 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
         status: true,
         clientName: true,
       },
+    }),
+    // Newest bookings by when they were made - feeds the activity timeline. Its start can be
+    // weeks out, so sorting on it would put every upcoming booking above real events.
+    prisma.booking.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      select: { id: true, name: true, startAt: true, status: true, createdAt: true },
     }),
     // Recent invoices (any status) - feeds the activity timeline.
     prisma.invoice.findMany({
@@ -345,7 +356,10 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
 
   // --- Derived KPIs for the dashboard sections ---
   const monthRevenue = monthIncome._sum.amount ?? 0;
-  // Money handed over on the day is already in, so only the balance is outstanding.
+  // Only a sent invoice is owed; money handed over on the day is already in, so only the
+  // balance counts.
+  const outstandingInvoices = unpaidInvoices.filter((inv) => inv.status === "SENT");
+  const draftInvoiceCount = unpaidInvoices.length - outstandingInvoices.length;
   const outstandingTotal = outstandingInvoices.reduce((s, inv) => s + balanceDue(inv), 0);
   // Same rule as the invoice list, so the alert count matches what its link opens.
   const overdueInvoices = outstandingInvoices.filter((inv) => isInvoiceOverdue(inv, now));
@@ -361,11 +375,11 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
 
   // --- Unified activity feed: merge recent events across tables and sort by time ---
   const activity: ActivityEvent[] = [
-    ...upcomingBookings.map((b) => ({
+    ...recentBookings.map((b) => ({
       kind: "booking" as const,
-      timestamp: b.startAt,
+      timestamp: b.createdAt,
       title: `Booking: ${b.name}`,
-      detail: `${formatDateTimeShort(b.startAt.toISOString())}`,
+      detail: `For ${formatDateTimeShort(b.startAt.toISOString())}${b.status === "cancelled" ? " (cancelled)" : ""}`,
       href: `/admin/bookings/${b.id}`,
     })),
     ...pendingReviews.map((r) => ({
@@ -428,6 +442,7 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     outstandingInvoices,
     overdueInvoices,
     outstandingTotal,
+    draftInvoiceCount,
     monthRevenue,
     recentInvoices,
     activity,

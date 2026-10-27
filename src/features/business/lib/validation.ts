@@ -4,11 +4,14 @@
 const MAX_AMOUNT = 1_000_000_000;
 
 /**
- * Parses a finite, non-negative money amount up to 1,000,000,000.
+ * Parses a finite, non-negative money amount up to 1,000,000,000. A blank, null or boolean
+ * is refused rather than read as 0 (`Number(null)` and `Number("")` are both 0).
  * @param value - Raw value from a request body.
  * @returns The numeric amount, or null if invalid.
  */
 export function parseAmount(value: unknown): number | null {
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  if (typeof value === "string" && value.trim() === "") return null;
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) return null;
   if (n < 0 || n > MAX_AMOUNT) return null;

@@ -199,7 +199,8 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                   <p className="mt-1 text-base font-semibold sm:text-lg">{promoRestriction} only</p>
                 )}
                 <p className="mt-1 text-base text-russian-violet-900 sm:text-lg">
-                  Until {formatDateShort(promoLastDay(promo.endAt))}.
+                  Book by {formatDateShort(promoLastDay(promo.endAt))}. Your visit can be after
+                  that.
                 </p>
               </div>
             </>
@@ -315,7 +316,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               {shownModifiers.map((mod) => (
                 <li key={mod.label} className="flex flex-col">
                   <span>
-                    <strong>{mod.label}</strong> ({mod.shownDelta} ={" "}
+                    <strong>{mod.publicLabel}</strong> ({mod.shownDelta} ={" "}
                     <PromoPrice
                       discounted={mod.shownRate !== mod.effectiveRate}
                       className="font-bold"

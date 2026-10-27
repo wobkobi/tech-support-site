@@ -2,9 +2,12 @@
 // PATCH /api/reviews/[id] - Allows a customer to edit their review (with valid
 // customerRef), resets status to pending.
 
+import { fillBlankContactDetails } from "@/features/reviews/lib/contact-details.server";
 import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
 import { reviewTextError } from "@/features/reviews/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
+import { normaliseEmailOrNull } from "@/shared/lib/normalise-email";
+import { normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
@@ -32,6 +35,12 @@ export async function PATCH(
     // that was accepted on submit can always be edited.
     const textErr = reviewTextError(text);
     if (textErr) return errorResponse(textErr, 400);
+    // Same name rule as the create path, or the edit would show as "Unknown".
+    const cleanFirst = typeof firstName === "string" ? firstName.trim() : "";
+    const cleanLast = typeof lastName === "string" ? lastName.trim() : "";
+    if (!isAnonymous && !cleanFirst) {
+      return errorResponse("First name required unless posting anonymously.", 400);
+    }
 
     // Find review and check customerRef
     const review = await prisma.review.findUnique({ where: { id } });
@@ -64,8 +73,8 @@ export async function PATCH(
       where: { id },
       data: {
         text: text.trim(),
-        firstName: isAnonymous ? null : firstName?.trim() || null,
-        lastName: isAnonymous ? null : lastName?.trim() || null,
+        firstName: isAnonymous ? null : cleanFirst,
+        lastName: isAnonymous ? null : cleanLast || null,
         isAnonymous: !!isAnonymous,
         status: "pending",
       },
@@ -75,26 +84,31 @@ export async function PATCH(
     // marquee / reviews page immediately rather than after the 24h cache TTL.
     revalidateReviewPaths();
 
+    const contactEmail = normaliseEmailOrNull(body.contactEmail);
+    const contactPhone = normaliseContactPhone(body.contactPhone);
+    if (updated.contactId) {
+      await fillBlankContactDetails(updated.contactId, {
+        email: contactEmail,
+        phone: contactPhone,
+      });
+    }
+
     // Notify the owner - an edit resets the review to pending, dropping it off the public
     // page until re-approved. Awaited, not detached: Vercel freezes the instance once the
     // response is sent, and a detached rejection escapes this try/catch entirely.
     try {
-      const {
-        id: reviewId,
-        text: reviewText,
-        firstName: fn,
-        lastName: ln,
-        isAnonymous: anon,
-        verified,
-      } = updated;
       const { sendOwnerReviewNotification } = await import("@/features/reviews/lib/email");
       await sendOwnerReviewNotification({
-        id: reviewId,
-        text: reviewText,
-        firstName: fn,
-        lastName: ln,
-        isAnonymous: anon,
-        verified: !!verified,
+        id: updated.id,
+        text: updated.text,
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        isAnonymous: updated.isAnonymous,
+        verified: !!updated.verified,
+        status: "pending",
+        edited: true,
+        contactEmail,
+        contactPhone,
       });
     } catch (e) {
       console.warn("[PATCH] Failed to send owner notification after edit", e);

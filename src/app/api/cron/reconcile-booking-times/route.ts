@@ -64,16 +64,24 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    return NextResponse.json({
-      ok: true,
-      checked: result.checked,
-      corrected: result.drifted.length,
-      rearmed: result.rearmed.length,
-      missing: result.missing.length,
-      restored: result.restored,
-      unreadable: result.unreadable,
-      calendarDeletes,
-    });
+    // A Google outage reads as every event unreadable, and the delete retries throwing means
+    // none were tried; the 500 makes cron-job.org flag either. An odd event (an all-day edit)
+    // among readable ones is unreadable on every run, so it doesn't fail the pass.
+    const googleDown = result.checked > 0 && result.unreadable === result.checked;
+    const failed = googleDown || calendarDeletes === null;
+    return NextResponse.json(
+      {
+        ok: !failed,
+        checked: result.checked,
+        corrected: result.drifted.length,
+        rearmed: result.rearmed.length,
+        missing: result.missing.length,
+        restored: result.restored,
+        unreadable: result.unreadable,
+        calendarDeletes,
+      },
+      { status: failed ? 500 : 200 },
+    );
   } catch (error) {
     console.error("[cron/reconcile-booking-times] Error:", error);
     return errorResponse("Failed to reconcile booking times", 500);

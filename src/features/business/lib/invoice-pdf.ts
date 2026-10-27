@@ -3,11 +3,13 @@
 // layout and palette.
 
 import {
-  balanceDue,
   formatNZD,
   goldCardLineLabel,
   lineItemQtyLabel,
   promoLineLabel,
+  settledCallout,
+  settlementRows,
+  UNSUCCESSFUL_LINE_LABEL,
 } from "@/features/business/lib/business";
 import { nzFinancialYearCode } from "@/features/business/lib/financial-year";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
@@ -16,10 +18,11 @@ import type { Invoice } from "@/features/business/types/business";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
+import fontkit from "@pdf-lib/fontkit";
 import type { Invoice as PrismaInvoice } from "@prisma/client";
 import { readFileSync } from "fs";
 import path from "path";
-import { degrees, PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from "pdf-lib";
+import { degrees, PDFDocument, PDFFont, PDFPage, rgb } from "pdf-lib";
 
 // Colours mirror the web's Tailwind palette so the PDF reads as the same document.
 const BRAND = rgb(12 / 255, 10 / 255, 62 / 255); // russian-violet #0c0a3e
@@ -40,12 +43,64 @@ const CONTENT_W = PAGE_W - MARGIN * 2;
 const LOGO_SVG_H = 674;
 const LOGO_H = 90;
 const HEADER_TOP = PAGE_H - MARGIN;
+// Lowest point body content may reach; the footer and its rule sit below it.
+const CONTENT_BOTTOM = MARGIN + 44;
+// Where a continuation page's content starts, under its "continued" line.
+const CONTINUED_TOP = PAGE_H - MARGIN - 34;
 
 interface PdfCtx {
+  doc: PDFDocument;
+  /** The page being drawn on; {@link ensureSpace} moves it to a new page. */
   page: PDFPage;
   font: PDFFont;
   bold: PDFFont;
   identity: IdentitySettings;
+  invoice: Invoice;
+}
+
+let fontBytes: { regular: Buffer; bold: Buffer } | null = null;
+
+/**
+ * Arimo, read once per instance. Its letters are as wide as Helvetica's, so the layout
+ * matches, and unlike the built-in Helvetica it can print a macron ("Hēmi"). The files are
+ * trimmed to Latin, macrons, punctuation and currency (about 26 KB each) and embedded whole,
+ * since pdf-lib's own subsetting drops letters from Arimo. A character outside that set
+ * prints blank rather than failing the PDF.
+ * @returns The regular and bold font files.
+ */
+function loadFontBytes(): { regular: Buffer; bold: Buffer } {
+  fontBytes ??= {
+    regular: readFileSync(
+      path.join(process.cwd(), "src/features/business/assets/fonts/Arimo-Regular.ttf"),
+    ),
+    bold: readFileSync(
+      path.join(process.cwd(), "src/features/business/assets/fonts/Arimo-Bold.ttf"),
+    ),
+  };
+  return fontBytes;
+}
+
+/**
+ * Starts a new page when the next `needed` points won't fit above the footer. The new page
+ * gets the watermark and a "continued" line, and drawing carries on under it.
+ * @param ctx - PDF drawing context; its page moves on a break.
+ * @param y - Where the next block would start.
+ * @param needed - Height the next block takes.
+ * @returns Where to draw the block: `y`, or the top of the new page.
+ */
+function ensureSpace(ctx: PdfCtx, y: number, needed: number): number {
+  if (y - needed >= CONTENT_BOTTOM) return y;
+  ctx.page = ctx.doc.addPage([PAGE_W, PAGE_H]);
+  drawStatusWatermark(ctx, ctx.invoice);
+  const label = `${ctx.invoice.number} continued`;
+  ctx.page.drawText(label, {
+    x: MARGIN + CONTENT_W - ctx.font.widthOfTextAtSize(label, 10),
+    y: PAGE_H - MARGIN - 10,
+    size: 10,
+    font: ctx.font,
+    color: MID,
+  });
+  return CONTINUED_TOP;
 }
 
 interface LogoPath {
@@ -65,7 +120,8 @@ function hexToRgb(hex: string): ReturnType<typeof rgb> {
 }
 
 /**
- * Greedy word-wrap: packs words into lines that fit within maxW at fontSize.
+ * Greedy word-wrap: packs words into lines that fit within maxW at fontSize. A typed line
+ * break starts a new line.
  * @param text - Source string to wrap.
  * @param maxW - Maximum line width in PDF points.
  * @param size - Font size in PDF points.
@@ -73,19 +129,20 @@ function hexToRgb(hex: string): ReturnType<typeof rgb> {
  * @returns Array of line strings (always at least one element).
  */
 function wrapText(text: string, maxW: number, size: number, font: PDFFont): string[] {
-  const words = text.split(/\s+/);
   const lines: string[] = [];
-  let cur = "";
-  for (const w of words) {
-    const test = cur ? `${cur} ${w}` : w;
-    if (font.widthOfTextAtSize(test, size) <= maxW) {
-      cur = test;
-    } else {
-      if (cur) lines.push(cur);
-      cur = w;
+  for (const paragraph of text.split(/\r?\n/)) {
+    let cur = "";
+    for (const w of paragraph.split(/\s+/).filter(Boolean)) {
+      const test = cur ? `${cur} ${w}` : w;
+      if (font.widthOfTextAtSize(test, size) <= maxW) {
+        cur = test;
+      } else {
+        if (cur) lines.push(cur);
+        cur = w;
+      }
     }
+    if (cur) lines.push(cur);
   }
-  if (cur) lines.push(cur);
   return lines.length ? lines : [""];
 }
 
@@ -127,6 +184,8 @@ export function serialiseInvoice(inv: PrismaInvoice): Invoice {
     clientEmail: inv.clientEmail,
     issueDate: inv.issueDate.toISOString(),
     dueDate: inv.dueDate.toISOString(),
+    jobDate: inv.jobDate,
+    replacesNumber: inv.replacesNumber,
     lineItems: inv.lineItems,
     gst: inv.gst,
     subtotal: inv.subtotal,
@@ -137,6 +196,7 @@ export function serialiseInvoice(inv: PrismaInvoice): Invoice {
     promoNote: inv.promoNote,
     unsuccessful: inv.unsuccessful,
     unsuccessfulDiscount: inv.unsuccessfulDiscount,
+    unsuccessfulNote: inv.unsuccessfulNote,
     goldCardPercent: inv.goldCardPercent,
     goldCardDiscount: inv.goldCardDiscount,
     status: inv.status,
@@ -144,6 +204,7 @@ export function serialiseInvoice(inv: PrismaInvoice): Invoice {
     contactId: inv.contactId,
     sentAt: inv.sentAt?.toISOString() ?? null,
     paidAt: inv.paidAt?.toISOString() ?? null,
+    voidedAt: inv.voidedAt?.toISOString() ?? null,
     paymentMethod: inv.paymentMethod,
     paymentReference: inv.paymentReference,
     alreadyPaid: inv.alreadyPaid,
@@ -239,6 +300,17 @@ function drawHeader(ctx: PdfCtx, invoice: Invoice, logoPaths: LogoPath[]): numbe
     font: ctx.font,
     color: DARK,
   });
+  if (invoice.replacesNumber) {
+    rightY -= 14;
+    const replaces = `Replaces ${invoice.replacesNumber}`;
+    ctx.page.drawText(replaces, {
+      x: rightX - ctx.font.widthOfTextAtSize(replaces, 10),
+      y: rightY,
+      size: 10,
+      font: ctx.font,
+      color: MID,
+    });
+  }
   // DRAFT/SENT are internal and never printed; only PAID, OVERDUE and VOID change what the
   // reader should do. Quotes show their validity date instead.
   const statusText = invoice.isQuote
@@ -341,17 +413,25 @@ function drawBillToBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
       color: DARK,
     });
   };
-  drawDateRow("Issued:", formatDateShort(invoice.issueDate), 0);
+  // The work date leads, so the invoice can be matched to the visit and its weekend or
+  // holiday rates checked. A quote's work hasn't happened.
+  let dy = 0;
+  if (invoice.jobDate && !invoice.isQuote) {
+    drawDateRow("Work done:", formatDateShort(invoice.jobDate), dy);
+    dy -= 18;
+  }
+  drawDateRow("Issued:", formatDateShort(invoice.issueDate), dy);
+  dy -= 18;
   if (invoice.isQuote) {
     // A quote has no due date; show how long its prices hold.
     if (invoice.quoteValidUntil) {
-      drawDateRow("Valid to:", formatDateShort(invoice.quoteValidUntil), -18);
+      drawDateRow("Valid to:", formatDateShort(invoice.quoteValidUntil), dy);
     }
   } else {
-    drawDateRow("Due:", formatDateShort(invoice.dueDate), -18);
+    drawDateRow("Due:", formatDateShort(invoice.dueDate), dy);
   }
 
-  const sepY = infoY - 48;
+  const sepY = infoY + Math.min(-48, dy - 18);
   ctx.page.drawLine({
     start: { x: MARGIN, y: sepY },
     end: { x: MARGIN + CONTENT_W, y: sepY },
@@ -380,35 +460,52 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
   const HEADER_SIZE = 11;
   const CELL_SIZE = 11;
 
-  // Description left-aligns; numeric headers centre over their right-aligned values.
-  const headers = ["Description", "Qty", "Price", "Total"];
-  const cols = [COL.desc, COL.qty, COL.price, COL.total];
-  headers.forEach((h, i) => {
-    const headerWidth = ctx.bold.widthOfTextAtSize(h, HEADER_SIZE);
-    let x: number;
-    if (i === 0) {
-      x = cols[i]! + 4;
-    } else {
-      const colLeft = cols[i]!;
-      const colRight = i + 1 < cols.length ? cols[i + 1]! : MARGIN + CONTENT_W;
-      x = (colLeft + colRight) / 2 - headerWidth / 2;
-    }
-    ctx.page.drawText(h, { x, y: y - ROW_H + 9, size: HEADER_SIZE, font: ctx.bold, color: DARK });
-  });
-  ctx.page.drawLine({
-    start: { x: MARGIN, y: y - ROW_H },
-    end: { x: MARGIN + CONTENT_W, y: y - ROW_H },
-    thickness: 1.5,
-    color: BRAND,
-  });
-  // Breather between the brand-coloured header line and the first row.
-  y -= ROW_H + 6;
+  /**
+   * Draws the column headings and their brand rule; again at the top of a continuation page.
+   * @param top - Top of the heading row.
+   * @returns Where the first row starts.
+   */
+  const drawHeadings = (top: number): number => {
+    // Description left-aligns; numeric headers centre over their right-aligned values.
+    const headers = ["Description", "Qty", "Price", "Total"];
+    const cols = [COL.desc, COL.qty, COL.price, COL.total];
+    headers.forEach((h, i) => {
+      const headerWidth = ctx.bold.widthOfTextAtSize(h, HEADER_SIZE);
+      let x: number;
+      if (i === 0) {
+        x = cols[i]! + 4;
+      } else {
+        const colLeft = cols[i]!;
+        const colRight = i + 1 < cols.length ? cols[i + 1]! : MARGIN + CONTENT_W;
+        x = (colLeft + colRight) / 2 - headerWidth / 2;
+      }
+      ctx.page.drawText(h, {
+        x,
+        y: top - ROW_H + 9,
+        size: HEADER_SIZE,
+        font: ctx.bold,
+        color: DARK,
+      });
+    });
+    ctx.page.drawLine({
+      start: { x: MARGIN, y: top - ROW_H },
+      end: { x: MARGIN + CONTENT_W, y: top - ROW_H },
+      thickness: 1.5,
+      color: BRAND,
+    });
+    // Breather between the brand-coloured header line and the first row.
+    return top - ROW_H - 6;
+  };
+  y = drawHeadings(y);
 
   const descMaxW = COL.qty - COL.desc - 8;
   const LINE_GAP = 14;
   invoice.lineItems.forEach((item, idx) => {
     const lines = wrapText(item.description, descMaxW, CELL_SIZE, ctx.font);
     const rowH = ROW_H + (lines.length - 1) * LINE_GAP;
+    const page = ctx.page;
+    y = ensureSpace(ctx, y, rowH);
+    if (ctx.page !== page) y = drawHeadings(y);
 
     // Top-aligned: first description line baseline matches the numeric columns.
     const firstBaselineY = y - 10;
@@ -471,93 +568,86 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
   return y - 40;
 }
 
+/** One step of the totals block, measured before drawing so the block never splits. */
+type TotalsStep =
+  | { kind: "row"; label: string; value: string; style?: "bold" | "promo" }
+  | { kind: "note"; lines: string[] }
+  | { kind: "rule" }
+  | { kind: "lift" };
+
 /**
- * Draws Subtotal, optional discount and GST rows, then a bold Total.
+ * Height a totals step moves the pen down by.
+ * @param step - The step.
+ * @returns Points; the lift before the paid rows is negative.
+ */
+function totalsStepHeight(step: TotalsStep): number {
+  switch (step.kind) {
+    case "row":
+      return step.style === "bold" ? 26 : 19;
+    case "note":
+      return step.lines.length * 14;
+    case "rule":
+      return 12;
+    case "lift":
+      return -6;
+  }
+}
+
+/**
+ * Draws Subtotal, the discount and GST rows, a bold Total, then what's been paid.
  * @param ctx - PDF drawing context.
  * @param invoice - Invoice being rendered.
  * @param y - Top of the block.
- * @returns Y coordinate below the Total row, or the Balance due row on a part-paid invoice.
+ * @returns Y coordinate below the last row.
  */
 function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
   // Label area widened (0.4 > 0.6 of CONTENT_W) so long promo titles fit.
   const totalsLabelX = MARGIN + CONTENT_W * 0.4;
   const totalsValueX = MARGIN + CONTENT_W;
-
+  const NOTE_SIZE = 10;
   /**
-   * Draws one totals row, truncating the label with an ellipsis before it hits the value.
-   * @param label - Row label (e.g. "Subtotal").
-   * @param value - Pre-formatted value string (e.g. "$120.00").
-   * @param opts - Variant flags.
-   * @param opts.isBold - Renders in bold brand-violet (used for the final Total).
-   * @param opts.isPromo - Renders in amber to match the web promo styling.
+   * Wraps a note to the totals column.
+   * @param text - The note.
+   * @returns Its lines.
    */
-  const drawRow = (
-    label: string,
-    value: string,
-    opts: { isBold?: boolean; isPromo?: boolean } = {},
-  ): void => {
-    const isBold = opts.isBold ?? false;
-    const isPromo = opts.isPromo ?? false;
-    const f = isBold ? ctx.bold : ctx.font;
-    const labelColour = isBold ? BRAND : isPromo ? AMBER : MID;
-    const valueColour = isBold ? BRAND : isPromo ? AMBER : DARK;
-    const labelSize = isBold ? 14 : 12;
-    const valueSize = isBold ? 16 : 12;
-    const valueWidth = f.widthOfTextAtSize(value, valueSize);
-    const valueX = totalsValueX - valueWidth;
-    const labelMaxW = valueX - totalsLabelX - 12;
-    let lbl = label;
-    while (lbl.length > 1 && f.widthOfTextAtSize(lbl, labelSize) > labelMaxW) {
-      lbl = lbl.slice(0, -1);
-    }
-    if (lbl !== label) lbl = lbl.slice(0, -1) + "…";
-    ctx.page.drawText(lbl, { x: totalsLabelX, y, size: labelSize, font: f, color: labelColour });
-    ctx.page.drawText(value, { x: valueX, y, size: valueSize, font: f, color: valueColour });
-    y -= isBold ? 26 : 19;
-  };
+  const noteLines = (text: string): string[] =>
+    wrapText(text, totalsValueX - totalsLabelX, NOTE_SIZE, ctx.font);
 
-  drawRow("Subtotal", formatNZD(invoice.subtotal));
+  const steps: TotalsStep[] = [
+    { kind: "row", label: "Subtotal", value: formatNZD(invoice.subtotal) },
+  ];
   if (invoice.promoDiscount && invoice.promoDiscount > 0) {
-    drawRow(promoLineLabel(invoice.promoTitle), `-${formatNZD(invoice.promoDiscount)}`, {
-      isPromo: true,
+    steps.push({
+      kind: "row",
+      label: promoLineLabel(invoice.promoTitle),
+      value: `-${formatNZD(invoice.promoDiscount)}`,
+      style: "promo",
     });
-    // Smaller note tucked under the promo row: drawRow already stepped 19pt down, so y + 4
-    // sits 15pt below the row's baseline.
-    if (invoice.promoNote) {
-      const NOTE_SIZE = 10;
-      for (const line of wrapText(
-        invoice.promoNote,
-        totalsValueX - totalsLabelX,
-        NOTE_SIZE,
-        ctx.font,
-      )) {
-        ctx.page.drawText(line, {
-          x: totalsLabelX,
-          y: y + 4,
-          size: NOTE_SIZE,
-          font: ctx.font,
-          color: AMBER,
-        });
-        y -= 14;
-      }
-    }
+    if (invoice.promoNote) steps.push({ kind: "note", lines: noteLines(invoice.promoNote) });
   }
   // Promo, Gold Card, then unsuccessful: the order calcJobTotal takes them off.
   if (invoice.goldCardDiscount && invoice.goldCardDiscount > 0) {
-    drawRow(goldCardLineLabel(invoice.goldCardPercent), `-${formatNZD(invoice.goldCardDiscount)}`, {
-      isPromo: true,
+    steps.push({
+      kind: "row",
+      label: goldCardLineLabel(invoice.goldCardPercent),
+      value: `-${formatNZD(invoice.goldCardDiscount)}`,
+      style: "promo",
     });
   }
   if (invoice.unsuccessfulDiscount && invoice.unsuccessfulDiscount > 0) {
-    drawRow(
-      "Unsuccessful-visit discount (labour only)",
-      `-${formatNZD(invoice.unsuccessfulDiscount)}`,
-      { isPromo: true },
-    );
+    steps.push({
+      kind: "row",
+      label: UNSUCCESSFUL_LINE_LABEL,
+      value: `-${formatNZD(invoice.unsuccessfulDiscount)}`,
+      style: "promo",
+    });
+    if (invoice.unsuccessfulNote) {
+      steps.push({ kind: "note", lines: noteLines(invoice.unsuccessfulNote) });
+    }
   }
   // Gate on gstAmount, not the `gst` boolean, so the row appears once GST_REGISTERED flips.
   if (invoice.gstAmount > 0) {
-    drawRow("Includes GST", formatNZD(invoice.gstAmount));
+    steps.push({ kind: "row", label: "Includes GST", value: formatNZD(invoice.gstAmount) });
     // IRD requires a GST number on the header when an invoice carries GST.
     if (!ctx.identity.gstNumber) {
       console.warn(
@@ -565,30 +655,133 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
       );
     }
   }
-  ctx.page.drawLine({
-    start: { x: totalsLabelX, y: y + 6 },
-    end: { x: totalsValueX, y: y + 6 },
-    thickness: 0.5,
-    color: LIGHT,
-  });
-  // Push Total below the divider so 14pt bold doesn't overlap the line.
-  y -= 12;
-  drawRow("Total", formatNZD(invoice.total), { isBold: true });
-  // Part payment: the total stays the job's price and the balance is what's asked for.
-  if (invoice.alreadyPaid && invoice.alreadyPaid > 0) {
-    y += 6;
-    drawRow("Already paid", `-${formatNZD(invoice.alreadyPaid)}`);
-    ctx.page.drawLine({
-      start: { x: totalsLabelX, y: y + 6 },
-      end: { x: totalsValueX, y: y + 6 },
-      thickness: 0.5,
-      color: LIGHT,
-    });
-    y -= 12;
-    drawRow("Balance due", formatNZD(balanceDue(invoice)), { isBold: true });
+  steps.push({ kind: "rule" });
+  steps.push({ kind: "row", label: "Total", value: formatNZD(invoice.total), style: "bold" });
+  // Money handed over on the day, the payment that cleared it, then what's left.
+  const settled = settlementRows(invoice);
+  if (settled.length > 0) {
+    steps.push({ kind: "lift" });
+    for (const row of settled) {
+      if (row.bold) steps.push({ kind: "rule" });
+      steps.push({
+        kind: "row",
+        label: row.label,
+        value: row.value,
+        style: row.bold ? "bold" : undefined,
+      });
+    }
+  }
+
+  y = ensureSpace(
+    ctx,
+    y,
+    steps.reduce((h, s) => h + totalsStepHeight(s), 12),
+  );
+  for (const step of steps) {
+    if (step.kind === "row") {
+      // Truncate the label with an ellipsis before it runs into the value.
+      const isBold = step.style === "bold";
+      const isPromo = step.style === "promo";
+      const f = isBold ? ctx.bold : ctx.font;
+      const labelColour = isBold ? BRAND : isPromo ? AMBER : MID;
+      const valueColour = isBold ? BRAND : isPromo ? AMBER : DARK;
+      const labelSize = isBold ? 14 : 12;
+      const valueSize = isBold ? 16 : 12;
+      const valueX = totalsValueX - f.widthOfTextAtSize(step.value, valueSize);
+      const labelMaxW = valueX - totalsLabelX - 12;
+      let lbl = step.label;
+      while (lbl.length > 1 && f.widthOfTextAtSize(lbl, labelSize) > labelMaxW) {
+        lbl = lbl.slice(0, -1);
+      }
+      if (lbl !== step.label) lbl = lbl.slice(0, -1) + "…";
+      ctx.page.drawText(lbl, { x: totalsLabelX, y, size: labelSize, font: f, color: labelColour });
+      ctx.page.drawText(step.value, { x: valueX, y, size: valueSize, font: f, color: valueColour });
+    } else if (step.kind === "note") {
+      // The row already stepped 19pt down, so y + 4 sits 15pt below the row's baseline.
+      step.lines.forEach((line, i) => {
+        ctx.page.drawText(line, {
+          x: totalsLabelX,
+          y: y + 4 - i * 14,
+          size: NOTE_SIZE,
+          font: ctx.font,
+          color: AMBER,
+        });
+      });
+    } else if (step.kind === "rule") {
+      ctx.page.drawLine({
+        start: { x: totalsLabelX, y: y + 6 },
+        end: { x: totalsValueX, y: y + 6 },
+        thickness: 0.5,
+        color: LIGHT,
+      });
+    }
+    y -= totalsStepHeight(step);
   }
 
   return y - 12;
+}
+
+/** One line in a call-out box. */
+interface CalloutLine {
+  text: string;
+  /** Point size; 12 when unset. */
+  size?: number;
+  bold?: boolean;
+  /** Text colour; DARK when unset. */
+  colour?: ReturnType<typeof rgb>;
+}
+
+/**
+ * Draws a bordered call-out box: a heading, then its lines, wrapped to the box. Border-only
+ * so the diagonal status watermark shows through cleanly.
+ * @param ctx - PDF drawing context.
+ * @param y - Top of the block.
+ * @param heading - The box's heading.
+ * @param lines - The lines under it.
+ * @returns Y coordinate below the box, including the gap before notes.
+ */
+function drawCallout(ctx: PdfCtx, y: number, heading: string, lines: CalloutLine[]): number {
+  const BOX_PAD_X = 14;
+  const BOX_PAD_Y = 14;
+  const lineH = 16;
+  const wrapped = lines.flatMap((l) =>
+    wrapText(l.text, CONTENT_W - BOX_PAD_X * 2, l.size ?? 12, l.bold ? ctx.bold : ctx.font).map(
+      (text) => ({ ...l, text }),
+    ),
+  );
+  // Heading cap height (10) and its taller step (22), the lines, and a descender (3), so the
+  // padding reads the same above the heading and below the last line.
+  const BOX_H = BOX_PAD_Y * 2 + 10 + 22 + (wrapped.length - 1) * lineH + 3;
+  const boxTop = ensureSpace(ctx, y, BOX_H + 8) - 8;
+  ctx.page.drawRectangle({
+    x: MARGIN,
+    y: boxTop - BOX_H,
+    width: CONTENT_W,
+    height: BOX_H,
+    borderColor: LIGHT,
+    borderWidth: 0.8,
+  });
+
+  let by = boxTop - BOX_PAD_Y - 10;
+  ctx.page.drawText(heading, {
+    x: MARGIN + BOX_PAD_X,
+    y: by,
+    size: 14,
+    font: ctx.bold,
+    color: BRAND,
+  });
+  by -= 22;
+  for (const line of wrapped) {
+    ctx.page.drawText(line.text, {
+      x: MARGIN + BOX_PAD_X,
+      y: by,
+      size: line.size ?? 12,
+      font: line.bold ? ctx.bold : ctx.font,
+      color: line.colour ?? DARK,
+    });
+    by -= lineH;
+  }
+  return boxTop - BOX_H - 14;
 }
 
 /**
@@ -599,75 +792,17 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
  * @returns Y coordinate below the box, including the gap before notes.
  */
 function drawPaymentCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
-  const boxTop = y - 8;
-  const BOX_PAD_X = 14;
-  const BOX_PAD_Y = 14;
-  const lineH = 16;
-  const boxLines = 6; // heading + payee + account + particulars + code + due-by
-  const BOX_H = BOX_PAD_Y * 2 + 22 + (boxLines - 1) * lineH; // heading taller than rows
-  // Border-only so the diagonal status watermark shows through cleanly.
-  ctx.page.drawRectangle({
-    x: MARGIN,
-    y: boxTop - BOX_H,
-    width: CONTENT_W,
-    height: BOX_H,
-    borderColor: LIGHT,
-    borderWidth: 0.8,
-  });
-
-  let by = boxTop - BOX_PAD_Y - 2;
-  ctx.page.drawText("Bank transfer", {
-    x: MARGIN + BOX_PAD_X,
-    y: by,
-    size: 14,
-    font: ctx.bold,
-    color: BRAND,
-  });
-  by -= 22;
-  ctx.page.drawText(`Payee: ${ctx.identity.name}`, {
-    x: MARGIN + BOX_PAD_X,
-    y: by,
-    size: 12,
-    font: ctx.font,
-    color: DARK,
-  });
-  by -= lineH;
-  ctx.page.drawText(`Account: ${ctx.identity.bankAccount}`, {
-    x: MARGIN + BOX_PAD_X,
-    y: by,
-    size: 13,
-    font: ctx.bold,
-    color: DARK,
-  });
-  by -= lineH;
-  // Particulars then Code, each inside the payer's 12-character field
-  ctx.page.drawText(`Particulars: ${bankParticulars(invoice.clientName)}`, {
-    x: MARGIN + BOX_PAD_X,
-    y: by,
-    size: 12,
-    font: ctx.bold,
-    color: DARK,
-  });
-  by -= lineH;
-  ctx.page.drawText(`Code: ${bankCode(invoice.number)}`, {
-    x: MARGIN + BOX_PAD_X,
-    y: by,
-    size: 12,
-    font: ctx.bold,
-    color: DARK,
-  });
-  by -= lineH;
-  ctx.page.drawText(
-    `Due within ${ctx.identity.paymentTermsDays} days of issue (by ${formatDateShort(invoice.dueDate)}).`,
+  return drawCallout(ctx, y, "Bank transfer", [
+    { text: `Payee: ${ctx.identity.name}` },
+    { text: `Account: ${ctx.identity.bankAccount}`, size: 13, bold: true },
+    // Particulars then Code, each inside the payer's 12-character field
+    { text: `Particulars: ${bankParticulars(invoice.clientName)}`, bold: true },
+    { text: `Code: ${bankCode(invoice.number)}`, bold: true },
     {
-      x: MARGIN + BOX_PAD_X,
-      y: by,
-      size: 12,
-      font: ctx.font,
-      color: MID,
+      text: `Due within ${ctx.identity.paymentTermsDays} days of issue (by ${formatDateShort(invoice.dueDate)}).`,
+      colour: MID,
     },
-  );
-  return boxTop - BOX_H - 14;
+  ]);
 }
 
 /**
@@ -679,78 +814,44 @@ function drawPaymentCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
  * @returns Y coordinate below the box, including the gap before notes.
  */
 function drawQuoteCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
-  const boxTop = y - 8;
-  const BOX_PAD_X = 14;
-  const BOX_PAD_Y = 14;
-  const lineH = 16;
-  const boxLines = 3; // heading + accept line + validity line
-  const BOX_H = BOX_PAD_Y * 2 + 22 + (boxLines - 1) * lineH;
-  ctx.page.drawRectangle({
-    x: MARGIN,
-    y: boxTop - BOX_H,
-    width: CONTENT_W,
-    height: BOX_H,
-    borderColor: LIGHT,
-    borderWidth: 0.8,
-  });
-
-  let by = boxTop - BOX_PAD_Y - 2;
-  ctx.page.drawText("Accepting this quote", {
-    x: MARGIN + BOX_PAD_X,
-    y: by,
-    size: 14,
-    font: ctx.bold,
-    color: BRAND,
-  });
-  by -= 22;
-  ctx.page.drawText(`Reply to the email or ring ${ctx.identity.phone} to go ahead.`, {
-    x: MARGIN + BOX_PAD_X,
-    y: by,
-    size: 12,
-    font: ctx.font,
-    color: DARK,
-  });
-  by -= lineH;
-  ctx.page.drawText(
-    invoice.quoteValidUntil
-      ? `Prices are held until ${formatDateShort(invoice.quoteValidUntil)}.`
-      : "Prices may change if the scope does - anything extra is agreed first.",
+  return drawCallout(ctx, y, "Accepting this quote", [
+    { text: `Reply to the email or ring ${ctx.identity.phone} to go ahead.` },
     {
-      x: MARGIN + BOX_PAD_X,
-      y: by,
-      size: 12,
-      font: ctx.font,
-      color: MID,
+      text: invoice.quoteValidUntil
+        ? `Prices are held until ${formatDateShort(invoice.quoteValidUntil)}.`
+        : "Prices may change if the scope does - anything extra is agreed first.",
+      colour: MID,
     },
-  );
-  return boxTop - BOX_H - 14;
+  ]);
 }
 
 /**
- * Draws the operator-supplied notes line, if any. Wraps to the page width.
+ * Draws the operator-supplied notes, wrapped to the page width, onto further pages if long.
  * @param ctx - PDF drawing context.
  * @param invoice - Invoice being rendered.
- * @param y - Baseline for the notes text.
+ * @param y - Baseline for the first line.
  */
 function drawNotes(ctx: PdfCtx, invoice: Invoice, y: number): void {
   if (!invoice.notes) return;
-  ctx.page.drawText(invoice.notes, {
-    x: MARGIN,
-    y,
-    size: 11,
-    font: ctx.font,
-    color: MID,
-    maxWidth: CONTENT_W,
-  });
+  for (const line of wrapText(invoice.notes, CONTENT_W, 11, ctx.font)) {
+    // A baseline only needs room for its descenders above the footer.
+    y = ensureSpace(ctx, y, 4);
+    ctx.page.drawText(line, { x: MARGIN, y, size: 11, font: ctx.font, color: MID });
+    y -= 14;
+  }
 }
 
 /**
- * Draws the sender-contact footer at the page bottom under a thin border.
+ * Draws the sender-contact footer at a page's bottom under a thin border, with the page
+ * number when the invoice runs past one page.
  * @param ctx - PDF drawing context.
+ * @param page - The page to draw on.
+ * @param pageNo - This page's number, from 1.
+ * @param pageCount - Pages in the invoice.
  */
-function drawFooter(ctx: PdfCtx): void {
+function drawFooter(ctx: PdfCtx, page: PDFPage, pageNo: number, pageCount: number): void {
   const FOOTER_Y = MARGIN + 14;
-  ctx.page.drawLine({
+  page.drawLine({
     start: { x: MARGIN, y: FOOTER_Y + 14 },
     end: { x: MARGIN + CONTENT_W, y: FOOTER_Y + 14 },
     thickness: 0.5,
@@ -759,27 +860,50 @@ function drawFooter(ctx: PdfCtx): void {
   const footerLine = `${ctx.identity.email}  ·  ${ctx.identity.phone}  ·  ${ctx.identity.website}  ·  ${ctx.identity.location}`;
   const footerSize = 9;
   const footerW = ctx.font.widthOfTextAtSize(footerLine, footerSize);
-  ctx.page.drawText(footerLine, {
+  page.drawText(footerLine, {
     x: MARGIN + (CONTENT_W - footerW) / 2,
     y: FOOTER_Y,
     size: footerSize,
     font: ctx.font,
     color: MID,
   });
+  if (pageCount > 1) {
+    const label = `Page ${pageNo} of ${pageCount}`;
+    page.drawText(label, {
+      x: MARGIN + CONTENT_W - ctx.font.widthOfTextAtSize(label, footerSize),
+      y: FOOTER_Y - 13,
+      size: footerSize,
+      font: ctx.font,
+      color: MID,
+    });
+  }
 }
 
 /**
  * Generates the A4 PDF for an invoice or quote.
  * @param invoice - The invoice record to render.
+ * @param identity - Business identity to print; the live settings when omitted. The fixture
+ *   check passes the defaults, since live settings need a request.
  * @returns PDF content as a Buffer.
  */
-export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
-  const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const identity = await getIdentity();
-  const ctx: PdfCtx = { page, font, bold, identity };
+export async function generateInvoicePdf(
+  invoice: Invoice,
+  identity?: IdentitySettings,
+): Promise<Buffer> {
+  const doc = await PDFDocument.create();
+  doc.registerFontkit(fontkit);
+  const page = doc.addPage([PAGE_W, PAGE_H]);
+  const fonts = loadFontBytes();
+  const font = await doc.embedFont(fonts.regular);
+  const bold = await doc.embedFont(fonts.bold);
+  const ctx: PdfCtx = {
+    doc,
+    page,
+    font,
+    bold,
+    identity: identity ?? (await getIdentity()),
+    invoice,
+  };
   const logoPaths = parseWordmarkPaths();
 
   drawStatusWatermark(ctx, invoice);
@@ -787,12 +911,16 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   y = drawBillToBlock(ctx, invoice, y);
   y = drawLineItemsTable(ctx, invoice, y);
   y = drawTotalsBlock(ctx, invoice, y);
-  y = invoice.isQuote ? drawQuoteCallout(ctx, invoice, y) : drawPaymentCallout(ctx, invoice, y);
+  // A paid or voided invoice asks for nothing, so its box says so instead of the bank details.
+  const settled = settledCallout(invoice);
+  if (invoice.isQuote) y = drawQuoteCallout(ctx, invoice, y);
+  else if (settled) y = drawCallout(ctx, y, settled.heading, [{ text: settled.text }]);
+  else y = drawPaymentCallout(ctx, invoice, y);
   drawNotes(ctx, invoice, y);
-  drawFooter(ctx);
+  const pages = doc.getPages();
+  pages.forEach((p, i) => drawFooter(ctx, p, i + 1, pages.length));
 
-  const bytes = await pdfDoc.save();
-  return Buffer.from(bytes);
+  return Buffer.from(await doc.save());
 }
 
 /**

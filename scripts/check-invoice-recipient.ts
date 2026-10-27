@@ -22,6 +22,11 @@ function main(): void {
     invoiceRecipient("68 LTD.", michael).toCompany,
     true,
   );
+  expectEqual(
+    "company match ignores macrons",
+    invoiceRecipient("Ōrākei Plumbing", { name: "Jane Doe", company: "Orakei Plumbing" }).toCompany,
+    true,
+  );
   expectEqual("person invoice on the same contact", invoiceRecipient("Michael Smith", michael), {
     toCompany: false,
     attention: null,

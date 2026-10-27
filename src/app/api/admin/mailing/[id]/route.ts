@@ -76,6 +76,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
   const id = parseObjectId((await params).id);
   if (!id) return errorResponse("Email not found.", 404);
   const held = await prisma.campaign.findUnique({ where: { id }, select: { segmentId: true } });
+  if (!held) return errorResponse("Email not found.", 404);
   const deleted = await prisma.campaign.deleteMany({ where: { id, status: { not: "sending" } } });
   if (deleted.count === 0) {
     return errorResponse("This email is sending right now, so it can't be deleted.", 409);

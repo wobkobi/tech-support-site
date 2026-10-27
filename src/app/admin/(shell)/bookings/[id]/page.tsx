@@ -12,7 +12,7 @@ import { BookingActions } from "@/features/booking/components/admin/BookingActio
 import { BookingInfoCard } from "@/features/booking/components/admin/BookingInfoCard";
 import { BookingTimeline } from "@/features/booking/components/admin/BookingTimeline";
 import { BookingTimesCard } from "@/features/booking/components/admin/BookingTimesCard";
-import { meetingTypeFromNotes } from "@/features/booking/lib/booking";
+import { combineUnitAndAddress, meetingTypeFromNotes } from "@/features/booking/lib/booking";
 import { formatMins, formatNZD } from "@/features/business/lib/business";
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { Notice } from "@/shared/components/Notice";
@@ -203,7 +203,9 @@ export default async function BookingDetailPage({
               name={booking.name}
               email={booking.email}
               phone={booking.phone}
-              address={booking.address}
+              address={
+                booking.address ? combineUnitAndAddress(booking.unit ?? "", booking.address) : null
+              }
               notes={booking.notes}
               accessNotes={booking.accessNotes}
             />

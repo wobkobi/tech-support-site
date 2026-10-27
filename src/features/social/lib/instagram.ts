@@ -35,6 +35,17 @@ export interface InstagramContainers {
 }
 
 /**
+ * A picture's description as Instagram reads it to screen readers. Only single pictures and
+ * carousel items take one; reels and stories don't.
+ * @param alt - The picture's description, if any.
+ * @returns `alt_text` (Instagram's 1000-character cap), or nothing when there's none.
+ */
+function altText(alt: string | null): Record<string, string> {
+  const text = alt?.trim();
+  return text ? { alt_text: text.slice(0, 1000) } : {};
+}
+
+/**
  * The containers a post needs, by kind: one picture, a carousel of several, a reel, or a story.
  * Stories take no caption; links aren't clickable in captions, so the link is left off.
  * @param input - Filled caption and media.
@@ -74,14 +85,18 @@ export function instagramContainers(input: PublishInput): InstagramContainers {
   if (!input.imageUrl) throw new Error("Instagram needs a picture.");
   if (input.images.length > 1) {
     return {
-      children: input.images.map((p) => ({ image_url: p.url, is_carousel_item: "true" })),
+      children: input.images.map((p) => ({
+        image_url: p.url,
+        is_carousel_item: "true",
+        ...altText(p.alt),
+      })),
       main: { media_type: "CAROUSEL", caption: input.text },
       what: "pictures",
     };
   }
   return {
     children: [],
-    main: { image_url: input.imageUrl, caption: input.text },
+    main: { image_url: input.imageUrl, caption: input.text, ...altText(input.imageAlt) },
     what: "picture",
   };
 }

@@ -54,6 +54,27 @@ function describeThisDevice(): string {
 }
 
 /**
+ * Registers a browser subscription server-side (an upsert on its endpoint).
+ * @param sub - The browser's push subscription.
+ * @returns True when the server saved it.
+ */
+async function registerSubscription(sub: PushSubscription): Promise<boolean> {
+  const json = sub.toJSON() as { keys?: { p256dh?: string; auth?: string } };
+  const res = await fetch("/api/admin/push/subscribe", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      endpoint: sub.endpoint,
+      p256dh: json.keys?.p256dh,
+      auth: json.keys?.auth,
+      label: describeThisDevice(),
+      userAgent: navigator.userAgent,
+    }),
+  });
+  return res.ok;
+}
+
+/**
  * Push notification setup and device management for the current browser.
  * @returns Notifications view element.
  */
@@ -63,14 +84,18 @@ export function NotificationsView(): React.ReactElement {
   const [devices, setDevices] = useState<PushDeviceRow[]>([]);
   const [busy, setBusy] = useState(false);
 
-  const loadDevices = useCallback(async (): Promise<void> => {
+  const loadDevices = useCallback(async (): Promise<PushDeviceRow[] | null> => {
     try {
       const res = await fetch("/api/admin/push/devices");
       const d = (await res.json()) as { ok: boolean; devices?: PushDeviceRow[] };
-      if (d.ok && d.devices) setDevices(d.devices);
+      if (d.ok && d.devices) {
+        setDevices(d.devices);
+        return d.devices;
+      }
     } catch {
       toast("Couldn't load registered devices.", { tone: "error" });
     }
+    return null;
   }, [toast]);
 
   // Every branch is reachable on iOS; the wrong one shows an Enable button that does nothing.
@@ -100,8 +125,20 @@ export function NotificationsView(): React.ReactElement {
 
       const registration = await navigator.serviceWorker.ready;
       const existing = await registration.pushManager.getSubscription();
-      setState(existing ? "on" : "off");
-      if (existing) await loadDevices();
+      if (!existing) {
+        setState("off");
+        return;
+      }
+      // A subscribed browser whose server row is gone (pruned after a 404, or removed from
+      // the list) gets nothing, so register it again before calling it on.
+      const list = await loadDevices();
+      if (list && !list.some((d) => d.endpoint === existing.endpoint)) {
+        const registered = await registerSubscription(existing).catch(() => false);
+        setState(registered ? "on" : "off");
+        if (registered) await loadDevices();
+        return;
+      }
+      setState("on");
     }
 
     void resolve();
@@ -117,19 +154,7 @@ export function NotificationsView(): React.ReactElement {
         applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""),
       });
 
-      const json = sub.toJSON() as { keys?: { p256dh?: string; auth?: string } };
-      const res = await fetch("/api/admin/push/subscribe", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          endpoint: sub.endpoint,
-          p256dh: json.keys?.p256dh,
-          auth: json.keys?.auth,
-          label: describeThisDevice(),
-          userAgent: navigator.userAgent,
-        }),
-      });
-      if (!res.ok) throw new Error("register failed");
+      if (!(await registerSubscription(sub))) throw new Error("register failed");
 
       setState("on");
       await loadDevices();
@@ -200,6 +225,13 @@ export function NotificationsView(): React.ReactElement {
         body: JSON.stringify({ endpoint }),
       });
       if (!res.ok) throw new Error("remove failed");
+      // Removing this browser's own row turns it off here too, or the page would say on.
+      const registration = await navigator.serviceWorker.ready;
+      const sub = await registration.pushManager.getSubscription();
+      if (sub?.endpoint === endpoint) {
+        await sub.unsubscribe().catch(() => false);
+        setState("off");
+      }
       await loadDevices();
       toast("Device removed.", { tone: "success" });
     } catch {

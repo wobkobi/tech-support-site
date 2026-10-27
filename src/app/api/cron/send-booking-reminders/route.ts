@@ -116,7 +116,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     console.log(
       `[cron/send-booking-reminders] done: emails=${results.emailsSent} failed=${results.failed}`,
     );
-    return NextResponse.json({ ok: true, ...results });
+    // A failed send was handed back for the next run; the 500 makes cron-job.org flag the run,
+    // so a Resend outage that fails every reminder doesn't pass as done.
+    return NextResponse.json(
+      { ok: results.failed === 0, ...results },
+      { status: results.failed > 0 ? 500 : 200 },
+    );
   } catch (error) {
     console.error("[cron/send-booking-reminders] error:", error);
     return NextResponse.json(

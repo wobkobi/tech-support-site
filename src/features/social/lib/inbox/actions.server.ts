@@ -405,8 +405,13 @@ export async function deleteMessage(id: string, now: Date): Promise<void> {
     }
   } catch (error) {
     if (error instanceof InboxActionError) throw error;
-    // Already deleted on the app is what was asked for.
-    const gone = error instanceof GraphError && metaProblem(error.code, error.raw) === "gone";
+    // Already deleted on the app is what was asked for. Lost access reads the same as a
+    // deleted comment, so, as for replies, only a visible account confirms it.
+    const gone =
+      error instanceof GraphError &&
+      message.platform !== "google" &&
+      metaProblem(error.code, error.raw) === "gone" &&
+      (await accountVisible(message.platform));
     if (!gone) throw await failed(message, error, now);
   }
   await markGone(message, now);
