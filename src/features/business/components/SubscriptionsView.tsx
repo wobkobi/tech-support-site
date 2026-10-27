@@ -21,6 +21,8 @@ import {
   PAYMENT_METHODS,
   VALID_FREQUENCIES,
 } from "@/features/business/lib/constants";
+import { isGstRegisteredOn } from "@/features/business/lib/tax/gst-basis";
+import type { GstStatus } from "@/features/business/lib/tax/types";
 import type { Subscription } from "@/features/business/types/business";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
@@ -38,16 +40,17 @@ interface FormState {
 }
 
 /**
- * Returns a blank form state with sensible defaults.
+ * Returns a blank form state with sensible defaults; GST starts at 15% only once registered.
+ * @param gst - GST registration status.
  * @returns Default FormState.
  */
-function emptyForm(): FormState {
+function emptyForm(gst: GstStatus): FormState {
   return {
     description: "",
     supplier: "",
     category: "Subscriptions",
     amountIncl: "",
-    gstRate: "0.15",
+    gstRate: isGstRegisteredOn(todayISO(), gst) ? "0.15" : "0",
     method: "Business Account",
     frequency: "monthly",
     nextDue: todayISO(),
@@ -59,16 +62,23 @@ function emptyForm(): FormState {
  * Subscriptions manager - list, add, edit, record payment, delete.
  * @param props - Component props.
  * @param props.reloadKey - Bumped by the parent to force a reload (e.g. after an expense migrate).
+ * @param props.gst - GST registration status, for a new subscription's default rate.
  * @returns Subscriptions view element.
  */
-export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): React.ReactElement {
+export function SubscriptionsView({
+  reloadKey = 0,
+  gst,
+}: {
+  reloadKey?: number;
+  gst: GstStatus;
+}): React.ReactElement {
   const { toast } = useToast();
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   // A failed load shows a Try again banner, not "No subscriptions yet."
   const [loadError, setLoadError] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [form, setForm] = useState<FormState>(() => emptyForm(gst));
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [recording, setRecording] = useState<string | null>(null);
@@ -119,7 +129,7 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
   function cancelForm(): void {
     setShowForm(false);
     setEditId(null);
-    setForm(emptyForm());
+    setForm(emptyForm(gst));
   }
 
   /**
@@ -230,7 +240,7 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
             variant="outline"
             onClick={() => {
               setEditId(null);
-              setForm(emptyForm());
+              setForm(emptyForm(gst));
               setShowForm(true);
             }}
           >

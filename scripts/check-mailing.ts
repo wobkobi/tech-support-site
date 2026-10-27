@@ -597,13 +597,13 @@ function checkBlockRendering(): void {
   const promo = renderBody("::promo", VALUES, CTX.promo);
   expect(
     "the promo card shows the offer and end date",
-    promo.includes(">$10 off</p>") && promo.includes("Ends Friday 3 October</p>"),
+    promo.includes(">$10 off</p>") && promo.includes("Book by Friday 3 October</p>"),
     promo,
   );
   const limited = renderBody("::promo", VALUES, { ...CTX.promo!, restriction: "weekdays" });
   expect(
     "the promo card names a weekday limit",
-    limited.includes("Ends Friday 3 October, weekdays only"),
+    limited.includes("Book by Friday 3 October, weekdays only"),
     limited,
   );
   expect("no promo leaves the card out", renderBody("::promo", VALUES, null) === "");
@@ -696,7 +696,7 @@ function checkBlockRendering(): void {
   ).text;
   expect(
     "the text part reads the promo, quote and social links",
-    text.includes("$10 off\n\nEnds Friday 3 October") &&
+    text.includes("$10 off\n\nBook by Friday 3 October") &&
       text.includes("★★★★★\n\nGreat job.\n\n- Pat") &&
       text.includes("Find us on Google (https://"),
     text,

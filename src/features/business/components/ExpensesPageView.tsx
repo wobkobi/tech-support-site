@@ -22,7 +22,7 @@ interface ExpensesPageViewProps {
 /**
  * Expenses + subscriptions with migrate-triggered reload wiring.
  * @param props - Component props.
- * @param props.gst - GST registration status for the expenses ledger.
+ * @param props.gst - GST registration status for the expenses ledger and subscription defaults.
  * @param props.assetThreshold - Cost (on the GST basis) above which an expense offers "Turn into an asset".
  * @param props.linkedExpenseIds - Expenses already linked to an asset.
  * @returns The wrapper element.
@@ -42,7 +42,7 @@ export function ExpensesPageView({
         linkedExpenseIds={linkedExpenseIds}
       />
       <div className="mt-6">
-        <SubscriptionsView reloadKey={subsReloadKey} />
+        <SubscriptionsView reloadKey={subsReloadKey} gst={gst} />
       </div>
     </>
   );

@@ -376,7 +376,7 @@ function main(): void {
   expectEqual(
     "a spend floor is named, or the offer reads as unconditional",
     summariseForBanner({ ...promo("percent", 0.2), minSpend: 100 }).startsWith(
-      "20% off on jobs over $100 until",
+      "20% off on jobs over $100 if you book by",
     ),
     true,
   );
@@ -384,7 +384,7 @@ function main(): void {
   expectEqual(
     "a tiered promo does not repeat the promo-wide floor",
     summariseForBanner({ ...tiered([[100, 0.1]]), minSpend: 100 }).startsWith(
-      "10% off over $100 until",
+      "10% off over $100 if you book by",
     ),
     true,
   );

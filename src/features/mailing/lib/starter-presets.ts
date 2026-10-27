@@ -34,7 +34,7 @@ export function starterPresets(siteUrl: string): StarterPreset[] {
     {
       presetKey: PROMO_PRESET_KEY,
       name: "New promo",
-      subject: "{promoOffer} on tech help until {promoEnds}",
+      subject: "{promoOffer} on tech help if you book by {promoEnds}",
       preheader: "A quick heads-up about a deal I'm running.",
       body: [
         "Hi {firstName},",

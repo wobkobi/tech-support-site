@@ -636,7 +636,7 @@ async function main(): Promise<void> {
     "#10 the banner carries the limit after the days",
     summariseForBanner(activePromo({ activeWeekdays: [2], newCustomersOnly: true }), {
       fixedDate: true,
-    }).startsWith("10% off for new customers until"),
+    }).startsWith("10% off for new customers if you book by"),
   );
 
   // ---- #15c Promo-form dates are NZ midnights, whatever the browser's zone ----

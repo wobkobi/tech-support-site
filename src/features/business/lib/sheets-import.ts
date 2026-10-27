@@ -5,6 +5,7 @@ import { calcGstFromInclusive } from "@/features/business/lib/business";
 import { listSpreadsheetsInFolder } from "@/features/business/lib/google-drive";
 import { withRetry } from "@/features/business/lib/google-retry";
 import { getSheetId, getSheetsClient } from "@/features/business/lib/google-sheets";
+import { GST_RATE } from "@/features/business/lib/pricing-policy";
 import {
   appendRowWithSyncId,
   backfillSyncIds,
@@ -12,6 +13,9 @@ import {
   buildExpenseCells,
   resolveSheetIdForDate,
 } from "@/features/business/lib/sheets-sync";
+import { expenseGstRateOn } from "@/features/business/lib/tax/gst-basis";
+import { loadGstStatus } from "@/features/business/lib/tax/load";
+import type { GstStatus } from "@/features/business/lib/tax/types";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { parseSheetDate } from "@/shared/lib/date-format";
 import { roundCents } from "@/shared/lib/money";
@@ -42,16 +46,15 @@ function parseAmount(raw: string): number | null {
 /**
  * Parses a GST rate string like "15%" or "0.15" into a decimal fraction.
  * @param raw - Raw cell value.
- * @returns GST rate as a decimal (e.g. 0.15).
+ * @returns GST rate as a decimal (e.g. 0.15), or null for a blank or unreadable cell so the
+ *   caller can fall back to the rate for the row's date.
  */
-function parseGstRate(raw: string): number {
+function parseGstRate(raw: string): number | null {
   const t = raw.trim();
-  if (t.endsWith("%")) {
-    const n = parseFloat(t);
-    return isNaN(n) ? 0.15 : n / 100;
-  }
+  if (t === "") return null;
   const n = parseFloat(t);
-  return isNaN(n) ? 0.15 : n > 1 ? n / 100 : n;
+  if (isNaN(n)) return null;
+  return t.endsWith("%") || n > 1 ? n / 100 : n;
 }
 
 interface PerSheetCounts {
@@ -103,6 +106,8 @@ interface SyncState {
   expenseByDedup: Map<string, ExpenseEntry>;
   /** Every Sync ID observed (or minted) in the scanned sheets this run. */
   seenSyncIds: Set<string>;
+  /** GST registration, for an Expenses row with no GST rate. */
+  gst: GstStatus;
 }
 
 /** Setting key holding the Drive modifiedTime of each workbook at its last clean import. */
@@ -400,7 +405,8 @@ async function importFromSheet(
     const receiptRaw = (row[5] ?? "").trim().toLowerCase();
     const receipt = receiptRaw === "yes" || receiptRaw === "true";
     const amountIncl = parseAmount(row[6] ?? "");
-    const gstRate = parseGstRate(row[7] ?? "15%");
+    // A blank rate follows registration on the row's date, as the site's own expense form does.
+    const gstRate = parseGstRate(row[7] ?? "") ?? expenseGstRateOn(date, state.gst, GST_RATE);
     const notes = (row[10] ?? "").trim() || null;
 
     if (!supplier || !description || amountIncl === null || amountIncl <= 0) {
@@ -637,9 +643,10 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
 
   try {
     // Dedup maps hold only unlinked rows: a synced entry matching by value is a real second one.
-    const [incomeRows, expenseRows] = await Promise.all([
+    const [incomeRows, expenseRows, gst] = await Promise.all([
       prisma.incomeEntry.findMany(),
       prisma.expenseEntry.findMany(),
+      loadGstStatus(),
     ]);
     const state: SyncState = {
       incomeByKey: new Map(),
@@ -647,6 +654,7 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
       expenseByKey: new Map(),
       expenseByDedup: new Map(),
       seenSyncIds: new Set(),
+      gst,
     };
     for (const r of incomeRows) {
       if (r.sheetRowKey) state.incomeByKey.set(r.sheetRowKey, r);
