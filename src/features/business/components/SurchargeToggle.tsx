@@ -1,6 +1,6 @@
 "use client";
 // src/features/business/components/SurchargeToggle.tsx
-/// Tick that turns the weekend, public-holiday or (on a weekday) after-hours labour surcharge on
+// Tick that turns the weekend, public-holiday or (on a weekday) after-hours labour surcharge on
 // or off for one job.
 
 import { upliftPercent, type DateSurcharge } from "@/features/business/lib/pricing-policy";
@@ -12,7 +12,7 @@ interface Props {
   option: DateSurcharge;
   /** Whether the job bills it. */
   on: boolean;
-  /** Whether the date bills it by default (a weekend or public holiday). */
+  /** Whether the job bills it by default (a weekend, public holiday or after-hours start). */
   fromDate: boolean;
   /** Called with the new tick. */
   onChange: (on: boolean) => void;
@@ -20,11 +20,11 @@ interface Props {
 
 /**
  * Surcharge tick in a pill: amber while it bills, grey when off, with a note whenever the
- * tick differs from what the date would bill.
+ * tick differs from what the date and start would bill.
  * @param props - Component props.
  * @param props.option - The surcharge the tick switches.
  * @param props.on - Whether the job bills it.
- * @param props.fromDate - Whether the date bills it by default.
+ * @param props.fromDate - Whether the date and start bill it by default.
  * @param props.onChange - Called with the new tick.
  * @returns The toggle element.
  */

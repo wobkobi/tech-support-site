@@ -36,6 +36,7 @@ export async function saveSettingsGroup<G extends SettingsGroup>(
       console.error("[settings] Failed to write audit row:", err);
     }
   }
-  // Next 16's revalidateTag requires a profile arg (see the promo/reviews routes).
-  revalidateTag(SETTINGS_TAG, {});
+  // Expire now rather than stale-while-revalidate, so the first page load after a save already
+  // reads it; with a bare `{}` that load still got the old settings.
+  revalidateTag(SETTINGS_TAG, { expire: 0 });
 }

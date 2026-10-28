@@ -5,6 +5,7 @@
 
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
+import { hourLabel } from "@/features/booking/lib/booking";
 import { upliftPercent } from "@/features/business/lib/pricing-policy";
 import type { PricingSettings } from "@/shared/lib/settings/types";
 import type React from "react";
@@ -48,8 +49,12 @@ export function PricingPreview({ config }: Props): React.ReactElement {
     );
   }
   if (config.weekendUplift > 0) {
+    const afterHours =
+      config.afterHoursFromHour === null
+        ? "after-hours work when you tick it on a weekday"
+        : `a weekday job starting from ${hourLabel(config.afterHoursFromHour)}, or one you tick`;
     lines.push(
-      `Weekend labour carries a +${upliftPercent(config.weekendUplift)}% surcharge (Christmas Eve and New Year's Eve take the holiday one instead), and so does after-hours work when you tick it on a weekday.`,
+      `Weekend labour carries a +${upliftPercent(config.weekendUplift)}% surcharge (Christmas Eve and New Year's Eve take the holiday one instead), and so does ${afterHours}.`,
     );
   }
   if (config.minTravelCharge > 0) {

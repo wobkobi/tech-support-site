@@ -1,10 +1,12 @@
 // scripts/check-surcharge-copy.ts
-// Weekend and holiday surcharge copy, the offline holiday fallback and the public rate filter:
-// the stated rise matches what calcJobTotal bills under a promo, the eves are named as
-/// holiday rates (not public holidays), a weekend public holiday bills on its weekday off, and
-// admin-only modifiers never reach the public.
+// Weekend, holiday and after-hours surcharge rules and copy, the offline holiday fallback and the
+// public rate filter: the stated rise matches what calcJobTotal bills under a promo, the eves are
+// named as holiday rates (not public holidays), a weekend public holiday bills on its weekday
+// off, after hours starts on its hour (6pm counts), and admin-only modifiers never reach the
+// public.
 // Run with: npm test -- surcharge-copy
 
+import { slotSurcharge } from "@/features/booking/lib/booking";
 import { calcJobTotal, type JobPromo } from "@/features/business/lib/business";
 import {
   holidayTakenOn,
@@ -12,7 +14,10 @@ import {
   SURCHARGED_OBSERVANCES,
 } from "@/features/business/lib/holiday-calendar";
 import {
+  afterHoursCopy,
+  dateSurcharge,
   dateSurchargeNote,
+  eveningTickLabel,
   publicHolidayCopy,
   quoteSurchargeNote,
   surchargeCaveat,
@@ -56,6 +61,15 @@ const CHRISTMAS_EVE: PricedDateSurcharge = {
   perHour: 25,
   perHourRemote: 22.5,
 };
+const AFTER_HOURS: PricedDateSurcharge = {
+  reason: "After hours",
+  label: "After-hours surcharge",
+  uplift: 0.1,
+  perHour: 10,
+  perHourRemote: 9,
+};
+// The live defaults: weekend +10%, holiday +25%, after hours from 6pm.
+const RULES = { weekendUplift: 0.1, publicHolidayUplift: 0.25, afterHoursFromHour: 18 };
 
 // A $65/hr flat promo, the kind that made a "10% more" note read as $6.50 instead of $10.
 const FLAT_PROMO: JobPromo = {
@@ -114,27 +128,93 @@ async function main(): Promise<void> {
   expectEqual(
     "weekend, with the remote figure",
     dateSurchargeNote(WEEKEND),
-    "Weekend rates apply on Saturdays and Sundays: labour costs $10/hr more ($9/hr for remote support). Travel and parts cost the same.",
+    "Weekend rates: labour costs $10/hr more ($9/hr remote)",
   );
   expectEqual(
     "Christmas Eve says holiday rates, not public holiday",
     dateSurchargeNote(CHRISTMAS_EVE),
-    "Christmas Eve: holiday rates apply, so labour costs $25/hr more ($22.50/hr for remote support). Travel and parts cost the same.",
+    "Christmas Eve: holiday rates, labour costs $25/hr more ($22.50/hr remote)",
   );
   expectEqual(
     "remote figure dropped when it matches",
     dateSurchargeNote({ ...WEEKEND, perHourRemote: 10 }),
-    "Weekend rates apply on Saturdays and Sundays: labour costs $10/hr more. Travel and parts cost the same.",
+    "Weekend rates: labour costs $10/hr more",
   );
   expectEqual(
     "unpriced surcharge falls back to a share of the full rate",
     dateSurchargeNote({ reason: "Weekend", label: "Weekend surcharge", uplift: 0.125 }),
-    "Weekend rates apply on Saturdays and Sundays: labour costs an extra 12.5% of the full hourly rate. Travel and parts cost the same.",
+    "Weekend rates: labour costs an extra 12.5% of the full hourly rate",
   );
   expectEqual(
     "estimate line calls a holiday a holiday surcharge",
     quoteSurchargeNote(CHRISTMAS_EVE),
     "Includes the 25% holiday surcharge on labour.",
+  );
+  expectEqual(
+    "the evening tick names the hour and the rise",
+    eveningTickLabel(AFTER_HOURS, 18),
+    "Show evening times: from 6pm, labour costs $10/hr more ($9/hr remote)",
+  );
+  expectEqual(
+    "an unpriced evening tick falls back to a share of the full rate",
+    eveningTickLabel({ reason: "After hours", label: "After-hours surcharge", uplift: 0.1 }, 18),
+    "Show evening times: from 6pm, labour costs an extra 10% of the full hourly rate",
+  );
+  expectEqual(
+    "estimate line calls after hours after-hours",
+    quoteSurchargeNote(AFTER_HOURS),
+    "Includes the 10% after-hours surcharge on labour.",
+  );
+
+  console.log("\nWhich surcharge a job bills:");
+  // 28 Oct 2026 is a Wednesday, 31 Oct a Saturday.
+  expectEqual(
+    "a weekday 5:45pm start bills normal rates",
+    dateSurcharge(null, 3, RULES, 17 * 60 + 45),
+    null,
+  );
+  expectEqual(
+    "a weekday 6pm start bills after hours",
+    dateSurcharge(null, 3, RULES, 18 * 60)?.reason,
+    "After hours",
+  );
+  expectEqual("an unknown start bills no after hours", dateSurcharge(null, 3, RULES, null), null);
+  expectEqual(
+    "a Saturday evening stays weekend",
+    dateSurcharge(null, 6, RULES, 19 * 60)?.reason,
+    "Weekend",
+  );
+  expectEqual(
+    "a holiday evening stays holiday",
+    dateSurcharge("Labour Day", 1, RULES, 19 * 60)?.reason,
+    "Labour Day",
+  );
+  expectEqual(
+    "after hours off bills normal rates",
+    dateSurcharge(null, 3, { ...RULES, afterHoursFromHour: null }, 19 * 60),
+    null,
+  );
+  expectEqual(
+    "a 0% weekend rate leaves evenings at normal rates",
+    dateSurcharge(null, 3, { ...RULES, weekendUplift: 0 }, 19 * 60),
+    null,
+  );
+  const weekday = { surcharge: null, afterHours: { fromHour: 18, surcharge: AFTER_HOURS } };
+  expectEqual(
+    "the booking slot at 5:45pm bills nothing",
+    slotSurcharge(weekday, 17 * 60 + 45),
+    null,
+  );
+  expectEqual(
+    "the booking slot at 6pm bills after hours",
+    slotSurcharge(weekday, 18 * 60),
+    AFTER_HOURS,
+  );
+  expectEqual("no slot picked bills nothing", slotSurcharge(weekday, null), null);
+  expectEqual(
+    "a weekend slot bills the day's own surcharge",
+    slotSurcharge({ surcharge: WEEKEND, afterHours: null }, 19 * 60),
+    WEEKEND,
   );
 
   console.log("\nPricing page copy:");
@@ -183,6 +263,23 @@ async function main(): Promise<void> {
     "both off says nothing",
     surchargeCaveat({ weekendUplift: 0, publicHolidayUplift: 0 }, 100),
     null,
+  );
+  expectEqual(
+    "after hours joins the weekend subject",
+    surchargeCaveat(RULES, 100),
+    "Weekends and weekday visits starting from 6pm add $10/hr to labour, and public holidays add $25/hr, as do Christmas Eve and New Year's Eve.",
+  );
+  expectEqual(
+    "after hours with the weekend rate alone",
+    surchargeCaveat({ ...RULES, publicHolidayUplift: 0 }, 100),
+    "Weekends and weekday visits starting from 6pm add $10/hr to labour.",
+  );
+
+  console.log("\nAfter-hours pricing copy:");
+  expectEqual(
+    "names the hour, the rise in dollars and the booking tick",
+    afterHoursCopy(18, 0.1, 100),
+    "Weekday visits starting from **6pm** add **10% of the full hourly rate** to labour (**$10/hr** for an on-site visit). To book one online, tick **Show evening times** when you choose a start time. **Travel and parts are unchanged.**",
   );
   expectEqual("upliftPercent keeps a half percent", upliftPercent(0.125), 12.5);
   expectEqual("upliftPercent drops float noise", upliftPercent(0.07), 7);

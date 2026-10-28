@@ -6,6 +6,7 @@ import { GetEstimateButton } from "@/features/business/components/GetEstimateBut
 import { PricingWizard } from "@/features/business/components/PricingWizard";
 import { formatMoneyCompact } from "@/features/business/lib/business";
 import {
+  afterHoursCopy,
   cancellationCopy,
   gstCopy,
   minimumsCopy,
@@ -138,6 +139,19 @@ export default async function PricingPage(): Promise<React.ReactElement> {
   });
   const showWeekend = policy.WEEKEND_UPLIFT > 0;
   const showHoliday = policy.PUBLIC_HOLIDAY_UPLIFT > 0;
+  // After hours bills the weekend rise, so it shows only while that rise is on.
+  const afterHoursFromHour = showWeekend ? policy.AFTER_HOURS_FROM_HOUR : null;
+  // "Evenings, weekends and public holidays", dropping whichever are off.
+  const surchargeParts = [
+    afterHoursFromHour !== null && "evenings",
+    showWeekend && "weekends",
+    showHoliday && "public holidays",
+  ].filter((part): part is string => !!part);
+  const surchargeList =
+    surchargeParts.length > 1
+      ? `${surchargeParts.slice(0, -1).join(", ")} and ${surchargeParts.at(-1)}`
+      : (surchargeParts[0] ?? "");
+  const surchargeTitle = surchargeList.charAt(0).toUpperCase() + surchargeList.slice(1);
   const { identity } = settings;
   return (
     <PageShell>
@@ -363,16 +377,14 @@ export default async function PricingPage(): Promise<React.ReactElement> {
 
           {/* A 0% surcharge is off, so it gets no copy; with both off the section goes. */}
           {(showWeekend || showHoliday) && (
-            <Disclosure
-              title={
-                showWeekend && showHoliday
-                  ? "Weekends and public holidays"
-                  : showWeekend
-                    ? "Weekends"
-                    : "Public holidays"
-              }
-              bodyClassName="whitespace-pre-line"
-            >
+            <Disclosure title={surchargeTitle} bodyClassName="whitespace-pre-line">
+              {afterHoursFromHour !== null && (
+                <p>
+                  {renderEmphasised(
+                    afterHoursCopy(afterHoursFromHour, policy.WEEKEND_UPLIFT, baseRate),
+                  )}
+                </p>
+              )}
               {showWeekend && (
                 <p>
                   {renderEmphasised(
@@ -404,6 +416,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
           rates={toPublicRates(rateRows)}
           weekendUplift={policy.WEEKEND_UPLIFT}
           publicHolidayUplift={policy.PUBLIC_HOLIDAY_UPLIFT}
+          afterHoursFromHour={policy.AFTER_HOURS_FROM_HOUR}
           minBillableMins={policy.MIN_BILLABLE_MINS}
           minTravelCharge={policy.MIN_TRAVEL_CHARGE}
           travelRatePerHour={policy.TRAVEL_RATE_PER_HOUR}

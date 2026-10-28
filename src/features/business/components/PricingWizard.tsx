@@ -276,6 +276,8 @@ interface Props {
   weekendUplift: number;
   /** Public-holiday labour uplift (live pricing setting), for the weekday caveat. */
   publicHolidayUplift: number;
+  /** NZ hour from which a weekday start bills after hours, or null when off, for the caveat. */
+  afterHoursFromHour: number | null;
   /** Minimum billable minutes (live pricing setting); floors the estimate. */
   minBillableMins: number;
   /** Travel floor (live pricing setting) for the travel estimate. */
@@ -297,6 +299,7 @@ interface Props {
  * @param props.rates - Live customer-facing rate rows.
  * @param props.weekendUplift - Weekend labour uplift, for the weekday caveat.
  * @param props.publicHolidayUplift - Public-holiday labour uplift, for the weekday caveat.
+ * @param props.afterHoursFromHour - Hour from which a weekday start bills after hours, or null.
  * @param props.minBillableMins - Minimum billable minutes used to floor the estimate.
  * @param props.minTravelCharge - Travel floor for the travel estimate.
  * @param props.travelRatePerHour - Travel $/hr pricing the round trip.
@@ -310,6 +313,7 @@ export function PricingWizard({
   rates,
   weekendUplift,
   publicHolidayUplift,
+  afterHoursFromHour,
   minBillableMins,
   minTravelCharge,
   travelRatePerHour,
@@ -649,7 +653,10 @@ export function PricingWizard({
 
   // The quote has no date, so it prices a weekday; dollars at the quote's own full rate.
   const weekdayCaveat = quoteInputs
-    ? surchargeCaveat({ weekendUplift, publicHolidayUplift }, quoteInputs.fullRate)
+    ? surchargeCaveat(
+        { weekendUplift, publicHolidayUplift, afterHoursFromHour },
+        quoteInputs.fullRate,
+      )
     : null;
 
   // An applied code travels to /booking, which re-resolves it.

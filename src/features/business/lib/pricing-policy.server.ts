@@ -1,6 +1,7 @@
 // src/features/business/lib/pricing-policy.server.ts
 // Server-only pricing helpers that need Prisma, kept out of the client-safe pricing-policy.ts.
 
+import { hourLabel } from "@/features/booking/lib/booking";
 import { formatMoneyCompact } from "@/features/business/lib/business-format";
 import { remoteRateDelta } from "@/features/business/lib/estimate-range";
 import {
@@ -10,6 +11,7 @@ import {
 } from "@/features/business/lib/holiday-calendar";
 import { isBusinessModifier } from "@/features/business/lib/job-modifiers";
 import {
+  afterHoursSurcharge,
   dateSurcharge,
   FALLBACK_BASE_RATE,
   FALLBACK_BUSINESS_DELTA,
@@ -89,6 +91,7 @@ export const getPolicy = cache(async (): Promise<Policy> => {
     MAX_JOB_MINS: pricing.maxJobMins,
     PUBLIC_HOLIDAY_UPLIFT: pricing.publicHolidayUplift,
     WEEKEND_UPLIFT: pricing.weekendUplift,
+    AFTER_HOURS_FROM_HOUR: pricing.afterHoursFromHour,
     UNSUCCESSFUL_WORK_FACTOR: pricing.unsuccessfulWorkFactor,
     NO_FIX_FREE_MINS: pricing.noFixFreeMins,
     WORKMANSHIP_WINDOW_DAYS: pricing.workmanshipWindowDays,
@@ -252,6 +255,17 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
       deltaDescription: `+${formatMoneyCompact(upliftPerHour)}`,
       description: MODIFIER_DESCRIPTIONS.Weekend ?? "",
     });
+    // After hours shares the weekend uplift; its hour is a setting, so its line is built here.
+    if (pricing.afterHoursFromHour !== null) {
+      modifiers.push({
+        label: "After hours",
+        publicLabel: "After hours",
+        kind: "uplift",
+        effectiveRate: roundCents(baseRate + upliftPerHour),
+        deltaDescription: `+${formatMoneyCompact(upliftPerHour)}`,
+        description: `Applied automatically to weekday visits starting from ${hourLabel(pricing.afterHoursFromHour)} (not on top of a weekend or holiday).`,
+      });
+    }
   }
 
   // Latest mtime for the "Rates last updated" footer; ISO strings compare lexicographically.
@@ -337,12 +351,21 @@ export async function lookupPublicHolidaysForKeys(
 /**
  * Attaches each booking day's labour surcharge via {@link dateSurcharge}, the same rule
  * invoices bill with, priced in $/hr at the full on-site and remote rates for the day note.
+ * A weekday with none of its own also gets `afterHours`, which the slot picker applies to
+ * starts from the after-hours hour.
  * @param days - Bookable days keyed by NZ-local date.
- * @returns The same days, each with `surcharge` set (null when none applies).
+ * @returns The same days, each with `surcharge` and `afterHours` set (null when none applies).
  */
 export async function withDateSurcharges<T extends { dateKey: string }>(
   days: T[],
-): Promise<Array<T & { surcharge: DateSurcharge | PricedDateSurcharge | null }>> {
+): Promise<
+  Array<
+    T & {
+      surcharge: DateSurcharge | PricedDateSurcharge | null;
+      afterHours: { fromHour: number; surcharge: DateSurcharge | PricedDateSurcharge } | null;
+    }
+  >
+> {
   const [policy, holidays, pricing] = await Promise.all([
     getPolicy(),
     lookupPublicHolidaysForKeys(days.map((d) => d.dateKey)),
@@ -353,18 +376,30 @@ export async function withDateSurcharges<T extends { dateKey: string }>(
     publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
     weekendUplift: policy.WEEKEND_UPLIFT,
   };
+  /**
+   * Adds the $/hr rise at the full on-site and remote rates, when pricing loaded.
+   * @param surcharge - The surcharge to price.
+   * @returns The priced surcharge, or the bare one when pricing is unavailable.
+   */
+  const price = (surcharge: DateSurcharge): DateSurcharge | PricedDateSurcharge =>
+    pricing
+      ? {
+          ...surcharge,
+          perHour: roundCents(pricing.baseRate * surcharge.uplift),
+          perHourRemote: roundCents(pricing.remoteRate * surcharge.uplift),
+        }
+      : surcharge;
+  const fromHour = policy.AFTER_HOURS_FROM_HOUR;
+  const afterHours = fromHour === null ? null : afterHoursSurcharge(policy.WEEKEND_UPLIFT);
+  const pricedAfterHours =
+    fromHour !== null && afterHours ? { fromHour, surcharge: price(afterHours) } : null;
   return days.map((day) => {
     const [y, m, d] = dateKeyParts(day.dateKey);
     // Read at UTC noon so no time-zone offset can tip the date key into a neighbouring day.
     const weekday = weekdayOf(new Date(Date.UTC(y, m - 1, d, 12)));
     const holiday = holidays.get(day.dateKey)?.name ?? null;
     const surcharge = dateSurcharge(holiday, weekday, uplifts);
-    if (!surcharge || !pricing) return { ...day, surcharge };
-    const priced: PricedDateSurcharge = {
-      ...surcharge,
-      perHour: roundCents(pricing.baseRate * surcharge.uplift),
-      perHourRemote: roundCents(pricing.remoteRate * surcharge.uplift),
-    };
-    return { ...day, surcharge: priced };
+    if (surcharge) return { ...day, surcharge: price(surcharge), afterHours: null };
+    return { ...day, surcharge: null, afterHours: pricedAfterHours };
   });
 }

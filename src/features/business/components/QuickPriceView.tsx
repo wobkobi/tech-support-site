@@ -125,7 +125,7 @@ interface Props {
   rates: RateConfig[];
   /** The job's promo (its booking's, or whichever ran when it was booked), else today's, or null. */
   promo: ActivePromo | null;
-  /** Today's labour surcharge (public holiday or weekend), or null. */
+  /** The job's labour surcharge (public holiday, weekend or after hours), or null. */
   surcharge: DateSurcharge | null;
   /** Account number shown under the total for a bank transfer. */
   bankAccount: string;
@@ -143,7 +143,7 @@ interface Props {
  * @param props - Component props.
  * @param props.rates - Rate rows; the default hourly row prices labour.
  * @param props.promo - Automatic promo to apply, or null.
- * @param props.surcharge - Today's labour surcharge (public holiday or weekend), or null.
+ * @param props.surcharge - The job's labour surcharge (public holiday, weekend or after hours), or null.
  * @param props.bankAccount - Account number for bank transfers.
  * @param props.initialEnd - End time to start with (now, at page load).
  * @param props.events - Today's events to match against.

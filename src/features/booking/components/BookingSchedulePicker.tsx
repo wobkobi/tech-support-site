@@ -2,11 +2,12 @@
 // src/features/booking/components/BookingSchedulePicker.tsx
 // Schedule section of the booking form: duration, day and start-time pickers.
 
-import type {
-  BookableDay,
-  JobDuration,
-  StartMinute,
-  TimeOfDay,
+import {
+  offersAfterHoursStart,
+  type BookableDay,
+  type JobDuration,
+  type StartMinute,
+  type TimeOfDay,
 } from "@/features/booking/lib/booking";
 import {
   buildDurationOptions,
@@ -14,7 +15,7 @@ import {
   durationText,
   subSlotLabel,
 } from "@/features/booking/lib/booking-form";
-import { dateSurchargeNote } from "@/features/business/lib/pricing-policy";
+import { dateSurchargeNote, eveningTickLabel } from "@/features/business/lib/pricing-policy";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
@@ -22,7 +23,7 @@ import type React from "react";
 type TimeWindow = BookableDay["timeWindows"][number];
 
 export interface BookingSchedulePickerProps {
-  /** Days offered for booking. */
+  /** Days offered for booking, evening starts included. */
   availableDays: BookableDay[];
   /** Live job durations (minutes) for the picker labels. */
   durations: { short: number; long: number };
@@ -30,8 +31,12 @@ export interface BookingSchedulePickerProps {
   duration: JobDuration;
   /** Called when the customer picks a duration. */
   onDurationChange: (duration: JobDuration) => void;
-  /** Chosen day, resolved against the current `availableDays`. */
+  /** Chosen day as shown, without its evening starts unless `showEvenings` is on. */
   selectedDay: BookableDay | null;
+  /** Whether the customer ticked Show evening times. */
+  showEvenings: boolean;
+  /** Called when the customer ticks or unticks Show evening times. */
+  onShowEveningsChange: (on: boolean) => void;
   /** Chosen time window, or null. */
   selectedTime: TimeOfDay | null;
   /** Chosen minute past the hour. */
@@ -53,11 +58,13 @@ export interface BookingSchedulePickerProps {
 /**
  * Duration, day and start-time pickers for the booking form.
  * @param props - Component props.
- * @param props.availableDays - Days offered for booking.
+ * @param props.availableDays - Days offered for booking, evening starts included.
  * @param props.durations - Live job durations (minutes) for the picker labels.
  * @param props.duration - Chosen job duration.
  * @param props.onDurationChange - Called when the customer picks a duration.
- * @param props.selectedDay - Chosen day, or null.
+ * @param props.selectedDay - Chosen day as shown, or null.
+ * @param props.showEvenings - Whether the customer ticked Show evening times.
+ * @param props.onShowEveningsChange - Called when the customer ticks or unticks it.
  * @param props.selectedTime - Chosen time window, or null.
  * @param props.selectedMinute - Chosen minute past the hour.
  * @param props.activeWindow - The chosen time window's data, or null.
@@ -74,6 +81,8 @@ export function BookingSchedulePicker({
   duration,
   onDurationChange,
   selectedDay,
+  showEvenings,
+  onShowEveningsChange,
   selectedTime,
   selectedMinute,
   activeWindow,
@@ -85,6 +94,14 @@ export function BookingSchedulePicker({
 }: BookingSchedulePickerProps): React.ReactElement {
   const durationOptions = buildDurationOptions(durations);
 
+  // The tick shows on a weekday with an open evening start for this duration, and stays while
+  // ticked so it can be unticked. Read from the full day, as the shown one has evenings removed.
+  const fullDay = availableDays.find((d) => d.dateKey === selectedDay?.dateKey);
+  const eveningTick =
+    fullDay?.afterHours && (showEvenings || offersAfterHoursStart(fullDay, duration))
+      ? fullDay.afterHours
+      : null;
+
   // One run in date order, so tomorrow always sits next to today even when it's a
   // Saturday. Each label carries its weekday name, so weekends still read as such.
   const daysInOrder = [...availableDays].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
@@ -93,15 +110,18 @@ export function BookingSchedulePicker({
     selectedDay?.timeWindows.every((w) =>
       duration === "short" ? !w.availableShort : !w.availableLong,
     ) ?? false;
+  const onlyEveningsLeft = dayHasNoRoom && !!eveningTick && !showEvenings;
   // One polite status line for the schedule picker, instead of a live region
   // over the whole time grid that re-announced every button on each change.
   const scheduleStatus = !selectedDay
     ? ""
-    : dayHasNoRoom
-      ? `${selectedDay.fullLabel} has no room for ${durationText(durations[duration])}.`
-      : timeLabel
-        ? `${timeLabel} on ${selectedDay.fullLabel} selected.`
-        : `${selectedDay.fullLabel}: choose a start time.`;
+    : onlyEveningsLeft
+      ? `${selectedDay.fullLabel} only has evening times left.`
+      : dayHasNoRoom
+        ? `${selectedDay.fullLabel} has no room for ${durationText(durations[duration])}.`
+        : timeLabel
+          ? `${timeLabel} on ${selectedDay.fullLabel} selected.`
+          : `${selectedDay.fullLabel}: choose a start time.`;
 
   return (
     <fieldset className="flex flex-col gap-6">
@@ -191,22 +211,47 @@ export function BookingSchedulePicker({
 
       {/* Time Selection */}
       {selectedDay && (
-        <fieldset id="booking-time" className="flex min-w-0 flex-col gap-3">
-          <legend className="mb-3 text-base font-semibold text-rich-black">
-            Start time for {selectedDay.fullLabel}
+        // Named by the heading alone, so the tick's label doesn't read as part of the group name.
+        <fieldset
+          id="booking-time"
+          aria-labelledby="booking-time-heading"
+          className="flex min-w-0 flex-col gap-3"
+        >
+          {/* The day's surcharge note or the evening tick sits beside the heading, wrapping
+              under it on a phone. */}
+          <legend className="mb-3 flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 text-base font-semibold text-rich-black">
+            <span id="booking-time-heading">Start time for {selectedDay.fullLabel}</span>
+            {selectedDay.surcharge ? (
+              <span className="font-normal text-rich-black/80">
+                {dateSurchargeNote(selectedDay.surcharge)}
+              </span>
+            ) : (
+              eveningTick && (
+                <label
+                  htmlFor="booking-evenings"
+                  className="flex min-h-11 cursor-pointer items-center gap-3 font-normal text-rich-black/80"
+                >
+                  <input
+                    id="booking-evenings"
+                    type="checkbox"
+                    checked={showEvenings}
+                    onChange={(e) => onShowEveningsChange(e.target.checked)}
+                    className="size-5 shrink-0 cursor-pointer accent-russian-violet"
+                  />
+                  <span>{eveningTickLabel(eveningTick.surcharge, eveningTick.fromHour)}</span>
+                </label>
+              )
+            )}
           </legend>
-
-          {selectedDay.surcharge && (
-            <p className="rounded-lg border border-mustard-300/60 bg-mustard-50/40 p-3 text-base text-rich-black">
-              {dateSurchargeNote(selectedDay.surcharge)}
-            </p>
-          )}
 
           {dayHasNoRoom ? (
             <div className="rounded-lg border border-seasalt-200/80 bg-white/30 p-4">
               <p className="text-base text-rich-black/70">
-                Sorry, this day has no room for {durationText(durations[duration])}.
+                {onlyEveningsLeft
+                  ? "Only evening times are left on this day. Tick Show evening times to see them, or choose another day."
+                  : `Sorry, this day has no room for ${durationText(durations[duration])}.`}
                 {duration === "long" &&
+                  !onlyEveningsLeft &&
                   ` Try ${durationText(durations.short)} instead, or choose another day.`}
               </p>
             </div>

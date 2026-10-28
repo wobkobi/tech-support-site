@@ -251,6 +251,8 @@ function validatePricing(p: PricingSettings): FieldError[] {
     errors.push({ field: "publicHolidayUplift", message: "Must be 0-500% (0 = off)." });
   if (!inRange(p.weekendUplift, 0, 5))
     errors.push({ field: "weekendUplift", message: "Must be 0-500% (0 = off)." });
+  if (p.afterHoursFromHour !== null && !inRange(p.afterHoursFromHour, 0, 23))
+    errors.push({ field: "afterHoursFromHour", message: "Must be an hour 0-23, or Off." });
   if (!nonNeg(p.minTravelCharge))
     errors.push({ field: "minTravelCharge", message: "Must be 0 or more (0 = no floor)." });
   if (!nonNeg(p.travelRatePerHour))

@@ -118,11 +118,16 @@ export interface PricingSettings {
   /** Public-holiday labour surcharge, fraction (0.25 = +25%). 0 = no surcharge. */
   publicHolidayUplift: number;
   /**
-   * Weekend labour surcharge fraction (0.1 = +10%), also billed for after hours ticked on a
-   * weekday. A weekend public holiday bills this (its holiday rate moves to the observed
-   * weekday); Christmas Eve and New Year's Eve take the holiday surcharge instead. 0 = none.
+   * Weekend labour surcharge fraction (0.1 = +10%), also billed as after hours on a weekday. A
+   * weekend public holiday bills this (its holiday rate moves to the observed weekday);
+   * Christmas Eve and New Year's Eve take the holiday surcharge instead. 0 = none.
    */
   weekendUplift: number;
+  /**
+   * NZ hour from which a weekday start bills after hours at the weekend uplift, a start on
+   * the hour itself included. null = only when ticked in the calculator.
+   */
+  afterHoursFromHour: number | null;
   /** Minimum travel charge floor (NZD). 0 = no floor. */
   minTravelCharge: number;
   /** Hourly rate for drive time (NZD/hr); prices every round trip. */

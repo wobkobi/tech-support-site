@@ -89,7 +89,11 @@ export default async function FaqPage(): Promise<React.ReactElement> {
   const travelDiscounted = travelFactor < 1;
   // Worked out on the full rate, which no promo discounts; empty when both surcharges are off.
   const surchargeText = surchargeCaveat(
-    { weekendUplift: policy.WEEKEND_UPLIFT, publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT },
+    {
+      weekendUplift: policy.WEEKEND_UPLIFT,
+      publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
+      afterHoursFromHour: policy.AFTER_HOURS_FROM_HOUR,
+    },
     pricing.baseRate,
   );
   const surchargeSentence = surchargeText ? ` ${surchargeText}` : "";

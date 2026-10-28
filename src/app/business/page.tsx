@@ -164,6 +164,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
   const surchargeText = surchargeCaveat({
     weekendUplift: policy.WEEKEND_UPLIFT,
     publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
+    afterHoursFromHour: policy.AFTER_HOURS_FROM_HOUR,
   });
   const businessJsonLd = {
     "@context": "https://schema.org",

@@ -1,7 +1,7 @@
 "use client";
 // src/features/business/hooks/use-job-context.ts
-// Resolves the calculator's job date to its surcharge and the promo that applied then,
-// via /api/business/job-context.
+// Resolves the calculator's job date and start to its surcharge and the promo that applied
+// then, via /api/business/job-context.
 
 import type { DateSurcharge } from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 interface UseJobContextArgs {
   /** Job date (YYYY-MM-DD). */
   jobDate: string;
-  /** Earliest start (HH:MM), or "" for the lookup's midday default. */
+  /** Earliest start (HH:MM), which also decides after hours, or "" for the midday default. */
   jobStartTime: string;
   /** Applied promo code, or "". */
   promoCode: string;
@@ -27,7 +27,7 @@ interface UseJobContextArgs {
 
 /** Surcharge + promo context for the selected job date. */
 interface JobContext {
-  /** Labour surcharge for the date (public holiday or weekend), or null when neither applies. */
+  /** Labour surcharge for the job (public holiday, weekend or after hours), or null when none applies. */
   surcharge: DateSurcharge | null;
   /** Promo resolved for the job date, or null. */
   activePromo: ActivePromo | null;

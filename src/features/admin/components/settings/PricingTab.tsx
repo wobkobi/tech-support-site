@@ -4,6 +4,7 @@
 
 import { PricingPreview } from "@/features/admin/components/settings/PricingPreview";
 import {
+  HourField,
   NumberField,
   SettingsTabBody,
   TextField,
@@ -149,6 +150,17 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
             error={fieldErrors.weekendUplift}
             customised={draft.weekendUplift !== defaults.weekendUplift}
             onChange={(v) => setTop({ weekendUplift: (v ?? 0) / 100 })}
+          />
+          <HourField
+            id="afterHoursFromHour"
+            meta={m.afterHoursFromHour}
+            value={draft.afterHoursFromHour}
+            from={12}
+            to={23}
+            noneLabel="Off"
+            error={fieldErrors.afterHoursFromHour}
+            customised={draft.afterHoursFromHour !== defaults.afterHoursFromHour}
+            onChange={(h) => setTop({ afterHoursFromHour: h })}
           />
           <NumberField
             id="minTravelCharge"

@@ -40,7 +40,7 @@ export interface InlineEstimateInputs {
   address: string;
   /** Chosen day key, or null. */
   dateKey: string | null;
-  /** The chosen day's weekend or public-holiday surcharge, or null. */
+  /** The chosen slot's weekend, public-holiday or after-hours surcharge, or null. */
   surcharge: DateSurcharge | null;
   /** Chosen time window, or null. */
   selectedTime: TimeOfDay | null;

@@ -31,7 +31,8 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
   },
   pricing: {
     title: "Pricing & cancellation",
-    blurb: "Cancellation policy, minimum charges, public-holiday surcharge, and GST status.",
+    blurb:
+      "Cancellation policy, minimum charges, holiday, weekend and after-hours surcharges, and GST status.",
   },
   estimator: {
     title: "Price estimator",
@@ -632,9 +633,15 @@ export const PRICING_FIELD_META = {
   weekendUplift: {
     title: "Weekend surcharge",
     description:
-      "Extra added to labour on Saturdays and Sundays (10 = +10%), worked out on the full hourly rate, and on a weekday job when you tick after-hours rates in the calculator. A public holiday on a weekend bills this; its holiday surcharge moves to the weekday it's observed. Christmas Eve and New Year's Eve take the public-holiday surcharge instead. Travel and parts are unchanged.",
+      "Extra added to labour on Saturdays and Sundays (10 = +10%), worked out on the full hourly rate. Weekday jobs starting from the After hours from time below bill it too, as do any you tick after-hours rates on in the calculator. A public holiday on a weekend bills this; its holiday surcharge moves to the weekday it's observed. Christmas Eve and New Year's Eve take the public-holiday surcharge instead. Travel and parts are unchanged.",
     unit: "%",
-    off: "Set 0 to charge normal rates at weekends.",
+    off: "Set 0 to charge normal rates at weekends and after hours.",
+  },
+  afterHoursFromHour: {
+    title: "After hours from",
+    description:
+      "A weekday job starting at this time or later bills the weekend surcharge as after-hours rates. The calculator and Quick price tick it for you, and you can untick it to waive it. On the booking page, weekday times from it stay hidden until the customer ticks Show evening times, which states the rate. Weekends and public holidays keep their own rate, and travel and parts are unchanged. The pricing page and FAQ say so too.",
+    off: "Choose Off to add after-hours rates only when you tick them.",
   },
   minTravelCharge: {
     title: "Minimum travel charge",
