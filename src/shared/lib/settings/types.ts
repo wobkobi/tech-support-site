@@ -296,6 +296,10 @@ export interface SchedulingSettings {
   pastEditLockHours: number;
   /** NZ hour a no-slot travel quote is priced against (realistic-traffic proxy). */
   travelQuoteHour: number;
+  /** NZ hour suggested weekday jobs should finish by (1-24); later times only top the suggestions up. */
+  suggestEndHour: number;
+  /** The same finish-by hour for Saturdays and Sundays (1-24). */
+  suggestWeekendEndHour: number;
 }
 
 export interface ReviewsSettings {

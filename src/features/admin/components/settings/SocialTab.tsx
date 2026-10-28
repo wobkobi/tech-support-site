@@ -9,6 +9,7 @@ import {
   NumberField,
   SettingsTabBody,
   TextField,
+  TIME_SELECT_CLS,
   ToggleField,
 } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
@@ -263,7 +264,7 @@ export function SocialTab({ initial, defaults }: Props): React.ReactElement {
               id="schedules.defaultMinute"
               value={sched.defaultMinute}
               onChange={(e) => setSched({ defaultMinute: Number(e.target.value) })}
-              className="sm:w-48"
+              className={TIME_SELECT_CLS}
             >
               {slotMinutes().map((min) => (
                 <option key={min} value={min}>

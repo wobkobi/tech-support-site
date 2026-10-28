@@ -342,6 +342,39 @@ export function closeLabel(h: number): string {
   return h === 24 ? "12am" : hourLabel(h);
 }
 
+/**
+ * The `<option>` list shared by every hour dropdown, labelled "6pm" style.
+ * @param props - Component props.
+ * @param props.from - First hour offered.
+ * @param props.to - Last hour offered (inclusive).
+ * @param props.close - Whether to label 24 as midnight.
+ * @returns The options fragment.
+ */
+function HourOptions({
+  from,
+  to,
+  close,
+}: {
+  from: number;
+  to: number;
+  close?: boolean;
+}): React.ReactElement {
+  const opts: number[] = [];
+  for (let h = from; h <= to; h++) opts.push(h);
+  return (
+    <>
+      {opts.map((h) => (
+        <option key={h} value={h}>
+          {close ? closeLabel(h) : hourLabel(h)}
+        </option>
+      ))}
+    </>
+  );
+}
+
+/** Width for every time-of-day dropdown in settings, so they all match. */
+export const TIME_SELECT_CLS = "w-auto px-2";
+
 interface HourSelectProps {
   value: number;
   onChange: (h: number) => void;
@@ -350,18 +383,21 @@ interface HourSelectProps {
   to: number;
   /** Use the close-style label (24 = midnight). */
   close?: boolean;
+  /** Input id, when a label points at the select. */
+  id?: string;
   /** Accessible name, for selects rendered without an adjacent label. */
   ariaLabel?: string;
 }
 
 /**
- * Small hour dropdown used for open/close/break times.
+ * Small inline hour dropdown, for times inside a sentence-style row (open/close/break, guards).
  * @param props - Component props.
  * @param props.value - Selected hour.
  * @param props.onChange - Called with the new hour.
  * @param props.from - First selectable hour.
  * @param props.to - Last selectable hour.
  * @param props.close - Whether to label 24 as midnight.
+ * @param props.id - Input id for an external label.
  * @param props.ariaLabel - Accessible name for the select.
  * @returns Hour select element.
  */
@@ -371,22 +407,80 @@ export function HourSelect({
   from,
   to,
   close,
+  id,
   ariaLabel,
 }: HourSelectProps): React.ReactElement {
-  const opts: number[] = [];
-  for (let h = from; h <= to; h++) opts.push(h);
   return (
     <AdminSelect
+      id={id}
       value={value}
       aria-label={ariaLabel}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="w-auto px-2"
+      className={TIME_SELECT_CLS}
     >
-      {opts.map((h) => (
-        <option key={h} value={h}>
-          {close ? closeLabel(h) : hourLabel(h)}
-        </option>
-      ))}
+      <HourOptions from={from} to={to} close={close} />
     </AdminSelect>
+  );
+}
+
+interface HourFieldProps {
+  id: string;
+  meta: FieldMeta;
+  value: number | null;
+  onChange: (h: number | null) => void;
+  /** Inclusive hour range for the options. */
+  from: number;
+  to: number;
+  /** Use the close-style label (24 = midnight). */
+  close?: boolean;
+  /** Label for an extra "off" choice that maps to null; omit when an hour is required. */
+  noneLabel?: string;
+  error?: string;
+  customised?: boolean;
+}
+
+/**
+ * Hour-of-day settings row: the same dropdown as {@link HourSelect}, inside a labelled field.
+ * @param props - Component props.
+ * @param props.id - Input id.
+ * @param props.meta - Field metadata.
+ * @param props.value - Selected hour, or null for the "off" choice.
+ * @param props.onChange - Called with the new hour, or null for the "off" choice.
+ * @param props.from - First selectable hour.
+ * @param props.to - Last selectable hour.
+ * @param props.close - Whether to label 24 as midnight.
+ * @param props.noneLabel - Label for the "off" choice, when the field allows one.
+ * @param props.error - Inline validation error.
+ * @param props.customised - Whether the value differs from default.
+ * @returns Hour field element.
+ */
+export function HourField({
+  id,
+  meta,
+  value,
+  onChange,
+  from,
+  to,
+  close,
+  noneLabel,
+  error,
+  customised,
+}: HourFieldProps): React.ReactElement {
+  return (
+    <FieldShell id={id} meta={meta} error={error} customised={customised}>
+      <AdminSelect
+        id={id}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+        aria-invalid={error ? true : undefined}
+        className={cn(
+          TIME_SELECT_CLS,
+          error && "border-coquelicot-600 focus:border-coquelicot-600",
+        )}
+      >
+        {noneLabel && <option value="">{noneLabel}</option>}
+        <HourOptions from={from} to={to} close={close} />
+      </AdminSelect>
+    </FieldShell>
   );
 }
