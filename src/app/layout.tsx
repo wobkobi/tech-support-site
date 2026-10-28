@@ -9,6 +9,7 @@ import { NavBar } from "@/shared/components/NavBar";
 import { PromoBanner } from "@/shared/components/PromoBanner";
 import { SiteFooter } from "@/shared/components/SiteFooter";
 import { ThryvTag } from "@/shared/components/ThryvTag";
+import { advertisedHours } from "@/shared/lib/advertised-hours";
 import {
   FACEBOOK_PAGE_URL,
   GOOGLE_BUSINESS_PROFILE_URL,
@@ -19,7 +20,7 @@ import { SITE_OPEN_GRAPH } from "@/shared/lib/open-graph";
 import { servedSuburbGroups } from "@/shared/lib/served-suburbs";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
-import { DAY_NAMES, type Weekday } from "@/shared/lib/timezone-utils";
+import { DAY_NAMES } from "@/shared/lib/timezone-utils";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
@@ -133,17 +134,14 @@ export default async function RootLayout({
     getPublicPricing(),
   ]);
   const telephone = identity.phoneTel.replace(/^tel:/, "");
-  // Days track the real schedule; only the advertised times can be narrower. Monday-first.
-  const published = identity.publishedHours;
-  const advertisedOrder: readonly Weekday[] = [1, 2, 3, 4, 5, 6, 0];
-  const openingHoursSpecification = advertisedOrder
-    .filter((d) => availability.schedule[d].enabled)
-    .map((d) => ({
+  const openingHoursSpecification = advertisedHours(identity, availability).map(
+    ({ day, open, close }) => ({
       "@type": "OpeningHoursSpecification",
-      dayOfWeek: DAY_NAMES[d],
-      opens: `${String(published?.open ?? availability.schedule[d].open).padStart(2, "0")}:00`,
-      closes: `${String(published?.close ?? availability.schedule[d].close).padStart(2, "0")}:00`,
-    }));
+      dayOfWeek: DAY_NAMES[day],
+      opens: `${String(open).padStart(2, "0")}:00`,
+      closes: `${String(close).padStart(2, "0")}:00`,
+    }),
+  );
   // Region headings are Services-page layout only; areaServed takes the flat list.
   const servedSuburbs = servedSuburbGroups(identity).flatMap((g) => g.suburbs);
   // One coverage circle centred on the base address; the radius is operator-set.

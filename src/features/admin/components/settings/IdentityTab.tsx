@@ -279,7 +279,7 @@ export function IdentityTab({ initial, defaults, bookableSchedule }: Props): Rea
         </FieldShell>
       </div>
 
-      <SectionHeading>Published hours (SEO)</SectionHeading>
+      <SectionHeading>Published hours (Google and SEO)</SectionHeading>
       <div className="divide-y divide-admin-border">
         <FieldShell
           id="publishedHours"

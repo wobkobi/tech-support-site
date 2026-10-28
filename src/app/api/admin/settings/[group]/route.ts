@@ -1,7 +1,9 @@
 // src/app/api/admin/settings/[group]/route.ts
 // Admin read/write for one settings group. PUT validates and runs guardrails: BLOCKs reject,
-// WARNs reject unless confirmed.
+// WARNs reject unless confirmed. A Business or Availability save also updates the Google
+// Business Profile's phone, website and hours.
 
+import { syncProfileDetails } from "@/features/social/lib/google-business";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { asSettingsGroup } from "@/shared/lib/settings/defaults";
@@ -38,7 +40,8 @@ export async function GET(
  * PUT /api/admin/settings/[group] - validates + saves one group.
  * Body: `{ value: Settings[group], confirmWarnings?: boolean }`.
  * Responses: 400 field errors, 409 guardrail warnings (resend with
- * `confirmWarnings`), 422 guardrail blocks, 200 on success.
+ * `confirmWarnings`), 422 guardrail blocks, 200 on success with `google` saying what the
+ * save did to the Google Business Profile (null for groups it doesn't read).
  * @param request - Incoming request (admin-gated).
  * @param ctx - Route context carrying the `[group]` param.
  * @param ctx.params - Promised route params.
@@ -84,5 +87,7 @@ export async function PUT(
   }
 
   await saveSettingsGroup(group, value);
-  return NextResponse.json({ ok: true, value });
+  const google =
+    group === "identity" || group === "availability" ? await syncProfileDetails(proposed) : null;
+  return NextResponse.json({ ok: true, value, google });
 }

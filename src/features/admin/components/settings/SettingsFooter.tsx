@@ -1,7 +1,8 @@
 "use client";
 // src/features/admin/components/settings/SettingsFooter.tsx
-// Guardrail banners plus the save/reset bar, as one footer so no tab renders the save bar
-// without the banners that explain a refused save.
+// Guardrail banners, the Google Business Profile result of a Business or Availability save,
+// and the save/reset bar, as one footer so no tab renders the save bar without the banners that
+// explain a refused save.
 
 import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import type { SettingsFormApi } from "@/features/admin/components/settings/useSettingsForm";
@@ -22,7 +23,7 @@ export function SettingsFooter<G extends SettingsGroup>({
 }: {
   form: SettingsFormApi<G>;
 }): React.ReactElement {
-  const { blocks, warns, dirty, saving, savedAt } = form;
+  const { blocks, warns, dirty, saving, savedAt, google } = form;
 
   return (
     <>
@@ -57,6 +58,24 @@ export function SettingsFooter<G extends SettingsGroup>({
             Save anyway
           </AdminButton>
         </div>
+      )}
+
+      {/* Shown until the next edit, so it always describes the save just made. */}
+      {!dirty && google?.status === "failed" && (
+        <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-800">
+            Saved here, but your Google profile wasn&apos;t updated:
+          </p>
+          <p className="mt-1 text-sm text-amber-800">{google.error}</p>
+        </div>
+      )}
+      {!dirty && google && google.status !== "failed" && (
+        <p className="mt-6 text-sm text-admin-text-secondary">
+          {google.status === "updated" && `Google profile updated: ${google.fields.join(", ")}.`}
+          {google.status === "unchanged" && "Google profile already matches."}
+          {google.status === "not-connected" &&
+            "Google profile not connected, so it wasn't updated."}
+        </p>
       )}
 
       <SettingsSaveBar

@@ -368,9 +368,14 @@ export const IDENTITY_FIELD_META = {
   },
   phoneTel: {
     title: "Phone (tel: link)",
-    description: "Phone for click-to-call links, e.g. tel:+64212971237.",
+    description:
+      "Phone for click-to-call links and your Google Business Profile, e.g. tel:+64212971237.",
   },
-  website: { title: "Website", description: "Public website, no scheme (e.g. tothepoint.co.nz)." },
+  website: {
+    title: "Website",
+    description:
+      "Public website, no scheme (e.g. tothepoint.co.nz). Also set on your Google Business Profile.",
+  },
   location: {
     title: "Location",
     description: "Locality shown in email signatures (e.g. Auckland, New Zealand).",
@@ -433,7 +438,7 @@ export const IDENTITY_FIELD_META = {
   publishedHours: {
     title: "Published hours",
     description:
-      "The hours Google and other search engines are told you are open. Does not change what the booking form offers, so you can advertise a tidy window and still take later bookings.",
+      "The hours your Google Business Profile and other search engines show. Saving updates the Google profile. Does not change what the booking form offers, so you can advertise a tidy window and still take later bookings.",
     off: "Off = publish each day's real bookable hours from the Availability tab.",
   },
   emailSignature: {
