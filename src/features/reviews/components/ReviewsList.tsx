@@ -81,9 +81,9 @@ export function ReviewsList({ reviews }: { reviews: PublicReview[] }): React.Rea
     <>
       {/* Two balanced masonry columns; on mobile display:contents merges them and CSS
           `order` restores newest-first. */}
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+      <div className="flex flex-col gap-9 sm:flex-row sm:items-start sm:gap-7">
         {[columns.left, columns.right].map((column, columnIndex) => (
-          <ul key={columnIndex} className="contents sm:flex sm:flex-1 sm:flex-col sm:gap-6">
+          <ul key={columnIndex} className="contents sm:flex sm:flex-1 sm:flex-col sm:gap-9">
             {column.map(({ review: r, order }) => {
               const clampable = r.text.length > CLAMP_CHARS && hash !== `#review-${r.id}`;
               const open = expanded.has(r.id);
@@ -93,7 +93,8 @@ export function ReviewsList({ reviews }: { reviews: PublicReview[] }): React.Rea
                   key={r.id}
                   id={`review-${r.id}`}
                   style={{ order }}
-                  className="flex flex-col gap-4 rounded-lg border border-seasalt-100 bg-white p-6"
+                  // Topped with the moonstone rule RuledBlock uses, not boxed.
+                  className="flex flex-col gap-3 border-t-[3px] border-moonstone-500 pt-4"
                 >
                   <p
                     id={textId}
@@ -110,7 +111,7 @@ export function ReviewsList({ reviews }: { reviews: PublicReview[] }): React.Rea
                       aria-expanded={open}
                       aria-controls={textId}
                       onClick={() => toggle(r.id)}
-                      className="-mt-4 inline-flex min-h-11 items-center self-start text-base font-bold text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800 sm:hidden"
+                      className="-mt-3 inline-flex min-h-11 items-center self-start text-base font-bold text-coquelicot-700 underline underline-offset-4 hover:text-coquelicot-800 sm:hidden"
                     >
                       {open ? "Show less" : "Read more"}
                     </button>
@@ -127,7 +128,7 @@ export function ReviewsList({ reviews }: { reviews: PublicReview[] }): React.Rea
       </div>
 
       {remaining > 0 && (
-        <div className="mt-6 flex justify-center">
+        <div className="mt-9 flex justify-center">
           <Button
             type="button"
             variant="outline"

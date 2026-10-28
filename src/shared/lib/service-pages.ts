@@ -16,8 +16,6 @@ export interface ServicePage {
   heading: string;
   /** Opening paragraph under the h1. */
   intro: string;
-  /** Link text on the /services card that points here. */
-  linkText: string;
   /** Heading over {@link ServicePage.problems}. */
   problemsHeading: string;
   /** 6-8 items in the customer's own words. */
@@ -44,7 +42,6 @@ export const SERVICE_PAGES: Readonly<Record<ServicePageSlug, ServicePage>> = {
     heading: "Wi-Fi and internet help in Auckland",
     intro:
       "If your Wi-Fi keeps dropping out, doesn't reach some rooms, or you've got a new router that needs setting up, I can come and sort it. I'll work out whether the problem is the router, where it sits, or the devices connecting to it.",
-    linkText: "More about Wi-Fi and internet help",
     problemsHeading: "Common Wi-Fi problems I fix",
     problems: [
       "The Wi-Fi drops out, or you have to restart the router often",
@@ -85,7 +82,6 @@ export const SERVICE_PAGES: Readonly<Record<ServicePageSlug, ServicePage>> = {
     heading: "Printer and scanner help in Auckland",
     intro:
       "If your printer says it's offline, won't connect to the Wi-Fi, or the scanner has stopped working, I can come to you and sort it out. I work with Windows PCs, Macs, phones and tablets.",
-    linkText: "More about printer and scanner help",
     problemsHeading: "Common printer problems I fix",
     problems: [
       "The printer says it's offline",
@@ -129,7 +125,6 @@ export const SERVICE_PAGES: Readonly<Record<ServicePageSlug, ServicePage>> = {
     heading: "New computer setup and data transfer in Auckland",
     intro:
       "When you get a new computer, laptop or phone, I can set it up and move everything across from the old one: files, photos, email, passwords and the apps you use. You end up with a new device that works the way your old one did.",
-    linkText: "More about setup and data transfer",
     problemsHeading: "What I can set up and move",
     problems: [
       "Setting up a new Windows PC, Mac or laptop",
@@ -175,7 +170,6 @@ export const SERVICE_PAGES: Readonly<Record<ServicePageSlug, ServicePage>> = {
     heading: "Scam, virus and password help in Auckland",
     intro:
       "If you've clicked a link you shouldn't have, a pop-up says your computer is infected, or you're worried someone has got into your email, I can check what's happened and fix it. I explain it all in plain English, without the scare tactics.",
-    linkText: "More about scam, virus and password help",
     problemsHeading: "Common reasons people call me",
     problems: [
       "A pop-up says your computer has a virus and to call a number",

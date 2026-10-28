@@ -96,8 +96,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
           </p>
         </Section>
       ) : (
-        // Grey band: the review cards are white, so they need a ground to stand out from.
-        <Section tone="grey" aria-label="Client reviews">
+        <Section aria-label="Client reviews">
           <ReviewsList reviews={normalisedRows} />
           <p className="mt-8 text-seasalt-700">
             Had an appointment? You&apos;ll receive a review link by email after your visit.
