@@ -105,8 +105,8 @@ interface CalculatorViewProps {
   pricing: JobPricing & {
     travelRatePerHour: number;
     mergeSuggestGapMins: number;
-    /** Weekend labour uplift, which the surcharge tick can bill on any day (0 = off). */
-    weekendUplift: number;
+    /** Weekend surcharge in $/hr, which the surcharge tick can bill on any day (0 = off). */
+    weekendPerHour: number;
   };
   /** Live cancellation policy for cancel mode; not part of {@link JobPricing}. */
   cancellation: CancellationPolicy;
@@ -498,7 +498,7 @@ export function CalculatorView({
   const surchargeOn = surchargeTick?.date === jobDate ? surchargeTick.on : null;
   const surcharge = cancelMode
     ? null
-    : chosenSurcharge(dateSurcharge, surchargeOn, pricing.weekendUplift);
+    : chosenSurcharge(dateSurcharge, surchargeOn, pricing.weekendPerHour);
 
   /**
    * Applies a picked Places suggestion and drops the stale trip (manual entries survive).
@@ -681,8 +681,8 @@ export function CalculatorView({
   const aggregateEnd = sortedRanges[sortedRanges.length - 1]?.endTime ?? "";
   // Base hourly rates (e.g. Standard $65/hr) used as the per-task base rate.
   const baseRates = rates.filter((r) => r.ratePerHour !== null);
-  // Signed $/hr modifier chips per task. Percent rows stay off: the date surcharge already
-  // adds that uplift.
+  // Signed $/hr modifier chips per task. Percent rows (Gold Card) stay off: they apply to
+  // the whole job, not a task.
   const modifierRates = rates
     .filter((r) => r.hourlyDelta !== null)
     .sort((a, b) => a.label.localeCompare(b.label));
@@ -714,7 +714,7 @@ export function CalculatorView({
   const appliedGoldCard = goldCard && !cancelMode ? goldCardRate : null;
   const jobPricing = {
     ...pricing,
-    surchargeUplift: surcharge?.uplift ?? 0,
+    surchargePerHour: surcharge?.perHour ?? 0,
     businessModifierId,
     standardRate,
     rates,
@@ -940,7 +940,7 @@ export function CalculatorView({
         promoCode={promoCode}
         onApplyPromoCode={() => setPromoCode(promoCodeInput.trim())}
         onClearForm={() => setConfirmClearOpen(true)}
-        surchargeOption={cancelMode ? null : surchargeOption(dateSurcharge, pricing.weekendUplift)}
+        surchargeOption={cancelMode ? null : surchargeOption(dateSurcharge, pricing.weekendPerHour)}
         surchargeOn={surcharge !== null}
         surchargeFromDate={dateSurcharge !== null}
         onSurchargeChange={(on) => setSurchargeTick({ date: jobDate, on })}

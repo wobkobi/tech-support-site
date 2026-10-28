@@ -271,8 +271,8 @@ export default async function QuickPricePage({
           holiday?.name ?? null,
           nzWeekday(jobStart),
           {
-            publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
-            weekendUplift: policy.WEEKEND_UPLIFT,
+            publicHolidayPerHour: policy.PUBLIC_HOLIDAY_PER_HOUR,
+            weekendPerHour: policy.WEEKEND_PER_HOUR,
             afterHoursFromHour: policy.AFTER_HOURS_FROM_HOUR,
           },
           // A blank form prices at now, which says nothing about when the job started.
@@ -289,7 +289,7 @@ export default async function QuickPricePage({
           minBillableMins: policy.MIN_BILLABLE_MINS,
           billingIncrementMins: policy.BILLING_INCREMENT_MINS,
           unsuccessfulFactor: policy.UNSUCCESSFUL_WORK_FACTOR,
-          weekendUplift: policy.WEEKEND_UPLIFT,
+          weekendPerHour: policy.WEEKEND_PER_HOUR,
         }}
       />
     </>

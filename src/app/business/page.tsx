@@ -160,10 +160,10 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
   ]);
   // Undiscounted: promos are a home offer and business travel is invoiced in full.
   const displayTravelRate = pricing.travelRatePerHour;
-  // Percents, not dollars: they hold at both the on-site and the remote business rate.
+  // Flat $/hr, the same at the on-site and the remote business rate.
   const surchargeText = surchargeCaveat({
-    weekendUplift: policy.WEEKEND_UPLIFT,
-    publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
+    weekendPerHour: policy.WEEKEND_PER_HOUR,
+    publicHolidayPerHour: policy.PUBLIC_HOLIDAY_PER_HOUR,
     afterHoursFromHour: policy.AFTER_HOURS_FROM_HOUR,
   });
   const businessJsonLd = {

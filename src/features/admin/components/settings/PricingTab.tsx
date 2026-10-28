@@ -16,7 +16,6 @@ import { SettingsWithPreview } from "@/features/admin/components/settings/Settin
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
-import { upliftPercent } from "@/features/business/lib/pricing-policy";
 import { cn } from "@/shared/lib/cn";
 import { PRICING_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { PricingSettings } from "@/shared/lib/settings/types";
@@ -131,25 +130,24 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
             onChange={(v) => setTop({ maxJobMins: v ?? 60 })}
           />
           <NumberField
-            id="publicHolidayUplift"
-            meta={m.publicHolidayUplift}
-            // Stored as a fraction; shown + edited as a percent, unrounded so 12.5 stays 12.5.
-            value={upliftPercent(draft.publicHolidayUplift)}
+            id="publicHolidayPerHour"
+            meta={m.publicHolidayPerHour}
+            value={draft.publicHolidayPerHour}
             min={0}
             max={500}
-            error={fieldErrors.publicHolidayUplift}
-            customised={draft.publicHolidayUplift !== defaults.publicHolidayUplift}
-            onChange={(v) => setTop({ publicHolidayUplift: (v ?? 0) / 100 })}
+            error={fieldErrors.publicHolidayPerHour}
+            customised={draft.publicHolidayPerHour !== defaults.publicHolidayPerHour}
+            onChange={(v) => setTop({ publicHolidayPerHour: v ?? 0 })}
           />
           <NumberField
-            id="weekendUplift"
-            meta={m.weekendUplift}
-            value={upliftPercent(draft.weekendUplift)}
+            id="weekendPerHour"
+            meta={m.weekendPerHour}
+            value={draft.weekendPerHour}
             min={0}
             max={500}
-            error={fieldErrors.weekendUplift}
-            customised={draft.weekendUplift !== defaults.weekendUplift}
-            onChange={(v) => setTop({ weekendUplift: (v ?? 0) / 100 })}
+            error={fieldErrors.weekendPerHour}
+            customised={draft.weekendPerHour !== defaults.weekendPerHour}
+            onChange={(v) => setTop({ weekendPerHour: v ?? 0 })}
           />
           <HourField
             id="afterHoursFromHour"

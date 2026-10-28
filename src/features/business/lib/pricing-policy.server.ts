@@ -20,7 +20,6 @@ import {
   NZ_REGION,
   type DateSurcharge,
   type Policy,
-  type PricedDateSurcharge,
 } from "@/features/business/lib/pricing-policy";
 import type { PublicRate } from "@/features/business/types/pricing";
 import { roundCents } from "@/shared/lib/money";
@@ -89,8 +88,8 @@ export const getPolicy = cache(async (): Promise<Policy> => {
     SHORT_TASK_MINS: pricing.shortTaskMins,
     MIN_TASK_MINS: pricing.minTaskMins,
     MAX_JOB_MINS: pricing.maxJobMins,
-    PUBLIC_HOLIDAY_UPLIFT: pricing.publicHolidayUplift,
-    WEEKEND_UPLIFT: pricing.weekendUplift,
+    PUBLIC_HOLIDAY_PER_HOUR: pricing.publicHolidayPerHour,
+    WEEKEND_PER_HOUR: pricing.weekendPerHour,
     AFTER_HOURS_FROM_HOUR: pricing.afterHoursFromHour,
     UNSUCCESSFUL_WORK_FACTOR: pricing.unsuccessfulWorkFactor,
     NO_FIX_FREE_MINS: pricing.noFixFreeMins,
@@ -137,25 +136,25 @@ export interface PublicPricing {
 }
 
 /**
- * Customer-facing names for rate labels that read wrong on a public page. "At home" is my
- * bench, but under "Home rates" a customer takes it as their own home.
+ * Customer-facing names for rate labels that read wrong on a public page. "At home" is
+ * complex work taken back to the operator's place, but under "Home rates" a customer takes it
+ * as their own home; Remote also covers phone help.
  */
 const MODIFIER_PUBLIC_LABELS: Record<string, string> = {
-  "At home": "Bench repair at my place",
+  "At home": "Complex work at my place",
+  Remote: "Remote or phone",
 };
 
 /** Per-label description shown under each modifier on the accordion. */
 const MODIFIER_DESCRIPTIONS: Record<string, string> = {
-  Remote: "Screen-share session - I log in instead of visiting.",
-  "At home": "I take the device away to fix it instead of working at your place.",
-  Phone: "Help over the phone - quick calls are free; longer fixes bill at this rate.",
-  "Public Holiday":
-    "Applied automatically on every NZ public holiday, plus Christmas Eve and New Year's Eve. A public holiday on a weekend is charged on the weekday it's observed.",
+  Remote: "I log in to your computer or talk you through it on the phone. Quick calls are free.",
+  "At home":
+    "Bigger jobs like data recovery or hardware repairs, where I take the device away and work on it here.",
   Weekend: "Applied automatically on Saturdays and Sundays (not on top of a holiday).",
 };
 
 /** $/hr modifiers customers can see; the rest (Business and any added later) stay admin-only. */
-const PUBLIC_DELTA_LABELS = new Set(["Remote", "At home", "Phone"]);
+const PUBLIC_DELTA_LABELS = new Set(["Remote", "At home"]);
 
 /**
  * The base hourly rate: the default hourly row, else the first hourly row.
@@ -216,7 +215,7 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
   const businessRate = roundCents(baseRate + businessDelta);
   const businessRemoteRate = roundCents(businessRate + remoteDelta);
 
-  // Public Holiday uses percentDelta; the rest use hourlyDelta.
+  // Delivery channels are rate rows; the surcharges are flat $/hr pricing settings.
   const modifiers: PublicModifier[] = [];
   for (const row of rows) {
     if (row.unit !== "modifier") continue;
@@ -229,43 +228,41 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
         deltaDescription: row.hourlyDelta > 0 ? `+$${row.hourlyDelta}` : `-$${-row.hourlyDelta}`,
         description: MODIFIER_DESCRIPTIONS[row.label] ?? "",
       });
-    } else if (row.label === "Public Holiday" && pricing.publicHolidayUplift > 0) {
-      // Uplift from the pricing settings (what is charged), not the row's percentDelta.
-      // Shown in dollars of full labour so it adds up beside a promo-discounted headline.
-      const uplift = pricing.publicHolidayUplift;
-      const upliftPerHour = roundCents(baseRate * uplift);
-      modifiers.push({
-        label: row.label,
-        publicLabel: row.label,
-        kind: "uplift",
-        effectiveRate: roundCents(baseRate + upliftPerHour),
-        deltaDescription: `+${formatMoneyCompact(upliftPerHour)}`,
-        description: MODIFIER_DESCRIPTIONS[row.label] ?? "",
-      });
     }
   }
-  // Weekend has no rate row; described like the holiday uplift.
-  if (pricing.weekendUplift > 0) {
-    const upliftPerHour = roundCents(baseRate * pricing.weekendUplift);
+  /**
+   * Adds one flat surcharge line, priced on the base rate for the accordion's "= $/hr".
+   * @param label - Line label.
+   * @param perHour - Surcharge in $/hr.
+   * @param description - Context shown under the line.
+   */
+  const pushSurcharge = (label: string, perHour: number, description: string): void => {
     modifiers.push({
-      label: "Weekend",
-      publicLabel: "Weekend",
+      label,
+      publicLabel: label,
       kind: "uplift",
-      effectiveRate: roundCents(baseRate + upliftPerHour),
-      deltaDescription: `+${formatMoneyCompact(upliftPerHour)}`,
-      description: MODIFIER_DESCRIPTIONS.Weekend ?? "",
+      effectiveRate: roundCents(baseRate + perHour),
+      deltaDescription: `+${formatMoneyCompact(perHour)}`,
+      description,
     });
-    // After hours shares the weekend uplift; its hour is a setting, so its line is built here.
+  };
+  if (pricing.weekendPerHour > 0) {
+    pushSurcharge("Weekend", pricing.weekendPerHour, MODIFIER_DESCRIPTIONS.Weekend ?? "");
+    // After hours bills the weekend amount from an hour that's a setting.
     if (pricing.afterHoursFromHour !== null) {
-      modifiers.push({
-        label: "After hours",
-        publicLabel: "After hours",
-        kind: "uplift",
-        effectiveRate: roundCents(baseRate + upliftPerHour),
-        deltaDescription: `+${formatMoneyCompact(upliftPerHour)}`,
-        description: `Applied automatically to weekday visits starting from ${hourLabel(pricing.afterHoursFromHour)} (not on top of a weekend or holiday).`,
-      });
+      pushSurcharge(
+        "After hours",
+        pricing.weekendPerHour,
+        `Applied automatically to weekday visits starting from ${hourLabel(pricing.afterHoursFromHour)} (not on top of a weekend or holiday).`,
+      );
     }
+  }
+  if (pricing.publicHolidayPerHour > 0) {
+    pushSurcharge(
+      "Public holiday",
+      pricing.publicHolidayPerHour,
+      "Applied automatically on every NZ public holiday, plus Christmas Eve and New Year's Eve. A public holiday on a weekend is charged on the weekday it's observed.",
+    );
   }
 
   // Latest mtime for the "Rates last updated" footer; ISO strings compare lexicographically.
@@ -350,9 +347,8 @@ export async function lookupPublicHolidaysForKeys(
 
 /**
  * Attaches each booking day's labour surcharge via {@link dateSurcharge}, the same rule
- * invoices bill with, priced in $/hr at the full on-site and remote rates for the day note.
- * A weekday with none of its own also gets `afterHours`, which the slot picker applies to
- * starts from the after-hours hour.
+ * invoices bill with. A weekday with none of its own also gets `afterHours`, which the slot
+ * picker applies to starts from the after-hours hour.
  * @param days - Bookable days keyed by NZ-local date.
  * @returns The same days, each with `surcharge` and `afterHours` set (null when none applies).
  */
@@ -361,45 +357,29 @@ export async function withDateSurcharges<T extends { dateKey: string }>(
 ): Promise<
   Array<
     T & {
-      surcharge: DateSurcharge | PricedDateSurcharge | null;
-      afterHours: { fromHour: number; surcharge: DateSurcharge | PricedDateSurcharge } | null;
+      surcharge: DateSurcharge | null;
+      afterHours: { fromHour: number; surcharge: DateSurcharge } | null;
     }
   >
 > {
-  const [policy, holidays, pricing] = await Promise.all([
+  const [policy, holidays] = await Promise.all([
     getPolicy(),
     lookupPublicHolidaysForKeys(days.map((d) => d.dateKey)),
-    // Unpriced, the note falls back to a percent of the full rate rather than failing the page.
-    getPublicPricing().catch(() => null),
   ]);
-  const uplifts = {
-    publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
-    weekendUplift: policy.WEEKEND_UPLIFT,
+  const rules = {
+    publicHolidayPerHour: policy.PUBLIC_HOLIDAY_PER_HOUR,
+    weekendPerHour: policy.WEEKEND_PER_HOUR,
   };
-  /**
-   * Adds the $/hr rise at the full on-site and remote rates, when pricing loaded.
-   * @param surcharge - The surcharge to price.
-   * @returns The priced surcharge, or the bare one when pricing is unavailable.
-   */
-  const price = (surcharge: DateSurcharge): DateSurcharge | PricedDateSurcharge =>
-    pricing
-      ? {
-          ...surcharge,
-          perHour: roundCents(pricing.baseRate * surcharge.uplift),
-          perHourRemote: roundCents(pricing.remoteRate * surcharge.uplift),
-        }
-      : surcharge;
   const fromHour = policy.AFTER_HOURS_FROM_HOUR;
-  const afterHours = fromHour === null ? null : afterHoursSurcharge(policy.WEEKEND_UPLIFT);
-  const pricedAfterHours =
-    fromHour !== null && afterHours ? { fromHour, surcharge: price(afterHours) } : null;
+  const afterHours = fromHour === null ? null : afterHoursSurcharge(policy.WEEKEND_PER_HOUR);
+  const eveningRule = fromHour !== null && afterHours ? { fromHour, surcharge: afterHours } : null;
   return days.map((day) => {
     const [y, m, d] = dateKeyParts(day.dateKey);
     // Read at UTC noon so no time-zone offset can tip the date key into a neighbouring day.
     const weekday = weekdayOf(new Date(Date.UTC(y, m - 1, d, 12)));
     const holiday = holidays.get(day.dateKey)?.name ?? null;
-    const surcharge = dateSurcharge(holiday, weekday, uplifts);
-    if (surcharge) return { ...day, surcharge: price(surcharge), afterHours: null };
-    return { ...day, surcharge: null, afterHours: pricedAfterHours };
+    const surcharge = dateSurcharge(holiday, weekday, rules);
+    if (surcharge) return { ...day, surcharge, afterHours: null };
+    return { ...day, surcharge: null, afterHours: eveningRule };
   });
 }

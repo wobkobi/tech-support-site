@@ -92,14 +92,14 @@ function parsedHour(unsuccessful: boolean): ParseJobResponse["tasks"][number] {
  * Re-parses a two-hour unbooked job into two $80/hr hours, the second not fixed.
  * @param factor - Share of an unsuccessful line still charged.
  * @param promo - The invoice's promo terms, or null.
- * @param uplift - Weekend or holiday labour uplift for the job date.
+ * @param perHour - Weekend or holiday labour surcharge in $/hr for the job date.
  * @param gold - The invoice's Gold Card share off labour, or 0 for none.
  * @returns The parse's line items and discounts.
  */
 function reparse(
   factor: number,
   promo: JobPromo | null,
-  uplift = 0,
+  perHour = 0,
   gold = 0,
 ): ReturnType<typeof parsedJobToLineItems> {
   return parsedJobToLineItems(
@@ -110,7 +110,7 @@ function reparse(
       minBillableMins: 60,
       travelRatePerHour: 60,
       minTravelCharge: 10,
-      surcharge: uplift > 0 ? { label: "Weekend surcharge", uplift } : null,
+      surcharge: perHour > 0 ? { label: "Weekend surcharge", perHour } : null,
       unsuccessfulFactor: factor,
       standardRate: 80,
       goldCardPercent: gold,
@@ -124,15 +124,15 @@ function reparse(
  * {@link reparse}'s promo and unsuccessful-work discounts.
  * @param factor - Share of an unsuccessful line still charged.
  * @param promo - The invoice's promo terms, or null.
- * @param uplift - Weekend or holiday labour uplift for the job date.
+ * @param perHour - Weekend or holiday labour surcharge in $/hr for the job date.
  * @returns The promo and unsuccessful-work discounts for the new lines.
  */
 function repriced(
   factor: number,
   promo: JobPromo | null,
-  uplift = 0,
+  perHour = 0,
 ): { promoDiscount: number; unsuccessfulDiscount: number } {
-  const { promoDiscount, unsuccessfulDiscount } = reparse(factor, promo, uplift);
+  const { promoDiscount, unsuccessfulDiscount } = reparse(factor, promo, perHour);
   return { promoDiscount, unsuccessfulDiscount };
 }
 
@@ -407,9 +407,9 @@ function main(): void {
     40,
   );
   expectEqual(
-    "a +25% day's surcharge on the unfixed hour is halved too",
-    repriced(0.5, null, 0.25).unsuccessfulDiscount,
-    50,
+    "a $25/hr day's surcharge on the unfixed hour is halved too",
+    repriced(0.5, null, 25).unsuccessfulDiscount,
+    52.5,
   );
   expectEqual(
     "a Gold Card invoice takes 10% off, then halves the unfixed hour",

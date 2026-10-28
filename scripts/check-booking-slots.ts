@@ -116,7 +116,7 @@ function main(): void {
   // Show evening times unticked: starts from 6pm on are left out, not crossed out.
   const after6 = {
     fromHour: 18,
-    surcharge: { reason: "After hours", label: "After-hours surcharge", uplift: 0.1 },
+    surcharge: { reason: "After hours", label: "After-hours surcharge", perHour: 10 },
   };
   const wedEvenings = wednesday && { ...wednesday, afterHours: after6 };
   const hidden = wedEvenings && withoutAfterHoursStarts(wedEvenings);

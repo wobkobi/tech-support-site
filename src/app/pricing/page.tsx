@@ -1,20 +1,16 @@
 // src/app/pricing/page.tsx
-// Pricing page. Live rates; accordion copy from pricing-policy.ts so it matches the
-// booking emails and FAQ.
+// Pricing page: every live rate and out-of-hours charge as ruled blocks, the estimate, then
+// the fine print. Copy comes from pricing-policy.ts so it matches the booking emails and FAQ.
 
+import { hourLabel } from "@/features/booking/lib/booking";
 import { GetEstimateButton } from "@/features/business/components/GetEstimateButton";
 import { PricingWizard } from "@/features/business/components/PricingWizard";
 import { formatMoneyCompact } from "@/features/business/lib/business";
 import {
-  afterHoursCopy,
   cancellationCopy,
-  gstCopy,
   minimumsCopy,
-  partsCopy,
-  publicHolidayCopy,
   travelCopy,
   unsuccessfulWorkCopy,
-  weekendCopy,
   workmanshipCopy,
 } from "@/features/business/lib/pricing-policy";
 import {
@@ -32,8 +28,6 @@ import {
   promoForRateCard,
   promoLastDay,
   promoModifierRate,
-  promoRateBeforeAfter,
-  promoTravelBeforeAfter,
   promoTravelFactor,
   summariseForBanner,
 } from "@/features/business/lib/promos";
@@ -59,6 +53,45 @@ import type React from "react";
 // Rate/promo edits purge via cache tags, and the publish cron busts active-promo within
 // ~5 min of a promo starting or ending. The daily timer is a fallback.
 export const revalidate = 86400;
+
+/** One rate or out-of-hours charge on the price grid. */
+interface PriceLine {
+  key: string;
+  name: string;
+  note: React.ReactNode;
+  /** The figure a promo crosses out, or null when nothing is crossed out. */
+  before: number | null;
+  /** The figure shown, e.g. 65 for "$65/hr" or 10 for "+$10/hr". */
+  price: number;
+  /** "+$10/hr" for a surcharge, "$65/hr" for a rate. */
+  surcharge?: boolean;
+}
+
+/**
+ * One price as a ruled block: the name, the figure (after the crossed-out original when a
+ * promo moved it), then what it covers.
+ * @param props - Component props.
+ * @param props.line - The price to show.
+ * @returns The block element.
+ */
+function PriceBlock({ line }: { line: PriceLine }): React.ReactElement {
+  return (
+    <RuledBlock title={line.name}>
+      <p className="mb-1 text-2xl font-extrabold">
+        {line.before !== null && (
+          <s className="mr-2 text-lg font-semibold text-seasalt-700">
+            {formatMoneyCompact(line.before)}/hr
+          </s>
+        )}
+        <PromoPrice discounted={line.before !== null} className="font-extrabold">
+          {line.surcharge && "+"}
+          {formatMoneyCompact(line.price)}/hr
+        </PromoPrice>
+      </p>
+      <p className="text-pretty text-seasalt-700">{line.note}</p>
+    </RuledBlock>
+  );
+}
 
 /**
  * Builds page metadata; reflects the active promo and live base/complex rates.
@@ -108,50 +141,86 @@ export default async function PricingPage(): Promise<React.ReactElement> {
   // spend floor can't be checked here (no slot or job yet), so figures stay undiscounted.
   const pricedPromo = promoForRateCard(promo);
   const promoRestriction = promo ? describeRecurringWindow(promo) : null;
-  // Crossed-out pairs; null when the promo doesn't touch that figure.
-  const ratePair = pricedPromo ? promoRateBeforeAfter(baseRate, pricedPromo) : null;
-  const travelPair = pricedPromo
-    ? promoTravelBeforeAfter(pricing.travelRatePerHour, pricedPromo)
-    : null;
-  // Every other price quotes these, so the page never contradicts the promo.
+  // Every price below quotes these, so the page never contradicts the promo.
   const displayRate = promoDisplayRate(baseRate, pricedPromo);
   const travelFactor = promoTravelFactor(pricedPromo);
   const displayTravelRate = roundCents(pricing.travelRatePerHour * travelFactor);
   const displayMinTravel = roundCents(policy.MIN_TRAVEL_CHARGE * travelFactor);
-  const rateDiscounted = displayRate !== baseRate;
   const travelDiscounted = travelFactor < 1;
-  // Each modifier's delta is read off the prices shown, so "-$15 = $50" adds up beside a
-  // promo headline even where a flat promo prices the modifier at its locked-in gap.
-  const shownModifiers = pricing.modifiers.map((mod) => {
-    const shownRate = promoModifierRate(
-      baseRate,
-      mod.effectiveRate,
-      mod.kind,
-      pricedPromo,
-      mod.label,
-    );
-    const delta = roundCents(shownRate - displayRate);
-    return {
-      ...mod,
-      shownRate,
-      shownDelta: `${delta < 0 ? "-" : "+"}${formatMoneyCompact(Math.abs(delta))}`,
-    };
-  });
-  const showWeekend = policy.WEEKEND_UPLIFT > 0;
-  const showHoliday = policy.PUBLIC_HOLIDAY_UPLIFT > 0;
-  // After hours bills the weekend rise, so it shows only while that rise is on.
-  const afterHoursFromHour = showWeekend ? policy.AFTER_HOURS_FROM_HOUR : null;
-  // "Evenings, weekends and public holidays", dropping whichever are off.
-  const surchargeParts = [
-    afterHoursFromHour !== null && "evenings",
-    showWeekend && "weekends",
-    showHoliday && "public holidays",
-  ].filter((part): part is string => !!part);
-  const surchargeList =
-    surchargeParts.length > 1
-      ? `${surchargeParts.slice(0, -1).join(", ")} and ${surchargeParts.at(-1)}`
-      : (surchargeParts[0] ?? "");
-  const surchargeTitle = surchargeList.charAt(0).toUpperCase() + surchargeList.slice(1);
+
+  // On-site first, then each public channel dearest first. A flat promo prices a channel at
+  // the gap it locked in, which promoModifierRate reads by label.
+  const channelLines = pricing.modifiers
+    .filter((mod) => mod.kind === "delta")
+    .map((mod): PriceLine => {
+      const price = promoModifierRate(
+        baseRate,
+        mod.effectiveRate,
+        mod.kind,
+        pricedPromo,
+        mod.label,
+      );
+      return {
+        key: mod.label,
+        name: mod.publicLabel,
+        note: mod.description,
+        before: price !== mod.effectiveRate ? mod.effectiveRate : null,
+        price,
+      };
+    })
+    .sort((a, b) => b.price - a.price);
+  const rateLines: PriceLine[] = [
+    {
+      key: "on-site",
+      name: "At your place",
+      note: (
+        <>
+          Anything hands-on, like Wi-Fi, printers, TVs and new devices. Plus travel: one round trip
+          at{" "}
+          <PromoPrice discounted={travelDiscounted}>
+            {formatMoneyCompact(displayTravelRate)}/hr
+          </PromoPrice>
+          , {/* Read from settings, not hardcoded: the minimum is configurable. */}
+          <PromoPrice discounted={travelDiscounted}>
+            {formatMoneyCompact(displayMinTravel)} minimum
+          </PromoPrice>
+          .
+        </>
+      ),
+      before: displayRate !== baseRate ? baseRate : null,
+      price: displayRate,
+    },
+    ...channelLines,
+  ];
+
+  // Flat $/hr on every rate, which no promo discounts. After hours bills the weekend amount,
+  // so evenings show only while that is on; a $0 surcharge is off and gets no line.
+  const eveningFrom = policy.WEEKEND_PER_HOUR > 0 ? policy.AFTER_HOURS_FROM_HOUR : null;
+  const surchargeLines: PriceLine[] = [];
+  if (policy.WEEKEND_PER_HOUR > 0) {
+    surchargeLines.push({
+      key: "weekend",
+      name:
+        eveningFrom === null ? "Weekends" : `Evenings from ${hourLabel(eveningFrom)} and weekends`,
+      note:
+        eveningFrom === null
+          ? "All day Saturday and Sunday."
+          : `Weekday visits starting from ${hourLabel(eveningFrom)}, and all day Saturday and Sunday. To book an evening online, tick Show evening times.`,
+      before: null,
+      price: policy.WEEKEND_PER_HOUR,
+      surcharge: true,
+    });
+  }
+  if (policy.PUBLIC_HOLIDAY_PER_HOUR > 0) {
+    surchargeLines.push({
+      key: "holiday",
+      name: "Public holidays",
+      note: "Christmas Eve and New Year's Eve count too. Never on top of the weekend extra.",
+      before: null,
+      price: policy.PUBLIC_HOLIDAY_PER_HOUR,
+      surcharge: true,
+    });
+  }
   const { identity } = settings;
   return (
     <PageShell>
@@ -167,83 +236,40 @@ export default async function PricingPage(): Promise<React.ReactElement> {
       />
 
       <Section aria-labelledby="home-rates-heading">
-        {/* "Home", so business visitors don't take this rate as theirs. */}
-        <SectionHeading id="home-rates-heading" title="Home rates" />
+        {/* "Home", so business visitors don't take these rates as theirs. */}
+        <SectionHeading
+          id="home-rates-heading"
+          title="Home rates"
+          lead="You only pay for the time the job takes."
+        />
+        <RuledGrid cols={3}>
+          {rateLines.map((line) => (
+            <PriceBlock key={line.key} line={line} />
+          ))}
+        </RuledGrid>
 
-        <div className="max-w-180">
-          {promo ? (
-            <>
-              <div className="rounded-lg border-2 border-mustard-300 bg-mustard-50 p-6">
-                {/* Labour promos (fixed amounts too, see promoRateBeforeAfter) move this;
-                    travel promos cross out the travel charge instead. */}
-                {ratePair && (
-                  <p className="mb-1 text-lg text-seasalt-700 line-through sm:text-xl">
-                    {formatMoneyCompact(ratePair.before)}/hr
-                  </p>
-                )}
-                <p className="mb-2 text-3xl font-bold text-russian-violet sm:text-4xl">
-                  {formatMoneyCompact(ratePair?.after ?? baseRate)}/hr
-                </p>
-                {travelPair && (
-                  <p className="mb-2 text-lg font-semibold text-russian-violet sm:text-xl">
-                    Travel{" "}
-                    <span className="text-seasalt-700 line-through">
-                      {formatMoneyCompact(travelPair.before)}/hr
-                    </span>{" "}
-                    {formatMoneyCompact(travelPair.after)}/hr
-                  </p>
-                )}
-                <p className="text-base text-rich-black sm:text-lg">
-                  One rate for every home job - troubleshooting, setup, software, tune-ups, Wi-Fi,
-                  backups, data recovery, hardware repairs, and more.
-                </p>
-              </div>
-
-              <div className="mt-4 rounded-lg bg-mustard-300 px-4 py-3 text-center text-russian-violet-900">
-                <p className="text-base font-bold sm:text-lg">
-                  ⚡ Limited offer: {promo.title}
-                  {promo.description ? ` - ${promo.description}` : ""}
-                </p>
-                {/* The pair shows the result, not the terms ("$65 to $55.25" isn't "15% off"). */}
-                <p className="mt-1 text-base font-semibold sm:text-lg">
-                  {describePromoOffer(promo)}
-                </p>
-                {/* Explains why the rate above hasn't moved for a restricted promo. */}
-                {promoRestriction && (
-                  <p className="mt-1 text-base font-semibold sm:text-lg">{promoRestriction} only</p>
-                )}
-                <p className="mt-1 text-base text-russian-violet-900 sm:text-lg">
-                  Book by {formatDateShort(promoLastDay(promo.endAt))}. Your visit can be after
-                  that.
-                </p>
-              </div>
-            </>
-          ) : (
-            <div className="rounded-lg border border-seasalt-100 p-6">
-              <p className="mb-2 text-3xl font-bold text-russian-violet sm:text-4xl">
-                ${baseRate}/hr
+        <div className="mt-9 max-w-180">
+          {promo && (
+            // The Notice shape in the promo banner's mustard, so the offer reads as part of the page.
+            <div className="mb-8 border-l-4 border-mustard-500 bg-mustard-100 px-5 py-4 text-russian-violet-900">
+              <p className="font-bold">
+                Limited offer: {promo.title}
+                {promo.description ? ` - ${promo.description}` : ""}
               </p>
-              <p className="text-base text-rich-black sm:text-lg">
-                One rate for every home job - troubleshooting, setup, software, tune-ups, Wi-Fi,
-                backups, data recovery, hardware repairs, and more.
+              {/* The pair shows the result, not the terms ("$65 to $55.25" isn't "15% off"). */}
+              <p className="mt-1 font-semibold">{describePromoOffer(promo)}</p>
+              {/* Explains why the prices above haven't moved for a restricted promo. */}
+              {promoRestriction && <p className="mt-1 font-semibold">{promoRestriction} only</p>}
+              <p className="mt-1">
+                Book by {formatDateShort(promoLastDay(promo.endAt))}. Your visit can be after that.
               </p>
             </div>
           )}
 
-          {/* Beside the rate, not in the caveats, where it reads as skippable fine print. */}
-          <Notice className="mt-5">
-            <strong>Running a business?</strong> Check out the business rates and monthly retainers
-            on the{" "}
-            <Link href="/business" className={TEXT_LINK}>
-              business page
-            </Link>
-            .
-          </Notice>
-
-          <TickList className="mt-5">
+          <TickList>
             <TickItem>
-              <strong>Quick calls and emails are free.</strong> A "remote session" is when I log in
-              and start working on your machine.
+              <strong>Parts at cost, no markup.</strong> You approve the price first.{" "}
+              {policy.GST_REGISTERED ? "Prices include GST." : "Not GST registered."}
             </TickItem>
             <TickItem>
               <strong>Most jobs take 1 to 2 hours.</strong> I'll give you a time estimate before we
@@ -253,53 +279,57 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               <strong>Not sure which rate applies?</strong> Just ask - I'll confirm before starting.
             </TickItem>
           </TickList>
+
+          {/* Beside the rates, not in the caveats, where it reads as skippable fine print. */}
+          <Notice className="mt-8">
+            <strong>Running a business?</strong> Check out the business rates and monthly retainers
+            on the{" "}
+            <Link href="/business" className={TEXT_LINK}>
+              business page
+            </Link>
+            .
+          </Notice>
         </div>
       </Section>
 
-      <Section tone="grey" aria-labelledby="how-pricing-works-heading">
-        <SectionHeading id="how-pricing-works-heading" title="On-site vs Remote" />
-        <RuledGrid cols={2}>
-          <RuledBlock title="On-site visits">
-            <TickList className="gap-2.5">
-              <TickItem variant="dot">
-                Hourly rate (
-                <PromoPrice discounted={rateDiscounted}>
-                  {formatMoneyCompact(displayRate)}/hr
-                </PromoPrice>
-                )
-              </TickItem>
-              <TickItem variant="dot">
-                <strong>One round trip</strong> billed at{" "}
-                <PromoPrice discounted={travelDiscounted} className="font-bold">
-                  {formatMoneyCompact(displayTravelRate)}/hr
-                </PromoPrice>{" "}
-                (lower than the hourly rate),{" "}
-                {/* Read from settings, not hardcoded: the minimum is configurable. */}
-                <PromoPrice discounted={travelDiscounted} className="font-bold">
-                  {formatMoneyCompact(displayMinTravel)} minimum
-                </PromoPrice>
-              </TickItem>
-              <TickItem variant="dot">
-                Best for: Wi-Fi setup, printers, smart TVs, physical hardware, anything needing
-                hands-on work
-              </TickItem>
-            </TickList>
-          </RuledBlock>
+      {surchargeLines.length > 0 && (
+        <Section tone="grey" aria-labelledby="out-of-hours-heading">
+          <SectionHeading
+            id="out-of-hours-heading"
+            title="Out-of-hours rates"
+            lead="Labour costs this much more per hour on any rate above. Travel and parts stay the same."
+          />
+          <RuledGrid cols={3}>
+            {surchargeLines.map((line) => (
+              <PriceBlock key={line.key} line={line} />
+            ))}
+          </RuledGrid>
+        </Section>
+      )}
 
-          <RuledBlock title="Remote support">
-            <TickList className="gap-2.5">
-              <TickItem variant="dot">Discounted rate, no travel charge</TickItem>
-              <TickItem variant="dot">No drive time means quicker turnaround</TickItem>
-              <TickItem variant="dot">
-                Best for: account issues, software setup, email problems, quick fixes, follow-up
-                support
-              </TickItem>
-            </TickList>
-          </RuledBlock>
-        </RuledGrid>
+      {/* The id is the scroll target of GetEstimateButton; Section adds the scroll margin. */}
+      <Section id="estimate" aria-labelledby="estimate-heading">
+        <SectionHeading
+          id="estimate-heading"
+          title="Get a rough estimate"
+          lead="Answer a few quick questions to get a price range. No commitment required."
+        />
+        <PricingWizard
+          baseRate={baseRate}
+          rates={toPublicRates(rateRows)}
+          weekendPerHour={policy.WEEKEND_PER_HOUR}
+          publicHolidayPerHour={policy.PUBLIC_HOLIDAY_PER_HOUR}
+          afterHoursFromHour={policy.AFTER_HOURS_FROM_HOUR}
+          minBillableMins={policy.MIN_BILLABLE_MINS}
+          minTravelCharge={policy.MIN_TRAVEL_CHARGE}
+          travelRatePerHour={policy.TRAVEL_RATE_PER_HOUR}
+          estimatorRange={settings.estimator.range}
+          lowEndFloorFactor={settings.estimator.lowEndFloorFactor}
+          showPromoCode={showPromoCode}
+        />
       </Section>
 
-      <Section aria-labelledby="no-surprises-heading">
+      <Section tone="grey" aria-labelledby="no-surprises-heading">
         <SectionHeading id="no-surprises-heading" title="No surprises" />
 
         <TickList className="mb-8">
@@ -315,35 +345,12 @@ export default async function PricingPage(): Promise<React.ReactElement> {
           </TickItem>
         </TickList>
 
-        <h3 className="mb-3 text-xl font-bold">Full details</h3>
+        <h3 className="mb-3 text-xl font-extrabold">Full details</h3>
         <p className="mb-4 text-seasalt-700">
           The fine print, in plain English. Tap or click any section to open it.
         </p>
 
         <div className="max-w-180">
-          <Disclosure title="Rate modifiers" bodyClassName="whitespace-pre-line">
-            <p>
-              The hourly rate is the starting point. These modifiers can stack on top depending on
-              the job:
-            </p>
-            <ul className="space-y-2">
-              {shownModifiers.map((mod) => (
-                <li key={mod.label} className="flex flex-col">
-                  <span>
-                    <strong>{mod.publicLabel}</strong> ({mod.shownDelta} ={" "}
-                    <PromoPrice
-                      discounted={mod.shownRate !== mod.effectiveRate}
-                      className="font-bold"
-                    >
-                      {formatMoneyCompact(mod.shownRate)}/hr
-                    </PromoPrice>
-                    ) - {mod.description}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Disclosure>
-
           <Disclosure title="Travel" bodyClassName="whitespace-pre-line">
             {renderEmphasised(travelCopy(displayTravelRate, displayMinTravel))}
           </Disclosure>
@@ -354,15 +361,11 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             )}
           </Disclosure>
 
-          <Disclosure title="Parts" bodyClassName="whitespace-pre-line">
-            {renderEmphasised(partsCopy())}
-          </Disclosure>
-
           <Disclosure title="Cancellation" bodyClassName="whitespace-pre-line">
             {renderEmphasised(cancellationCopy(policy.CANCELLATION))}
           </Disclosure>
 
-          <Disclosure title="Unsuccessful work" bodyClassName="whitespace-pre-line">
+          <Disclosure title="If I can't fix it" bodyClassName="whitespace-pre-line">
             {renderEmphasised(
               unsuccessfulWorkCopy(policy.UNSUCCESSFUL_WORK_FACTOR, policy.NO_FIX_FREE_MINS),
             )}
@@ -374,56 +377,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               {renderEmphasised(workmanshipCopy(policy.WORKMANSHIP_WINDOW_DAYS))}
             </Disclosure>
           )}
-
-          {/* A 0% surcharge is off, so it gets no copy; with both off the section goes. */}
-          {(showWeekend || showHoliday) && (
-            <Disclosure title={surchargeTitle} bodyClassName="whitespace-pre-line">
-              {afterHoursFromHour !== null && (
-                <p>
-                  {renderEmphasised(
-                    afterHoursCopy(afterHoursFromHour, policy.WEEKEND_UPLIFT, baseRate),
-                  )}
-                </p>
-              )}
-              {showWeekend && (
-                <p>
-                  {renderEmphasised(
-                    weekendCopy(policy.WEEKEND_UPLIFT, baseRate, policy.PUBLIC_HOLIDAY_UPLIFT),
-                  )}
-                </p>
-              )}
-              {showHoliday && (
-                <p>{renderEmphasised(publicHolidayCopy(policy.PUBLIC_HOLIDAY_UPLIFT, baseRate))}</p>
-              )}
-            </Disclosure>
-          )}
-
-          <Disclosure title="GST" bodyClassName="whitespace-pre-line">
-            {renderEmphasised(gstCopy(policy.GST_REGISTERED))}
-          </Disclosure>
         </div>
-      </Section>
-
-      {/* The id is the scroll target of GetEstimateButton; Section adds the scroll margin. */}
-      <Section tone="grey" id="estimate" aria-labelledby="estimate-heading">
-        <SectionHeading
-          id="estimate-heading"
-          title="Get a rough estimate"
-          lead="Answer a few quick questions to get a price range. No commitment required."
-        />
-        <PricingWizard
-          baseRate={baseRate}
-          rates={toPublicRates(rateRows)}
-          weekendUplift={policy.WEEKEND_UPLIFT}
-          publicHolidayUplift={policy.PUBLIC_HOLIDAY_UPLIFT}
-          afterHoursFromHour={policy.AFTER_HOURS_FROM_HOUR}
-          minBillableMins={policy.MIN_BILLABLE_MINS}
-          minTravelCharge={policy.MIN_TRAVEL_CHARGE}
-          travelRatePerHour={policy.TRAVEL_RATE_PER_HOUR}
-          estimatorRange={settings.estimator.range}
-          lowEndFloorFactor={settings.estimator.lowEndFloorFactor}
-          showPromoCode={showPromoCode}
-        />
         {pricing.ratesUpdatedAt && (
           <p className="mt-6 text-sm text-seasalt-700">
             Rates last updated on {formatDateShort(pricing.ratesUpdatedAt)}.

@@ -549,7 +549,7 @@ function main(): void {
 
   // ---- Modifier rates during a promo ----
   // A delta modifier is discounted; an uplift and the promo both apply to full labour, so
-  // they add: 65 + 25% - 15% is 71.50, not 81.25 x 0.85.
+  // they add: 65 + $25 - 15% is 80.25, not 90 x 0.85.
 
   expectEqual(
     "percent promo discounts a delta modifier",
@@ -559,8 +559,8 @@ function main(): void {
 
   expectEqual(
     "percent promo against a holiday uplift is additive",
-    promoModifierRate(65, 81.25, "uplift", promo("percent", 0.15)),
-    71.5,
+    promoModifierRate(65, 90, "uplift", promo("percent", 0.15)),
+    80.25,
   );
 
   expectEqual(
@@ -571,8 +571,8 @@ function main(): void {
 
   expectEqual(
     "fixed amount against an uplift takes the same dollars",
-    promoModifierRate(65, 81.25, "uplift", promo("fixed_amount", 10)),
-    71.25,
+    promoModifierRate(65, 90, "uplift", promo("fixed_amount", 10)),
+    80,
   );
 
   // A travel promo touches no labour rate at all.
@@ -735,14 +735,14 @@ function main(): void {
   const FLAT = STANDARD - 10;
   const CUT = STANDARD - FLAT;
   const REMOTE_DELTA = seededDelta("Remote");
-  const PHONE_DELTA = seededDelta("Phone");
-  const HOLIDAY_UPLIFT = DEFAULT_SETTINGS.pricing.publicHolidayUplift;
+  const HOME_DELTA = seededDelta("At home");
+  const HOLIDAY_PER_HOUR = DEFAULT_SETTINGS.pricing.publicHolidayPerHour;
   const remoteRate = STANDARD + REMOTE_DELTA;
-  const phoneRate = STANDARD + PHONE_DELTA;
-  const holidayRate = STANDARD * (1 + HOLIDAY_UPLIFT);
+  const homeRate = STANDARD + HOME_DELTA;
+  const holidayRate = STANDARD + HOLIDAY_PER_HOUR;
 
   const cutJob = job(remoteRate, false);
-  cutJob.tasks.push({ ...cutJob.tasks[0]!, unitPrice: phoneRate, lineTotal: phoneRate });
+  cutJob.tasks.push({ ...cutJob.tasks[0]!, unitPrice: homeRate, lineTotal: homeRate });
   expectEqual(
     "a flat rate cuts every home line by Standard minus flat",
     computeJobPromoDiscount(cutJob, promo("flat_hourly", FLAT), 0, BIZ, undefined, STANDARD),
@@ -791,7 +791,7 @@ function main(): void {
 
   const LIVE_RATES = [
     { id: "base", ratePerHour: STANDARD, hourlyDelta: null, percentDelta: null },
-    { id: "phone", ratePerHour: null, hourlyDelta: PHONE_DELTA, percentDelta: null },
+    { id: "home", ratePerHour: null, hourlyDelta: HOME_DELTA, percentDelta: null },
   ] as unknown as RateConfig[];
   const STALE = FLAT + CUT / 2;
   expectEqual(
@@ -807,12 +807,12 @@ function main(): void {
     ),
     STALE - FLAT,
   );
-  const livePhone = job(phoneRate, false);
-  livePhone.tasks[0]!.modifierIds = ["phone"];
+  const liveHome = job(homeRate, false);
+  liveHome.tasks[0]!.modifierIds = ["home"];
   expectEqual(
     "a live modified line still takes the full cut",
     computeJobPromoDiscount(
-      livePhone,
+      liveHome,
       promo("flat_hourly", FLAT),
       0,
       BIZ,
@@ -838,8 +838,8 @@ function main(): void {
 
   expectEqual(
     "the rate helper cuts a modified rate the same way",
-    applyPromoToHourlyRate(phoneRate, promo("flat_hourly", FLAT), STANDARD),
-    phoneRate - CUT,
+    applyPromoToHourlyRate(homeRate, promo("flat_hourly", FLAT), STANDARD),
+    homeRate - CUT,
   );
   expectEqual(
     "the rate helper still reads a bare rate as Standard",
@@ -1042,12 +1042,12 @@ function main(): void {
   );
 
   expectEqual(
-    "a +25% day's surcharge is halved with the labour: 2h at $65 takes $81.25 off",
+    "a $25/hr day's surcharge is halved with the labour: 2h at $65 takes $90 off",
     calcJobTotal(failedJob([{ qty: 2, unitPrice: 65 }], true), null, {
       ...NO_FLOOR,
-      surchargeUplift: 0.25,
+      surchargePerHour: 25,
     }).unsuccessfulDiscount,
-    81.25,
+    90,
   );
 
   /**
@@ -1196,25 +1196,25 @@ function main(): void {
   );
 
   console.log("\nthe surcharge tick\n");
-  const uplifts = { publicHolidayUplift: 0.25, weekendUplift: 0.1 };
-  const saturday = dateSurcharge(null, 6, uplifts);
-  const holiday = dateSurcharge("Labour Day", 1, uplifts);
+  const rules = { publicHolidayPerHour: 25, weekendPerHour: 10 };
+  const saturday = dateSurcharge(null, 6, rules);
+  const holiday = dateSurcharge("Labour Day", 1, rules);
   expectEqual(
     "untouched, a Saturday bills weekend rates",
-    chosenSurcharge(saturday, null, 0.1),
+    chosenSurcharge(saturday, null, 10),
     saturday,
   );
-  expectEqual("unticked, a Saturday bills none", chosenSurcharge(saturday, false, 0.1), null);
-  expectEqual("unticked, a holiday bills none", chosenSurcharge(holiday, false, 0.1), null);
-  expectEqual("ticked, a holiday keeps its own rate", chosenSurcharge(holiday, true, 0.1), holiday);
-  expectEqual("untouched, a weekday bills none", chosenSurcharge(null, null, 0.1), null);
+  expectEqual("unticked, a Saturday bills none", chosenSurcharge(saturday, false, 10), null);
+  expectEqual("unticked, a holiday bills none", chosenSurcharge(holiday, false, 10), null);
+  expectEqual("ticked, a holiday keeps its own rate", chosenSurcharge(holiday, true, 10), holiday);
+  expectEqual("untouched, a weekday bills none", chosenSurcharge(null, null, 10), null);
   expectEqual(
-    "ticked, a weekday bills the weekend uplift as after hours",
-    chosenSurcharge(null, true, 0.1),
+    "ticked, a weekday bills the weekend surcharge as after hours",
+    chosenSurcharge(null, true, 10),
     {
       reason: "After hours",
       label: "After-hours surcharge",
-      uplift: 0.1,
+      perHour: 10,
     },
   );
   expectEqual("with weekend rates off there is nothing to tick", surchargeOption(null, 0), null);
@@ -1244,7 +1244,7 @@ function main(): void {
       goldCardPercent: null,
       ...extra,
     });
-  const withLine = voided(["Email setup", "Weekend surcharge (+10%)", "Round-trip travel"]);
+  const withLine = voided(["Email setup", "Weekend surcharge (+$10/hr)", "Round-trip travel"]);
   expectEqual(
     "the surcharge line leaves the job text",
     withLine.jobText.includes("surcharge"),
@@ -1254,12 +1254,17 @@ function main(): void {
   expectEqual("a dropped surcharge starts the tick off", voided(["Email setup"]).surcharge, false);
   expectEqual(
     "a holiday surcharge line is spotted too",
-    voided(["Public holiday surcharge (+25%)"]).surcharge,
+    voided(["Public holiday surcharge (+$25/hr)"]).surcharge,
     true,
   );
   expectEqual(
     "and an after-hours one, so a weekday re-issue keeps it ticked",
-    voided(["After-hours surcharge (+10%)"]).surcharge,
+    voided(["After-hours surcharge (+$12.50/hr)"]).surcharge,
+    true,
+  );
+  expectEqual(
+    "and the percent form older invoices carry",
+    voided(["Weekend surcharge (+10%)"]).surcharge,
     true,
   );
   // 2026-10-26T00:00Z is Mon 26 Oct in NZ; the job was the Saturday before.

@@ -55,11 +55,8 @@ const BUILT_IN_LABELS = new Set<string>(DEFAULT_RATE_ROWS.map((r) => r.label));
 /** One-line notes for built-in rates, keyed by lowercase label. */
 const RATE_NOTES: Record<string, string> = {
   business: "Added for business clients.",
-  "at home": "Bench repair at your place. One of At home, Remote or Phone per task.",
-  remote: "Screen-share sessions. One of At home, Remote or Phone per task.",
-  phone: "Help over the phone. One of At home, Remote or Phone per task.",
-  "public holiday":
-    "Lists the holiday surcharge on the pricing page. Holidays bill the public-holiday surcharge on the Pricing tab, so this % is never charged.",
+  "at home": "Complex work taken back to your place. One of At home or Remote per task.",
+  remote: "Screen-share sessions and phone help. One of At home or Remote per task.",
 };
 
 /**
@@ -578,7 +575,7 @@ export function RatesTab({ rates, setRates }: Props): React.ReactElement {
       <ConfirmDialog
         open={confirmResetOpen}
         title="Reset all rates?"
-        body="This deletes every rate and puts back the defaults (Standard, Business, At home, Remote, Phone, Public Holiday). Any rates you've added will be gone."
+        body="This deletes every rate and puts back the defaults (Standard, Business, At home, Remote). Any rates you've added will be gone."
         confirmLabel="Reset rates"
         tone="danger"
         onConfirm={() => void resetRates()}

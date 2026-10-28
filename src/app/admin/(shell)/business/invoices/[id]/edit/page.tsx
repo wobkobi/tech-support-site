@@ -113,15 +113,15 @@ export default async function EditInvoicePage({
   const jobDay = new Date(`${jobDate}T00:00:00Z`);
   const holiday = await lookupPublicHoliday(jobDay).catch(() => null);
   const fromDate = dateSurcharge(holiday?.name ?? null, nzWeekday(jobDay), {
-    publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
-    weekendUplift: policy.WEEKEND_UPLIFT,
+    publicHolidayPerHour: policy.PUBLIC_HOLIDAY_PER_HOUR,
+    weekendPerHour: policy.WEEKEND_PER_HOUR,
   });
   // The draft's own surcharge line decides, like the calculator's tick: one waived stays off,
   // and one added on a weekday stays on.
   const surcharge = chosenSurcharge(
     fromDate,
     invoice.lineItems.some((l) => isSurchargeLine(l.description)),
-    policy.WEEKEND_UPLIFT,
+    policy.WEEKEND_PER_HOUR,
   );
   const company = contact?.company?.trim() ?? "";
   const aiContext: InvoiceAiContext = {

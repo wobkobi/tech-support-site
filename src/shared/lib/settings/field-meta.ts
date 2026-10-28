@@ -623,18 +623,18 @@ export const PRICING_FIELD_META = {
       "Ceiling on the time a single job can bill. Catches a mistyped time range before it reaches an invoice.",
     unit: "minutes",
   },
-  publicHolidayUplift: {
+  publicHolidayPerHour: {
     title: "Public-holiday surcharge",
     description:
-      "Extra added to labour on every NZ public holiday (Auckland Anniversary Day included), plus Christmas Eve and New Year's Eve (25 = +25%), worked out on the full hourly rate. A public holiday on a weekend is charged on the weekday it's observed instead. Travel and parts are unchanged.",
-    unit: "%",
+      "Dollars an hour added to labour on every NZ public holiday (Auckland Anniversary Day included), plus Christmas Eve and New Year's Eve. The same amount on every rate (on-site, remote, bench, business). A public holiday on a weekend is charged on the weekday it's observed instead. Travel and parts are unchanged.",
+    unit: "$/hr",
     off: "Set 0 to charge normal rates on public holidays.",
   },
-  weekendUplift: {
-    title: "Weekend surcharge",
+  weekendPerHour: {
+    title: "Weekend and evening surcharge",
     description:
-      "Extra added to labour on Saturdays and Sundays (10 = +10%), worked out on the full hourly rate. Weekday jobs starting from the After hours from time below bill it too, as do any you tick after-hours rates on in the calculator. A public holiday on a weekend bills this; its holiday surcharge moves to the weekday it's observed. Christmas Eve and New Year's Eve take the public-holiday surcharge instead. Travel and parts are unchanged.",
-    unit: "%",
+      "Dollars an hour added to labour on Saturdays and Sundays, the same amount on every rate (on-site, remote, bench, business). Weekday jobs starting from the After hours from time below bill it too, as do any you tick after-hours rates on in the calculator. A public holiday on a weekend bills this; its holiday surcharge moves to the weekday it's observed. Christmas Eve and New Year's Eve take the public-holiday surcharge instead. Travel and parts are unchanged.",
+    unit: "$/hr",
     off: "Set 0 to charge normal rates at weekends and after hours.",
   },
   afterHoursFromHour: {

@@ -14,6 +14,12 @@ import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
+ * Rate rows the site no longer bills, deleted on sight. Phone help bills at Remote, and the
+ * holiday surcharge is the publicHolidayPerHour pricing setting, not a rate row.
+ */
+const RETIRED_LABELS = ["Student", "Complex", "Phone", "Public Holiday"];
+
+/**
  * GET /api/business/rates - Returns all rate configs, seeding any missing defaults on each call.
  * @param request - Incoming Next.js request
  * @returns JSON with rates array
@@ -33,10 +39,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     await prisma.rateConfig.createMany({ data: missing });
   }
 
-  // Passive cleanup: Student and Complex are no longer part of DEFAULT_RATE_ROWS.
-  const hasRetiredLabels = rates.some((r) => r.label === "Student" || r.label === "Complex");
+  // Passive cleanup: retired labels are no longer part of DEFAULT_RATE_ROWS.
+  const hasRetiredLabels = rates.some((r) => RETIRED_LABELS.includes(r.label));
   if (hasRetiredLabels) {
-    await prisma.rateConfig.deleteMany({ where: { label: { in: ["Student", "Complex"] } } });
+    await prisma.rateConfig.deleteMany({ where: { label: { in: RETIRED_LABELS } } });
   }
 
   // Travel-row retirement: carry a row's rate into pricing settings if they state none

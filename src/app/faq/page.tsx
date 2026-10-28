@@ -87,15 +87,12 @@ export default async function FaqPage(): Promise<React.ReactElement> {
   const displayMinTravel = roundCents(policy.MIN_TRAVEL_CHARGE * travelFactor);
   const rateDiscounted = displayRate !== pricing.baseRate;
   const travelDiscounted = travelFactor < 1;
-  // Worked out on the full rate, which no promo discounts; empty when both surcharges are off.
-  const surchargeText = surchargeCaveat(
-    {
-      weekendUplift: policy.WEEKEND_UPLIFT,
-      publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
-      afterHoursFromHour: policy.AFTER_HOURS_FROM_HOUR,
-    },
-    pricing.baseRate,
-  );
+  // Flat $/hr, which no promo discounts; empty when both surcharges are off.
+  const surchargeText = surchargeCaveat({
+    weekendPerHour: policy.WEEKEND_PER_HOUR,
+    publicHolidayPerHour: policy.PUBLIC_HOLIDAY_PER_HOUR,
+    afterHoursFromHour: policy.AFTER_HOURS_FROM_HOUR,
+  });
   const surchargeSentence = surchargeText ? ` ${surchargeText}` : "";
   const paymentTermsDays = settings.identity.paymentTermsDays;
   const cancellationText = cancellationCopy(policy.CANCELLATION);

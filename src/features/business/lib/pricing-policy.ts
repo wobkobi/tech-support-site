@@ -10,7 +10,6 @@ import {
 } from "@/features/business/lib/business";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { roundCents } from "@/shared/lib/money";
-import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 
 /** GST is back-calculated from the inclusive total via calcGstFromInclusive when enabled. */
 export const GST_RATE = 0.15;
@@ -26,12 +25,6 @@ export const MIN_BILLABLE_MINS = 15;
 
 /** Round-to-nearest step for billable time; mirrors {@link billableMins} in business.ts. */
 export const BILLING_INCREMENT_MINS = 5;
-
-/** Multiplier applied to labour on NZ public holidays. Travel and parts are not uplifted. */
-const PUBLIC_HOLIDAY_UPLIFT = 0.25;
-
-/** Multiplier applied to labour on an NZ Saturday or Sunday. Travel and parts are not uplifted. */
-const WEEKEND_UPLIFT = 0.1;
 
 /** Fallback fraction charged for an unsuccessful visit (0.5 = half price). */
 const UNSUCCESSFUL_WORK_FACTOR = 0.5;
@@ -52,7 +45,8 @@ export const FALLBACK_BUSINESS_DELTA = 20;
 
 /**
  * Default RateConfig rows, seeded by the rates route when a label is missing: Standard plus
- * $/hr and percentage modifiers. Standard and Business read the fallbacks above so they agree.
+ * $/hr modifiers. Standard and Business read the fallbacks above so they agree. Weekend,
+ * after-hours and holiday surcharges are pricing settings, not rows.
  */
 export const DEFAULT_RATE_ROWS = [
   {
@@ -87,29 +81,8 @@ export const DEFAULT_RATE_ROWS = [
     label: "Remote",
     ratePerHour: null,
     flatRate: null,
-    hourlyDelta: -10,
-    percentDelta: null,
-    unit: "modifier",
-    isDefault: false,
-  },
-  {
-    // Phone work, cheaper than Remote; for calls long enough to bill.
-    label: "Phone",
-    ratePerHour: null,
-    flatRate: null,
     hourlyDelta: -25,
     percentDelta: null,
-    unit: "modifier",
-    isDefault: false,
-  },
-  {
-    // The row only surfaces the modifier; the charged uplift is the pricing
-    // setting, so the seed takes its default from there.
-    label: "Public Holiday",
-    ratePerHour: null,
-    flatRate: null,
-    hourlyDelta: null,
-    percentDelta: DEFAULT_SETTINGS.pricing.publicHolidayUplift,
     unit: "modifier",
     isDefault: false,
   },
@@ -117,7 +90,7 @@ export const DEFAULT_RATE_ROWS = [
 
 /** Region label for nationwide NZ public holidays in the PublicHoliday table. */
 export const NZ_REGION = "NZ";
-/** Region for the operator's regional anniversary day (also charged the uplift). */
+/** Region for the operator's regional anniversary day (also charged the holiday surcharge). */
 export const HOME_REGION = "Auckland";
 
 /**
@@ -537,55 +510,18 @@ export function minimumsCopy(
   return (
     `**${minBillableMins} minutes minimum** per job, then ` +
     `**${billingIncrementMins}-minute increments** after that. ` +
-    `Quick calls and emails stay **free** - a "remote session" is when I log in ` +
-    `and start working on your machine.`
+    `Quick calls and emails stay **free** - time counts once I log in to your computer ` +
+    `or we start fixing something over the phone.`
   );
 }
 
 /**
- * Every day billed at holiday rates, as customer copy names them. Christmas Eve and New Year's
- * Eve aren't public holidays, so copy says "holiday rates" rather than calling them one.
+ * A surcharge as customer copy states it.
+ * @param perHour - Surcharge in $/hr.
+ * @returns e.g. "$10/hr".
  */
-const HOLIDAY_DAYS = `every NZ public holiday (${HOME_REGION} Anniversary Day included), plus Christmas Eve and New Year's Eve`;
-
-/**
- * A labour uplift as a percent, to two decimals so 12.5% never shows as 13%.
- * @param uplift - Uplift as a fraction (0.125 = 12.5%).
- * @returns The percent, e.g. 12.5.
- */
-export function upliftPercent(uplift: number): number {
-  return Math.round(uplift * 10000) / 100;
-}
-
-/**
- * The labour rise a surcharge adds, worked out on the full rate: a promo never discounts it,
- * so a dollar figure stays right under a promo where a percent of the promo rate wouldn't.
- * @param fullRate - Full hourly rate before any promo.
- * @param uplift - Uplift as a fraction.
- * @returns The rise, e.g. "$10/hr".
- */
-function risePerHour(fullRate: number, uplift: number): string {
-  return `${formatMoneyCompact(roundCents(fullRate * uplift))}/hr`;
-}
-
-/**
- * Public-holiday surcharge text, naming every day billed at holiday rates.
- * @param uplift - Surcharge multiplier (defaults to the module constant).
- * @param fullRate - Full on-site hourly rate, to add the rise in dollars; omitted gives the percent only.
- * @returns Copy describing the holiday surcharge.
- */
-export function publicHolidayCopy(
-  uplift: number = PUBLIC_HOLIDAY_UPLIFT,
-  fullRate?: number,
-): string {
-  const dollars =
-    fullRate === undefined ? "" : ` (**${risePerHour(fullRate, uplift)}** for an on-site visit)`;
-  return (
-    `Available on ${HOLIDAY_DAYS}. When a public holiday falls on a weekend, holiday rates ` +
-    `apply on the weekday it's observed instead (ANZAC Day on a Saturday means the Monday). ` +
-    `Holiday rates add **${upliftPercent(uplift)}% of the full hourly rate** to labour${dollars}. ` +
-    `**Travel and parts are unchanged.**`
-  );
+function perHourLabel(perHour: number): string {
+  return `${formatMoneyCompact(perHour)}/hr`;
 }
 
 /**
@@ -601,82 +537,32 @@ export function unsuccessfulShareLabel(factor: number): string {
 }
 
 /**
- * Weekend surcharge text, shown with the public-holiday copy.
- * @param uplift - Surcharge multiplier (defaults to the module constant).
- * @param fullRate - Full on-site hourly rate, to add the rise in dollars; omitted gives the percent only.
- * @param holidayUplift - Public-holiday uplift; at 0 Christmas Eve or New Year's Eve on a
- * weekend bills normal rates.
- * @returns Copy describing the weekend surcharge.
- */
-export function weekendCopy(
-  uplift: number = WEEKEND_UPLIFT,
-  fullRate?: number,
-  holidayUplift: number = PUBLIC_HOLIDAY_UPLIFT,
-): string {
-  const dollars =
-    fullRate === undefined ? "" : ` (**${risePerHour(fullRate, uplift)}** for an on-site visit)`;
-  // A weekend public holiday is observed on a weekday, so the day itself is a plain weekend.
-  // The eves aren't moved, and win over a weekend even at 0%, leaving that day at normal rates.
-  const onHoliday =
-    holidayUplift > 0
-      ? "A public holiday that falls on a weekend is charged weekend rates on the day, and holiday rates on the weekday it's observed. Christmas Eve and New Year's Eve take holiday rates even at a weekend - the two never add together."
-      : "A public holiday that falls on a weekend is charged weekend rates. Christmas Eve and New Year's Eve are charged at normal rates, even at a weekend.";
-  return (
-    `Saturday and Sunday appointments add **${upliftPercent(uplift)}% of the full hourly rate** ` +
-    `to labour${dollars}. ${onHoliday} **Travel and parts are unchanged.**`
-  );
-}
-
-/**
- * After-hours copy for the pricing page: which weekday starts carry the weekend rise, and
- * the booking page tick that shows them.
- * @param fromHour - NZ hour from which a weekday start bills after hours.
- * @param uplift - Labour uplift as a fraction (the weekend one).
- * @param fullRate - Full on-site hourly rate, to add the rise in dollars.
- * @returns Copy describing the after-hours surcharge.
- */
-export function afterHoursCopy(fromHour: number, uplift: number, fullRate: number): string {
-  return (
-    `Weekday visits starting from **${hourLabel(fromHour)}** add **${upliftPercent(uplift)}% ` +
-    `of the full hourly rate** to labour (**${risePerHour(fullRate, uplift)}** for an on-site ` +
-    `visit). To book one online, tick **Show evening times** when you choose a start time. ` +
-    `**Travel and parts are unchanged.**`
-  );
-}
-
-/**
  * One-line caveat for copy that quotes a weekday rate: what weekends, weekday evenings and
- * holidays add.
- * @param uplifts - Live surcharge settings from the pricing group.
- * @param uplifts.publicHolidayUplift - Public-holiday labour uplift (0 = off).
- * @param uplifts.weekendUplift - Weekend labour uplift (0 = off), which after hours shares.
- * @param uplifts.afterHoursFromHour - NZ hour from which a weekday start bills after hours, or
+ * holidays add. The surcharges are flat, so one figure holds for every rate.
+ * @param rules - Live surcharge settings from the pricing group.
+ * @param rules.publicHolidayPerHour - Public-holiday surcharge in $/hr (0 = off).
+ * @param rules.weekendPerHour - Weekend surcharge in $/hr (0 = off), which after hours shares.
+ * @param rules.afterHoursFromHour - NZ hour from which a weekday start bills after hours, or
  * null when only ticked by hand (left unsaid).
- * @param fullRate - Full hourly rate being quoted, to state the rise in dollars; omitted states percents.
  * @returns The sentence, or null when neither surcharge is on.
  */
-export function surchargeCaveat(uplifts: SurchargeRules, fullRate?: number): string | null {
-  /**
-   * States one surcharge in dollars at the quoted rate, else as a percent.
-   * @param uplift - Labour uplift as a fraction.
-   * @returns The rise, e.g. "$10/hr" or "10%".
-   */
-  const rise = (uplift: number): string =>
-    fullRate === undefined ? `${upliftPercent(uplift)}%` : risePerHour(fullRate, uplift);
-  const { weekendUplift, publicHolidayUplift, afterHoursFromHour } = uplifts;
+export function surchargeCaveat(rules: SurchargeRules): string | null {
+  const { weekendPerHour, publicHolidayPerHour, afterHoursFromHour } = rules;
   const weekendSubject =
     afterHoursFromHour == null
       ? "Weekends"
       : `Weekends and weekday visits starting from ${hourLabel(afterHoursFromHour)}`;
-  if (weekendUplift > 0 && publicHolidayUplift > 0) {
+  if (weekendPerHour > 0 && publicHolidayPerHour > 0) {
     return (
-      `${weekendSubject} add ${rise(weekendUplift)} to labour, and public holidays add ` +
-      `${rise(publicHolidayUplift)}, as do Christmas Eve and New Year's Eve.`
+      `${weekendSubject} add ${perHourLabel(weekendPerHour)} to labour, and public holidays ` +
+      `add ${perHourLabel(publicHolidayPerHour)}, as do Christmas Eve and New Year's Eve.`
     );
   }
-  if (weekendUplift > 0) return `${weekendSubject} add ${rise(weekendUplift)} to labour.`;
-  if (publicHolidayUplift > 0) {
-    return `Public holidays add ${rise(publicHolidayUplift)} to labour, as do Christmas Eve and New Year's Eve.`;
+  if (weekendPerHour > 0) {
+    return `${weekendSubject} add ${perHourLabel(weekendPerHour)} to labour.`;
+  }
+  if (publicHolidayPerHour > 0) {
+    return `Public holidays add ${perHourLabel(publicHolidayPerHour)} to labour, as do Christmas Eve and New Year's Eve.`;
   }
   return null;
 }
@@ -685,25 +571,25 @@ export function surchargeCaveat(uplifts: SurchargeRules, fullRate?: number): str
 export interface DateSurcharge {
   /** Why it applies, for the calculator strip: the holiday's name, "Weekend" or "After hours". */
   reason: string;
-  /** Invoice-line wording without the percent, e.g. "Weekend surcharge". */
+  /** Invoice-line wording without the amount, e.g. "Weekend surcharge". */
   label: string;
-  /** Labour uplift as a fraction (0.1 = +10%). */
-  uplift: number;
+  /** Dollars added to every billed labour hour, whatever that line's own rate. */
+  perHour: number;
 }
 
 /** The pricing settings that decide a job's labour surcharge. */
 export interface SurchargeRules {
-  /** Public-holiday labour uplift (0 = off). */
-  publicHolidayUplift: number;
-  /** Weekend labour uplift (0 = off), which after hours shares. */
-  weekendUplift: number;
+  /** Public-holiday surcharge in $/hr (0 = off). */
+  publicHolidayPerHour: number;
+  /** Weekend surcharge in $/hr (0 = off), which after hours shares. */
+  weekendPerHour: number;
   /** NZ hour from which a weekday start bills after hours; null or absent = only when ticked. */
   afterHoursFromHour?: number | null;
 }
 
 /**
  * The labour surcharge for a job's date and start. A public holiday wins over a weekend (never
- * stacked), even when set to 0%, and either wins over after hours. After hours starts on the
+ * stacked), even when set to $0, and either wins over after hours. After hours starts on the
  * hour itself, so a 6pm start with a 6pm cutoff bills after hours and 5:45pm doesn't.
  * @param holidayName - The NZ public holiday on the job date, or null.
  * @param weekday - NZ weekday of the job, 0 = Sunday through 6 = Saturday.
@@ -718,102 +604,87 @@ export function dateSurcharge(
   startMins: number | null = null,
 ): DateSurcharge | null {
   if (holidayName !== null) {
-    return rules.publicHolidayUplift > 0
+    return rules.publicHolidayPerHour > 0
       ? {
           reason: holidayName,
           label: "Public holiday surcharge",
-          uplift: rules.publicHolidayUplift,
+          perHour: rules.publicHolidayPerHour,
         }
       : null;
   }
-  if (weekday === 0 || weekday === 6) return weekendSurcharge(rules.weekendUplift);
+  if (weekday === 0 || weekday === 6) return weekendSurcharge(rules.weekendPerHour);
   const from = rules.afterHoursFromHour;
   if (startMins !== null && from != null && startMins >= from * 60) {
-    return afterHoursSurcharge(rules.weekendUplift);
+    return afterHoursSurcharge(rules.weekendPerHour);
   }
   return null;
 }
 
 /**
- * The weekend surcharge at a given uplift.
- * @param uplift - Weekend labour uplift as a fraction.
+ * The weekend surcharge at a given amount.
+ * @param perHour - Weekend surcharge in $/hr.
  * @returns The surcharge, or null when weekend rates are off (0).
  */
-function weekendSurcharge(uplift: number): DateSurcharge | null {
-  return uplift > 0 ? { reason: "Weekend", label: "Weekend surcharge", uplift } : null;
+function weekendSurcharge(perHour: number): DateSurcharge | null {
+  return perHour > 0 ? { reason: "Weekend", label: "Weekend surcharge", perHour } : null;
 }
 
 /**
- * The after-hours surcharge, billed at the weekend uplift.
- * @param uplift - Weekend labour uplift as a fraction.
+ * The after-hours surcharge, billed at the weekend amount.
+ * @param perHour - Weekend surcharge in $/hr.
  * @returns The surcharge, or null when weekend rates are off (0).
  */
-export function afterHoursSurcharge(uplift: number): DateSurcharge | null {
-  return uplift > 0 ? { reason: "After hours", label: "After-hours surcharge", uplift } : null;
+export function afterHoursSurcharge(perHour: number): DateSurcharge | null {
+  return perHour > 0 ? { reason: "After hours", label: "After-hours surcharge", perHour } : null;
 }
 
 /**
- * The surcharge an operator's tick switches: the date's own, else the weekend uplift billed
+ * The surcharge an operator's tick switches: the date's own, else the weekend surcharge billed
  * as after hours, so an evening call on a weekday reads right on the invoice.
  * @param fromDate - The job's surcharge from {@link dateSurcharge}, or null.
- * @param weekendUplift - Weekend labour uplift (0 = off), which after hours shares.
+ * @param weekendPerHour - Weekend surcharge in $/hr (0 = off), which after hours shares.
  * @returns The surcharge the tick controls, or null when there's nothing to switch on.
  */
 export function surchargeOption(
   fromDate: DateSurcharge | null,
-  weekendUplift: number,
+  weekendPerHour: number,
 ): DateSurcharge | null {
-  return fromDate ?? afterHoursSurcharge(weekendUplift);
+  return fromDate ?? afterHoursSurcharge(weekendPerHour);
 }
 
 /**
  * The surcharge a job bills once the operator's tick is applied.
  * @param fromDate - The date's surcharge from {@link dateSurcharge}, or null.
  * @param on - The tick: true bills {@link surchargeOption}, false bills none, null follows the date.
- * @param weekendUplift - Weekend labour uplift (0 = off).
+ * @param weekendPerHour - Weekend surcharge in $/hr (0 = off).
  * @returns The surcharge to bill, or null.
  */
 export function chosenSurcharge(
   fromDate: DateSurcharge | null,
   on: boolean | null,
-  weekendUplift: number,
+  weekendPerHour: number,
 ): DateSurcharge | null {
   if (on === null) return fromDate;
-  return on ? surchargeOption(fromDate, weekendUplift) : null;
-}
-
-/** A booking day's surcharge with its rise in $/hr at the full rates, for the day-picker note. */
-export interface PricedDateSurcharge extends DateSurcharge {
-  /** Labour rise in $/hr at the full on-site rate. */
-  perHour: number;
-  /** Labour rise in $/hr at the full remote rate. */
-  perHourRemote: number;
+  return on ? surchargeOption(fromDate, weekendPerHour) : null;
 }
 
 /**
- * The labour rise a booking-page note states: dollars when priced, else a share of the full rate.
- * @param surcharge - The surcharge; priced ones (from withDateSurcharges) state dollars.
- * @returns e.g. "labour costs $10/hr more ($9/hr remote)".
+ * The labour rise a booking-page note states.
+ * @param surcharge - The surcharge.
+ * @returns e.g. "labour costs $10/hr more".
  */
-function surchargeRise(surcharge: DateSurcharge | PricedDateSurcharge): string {
-  if (!("perHour" in surcharge)) {
-    return `labour costs an extra ${upliftPercent(surcharge.uplift)}% of the full hourly rate`;
-  }
-  const remote =
-    surcharge.perHourRemote !== surcharge.perHour
-      ? ` (${formatMoneyCompact(surcharge.perHourRemote)}/hr remote)`
-      : "";
-  return `labour costs ${formatMoneyCompact(surcharge.perHour)}/hr more${remote}`;
+function surchargeRise(surcharge: DateSurcharge): string {
+  return `labour costs ${perHourLabel(surcharge.perHour)} more`;
 }
 
 /**
  * Short customer-facing note beside the start-time heading when a surcharged booking day is
  * picked. Holidays read "holiday rates", since Christmas Eve and New Year's Eve bill them
  * without being public holidays.
- * @param surcharge - The day's surcharge; priced ones (from withDateSurcharges) state dollars.
+ * @param surcharge - The day's surcharge.
  * @returns One line naming the reason and the rise, e.g. "Weekend rates: labour costs $10/hr more".
  */
-export function dateSurchargeNote(surcharge: DateSurcharge | PricedDateSurcharge): string {
+export function dateSurchargeNote(surcharge: DateSurcharge): string {
   return surcharge.reason === "Weekend"
     ? `Weekend rates: ${surchargeRise(surcharge)}`
     : `${surcharge.reason}: holiday rates, ${surchargeRise(surcharge)}`;
@@ -822,21 +693,18 @@ export function dateSurchargeNote(surcharge: DateSurcharge | PricedDateSurcharge
 /**
  * Label for the booking page's Show evening times tick, stating when after-hours rates start
  * and what they add, so nobody ticks it without seeing the price.
- * @param surcharge - The weekday's after-hours surcharge; priced ones state dollars.
+ * @param surcharge - The weekday's after-hours surcharge.
  * @param fromHour - NZ hour from which a weekday start bills after hours.
- * @returns e.g. "Show evening times: from 6pm, labour costs $10/hr more ($9/hr remote)".
+ * @returns e.g. "Show evening times: from 6pm, labour costs $10/hr more".
  */
-export function eveningTickLabel(
-  surcharge: DateSurcharge | PricedDateSurcharge,
-  fromHour: number,
-): string {
+export function eveningTickLabel(surcharge: DateSurcharge, fromHour: number): string {
   return `Show evening times: from ${hourLabel(fromHour)}, ${surchargeRise(surcharge)}`;
 }
 
 /**
  * Line under a booking estimate whose labour range includes a surcharge.
  * @param surcharge - The picked slot's surcharge from {@link dateSurcharge}.
- * @returns One short sentence naming the surcharge and its percent.
+ * @returns One short sentence naming the surcharge and its amount.
  */
 export function quoteSurchargeNote(surcharge: DateSurcharge): string {
   const kind =
@@ -845,7 +713,7 @@ export function quoteSurchargeNote(surcharge: DateSurcharge): string {
       : surcharge.reason === "After hours"
         ? "after-hours"
         : "holiday";
-  return `Includes the ${upliftPercent(surcharge.uplift)}% ${kind} surcharge on labour.`;
+  return `Includes the ${perHourLabel(surcharge.perHour)} ${kind} surcharge on labour.`;
 }
 
 /**
@@ -873,8 +741,8 @@ export interface Policy {
   SHORT_TASK_MINS: number;
   MIN_TASK_MINS: number;
   MAX_JOB_MINS: number;
-  PUBLIC_HOLIDAY_UPLIFT: number;
-  WEEKEND_UPLIFT: number;
+  PUBLIC_HOLIDAY_PER_HOUR: number;
+  WEEKEND_PER_HOUR: number;
   AFTER_HOURS_FROM_HOUR: number | null;
   UNSUCCESSFUL_WORK_FACTOR: number;
   NO_FIX_FREE_MINS: number;

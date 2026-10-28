@@ -72,8 +72,8 @@ interface QuickPricing {
   billingIncrementMins: number;
   /** Share of the labour still charged when the problem wasn't fixed (0.5 = half price). */
   unsuccessfulFactor: number;
-  /** Weekend labour uplift, which the surcharge tick can bill on any day (0 = off). */
-  weekendUplift: number;
+  /** Weekend surcharge in $/hr, which the surcharge tick can bill on any day (0 = off). */
+  weekendPerHour: number;
 }
 
 /** One of today's booking-calendar events, with NZ-local HH:MM bounds. */
@@ -170,8 +170,8 @@ export function QuickPriceView({
   const [goldCard, setGoldCard] = useState(false);
   // Surcharge tick (weekend, holiday, or after hours on a weekday); null follows today's date.
   const [surchargeOn, setSurchargeOn] = useState<boolean | null>(null);
-  const surcharge = chosenSurcharge(todaySurcharge, surchargeOn, pricing.weekendUplift);
-  const surchargeChoice = surchargeOption(todaySurcharge, pricing.weekendUplift);
+  const surcharge = chosenSurcharge(todaySurcharge, surchargeOn, pricing.weekendPerHour);
+  const surchargeChoice = surchargeOption(todaySurcharge, pricing.weekendPerHour);
   const [travel, setTravel] = useState<TravelEntry | null>(prefill?.travel ?? null);
   const [lookingUp, setLookingUp] = useState(false);
   const [travelNote, setTravelNote] = useState<string | null>(null);
@@ -239,7 +239,7 @@ export function QuickPriceView({
     gstRegistered: pricing.gstRegistered,
     minTravelCharge: pricing.minTravelCharge,
     minBillableMins: pricing.minBillableMins,
-    surchargeUplift: surcharge?.uplift ?? 0,
+    surchargePerHour: surcharge?.perHour ?? 0,
     unsuccessfulFactor: pricing.unsuccessfulFactor,
     businessModifierId: businessModifier?.id ?? null,
     standardRate: standard?.ratePerHour ?? null,

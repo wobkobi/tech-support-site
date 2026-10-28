@@ -480,7 +480,7 @@ export function parsedJobToLineItems(
       gstRegistered: false,
       minTravelCharge: pricing.minTravelCharge,
       minBillableMins: pricing.minBillableMins,
-      surchargeUplift: pricing.surcharge?.uplift ?? 0,
+      surchargePerHour: pricing.surcharge?.perHour ?? 0,
       unsuccessfulFactor: pricing.unsuccessfulFactor,
       businessModifierId: pricing.businessModifierId,
       standardRate: pricing.standardRate,

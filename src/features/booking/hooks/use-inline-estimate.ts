@@ -175,7 +175,7 @@ export function useInlineEstimate(inputs: InlineEstimateInputs): InlineEstimateS
         lowEndFloorFactor,
         departureTimeIso: slotStart?.toISOString(),
         returnDepartureTimeIso: slotEnd?.toISOString(),
-        surchargeUplift: surcharge?.uplift ?? 0,
+        surchargePerHour: surcharge?.perHour ?? 0,
         promoCode,
         email,
       });
