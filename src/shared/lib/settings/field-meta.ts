@@ -201,12 +201,10 @@ export const COMMS_FIELD_META = {
   quietHoursStart: {
     title: "Quiet from",
     description: "NZ hour the window opens - emails triggered after this wait.",
-    unit: "o'clock",
   },
   quietHoursEnd: {
     title: "Quiet until",
     description: "NZ hour the window closes - held emails go out then.",
-    unit: "o'clock",
   },
 } satisfies Record<string, FieldMeta>;
 
@@ -566,7 +564,18 @@ export const SCHEDULING_FIELD_META = {
     title: "Travel-quote time",
     description:
       "When a customer hasn't picked a slot yet, drive time is quoted against this hour of the day (a realistic-traffic proxy rather than whenever they opened the page).",
-    unit: "hour 0-23",
+  },
+  suggestEndHour: {
+    title: "Suggested jobs finish by",
+    description:
+      "On weekdays, the schedule's Next open times bar suggests times that finish by this hour first, plus a time straight after a booking you already have that day. Later times are suggested only when there aren't enough of those. Customers can still book any open time online.",
+    off: "Choose 12am to treat every time the same.",
+  },
+  suggestWeekendEndHour: {
+    title: "Suggested weekend jobs finish by",
+    description:
+      "The same for Saturdays and Sundays, so weekend suggestions can end earlier than weekday ones.",
+    off: "Choose 12am to treat every weekend time the same.",
   },
 } satisfies Record<string, FieldMeta>;
 

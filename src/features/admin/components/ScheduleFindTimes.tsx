@@ -1,26 +1,40 @@
 "use client";
 // src/features/admin/components/ScheduleFindTimes.tsx
-// "Next open times" bar: a few bookable starts to read out on the phone, optionally gated
-// by the drive from a customer address. Uses the public availability engine via the API.
+// "Next open times" bar: a few bookable starts in the week on screen to read out on the phone,
+// optionally gated by the drive from a customer address. Uses the public availability engine
+// via the API.
 
 import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { Card } from "@/features/admin/components/ui/Card";
 import {
   SEGMENTED_GROUP_CLS,
   segmentedButtonClass,
 } from "@/features/admin/components/ui/chip-classes";
+import { mondayOf } from "@/features/admin/lib/schedule-types";
+import { spreadEvenly } from "@/features/admin/lib/spread-evenly";
+import { addDaysToDateKey, nzTodayKey } from "@/shared/lib/timezone-utils";
+import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
 interface SuggestedSlot {
-  dateKey: string;
   startIso: string;
-  startHour: number;
-  minute: number;
-  dayLabel: string;
   timeLabel: string;
   driveNote?: string;
+}
+
+interface SuggestedDay {
+  dateKey: string;
+  dayLabel: string;
+  slots: SuggestedSlot[];
+}
+
+/** One dropdown: a weekday, or Saturday and Sunday together. */
+interface DayGroup {
+  key: string;
+  days: SuggestedDay[];
 }
 
 interface ContactSuggestion {
@@ -29,22 +43,129 @@ interface ContactSuggestion {
   address: string | null;
 }
 
-// A handful to offer, not a wall of times.
-const SLOT_COUNT = 6;
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Times in one dropdown; the weekend's two days share it.
+const PER_DROPDOWN = 5;
+
+/**
+ * Whether a date key falls on a Saturday or Sunday.
+ * @param key - Date key (YYYY-MM-DD).
+ * @returns True on a weekend day.
+ */
+function isWeekend(key: string): boolean {
+  const dow = new Date(`${key}T12:00:00Z`).getUTCDay();
+  return dow === 0 || dow === 6;
+}
+
+/**
+ * Splits one dropdown's worth of times across a weekend: Saturday takes the larger half,
+ * and a day short of its half leaves the rest to the other. Each day's share stays spread
+ * across that day.
+ * @param sat - Saturday and its times.
+ * @param sun - The Sunday after it and its times.
+ * @returns Both days, holding PER_DROPDOWN times between them.
+ */
+function shareWeekend(sat: SuggestedDay, sun: SuggestedDay): SuggestedDay[] {
+  const satCount = Math.min(
+    sat.slots.length,
+    Math.max(Math.ceil(PER_DROPDOWN / 2), PER_DROPDOWN - sun.slots.length),
+  );
+  const sunCount = Math.min(sun.slots.length, PER_DROPDOWN - satCount);
+  return [
+    { ...sat, slots: spreadEvenly(sat.slots, satCount) },
+    { ...sun, slots: spreadEvenly(sun.slots, sunCount) },
+  ];
+}
+
+/**
+ * Groups days for the dropdowns: one per weekday, with a Saturday and the Sunday after it
+ * sharing one (and its five times).
+ * @param days - Days with openings, in date order.
+ * @returns Dropdown groups, in date order.
+ */
+function groupDays(days: SuggestedDay[]): DayGroup[] {
+  const groups: DayGroup[] = [];
+  for (const day of days) {
+    const last = groups.at(-1);
+    const lastDay = last?.days.at(-1);
+    if (
+      last &&
+      lastDay &&
+      isWeekend(lastDay.dateKey) &&
+      isWeekend(day.dateKey) &&
+      addDaysToDateKey(lastDay.dateKey, 1) === day.dateKey
+    ) {
+      last.days = shareWeekend(lastDay, day);
+    } else groups.push({ key: day.dateKey, days: [day] });
+  }
+  return groups;
+}
+
+/**
+ * Option text for a time, with the drive when gated by address.
+ * @param slot - The suggested time.
+ * @returns "2:00pm" or "2:00pm (18 min drive)".
+ */
+function slotOptionLabel(slot: SuggestedSlot): string {
+  return slot.driveNote ? `${slot.timeLabel} (${slot.driveNote})` : slot.timeLabel;
+}
+
+/**
+ * Short label for a Monday-to-Sunday range: "2-8 Nov", or "26 Oct - 1 Nov" across months.
+ * @param startKey - Monday's date key (YYYY-MM-DD).
+ * @param endKey - Sunday's date key (YYYY-MM-DD).
+ * @returns The range label.
+ */
+function weekRangeLabel(startKey: string, endKey: string): string {
+  /**
+   * Formats a date key as a day, with the month when asked.
+   * @param key - Date key (YYYY-MM-DD).
+   * @param withMonth - Whether to add the short month name.
+   * @returns "2" or "2 Nov".
+   */
+  const fmt = (key: string, withMonth: boolean): string =>
+    new Date(`${key}T12:00:00Z`).toLocaleDateString("en-NZ", {
+      timeZone: "UTC",
+      day: "numeric",
+      ...(withMonth ? { month: "short" } : {}),
+    });
+  return startKey.slice(0, 7) === endKey.slice(0, 7)
+    ? `${fmt(startKey, false)}-${fmt(endKey, true)}`
+    : `${fmt(startKey, true)} - ${fmt(endKey, true)}`;
+}
 
 /**
  * "Next open times" bar: a Short/Long toggle, an optional customer/address box
- * (with contact lookup), and tap-to-book spaced suggestions.
+ * (with contact lookup), and a dropdown per day (the weekend shares one) of up to five
+ * spread-out times, each opening the booking form. Follows the week on screen through the
+ * schedule's `?weekStart=` or `?day=` param.
  * @returns The find-times bar element.
  */
 export function ScheduleFindTimes(): React.ReactElement {
+  // The week and day views update these with replaceState, which useSearchParams sees.
+  const searchParams = useSearchParams();
+  const dayParam = searchParams.get("day");
+  const weekParam = searchParams.get("weekStart");
+  const todayKey = nzTodayKey();
+  const thisWeekKey = mondayOf(todayKey);
+  const weekStartKey =
+    dayParam && DATE_KEY_RE.test(dayParam)
+      ? mondayOf(dayParam)
+      : weekParam && DATE_KEY_RE.test(weekParam)
+        ? mondayOf(weekParam)
+        : thisWeekKey;
+  const weekEndKey = addDaysToDateKey(weekStartKey, 6);
+  const isThisWeek = weekStartKey === thisWeekKey;
+  const weekOver = weekEndKey < todayKey;
+
   const [duration, setDuration] = useState<"short" | "long">("short");
   const [address, setAddress] = useState("");
   const [debouncedAddress, setDebouncedAddress] = useState("");
   const [contacts, setContacts] = useState<ContactSuggestion[] | null>(null);
   const [contactsOpen, setContactsOpen] = useState(false);
 
-  const [slots, setSlots] = useState<SuggestedSlot[] | null>(null);
+  const [days, setDays] = useState<SuggestedDay[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Bumped after a booking closes so the freshly-taken slot drops off the list.
@@ -75,36 +196,42 @@ export function ScheduleFindTimes(): React.ReactElement {
 
   useEffect(() => {
     let cancelled = false;
-    /** Loads the next spaced open times for the current job length + address. */
+    /** Loads spaced open times in the week on screen for the current job length + address. */
     async function load(): Promise<void> {
-      setLoading(true);
       setError(null);
+      if (weekOver) {
+        setDays([]);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
       try {
         const res = await fetch("/api/admin/schedule/suggest-times", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             duration,
-            limit: SLOT_COUNT,
+            fromDateKey: weekStartKey,
+            toDateKey: weekEndKey,
             address: debouncedAddress || undefined,
           }),
         });
         const data = (await res.json().catch(() => ({}))) as {
-          slots?: SuggestedSlot[];
+          days?: SuggestedDay[];
           error?: string;
         };
         if (cancelled) return;
         if (!res.ok) {
           setError(data.error ?? "Couldn't load times.");
-          setSlots(null);
+          setDays(null);
         } else {
-          setSlots(data.slots ?? []);
+          setDays(data.days ?? []);
         }
       } catch (err) {
         console.error("[ScheduleFindTimes] request failed", err);
         if (!cancelled) {
           setError("Network error.");
-          setSlots(null);
+          setDays(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -114,7 +241,7 @@ export function ScheduleFindTimes(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [duration, reloadKey, debouncedAddress]);
+  }, [duration, reloadKey, debouncedAddress, weekStartKey, weekEndKey, weekOver]);
 
   /** Loads contacts once (lazily, on first focus) so the address box can autofill. */
   async function loadContacts(): Promise<void> {
@@ -140,7 +267,11 @@ export function ScheduleFindTimes(): React.ReactElement {
   return (
     <Card padding="sm" className="mb-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="text-sm font-bold text-admin-text">Next open times</span>
+        <span className="text-sm font-bold text-admin-text">
+          {isThisWeek
+            ? "Next open times"
+            : `Open times ${weekRangeLabel(weekStartKey, weekEndKey)}`}
+        </span>
 
         <div className={SEGMENTED_GROUP_CLS}>
           {(["short", "long"] as const).map((d) => (
@@ -195,36 +326,53 @@ export function ScheduleFindTimes(): React.ReactElement {
         <div className="flex basis-full flex-wrap items-center gap-1.5 sm:flex-1 sm:basis-auto">
           {loading && <span className="text-sm text-admin-muted">Finding...</span>}
           {!loading && error && <span className="text-sm text-red-600">{error}</span>}
-          {!loading && !error && slots?.length === 0 && (
+          {!loading && !error && days?.length === 0 && (
             <span className="text-sm text-admin-muted">
-              {debouncedAddress
-                ? "No times that fit the drive."
-                : "No openings in the next few weeks."}
+              {weekOver
+                ? "That week is over."
+                : debouncedAddress
+                  ? "No times that fit the drive."
+                  : isThisWeek
+                    ? "No openings left this week."
+                    : "No openings that week."}
             </span>
           )}
+          {/* Picking a time opens the booking form; the select itself stays on the day. */}
           {!loading &&
             !error &&
-            slots?.map((slot) => (
-              <button
-                key={slot.startIso}
-                type="button"
-                onClick={() => {
-                  setBookingDurationMin(duration === "long" ? 120 : 60);
-                  setBookingSlotIso(slot.startIso);
-                }}
-                title={
-                  slot.driveNote ? `${slot.driveNote} from your previous job` : "Book this time"
-                }
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-russian-violet/10 px-3 py-1 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20 pointer-coarse:min-h-11"
-              >
-                {slot.dayLabel} · {slot.timeLabel}
-                {slot.driveNote && (
-                  <span className="text-sm font-normal text-russian-violet/80">
-                    ({slot.driveNote})
-                  </span>
-                )}
-              </button>
-            ))}
+            groupDays(days ?? []).map((group) => {
+              const label = group.days.length > 1 ? "Weekend" : group.days[0]!.dayLabel;
+              return (
+                <AdminSelect
+                  key={group.key}
+                  value=""
+                  aria-label={`Open times, ${label}`}
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    setBookingDurationMin(duration === "long" ? 120 : 60);
+                    setBookingSlotIso(e.target.value);
+                  }}
+                  className="h-10 w-auto px-2 font-semibold"
+                >
+                  <option value="">{label}</option>
+                  {group.days.length > 1
+                    ? group.days.map((day) => (
+                        <optgroup key={day.dateKey} label={day.dayLabel}>
+                          {day.slots.map((slot) => (
+                            <option key={slot.startIso} value={slot.startIso}>
+                              {slotOptionLabel(slot)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))
+                    : group.days[0]!.slots.map((slot) => (
+                        <option key={slot.startIso} value={slot.startIso}>
+                          {slotOptionLabel(slot)}
+                        </option>
+                      ))}
+                </AdminSelect>
+              );
+            })}
         </div>
       </div>
 

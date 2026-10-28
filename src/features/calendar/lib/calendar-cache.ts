@@ -116,11 +116,13 @@ export async function recomputeTravelBlock(blockId: string): Promise<RecomputedT
 
 /**
  * Origin for an event's travel-to leg: the nearest located event ending within the
- * lookahead before it, else homeAddress.
+ * lookahead before it, else homeAddress. Home too when that nearest event is on
+ * `homeFirstCalendarId` (a job after a personal event starts from home).
  * @param allEvents - All calendar events in the current window.
  * @param targetEvent - The event being travelled to.
  * @param homeAddress - Fallback home address.
  * @param lookaheadHours - How far back to look for a preceding event (scheduling.smartOriginLookaheadHours).
+ * @param homeFirstCalendarId - Calendar whose events are always left for home first, if any.
  * @returns The best origin address to use.
  */
 function findSmartOrigin(
@@ -128,10 +130,12 @@ function findSmartOrigin(
   targetEvent: CalendarEvent,
   homeAddress: string,
   lookaheadHours: number,
+  homeFirstCalendarId?: string,
 ): string {
   const targetStart = new Date(targetEvent.start).getTime();
   const lookaheadMs = lookaheadHours * 60 * 60 * 1000;
 
+  let best: CalendarEvent | null = null;
   let bestOrigin: string | null = null;
   let bestGap = Infinity;
 
@@ -142,11 +146,13 @@ function findSmartOrigin(
     const endMs = new Date(e.end).getTime();
     const gap = targetStart - endMs;
     if (gap >= 0 && gap < lookaheadMs && gap < bestGap) {
+      best = e;
       bestOrigin = loc;
       bestGap = gap;
     }
   }
 
+  if (homeFirstCalendarId && best?.calendarEmail === homeFirstCalendarId) return homeAddress;
   return bestOrigin ?? homeAddress;
 }
 
@@ -299,6 +305,7 @@ export async function refreshCalendarCache(options?: {
   }
 
   const bookingCalId = getBookingCalendarId();
+  const personalCalId = process.env.PERSONAL_CALENDAR_ID ?? "";
   const isDev = process.env.NODE_ENV === "development";
 
   if (isDev) {
@@ -389,16 +396,19 @@ export async function refreshCalendarCache(options?: {
 
     // Booking events get a wind-down buffer before departure on the way back.
     const isBookingEvent = event.calendarEmail === bookingCalId;
+    const isPersonalEvent = Boolean(personalCalId) && event.calendarEmail === personalCalId;
     const departureForBack = isBookingEvent
       ? new Date(eventEnd.getTime() + scheduling.travelBackDepartureBufferMin * 60 * 1000)
       : eventEnd;
 
-    // Origin: the preceding event's location within the lookahead, else home.
+    // Origin: the preceding event's location within the lookahead, else home. After a
+    // personal event you go home before a job, so a job's origin is home then.
     const detectedOrigin = findSmartOrigin(
       timedEvents,
       event,
       homeAddress,
       scheduling.smartOriginLookaheadHours,
+      isBookingEvent ? personalCalId : undefined,
     );
     // customOrigin (user override) takes precedence over auto-detection
     const effectiveOrigin = existing?.customOrigin ?? detectedOrigin;
@@ -409,9 +419,12 @@ export async function refreshCalendarCache(options?: {
 
     // Chaining candidate, stored on the block so later runs see it move. Skipped with a
     // custom back destination.
-    const chained = hasCustomBackDestination
+    const nextEvent = hasCustomBackDestination
       ? null
       : findNextChainedEvent(timedEvents, event, departureForBack, new Set<string>());
+    // A personal event never chains into a job: the trip home always stands.
+    const chained =
+      isPersonalEvent && nextEvent?.event.calendarEmail === bookingCalId ? null : nextEvent;
     const currentChainedId = chained?.event.id ?? null;
     const currentChainedStart = chained?.startAt ?? null;
 

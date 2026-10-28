@@ -3,7 +3,11 @@
 // Editor for the advanced scheduling group: the calendar travel engine's travel-block
 // heuristics. Marked advanced - the defaults rarely need changing.
 
-import { NumberField, SettingsTabBody } from "@/features/admin/components/settings/SettingsFields";
+import {
+  HourField,
+  NumberField,
+  SettingsTabBody,
+} from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
@@ -39,8 +43,9 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
     <SettingsTabBody changed={form.changedPaths}>
       <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
         <p className="text-sm text-amber-800">
-          Advanced. These tune the calendar travel-block engine. The defaults work well - only
-          change them if you know you need to, and use &quot;Reset to defaults&quot; if unsure.
+          Advanced. These tune the calendar travel-block engine and the schedule&apos;s suggested
+          times. The defaults work well - only change them if you know you need to, and use
+          &quot;Reset to defaults&quot; if unsure.
         </p>
       </div>
       <div className="divide-y divide-admin-border">
@@ -82,15 +87,37 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
           customised={draft.smartOriginLookaheadHours !== defaults.smartOriginLookaheadHours}
           onChange={(v) => set({ smartOriginLookaheadHours: v ?? 0 })}
         />
-        <NumberField
+        <HourField
           id="travelQuoteHour"
           meta={m.travelQuoteHour}
           value={draft.travelQuoteHour}
-          min={0}
-          max={23}
+          from={0}
+          to={23}
           error={fieldErrors.travelQuoteHour}
           customised={draft.travelQuoteHour !== defaults.travelQuoteHour}
-          onChange={(v) => set({ travelQuoteHour: v ?? 0 })}
+          onChange={(h) => set({ travelQuoteHour: h ?? defaults.travelQuoteHour })}
+        />
+        <HourField
+          id="suggestEndHour"
+          meta={m.suggestEndHour}
+          value={draft.suggestEndHour}
+          from={1}
+          to={24}
+          close
+          error={fieldErrors.suggestEndHour}
+          customised={draft.suggestEndHour !== defaults.suggestEndHour}
+          onChange={(h) => set({ suggestEndHour: h ?? defaults.suggestEndHour })}
+        />
+        <HourField
+          id="suggestWeekendEndHour"
+          meta={m.suggestWeekendEndHour}
+          value={draft.suggestWeekendEndHour}
+          from={1}
+          to={24}
+          close
+          error={fieldErrors.suggestWeekendEndHour}
+          customised={draft.suggestWeekendEndHour !== defaults.suggestWeekendEndHour}
+          onChange={(h) => set({ suggestWeekendEndHour: h ?? defaults.suggestWeekendEndHour })}
         />
         <NumberField
           id="pastEditLockHours"

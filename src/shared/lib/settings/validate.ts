@@ -667,6 +667,10 @@ function validateScheduling(s: SchedulingSettings): FieldError[] {
     errors.push({ field: "pastEditLockHours", message: "Must be 0-720 hours." });
   if (!inRange(s.travelQuoteHour, 0, 23))
     errors.push({ field: "travelQuoteHour", message: "Must be an hour 0-23." });
+  if (!inRange(s.suggestEndHour, 1, 24))
+    errors.push({ field: "suggestEndHour", message: "Must be an hour 1-24." });
+  if (!inRange(s.suggestWeekendEndHour, 1, 24))
+    errors.push({ field: "suggestWeekendEndHour", message: "Must be an hour 1-24." });
   return errors;
 }
 

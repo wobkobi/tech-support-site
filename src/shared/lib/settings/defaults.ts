@@ -255,6 +255,8 @@ export const DEFAULT_SETTINGS: Settings = {
     smartOriginLookaheadHours: 4,
     pastEditLockHours: 18,
     travelQuoteHour: 14,
+    suggestEndHour: 18,
+    suggestWeekendEndHour: 17,
   },
 
   // Source: page.tsx getApprovedReviews (take 20) + reviews POST + review-ask-run.server.ts.

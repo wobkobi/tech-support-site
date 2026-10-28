@@ -6,6 +6,7 @@
 import { AvailabilityPreview } from "@/features/admin/components/settings/AvailabilityPreview";
 import {
   FieldShell,
+  HourField,
   HourSelect,
   NumberField,
   SettingsTabBody,
@@ -22,7 +23,6 @@ import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
-import { hourLabel } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
 import { AVAILABILITY_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { AvailabilitySettings, DayWindow, MorningGuard } from "@/shared/lib/settings/types";
@@ -280,28 +280,17 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
             customised={draft.minHoursNotice !== defaults.minHoursNotice}
             onChange={(v) => setTop({ minHoursNotice: v ?? 0 })}
           />
-          <FieldShell
+          <HourField
             id="sameDayCutoffHour"
             meta={m.sameDayCutoffHour}
+            value={draft.sameDayCutoffHour}
+            from={0}
+            to={23}
+            noneLabel="No cutoff"
             error={fieldErrors.sameDayCutoffHour}
             customised={draft.sameDayCutoffHour !== defaults.sameDayCutoffHour}
-          >
-            <AdminSelect
-              id="sameDayCutoffHour"
-              value={draft.sameDayCutoffHour ?? ""}
-              onChange={(e) =>
-                setTop({ sameDayCutoffHour: e.target.value === "" ? null : Number(e.target.value) })
-              }
-              className="w-auto"
-            >
-              <option value="">No cutoff</option>
-              {Array.from({ length: 24 }, (_, h) => (
-                <option key={h} value={h}>
-                  {hourLabel(h)}
-                </option>
-              ))}
-            </AdminSelect>
-          </FieldShell>
+            onChange={(h) => setTop({ sameDayCutoffHour: h })}
+          />
           <NumberField
             id="bufferMin"
             meta={m.bufferMin}
