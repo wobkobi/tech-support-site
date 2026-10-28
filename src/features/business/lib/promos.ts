@@ -862,7 +862,7 @@ export function promoTravelFactor(promo: ActivePromo | null): number {
 /**
  * The rate a modified job actually bills at under a promo, mirroring the engine. A "delta"
  * is discounted directly ($40 at 15% off = $34); an "uplift" adds to the promo, both on full
- * labour (base + 25% - 15%, not the uplifted rate x 0.85).
+ * labour (base + $25 - 15%, not the surcharged rate x 0.85).
  * @param baseRate - The undiscounted hourly rate.
  * @param modifierRate - The modifier's rate before any promo.
  * @param kind - Whether the modifier changes the rate or adds a surcharge.

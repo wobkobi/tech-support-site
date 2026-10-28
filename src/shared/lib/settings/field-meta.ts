@@ -31,7 +31,8 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
   },
   pricing: {
     title: "Pricing & cancellation",
-    blurb: "Cancellation policy, minimum charges, public-holiday surcharge, and GST status.",
+    blurb:
+      "Cancellation policy, minimum charges, holiday, weekend and after-hours surcharges, and GST status.",
   },
   estimator: {
     title: "Price estimator",
@@ -367,9 +368,14 @@ export const IDENTITY_FIELD_META = {
   },
   phoneTel: {
     title: "Phone (tel: link)",
-    description: "Phone for click-to-call links, e.g. tel:+64212971237.",
+    description:
+      "Phone for click-to-call links and your Google Business Profile, e.g. tel:+64212971237.",
   },
-  website: { title: "Website", description: "Public website, no scheme (e.g. tothepoint.co.nz)." },
+  website: {
+    title: "Website",
+    description:
+      "Public website, no scheme (e.g. tothepoint.co.nz). Also set on your Google Business Profile.",
+  },
   location: {
     title: "Location",
     description: "Locality shown in email signatures (e.g. Auckland, New Zealand).",
@@ -432,7 +438,7 @@ export const IDENTITY_FIELD_META = {
   publishedHours: {
     title: "Published hours",
     description:
-      "The hours Google and other search engines are told you are open. Does not change what the booking form offers, so you can advertise a tidy window and still take later bookings.",
+      "The hours your Google Business Profile and other search engines show. Saving updates the Google profile. Does not change what the booking form offers, so you can advertise a tidy window and still take later bookings.",
     off: "Off = publish each day's real bookable hours from the Availability tab.",
   },
   emailSignature: {
@@ -622,19 +628,25 @@ export const PRICING_FIELD_META = {
       "Ceiling on the time a single job can bill. Catches a mistyped time range before it reaches an invoice.",
     unit: "minutes",
   },
-  publicHolidayUplift: {
+  publicHolidayPerHour: {
     title: "Public-holiday surcharge",
     description:
-      "Extra added to labour on every NZ public holiday (Auckland Anniversary Day included), plus Christmas Eve and New Year's Eve (25 = +25%), worked out on the full hourly rate. A public holiday on a weekend is charged on the weekday it's observed instead. Travel and parts are unchanged.",
-    unit: "%",
+      "Dollars an hour added to labour on every NZ public holiday (Auckland Anniversary Day included), plus Christmas Eve and New Year's Eve. The same amount on every rate (on-site, remote, bench, business). A public holiday on a weekend is charged on the weekday it's observed instead. Travel and parts are unchanged.",
+    unit: "$/hr",
     off: "Set 0 to charge normal rates on public holidays.",
   },
-  weekendUplift: {
-    title: "Weekend surcharge",
+  weekendPerHour: {
+    title: "Weekend and evening surcharge",
     description:
-      "Extra added to labour on Saturdays and Sundays (10 = +10%), worked out on the full hourly rate, and on a weekday job when you tick after-hours rates in the calculator. A public holiday on a weekend bills this; its holiday surcharge moves to the weekday it's observed. Christmas Eve and New Year's Eve take the public-holiday surcharge instead. Travel and parts are unchanged.",
-    unit: "%",
-    off: "Set 0 to charge normal rates at weekends.",
+      "Dollars an hour added to labour on Saturdays and Sundays, the same amount on every rate (on-site, remote, bench, business). Weekday jobs starting from the After hours from time below bill it too, as do any you tick after-hours rates on in the calculator. A public holiday on a weekend bills this; its holiday surcharge moves to the weekday it's observed. Christmas Eve and New Year's Eve take the public-holiday surcharge instead. Travel and parts are unchanged.",
+    unit: "$/hr",
+    off: "Set 0 to charge normal rates at weekends and after hours.",
+  },
+  afterHoursFromHour: {
+    title: "After hours from",
+    description:
+      "A weekday job starting at this time or later bills the weekend surcharge as after-hours rates. The calculator and Quick price tick it for you, and you can untick it to waive it. On the booking page, weekday times from it stay hidden until the customer ticks Show evening times, which states the rate. Weekends and public holidays keep their own rate, and travel and parts are unchanged. The pricing page and FAQ say so too.",
+    off: "Choose Off to add after-hours rates only when you tick them.",
   },
   minTravelCharge: {
     title: "Minimum travel charge",

@@ -94,7 +94,7 @@ export default async function CalculatorPage({
     minBillableMins: policy.MIN_BILLABLE_MINS,
     unsuccessfulFactor: policy.UNSUCCESSFUL_WORK_FACTOR,
     mergeSuggestGapMins: policy.MERGE_SUGGEST_GAP_MINS,
-    weekendUplift: policy.WEEKEND_UPLIFT,
+    weekendPerHour: policy.WEEKEND_PER_HOUR,
     taskTiming: {
       snapMins: policy.BILLING_INCREMENT_MINS,
       shortTaskMins: policy.SHORT_TASK_MINS,

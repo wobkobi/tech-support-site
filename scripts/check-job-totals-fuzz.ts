@@ -166,9 +166,9 @@ const PROMOS: (JobPromo | null)[] = [
 
 const SURCHARGES: (LabourSurcharge | null)[] = [
   null,
-  { label: "Weekend surcharge", uplift: 0.1 },
-  { label: "Public holiday surcharge", uplift: 0.25 },
-  { label: "After-hours surcharge", uplift: 0.125 },
+  { label: "Weekend surcharge", perHour: 10 },
+  { label: "Public holiday surcharge", perHour: 25 },
+  { label: "After-hours surcharge", perHour: 12.5 },
 ];
 
 const MINUTES = [
@@ -343,7 +343,7 @@ function main(): void {
       gstRegistered: rand() < 0.5,
       minTravelCharge: 10,
       minBillableMins: 15,
-      surchargeUplift: surcharge?.uplift ?? 0,
+      surchargePerHour: surcharge?.perHour ?? 0,
       unsuccessfulFactor: 0.5,
       businessModifierId: "biz",
       standardRate: 100,
@@ -351,7 +351,7 @@ function main(): void {
       goldCardPercent: rand() < 0.2 ? 0.1 : 0,
     };
     const calc = calcJobTotal(job, promo, pricing);
-    const label = `job ${n} (promo ${JSON.stringify(promo)}, surcharge ${surcharge?.uplift ?? 0}, gold ${pricing.goldCardPercent}, tasks ${JSON.stringify(tasks.map((t) => [t.minutes ?? "flat", t.unitPrice, t.modifierIds, !!t.unsuccessful]))}, parts ${JSON.stringify(job.parts.map((p) => p.cost))}, travel ${JSON.stringify(job.travelEntries.map((e) => e.cost))}, job unsuccessful ${job.unsuccessful})`;
+    const label = `job ${n} (promo ${JSON.stringify(promo)}, surcharge ${surcharge?.perHour ?? 0}, gold ${pricing.goldCardPercent}, tasks ${JSON.stringify(tasks.map((t) => [t.minutes ?? "flat", t.unitPrice, t.modifierIds, !!t.unsuccessful]))}, parts ${JSON.stringify(job.parts.map((p) => p.cost))}, travel ${JSON.stringify(job.travelEntries.map((e) => e.cost))}, job unsuccessful ${job.unsuccessful})`;
 
     // The saved invoice: its lines, re-totalled with the discounts the save sends.
     const lines = withSplitLineTotals(
@@ -434,14 +434,16 @@ function main(): void {
      * @returns True when it carries the Business modifier.
      */
     const isBiz = (i: number): boolean => (tasks[i]!.modifierIds ?? []).includes("biz");
+    // The flat $/hr rides on every paid hourly line's billed minutes; credit and free lines skip it.
+    const paidMins = taskLines.reduce(
+      (s, l) => (l.minutes != null && l.lineTotal > 0 ? s + l.minutes : s),
+      0,
+    );
     const surchargeCents = surcharge
-      ? shareCents(
-          labourCents(() => true),
-          surcharge.uplift,
-        )
+      ? Math.floor((2 * paidMins * Math.round(surcharge.perHour * 100) + 60) / 120)
       : 0;
     check(
-      "the surcharge is its share of the labour lines, an exact half cent rounding up",
+      "the surcharge is its $/hr on the paid labour minutes, an exact half cent rounding up",
       Math.round(calc.surchargeTotal * 100) === surchargeCents,
       () => `${label}\n        surcharge ${calc.surchargeTotal}, expected ${surchargeCents / 100}`,
     );

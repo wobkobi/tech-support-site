@@ -1,16 +1,22 @@
 // src/features/social/lib/google-business.ts
 // Publishes to and deletes from the Google Business Profile via the v4 localPosts API, using the
 // shared Google OAuth refresh token with the business.manage scope, checks which of its APIs
-// answer for the permissions grid, reads the profile's daily figures for Analytics, and reads and
-// answers its reviews for the Inbox.
+// answer for the permissions grid, reads the profile's daily figures for Analytics, reads and
+// answers its reviews for the Inbox, and keeps its phone, website and hours in step with Settings.
 
 import { withRetry } from "@/features/business/lib/google-retry";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import type { PlatformAdapter, PublishInput, PublishResult } from "@/features/social/lib/adapter";
 import { googlePostBody } from "@/features/social/lib/google-post";
+import {
+  profileChanges,
+  type ProfileDetails,
+  type ProfileSyncResult,
+} from "@/features/social/lib/google-profile";
 import type { GoogleReview } from "@/features/social/lib/inbox/map";
 import type { DailyMetricsAnswer } from "@/features/social/lib/insights/metrics";
 import type { GoogleProbe, ProbeResult } from "@/features/social/lib/permissions";
+import type { Settings } from "@/shared/lib/settings/types";
 import { addDaysToDateKey, dateKeyParts, nzDateKey } from "@/shared/lib/timezone-utils";
 
 const V4_BASE = "https://mybusiness.googleapis.com/v4";
@@ -86,12 +92,12 @@ function toGoogleError(error: unknown, api = "Google My Business API"): Error {
  * Calls a Business Profile endpoint with the shared OAuth client.
  * @param url - Full URL.
  * @param method - HTTP method.
- * @param data - JSON body, for POST and PUT.
+ * @param data - JSON body, for POST, PUT and PATCH.
  * @returns The parsed response body.
  */
 async function call<T>(
   url: string,
-  method: "GET" | "POST" | "PUT" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   data?: unknown,
 ): Promise<T> {
   const res = await getOAuth2Client().request<T>({ url, method, data, timeout: 20_000 });
@@ -331,3 +337,33 @@ export const google: PlatformAdapter = {
     }
   },
 };
+
+/**
+ * Brings the profile's phone number, website and opening hours in step with Settings: reads
+ * them, then writes only the fields that differ, so a save that changes none costs one read.
+ * Never throws, so a Google failure can't undo the Settings save that called it.
+ * @param settings - Settings as just saved.
+ * @returns What changed, or why nothing could.
+ */
+export async function syncProfileDetails(settings: Settings): Promise<ProfileSyncResult> {
+  if (google.missingEnv().length > 0) return { status: "not-connected" };
+  const api = "My Business Business Information API";
+  try {
+    const { locationId } = googleConfig();
+    const url = `${INFO_BASE}/locations/${locationId}`;
+    const current = await withRetry(
+      () => call<ProfileDetails>(`${url}?readMask=phoneNumbers,websiteUri,regularHours`, "GET"),
+      { label: "gbp" },
+    );
+    const changes = profileChanges(settings, current);
+    if (changes.mask.length === 0) return { status: "unchanged" };
+    // A PATCH with the same body lands the same way twice, so a retry is safe.
+    await withRetry(
+      () => call(`${url}?updateMask=${changes.mask.join(",")}`, "PATCH", changes.body),
+      { label: "gbp" },
+    );
+    return { status: "updated", fields: changes.labels };
+  } catch (error) {
+    return { status: "failed", error: toGoogleError(error, api).message };
+  }
+}

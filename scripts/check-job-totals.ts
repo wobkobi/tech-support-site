@@ -75,7 +75,7 @@ const PERCENT_12_5: JobPromo = {
   lockedDeltas: undefined,
 };
 
-const WEEKEND: LabourSurcharge = { label: "Weekend surcharge", uplift: 0.1 };
+const WEEKEND: LabourSurcharge = { label: "Weekend surcharge", perHour: 10 };
 
 /**
  * Builds an hourly task line the way the calculator does after a typed time.
@@ -161,7 +161,7 @@ function price(
     gstRegistered: false,
     minTravelCharge: 10,
     minBillableMins: 15,
-    surchargeUplift: surcharge?.uplift ?? 0,
+    surchargePerHour: surcharge?.perHour ?? 0,
     unsuccessfulFactor: 0.5,
     businessModifierId: "biz",
     standardRate,
@@ -227,9 +227,9 @@ function main(): void {
     { surcharge: WEEKEND },
   );
   expectEqual(
-    "labour netting below $0 takes no surcharge on either path",
+    "a credit line takes no surcharge, the paid line beside it still does",
     [negLabour.calc.surchargeTotal, negLabour.calc.subtotal, negLabour.invoice.subtotal],
-    [0, 150, 150],
+    [10, 160, 160],
   );
   const subCent = price(
     job(

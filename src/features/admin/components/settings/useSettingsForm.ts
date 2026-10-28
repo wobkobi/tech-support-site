@@ -4,6 +4,7 @@
 // `/api/admin/settings/[group]` (400 field errors, 409 warnings, 422 blocks).
 
 import { useUnsavedChangesWarning } from "@/features/admin/hooks/use-unsaved-changes-warning";
+import type { ProfileSyncResult } from "@/features/social/lib/google-profile";
 import type { Settings, SettingsGroup } from "@/shared/lib/settings/types";
 import { checkGuardrails, type FieldError } from "@/shared/lib/settings/validate";
 import type React from "react";
@@ -66,6 +67,8 @@ export interface SettingsFormApi<G extends SettingsGroup> {
   warns: string[];
   /** Epoch ms of the last successful save, or null. */
   savedAt: number | null;
+  /** What the last save did to the Google Business Profile; null for groups it doesn't read. */
+  google: ProfileSyncResult | null;
   /** Saves the draft. Pass true to confirm past WARN-level guardrails. */
   save: (confirmWarnings?: boolean) => Promise<boolean>;
   /** Resets the draft back to the supplied defaults (does not save). */
@@ -92,6 +95,7 @@ export function useSettingsForm<G extends SettingsGroup>(
   const [serverBlocks, setServerBlocks] = useState<string[]>([]);
   const [serverWarns, setServerWarns] = useState<string[]>([]);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [google, setGoogle] = useState<ProfileSyncResult | null>(null);
 
   // Live cross-setting guardrails: the save route's own check, run as the operator types.
   const store = useContext(SettingsAllContext);
@@ -131,6 +135,7 @@ export function useSettingsForm<G extends SettingsGroup>(
       setSaving(true);
       setFieldErrors({});
       setServerBlocks([]);
+      setGoogle(null);
       if (!confirmWarnings) setServerWarns([]);
       try {
         const res = await fetch(`/api/admin/settings/${group}`, {
@@ -140,6 +145,10 @@ export function useSettingsForm<G extends SettingsGroup>(
           body: JSON.stringify({ value: draft, confirmWarnings }),
         });
         if (res.ok) {
+          const saved = (await res.json().catch(() => ({}))) as {
+            google?: ProfileSyncResult | null;
+          };
+          setGoogle(saved.google ?? null);
           setSavedAt(Date.now());
           setServerWarns([]);
           setBaseline(draft);
@@ -187,6 +196,7 @@ export function useSettingsForm<G extends SettingsGroup>(
     blocks,
     warns,
     savedAt,
+    google,
     save,
     resetToDefault,
   };

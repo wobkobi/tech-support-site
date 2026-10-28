@@ -27,6 +27,7 @@ import {
   dateKeyParts,
   nzDateKey,
   nzMidnightUtc,
+  nzMinuteOfDay,
   nzNowTime,
   nzWallClockUtc,
   nzWeekday,
@@ -266,10 +267,17 @@ export default async function QuickPricePage({
         key={prefill?.eventId ?? "blank"}
         rates={rates}
         promo={promo}
-        surcharge={dateSurcharge(holiday?.name ?? null, nzWeekday(jobStart), {
-          publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT,
-          weekendUplift: policy.WEEKEND_UPLIFT,
-        })}
+        surcharge={dateSurcharge(
+          holiday?.name ?? null,
+          nzWeekday(jobStart),
+          {
+            publicHolidayPerHour: policy.PUBLIC_HOLIDAY_PER_HOUR,
+            weekendPerHour: policy.WEEKEND_PER_HOUR,
+            afterHoursFromHour: policy.AFTER_HOURS_FROM_HOUR,
+          },
+          // A blank form prices at now, which says nothing about when the job started.
+          matched || slot ? nzMinuteOfDay(jobStart) : null,
+        )}
         bankAccount={identity.bankAccount}
         initialEnd={nzNowTime()}
         events={events}
@@ -281,7 +289,7 @@ export default async function QuickPricePage({
           minBillableMins: policy.MIN_BILLABLE_MINS,
           billingIncrementMins: policy.BILLING_INCREMENT_MINS,
           unsuccessfulFactor: policy.UNSUCCESSFUL_WORK_FACTOR,
-          weekendUplift: policy.WEEKEND_UPLIFT,
+          weekendPerHour: policy.WEEKEND_PER_HOUR,
         }}
       />
     </>

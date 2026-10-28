@@ -26,7 +26,7 @@ import { PageHead } from "@/shared/components/PageHead";
 import { PageShell } from "@/shared/components/PageLayout";
 import { PromoPrice } from "@/shared/components/PromoPrice";
 import { renderEmphasised } from "@/shared/components/renderEmphasised";
-import { Section, TEXT_LINK } from "@/shared/components/Section";
+import { Section, SectionHeading, TEXT_LINK } from "@/shared/components/Section";
 import { jsonLdHtml } from "@/shared/lib/json-ld";
 import { roundCents } from "@/shared/lib/money";
 import { pageOpenGraph } from "@/shared/lib/open-graph";
@@ -49,7 +49,17 @@ export const metadata: Metadata = {
 // Rate and settings edits purge via cache tags; the daily timer is a fallback.
 export const revalidate = 86400;
 
+/** The page's question sections, in order. */
+const FAQ_GROUPS = [
+  { id: "visits", title: "Visits and remote help" },
+  { id: "prices", title: "Prices and paying" },
+  { id: "booking", title: "Booking and cancelling" },
+  { id: "problems", title: "If something goes wrong" },
+] as const;
+
 interface FaqItem {
+  /** Which of {@link FAQ_GROUPS} the question sits under. */
+  group: (typeof FAQ_GROUPS)[number]["id"];
   question: string;
   answer: React.ReactNode;
   /** Plain-text answer for FAQPage JSON-LD (search engines need text, not React nodes). */
@@ -87,11 +97,12 @@ export default async function FaqPage(): Promise<React.ReactElement> {
   const displayMinTravel = roundCents(policy.MIN_TRAVEL_CHARGE * travelFactor);
   const rateDiscounted = displayRate !== pricing.baseRate;
   const travelDiscounted = travelFactor < 1;
-  // Worked out on the full rate, which no promo discounts; empty when both surcharges are off.
-  const surchargeText = surchargeCaveat(
-    { weekendUplift: policy.WEEKEND_UPLIFT, publicHolidayUplift: policy.PUBLIC_HOLIDAY_UPLIFT },
-    pricing.baseRate,
-  );
+  // Flat $/hr, which no promo discounts; empty when both surcharges are off.
+  const surchargeText = surchargeCaveat({
+    weekendPerHour: policy.WEEKEND_PER_HOUR,
+    publicHolidayPerHour: policy.PUBLIC_HOLIDAY_PER_HOUR,
+    afterHoursFromHour: policy.AFTER_HOURS_FROM_HOUR,
+  });
   const surchargeSentence = surchargeText ? ` ${surchargeText}` : "";
   const paymentTermsDays = settings.identity.paymentTermsDays;
   const cancellationText = cancellationCopy(policy.CANCELLATION);
@@ -107,6 +118,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
 
   const faqItems: ReadonlyArray<FaqItem> = [
     {
+      group: "visits",
       question: "What areas of Auckland do you cover?",
       plainAnswer:
         "I work across the wider Auckland area, from Central out to the Inner West, North Shore, East and South. For most addresses I can come to you. Not sure if you're in range? Send a message with your suburb and I'll confirm.",
@@ -124,14 +136,16 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
+      group: "visits",
       question: "Do you offer remote support?",
       plainAnswer:
-        "Yes. A lot of software, account, and setup issues can be sorted remotely once you've given me access. If it turns out the problem really needs hands on a Wi-Fi router, printer, or cable, we can swap to an on-site visit instead.",
+        "Yes. A lot of software, account, and setup issues can be sorted remotely once you've given me access, or talked through over the phone. Both bill at the cheaper remote rate with no travel. If it turns out the problem really needs hands on a Wi-Fi router, printer, or cable, we can swap to an on-site visit instead.",
       answer: (
         <>
           <p>
             Yes - a lot of software, account, and setup work can be done remotely once you've given
-            me access, which usually means a faster turnaround and a lower bill.
+            me access, or talked through over the phone. Both bill at the cheaper remote rate with
+            no travel, which usually means a faster turnaround and a lower bill.
           </p>
           <p className="mt-2 text-rich-black/80">
             If it turns out the issue really needs hands on a router, printer, or cable, we can
@@ -141,6 +155,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
+      group: "visits",
       question: "Is remote access safe?",
       plainAnswer:
         "Yes - you stay in control the whole time. A remote session only happens at a time we've arranged: you let me in, you can watch everything I do on your screen, and you can end the session at any moment. When the session ends, so does my access - I cannot connect to your computer without you. And if anyone rings you out of the blue claiming to be tech support and asking for remote access, that's a scam: hang up. I only ever connect at a time you've booked with me.",
@@ -161,6 +176,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
+      group: "visits",
       question: "What devices and systems do you work with?",
       plainAnswer:
         "Pretty much anything you'd find in a home or small office: Windows and Mac computers, iPhones and Android phones, iPads and tablets, printers, smart TVs, routers and mesh Wi-Fi, smart home gear, and more. If you have something unusual, mention the model and I'll let you know whether I can help.",
@@ -180,6 +196,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
+      group: "prices",
       question: "How much does it cost?",
       plainAnswer: `Work is ${formatMoneyCompact(displayRate)}/hr whatever the job - troubleshooting, setup, data recovery, hardware repairs, the lot.${surchargeSentence} On-site visits also include round-trip drive time at ${formatMoneyCompact(displayTravelRate)}/hr (${formatMoneyCompact(displayMinTravel)} minimum). I'll always confirm the expected cost before any work starts so there are no surprises on the bill.`,
       answer: (
@@ -219,6 +236,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
+      group: "prices",
       question: "What if the job takes longer than the estimate?",
       plainAnswer:
         "You'll never be surprised by the bill. I confirm the expected cost before starting, and if the work is heading past it, I pause and check with you before carrying on - you decide whether to continue. A booked time slot isn't a hard cutoff either: if the job needs longer and the calendar allows, I stay until it's sorted. And if it genuinely needs a second visit, the extra trip's travel is on me.",
@@ -238,6 +256,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
+      group: "prices",
       question: "Do you sell hardware or push unnecessary upgrades?",
       plainAnswer: `No. I don't resell hardware and I don't earn commission on anything, so there's no incentive to nudge you towards extras you don't need. The aim is to leave the existing setup working properly. If a replacement part or upgrade genuinely makes sense, I'll lay out the options and the trade-offs and let you decide. If you're not sure what to buy - whether it's a part, a cable, a new device, or any other piece of tech - I can suggest the right thing to get, or pick one up and bring it along, so you don't end up with the wrong product. ${stripEmphasis(partsText)}`,
       answer: (
@@ -260,6 +279,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
+      group: "booking",
       question: "How do I book an appointment?",
       plainAnswer:
         "The fastest way is to book online via the booking page - it shows available days and times. You can also call or email if you'd rather chat first. For anything urgent, a phone call works best because I can usually slot you in sooner.",
@@ -284,6 +304,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
+      group: "booking",
       question: "How do I cancel or reschedule?",
       plainAnswer: `Every booking confirmation email has cancel and reschedule links. Use those, or just reply to the email and I'll sort it. ${stripEmphasis(cancellationText)}`,
       answer: (
@@ -297,6 +318,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
+      group: "booking",
       question: "What if I cancel last-minute?",
       plainAnswer: stripEmphasis(cancellationText),
       answer: (
@@ -310,6 +332,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
+      group: "booking",
       question: "What happens if I miss my appointment?",
       plainAnswer: `${noShow.charge} ${noShow.notice}`,
       answer: (
@@ -320,6 +343,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
+      group: "problems",
       question: "Will my files and photos be safe?",
       plainAnswer:
         "Your files get treated as the most valuable thing on the machine. Before anything risky - work on a failing drive, a hardware repair, a system reinstall - I'll explain the risk and, wherever practical, back up your important files first. Nothing gets deleted without checking with you. One honest caveat: recovery from a drive that's already failing can never be guaranteed - a dying disk can give out even when it's handled carefully. I'll always tell you where you stand before any work starts.",
@@ -340,6 +364,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
+      group: "problems",
       question: "What if you can't fix the problem?",
       plainAnswer: stripEmphasis(unsuccessfulText),
       answer: (
@@ -352,6 +377,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
     ...(policy.WORKMANSHIP_WINDOW_DAYS > 0
       ? [
           {
+            group: "problems" as const,
             question: "What if a problem comes back after your visit?",
             plainAnswer: stripEmphasis(workmanshipText),
             answer: <p className="whitespace-pre-line">{renderEmphasised(workmanshipText)}</p>,
@@ -359,6 +385,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
         ]
       : []),
     {
+      group: "prices",
       question: "How and when do I pay?",
       plainAnswer: `Nothing is due up front. After the job you'll get an itemised invoice by email - work, travel, and any parts. Pay by bank transfer within ${paymentTermsDays} days, or cash on the day if you prefer.`,
       answer: (
@@ -375,23 +402,31 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
+      group: "prices",
       question: "Do I pay GST?",
       plainAnswer: stripEmphasis(gstText),
       answer: <p>{renderEmphasised(gstText)}</p>,
     },
   ];
 
+  const groups = FAQ_GROUPS.map((group) => ({
+    ...group,
+    items: faqItems.filter((item) => item.group === group.id),
+  }));
+
   const faqJsonLd = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
-    mainEntity: faqItems.map((item) => ({
-      "@type": "Question",
-      name: item.question,
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: item.plainAnswer,
-      },
-    })),
+    mainEntity: groups
+      .flatMap((group) => group.items)
+      .map((item) => ({
+        "@type": "Question",
+        name: item.question,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: item.plainAnswer,
+        },
+      })),
   };
 
   return (
@@ -418,16 +453,24 @@ export default async function FaqPage(): Promise<React.ReactElement> {
         }
       />
 
-      {/* One column so the questions read straight down, not left-right then down. */}
-      <Section aria-label="FAQ list">
-        <div className="max-w-180">
-          {faqItems.map((item) => (
-            <Disclosure key={item.question} title={item.question}>
-              {item.answer}
-            </Disclosure>
-          ))}
-        </div>
-      </Section>
+      {groups.map((group, i) => (
+        <Section
+          key={group.id}
+          id={group.id}
+          tone={i % 2 === 1 ? "grey" : "white"}
+          aria-labelledby={`${group.id}-heading`}
+        >
+          <SectionHeading id={`${group.id}-heading`} title={group.title} />
+          {/* One column so the questions read straight down, not left-right then down. */}
+          <div className="max-w-180">
+            {group.items.map((item) => (
+              <Disclosure key={item.question} title={item.question} titleAs="h3">
+                {item.answer}
+              </Disclosure>
+            ))}
+          </div>
+        </Section>
+      ))}
 
       <ClosingCta
         title="Still got a question?"

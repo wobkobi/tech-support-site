@@ -40,7 +40,7 @@ export interface InlineEstimateInputs {
   address: string;
   /** Chosen day key, or null. */
   dateKey: string | null;
-  /** The chosen day's weekend or public-holiday surcharge, or null. */
+  /** The chosen slot's weekend, public-holiday or after-hours surcharge, or null. */
   surcharge: DateSurcharge | null;
   /** Chosen time window, or null. */
   selectedTime: TimeOfDay | null;
@@ -175,7 +175,7 @@ export function useInlineEstimate(inputs: InlineEstimateInputs): InlineEstimateS
         lowEndFloorFactor,
         departureTimeIso: slotStart?.toISOString(),
         returnDepartureTimeIso: slotEnd?.toISOString(),
-        surchargeUplift: surcharge?.uplift ?? 0,
+        surchargePerHour: surcharge?.perHour ?? 0,
         promoCode,
         email,
       });

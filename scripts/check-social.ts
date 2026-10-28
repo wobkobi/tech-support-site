@@ -1,8 +1,8 @@
 // scripts/check-social.ts
 // Social posting logic: platform validators, emoji counting, Google posts and events, promo
 // placeholders, email to post and post to email, JPEG size reader, status roll-up, take-downs,
-// PATCH parsing, tags, the logo's placement, the brand profile and Write with AI's request and
-// reply reading. Pure logic, no DB.
+// PATCH parsing, tags, the logo's placement, the brand profile, Write with AI's request and
+// reply reading, and which Business Profile details differ from Settings. Pure logic, no DB.
 // Run with: npm test -- social
 
 import { BRIEF_MAX, POST_SOURCE_MAX } from "@/features/mailing/lib/ai-draft";
@@ -14,6 +14,7 @@ import {
 } from "@/features/social/lib/caption-ai";
 import { postFromEmail } from "@/features/social/lib/from-email";
 import { googlePostBody } from "@/features/social/lib/google-post";
+import { profileChanges } from "@/features/social/lib/google-profile";
 import { insertableGroups } from "@/features/social/lib/insertables";
 import { mergeTargets, parsePostPatch } from "@/features/social/lib/parse";
 import { byTagName, nextTagColour, tagKey, tagName } from "@/features/social/lib/tags";
@@ -1601,6 +1602,84 @@ function checkToEmail(): void {
   expectEqual("brief: a post may run longer than a typed brief", POST_SOURCE_MAX > BRIEF_MAX, true);
 }
 
+/** Business Profile sync: which of the phone, website and hours differ from Settings. */
+function checkProfileSync(): void {
+  console.log("Profile sync");
+  const settings = DEFAULT_SETTINGS;
+  const fresh = profileChanges(settings, {});
+  expectEqual("profile: an empty profile gets all three", fresh.mask, [
+    "phoneNumbers",
+    "websiteUri",
+    "regularHours",
+  ]);
+  expectEqual(
+    "profile: a matching profile needs nothing",
+    profileChanges(settings, fresh.body).mask,
+    [],
+  );
+
+  const spelled = profileChanges(settings, {
+    ...fresh.body,
+    phoneNumbers: { primaryPhone: "021 297 1237" },
+    websiteUri: "https://www.tothepoint.co.nz/?utm_source=gbp",
+  });
+  expectEqual("profile: local phone format and a tracking link still match", spelled.mask, []);
+
+  const moved = profileChanges(settings, {
+    ...fresh.body,
+    phoneNumbers: { primaryPhone: "+64 9 555 0000", additionalPhones: ["+64 9 555 1111"] },
+    websiteUri: "https://old.example.com",
+  });
+  expectEqual("profile: a new phone and site both go", moved.mask, ["phoneNumbers", "websiteUri"]);
+  expectEqual(
+    "profile: extra phone numbers go back unchanged",
+    moved.body.phoneNumbers?.additionalPhones,
+    ["+64 9 555 1111"],
+  );
+  expectEqual(
+    "profile: the site gets its scheme",
+    moved.body.websiteUri,
+    "https://tothepoint.co.nz",
+  );
+
+  // Google leaves out zero fields, so a midnight opening reads back as {}.
+  const midnight = profileChanges(
+    { ...settings, identity: { ...settings.identity, publishedHours: { open: 0, close: 24 } } },
+    {
+      ...fresh.body,
+      regularHours: {
+        periods: (fresh.body.regularHours?.periods ?? []).map((p) => ({
+          ...p,
+          openTime: {},
+          closeTime: { hours: 24 },
+        })),
+      },
+    },
+  );
+  expectEqual("profile: 00:00 read back as {} still matches", midnight.mask, []);
+
+  const narrowed = profileChanges(
+    { ...settings, identity: { ...settings.identity, publishedHours: { open: 9, close: 17 } } },
+    fresh.body,
+  );
+  expectEqual("profile: published hours change the hours", narrowed.labels, ["opening hours"]);
+  expect(
+    "profile: every day gets the published window",
+    (narrowed.body.regularHours?.periods ?? []).every(
+      (p) => p.openTime.hours === 9 && p.closeTime.hours === 17 && p.openDay === p.closeDay,
+    ),
+  );
+
+  const schedule = Object.fromEntries(
+    Object.entries(settings.availability.schedule).map(([d, w]) => [d, { ...w, enabled: false }]),
+  ) as typeof settings.availability.schedule;
+  expectEqual(
+    "profile: no open days leaves the hours alone",
+    profileChanges({ ...settings, availability: { ...settings.availability, schedule } }, {}).mask,
+    ["phoneNumbers", "websiteUri"],
+  );
+}
+
 /** Runs every group and exits non-zero on any failure. */
 function main(): void {
   checkValidators();
@@ -1621,6 +1700,7 @@ function main(): void {
   checkBrandProfile();
   checkScheduleSettings();
   checkCaptionAi();
+  checkProfileSync();
   finish();
 }
 

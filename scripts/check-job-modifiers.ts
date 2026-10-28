@@ -6,12 +6,10 @@
 import { isBusinessModifier, withJobModifiers } from "@/features/business/lib/job-modifiers";
 import { expectEqual, finish } from "./lib/harness.js";
 
-// The live modifier rows, as of 2026-10-12.
+// Modifier rows shaped like the live ones, plus a Research row that stacks freely.
 const RATES = [
   { id: "home", label: "At home", hourlyDelta: -30 },
   { id: "remote", label: "Remote", hourlyDelta: -10 },
-  { id: "holiday", label: "Public Holiday", hourlyDelta: null },
-  { id: "phone", label: "Phone", hourlyDelta: -35 },
   { id: "business", label: "Business", hourlyDelta: 40 },
   { id: "research", label: "Research", hourlyDelta: 10 },
 ];
@@ -37,14 +35,11 @@ function main(): void {
     withJobModifiers(["research"], RATES, REMOTE).ids,
     ["research", "remote"],
   );
-  expectEqual("a phone task stays Phone", withJobModifiers(["phone"], RATES, REMOTE), {
-    ids: ["phone"],
+  expectEqual("an at-home task stays At home", withJobModifiers(["home"], RATES, REMOTE), {
+    ids: ["home"],
     addedRemote: false,
     addedBusiness: false,
   });
-  expectEqual("an at-home task stays At home", withJobModifiers(["home"], RATES, REMOTE).ids, [
-    "home",
-  ]);
   expectEqual("Remote already there is not doubled", withJobModifiers(["remote"], RATES, REMOTE), {
     ids: ["remote"],
     addedRemote: false,
@@ -75,8 +70,8 @@ function main(): void {
     addedRemote: false,
     addedBusiness: true,
   });
-  expectEqual("stacks with a channel", withJobModifiers(["phone"], RATES, BUSINESS).ids, [
-    "phone",
+  expectEqual("stacks with a channel", withJobModifiers(["home"], RATES, BUSINESS).ids, [
+    "home",
     "business",
   ]);
   expectEqual(
@@ -100,8 +95,8 @@ function main(): void {
     addedRemote: true,
     addedBusiness: true,
   });
-  expectEqual("phone task only gains Business", withJobModifiers(["phone"], RATES, BOTH), {
-    ids: ["phone", "business"],
+  expectEqual("an at-home task only gains Business", withJobModifiers(["home"], RATES, BOTH), {
+    ids: ["home", "business"],
     addedRemote: false,
     addedBusiness: true,
   });

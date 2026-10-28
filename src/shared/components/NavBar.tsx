@@ -162,7 +162,9 @@ export function NavBar({ phone, phoneTel }: NavBarProps): React.ReactElement | n
             alt="To the Point Tech - home"
             width={2000}
             height={674}
-            preload
+            // Eager, not preload: the logo is the LCP only on pages without a hero image, and a
+            // head preload would compete with the home hero.
+            loading="eager"
             className="h-12 w-auto sm:h-17"
           />
         </Link>

@@ -146,8 +146,8 @@ function invoiceVsCalculator(
 ): { invoice: number; calculator: number } {
   const p = { ...BASE, ...pricing };
   const t = calcJobTotal(j, promo, p);
-  const surcharge: LabourSurcharge | null = p.surchargeUplift
-    ? { label: "Weekend surcharge", uplift: p.surchargeUplift }
+  const surcharge: LabourSurcharge | null = p.surchargePerHour
+    ? { label: "Weekend surcharge", perHour: p.surchargePerHour }
     : null;
   const lines = jobToLineItems(j, surcharge, p.minTravelCharge, p.minBillableMins);
   const invoice = calcInvoiceTotals(
@@ -195,8 +195,8 @@ function main(): void {
     },
   );
   expectEqual(
-    "a +25% weekend surcharge counts as labour",
-    price(twoHours, null, { goldCardPercent: 0.1, surchargeUplift: 0.25 }),
+    "a $25/hr weekend surcharge counts as labour",
+    price(twoHours, null, { goldCardPercent: 0.1, surchargePerHour: 25 }),
     { promo: 0, gold: 25, unsuccessful: 0, total: 305 },
   );
   expectEqual(
@@ -245,7 +245,7 @@ function main(): void {
     "the promo skips the surcharge, the gold card doesn't",
     price(job([{ minutes: 120, unitPrice: 100 }]), PCT_20, {
       goldCardPercent: 0.1,
-      surchargeUplift: 0.25,
+      surchargePerHour: 25,
     }),
     { promo: 40, gold: 21, unsuccessful: 0, total: 189 },
   );
@@ -279,9 +279,9 @@ function main(): void {
     total: 230,
   });
   expectEqual(
-    "only the home hour's share of a +25% surcharge comes down",
-    price(mixed, null, { goldCardPercent: 0.1, surchargeUplift: 0.25 }),
-    { promo: 0, gold: 12.5, unsuccessful: 0, total: 287.5 },
+    "only the home hour's share of a $25/hr surcharge comes down",
+    price(mixed, null, { goldCardPercent: 0.1, surchargePerHour: 25 }),
+    { promo: 0, gold: 12.5, unsuccessful: 0, total: 277.5 },
   );
   expectEqual(
     "$65 flat on the home hour, then 10% off it",
@@ -343,11 +343,11 @@ function main(): void {
     { promo: 0, gold: 20, unsuccessful: 45, total: 135 },
   );
   expectEqual(
-    "a +25% day's surcharge on the unfixed hour is halved after the 10% too",
+    "a $25/hr day's surcharge on the unfixed hour is halved after the 10% too",
     price(job([{ minutes: 60, unitPrice: 100 }], { unsuccessful: true }), null, {
       goldCardPercent: 0.1,
       unsuccessfulFactor: 0.5,
-      surchargeUplift: 0.25,
+      surchargePerHour: 25,
     }),
     { promo: 0, gold: 12.5, unsuccessful: 56.25, total: 56.25 },
   );
@@ -376,7 +376,7 @@ function main(): void {
       "flat promo, surcharge, GST",
       job([{ minutes: 260, unitPrice: 100 }], { drive: 30 }),
       FLAT_65,
-      { surchargeUplift: 0.25, gstRegistered: true },
+      { surchargePerHour: 25, gstRegistered: true },
     ],
     [
       "unfixed task with a fixed promo",
@@ -403,7 +403,7 @@ function main(): void {
       "surcharge and GST",
       twoHours,
       null,
-      { goldCardPercent: 0.1, surchargeUplift: 0.25, gstRegistered: true },
+      { goldCardPercent: 0.1, surchargePerHour: 25, gstRegistered: true },
     ],
     [
       "4h20m flat promo",
@@ -430,7 +430,7 @@ function main(): void {
         { minutes: 45, unitPrice: 95, unsuccessful: true },
       ]),
       FIXED_32,
-      { goldCardPercent: 0.1, unsuccessfulFactor: 0.5, surchargeUplift: 0.1 },
+      { goldCardPercent: 0.1, unsuccessfulFactor: 0.5, surchargePerHour: 10 },
     ],
     [
       "home and business work, weekend, flat promo, unfixed business line",
@@ -439,7 +439,7 @@ function main(): void {
         { minutes: 50, unitPrice: 135, business: true, unsuccessful: true },
       ]),
       FLAT_65,
-      { goldCardPercent: 0.1, unsuccessfulFactor: 0.5, surchargeUplift: 0.1 },
+      { goldCardPercent: 0.1, unsuccessfulFactor: 0.5, surchargePerHour: 10 },
     ],
     [
       "whole job unfixed",

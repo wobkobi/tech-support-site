@@ -270,12 +270,14 @@ function buildPriceRange(
 interface Props {
   /** Live Standard hourly rate, the same figure the page headline quotes before any promo. */
   baseRate: number;
-  /** Live customer-facing rate rows (hourly rates and the Remote/At home/Phone modifiers). */
+  /** Live customer-facing rate rows (hourly rates and the Remote/At home modifiers). */
   rates: PublicRate[];
-  /** Weekend labour uplift (live pricing setting), for the weekday caveat. */
-  weekendUplift: number;
-  /** Public-holiday labour uplift (live pricing setting), for the weekday caveat. */
-  publicHolidayUplift: number;
+  /** Weekend surcharge in $/hr (live pricing setting), for the weekday caveat. */
+  weekendPerHour: number;
+  /** Public-holiday surcharge in $/hr (live pricing setting), for the weekday caveat. */
+  publicHolidayPerHour: number;
+  /** NZ hour from which a weekday start bills after hours, or null when off, for the caveat. */
+  afterHoursFromHour: number | null;
   /** Minimum billable minutes (live pricing setting); floors the estimate. */
   minBillableMins: number;
   /** Travel floor (live pricing setting) for the travel estimate. */
@@ -295,8 +297,9 @@ interface Props {
  * @param props - Component props.
  * @param props.baseRate - Live Standard hourly rate.
  * @param props.rates - Live customer-facing rate rows.
- * @param props.weekendUplift - Weekend labour uplift, for the weekday caveat.
- * @param props.publicHolidayUplift - Public-holiday labour uplift, for the weekday caveat.
+ * @param props.weekendPerHour - Weekend surcharge in $/hr, for the weekday caveat.
+ * @param props.publicHolidayPerHour - Public-holiday surcharge in $/hr, for the weekday caveat.
+ * @param props.afterHoursFromHour - Hour from which a weekday start bills after hours, or null.
  * @param props.minBillableMins - Minimum billable minutes used to floor the estimate.
  * @param props.minTravelCharge - Travel floor for the travel estimate.
  * @param props.travelRatePerHour - Travel $/hr pricing the round trip.
@@ -308,8 +311,9 @@ interface Props {
 export function PricingWizard({
   baseRate,
   rates,
-  weekendUplift,
-  publicHolidayUplift,
+  weekendPerHour,
+  publicHolidayPerHour,
+  afterHoursFromHour,
   minBillableMins,
   minTravelCharge,
   travelRatePerHour,
@@ -647,9 +651,9 @@ export function PricingWizard({
     return `Jobs over $${next} get ${describePromoDiscount({ ...earned, tiers: [] })}.`;
   })();
 
-  // The quote has no date, so it prices a weekday; dollars at the quote's own full rate.
+  // The quote has no date, so it prices a weekday and names what other days add.
   const weekdayCaveat = quoteInputs
-    ? surchargeCaveat({ weekendUplift, publicHolidayUplift }, quoteInputs.fullRate)
+    ? surchargeCaveat({ weekendPerHour, publicHolidayPerHour, afterHoursFromHour })
     : null;
 
   // An applied code travels to /booking, which re-resolves it.
@@ -713,8 +717,8 @@ export function PricingWizard({
         <div>
           <h3 className={STEP_TITLE}>How would you like the work done?</h3>
           <p className={STEP_HELP}>
-            On-site visits include travel; remote sessions get a small rate reduction and no travel
-            charge.
+            On-site visits include travel; remote and phone help costs a little less and has no
+            travel charge.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
@@ -726,8 +730,8 @@ export function PricingWizard({
                 },
                 {
                   value: "remote",
-                  title: "Remote session",
-                  body: "I log in via screen share. Best for software, accounts, quick fixes.",
+                  title: "Remote or phone",
+                  body: "I log in to your computer or help over the phone. Best for software, accounts, quick fixes.",
                 },
               ] as const
             ).map((option) => {
@@ -821,7 +825,7 @@ export function PricingWizard({
             </p>
             <p className="mt-3 text-base text-seasalt-700">
               {meeting === "remote"
-                ? "Remote session - no travel charge. "
+                ? "Remote or phone - no travel charge. "
                 : result.includesTravel
                   ? // Mention the minimum only when the minimum is what's charged.
                     (result.travelCharge ?? 0) <= minTravelCharge

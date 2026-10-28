@@ -247,10 +247,12 @@ function validatePricing(p: PricingSettings): FieldError[] {
     errors.push({ field: "minTaskMins", message: "Must be 1-240 minutes." });
   if (!inRange(p.maxJobMins, 60, 1440))
     errors.push({ field: "maxJobMins", message: "Must be 60-1440 minutes (1-24 hours)." });
-  if (!inRange(p.publicHolidayUplift, 0, 5))
-    errors.push({ field: "publicHolidayUplift", message: "Must be 0-500% (0 = off)." });
-  if (!inRange(p.weekendUplift, 0, 5))
-    errors.push({ field: "weekendUplift", message: "Must be 0-500% (0 = off)." });
+  if (!inRange(p.publicHolidayPerHour, 0, 500))
+    errors.push({ field: "publicHolidayPerHour", message: "Must be $0-500 an hour (0 = off)." });
+  if (!inRange(p.weekendPerHour, 0, 500))
+    errors.push({ field: "weekendPerHour", message: "Must be $0-500 an hour (0 = off)." });
+  if (p.afterHoursFromHour !== null && !inRange(p.afterHoursFromHour, 0, 23))
+    errors.push({ field: "afterHoursFromHour", message: "Must be an hour 0-23, or Off." });
   if (!nonNeg(p.minTravelCharge))
     errors.push({ field: "minTravelCharge", message: "Must be 0 or more (0 = no floor)." });
   if (!nonNeg(p.travelRatePerHour))

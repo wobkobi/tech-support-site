@@ -305,6 +305,87 @@ export interface BookableDay {
    * Labour surcharge for the day (public holiday or weekend); null or absent when none.
    */
   surcharge?: DateSurcharge | null;
+  /**
+   * After-hours surcharge for starts from `fromHour` on, on a weekday with no surcharge of its
+   * own; null or absent when none applies.
+   */
+  afterHours?: { fromHour: number; surcharge: DateSurcharge } | null;
+}
+
+/**
+ * The surcharge a booking slot bills: the day's own (weekend or holiday), else after hours for
+ * a weekday start from the after-hours hour, as the calculator bills it.
+ * @param day - The bookable day, with surcharges attached by withDateSurcharges.
+ * @param startMins - Slot start in minutes from NZ midnight, or null when no time is picked.
+ * @returns The surcharge, or null when none applies.
+ */
+export function slotSurcharge(
+  day: Pick<BookableDay, "surcharge" | "afterHours">,
+  startMins: number | null,
+): DateSurcharge | null {
+  if (day.surcharge) return day.surcharge;
+  return day.afterHours && startMins !== null && isAfterHoursStart(day, startMins)
+    ? day.afterHours.surcharge
+    : null;
+}
+
+/**
+ * Whether a start is at or after the day's after-hours hour (6pm itself counts as evening);
+ * never true on a weekend or holiday, which carry no `afterHours`.
+ * @param day - The bookable day, with surcharges attached by withDateSurcharges.
+ * @param startMins - Start in minutes from NZ midnight.
+ * @returns True for an after-hours start.
+ */
+export function isAfterHoursStart(
+  day: Pick<BookableDay, "afterHours">,
+  startMins: number,
+): boolean {
+  return !!day.afterHours && startMins >= day.afterHours.fromHour * 60;
+}
+
+/**
+ * Whether a weekday has an open after-hours start for the duration, so the booking page only
+ * offers its Show evening times tick on a day where ticking it shows something.
+ * @param day - The bookable day, with surcharges attached by withDateSurcharges.
+ * @param duration - The chosen job length.
+ * @returns True when an after-hours start is open.
+ */
+export function offersAfterHoursStart(day: BookableDay, duration: JobDuration): boolean {
+  return day.timeWindows.some((w) =>
+    w.subSlots.some(
+      (s) =>
+        (duration === "short" ? s.availableShort : s.availableLong) &&
+        isAfterHoursStart(day, w.startHour * 60 + s.minute),
+    ),
+  );
+}
+
+/**
+ * The day as the booking page shows it until Show evening times is ticked: after-hours starts
+ * are left out entirely (not crossed out), so the after-hours hour and every later one vanish.
+ * @param day - The bookable day, with surcharges attached by withDateSurcharges.
+ * @returns The day without its after-hours starts, or the same day when it has none.
+ */
+export function withoutAfterHoursStarts(day: BookableDay): BookableDay {
+  if (!day.afterHours) return day;
+  const timeWindows = day.timeWindows
+    .map((w) => {
+      const subSlots = w.subSlots.filter(
+        (s) => !isAfterHoursStart(day, w.startHour * 60 + s.minute),
+      );
+      return {
+        ...w,
+        subSlots,
+        availableShort: subSlots.some((s) => s.availableShort),
+        availableLong: subSlots.some((s) => s.availableLong),
+      };
+    })
+    .filter((w) => w.subSlots.length > 0);
+  return {
+    ...day,
+    timeWindows,
+    hasAnySlots: timeWindows.some((w) => w.availableShort || w.availableLong),
+  };
 }
 
 export interface BuildAvailableDaysResult {

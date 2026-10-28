@@ -2,7 +2,7 @@
 // Core business maths: billable minutes, hourly rates, travel, line items, promo discounts
 // and job totals. Also re-exports the format, task-timing and invoice-maths helpers.
 
-import { unsuccessfulNote } from "@/features/business/lib/business-format";
+import { formatMoneyCompact, unsuccessfulNote } from "@/features/business/lib/business-format";
 import {
   calcGstFromInclusive,
   calcInvoiceTotals,
@@ -14,7 +14,6 @@ import {
   GST_RATE,
   GST_REGISTERED,
   MIN_BILLABLE_MINS,
-  upliftPercent,
 } from "@/features/business/lib/pricing-policy";
 import { lockedDeltaShift, type LockedDelta } from "@/features/business/lib/promo-locked-rates";
 import { promoForSpend, type PromoTierValues } from "@/features/business/lib/promo-tiers";
@@ -24,6 +23,7 @@ import {
   explicitRoundingAllowanceMins,
   isHourlyTask,
   TASK_TIMING_FALLBACK,
+  taskMinutes,
   type TaskTimingConfig,
 } from "@/features/business/lib/task-timing";
 import type {
@@ -177,14 +177,14 @@ export function splitTravel(entries: TravelEntry[], minTravelCharge: number): Tr
  * Delivery-channel modifier labels, lower-cased. A task has exactly one channel, so these
  * never stack. Matched on the default labels, so a renamed row stacks again.
  */
-export const CHANNEL_MODIFIER_LABELS = new Set(["at home", "remote", "phone"]);
+export const CHANNEL_MODIFIER_LABELS = new Set(["at home", "remote"]);
 
 /**
  * Whether a rate row is a delivery channel rather than a freely stacking modifier. Shared
  * by the calculator and the parse-job route.
  * @param rate - Rate row to test, or anything carrying its label.
  * @param rate.label - Label to match, compared trimmed and case-insensitively.
- * @returns True for a delivery channel (At home / Remote / Phone).
+ * @returns True for a delivery channel (At home / Remote).
  */
 export function isChannelModifier(rate: { label: string }): boolean {
   return CHANNEL_MODIFIER_LABELS.has(rate.label.trim().toLowerCase());
@@ -238,6 +238,25 @@ export function taskLineTotals(tasks: readonly TaskLine[]): number[] {
 }
 
 /**
+ * Each task line's share of a flat labour surcharge: its billed minutes at `perHour`, whatever
+ * the line's own rate. Only paid hourly lines carry it, so flat-fee, free and credit lines add
+ * nothing, and travel and parts never do.
+ * @param tasks - Task lines, after the minimum-billable floor.
+ * @param lineTotals - Each line's printed total, from {@link taskLineTotals}.
+ * @param perHour - Surcharge in $/hr (0 = none).
+ * @returns Each line's unrounded share.
+ */
+function surchargeByTask(
+  tasks: readonly TaskLine[],
+  lineTotals: readonly number[],
+  perHour: number,
+): number[] {
+  return tasks.map((t, i) =>
+    perHour > 0 && isHourlyTask(t) && lineTotals[i]! > 0 ? (taskMinutes(t) * perHour) / 60 : 0,
+  );
+}
+
+/**
  * Converts a job calculation into invoice line items: one per task and part, plus travel.
  * Mirrors {@link calcJobTotal}'s {@link MIN_TRAVEL_CHARGE} and {@link enforceMinBillable} floors.
  * @param job - Job calculation with tasks, parts, and travel.
@@ -253,9 +272,6 @@ export function jobToLineItems(
   minBillableMins: number = MIN_BILLABLE_MINS,
 ): LineItem[] {
   const items: LineItem[] = [];
-  // Hourly labour only, so the surcharge never uplifts travel or parts.
-  let labourTotal = 0;
-
   const tasks = enforceMinBillable(job.tasks, minBillableMins);
   const lineTotals = taskLineTotals(tasks);
   for (const [i, task] of tasks.entries()) {
@@ -268,14 +284,14 @@ export function jobToLineItems(
       // Billed minutes on hourly rows so the invoice renders h:mm.
       ...(task.minutes != null && isHourlyTask(task) && { minutes: task.minutes }),
     });
-    if (isHourlyTask(task)) labourTotal += lineTotal;
   }
 
-  if (surcharge && surcharge.uplift > 0 && labourTotal > 0) {
-    const amount = roundCents(roundCents(labourTotal) * surcharge.uplift);
+  if (surcharge) {
+    const shares = surchargeByTask(tasks, lineTotals, surcharge.perHour);
+    const amount = roundCents(shares.reduce((s, share) => s + share, 0));
     if (amount > 0) {
       items.push({
-        description: `${surcharge.label} (+${upliftPercent(surcharge.uplift)}%)`,
+        description: `${surcharge.label} (+${formatMoneyCompact(surcharge.perHour)}/hr)`,
         qty: 1,
         unitPrice: amount,
         lineTotal: amount,
@@ -339,10 +355,10 @@ export interface JobPromo {
 
 /** A date-based labour surcharge as {@link jobToLineItems} prints it. */
 export interface LabourSurcharge {
-  /** Line wording without the percent, e.g. "Weekend surcharge". */
+  /** Line wording without the amount, e.g. "Weekend surcharge". */
   label: string;
-  /** Labour uplift as a fraction (0.1 = +10%). */
-  uplift: number;
+  /** Dollars added to every billed labour hour, whatever that line's own rate. */
+  perHour: number;
 }
 
 /** Live pricing values threaded into {@link calcJobTotal}; defaults are the code consts. */
@@ -351,8 +367,8 @@ export interface JobPricing {
   minTravelCharge: number;
   /** Minimum billable labour minutes; the whole-job floor applied by {@link enforceMinBillable}. */
   minBillableMins: number;
-  /** Date-based labour uplift as a fraction (public holiday 0.25, weekend 0.1), else 0. */
-  surchargeUplift?: number;
+  /** Date-based labour surcharge in $/hr (public holiday 25, weekend 10), else 0. */
+  surchargePerHour?: number;
   /** Fraction charged for an unsuccessful visit (e.g. 0.5 = half); defaults to 0.5. */
   unsuccessfulFactor?: number;
   /** RateConfig id of the "Business" modifier; its labour is excluded from promos. */
@@ -565,7 +581,7 @@ function jobPromoBreakdown(
  * {@link enforceMinBillable} floors apply.
  * @param jobIn - Job calculation with tasks, parts, and travel.
  * @param promo - Optional active promo to apply.
- * @param pricing - Live pricing (GST, min travel, min billable, holiday uplift); defaults to the code consts.
+ * @param pricing - Live pricing (GST, min travel, min billable, date surcharge); defaults to the code consts.
  * @returns Cost breakdown with promo + unsuccessful discounts split out, and the rate pair
  * the promo billed at for the invoice's promo note.
  */
@@ -606,16 +622,10 @@ export function calcJobTotal(
     job.travelEntries,
     pricing.minTravelCharge,
   );
-  // The date surcharge (public holiday or weekend) uplifts labour only (hourly task
-  // lines), never travel or parts. 0 when neither applies.
-  const surchargeUplift = pricing.surchargeUplift ?? 0;
-  // From the rounded line totals, as jobToLineItems does, or the surcharge drifts a cent.
-  const hourlyTasksTotal = roundCents(
-    job.tasks.reduce((s, t, i) => (isHourlyTask(t) ? s + lineTotals[i]! : s), 0),
-  );
-  // Never below 0: jobToLineItems prints no surcharge line on labour that nets to $0 or less.
-  const surchargeTotal =
-    surchargeUplift > 0 ? roundCents(Math.max(0, hourlyTasksTotal) * surchargeUplift) : 0;
+  // The date surcharge (public holiday, weekend or after hours) is a flat $/hr on paid hourly
+  // lines, never travel or parts; summed as jobToLineItems sums it, so the cents match.
+  const surchargeShares = surchargeByTask(job.tasks, lineTotals, pricing.surchargePerHour ?? 0);
+  const surchargeTotal = roundCents(surchargeShares.reduce((s, share) => s + share, 0));
   const subtotal = roundCents(tasksTotal + partsTotal + travelTotal + surchargeTotal);
   const {
     total: promoDiscount,
@@ -649,7 +659,7 @@ export function calcJobTotal(
   // With no business work the printed surcharge line counts whole, so the 10% matches the
   // invoice lines to the cent; otherwise only the home lines' share of it.
   const goldSurcharge = job.tasks.some((t) => isHourlyTask(t) && isBusiness(t))
-    ? goldLabour * surchargeUplift
+    ? job.tasks.reduce((s, t, i) => (isBusiness(t) ? s : s + surchargeShares[i]!), 0)
     : surchargeTotal;
   const labourPromo = promoOffTravel ? 0 : promoDiscount;
   const goldCardDiscount =
@@ -657,11 +667,11 @@ export function calcJobTotal(
   // Fraction removed from an unsuccessful line: 1 - the charged share.
   const unsuccessfulCut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
   // Halve what was due after the promo and Gold Card (35% off then half bills 32.5%, not
-  // 15%). The surcharge share halves too: 2h on a +25% holiday bills $81.25, half of $162.50.
+  // 15%). The line's surcharge halves too: 2h at $65 on a $25/hr holiday bills $90, half of $180.
   const unsuccessfulBase = job.tasks.reduce((s, t, i) => {
     if (!isHourlyTask(t) || !(job.unsuccessful || t.unsuccessful)) return s;
     const kept = isBusiness(t) ? 1 : 1 - goldCut;
-    return s + lineTotals[i]! * (1 + surchargeUplift) * kept - (promoByTask[i] ?? 0) * kept;
+    return s + (lineTotals[i]! + surchargeShares[i]!) * kept - (promoByTask[i] ?? 0) * kept;
   }, 0);
   const unsuccessfulDiscount = Math.max(0, roundCents(unsuccessfulBase * unsuccessfulCut));
   // A whole visit that failed names no lines: all its labour is the base.

@@ -16,7 +16,7 @@ import { jsonLdHtml } from "@/shared/lib/json-ld";
 import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { servedSuburbGroups } from "@/shared/lib/served-suburbs";
 import { SERVICE_AREAS } from "@/shared/lib/service-areas";
-import { SERVICE_PAGES, hasServicePage } from "@/shared/lib/service-pages";
+import { hasServicePage } from "@/shared/lib/service-pages";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
@@ -132,7 +132,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
                   href={`/services/${slug}`}
                   className={cn(TEXT_LINK, "mt-3 inline-flex min-h-11 items-center")}
                 >
-                  {SERVICE_PAGES[slug].linkText}
+                  More details<span className="sr-only"> on {label}</span>
                 </Link>
               )}
             </RuledBlock>

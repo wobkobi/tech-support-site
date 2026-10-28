@@ -34,8 +34,8 @@ export interface QuickEstimateInput {
   departureTimeIso?: string;
   /** End of the visit; the return leg is quoted from here. */
   returnDepartureTimeIso?: string;
-  /** Weekend or public holiday labour uplift as a fraction (e.g. 0.1); omitted or 0 for none. */
-  surchargeUplift?: number;
+  /** Weekend, after-hours or public-holiday surcharge in $/hr (e.g. 10); omitted or 0 for none. */
+  surchargePerHour?: number;
   /** Entered promo code; a valid one beats the automatic promo, an invalid one is ignored. */
   promoCode?: string | null;
   /** Booking email, so a per-customer code is judged as the booking will judge it. */
@@ -199,11 +199,12 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     estimatorRange,
     lowEndFloorFactor,
   );
-  // Date surcharge: full-rate labour no promo discounts, counted towards the spend threshold
-  // (calcJobTotal's order). Low rounds down, high up.
-  const uplift = Math.max(0, input.surchargeUplift ?? 0);
-  const surchargeLow = Math.floor(undiscounted.low * uplift);
-  const surchargeHigh = Math.ceil(undiscounted.high * uplift);
+  // Date surcharge: a flat $/hr on the band's hours (its dollars over the full rate), which no
+  // promo discounts, counted towards the spend threshold (calcJobTotal's order). Low rounds
+  // down, high up.
+  const perHour = Math.max(0, input.surchargePerHour ?? 0);
+  const surchargeLow = fullRate > 0 ? Math.floor((undiscounted.low / fullRate) * perHour) : 0;
+  const surchargeHigh = fullRate > 0 ? Math.ceil((undiscounted.high / fullRate) * perHour) : 0;
   const promo = promoForSpend(dateGated, undiscounted.low + surchargeLow + rawTravel);
 
   const promoRate = applyPromoToHourlyRate(

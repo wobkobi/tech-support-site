@@ -1,14 +1,18 @@
 // scripts/check-booking-slots.ts
 // Submit-time slot rules: the calendar window reaches the end of the last bookable NZ day,
-// date keys must be real dates, the overlap re-check judges from the new booking's side, and
-// only a 404 or 410 reads as a Google event already gone.
+// date keys must be real dates, the last hour offered is the latest a 2hr job fits, unticked
+// evening starts are left out of a weekday, the overlap re-check judges from the new booking's
+// side, and only a 404 or 410 reads as a Google event already gone.
 // Run with: npm test -- booking-slots
 
 import {
   bookingWindowEnd,
+  buildAvailableDays,
   isSlotFree,
   validateBookingRequest,
+  withoutAfterHoursStarts,
   type AvailabilityConfig,
+  type BookableDay,
   type ExistingBooking,
 } from "@/features/booking/lib/booking";
 import { isEventGone } from "@/features/calendar/lib/google-calendar";
@@ -84,6 +88,50 @@ function main(): void {
   expectEqual("31 February is refused", check("2026-02-31"), "Invalid date format");
   expectEqual("an unpadded key is refused", check("2026-10-8"), "Invalid date format");
   expectEqual("a trailing time is refused", check("2026-10-28T00"), "Invalid date format");
+
+  // Close at 8pm: the last hour offered is 6pm, the latest a 2hr job fits, so no 7pm hour with
+  // a single start in it.
+  const { days } = buildAvailableDays([], [], now, CONFIG);
+  const wednesday = days.find((d) => d.dateKey === "2026-10-28");
+  /**
+   * The open starts on Wednesday's grid for a duration.
+   * @param day - The day to read.
+   * @param long - True for the 2hr job.
+   * @returns Minutes from NZ midnight of every open start.
+   */
+  const startsOf = (day: BookableDay | undefined, long = false): number[] =>
+    (day?.timeWindows ?? []).flatMap((w) =>
+      w.subSlots
+        .filter((s) => (long ? s.availableLong : s.availableShort))
+        .map((s) => w.startHour * 60 + s.minute),
+    );
+  expectEqual("a 1hr job's last start is 6:45pm", Math.max(...startsOf(wednesday)), 18 * 60 + 45);
+  expectEqual(
+    "there's no 7pm hour",
+    wednesday?.timeWindows.some((w) => w.startHour === 19),
+    false,
+  );
+  expectEqual("a 2hr job's last start is 6pm", Math.max(...startsOf(wednesday, true)), 18 * 60);
+
+  // Show evening times unticked: starts from 6pm on are left out, not crossed out.
+  const after6 = {
+    fromHour: 18,
+    surcharge: { reason: "After hours", label: "After-hours surcharge", perHour: 10 },
+  };
+  const wedEvenings = wednesday && { ...wednesday, afterHours: after6 };
+  const hidden = wedEvenings && withoutAfterHoursStarts(wedEvenings);
+  expectEqual("unticked, the last start is 5:45pm", Math.max(...startsOf(hidden)), 17 * 60 + 45);
+  expectEqual(
+    "unticked, the 6pm and 7pm hours are gone",
+    hidden?.timeWindows.some((w) => w.startHour >= 18),
+    false,
+  );
+  const saturday = days.find((d) => d.dateKey === "2026-10-31");
+  expectEqual(
+    "a weekend day, with no after-hours, is left alone",
+    saturday && withoutAfterHoursStarts(saturday) === saturday,
+    true,
+  );
 
   // 10:00-11:00 NZ on 28 Oct.
   const start = new Date("2026-10-27T21:00:00Z");

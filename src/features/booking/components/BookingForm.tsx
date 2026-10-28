@@ -29,7 +29,10 @@ import { useInlineEstimate } from "@/features/booking/hooks/use-inline-estimate"
 import { useSubmitAttention } from "@/features/booking/hooks/use-submit-attention";
 import {
   combineUnitAndAddress,
+  isAfterHoursStart,
+  slotSurcharge,
   splitUnitFromAddress,
+  withoutAfterHoursStarts,
   type BookableDay,
   type JobDuration,
   type StartMinute,
@@ -137,13 +140,42 @@ export default function BookingForm({
   const promoParam = normalisePromoCode(searchParams.get("promo"));
   const [promoCode, setPromoCode] = useState(promoParam ?? "");
 
+  /**
+   * Whether a pick is an after-hours start, so an evening booking being edited or restored
+   * opens with evening times showing.
+   * @param dateKey - The picked day.
+   * @param time - The picked hour.
+   * @param minute - The picked minute past the hour.
+   * @returns True for an after-hours start.
+   */
+  function isEveningPick(
+    dateKey: string | undefined,
+    time: TimeOfDay | null | undefined,
+    minute: number | undefined,
+  ): boolean {
+    const day = availableDays.find((d) => d.dateKey === dateKey);
+    const window = day?.timeWindows.find((w) => w.value === time);
+    return !!day && !!window && isAfterHoursStart(day, window.startHour * 60 + (minute ?? 0));
+  }
+
+  // Evening starts stay hidden until the customer ticks Show evening times.
+  const [showEvenings, setShowEvenings] = useState(() =>
+    isEveningPick(initialValues?.dateKey, initialValues?.timeOfDay, initialValues?.startMinute),
+  );
+
   // Store the key, not the BookableDay, so fresh slot data is read from props after a refresh.
   const [duration, setDuration] = useState<JobDuration>(initialValues?.duration ?? "short");
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(() => {
     if (initialValues?.dateKey && availableDays.some((d) => d.dateKey === initialValues.dateKey)) {
       return initialValues.dateKey;
     }
-    return availableDays.find((d) => d.hasAnySlots)?.dateKey ?? availableDays[0]?.dateKey ?? null;
+    // Open on a day with daytime room, so nobody lands on one with only evening times left.
+    return (
+      availableDays.find((d) => withoutAfterHoursStarts(d).hasAnySlots)?.dateKey ??
+      availableDays.find((d) => d.hasAnySlots)?.dateKey ??
+      availableDays[0]?.dateKey ??
+      null
+    );
   });
   const [selectedTime, setSelectedTime] = useState<TimeOfDay | null>(
     initialValues?.timeOfDay ?? null,
@@ -152,10 +184,13 @@ export default function BookingForm({
     initialValues?.startMinute ?? 0,
   );
 
-  // Null when the pick has since disappeared, hiding the time picker.
-  const selectedDay: BookableDay | null = selectedDateKey
+  // Null when the pick has since disappeared, hiding the time picker. Unticking evenings drops
+  // an evening pick through the unavailable-time check below.
+  const pickedDay = selectedDateKey
     ? (availableDays.find((d) => d.dateKey === selectedDateKey) ?? null)
     : null;
+  const selectedDay: BookableDay | null =
+    pickedDay && !showEvenings ? withoutAfterHoursStarts(pickedDay) : pickedDay;
   const [name, setName] = useState(initialValues?.name ?? "");
   const [email, setEmail] = useState(initialValues?.email ?? "");
   const [phone, setPhone] = useState(initialValues?.phone ?? "");
@@ -199,6 +234,15 @@ export default function BookingForm({
     return nzWallClockUtc(y, m, d, window.startHour, selectedMinute);
   }
 
+  /**
+   * The chosen slot's start in minutes from NZ midnight, which decides after-hours rates.
+   * @returns Minutes from midnight, or null when no time is chosen yet.
+   */
+  function slotStartMins(): number | null {
+    const window = selectedDay?.timeWindows.find((w) => w.value === selectedTime);
+    return window ? window.startHour * 60 + selectedMinute : null;
+  }
+
   // Inline "get a rough estimate" state (new bookings only).
   const {
     canInlineEstimate,
@@ -222,7 +266,7 @@ export default function BookingForm({
     unit,
     address,
     dateKey: selectedDay?.dateKey ?? null,
-    surcharge: selectedDay?.surcharge ?? null,
+    surcharge: selectedDay ? slotSurcharge(selectedDay, slotStartMins()) : null,
     selectedTime,
     selectedMinute,
     duration,
@@ -329,6 +373,9 @@ export default function BookingForm({
     if (d.accessNotes) setAccessNotes(d.accessNotes);
     if (d.mailingList !== undefined) setMailingList(d.mailingList);
     if (d.slot) {
+      if (isEveningPick(d.slot.dateKey, d.slot.timeOfDay, d.slot.startMinute)) {
+        setShowEvenings(true);
+      }
       setSelectedDateKey(d.slot.dateKey);
       setSelectedTime(d.slot.timeOfDay);
       setSelectedMinute(d.slot.startMinute);
@@ -613,6 +660,8 @@ export default function BookingForm({
         duration={duration}
         onDurationChange={handleDurationChange}
         selectedDay={selectedDay}
+        showEvenings={showEvenings}
+        onShowEveningsChange={setShowEvenings}
         selectedTime={selectedTime}
         selectedMinute={selectedMinute}
         activeWindow={activeWindow}
