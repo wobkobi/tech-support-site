@@ -264,8 +264,11 @@ export function NotificationsView(): React.ReactElement {
           tabs can&apos;t receive them.
         </p>
         <ol className="list-decimal space-y-1 pl-5 text-admin-text">
-          <li>Tap the Share button in Safari</li>
-          <li>Choose &quot;Add to Home Screen&quot;</li>
+          <li>Tap the Share button in Safari (on newer iPhones it&apos;s in the ••• menu)</li>
+          <li>
+            Choose &quot;Add to Home Screen&quot;. If you see &quot;Open as Web App&quot;, leave it
+            on
+          </li>
           <li>Open the admin from the new Home Screen icon</li>
           <li>Sign in again - the installed app has its own login</li>
           <li>Come back to this page and turn notifications on</li>
@@ -280,8 +283,8 @@ export function NotificationsView(): React.ReactElement {
         <CardHeader title="Notifications are blocked" className="mb-0" />
         <p className="text-admin-muted">
           This device declined the prompt, and it can&apos;t be asked again from the page. On
-          iPhone, turn it back on in Settings &gt; Notifications &gt; To the Point Admin, then
-          reload this page.
+          iPhone, turn it back on in Settings &gt; Notifications &gt; TTP Admin (or whatever you
+          named the Home Screen icon), then reload this page.
         </p>
       </Card>
     );

@@ -1,6 +1,7 @@
 // src/features/admin/lib/quick-actions.ts
-// Admin shortcut list shared by the phone + button (MobileQuickActions) and the desktop
-// top bar's Quick actions menu, so both always offer the same destinations.
+// Admin shortcut list shared by the phone + button (MobileQuickActions), the desktop top
+// bar's Quick actions menu and the installed app's shortcuts (src/app/admin.webmanifest),
+// so all three always offer the same destinations.
 
 import type { IconType } from "react-icons";
 import {
@@ -22,8 +23,8 @@ export interface QuickAction {
 }
 
 /**
- * The shortcuts, in phone order: the + button lists them bottom-up, so the most used
- * sits nearest the thumb.
+ * The shortcuts, most used first: the + button lists them bottom-up, so the first sits
+ * nearest the thumb, and the installed app's long-press menu shows only the first 3 on Android.
  */
 export const QUICK_ACTIONS: readonly QuickAction[] = [
   { label: "Quick price", icon: FaHandHoldingDollar, path: "/admin/business/quick" },
