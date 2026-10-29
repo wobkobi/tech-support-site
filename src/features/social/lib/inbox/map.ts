@@ -731,6 +731,9 @@ export function replyProblem(
 /** Longest message, earlier message or post words sent for a suggestion. */
 export const REPLY_INPUT_MAX = 2000;
 
+/** Most unused suggestions sent back, so pressing Suggest again writes a fresh one. */
+export const REPLY_TRIED_MAX = 3;
+
 /** What a reply suggestion is wanted for. */
 export interface ReplyRequest {
   platform: SocialPlatformKey;
@@ -746,6 +749,8 @@ export interface ReplyRequest {
   earlier: { fromUs: boolean; text: string }[];
   /** The words of the post a comment is on. */
   postText: string | null;
+  /** Suggestions already given for this message and not used, oldest first. */
+  tried: string[];
 }
 
 /**
@@ -782,6 +787,12 @@ export function parseReplyRequest(raw: unknown): ReplyRequest | { error: string 
       const said = str(item.text);
       return said ? [{ fromUs: item.fromUs === true, text: said }] : [];
     });
+  const tried = (Array.isArray(body.tried) ? body.tried : [])
+    .slice(-REPLY_TRIED_MAX)
+    .flatMap((t: unknown) => {
+      const said = str(t);
+      return said ? [said] : [];
+    });
   return {
     platform,
     kind,
@@ -790,6 +801,7 @@ export function parseReplyRequest(raw: unknown): ReplyRequest | { error: string 
     text,
     earlier,
     postText: str(body.postText),
+    tried,
   };
 }
 

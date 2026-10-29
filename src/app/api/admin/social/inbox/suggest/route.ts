@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * POST /api/admin/social/inbox/suggest
  * Body: a `ReplyRequest` (`platform`, `kind`, `rating`, `author`, `text`, `earlier`,
- * `postText`), read by `parseReplyRequest`.
+ * `postText`, `tried`), read by `parseReplyRequest`.
  * @param request - Incoming request.
  * @returns JSON `{ reply, hide }`, a 429 with a retry hint when the AI provider is rate limited,
  *   or an error.

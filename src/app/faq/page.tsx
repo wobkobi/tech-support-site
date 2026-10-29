@@ -2,7 +2,7 @@
 // FAQ page. Live rates, and policy copy from pricing-policy.ts so it matches /pricing
 // and the booking emails.
 
-import { formatMoneyCompact } from "@/features/business/lib/business";
+import { formatMoneyCompact, goldCardOffText } from "@/features/business/lib/business";
 import {
   cancellationCopy,
   cancellationTiersCopy,
@@ -104,6 +104,10 @@ export default async function FaqPage(): Promise<React.ReactElement> {
     afterHoursFromHour: policy.AFTER_HOURS_FROM_HOUR,
   });
   const surchargeSentence = surchargeText ? ` ${surchargeText}` : "";
+  const goldCardSentence =
+    pricing.goldCardPercent !== null
+      ? ` SuperGold Card holders get ${goldCardOffText(pricing.goldCardPercent)}.`
+      : "";
   const paymentTermsDays = settings.identity.paymentTermsDays;
   const cancellationText = cancellationCopy(policy.CANCELLATION);
   const cancellationTiers = cancellationTiersCopy(policy.CANCELLATION);
@@ -198,7 +202,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
     {
       group: "prices",
       question: "How much does it cost?",
-      plainAnswer: `Work is ${formatMoneyCompact(displayRate)}/hr whatever the job - troubleshooting, setup, data recovery, hardware repairs, the lot.${surchargeSentence} On-site visits also include round-trip drive time at ${formatMoneyCompact(displayTravelRate)}/hr (${formatMoneyCompact(displayMinTravel)} minimum). I'll always confirm the expected cost before any work starts so there are no surprises on the bill.`,
+      plainAnswer: `Work is ${formatMoneyCompact(displayRate)}/hr whatever the job - troubleshooting, setup, data recovery, hardware repairs, the lot.${surchargeSentence}${goldCardSentence} On-site visits also include round-trip drive time at ${formatMoneyCompact(displayTravelRate)}/hr (${formatMoneyCompact(displayMinTravel)} minimum). I'll always confirm the expected cost before any work starts so there are no surprises on the bill.`,
       answer: (
         <>
           <p>
@@ -207,7 +211,8 @@ export default async function FaqPage(): Promise<React.ReactElement> {
               {formatMoneyCompact(displayRate)}/hr
             </PromoPrice>{" "}
             whatever the job - troubleshooting, setup, data recovery, hardware repairs, the lot.
-            {surchargeSentence} I confirm the expected cost before any work starts, so there are no
+            {surchargeSentence}
+            {goldCardSentence} I confirm the expected cost before any work starts, so there are no
             surprises on the invoice.
           </p>
           <p className="mt-2 text-rich-black/80">
