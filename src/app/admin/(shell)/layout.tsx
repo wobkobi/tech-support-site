@@ -7,14 +7,8 @@ import { MobileQuickActions } from "@/features/admin/components/MobileQuickActio
 import { AdminToastProvider } from "@/features/admin/components/ui/Toast";
 import { SIDEBAR_COLLAPSED, SIDEBAR_COOKIE } from "@/features/admin/lib/sidebar-cookie";
 import { PushRegistrar } from "@/features/notifications/components/PushRegistrar";
-import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import type React from "react";
-
-// Installing from the admin should open the admin, not the public homepage.
-export const metadata: Metadata = {
-  manifest: "/admin.webmanifest",
-};
 
 /**
  * Renders the admin chrome around every page; the {@link SIDEBAR_COOKIE} cookie (set by
