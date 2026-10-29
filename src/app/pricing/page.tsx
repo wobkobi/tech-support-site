@@ -5,7 +5,7 @@
 import { hourLabel } from "@/features/booking/lib/booking";
 import { GetEstimateButton } from "@/features/business/components/GetEstimateButton";
 import { PricingWizard } from "@/features/business/components/PricingWizard";
-import { formatMoneyCompact } from "@/features/business/lib/business";
+import { formatMoneyCompact, goldCardOffText } from "@/features/business/lib/business";
 import {
   cancellationCopy,
   minimumsCopy,
@@ -271,6 +271,12 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               <strong>Parts at cost, no markup.</strong> You approve the price first.{" "}
               {policy.GST_REGISTERED ? "Prices include GST." : "Not GST registered."}
             </TickItem>
+            {pricing.goldCardPercent !== null && (
+              <TickItem>
+                <strong>SuperGold Card? {goldCardOffText(pricing.goldCardPercent)}.</strong> Just
+                mention it when you book.
+              </TickItem>
+            )}
             <TickItem>
               <strong>Most jobs take 1 to 2 hours.</strong> I'll give you a time estimate before we
               start.

@@ -4,6 +4,7 @@
 import { hourLabel } from "@/features/booking/lib/booking";
 import { formatMoneyCompact } from "@/features/business/lib/business-format";
 import { remoteRateDelta } from "@/features/business/lib/estimate-range";
+import { goldCardPercent } from "@/features/business/lib/gold-card";
 import {
   holidayTakenOn,
   offlineHoliday,
@@ -131,6 +132,8 @@ export interface PublicPricing {
   businessRemoteRate: number;
   /** Customer-facing modifier list rendered in the Modifiers accordion. */
   modifiers: PublicModifier[];
+  /** Gold Card share off home labour (0.15 = 15%); null when there's no Gold Card row. */
+  goldCardPercent: number | null;
   /** Most-recent updatedAt across all RateConfig rows; powers the "rates last updated" footer. */
   ratesUpdatedAt: Date | null;
 }
@@ -279,6 +282,7 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
     businessRate,
     businessRemoteRate,
     modifiers,
+    goldCardPercent: goldCardPercent(rows),
     ratesUpdatedAt: isoMax ? new Date(isoMax) : null,
   };
 });
