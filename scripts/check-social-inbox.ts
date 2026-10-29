@@ -667,6 +667,7 @@ console.log("Suggestion requests");
       text: "Great job",
       earlier: [{ fromUs: true, text: "Thanks!" }],
       postText: null,
+      tried: [],
     },
   );
   expectEqual("no app", parseReplyRequest({ text: "hi" }), { error: "Say which app it's on." });
@@ -705,6 +706,15 @@ console.log("Suggestion requests");
     "error" in many ? "error" : [many.earlier.length, many.earlier[0]?.text],
     [10, "m5"],
   );
+  const again = parseReplyRequest({
+    platform: "facebook",
+    text: "hi",
+    tried: ["one", "two", "three", "  ", "four"],
+  });
+  expectEqual("last 3 tried kept, blanks dropped", "error" in again ? "error" : again.tried, [
+    "three",
+    "four",
+  ]);
 }
 
 console.log("Review post brief");

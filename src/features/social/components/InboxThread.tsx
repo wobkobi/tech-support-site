@@ -23,6 +23,7 @@ import type {
 import {
   dmAppLabel,
   messageWhen,
+  REPLY_TRIED_MAX,
   replyLength,
   replyLimit,
   replyProblem,
@@ -79,6 +80,8 @@ export function InboxThread({
   const [sending, setSending] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [looksLikeSpam, setLooksLikeSpam] = useState(false);
+  // Suggestions already given for the message being answered, so Suggest again writes a fresh one.
+  const [tried, setTried] = useState<{ at: string; replies: string[] }>({ at: "", replies: [] });
   // The message an action is running on, so only its buttons wait.
   const [acting, setActing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<InboxMessage | null>(null);
@@ -174,6 +177,7 @@ export function InboxThread({
     if (!answer) return;
     setSuggesting(true);
     const at = thread.messages.indexOf(answer);
+    const before = tried.at === answer.id ? tried.replies : [];
     const res = await callApi<{ reply: string; hide: boolean }>(
       "/api/admin/social/inbox/suggest",
       "POST",
@@ -188,6 +192,7 @@ export function InboxThread({
           .filter((m) => !m.gone)
           .map((m) => ({ fromUs: m.fromUs, text: m.text })),
         postText: direct ? null : thread.post.text,
+        tried: before,
       },
     );
     setSuggesting(false);
@@ -196,7 +201,9 @@ export function InboxThread({
       return;
     }
     setLooksLikeSpam(res.hide && thread.platform !== "google");
-    if (res.reply) setText(res.reply);
+    if (!res.reply) return;
+    setText(res.reply);
+    setTried({ at: answer.id, replies: [...before, res.reply].slice(-REPLY_TRIED_MAX) });
   }
 
   /** Copies the review template and opens it with Draft with AI ready to fill from this review. */
