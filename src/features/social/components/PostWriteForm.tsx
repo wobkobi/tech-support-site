@@ -8,6 +8,7 @@ import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
+import { AdminTimeSelect } from "@/features/admin/components/ui/AdminTimeSelect";
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { InsertMenu, type InsertGroup } from "@/features/admin/components/ui/InsertMenu";
@@ -587,26 +588,20 @@ export function PostWriteForm({
                 {!allDay && (
                   <div className="grid gap-4 sm:grid-cols-2">
                     <AdminField label="Starts at" htmlFor={`${fieldId}-event-start-time`}>
-                      <AdminInput
+                      <AdminTimeSelect
                         id={`${fieldId}-event-start-time`}
-                        type="time"
-                        step={300}
+                        stepMins={5}
                         value={content.eventStartTime}
-                        onChange={(e) =>
-                          setContent((c) => ({ ...c, eventStartTime: e.target.value }))
-                        }
+                        onChange={(eventStartTime) => setContent((c) => ({ ...c, eventStartTime }))}
                         disabled={!editable}
                       />
                     </AdminField>
                     <AdminField label="Ends at" htmlFor={`${fieldId}-event-end-time`}>
-                      <AdminInput
+                      <AdminTimeSelect
                         id={`${fieldId}-event-end-time`}
-                        type="time"
-                        step={300}
+                        stepMins={5}
                         value={content.eventEndTime}
-                        onChange={(e) =>
-                          setContent((c) => ({ ...c, eventEndTime: e.target.value }))
-                        }
+                        onChange={(eventEndTime) => setContent((c) => ({ ...c, eventEndTime }))}
                         disabled={!editable}
                       />
                     </AdminField>

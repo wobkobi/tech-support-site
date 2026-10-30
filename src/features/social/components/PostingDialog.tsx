@@ -3,8 +3,8 @@
 // Sends a content item out once: a posting made now or at a set time, with the caption picked.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminDateTimeInput } from "@/features/admin/components/ui/AdminDateTimeInput";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
-import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
@@ -24,7 +24,7 @@ const SNIPPET = 60;
  * The time the dialog starts on: the one asked for while it's still ahead, else the top of the
  * next hour.
  * @param wanted - ISO time asked for, if any.
- * @returns A datetime-local value in NZ time.
+ * @returns An NZ "YYYY-MM-DDTHH:mm" value for the picker.
  */
 function startTime(wanted: string | undefined): string {
   if (wanted && Date.parse(wanted) > Date.now() + 60_000) return toNzInputValue(new Date(wanted));
@@ -200,12 +200,7 @@ export function PostingDialog({
         </fieldset>
         {when === "later" && (
           <AdminField label="Date and time" htmlFor={`${id}-at`}>
-            <AdminInput
-              id={`${id}-at`}
-              type="datetime-local"
-              value={at}
-              onChange={(e) => setAt(e.target.value)}
-            />
+            <AdminDateTimeInput id={`${id}-at`} timeLabel="Post time" value={at} onChange={setAt} />
           </AdminField>
         )}
         {choices.length > 1 ? (

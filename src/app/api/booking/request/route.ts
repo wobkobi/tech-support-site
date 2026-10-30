@@ -21,6 +21,7 @@ import {
   loadBlockingBookings,
   loadBlockingEvents,
 } from "@/features/booking/lib/existing-bookings.server";
+import { loadOwnerBookingSummary } from "@/features/booking/lib/owner-booking-summary.server";
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 
 import { recordPromoRedemption } from "@/features/business/lib/promo-redemption";
@@ -438,18 +439,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // Send before returning, or Vercel kills the function; helpers never throw.
       const { comms } = settings;
       await Promise.all([
-        sendOwnerBookingNotification({
-          id: booking.id,
-          name: booking.name,
-          email: booking.email,
-          notes: booking.notes ?? "",
-          startAt: booking.startAt,
-          endAt: booking.endAt,
-          cancelToken: booking.cancelToken,
-          address: combineUnitAndAddress(booking.unit ?? "", booking.address ?? ""),
-          meetingType: booking.meetingType,
-          accessNotes: booking.accessNotes,
-        }),
+        loadOwnerBookingSummary(booking.id).then((ownerSummary) =>
+          sendOwnerBookingNotification({
+            id: booking.id,
+            name: booking.name,
+            email: booking.email,
+            notes: booking.notes ?? "",
+            startAt: booking.startAt,
+            endAt: booking.endAt,
+            cancelToken: booking.cancelToken,
+            address: combineUnitAndAddress(booking.unit ?? "", booking.address ?? ""),
+            meetingType: booking.meetingType,
+            accessNotes: booking.accessNotes,
+            ownerSummary,
+          }),
+        ),
         ...(comms.pushOnBooking
           ? [
               sendOwnerPush({

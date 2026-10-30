@@ -293,7 +293,10 @@ OTHER RULES:
     - "Cruxtec NVMe & NGFF Dual Protocol M.2 SSD to USB-C Enclosure - Aluminum 10Gbps - Up to 4TB" → "Cruxtec M.2 SSD Enclosure" (enclosure > no defining spec, keep none)
     - "HDMI to VGA Adapter Cable 1080p Gold Plated" → "HDMI to VGA adapter" (no brand - omit it)
     - "thermal paste" → "thermal paste" (already minimal)
-- notes: A single professional sentence suitable for the invoice footer. Use empty string if nothing meaningful to add.
+- notes: did a FREE / NO-CHARGE WORK rule above take work or minutes off this job (work stated free, the return visit after a no-fix, or workmanship fallout)?
+  - YES: the one professional sentence that rule asks for, printed in the invoice footer.
+  - NO: notes is "". Nothing else ever goes in notes.
+  INVARIANT - notes never lists, sums up or restates the work. The line items already say what was done, so "Wi-Fi setup and data transfer completed during the on-site session." is always wrong: return "".
 - confidence: "high" if all session times are clearly stated. "medium" if some times were estimated. "low" if mostly guessed.
 - warnings[]: Flag anything ambiguous, assumed, or conflicting in plain English.
 - trips[]: write this list FIRST - storeRuns and the destination decision below both read from it. LIST every trip the description names, in the order it names them. Read to the final sentence before listing - a supply run is normally named after the visit it followed. One entry per trip:

@@ -5,6 +5,7 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminTimeSelect } from "@/features/admin/components/ui/AdminTimeSelect";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
@@ -208,11 +209,10 @@ export function CancelFeeSection({
           />
         </AdminField>
         <AdminField label="Booking start time" htmlFor="cancel-booking-time">
-          <AdminInput
+          <AdminTimeSelect
             id="cancel-booking-time"
-            type="time"
             value={bookingTime}
-            onChange={(e) => onBookingTimeChange(e.target.value)}
+            onChange={onBookingTimeChange}
           />
         </AdminField>
       </div>
@@ -229,11 +229,11 @@ export function CancelFeeSection({
             />
           </AdminField>
           <AdminField label="At" htmlFor="cancel-at-time">
-            <AdminInput
+            <AdminTimeSelect
               id="cancel-at-time"
-              type="time"
               value={cancelledAtTime}
-              onChange={(e) => onCancelledAtTimeChange(e.target.value)}
+              onChange={onCancelledAtTimeChange}
+              stepMins={5}
             />
           </AdminField>
         </div>

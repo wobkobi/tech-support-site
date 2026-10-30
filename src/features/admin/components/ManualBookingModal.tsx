@@ -4,6 +4,7 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { AdminDateTimeInput } from "@/features/admin/components/ui/AdminDateTimeInput";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
@@ -228,13 +229,14 @@ export function ManualBookingModal({
       }
     >
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {/* Start holds a date and a time box, so it takes the wider column. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <AdminField label="Start" htmlFor="mb-start" required>
-            <AdminInput
+            <AdminDateTimeInput
               id="mb-start"
-              type="datetime-local"
+              timeLabel="Start time"
               value={startAtLocal}
-              onChange={(e) => setStartAtLocal(e.target.value)}
+              onChange={setStartAtLocal}
               required
             />
           </AdminField>

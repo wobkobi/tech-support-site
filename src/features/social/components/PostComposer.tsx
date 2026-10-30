@@ -5,8 +5,8 @@
 // shows is what goes out.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminDateTimeInput } from "@/features/admin/components/ui/AdminDateTimeInput";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
-import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
@@ -1688,11 +1688,11 @@ export function PostComposer({
         }
       >
         <AdminField label="Date and time" htmlFor={scheduleFieldId}>
-          <AdminInput
+          <AdminDateTimeInput
             id={scheduleFieldId}
-            type="datetime-local"
+            timeLabel="Post time"
             value={scheduling ?? ""}
-            onChange={(e) => setScheduling(e.target.value)}
+            onChange={setScheduling}
           />
         </AdminField>
       </Modal>

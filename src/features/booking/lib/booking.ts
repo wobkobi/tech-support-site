@@ -9,6 +9,7 @@ import {
   dateKeyParts,
   getPacificAucklandOffset,
   nzMidnightUtc,
+  nzMinuteOfDay,
   nzWallClockUtc,
   weekdayOf,
 } from "@/shared/lib/timezone-utils";
@@ -40,6 +41,55 @@ export function replaceUserNotes(raw: string | null, userNotes: string): string 
   const text = userNotes.trim();
   if (!meta) return text;
   return text ? `${text}\n\n${meta}` : meta;
+}
+
+/**
+ * Rewrites a notes blob's slot line for a moved booking. A customer booking's
+ * "[2pm - Standard (60 min)]" takes the new start and length; a manual
+ * "[Manual entry by admin - 60 min]" takes the new length. The rest of the blob is unchanged.
+ * @param raw - Existing notes blob.
+ * @param startAt - The new start.
+ * @param endAt - The new finish.
+ * @param durations - The booking lengths (minutes) that read as Standard and Extended.
+ * @param durations.short - Standard length.
+ * @param durations.long - Extended length.
+ * @returns The rebuilt blob, or null when it has no slot line this knows how to rewrite.
+ */
+export function replaceSlotLine(
+  raw: string | null,
+  startAt: Date,
+  endAt: Date,
+  durations: { short: number; long: number },
+): string | null {
+  const { userNotes, meta } = splitNotesBlob(raw);
+  // The slot line is the metadata block's first line: "[{time or source} - {length}]".
+  const [first = "", ...rest] = meta.split("\n");
+  const slot = /^\[(.+?) - .+\]$/.exec(first);
+  if (!slot) return null;
+
+  const mins = Math.round((endAt.getTime() - startAt.getTime()) / 60_000);
+  let line: string;
+  if (/^\d{1,2}(:\d{2})?(am|pm)$/i.test(slot[1]!)) {
+    const ofDay = nzMinuteOfDay(startAt);
+    const hour = hourLabel(Math.floor(ofDay / 60));
+    const minute = ofDay % 60;
+    const time =
+      minute === 0 ? hour : hour.replace(/(am|pm)$/, `:${String(minute).padStart(2, "0")}$1`);
+    const length =
+      mins === durations.short
+        ? `Standard (${mins} min)`
+        : mins === durations.long
+          ? `Extended (${mins} min)`
+          : `${mins} min`;
+    line = `[${time} - ${length}]`;
+  } else if (slot[1] === "Manual entry by admin") {
+    line = `[${slot[1]} - ${mins} min]`;
+  } else {
+    return null;
+  }
+
+  const rebuilt = [line, ...rest].join("\n");
+  return userNotes ? `${userNotes}\n\n${rebuilt}` : rebuilt;
 }
 
 /**

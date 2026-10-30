@@ -11,6 +11,8 @@ export interface ParseCase {
   input: string;
   /** "exact" (default) hard-asserts durationMins === calcSessionMins(input); "info" is report-only. */
   expectMode?: "exact" | "info";
+  /** Hard-asserts the invoice footer note when pinned: "empty" wants "", "set" wants a sentence. */
+  notes?: "empty" | "set";
 }
 
 /** An authored estimate case (drift + reproducibility are report-only, no hard assert). */
@@ -175,6 +177,34 @@ export const PARSE_CASES: ParseCase[] = [
     id: "parse-booked-plus-later-visit",
     input:
       "2026-10-07\n16:30-17:30\nTV setup\nPrinter setup\n\nAlready paid $47.00\n\nMacBook printer set up Friday, 1:46 pm to 2:05 pm",
+  },
+  // > Footer note: only free work earns one; the line items already say what was done.
+  {
+    id: "parse-notes-plain-job",
+    input:
+      "6:30-8:25pm\nWi-Fi network setup\nPhone data transfer old phone to new\nFactory reset old phone",
+    expectMode: "info",
+    notes: "empty",
+  },
+  {
+    id: "parse-notes-chatty-job",
+    input:
+      "10-11:30am\nSet up her new laptop and moved her files across. Showed her how to use email, she was really happy. Will book again for the printer.",
+    expectMode: "info",
+    notes: "empty",
+  },
+  {
+    id: "parse-notes-free-followup",
+    input:
+      "2-3pm\nPrinter driver reinstall\nThe last 20 min was a free follow-up on the router setup from last week",
+    expectMode: "info",
+    notes: "set",
+  },
+  {
+    id: "parse-notes-whole-visit-free",
+    input: "Popped round 4-4:30pm to check the wifi I set up last week, no charge",
+    expectMode: "info",
+    notes: "set",
   },
 ];
 
