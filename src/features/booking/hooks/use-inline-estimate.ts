@@ -176,6 +176,8 @@ export function useInlineEstimate(inputs: InlineEstimateInputs): InlineEstimateS
         departureTimeIso: slotStart?.toISOString(),
         returnDepartureTimeIso: slotEnd?.toISOString(),
         surchargePerHour: surcharge?.perHour ?? 0,
+        // Standard is the default pick, so only Extended says anything about the job's length.
+        bookedMins: duration === "long" ? durations.long : undefined,
         promoCode,
         email,
       });

@@ -66,12 +66,20 @@ export async function loadOwnerBookingSummary(
       ...r,
       createdAt: r.createdAt.toISOString(),
     }));
-    const tasks =
+    const estimated =
       booking.quotedTasksAtBooking.length > 0
         ? booking.quotedTasksAtBooking
         : booking.quotedMinsAtBooking
           ? [{ label: "Labour", mins: booking.quotedMinsAtBooking }]
           : [];
+    // An Extended booking's quote covers the whole session, so its tasks are padded out to
+    // the booked length to match what the customer was shown.
+    const bookedMins = Math.round((booking.endAt.getTime() - booking.startAt.getTime()) / 60_000);
+    const taskMins = estimated.reduce((s, t) => s + t.mins, 0);
+    const tasks =
+      booking.duration === "long" && taskMins > 0 && taskMins < bookedMins
+        ? [...estimated, { label: "Rest of the booked session", mins: bookedMins - taskMins }]
+        : estimated;
     const travel =
       booking.meetingType !== "remote" && booking.travelMinsAtBooking != null
         ? {

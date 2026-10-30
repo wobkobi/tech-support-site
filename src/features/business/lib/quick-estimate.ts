@@ -36,6 +36,8 @@ export interface QuickEstimateInput {
   returnDepartureTimeIso?: string;
   /** Weekend, after-hours or public-holiday surcharge in $/hr (e.g. 10); omitted or 0 for none. */
   surchargePerHour?: number;
+  /** Session length picked on purpose (Extended); the band covers at least this much labour. */
+  bookedMins?: number;
   /** Entered promo code; a valid one beats the automatic promo, an invalid one is ignored. */
   promoCode?: string | null;
   /** Booking email, so a per-customer code is judged as the booking will judge it. */
@@ -183,7 +185,8 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     tasks = Array.isArray(ai.tasks) ? ai.tasks : [];
   }
 
-  const effectiveMins = Math.max(minBillableMins, estimatedMins);
+  // A longer session picked on purpose says the job runs past the AI's task estimate.
+  const effectiveMins = Math.max(minBillableMins, estimatedMins, input.bookedMins ?? 0);
   const rawTravel = calcTravelCharge(
     travelMins,
     travelMinsBack,
