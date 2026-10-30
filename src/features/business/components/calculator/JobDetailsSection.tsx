@@ -6,6 +6,7 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminTimeSelect } from "@/features/admin/components/ui/AdminTimeSelect";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
@@ -132,11 +133,11 @@ export function JobDetailsSection({
                       Start
                     </label>
                   )}
-                  <AdminInput
+                  <AdminTimeSelect
                     id={`time-slot-${index}-start`}
-                    type="time"
                     value={range.startTime}
-                    onChange={(e) => patchRange(index, { startTime: e.target.value })}
+                    onChange={(startTime) => patchRange(index, { startTime })}
+                    stepMins={5}
                     aria-invalid={issue?.tone === "warn"}
                     className={cn(issue?.tone === "warn" && "border-amber-400")}
                   />
@@ -147,11 +148,11 @@ export function JobDetailsSection({
                       End
                     </label>
                   )}
-                  <AdminInput
+                  <AdminTimeSelect
                     id={`time-slot-${index}-end`}
-                    type="time"
                     value={range.endTime}
-                    onChange={(e) => patchRange(index, { endTime: e.target.value })}
+                    onChange={(endTime) => patchRange(index, { endTime })}
+                    stepMins={5}
                     aria-invalid={issue?.tone === "warn"}
                     className={cn(issue?.tone === "warn" && "border-amber-400")}
                   />

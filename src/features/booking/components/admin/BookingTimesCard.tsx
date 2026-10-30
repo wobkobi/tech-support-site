@@ -5,8 +5,8 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { AdminDateTimeInput } from "@/features/admin/components/ui/AdminDateTimeInput";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
-import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { ADMIN_META_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
@@ -76,6 +76,19 @@ export function BookingTimesCard({
     setForm({ start: toNzInputValue(startAt), end: toNzInputValue(endAt) });
     setNotifyCustomer(true);
     setEditing(false);
+  }
+
+  /**
+   * Sets the start and shifts the finish by the same amount, so the booking keeps its length.
+   * Moving the finish leaves the start where it is.
+   * @param start - The new NZ start value, or "" when cleared.
+   */
+  function moveStart(start: string): void {
+    setForm((f) => {
+      if (!start || !f.start || !f.end) return { ...f, start };
+      const shift = fromNzInputValue(start).getTime() - fromNzInputValue(f.start).getTime();
+      return { start, end: toNzInputValue(new Date(fromNzInputValue(f.end).getTime() + shift)) };
+    });
   }
 
   /**
@@ -155,20 +168,20 @@ export function BookingTimesCard({
           </p>
         )}
         <AdminField label="Start" htmlFor={`edit-start-${id}`}>
-          <AdminInput
+          <AdminDateTimeInput
             id={`edit-start-${id}`}
-            type="datetime-local"
+            timeLabel="Start time"
             value={form.start}
-            onChange={(e) => setForm((f) => ({ ...f, start: e.target.value }))}
+            onChange={moveStart}
             disabled={saving}
           />
         </AdminField>
         <AdminField label="Finish" htmlFor={`edit-end-${id}`}>
-          <AdminInput
+          <AdminDateTimeInput
             id={`edit-end-${id}`}
-            type="datetime-local"
+            timeLabel="Finish time"
             value={form.end}
-            onChange={(e) => setForm((f) => ({ ...f, end: e.target.value }))}
+            onChange={(end) => setForm((f) => ({ ...f, end }))}
             disabled={saving}
           />
         </AdminField>

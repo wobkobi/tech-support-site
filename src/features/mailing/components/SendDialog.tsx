@@ -5,6 +5,7 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
+import { AdminDateTimeInput } from "@/features/admin/components/ui/AdminDateTimeInput";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Modal } from "@/features/admin/components/ui/Modal";
@@ -37,7 +38,7 @@ function hourLabel(hour: number): string {
  * Default time for the schedule picker: the end of quiet hours if it's quiet now,
  * otherwise an hour from now on the hour.
  * @param quiet - Live quiet-hours window.
- * @returns NZ datetime-local value.
+ * @returns NZ "YYYY-MM-DDTHH:mm" value for the picker.
  */
 function defaultScheduleValue(quiet: QuietHours): string {
   const held = nextSendTime(quiet);
@@ -286,11 +287,11 @@ export function SendDialog({
 
         {mode === "schedule" && (
           <AdminField label="When (NZ time)" htmlFor={whenId}>
-            <AdminInput
+            <AdminDateTimeInput
               id={whenId}
-              type="datetime-local"
+              timeLabel="Send time"
               value={when}
-              onChange={(e) => setWhen(e.target.value)}
+              onChange={setWhen}
               className="max-w-xs"
             />
             {scheduleMovedTo && (
@@ -362,7 +363,7 @@ export function SendDialog({
 }
 
 /**
- * Reads a datetime-local value as NZ time.
+ * Reads the picker's "YYYY-MM-DDTHH:mm" value as NZ time.
  * @param value - Input value.
  * @returns The instant, or null when the field is incomplete.
  */

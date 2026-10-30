@@ -7,6 +7,7 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminTimeSelect } from "@/features/admin/components/ui/AdminTimeSelect";
 import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { TEXT_ACTION_CLS } from "@/features/business/components/calculator/calculator-classes";
 import { PROMO_TAG_CLS } from "@/features/business/components/promo-list-helpers";
@@ -242,20 +243,18 @@ export function PromoAdvancedOptions({
           </div>
           <div className="flex flex-wrap items-end gap-4">
             <AdminField label="From" htmlFor={`${id}-from`}>
-              <AdminInput
+              <AdminTimeSelect
                 id={`${id}-from`}
-                type="time"
                 value={form.activeFrom}
-                onChange={(e) => setForm((p) => ({ ...p, activeFrom: e.target.value }))}
+                onChange={(activeFrom) => setForm((p) => ({ ...p, activeFrom }))}
                 className="w-32"
               />
             </AdminField>
             <AdminField label="To" htmlFor={`${id}-to`}>
-              <AdminInput
+              <AdminTimeSelect
                 id={`${id}-to`}
-                type="time"
                 value={form.activeTo}
-                onChange={(e) => setForm((p) => ({ ...p, activeTo: e.target.value }))}
+                onChange={(activeTo) => setForm((p) => ({ ...p, activeTo }))}
                 className="w-32"
               />
             </AdminField>

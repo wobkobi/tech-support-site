@@ -7,6 +7,7 @@ import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
+import { AdminTimeSelect } from "@/features/admin/components/ui/AdminTimeSelect";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { StickyRail } from "@/features/admin/components/ui/StickyRail";
 import { useToast } from "@/features/admin/components/ui/Toast";
@@ -418,13 +419,12 @@ export function QuickPriceView({
 
           <div className="grid grid-cols-2 gap-3">
             <AdminField label="Start" htmlFor="quick-start">
-              {/* min-w-0 + appearance-none: iOS Safari time inputs otherwise overflow a half column. */}
-              <AdminInput
+              <AdminTimeSelect
                 id="quick-start"
-                type="time"
                 value={start}
-                onChange={(e) => setStart(e.target.value)}
-                className="block min-w-0 appearance-none"
+                onChange={setStart}
+                stepMins={5}
+                className="min-w-0"
               />
             </AdminField>
             <div>
@@ -440,12 +440,12 @@ export function QuickPriceView({
                   Now
                 </button>
               </div>
-              <AdminInput
+              <AdminTimeSelect
                 id="quick-end"
-                type="time"
                 value={end}
-                onChange={(e) => setEnd(e.target.value)}
-                className="block min-w-0 appearance-none"
+                onChange={setEnd}
+                stepMins={5}
+                className="min-w-0"
               />
               {prefill && end !== prefill.bookedEnd && (
                 <p className="mt-1 text-sm text-admin-text-secondary">
