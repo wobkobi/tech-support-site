@@ -62,6 +62,23 @@ const booking = {
   address: "1 Queen Street & Co, Auckland",
   meetingType: "in_person" as const,
   rescheduleCount: 0,
+  ownerSummary: {
+    phone: "021 000 0000",
+    phoneTel: "+64210000000",
+    history: `Returning customer ${PAYLOAD}`,
+    breakdown: {
+      fullRate: 100,
+      promoRate: 65,
+      promoTitle: "Winter <special>",
+      tasks: [{ label: `Modem setup ${PAYLOAD}`, mins: 45, amount: 48.75 }],
+      tasksTotal: 48.75,
+      surcharge: { reason: "After hours", perHour: 10, amount: 7.5 },
+      promoDiscount: 0,
+      travel: { amount: 10, minsThere: 2, minsBack: 2 },
+      total: 66.25,
+      quoted: "$55 - $90 + $10 travel",
+    },
+  },
 };
 
 const enquiry: BusinessEnquiryData = {

@@ -22,6 +22,7 @@ import {
   loadBlockingBookings,
   loadBlockingEvents,
 } from "@/features/booking/lib/existing-bookings.server";
+import { loadOwnerBookingSummary } from "@/features/booking/lib/owner-booking-summary.server";
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import {
@@ -519,20 +520,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             }
           : { kind: "updated" },
       ),
-      sendOwnerBookingNotification(
-        {
-          id: booking.id,
-          name: cleanName,
-          email: booking.email,
-          notes: bookingNotes,
-          accessNotes: cleanAccessNotes,
-          startAt,
-          endAt,
-          cancelToken: booking.cancelToken,
-          address: canonicalAddress ?? "",
-          meetingType: nextMeetingType,
-        },
-        slotMoved ? { kind: "rescheduled", previousStartAt } : { kind: "updated" },
+      loadOwnerBookingSummary(booking.id).then((ownerSummary) =>
+        sendOwnerBookingNotification(
+          {
+            id: booking.id,
+            name: cleanName,
+            email: booking.email,
+            notes: bookingNotes,
+            accessNotes: cleanAccessNotes,
+            startAt,
+            endAt,
+            cancelToken: booking.cancelToken,
+            address: canonicalAddress ?? "",
+            meetingType: nextMeetingType,
+            ownerSummary,
+          },
+          slotMoved ? { kind: "rescheduled", previousStartAt } : { kind: "updated" },
+        ),
       ),
       ...(comms?.pushOnBooking
         ? [

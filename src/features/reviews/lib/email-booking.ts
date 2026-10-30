@@ -3,6 +3,14 @@
 
 import { buildAppointmentDescription, parseBookingNotes } from "@/features/booking/lib/booking";
 import { buildIcs } from "@/features/booking/lib/ics";
+import type { OwnerBookingSummary } from "@/features/booking/lib/owner-booking-summary.server";
+import type { OwnerQuoteBreakdown } from "@/features/booking/lib/owner-quote";
+import {
+  formatBilledTime,
+  formatMins,
+  formatMoneyCompact,
+  formatNZD,
+} from "@/features/business/lib/business-format";
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import {
@@ -34,7 +42,7 @@ export interface BookingNotificationData {
   name: string;
   /** Customer email */
   email: string;
-  /** Formatted notes (time slot, meeting type, address, phone, description) */
+  /** Formatted notes (description, time slot, meeting type, address, quoted range) */
   notes: string;
   /** Appointment start (UTC) */
   startAt: Date;
@@ -54,6 +62,8 @@ export interface BookingNotificationData {
   rescheduleCount?: number;
   /** Parking, directions and other visit details from the booking form's second box. */
   accessNotes?: string | null;
+  /** Owner email only: phone, customer history and the priced quote; null or absent hides them. */
+  ownerSummary?: OwnerBookingSummary | null;
 }
 
 /**
@@ -140,6 +150,109 @@ function ownerMapHtml(booking: BookingNotificationData): string {
 }
 
 /**
+ * One label/amount row of the owner's price breakdown. The space between the cells keeps
+ * label and amount apart in the text part, which drops the table markup.
+ * @param label - Left cell, already escaped.
+ * @param amount - Right cell, already escaped.
+ * @param border - Optional top border CSS, for the subtotal and total rows.
+ * @returns HTML table row.
+ */
+function breakdownRow(label: string, amount: string, border = ""): string {
+  const edge = border ? `;border-top:${border}` : "";
+  return `<tr><td style="padding:6px 12px 6px 0;vertical-align:top${edge}">${label}</td> <td style="padding:6px 0;text-align:right;vertical-align:top;white-space:nowrap${edge}">${amount}</td></tr>`;
+}
+
+/**
+ * Owner-only price breakdown: the rate (full > promo), the AI tasks at the promo rate, the
+ * date surcharge, travel and the total, then the range the customer was quoted.
+ * @param b - The booking's priced quote.
+ * @returns HTML fragment.
+ */
+function ownerBreakdownHtml(b: OwnerQuoteBreakdown): string {
+  /**
+   * Greys out secondary text in a row (task minutes, the drive, the full rate).
+   * @param text - Already-escaped text.
+   * @returns HTML span.
+   */
+  const grey = (text: string): string => `<span style="color:#888">${text}</span>`;
+  const shownRate = b.promoRate ?? b.fullRate;
+  const rows: string[] = [
+    breakdownRow(
+      "Rate",
+      (b.promoRate !== null
+        ? `${grey(`${formatMoneyCompact(b.fullRate)}/hr`)} &gt; <strong>${formatMoneyCompact(b.promoRate)}/hr</strong>`
+        : `${formatMoneyCompact(b.fullRate)}/hr`) +
+        (b.promoRate !== null && b.promoTitle
+          ? `<br><span style="font-size:13px;color:#888">${escapeHtml(b.promoTitle)}</span>`
+          : ""),
+    ),
+  ];
+  for (const t of b.tasks) {
+    rows.push(
+      breakdownRow(`${escapeHtml(t.label)} ${grey(formatMins(t.mins))}`, formatNZD(t.amount)),
+    );
+  }
+  if (b.tasks.length > 0) {
+    rows.push(
+      breakdownRow(
+        `Tasks at ${formatMoneyCompact(shownRate)}/hr`,
+        formatNZD(b.tasksTotal),
+        "1px solid #e5e7eb",
+      ),
+    );
+  }
+  if (b.surcharge) {
+    const perHour = `+${formatMoneyCompact(b.surcharge.perHour)}/hr`;
+    rows.push(
+      b.surcharge.amount !== null
+        ? breakdownRow(
+            `${escapeHtml(b.surcharge.reason)} ${perHour}`,
+            `+${formatNZD(b.surcharge.amount)}`,
+          )
+        : breakdownRow(escapeHtml(b.surcharge.reason), perHour),
+    );
+  }
+  if (b.promoDiscount > 0) {
+    rows.push(breakdownRow(escapeHtml(b.promoTitle ?? "Promo"), formatNZD(-b.promoDiscount)));
+  }
+  if (b.travel) {
+    const { minsThere, minsBack } = b.travel;
+    const drive =
+      minsThere === minsBack
+        ? `${minsThere} min each way`
+        : `${minsThere} min there, ${minsBack} back`;
+    rows.push(breakdownRow(`Travel ${grey(drive)}`, formatNZD(b.travel.amount)));
+  }
+  if (b.total !== null) {
+    rows.push(
+      breakdownRow(
+        "<strong>Total</strong>",
+        `<strong>${formatNZD(b.total)}</strong>`,
+        "2px solid #0c0a3e",
+      ),
+    );
+  }
+
+  const billedMins = b.tasks.reduce((s, t) => s + t.mins, 0);
+  const heading =
+    billedMins > 0
+      ? `Price breakdown (estimate, ${formatBilledTime(billedMins)})`
+      : "Price breakdown";
+  const footnotes = [
+    b.quoted ? `They were quoted ${escapeHtml(b.quoted)}.` : "",
+    b.tasks.length > 0
+      ? "Priced from the AI's task times; the invoice bills the real time."
+      : "No estimate was run, so there are no task costs yet.",
+  ].filter(Boolean);
+
+  return `<div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:20px">
+      <p style="margin:0 0 8px;font-size:14px;color:#888">${heading}</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;color:#444;line-height:1.5">${rows.join("")}</table>
+      <p style="margin:12px 0 0;font-size:13px;color:#888;line-height:1.5">${footnotes.join("<br>")}</p>
+    </div>`;
+}
+
+/**
  * Builds the `.ics` attachment sent with the customer's booking emails.
  * @param booking - The booking being emailed about.
  * @returns A Resend attachment list holding one calendar file.
@@ -208,6 +321,21 @@ export async function sendOwnerBookingNotification(
   const safeName = escapeHtml(booking.name);
   const safeEmail = escapeHtml(booking.email);
   const safeMailto = encodeURIComponent(booking.email);
+  const summary = booking.ownerSummary ?? null;
+  /**
+   * A fixed-width grey label so the phone and email values line up.
+   * @param text - Label text, already safe.
+   * @returns HTML span with a trailing space for the text part.
+   */
+  const label = (text: string): string =>
+    `<span style="display:inline-block;min-width:56px;color:#888">${text}</span> `;
+  const historyLine = summary
+    ? `<p style="margin:0 0 12px;font-size:13px;color:#555">${escapeHtml(summary.history)}</p>`
+    : "";
+  const phoneLine =
+    summary?.phone && summary.phoneTel
+      ? `<p style="margin:0 0 4px;font-size:14px;color:#444">${label("Phone")}<a href="tel:${summary.phoneTel.replace(/[^+\d]/g, "")}" style="color:#43bccd">${escapeHtml(summary.phone)}</a></p>`
+      : "";
 
   const heading =
     kind === "rescheduled"
@@ -234,12 +362,16 @@ export async function sendOwnerBookingNotification(
 
     <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:20px">
       <p style="margin:0 0 4px;font-size:14px;color:#888">Customer</p>
-      <p style="margin:0 0 12px;font-size:15px;color:#0c0a3e;font-weight:600">${safeName}</p>
-      <p style="margin:0 0 12px;font-size:14px;color:#444"><a href="mailto:${safeMailto}" style="color:#43bccd">${safeEmail}</a></p>
+      <p style="margin:0 0 ${historyLine ? "2px" : "12px"};font-size:15px;color:#0c0a3e;font-weight:600">${safeName}</p>
+      ${historyLine}
+      ${phoneLine}
+      <p style="margin:0 0 12px;font-size:14px;color:#444">${summary ? label("Email") : ""}<a href="mailto:${safeMailto}" style="color:#43bccd">${safeEmail}</a></p>
       <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${notesHtml}</p>
     </div>
 
     ${accessNotesPanel(booking)}
+
+    ${summary?.breakdown ? ownerBreakdownHtml(summary.breakdown) : ""}
 
     ${ownerMapHtml(booking)}
 `);

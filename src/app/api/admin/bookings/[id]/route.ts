@@ -12,6 +12,7 @@ import {
   bookingEventSummary,
 } from "@/features/booking/lib/booking-event.server";
 import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
+import { loadOwnerBookingSummary } from "@/features/booking/lib/owner-booking-summary.server";
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 import { assessCancellation } from "@/features/business/lib/pricing-policy";
 import { getPolicy, lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
@@ -486,20 +487,23 @@ export async function PATCH(
           lapsedPromoTitle: movedPromo?.lapsedTitle ?? null,
         },
       ),
-      sendOwnerBookingNotification(
-        {
-          id: updated.id,
-          name: updated.name,
-          email: updated.email,
-          notes: updated.notes ?? "",
-          accessNotes: updated.accessNotes,
-          startAt: timeChange.startAt,
-          endAt: timeChange.endAt,
-          cancelToken: updated.cancelToken,
-          address: emailAddress,
-          meetingType: updated.meetingType,
-        },
-        { kind: "rescheduled", previousStartAt: booking.startAt },
+      loadOwnerBookingSummary(updated.id).then((ownerSummary) =>
+        sendOwnerBookingNotification(
+          {
+            id: updated.id,
+            name: updated.name,
+            email: updated.email,
+            notes: updated.notes ?? "",
+            accessNotes: updated.accessNotes,
+            startAt: timeChange.startAt,
+            endAt: timeChange.endAt,
+            cancelToken: updated.cancelToken,
+            address: emailAddress,
+            meetingType: updated.meetingType,
+            ownerSummary,
+          },
+          { kind: "rescheduled", previousStartAt: booking.startAt },
+        ),
       ),
     ]);
   }
