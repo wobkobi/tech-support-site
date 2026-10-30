@@ -24,6 +24,7 @@ import {
   withinTolerance,
   type CheckResult,
 } from "./assert";
+import type { ParseJobResult } from "./client";
 import type { LiveContext } from "./context";
 
 // Record an errored case and carry on; three in a row means the API is down, so abort.
@@ -45,6 +46,8 @@ interface RawRun {
   input?: string;
   /** Parse cases: "exact" hard-asserts, "info" is report-only. */
   expectMode?: "exact" | "info";
+  /** Parse cases: the pinned footer note, when the case pins one. */
+  notes?: "empty" | "set";
   /** Cross-route cases: the parse-job durationMins for the same input. */
   parseMins?: number;
   /** Travel cases: the decision the route returned, and what was expected. */
@@ -671,6 +674,7 @@ async function collectRaw(
         kind: "parse",
         input: c.input,
         expectMode: c.expectMode ?? "exact",
+        notes: c.notes,
         durations,
         first,
       });
@@ -1011,6 +1015,17 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
               ? ` (canonical ${canonical}, capped at the ${ctx.maxJobMins} min ceiling)`
               : ""
           }`,
+        });
+      }
+      // The footer note, when pinned: free work gets a sentence, anything else none.
+      if (r.notes) {
+        const note = ((r.first as ParseJobResult | null)?.notes ?? "").trim();
+        out.push({
+          id: r.id,
+          family: "context",
+          label: `parse notes ${r.id}`,
+          status: (r.notes === "empty") === (note === "") ? "pass" : "fail",
+          detail: `want ${r.notes === "empty" ? "no note" : "a note"}, got ${note ? JSON.stringify(note) : "none"}`,
         });
       }
     }

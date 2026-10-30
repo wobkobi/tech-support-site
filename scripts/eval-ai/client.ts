@@ -36,6 +36,8 @@ export interface ParseJobResult {
   noTravelCharge?: boolean;
   /** Mid-job drives from the client to a store and back, billed on top of the trip. */
   storeRuns?: string[];
+  /** Invoice footer note; "" when none. */
+  notes?: string;
   clarify?: unknown[];
 }
 
