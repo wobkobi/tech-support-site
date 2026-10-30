@@ -142,8 +142,10 @@ export function Modal({
     <div
       className={cn(
         "fixed inset-0 z-50 flex justify-center bg-black/50 p-4 print:hidden",
+        // A phone sheet keeps clear of the iPhone home indicator. iOS reports the safe-area
+        // inset as 0 without viewport-fit=cover, so the 2rem floor does the work there.
         placement === "sheet"
-          ? "items-end sm:items-center"
+          ? "items-end max-sm:pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] sm:items-center"
           : placement === "top"
             ? "items-start sm:items-center"
             : "items-center",
