@@ -5,6 +5,7 @@ import { getAvailabilityConfig } from "@/features/booking/lib/availability-confi
 import {
   BOOKING_FIELD_LIMITS,
   combineUnitAndAddress,
+  replaceSlotLine,
   splitUnitFromAddress,
 } from "@/features/booking/lib/booking";
 import {
@@ -278,6 +279,19 @@ export async function PATCH(
           console.warn("[admin/bookings] public-holiday lookup failed:", err);
           return null;
         });
+    }
+
+    // The notes' "[2pm - Standard (60 min)]" line follows a live move, unless this request
+    // sends its own notes. A past record keeps the slot as it was booked.
+    if (live && body.notes === undefined) {
+      const { config } = await getAvailabilityConfig();
+      const notes = replaceSlotLine(
+        (data.notes as string | undefined) ?? booking.notes,
+        startAt,
+        endAt,
+        config.durations,
+      );
+      if (notes !== null) data.notes = notes;
     }
 
     // The ICS SEQUENCE comes from rescheduleCount and must rise to supersede.
