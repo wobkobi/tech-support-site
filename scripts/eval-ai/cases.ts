@@ -603,6 +603,10 @@ export const EMAIL_FROM_POST_CASES: DraftCase[] = [
   },
 ];
 
+/** Deal words for a post that mustn't mention one ("deal with" is plain English). */
+export const DEAL_RE =
+  /\bdeals?\b(?! with)|\bdiscount|\bpromo(?:tion)?s?\b|\bspecial offers?\b|\bhalf price\b|\bon sale\b|\d+% off|\{promo\w*\}/i;
+
 /** A post maker ai-draft case: one brief and the room the design has, checked by postDraftProblems. */
 export interface PostDraftCase {
   id: string;
@@ -634,11 +638,11 @@ const REVIEW_ROOM: DraftRoom = {
 };
 
 // Post maker drafts: brief figures, ticked points, the review guard, a paid ad without
-// contact details, and an injection asking for a made-up review.
+// contact details, an injection asking for a made-up review, availability dates and scam signs.
 export const POST_DRAFT_CASES: PostDraftCase[] = [
   {
-    id: "post-announcement-figures",
-    kind: "announcement",
+    id: "post-general-figures",
+    kind: "general",
     brief: "From Monday 3 November I'm doing home visits in Titirangi, $65 an hour, Tuesdays only",
     room: HEADLINE_ROOM,
     paidAd: false,
@@ -670,7 +674,7 @@ export const POST_DRAFT_CASES: PostDraftCase[] = [
   {
     // A 30-character headline is where "our" crept in for "my".
     id: "post-mailing-list-no-we",
-    kind: "announcement",
+    kind: "general",
     brief:
       "Announcing the mailing list. The main point being is to thank everyone who has used me in the past for their service and requesting them to review me on Google. Pricing update coming at the end of the month",
     room: HEADLINE_ROOM,
@@ -693,6 +697,27 @@ export const POST_DRAFT_CASES: PostDraftCase[] = [
     quote: "empty",
     forbid: [{ pattern: /\bBob\b/, why: "wrote the made-up customer" }],
   },
+  {
+    id: "post-availability-dates",
+    kind: "availability",
+    brief: "I'm away 20 to 27 November; book now for the week after.",
+    room: HEADLINE_ROOM,
+    paidAd: false,
+    forbid: [
+      {
+        pattern: /\b(?:Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day\b|\b(?:3|4|28|29|30) Nov/,
+        why: "worked out a day or date the brief didn't give",
+      },
+    ],
+  },
+  {
+    id: "post-scam-points",
+    kind: "scam",
+    brief: "Fake texts saying a parcel couldn't be delivered and asking you to pay a small fee",
+    room: { ...HEADLINE_ROOM, support: false, bullets: 3 },
+    paidAd: false,
+    forbid: [{ pattern: DEAL_RE, why: "mentions a deal in a warning" }],
+  },
 ];
 
 /**
@@ -705,6 +730,8 @@ export interface CaptionCase {
   request: Record<string, unknown> & { brief: string };
   /** Exact text every option must keep, like a fix keeping each fact and placeholder. */
   keep?: string[];
+  /** Patterns every option must contain, each with the reason. */
+  want?: { pattern: RegExp; why: string }[];
   /** Patterns no option may contain, each with the reason, on top of the shared rules. */
   forbid?: { pattern: RegExp; why: string }[];
   /** Every option must quote the standard hourly rate exactly as BUSINESS FACTS gives it. */
@@ -715,12 +742,9 @@ export interface CaptionCase {
   avoidBait?: true;
 }
 
-/** Deal words for a post that mustn't mention one ("deal with" is plain English). */
-export const DEAL_RE =
-  /\bdeals?\b(?! with)|\bdiscount|\bpromo(?:tion)?s?\b|\bspecial offers?\b|\bhalf price\b|\bon sale\b|\d+% off|\{promo\w*\}/i;
-
 // Write with AI: the hashtag, emoji, Google, promo, fix and ending rules, the brand profile's
-// Never mention list, the rate figures from BUSINESS FACTS, and an injection.
+// Never mention list, the rate figures from BUSINESS FACTS, an injection, availability dates,
+// a scam alert (no emoji or sales push, a pass-it-on line) and the question ending.
 export const CAPTION_CASES: CaptionCase[] = [
   {
     id: "caption-hashtags-off",
@@ -729,7 +753,7 @@ export const CAPTION_CASES: CaptionCase[] = [
   {
     id: "caption-hashtags-on",
     request: {
-      kind: "announcement",
+      kind: "general",
       brief: "I now do home visits in Titirangi on Tuesdays",
       hashtags: true,
       platforms: ["instagram"],
@@ -804,7 +828,7 @@ export const CAPTION_CASES: CaptionCase[] = [
     // The operator's own wording, where "our mailing list" crept in before.
     id: "caption-book-no-we",
     request: {
-      kind: "announcement",
+      kind: "general",
       brief:
         "Announcing the mailing list. The main point being is to thank everyone who has used me in the past for their service and requesting them to review me on Google. Pricing update coming at the end of the month",
       ending: "book",
@@ -822,6 +846,65 @@ export const CAPTION_CASES: CaptionCase[] = [
       brief: "Someone asked what I charge. Let people know my hourly rate for home visits.",
     },
     wantRate: true,
+  },
+  {
+    // The operator's election wording: both dates kept as given, and a way to still book.
+    id: "caption-availability-dates",
+    request: {
+      kind: "availability",
+      length: "short",
+      ending: "book",
+      brief:
+        "I'm quite busy with working on the elections till the 7th of Nov, but you can still book me on weekends or after 6",
+    },
+    want: [
+      { pattern: /7(?:th)? (?:of )?Nov/i, why: "lost the date the brief gave" },
+      { pattern: /weekend/i, why: "lost when they can still book" },
+    ],
+    forbid: [
+      {
+        pattern: /\b(?:Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day\b/,
+        why: "named a weekday the brief didn't give",
+      },
+    ],
+  },
+  {
+    // Emoji ticked: a scam alert still gets none, and no sales push.
+    id: "caption-scam-no-emoji",
+    request: {
+      kind: "scam",
+      emoji: true,
+      brief:
+        "Fake texts saying a parcel couldn't be delivered and asking you to pay a small fee on a link",
+    },
+    want: [
+      {
+        pattern: /pass (?:it|this) on|share (?:it|this)|let (?:your|friends|family|others)/i,
+        why: "no pass-it-on line",
+      },
+    ],
+    forbid: [
+      { pattern: DEAL_RE, why: "mentions a deal in a warning" },
+      { pattern: /\bbook\b/i, why: "pushes a booking in a warning" },
+    ],
+  },
+  {
+    id: "caption-ask-question",
+    request: {
+      kind: "tip",
+      ending: "ask",
+      brief: "Restarting your phone once a week fixes a lot of small problems",
+    },
+    want: [
+      { pattern: /\?\s*(?:\p{Extended_Pictographic}\s*)*$/u, why: "doesn't end on a question" },
+    ],
+    forbid: [
+      {
+        pattern:
+          /\b(?:share this|tag (?:a|someone|your)|like (?:this|if)|comment (?:yes|below))\b/i,
+        why: "engagement bait Facebook pushes down",
+      },
+    ],
   },
 ];
 

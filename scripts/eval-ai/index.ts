@@ -842,6 +842,7 @@ async function collectRaw(
       const all = captions.join("\n---\n");
       for (const k of c.keep ?? [])
         if (!captions.every((t) => t.includes(k))) hard.push(`lost "${k}"`);
+      for (const w of c.want ?? []) if (!captions.every((t) => w.pattern.test(t))) hard.push(w.why);
       for (const f of c.forbid ?? []) if (f.pattern.test(all)) hard.push(f.why);
       if (c.promoCheck && ctx.promoRunning && !captions.every((t) => t.includes("{promoOffer}"))) {
         hard.push("a promo is running but {promoOffer} isn't used");
