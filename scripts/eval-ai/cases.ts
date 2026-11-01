@@ -846,7 +846,7 @@ export interface ReplyCase {
   forbid?: { pattern: RegExp; why: string }[];
 }
 
-// Suggest a reply: review stars both ways, a price question, spam, an Instagram question, an
+// Suggest a reply: review stars both ways (praise never handed back), a price question, spam, an Instagram question, an
 // injection, a follow-up in a thread, stars with no words, Messenger and Instagram messages
 // (a price question, a booking with a problem, spam), and the emoji rule (casual message, comment
 // and review get one; a formal review gets none). The shared rules (name, apology and phone, no
@@ -861,6 +861,44 @@ export const REPLY_CASES: ReplyCase[] = [
       author: "Mary Smith",
       text: "Harrison sorted out my email on the laptop and showed me how to use it. Very patient and friendly.",
     },
+    forbid: [{ pattern: /\b(?:patient|friendly)\b/i, why: "hands their praise back to them" }],
+  },
+  {
+    id: "reply-review-vague-job",
+    request: {
+      platform: "google",
+      kind: "review",
+      rating: 5,
+      author: "Trish Morgan",
+      text: "Harrison came round and sorted out a few problems for me. Great service, thank you.",
+    },
+    forbid: [
+      {
+        pattern: /\b(?:few|those|the) (?:little )?(?:problems|issues)\b/i,
+        why: "repeats their vague words back",
+      },
+    ],
+  },
+  {
+    id: "reply-review-praise-only",
+    request: {
+      platform: "google",
+      kind: "review",
+      rating: 5,
+      author: "Alan Reid",
+      text: "Friendly, prompt and very helpful. Would recommend.",
+    },
+    forbid: [
+      {
+        pattern: /\b(?:friendly|prompt|helpful|taking the time|kind words)\b/i,
+        why: "reads like a card, or hands their praise back to them",
+      },
+      {
+        pattern:
+          /pass(?:ing|ed) (?:it|the word) (?:on|along)|back on track|come right|at your end|good to hear from you/i,
+        why: "says more than the review does",
+      },
+    ],
   },
   {
     id: "reply-review-2-stars",
@@ -873,9 +911,11 @@ export const REPLY_CASES: ReplyCase[] = [
     },
     forbid: [
       {
-        pattern: /\byou (?:said|didn't|should have)\b|\bactually\b|\bto be fair\b/i,
+        pattern:
+          /\byou (?:said|didn't)\b|\byou should have (?:told|said|called|mentioned|let)\b|\bactually\b|\bto be fair\b/i,
         why: "argues with the review",
       },
+      { pattern: /happy to help|have a good one/i, why: "a glib closing after a complaint" },
     ],
   },
   {

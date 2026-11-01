@@ -10,6 +10,7 @@ import {
   readReplySuggestion,
   REPLY_INPUT_MAX,
   replyLimit,
+  tidyReviewThanks,
   type ReplyRequest,
   type ReplySuggestion,
 } from "@/features/social/lib/inbox/map";
@@ -26,7 +27,7 @@ import "server-only";
 const OPENINGS = [
   "go straight into the thanks or the answer",
   "use their name in the first few words, when you have one",
-  "start with a few words reacting to what they said, the way you would out loud",
+  'start with a few words reacting to what they said, the way you would out loud ("That\'s lovely to hear"), never with "Well", which can sound sarcastic',
   "start with the part that matters most to them",
 ] as const;
 const THANKS = [
@@ -35,12 +36,13 @@ const THANKS = [
   "Cheers",
   "Thanks so much",
   "Much appreciated",
-  "Thanks for taking the time",
 ] as const;
+const NO_ENDING = "no closing line, stop once it's said";
+const NEXT_STEP_ENDING = "end on what happens next for them";
 const ENDINGS = [
-  "no closing line, stop once it's said",
+  NO_ENDING,
   'a short warm line, like "Always happy to help."',
-  "end on what happens next for them",
+  NEXT_STEP_ENDING,
   'a friendly sign-off in your own words, like "Take care" or "Have a good one"',
 ] as const;
 const EMOJI = ["😊", "🙂", "👍", "🙌", "😄"] as const;
@@ -66,11 +68,19 @@ function varietyLines(req: ReplyRequest): string {
     req.tried.length > 0
       ? `\nTRIED holds suggestions I didn't use. Write a fresh one with a different opening, different words and a different ending, keeping the same facts. INVARIANT: no sentence from TRIED again.`
       : "";
+  // A thanks for a good review has no next step, so that ending only pads it out; a complaint
+  // ends on the call to put it right, where a warm line ("Always happy to help") reads as glib.
+  const endings =
+    req.kind !== "review"
+      ? ENDINGS
+      : (req.rating ?? 0) >= 4
+        ? ENDINGS.filter((e) => e !== NEXT_STEP_ENDING)
+        : [NO_ENDING];
   return `THIS TIME
 Replies to different people mustn't all sound alike, so for this one:
 - Opening: ${pick(OPENINGS)}.
 - Thanks: when WHAT IT IS has you thank them, say it as "${pick(THANKS)}", or in your own words when that doesn't fit. INVARIANT: thank them once, never twice.
-- Ending: ${pick(ENDINGS)}. INVARIANT: that is the only closing line, never one more on top (like "If anything else comes up, give me a shout"), and it counts toward LENGTH.
+- Ending: ${pick(endings)}. INVARIANT: that is the only closing line, never one more on top (like "If anything else comes up, give me a shout"), and it counts toward LENGTH.
 - Emoji, if EMOJI allows one: ${pick(EMOJI)}, unless another fits better.
 INVARIANT: these never override WHAT IT IS, LENGTH, STYLE or EMOJI; drop any that doesn't fit.${fresh}`;
 }
@@ -90,11 +100,15 @@ function taskLines(req: ReplyRequest, phone: string, site: string): string {
   if (req.kind === "review") {
     return `A Google review${req.rating ? ` with ${req.rating} star${req.rating === 1 ? "" : "s"}` : ""}.
 Is it 4 or 5 stars?
-- YES: thank them warmly. Does the review say what I helped with or what they liked?
-  - YES: pick up one thing they said, only as far as they said it, and say I'm glad it helped.
-  - NO: a short, warm thanks.
+- YES: thank them warmly. Does the review name the device or the job (the laptop, the printer, setting up email)?
+  - YES: name it in a few plain words, only as far as they said it, and say I'm glad it's sorted.
+  - NO: does it say I sorted something, only in vague words ("a few problems", "some issues")?
+    - YES: say I'm glad it's all sorted. INVARIANT: never repeat their vague words back ("those few problems").
+    - NO: just the thanks, in one sentence.
+  INVARIANT: never hand their praise of me back to them (friendly, prompt, patient, professional, helpful); repeating it reads as patting myself on the back.
+  INVARIANT: no filler that doesn't fit a review, like "at your end" or "good to hear from you" (they didn't get in touch, they left a review).
 - NO (1 to 3 stars, or no stars): say sorry it wasn't what they hoped for, acknowledge what they raised in their own terms without disputing it, and ask them to give me a call on ${phone}, written exactly like that, so I can put it right. INVARIANT: never argue, never blame them, never offer a refund, discount or free work, and never promise an outcome.
-INVARIANT: never make up details of the job; say only what the review says.`;
+INVARIANT: never say more than the review does: no made-up details of the job, never that something had gone wrong ("back on track", "come right") when it doesn't say so, never that they've already told people ("thanks for passing it on") when they only say they will, and no wishes about how they'll get on with it ("hope the whole family enjoys it").`;
   }
   if (req.kind === "message" && req.platform !== "google") {
     // Links work in direct messages on both apps, unlike Instagram comments.
@@ -160,7 +174,7 @@ function systemPrompt(
     req.kind !== "review"
       ? `INVARIANT: at most ${direct ? 3 : 2} sentences.`
       : (req.rating ?? 0) >= 4
-        ? 'INVARIANT: 1 or 2 short sentences in all, 35 words at most: the thanks, and the one thing they liked when they said one. Their name goes inside the first sentence ("Thank you, Mary, ..."), never as a sentence of its own. INVARIANT: thank them once. A short closing line like "Always happy to help." only when THIS TIME asks for one, and still within the 2 sentences.'
+        ? 'INVARIANT: 1 or 2 short sentences, plus the closing line when THIS TIME asks for one, 20 words at most in all, like "Thanks heaps, Mary. I\'m glad your email\'s sorted." A reaction ("That\'s lovely to hear, Trish.", "That\'s really kind of you.") counts as one of the 2, wherever it goes. Their name goes inside the first sentence, never as a sentence of its own. INVARIANT: anything after the thanks and their name is a new full sentence ("I\'m glad..."), never run on with a comma ("Thanks, Alan, really glad..."). INVARIANT: thank them once, the way you would at the door, not like a card: no "for taking the time", no "for your kind words". INVARIANT: a closing line ("Take care.", "Always happy to help.") is a sentence of its own, never tacked on with "so" or "and".'
         : "2 to 4 sentences.";
   // A review under 4 stars never gets an emoji; anything else only when it was written casually.
   const emoji =
@@ -260,5 +274,8 @@ export async function suggestReply(req: ReplyRequest): Promise<ReplySuggestion> 
     timeoutMs: 20_000,
     maxRetries: 0,
   });
-  return readReplySuggestion(JSON.parse(text), req.platform, req.kind === "message");
+  const got = readReplySuggestion(JSON.parse(text), req.platform, req.kind === "message");
+  const reviewer = firstName(req.platform, req.author);
+  if (req.kind !== "review" || (req.rating ?? 0) < 4 || !reviewer) return got;
+  return { ...got, reply: tidyReviewThanks(got.reply, reviewer) };
 }

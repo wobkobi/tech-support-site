@@ -34,6 +34,7 @@ import {
   reviewBrief,
   snippet,
   threadState,
+  tidyReviewThanks,
   windowClosedText,
   type ThreadMessage,
 } from "@/features/social/lib/inbox/map";
@@ -621,6 +622,82 @@ console.log("Replies");
     hide: true,
   });
   expectEqual("junk answer", readReplySuggestion("nope", "google"), { reply: "", hide: false });
+  expectEqual(
+    "an opening Well goes",
+    [
+      readReplySuggestion({ reply: "Well that's lovely to hear, Trish. Take care 😊" }, "google")
+        .reply,
+      readReplySuggestion({ reply: "Well, that's great news!" }, "facebook").reply,
+    ],
+    ["That's lovely to hear, Trish. Take care 😊", "That's great news!"],
+  );
+  expectEqual(
+    "Well done and Well said stay",
+    [
+      readReplySuggestion({ reply: "Well done, Sam!" }, "facebook").reply,
+      readReplySuggestion({ reply: "Well said!" }, "facebook").reply,
+    ],
+    ["Well done, Sam!", "Well said!"],
+  );
+  expectEqual(
+    "run-on after the name: I",
+    tidyReviewThanks("Cheers, Alan, I appreciate you leaving a review 👍 Take care.", "Alan"),
+    "Cheers, Alan. I appreciate you leaving a review 👍 Take care.",
+  );
+  expectEqual(
+    "run-on after the name: lowercase",
+    tidyReviewThanks("Thanks so much, Alan, really glad you were happy.", "Alan"),
+    "Thanks so much, Alan. Really glad you were happy.",
+  );
+  expectEqual(
+    "full stop after the name stays",
+    tidyReviewThanks("Cheers, Alan. I appreciate it.", "Alan"),
+    "Cheers, Alan. I appreciate it.",
+  );
+  expectEqual(
+    "Alan, for and Alan, and stay one sentence",
+    [
+      tidyReviewThanks("Thanks, Alan, for the lovely review.", "Alan"),
+      tidyReviewThanks("Good to hear, Alan, and thanks.", "Alan"),
+    ],
+    ["Thanks, Alan, for the lovely review.", "Good to hear, Alan, and thanks."],
+  );
+  expectEqual(
+    "a hyphenated name",
+    tidyReviewThanks("Thank you, Mary-Ann, so glad it's sorted.", "Mary-Ann"),
+    "Thank you, Mary-Ann. So glad it's sorted.",
+  );
+  expectEqual(
+    "run-on after a thanks with no name",
+    tidyReviewThanks(
+      "That's lovely to hear, Beverley. Thanks so much, I'm glad it's all sorted now.",
+      "Beverley",
+    ),
+    "That's lovely to hear, Beverley. Thanks so much. I'm glad it's all sorted now.",
+  );
+  expectEqual(
+    "a thanks before the name or a word stays",
+    [
+      tidyReviewThanks("Thanks heaps, Joanna.", "Joanna"),
+      tidyReviewThanks("Cheers, mate.", "Joanna"),
+    ],
+    ["Thanks heaps, Joanna.", "Cheers, mate."],
+  );
+  expectEqual(
+    "a lone name joins the next sentence",
+    tidyReviewThanks("Trish. Thanks so much for the review. Take care.", "Trish"),
+    "Trish, thanks so much for the review. Take care.",
+  );
+  expectEqual(
+    "a lone name before I stays",
+    tidyReviewThanks("Trish. I'm glad it's sorted.", "Trish"),
+    "Trish. I'm glad it's sorted.",
+  );
+  expectEqual(
+    "a name opening the reply stays",
+    tidyReviewThanks("Trish, thanks so much for the review.", "Trish"),
+    "Trish, thanks so much for the review.",
+  );
   expectEqual(
     "capped",
     readReplySuggestion({ reply: "a".repeat(3000) }, "instagram").reply.length,

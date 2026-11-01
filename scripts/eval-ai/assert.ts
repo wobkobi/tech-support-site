@@ -15,6 +15,7 @@ import {
   firstName,
   replyLength,
   replyLimit,
+  tidyReviewThanks,
   type ReplyRequest,
 } from "@/features/social/lib/inbox/map";
 import { GOOGLE_MAX_CHARS } from "@/features/social/lib/validate";
@@ -365,6 +366,7 @@ export function replyProblems(
   }
 
   if (/[–—]/.test(text)) hard.push("has an em or en dash");
+  if (/^Well,? (?!(?:done|said)\b)/.test(text)) hard.push('opens with "Well"');
   if (saysWe(text)) hard.push('says "we", "us" or "our"');
   if (/\*\*|^#+ /m.test(text)) hard.push("has markup");
   if (hashtagsIn(text).length > 0) hard.push("has hashtags");
@@ -401,20 +403,25 @@ export function replyProblems(
     hard.push("a link Instagram can't tap");
   }
 
-  // A sentence ends at . ! or ? followed by a space or the end.
-  const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => s.trim()).length;
-  // A 4 or 5 star review gets a short thanks; a lower one room to say sorry and give the phone.
+  // A sentence ends at . ! or ? followed by a space or the end; a trailing emoji isn't one.
+  const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => /\p{L}/u.test(s)).length;
+  // A 4 or 5 star review gets a short thanks (two sentences and a closing line); a lower one
+  // room to say sorry and give the phone.
   const praise = req.kind === "review" && (req.rating ?? 0) >= 4;
-  const most = praise ? 2 : req.kind === "review" ? 4 : direct ? 3 : 2;
+  const most = praise ? 3 : req.kind === "review" ? 4 : direct ? 3 : 2;
   if (sentences > most + 1) hard.push(`${sentences} sentences, at most ${most}`);
   else if (sentences > most) soft.push(`${sentences} sentences, at most ${most}`);
   if (req.kind === "review" && !praise && sentences < 2) soft.push("one sentence for a review");
   const words = text.split(/\s+/).filter(Boolean).length;
-  if (praise && words > 35) soft.push(`${words} words, a thanks takes 35 at most`);
+  if (praise && words > 20) soft.push(`${words} words, a thanks takes 20 at most`);
 
   if (req.kind === "review" && req.rating !== null) {
     const name = firstName("google", req.author);
     if (req.rating >= 4 && name && !text.includes(name)) hard.push(`doesn't thank ${name} by name`);
+    // The route fixes these itself, so one getting through means tidyReviewThanks missed it.
+    if (req.rating >= 4 && name && tidyReviewThanks(text, name) !== text) {
+      hard.push(`"${name}" stands alone or runs on into the next sentence`);
+    }
     if (req.rating <= 3) {
       if (!/sorry|apolog/i.test(text)) hard.push("doesn't apologise");
       if (!PHONE_RE.test(text)) hard.push("doesn't give the phone number");
